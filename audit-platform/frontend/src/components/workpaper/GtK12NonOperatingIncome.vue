@@ -69,6 +69,7 @@
           :all-responses="allResponses"
           :is-readonly="isReadonly"
           @save="handleChildSave"
+          @imported="selfLoad()"
         />
 
         <!-- K12-3 调整分录 -->
@@ -80,6 +81,7 @@
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @imported="selfLoad()"
         />
 
         <!-- K12-4 营业外收入检查表 -->

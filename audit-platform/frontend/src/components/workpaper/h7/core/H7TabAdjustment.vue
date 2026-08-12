@@ -12,6 +12,13 @@
     <div class="tab-toolbar">
       <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddEntry">+ 新增调整分录</el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H7-3" :context-project-id="projectId" /></span>
+      <CycleImportExportDropdown
+        :wp-id="wpId"
+        api-prefix="h7"
+        sheet="H7-3"
+        :disabled="isReadonly"
+        @imported="emit('imported')"
+      />
       <el-tag size="small" type="info">共 {{ rows.length }} 笔</el-tag>
       <el-tag size="small" :type="isBalanced ? 'success' : 'danger'">{{ isBalanced ? '借贷平衡' : '借贷不平衡' }}</el-tag>
       <el-button
@@ -140,6 +147,7 @@ import { ref, computed, onMounted, inject, toRef, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useH7Adjustment } from '../../composables/useH7Adjustment'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -150,6 +158,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+
+// 导入完成后由父宿主重载 allResponses（父绑定 @imported="selfLoad()"）
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 

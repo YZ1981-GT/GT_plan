@@ -44,7 +44,9 @@ import {
   calcSubtotal,
 } from '../composables/useG14FormulaEngine'
 import { G14_LINE_ITEMS, G14_CHANGE_RATE_THRESHOLD, G14_ECL_CROSS_REF } from '../composables/g14Constants'
-import { G14_IMPORT_EXPORT_SHEETS } from '../composables/useG14ImportExport'
+// G14 的导入导出 sheet 清单真源 = registry（原 `useG14ImportExport.ts` 只是
+// 一份重复常量，已随孤儿处置删除 —— spec: workpaper-import-export-lifecycle-closure Task 16）
+import { CYCLE_IMPORT_EXPORT } from '../shared/cycleImportExportRegistry'
 
 function extractSheet(sheetName: string): string {
   if (/底稿目录/.test(sheetName)) return '底稿目录'
@@ -175,8 +177,8 @@ describe('G14 集成 — 固定10类行', () => {
 
 describe('G14 集成 — 导入导出', () => {
   it('G14_IMPORT_EXPORT_SHEETS 包含 G14-2 和 G14-3', () => {
-    expect(G14_IMPORT_EXPORT_SHEETS).toContain('G14-2')
-    expect(G14_IMPORT_EXPORT_SHEETS).toContain('G14-3')
+    expect(CYCLE_IMPORT_EXPORT.g14.sheets).toContain('G14-2')
+    expect(CYCLE_IMPORT_EXPORT.g14.sheets).toContain('G14-3')
   })
 })
 

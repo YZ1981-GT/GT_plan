@@ -11,7 +11,6 @@ import type { ChecklistResponse } from '../../composables/useF2FormData'
 import type { useF2CrossSheet } from '../../composables/useF2CrossSheet'
 import F2ReviewChip from '../shared/F2ReviewChip.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
-import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const oaNav = [
   { id: 'st-oa-a', label: 'A 构成' },
@@ -141,13 +140,16 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
         <el-button size="small" :disabled="isReadonly" @click="syncCompositionFromDetail">同步明细金额</el-button>
         <F2ReviewChip section-id="F2-18-analysis" />
       </div>
+      <!--
+        F2-18 不挂导入导出下拉：后端 `_f2_import_export._SUPPORTED_SHEETS`（21 键）
+        **不含 F2-18**（它只有 `_F2_SHEET_CONFIGS` 的 18 个规则表 + F2-1 + 两个附注键）。
+        本表是多区段分析表（A 构成 / B 指标三期 / C 同行业 / D 周转 + 说明 + 结论），
+        没有规则的行列结构，后端未做 I/E 适配器。
+        此前这里挂过 `api-prefix="f2" sheet="F2-18"` 的下拉，点击必然 400
+        「不支持的sheet」，且未绑 @imported ⇒ 是死按钮。按「宁缺勿造」删除。
+        要恢复须先在后端补 F2-18 适配器（需源模板列结构依据，不得自造）。
+      -->
       <div class="toolbar-right">
-        <CycleImportExportDropdown
-          :wp-id="wpId"
-          api-prefix="f2"
-          sheet="F2-18"
-          :disabled="isReadonly"
-        />
         <span class="chip-wrap"><GtIndexChip value="wp:F2-1" :context-project-id="projectId" /></span>
         <span class="chip-wrap"><GtIndexChip value="wp:F2-18" :context-project-id="projectId" :validate="false" /></span>
       </div>

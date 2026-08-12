@@ -17,6 +17,13 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="l4"
+          sheet="L4-2"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
       </div>
     </div>
 
@@ -349,6 +356,7 @@ import { computed, inject, onMounted, ref } from 'vue'
 import { Plus, MagicStick, Check } from '@element-plus/icons-vue'
 import { useL4FormData } from '../../composables/useL4FormData'
 import { useL4Detail, type L4DetailRow, type L4DetailSegment } from '../../composables/useL4Detail'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{
   wpId: string
@@ -358,6 +366,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'navigate', sheetName: string): void
+  /** 导入完成 → 父宿主重载数据（父绑定 @imported="selfLoad()"） */
+  (e: 'imported'): void
 }>()
 
 const openReviewDialog = inject<() => void>('openReviewDialog', () => {})

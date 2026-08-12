@@ -1,0 +1,1406 @@
+{
+ "A/A1 财务报告程序表.xlsx": {
+  "sha256": "b859bcc138165ba8d765f4e74f504ca91c08bae337fd52f52bc1d01a27c34fa0",
+  "size": 27850
+ },
+ "A/A1-11 业务报告签发流转控制表+业务报告文号规则.xlsx": {
+  "sha256": "a84101d9018def6c589e668d9d629519c6b18c390692f1227c3589699d6ff582",
+  "size": 199193
+ },
+ "A/A1-13 完成阶段分析性复核（母公司）.xlsx": {
+  "sha256": "f4f6373dffb211f03eb1a2e08c53daf4a7812bfc916d5c2367f858d0ed25027f",
+  "size": 493070
+ },
+ "A/A1-14 完成阶段分析性复核（合并）.xlsx": {
+  "sha256": "fcd76f65afe39ab1abee60efe244a0e6c14e1b50ea8389c5fafa13c6268c4f7a",
+  "size": 494091
+ },
+ "A/A1-17 对应数据.xlsx": {
+  "sha256": "3f6693f65b15a1c169bfea14224fe0d4a4741820a880183fef4c2fecbcebef94",
+  "size": 21265
+ },
+ "A/A1-18 采用新金融工具准则衔接影响数核对 N.xlsx": {
+  "sha256": "6f35d3993948368af3cbc7966967757ded6c69bc1a38529b530b43d1aa89a174",
+  "size": 32295
+ },
+ "A/A10 与治理层沟通程序表.xlsx": {
+  "sha256": "ed2e3b666c9bd22cf8ca0b675924fb311bf53e0e6c072e4dcfe5c5ff7e31ddb9",
+  "size": 66744
+ },
+ "A/A10-2 与治理层的沟通记录（通用）.xlsx": {
+  "sha256": "61ce94751784ed6acec6287cdc4aceb10ce70f5486b10e62806f851c8e2d0837",
+  "size": 68604
+ },
+ "A/A11 期后事项程序表.xlsx": {
+  "sha256": "4b669acb2d2664c165a97e12fac33ff551c413435847d7db6d86b751fc240239",
+  "size": 253841
+ },
+ "A/A12 律师回复程序表.xlsx": {
+  "sha256": "53adb794ccc5a7e1b5a683a9a3ef4c1c139f561940b527c770505a0249c8621f",
+  "size": 57120
+ },
+ "A/A13 错报（程序表及底稿）.xlsx": {
+  "sha256": "b764e4d171d65260be19e5f394745bb4c3a8bd6a438da228340cd4e6588ef41b",
+  "size": 42048
+ },
+ "A/A14 内部控制缺陷程序表.xlsx": {
+  "sha256": "11d7e6fed5759086461779c602537cf1b6445f82043769b5e07be8c36287d314",
+  "size": 77917
+ },
+ "A/A14-1  内部控制缺陷汇总表.xlsx": {
+  "sha256": "386fe18738d0b0989425585688aa8da9cb515acf1dcaf1d404aacb6605e1a1e5",
+  "size": 16344
+ },
+ "A/A14-2 企业层面控制缺陷评价.xlsx": {
+  "sha256": "e3ef2889217b0a7a826c7fe02ce276e1d3c382cad68076b322896c0706b9f11a",
+  "size": 29468
+ },
+ "A/A14-3  IT缺陷汇总及评价.xlsx": {
+  "sha256": "ca2943b5b6d87b73f7ed424307d552e34956437256f9b72325b3002b6ef78da0",
+  "size": 146364
+ },
+ "A/A14-4 业务流程层面控制缺陷评价.xlsx": {
+  "sha256": "f9c2880a6760f46b0c3dc5dbabbbf39bc409775edb71519ce5aaa8f6b93aec5c",
+  "size": 49752
+ },
+ "A/A14-5 与其他缺陷一同进行评价.xlsx": {
+  "sha256": "15009768ca8112518d90873ce55186106021b2e37b44421e636b014c3cc4185c",
+  "size": 24099
+ },
+ "A/A14-6 非财务报告内部控制缺陷评价.xlsx": {
+  "sha256": "3b0be004fe23b19562178e1ef9129e479aa5b14a0295817b73eb23ff687622aa",
+  "size": 15529
+ },
+ "A/A15 持续经营假设的考虑程序表.xlsx": {
+  "sha256": "6091da4767f1a9e23c1ed95ef0a107dfe1f4516ac8e5ba58b768bba51c598181",
+  "size": 190337
+ },
+ "A/A15-1 持续经营调查表.xlsx": {
+  "sha256": "d8acba9def4afc3b78c565b695452bb1f2927e649ce6faec1710985e76c6c1e5",
+  "size": 39624
+ },
+ "A/A16  管理层声明书程序表.xlsx": {
+  "sha256": "17ed3d9886bf5e9fabbebf8868ecdef54177ced386447d0391a1fca9d91faa15",
+  "size": 81317
+ },
+ "A/A17  重大事项概要程序表.xlsx": {
+  "sha256": "654125d88c59f2ed5c38aa73e10d4b4a10417df321230149309972fd3c15d963",
+  "size": 67861
+ },
+ "A/A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx": {
+  "sha256": "5f87acfb2aefa4c00bc978bda2455eedbe7d7989f1337aade491da5b24e4f77c",
+  "size": 16316
+ },
+ "A/A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx": {
+  "sha256": "386dd42c8ed521729b2d8cd9122b2a81fce891c66e6c93f1673e6c5de5bdac07",
+  "size": 19283
+ },
+ "A/A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx": {
+  "sha256": "75eb0e9f386df478548d9d2654c86b61097cb8fa641b275ecb3c48429d2f3836",
+  "size": 18145
+ },
+ "A/A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx": {
+  "sha256": "80f7cfafdd8da801efcd9a2a74da54deba6f01ab8280fd241710629dc415eb5a",
+  "size": 33761
+ },
+ "A/A17-5-5  审计工作完成核对表（函证程序）.xlsx": {
+  "sha256": "0cc571ce36d9ddfb16b7abbb834891c7aa52a680b1a578bebe99c5d93c587195",
+  "size": 11515
+ },
+ "A/A2 调整分录程序表.xlsx": {
+  "sha256": "fb1b9354cb0a00361c79009395d96c11e93e3d5baad7c1d719052dafbbb05765",
+  "size": 20610
+ },
+ "A/A2-1、A2-2单体报表试算.xlsx": {
+  "sha256": "03fd9b0fdc60d64f4a9a2134fcb3cfb556ef7c5222def3b6c5cf84f1cacbbf08",
+  "size": 680360
+ },
+ "A/A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx": {
+  "sha256": "421227ca0e6e263485313af6b3cfae59870a7985d42cc9b12ce0ac5e03560362",
+  "size": 25562
+ },
+ "A/A21-2 项目现场负责人复核表及复核记录（适用于内控审计）.xlsx": {
+  "sha256": "2e45dd87ef24bbc1bf336f46437b740fc97f96169e8d8eb37316d5172f42d0ea",
+  "size": 26253
+ },
+ "A/A22-1 项目负责经理复核(适用于财报审计).xlsx": {
+  "sha256": "6b7217d6496d3fb9f6e2dbd560f43689910286c437191910edced9500dca6157",
+  "size": 35250
+ },
+ "A/A22-2 项目负责经理复核表（适用于内控审计）.xlsx": {
+  "sha256": "8920ca6a1ece23609e389a683af23e553ebefcffdce40432bb29ad25b1fb8417",
+  "size": 27178
+ },
+ "A/A23-1 项目合伙人复核(适用于财报审计).xlsx": {
+  "sha256": "b9193c1f144382609efc686f18bc7022889ece72c7bad84b61fb2a660c5d2d1a",
+  "size": 35149
+ },
+ "A/A23-2 项目合伙人复核表（适用于内控审计）.xlsx": {
+  "sha256": "efc30ddfdaef44143eabbed7f26f11452a705556d6aaecb8d4802ddaa655d64d",
+  "size": 28040
+ },
+ "A/A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx": {
+  "sha256": "d78e842615e51b7c0303b93f329f1fba7b2dcd0a1dd3ee420c0247aece3bc0f1",
+  "size": 24251
+ },
+ "A/A24-1 项目质量复核合伙人复核表及记录（财务报表审计-适用大型国企）.xlsx": {
+  "sha256": "b510df88b31bf7a7e5b1327261a07cbcc0476fc18136a664aac860399f1db21a",
+  "size": 25472
+ },
+ "A/A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx": {
+  "sha256": "77b43e499d8242e63eb0fc7a3e3bee75ddd0158d2f51dc9de2d7fcf00729439a",
+  "size": 26883
+ },
+ "A/A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx": {
+  "sha256": "e1fe85dc328900bfa778e5d1dce79956385f53f718026085ed7fb82bad0654bc",
+  "size": 25911
+ },
+ "A/A25-1 质量控制复核表及复核记录(适用于财报审计-适用非大型国企).xlsx": {
+  "sha256": "ba99bd9e3ef56c49a7ad0e5be2146cc472d75925859bbf6811390bd0b41240e9",
+  "size": 28505
+ },
+ "A/A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx": {
+  "sha256": "e09c93906ec25e715bc9839bd40d9fa53de9475d5fd26f0212dfe57d15d7a526",
+  "size": 30855
+ },
+ "A/A28 税务专家复核.xlsx": {
+  "sha256": "147187bc10a903c20e6f38ab98348b3b327f0e4e96559d32b13ab3b32634e7e6",
+  "size": 13567
+ },
+ "A/A3 合并流程程序表.xlsx": {
+  "sha256": "772bd5a85339f0c5afbbc5e39ec9ece96c01845d96ad2dece9c2c9cc2cc47949",
+  "size": 26182
+ },
+ "A/A3-1、-2 合并报表试算-2019.xlsx": {
+  "sha256": "4964cc874714da4d1d21f62adb583467a03f357c2a8eaba15df3fa4d67ce7cde",
+  "size": 1055613
+ },
+ "A/A3-3 结构化主体纳入合并范围的判断.xlsx": {
+  "sha256": "e8d4786e4524e905606dabe00c64a154f363fdf61221f56bc422f250ea596adb",
+  "size": 215491
+ },
+ "A/A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx": {
+  "sha256": "5a9d3fb45f12eb301c52725f8465d14e1e404cc0e0f68f071904719f495bd525",
+  "size": 1179986
+ },
+ "A/A3-5 合并附注汇总-2019.xlsx": {
+  "sha256": "380e2489492fe1ad474bb1e72af7163db91e7edaac8c15449bef936f2f3fe35d",
+  "size": 838825
+ },
+ "A/A3-6 母公司附注汇总-2019.xlsx": {
+  "sha256": "e9e20fb1d2cf31fb0bd9d82e7f9a2e7d71db0c1fff68a7e7fdad8fca815d8a83",
+  "size": 844093
+ },
+ "A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx": {
+  "sha256": "1aca5a29c608ef981e11af1a645eb3af1ee7b0e1b239c6d67ea742be8a3cee07",
+  "size": 436152
+ },
+ "A/A30 电子底稿归档检查表.xlsx": {
+  "sha256": "26be3ebb4b4f9ac3fe2a522df33f4d4b0d820d1dfeaebfe2ea55f6a1197db3c3",
+  "size": 51244
+ },
+ "A/A31 审计标识一览表.xlsx": {
+  "sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+  "size": 12620
+ },
+ "A/A4 经营分部程序表.xlsx": {
+  "sha256": "56254cf061ded66ef47e7507ad6907cca93467bf92702002cc1f2d18d3ba5611",
+  "size": 54009
+ },
+ "A/A4-1 经营分部列报信息2019.xlsx": {
+  "sha256": "459f7d36f75848175d1b1d8b1354ce4a169094789104848f0494aadaa449151b",
+  "size": 59392
+ },
+ "A/A5 财务报表支持程序表.xlsx": {
+  "sha256": "d92180860c86a0d059b24aacbd4076d6cd35b9e246e7adc59ba639b43bc70c52",
+  "size": 20626
+ },
+ "A/A5-1 现金流量表审计.xlsx": {
+  "sha256": "2a331368dad3aaf3ac922c8f46a0052e9ba1ec8c0a3ae0504edddc8153dab462",
+  "size": 60894
+ },
+ "A/A5-2 承诺事项.xlsx": {
+  "sha256": "ee455495e98c88accf3420323e2a9caf1da4de43dbd0c49fed7a381fdc5f45c2",
+  "size": 31376
+ },
+ "A/A5-3 或有事项.xlsx": {
+  "sha256": "dbe6919f812cb592e1a46ae77e37bf6bd0798cd48d1c5ca5199f05041a57a384",
+  "size": 76212
+ },
+ "A/A5-4 持续经营净利润和终止经营净利润.xlsx": {
+  "sha256": "2fa7ff166ef8ed63e87e357d2d071c03305f87ca8ebc40c082a7c473059eea9b",
+  "size": 103654
+ },
+ "A/A6 组成部分会计师报告（集团审计）程序程序表.xlsx": {
+  "sha256": "726ba852daac1630aa83c108db075273c46fd9c8e1d80a37379a8bb03f4afc3f",
+  "size": 20553
+ },
+ "A/A6-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx": {
+  "sha256": "6a3794be2160a3cb1d6cd37bc784212bf94ae5f7a6748daeb5ca4a11adc6ce4f",
+  "size": 515698
+ },
+ "A/A7 关联交易程序表.xlsx": {
+  "sha256": "1b5d44a432ecb8b32630b1f9c6667d0cd1b3e0db55a13a85c5c684085d3a077d",
+  "size": 63781
+ },
+ "A/A7-1 汇总关联方交易及关联往来.xlsx": {
+  "sha256": "b11d3fff50933164a023b8fd12337a36831654d50a4f7330a2ec3265b7717df6",
+  "size": 60092
+ },
+ "A/A7-2 关联方交易附注披露信息.xlsx": {
+  "sha256": "50f195be73843ba16ab4b3ffc03de36192afe92a7318c7247df02f6064327fdd",
+  "size": 59955
+ },
+ "A/A8 其他信息程序表20170720.xlsx": {
+  "sha256": "25a8468d7393346f4bc6834cab3376cd578c0fd636d7bc47acf5ff9b30b2613b",
+  "size": 67322
+ },
+ "A/A9 内部控制建议程序表.xlsx": {
+  "sha256": "5c72ba8e359b2ef1c82e256c1860dfda0d429b6f17bf2fff59f5174eca377ce0",
+  "size": 58648
+ },
+ "B/B1-1 风险评估表（适用于承接）.xlsx": {
+  "sha256": "dd3b72078bf4f6af0db09437774c035dcac18ffe88571264c91f1ac3c70e8bb0",
+  "size": 25320
+ },
+ "B/B1-2 风险评估表（适用于保持）.xlsx": {
+  "sha256": "8384e59e05ec06c803253d8323cf5d2deb73e1cb8513e33e5dbfac72634bfd44",
+  "size": 19037
+ },
+ "B/B1-5 KAA检查程序表.xlsx": {
+  "sha256": "94e42f695072ffb8d692697a400bf1d8fc321bb4e28fabb841f869d4ca9864c9",
+  "size": 20680
+ },
+ "B/B10 了解被审计单位及其环境和适用的财务报告编制基础.xlsx": {
+  "sha256": "939d509ffaa33b439123ff1a1a254baa96b4ac60e447da62faca7f09f10dda5d",
+  "size": 86265
+ },
+ "B/B11 检查相关信息或文件记录程序表.xlsx": {
+  "sha256": "a8d783ed0a37a470a103c4220df29bf3905122d250b7c55f2729bf91c2c3e999",
+  "size": 43682
+ },
+ "B/B12 与相关人员访谈程序及记录.xlsx": {
+  "sha256": "96e85c216facff263d0119f593b68c8746d209473cf78863c90863be0b0f15af",
+  "size": 46073
+ },
+ "B/B13 初步分析程序表.xlsx": {
+  "sha256": "a8cd621d390807152b1c63dc89b21c14a3b94c10e89bb2e67352bfc5a73c3c4c",
+  "size": 12943
+ },
+ "B/B13-2~5未审报表初步分析.xlsx": {
+  "sha256": "042a5ffaae1445b07d636eabfad6e326cbb759f063ec3a7c1a5b6432fdc8b785",
+  "size": 95355
+ },
+ "B/B15 重要性计算表.xlsx": {
+  "sha256": "b72852352f03c0707d0a3de7ec6f1750dd401d0370eed1cc06693e1eaab08e62",
+  "size": 45809
+ },
+ "B/B18 了解内部审计程序表.xlsx": {
+  "sha256": "519a60d3c203443ae9b429bdcb18efaea0707af1454c36e7d1b61d338a262fb5",
+  "size": 197801
+ },
+ "B/B19 识别关联方程序表.xlsx": {
+  "sha256": "7721d97f71e2401908e1ed05cc0bfbb0ef8a1545e85ab3d0f2d6a6e7dfd69f70",
+  "size": 192201
+ },
+ "B/B19-1 识别未披露的关联方关系及异常关联交易.xlsx": {
+  "sha256": "0f21c321d4a3dc4c8dc2e3c93abb71954105d6dc66e9d1540013f1c51e6a7d4d",
+  "size": 16336
+ },
+ "B/B1A 业务承接程序表（适用于首次承接）.xlsx": {
+  "sha256": "61952230501c7a3d8f9682d61855fb89a468eccddeb6c17e7481a82c7bb109ff",
+  "size": 15390
+ },
+ "B/B1B 业务保持程序表.xlsx": {
+  "sha256": "7b1832964b70ce8f703afb0dff3b7d53e7b0492f3058de1634b93dc573fd03b7",
+  "size": 14918
+ },
+ "B/B2 与前任注册会计师的沟通程序表.xlsx": {
+  "sha256": "0981d6adbc85c836906f6e3d7fee76225cbc333297a826fcccf58ce659b00c61",
+  "size": 16274
+ },
+ "B/B2-5 与前任注册会计师沟通后的评价（就业务承接事项）.xlsx": {
+  "sha256": "19fa7ea22d032a876e8f0d545762309cb3b4ffd4d3824c98135e8e7c3c41b937",
+  "size": 142136
+ },
+ "B/B22A-1 了解企业层面控制 - 控制环境.xlsx": {
+  "sha256": "30d62ce4357345ea9037417404310fdbe571cbc929f50d4f2692b72b1863956d",
+  "size": 24013
+ },
+ "B/B22A-2 了解企业层面控制 - 管理层凌驾于控制之上.xlsx": {
+  "sha256": "9961a9fad3a8001cbcd28b93edebb84c7dc4d8e6a881479c8f816c10b48285a4",
+  "size": 12033
+ },
+ "B/B22A-3 了解企业层面控制 - 风险评估.xlsx": {
+  "sha256": "b1bfc422306c8667b5debe2e35bfa01c712124655781d5df7b92e24b45f76324",
+  "size": 25580
+ },
+ "B/B22A-4 了解企业层面控制 - 信息与沟通.xlsx": {
+  "sha256": "b5621152acebf423f1278422dede62e093cf799d82c383889124952fca105e6a",
+  "size": 25912
+ },
+ "B/B22A-4-1 IT概要.xlsx": {
+  "sha256": "a509094b8f15beb5a4fb383d598b26567da59e43ce6ed05795411e7970dce7fa",
+  "size": 37329
+ },
+ "B/B22A-4-2 重大业务流程涉及的信息系统.xlsx": {
+  "sha256": "bbff08461f1d31728acc03e5b0c685001a9b9e71b14dd4c7c1363c0404f0114a",
+  "size": 28643
+ },
+ "B/B22A-4-4-1 了解IT一般控制.xlsx": {
+  "sha256": "d0faa638afe5f3a980abcfbc7a320602d3f6dcc621c2b3dbc80649b619ff767f",
+  "size": 35054
+ },
+ "B/B22A-4-4-2 IT一般控制职责分离分析.xlsx": {
+  "sha256": "a003e4c9921de776c564bd82f469871ea5b1792a29e48760ee4704f5cc28d825",
+  "size": 38093
+ },
+ "B/B22A-4-5 财务报告过程.xlsx": {
+  "sha256": "17c0ab2dc7acb90c7abccf507533144e568dac99c6576b0a81d58bf3e0ea8683",
+  "size": 31324
+ },
+ "B/B22A-5 了解企业层面控制 - 监督.xlsx": {
+  "sha256": "5dab78a4230e74a719f3b235cd201b89354b96963e5ee9a4bd69359646fcbada",
+  "size": 20510
+ },
+ "B/B22B 了解企业层面控制 - 控制矩阵.xlsx": {
+  "sha256": "2b754c5ba3b6ef062831a03a55fd95abcafc39a614db2048907618b2dee95eec",
+  "size": 26460
+ },
+ "B/B22C 评价设计有效性 - 企业层面.xlsx": {
+  "sha256": "aec790bb5a8e5f6cdeca9833dad744948cc519665e8f0efa3b2a131e3d4a6440",
+  "size": 48127
+ },
+ "B/B23-15 了解信息处理控制.xlsx": {
+  "sha256": "45509d189686bf258310afb2f457328ac86f6aea29454de3f472bc57f2812680",
+  "size": 30622
+ },
+ "B/B23-XX-5 职责分离 - 通用模板.xlsx": {
+  "sha256": "27b8a065d3dd7a98ae399c084eac397c8109ee1cf15da799c8d24eb0cbaed8a4",
+  "size": 39840
+ },
+ "B/B3 独立性确认程序表.xlsx": {
+  "sha256": "33d5863072b43bde70f09d32277172166ca24c9eb3e7857f67af63f4e717042b",
+  "size": 18824
+ },
+ "B/B30 集团审计程序表.xlsx": {
+  "sha256": "3d74275f4d817995d09c80a8a35189ccf3204d95430507cca98c2580550ee7e2",
+  "size": 15408
+ },
+ "B/B30-1 了解组成部分（2021年6月）.xlsx": {
+  "sha256": "91577bee5e7d60a5a181b20456b48f60a9fc2d241dd4b142137ad03436592bc9",
+  "size": 34992
+ },
+ "B/B30-1-2-1 特别风险记录模板.xlsx": {
+  "sha256": "535f02a06d81560e44e5dbe5ae86c8d45bf9be40e44d08d49cd18473b238799d",
+  "size": 48457
+ },
+ "B/B30-12 组成部分已识别错报汇总表（2021年6月）.xlsx": {
+  "sha256": "c7efac21647fdcd7114f5f2b124d8c0de8cb165c13f333d8f03317589da041cf",
+  "size": 41378
+ },
+ "B/B30-13-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx": {
+  "sha256": "278c21aaef12bfe7111a8b3f14eaa33a6767883ad4857f06fc69215d84b3868e",
+  "size": 486878
+ },
+ "B/B30-15 组成部分预算和实际收费信息（2021年6月）.xlsx": {
+  "sha256": "4a36d99cffbe5ab3bd678d35e9c71fae2b7e610679a9091fa37e1e0595a9bda5",
+  "size": 29685
+ },
+ "B/B30-8 了解组成部分注册会计师（2023年6月）.xlsx": {
+  "sha256": "9ee4580fc6987a81b10fd642642422057ae7d66b9989183e924c07e66f81eb71",
+  "size": 37280
+ },
+ "B/B40 项目组讨论程序表.xlsx": {
+  "sha256": "e6bd80cefb0d97e7c2b944ef64b54bb0517aebe1b75aaad69e845e01284b023b",
+  "size": 16349
+ },
+ "B/B50 汇总风险评估结果程序表.xlsx": {
+  "sha256": "f6671744443f3713018aaa148a53e9f4c43e3d37d541f4db2fd816fef1f28ef3",
+  "size": 15485
+ },
+ "B/B50-1 汇总识别的风险因素.xlsx": {
+  "sha256": "cb22f6b8b759892a986292c988f41033c923fc908711edec092773fff109499b",
+  "size": 20748
+ },
+ "B/B50-2 财务报表层次风险（含财务报表层次特别风险）.xlsx": {
+  "sha256": "3bb01499179a01257ebcce1e6ee20c8dd2c324eac564b09215ab83d9f6231533",
+  "size": 566929
+ },
+ "B/B50-3 认定层次重大错报风险.xlsx": {
+  "sha256": "1f77d0a38fbb2da5203a4eb6c9e5b04c90788a2303dbb6aafcc0ef2c814ff765",
+  "size": 1761424
+ },
+ "B/B50-4 汇总认定层次特别风险.xlsx": {
+  "sha256": "4fcd3d4adc87b1ab22815bc113e63229de4164852f4863ab50c922f8d8d39698",
+  "size": 316868
+ },
+ "B/B51 舞弊风险因素（三因素分析）.xlsx": {
+  "sha256": "a69ed32596c475a56456bf77db8db23f6c8dd119c11dc7503c3dbba12ba46575",
+  "size": 960180
+ },
+ "B/B51-3 识别对货币资金需保持警觉的情形程序.xlsx": {
+  "sha256": "5d8e03d60af26445868c2acca51be81f6e658cfdf24d6870ca3fbf253e9976b1",
+  "size": 15764
+ },
+ "B/B51-5 识别收入确认方面可能存在舞弊风险的迹象程序.xlsx": {
+  "sha256": "93313430842529e79fc77901ab2a045d56929a56e9d67b9df7f349c2837f8182",
+  "size": 19258
+ },
+ "B/B52 舞弊 - 管理层凌驾于控制之上的风险.xlsx": {
+  "sha256": "a2224bfec8a993aa4ce5f483d52d09711dfd8d7929f450253897c4c07eb2e14e",
+  "size": 207744
+ },
+ "B/B60-1 审计项目工时预算与控制表.xlsx": {
+  "sha256": "65154146ed3b88a3c2908e064ceb29b6bc73e842559934cbaf2b6893421bd0b0",
+  "size": 16568
+ },
+ "C/C1 企业层面控制测试.xlsx": {
+  "sha256": "d889c41ff790d271dfc2af79171c5b69cdb3b58b8999d2988ee31757bb220314",
+  "size": 71566
+ },
+ "C/C10 职工薪酬循环控制测试.xlsx": {
+  "sha256": "d39a901015bbb9cc496f223fa8aed2a85d9b9fbffc2197db33bed53c60bf927b",
+  "size": 28816
+ },
+ "C/C10-2 职工薪酬循环评价控制偏差.xlsx": {
+  "sha256": "0eedf54ebe2a82738ba20bcbe2d379165c877183b6f5c8dda707496657bfcd83",
+  "size": 219889
+ },
+ "C/C11 管理循环控制测试.xlsx": {
+  "sha256": "8af48dba1694691e801e1753436cc18294c8d6442b5818d05c2b79d4cc357bc9",
+  "size": 28818
+ },
+ "C/C11-2 管理循环评价控制偏差.xlsx": {
+  "sha256": "ac455933bb9c782cdeea88ae0dab47798d60769ba6a8fc32bef64e043ae7f6ec",
+  "size": 219884
+ },
+ "C/C12 税金循环控制测试.xlsx": {
+  "sha256": "c80770c1f23620ce5a0dff4ac42e23e8132644a675f8b42d9d5ac68af50f8859",
+  "size": 28876
+ },
+ "C/C12-2 税金循环评价控制偏差.xlsx": {
+  "sha256": "c4aa6a56fd46f48833fd4656804782d111c15740f789f384501ad9da05e79af4",
+  "size": 217315
+ },
+ "C/C13 债务循环业务层面控制测试.xlsx": {
+  "sha256": "5a3ab7014e3e4b9a8ca19ac631cf3e4a8baa5a6282c32b5ae9d92155ecdb09ff",
+  "size": 29352
+ },
+ "C/C13-2 债务循环评价控制偏差.xlsx": {
+  "sha256": "ebe6463d7ccbb0444263687ce03d6f1d191dba1ede96f42fd0ad5a4dd1d14b6e",
+  "size": 217263
+ },
+ "C/C14 租赁循环控制测试.xlsx": {
+  "sha256": "5e54a56efc3634fc4394d8eef8777bed51d9005faad94d4e6c4265566f3e47ea",
+  "size": 28854
+ },
+ "C/C14-2 租赁循环评价控制偏差.xlsx": {
+  "sha256": "b10a09cc1ed421798b6a04f43c3d8b3f518b5a2268580d29588fcd6e9e28283e",
+  "size": 217314
+ },
+ "C/C15 关联方循环控制测试.xlsx": {
+  "sha256": "9af2365063a42ed1bc6daf723c7336e4de82c044a0c1d02d18c7a8606be338b0",
+  "size": 28778
+ },
+ "C/C15-2 关联方循环评价控制偏差.xlsx": {
+  "sha256": "c3ee694553e08ea591ea368dceacb491a7820b9e95dd9814002fb8a7a78571fb",
+  "size": 217343
+ },
+ "C/C2 销售循环控制测试.xlsx": {
+  "sha256": "1f3035e9f78b1561cd1a418249d4ccc5a7aea77d7bf074bc7b1ac235328aaa41",
+  "size": 29135
+ },
+ "C/C2-2 销售循环评价控制偏差.xlsx": {
+  "sha256": "9c00d1129a02d5dc0bebdc4aae702d916d832afb2b0eee2efee4195cf828649d",
+  "size": 217153
+ },
+ "C/C21 具有信息技术专业技能的项目组成员.xlsx": {
+  "sha256": "4268e99f3a9baaa5d6af7e8f54ace6cb9ff5ca5f801c9d89c7db36c6e51b4409",
+  "size": 48143
+ },
+ "C/C21-1  IT审计发现汇总表.xlsx": {
+  "sha256": "5c4814648670c86f1b9edce1a3eab2067cbe48a0e18954cfae7ad5c0158452ca",
+  "size": 17509
+ },
+ "C/C22 IT一般控制测试.xlsx": {
+  "sha256": "1c2200431bbdcd3c988aee3d8ed1d269d3342ec0620b03b36492612f9ed148bf",
+  "size": 162358
+ },
+ "C/C23 会计分录 - 控制测试.xlsx": {
+  "sha256": "ddebea9de8b7101878508d5fcc2d475cb6144a3070b5665ebb68a6603ad9425b",
+  "size": 30294
+ },
+ "C/C24 会计分录 - 细节测试.xlsx": {
+  "sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6",
+  "size": 1291610
+ },
+ "C/C25 利用内审工作.xlsx": {
+  "sha256": "352f8045a93d628a7f6d9dcf5113f008d9c00f3c89a3cd124c472de40a7e720a",
+  "size": 34185
+ },
+ "C/C26 信息处理控制测试.xlsx": {
+  "sha256": "b054e5226932de00892589eff407d3bbadd7e96e6f81352767ada5f38e1c4caa",
+  "size": 25146
+ },
+ "C/C3 货币资金循环业务层面控制测试.xlsx": {
+  "sha256": "870a595244ffc786f5693698aa51ddff1ad96119a0ce9fd32e29ede402b3f4be",
+  "size": 29260
+ },
+ "C/C3-2 货币资金循环评价控制偏差.xlsx": {
+  "sha256": "7618f32a672de4ae96c341b7baa1932be48a87149ad0ecc4165d2adcb66a53e1",
+  "size": 217163
+ },
+ "C/C4 存货循环控制测试.xlsx": {
+  "sha256": "0d24d83ebafa89bcedadc852d390503a3aa1f7c001b10ce59f4f446d9337ae8b",
+  "size": 28779
+ },
+ "C/C4-2 存货循环评价控制偏差.xlsx": {
+  "sha256": "2e2939b8d5e1e4f1999455e92e458c6ca970cfee9048b690d7770ff111009299",
+  "size": 217209
+ },
+ "C/C5 投资循环控制测试.xlsx": {
+  "sha256": "3ef0194d9c219759a805241a27133e1c0687c5fd5f8aa0904df37aff9e31d0e7",
+  "size": 28715
+ },
+ "C/C5-2 投资循环评价控制偏差.xlsx": {
+  "sha256": "87c3ec83feb1f115048405ae48df715b749519b9e9cebd60dbaae61b03da45a9",
+  "size": 217321
+ },
+ "C/C6 固定资产循环控制测试.xlsx": {
+  "sha256": "6464f40c372a58c5d863a298cc2601de04545e6da2054fb8d40dcad330dc0fe5",
+  "size": 26582
+ },
+ "C/C6-2 固定资产循环评价控制偏差.xlsx": {
+  "sha256": "6840359ecc78de4efdd000be732c3b02efe059d4e72ed0e09ad736e7a0645f5e",
+  "size": 216860
+ },
+ "C/C7 在建工程循环控制测试.xlsx": {
+  "sha256": "2ff5b314726ac40c90812eb60875002ab94f126a9f8b8b4dbd5bb27984b840d9",
+  "size": 26625
+ },
+ "C/C7-2 在建工程循环评价控制偏差.xlsx": {
+  "sha256": "0ab1c590d1cfc990cf06a58ecbead3725b4afe367ef045c18f341a494d15dd05",
+  "size": 216739
+ },
+ "C/C8 无形资产及其他长期资产循环控制测试.xlsx": {
+  "sha256": "19bb0533dbf85908d95fe8b21ba987f2855ce60f566d942038a69d283f54f874",
+  "size": 29043
+ },
+ "C/C8-2 无形资产及其他长期资产循环评价控制偏差.xlsx": {
+  "sha256": "902a190631c069baff331f13041f96ad02f4895a80d48a644e2a44469388c388",
+  "size": 217172
+ },
+ "C/C9 研发循环控制测试.xlsx": {
+  "sha256": "6dd1dfe37f0f1ca6c28be45d0bb7ba1c8224595f7ea4482376a613df2bac3785",
+  "size": 28865
+ },
+ "C/C9-2 研发循环评价控制偏差.xlsx": {
+  "sha256": "f83fb427c8ccf7dca92f729de97ced87c986fbc936a2906d3c18ab63e014b941",
+  "size": 217276
+ },
+ "D/D0 收入循环函证.xlsx": {
+  "sha256": "23d46c846640ab8d0931a79f4451605b6ead1c905b98fe5a728c6c3b70d66977",
+  "size": 153802
+ },
+ "D/D1 应收票据.xlsx": {
+  "sha256": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577",
+  "size": 138008
+ },
+ "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx": {
+  "sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+  "size": 123162
+ },
+ "D/D2-5  应收账款 -分析程序（Leap应对措施-分析程序）.xlsx": {
+  "sha256": "50b52a4e1638918d5fef52d99f8d361a60a0541816d85fbca8304ee61f8eeabf",
+  "size": 102990
+ },
+ "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx": {
+  "sha256": "9e833af0fceb9af2ada456a34f109709464798d37eb2b431be1da5b66f5c3f6f",
+  "size": 357051
+ },
+ "D/D3 预收账款.xlsx": {
+  "sha256": "8a27614bd761c1a8a2d3c6bb2a6f1264138881f86bfd59a99309207cf8d1e5ae",
+  "size": 133116
+ },
+ "D/D4-12 营业收入-合同检查（Leap-常规程序）.xlsx": {
+  "sha256": "9189b3a9dfcf9535a39cdf7ad33d2d4d332dcc590ac22174697e01ff096ca136",
+  "size": 66754
+ },
+ "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx": {
+  "sha256": "1201b80cfa861ba3d7ed26af14cdef06d5561a620ec8d9284ea5e537737049ea",
+  "size": 115295
+ },
+ "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx": {
+  "sha256": "fa69c92d1af6548974fb3fe1a0a45236ddf1c64037b4ac811d7e084de934340b",
+  "size": 168102
+ },
+ "D/D4-21营业收入-关联方检查（Leap-常规程序）.xlsx": {
+  "sha256": "1581f215c0dd5cce2a7d7a828e190c0900b6cd10197b02c720fe1792371d003a",
+  "size": 79380
+ },
+ "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx": {
+  "sha256": "3058be79f74fd0ce8ff82ac15c0f65c0a8a64d583a74def23444a3f4c6c85c07",
+  "size": 152077
+ },
+ "D/D4-33至D4-36 其他业务收入.xlsx": {
+  "sha256": "76684ebd9f31c47932accf2f6da36831d0aa13f1438bd97cb862f554700147f0",
+  "size": 84726
+ },
+ "D/D4-5 营业收入-会计政策（Leap-常规程序）.xlsx": {
+  "sha256": "3b11284bcc6ba44173c0c2f07b34d436a3b68693186f88764bb0c1c9097ab0f3",
+  "size": 16848
+ },
+ "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx": {
+  "sha256": "ff279a8b06691ac1ebc33be13f7387987dc6afc79e64a5daccebf424c8983158",
+  "size": 49772
+ },
+ "D/D4收入底稿.xlsx": {
+  "sha256": "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155",
+  "size": 352950
+ },
+ "D/D5 应收款项融资.xlsx": {
+  "sha256": "53cd7518f45072b405e0c96cf5508749299db0b90e94b77a2c20dbcc9a25f70e",
+  "size": 113287
+ },
+ "D/D6 合同资产.xlsx": {
+  "sha256": "591d4c682a420820e80d6597c75dc0ddf6a82b4f3bce184ebc76fd4cbef7f996",
+  "size": 421708
+ },
+ "D/D7 合同负债.xlsx": {
+  "sha256": "d522ac9fc60d12fb665335f4df9518cc4edf4886bb4c3b46819e08a177e221df",
+  "size": 379551
+ },
+ "E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx": {
+  "sha256": "9073e46f0761f87d7744d11193126a94d73d7840c1755a96e701a247e3f0b738",
+  "size": 1011488
+ },
+ "E/E1-14至E1-15  货币资金 -分析程序（Leap应对措施-分析程序）.xlsx": {
+  "sha256": "c8ee99bddd417e12a94f88aaa66e43c24ab1eaafd4bdb9fbce58d422a70181ef",
+  "size": 38096
+ },
+ "E/E1-18至E1-23  货币资金 -检查（Leap应对措施-检查）.xlsx": {
+  "sha256": "4e88aa0ebc538ad9681f27c4cb401284fa11187d63acc88bbd7b2ff6a0e32be5",
+  "size": 203485
+ },
+ "E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx": {
+  "sha256": "8317e2bac2e57a70778755923332450bd07634e1ff68eb8c14e74d259e58a9ea",
+  "size": 145434
+ },
+ "E/E1-26至E1-32  货币资金-IPO 上市 新三板 重组 舞弊应对.xlsx": {
+  "sha256": "4c2756b3e0c9413670d365e3e17a09ead602b34b6d31c978d7370de141d9adb5",
+  "size": 117568
+ },
+ "F/F0 存货循环函证.xlsx": {
+  "sha256": "0c78ae6f5f88e6ed4f1acced01f48bce9a73ada58154c84ae7c1cf509f9905dd",
+  "size": 915398
+ },
+ "F/F1 预付账款.xlsx": {
+  "sha256": "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd",
+  "size": 261608
+ },
+ "F/F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx": {
+  "sha256": "ab2db1115926cc5e540ef1d6ae135a61a85a3c45d338bd25cb985cdfc051c69f",
+  "size": 14532
+ },
+ "F/F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx": {
+  "sha256": "ed99116207b8675b6821cd4af67e6146b26d41c621312bbdda3a4a658901da6d",
+  "size": 58050
+ },
+ "F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx": {
+  "sha256": "9e57efd242b47171423e61f63a35be6ae5b46889baa14c246595ea95591fd0d8",
+  "size": 180630
+ },
+ "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx": {
+  "sha256": "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7",
+  "size": 81418
+ },
+ "F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx": {
+  "sha256": "81532ad5ebe30f1913ea390232b77b539d656e0c8da43d5f4d75b80e1408a835",
+  "size": 63455
+ },
+ "F/F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx": {
+  "sha256": "fa6ea027095a4f2449ac572fbe6e6a9aec79234fc84bdbab0f1b46529f7a3db3",
+  "size": 114865
+ },
+ "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx": {
+  "sha256": "bab0abc099cfed3efdde3095bed510b3bbe7422ce32431054811034f6e6d5cd5",
+  "size": 443368
+ },
+ "F/F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx": {
+  "sha256": "a3182f1244d3e96aae268358151372cf16745a976813c36696b577bcc5b849b0",
+  "size": 104179
+ },
+ "F/F2-55至F2-58 合同履约成本.xlsx": {
+  "sha256": "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21",
+  "size": 100429
+ },
+ "F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx": {
+  "sha256": "8be7b7c01322daa93ea0a29621b6292bcbdd19806deb142492915d43638289b6",
+  "size": 182901
+ },
+ "F/F2存货.xlsx": {
+  "sha256": "afc762843ffee1c32087848d6401500b53d5f3fb59d32c1098acfff6f1b2ef0d",
+  "size": 560160
+ },
+ "F/F3 应付票据.xlsx": {
+  "sha256": "06de707ba4d4f8d91534e872c7d135b9576cc3a012e3877b1f60db59ce6b3a6b",
+  "size": 79616
+ },
+ "F/F4 应付账款.xlsx": {
+  "sha256": "e20e62725c209b716eab4977231f21c627ab92346a72b58c20acdc7a6f1711fd",
+  "size": 108329
+ },
+ "F/F5 营业成本.xlsx": {
+  "sha256": "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7",
+  "size": 187721
+ },
+ "G/G0 投资循环函证.xlsx": {
+  "sha256": "9d9820aba2761c1fbc092933675f3c5a56a6736ce72eb25b008d0599396df81a",
+  "size": 899392
+ },
+ "G/G1 交易性金融资产.xlsx": {
+  "sha256": "eba510b3b7cef68a0e3ea1a16eaa1262468bee11fccbee47a39ff513c33fba73",
+  "size": 157253
+ },
+ "G/G10 交易性金融负债.xlsx": {
+  "sha256": "3afd5131f3783c017f3b7e728e1b081188de71acebb46bdb43e2f8b24fb63da3",
+  "size": 99458
+ },
+ "G/G11 投资收益.xlsx": {
+  "sha256": "a1b1d87f29e2dc63e279326d887b3d09bcda6b48c9c54881d82a875a0fe0f513",
+  "size": 75600
+ },
+ "G/G12 净敞口套期收益.xlsx": {
+  "sha256": "6645caf0fdfadf38b5cc5919d8b4bc60e59dda7bda54747085a40bdf4b66a8f8",
+  "size": 79999
+ },
+ "G/G13 公允价值变动收益.xlsx": {
+  "sha256": "fd5e5e9eeca7b392d59ca54beac51e96bb1575894113c0f3e69f05a234b0f099",
+  "size": 58717
+ },
+ "G/G14 信用减值损失.xlsx": {
+  "sha256": "5ca770907cfd3723159f4eb45871102f1cee382255e391f3aca0b1d57a287dc6",
+  "size": 60094
+ },
+ "G/G2 应收利息.xlsx": {
+  "sha256": "c7563e85a3ebffb7f60a5800dca66f76a5baef97e57cd4be4147f484e7decc84",
+  "size": 99479
+ },
+ "G/G3 应收股利.xlsx": {
+  "sha256": "02a5727230a7e2b1f0d3504b87e45ab1998505bb891e8687f3fe0bd9be17a093",
+  "size": 480411
+ },
+ "G/G4 债权投资.xlsx": {
+  "sha256": "da3a3480d37a4b958245abbe6895ed17a1504937bd49d4596aa41fe05a7be0bf",
+  "size": 999788
+ },
+ "G/G5 长期应收款.xlsx": {
+  "sha256": "c59bba69789eba3f25a8037a5ed32f7482f5eacd08007ef632d04ef2ca0f4b99",
+  "size": 398912
+ },
+ "G/G6 其他债权投资.xlsx": {
+  "sha256": "63bf38c797d4612e71eeea6fad9dd049765399663af56bc95f235023d2df8f34",
+  "size": 981008
+ },
+ "G/G7 长期股权投资.xlsx": {
+  "sha256": "6bf9e2ebcdf50a1c4a32f8733353dd1de994e7dc483232ad43680043577c3335",
+  "size": 263335
+ },
+ "G/G8 其他权益工具投资.xlsx": {
+  "sha256": "5c8d3de7ee60ffef8677768c6c3966a313d4210ebc96b19a12c56721954b83b6",
+  "size": 450079
+ },
+ "G/G9 其他非流动金融资产.xlsx": {
+  "sha256": "264322c0ed1b4bf6882687b973377ff0e90bdb5664edb4d7e3752ba39fec2379",
+  "size": 88636
+ },
+ "H/H0 固定资产循环函证.xlsx": {
+  "sha256": "b39df62c02be968c1c510da2e1216fae5d317a2e60a42c2eca9c646d1b6b7dd7",
+  "size": 81702
+ },
+ "H/H1 固定资产.xlsx": {
+  "sha256": "344f83216b9024e3c3fde7c1ed545eb0026a6cf088a0b0dfd0916e47b64fdc87",
+  "size": 199413
+ },
+ "H/H10 资产处置损益.xlsx": {
+  "sha256": "9f0d2a64dab1fd7661bb512194b4eba9a22f5afe28db38ec64fc22867421ac8a",
+  "size": 42334
+ },
+ "H/H2 在建工程.xlsx": {
+  "sha256": "de9426a33e8d51e9351c8dd2393fe8502433d2cf810f30318f254a474ec480fe",
+  "size": 162616
+ },
+ "H/H3 投资性房地产.xlsx": {
+  "sha256": "6526c9fc186230fa659369a8efa91f2824799f02fc4cfbba8707c40cdbf13038",
+  "size": 146096
+ },
+ "H/H4 工程物资.xlsx": {
+  "sha256": "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc",
+  "size": 112937
+ },
+ "H/H5 油气资产.xlsx": {
+  "sha256": "6dcc109bee6310352a6601d8daa388da21ce16e07fa1fd68c1072d3a302b1905",
+  "size": 195306
+ },
+ "H/H6 固定资产清理.xlsx": {
+  "sha256": "c7d0d78a798ce9c3c47aab64ea02ffc93919a9b02474d8801d115c614656e8a8",
+  "size": 48865
+ },
+ "H/H7 生产性生物资产.xlsx": {
+  "sha256": "df55f0051d9b3a67f894f82392d5f4420c959cd1c68c57a56c5605701db9c8c5",
+  "size": 225641
+ },
+ "H/H8 使用权资产.xlsx": {
+  "sha256": "112053f0681642c371572998a559e4c5362f518265897a36fc90d7f84e666782",
+  "size": 465476
+ },
+ "H/H9 租赁负债.xlsx": {
+  "sha256": "7b1afdb49f190854160548349a24a07a65ac39f2014fbe8c1014b86c92c598a4",
+  "size": 67693
+ },
+ "I/I1 无形资产、累计摊销及减值准备.xlsx": {
+  "sha256": "97eced1f58ab392551d2dca25db7267ca0ea0a120381b0126f8391e2b2977b63",
+  "size": 136885
+ },
+ "I/I2 开发支出.xlsx": {
+  "sha256": "a93c298b1f4adfe28532ba899a9e44904459534c703158a5b4e6d92ca4d67178",
+  "size": 138084
+ },
+ "I/I3 商誉.xlsx": {
+  "sha256": "96cd6d6cb70698ce90087269aa3f5c3f70a7d80955bd2985904099c3d9257366",
+  "size": 212588
+ },
+ "I/I4 长期待摊费用.xlsx": {
+  "sha256": "8bfb85884705e47121589227d3212f3e406cab9b4ea6e0736d53b951c65eb8f8",
+  "size": 312532
+ },
+ "I/I5 其他非流动资产.xlsx": {
+  "sha256": "7e8ec9c22580e05daf7803362f1ab83ca39d452a56c009833b05d6f6a1393860",
+  "size": 306241
+ },
+ "I/I6 研发费用.xlsx": {
+  "sha256": "924a1e8348a897c268dcef7231c6c3d0db2f8382446a729d051e825ea71748eb",
+  "size": 87268
+ },
+ "J/J1 应付职工薪酬.xlsx": {
+  "sha256": "a6100d91202f4d066dc39fb00e3016ea87794489bb75d308fec2733e92ca6061",
+  "size": 196750
+ },
+ "J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx": {
+  "sha256": "b9a4d87c95d275d7d6d20e91494bf20760eeb22140a3588b5670dea4266fcce1",
+  "size": 107237
+ },
+ "J/J3 股份支付.xlsx": {
+  "sha256": "72e026f43612ec6b6b6f11d1115908463453a3118bfc9409b055402a18e3f491",
+  "size": 50195
+ },
+ "K/K0 管理循环函证.xlsx": {
+  "sha256": "3de48276e74a7f860d3ff4c712c810d86443eaa2ee3fd2dd372fcb228721f552",
+  "size": 108986
+ },
+ "K/K1 其他应收款.xlsx": {
+  "sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
+  "size": 173926
+ },
+ "K/K10 其他收益.xlsx": {
+  "sha256": "04996321e9ff9525b293ef3fd2bd0fffbc1249aae2e760ddd7c90aa836afbc0d",
+  "size": 147249
+ },
+ "K/K11 资产减值损失.xlsx": {
+  "sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+  "size": 58013
+ },
+ "K/K12 营业外收入.xlsx": {
+  "sha256": "7f9367a0bdf3d1ac1989c43592829f8b128b58db7b5aac6fe84b6c9f5934317c",
+  "size": 59739
+ },
+ "K/K13 营业外支出.xlsx": {
+  "sha256": "2a50b18a21de3b01afb9e586777fa2dd8215e0d59fc5f5c7c95d939f08eb1373",
+  "size": 58775
+ },
+ "K/K2 其他流动资产.xlsx": {
+  "sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894",
+  "size": 189597
+ },
+ "K/K3 其他应付款.xlsx": {
+  "sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
+  "size": 92581
+ },
+ "K/K4 其他流动负债.xlsx": {
+  "sha256": "88cdf2e65d75840adb9db327fe5d46ee49986d03d17f396c1596d053a59611dd",
+  "size": 170841
+ },
+ "K/K5 预计负债.xlsx": {
+  "sha256": "01780f5ee08b4ea659651ae0d40f28b15388a4e140f28840e8b1ad50f0a9c8e0",
+  "size": 81429
+ },
+ "K/K6 持有待售资产和负债.xlsx": {
+  "sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
+  "size": 118267
+ },
+ "K/K7 递延收益.xlsx": {
+  "sha256": "90e915f70395698363b3aae3fef0ea0c38de7883292380eabaefa77d415c0e0b",
+  "size": 75642
+ },
+ "K/K8 销售费用.xlsx": {
+  "sha256": "41918d65caba05fe70a9726cee12ee5ea9a83723f8ec1053d9ba44b3ebe04015",
+  "size": 89923
+ },
+ "K/K9 管理费用.xlsx": {
+  "sha256": "ad2f7a863e6d90031abee12875fccf9ca1c196e69f713cda938d9d37051eedbf",
+  "size": 94307
+ },
+ "L/L0 债务循环函证.xlsx": {
+  "sha256": "cd2aae3320baa0618e4bdfaf6255ce85a9991eef42cffc7fbf36c89d9a7ea0dc",
+  "size": 102076
+ },
+ "L/L1 短期借款.xlsx": {
+  "sha256": "78033d804a379d42e7e0bc500aefb617fe6175537373126f88827d70b728ceeb",
+  "size": 86873
+ },
+ "L/L2 应付利息.xlsx": {
+  "sha256": "8a747c9931f5a5e0f3a89d243b1eb6aea13ce9b16743664e7ce1a3d4678c989a",
+  "size": 54867
+ },
+ "L/L3 长期借款.xlsx": {
+  "sha256": "ca0ac1e878fde45f8aa91f5ecae4fc685b82c83d5ec765a8094ef263999e2b60",
+  "size": 87427
+ },
+ "L/L4 应付债券.xlsx": {
+  "sha256": "9df73e02d7af61f287732102cc6367011df09d2e52863c9c80432216ee1c562b",
+  "size": 122085
+ },
+ "L/L5 长期应付款.xlsx": {
+  "sha256": "c8506f391262bf10fa818df22b9ddfe53ddc2ebe4d280af48776e39f8c8ac497",
+  "size": 93254
+ },
+ "L/L6 专项应付款.xlsx": {
+  "sha256": "cf05ed3b9fa0afd6a05b73de5c79b7ee14a85b6c6f4a04e57ae2f09170d7b5d4",
+  "size": 55523
+ },
+ "L/L7 其他非流动负债.xlsx": {
+  "sha256": "9fe09748148a6f0692eef85e0c0cf3e24f22ea7e5d011c029dfa3e71bb04daea",
+  "size": 47108
+ },
+ "L/L8 财务费用.xlsx": {
+  "sha256": "d915e3091a426aadab3828bf4ba43502e9cb3a967392d177d2c22a139c6634e6",
+  "size": 76069
+ },
+ "M/M1 应付股利（利润）.xlsx": {
+  "sha256": "fe19e06e954699db4c0d710a12ec9af02ea4ba462d13fb7cd9fc2ed4d5fa6bf2",
+  "size": 302441
+ },
+ "M/M10 其他权益工具.xlsx": {
+  "sha256": "c804b879770c07c261d903917a7d6ae43af8047d2a6c40d707c08673ca489eea",
+  "size": 139234
+ },
+ "M/M2 实收资本（股本）.xlsx": {
+  "sha256": "85b8e9bf871e89dbd02dfccd00ebe9c8dec1d8b137faedfa996dfa4ec26686a0",
+  "size": 120532
+ },
+ "M/M3 库存股.xlsx": {
+  "sha256": "a0ee640d9f3919e6c10e46dc9048dcc860472116a68da128df7ab4f087939151",
+  "size": 109810
+ },
+ "M/M4 资本公积.xlsx": {
+  "sha256": "09d6688e728023c48ccd49013dba718dbb5154bda2dbc6e6a8ef94cde5d545dd",
+  "size": 105867
+ },
+ "M/M5 盈余公积.xlsx": {
+  "sha256": "572919b71ca374fe34c62f4c59d5756f902a0492bb81e286c4d4af066b98db45",
+  "size": 109027
+ },
+ "M/M6 未分配利润.xlsx": {
+  "sha256": "fc09ebd1c95e56f616ebca1b046a0a1fe2a5e04b5b786877dbe953c486d07bd7",
+  "size": 114625
+ },
+ "M/M7 专项储备.xlsx": {
+  "sha256": "46d938a5d9c3e1651a6cd7f04fcaeafa9fa3ff9fe830b56afc28a928349906ae",
+  "size": 108714
+ },
+ "M/M8 一般风险准备.xlsx": {
+  "sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
+  "size": 114420
+ },
+ "M/M9 其他综合收益.xlsx": {
+  "sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
+  "size": 453383
+ },
+ "N/N1 递延所得税资产.xlsx": {
+  "sha256": "2ca3ebbcd6f65c91da37bc576bb1af071543bf54d10b05d71c1216d2993386b5",
+  "size": 125085
+ },
+ "N/N2 应交税费.xlsx": {
+  "sha256": "24e92c2353b2abd6d89537361f195b490977757b9b49896285beb0661a6443b1",
+  "size": 159454
+ },
+ "N/N3 递延所得税负债.xlsx": {
+  "sha256": "dd3759ffa5859716e07cf8cffb35594122cf1bd999cedd24bc84a3f3ab77ac5f",
+  "size": 89735
+ },
+ "N/N4 税金及附加.xlsx": {
+  "sha256": "ae2ae9e1b290b11afe41be1e12156df20c47bc64644a293a5d5547bc35dd8c73",
+  "size": 55903
+ },
+ "N/N5 所得税费用.xlsx": {
+  "sha256": "0fa060b214a7eed83bf53e5153752abdb765cc1da922506d6d539d3003f8bd3d",
+  "size": 124437
+ },
+ "S/S1 对被审计单位违反法规行为的考虑2019.xlsx": {
+  "sha256": "433eadf9d37e0c3f8ec9cb3f623faf4e982d76b0064d9801a7f359637b0fef82",
+  "size": 29348
+ },
+ "S/S10 对环境事项的考虑.xlsx": {
+  "sha256": "42266852988bb790fb8ae21d61251bbdb7adc8aa66751775d3229a312a117038",
+  "size": 55309
+ },
+ "S/S11 利用服务机构活动.xlsx": {
+  "sha256": "b90aeda1bd49f22ee26609907f18dc0871118d1bdebe727490123dae50bd9d39",
+  "size": 76529
+ },
+ "S/S12 利用专家（注册会计师的专家）的工作.xlsx": {
+  "sha256": "7fb788963970ebb4e1879d7274334b41dfafcf6ac4c1ac9cc80125c7240c6b01",
+  "size": 132845
+ },
+ "S/S13 利用管理层的专家编制的信息形成审计证据.xlsx": {
+  "sha256": "032174bef48275407f07b885874e6e3c11d4e5bfde51205e57d5604a10ff70cc",
+  "size": 119789
+ },
+ "S/S14 会计估计和相关披露.xlsx": {
+  "sha256": "403dc582adec0149d4961cff8261ff4a1716160fe2430a3adaeb5a88687ad272",
+  "size": 44681
+ },
+ "S/S15 每股收益和净资产收益率.xlsx": {
+  "sha256": "b5ac01fffb107257772666a3b04cd7d1ac67de02236c5b8ed19c0ed2205477ef",
+  "size": 54564
+ },
+ "S/S16 套期活动.xlsx": {
+  "sha256": "4b7f5a74bf8dd61179bd44dbb85425ddb4520e86e640b453da1e9469fcb72adc",
+  "size": 50717
+ },
+ "S/S2 首次接受委托时对期初余额的审计2019.xlsx": {
+  "sha256": "88f466b638bbbffd15e8285cbb0bfa678982ab7b637e76a65c8870231bc144d8",
+  "size": 15803
+ },
+ "S/S20 营业收入扣除情况核查底稿202504.xlsx": {
+  "sha256": "aeeb3236e6135798f5fc6d7baf069ccb00fc0a0ac0b2fe85896ed795be2d42a0",
+  "size": 265790
+ },
+ "S/S21 数据资产.xlsx": {
+  "sha256": "ecf94fc88a8b507d468620f960cbe218ddac411e116413fcef9fe3f2c9428cda",
+  "size": 250571
+ },
+ "S/S3 会计政策变更、前期差错会计、估计变更2020.xlsx": {
+  "sha256": "ba6991bb6a8396360f253be72777f075950254a4a30846ccc1bbaf584713d5ad",
+  "size": 170129
+ },
+ "S/S32-10专项核查-资产减值估计不足的情形.xlsx": {
+  "sha256": "6bec7959507b4993e67c3e28c9ec12c36a84697b50963d6eb11164b244aca368",
+  "size": 47887
+ },
+ "S/S32-11专项核查-延迟资产转固减少折旧的情形.xlsx": {
+  "sha256": "c4bf1635110be3588174381249560af35414cc9f72e8db824b472db254d35a2c",
+  "size": 34796
+ },
+ "S/S32-12专项核查-其他粉饰业绩或财务造假的情形.xlsx": {
+  "sha256": "2548b2ee67249c3bdad313e98eb04e97795fd62b6382bc576f66fa7a535d98d8",
+  "size": 32578
+ },
+ "S/S32-13 专项核查-期后业绩下滑情形.xlsx": {
+  "sha256": "85526a25c7bf4d5109328541c8e280574720f4b3ab07c4a7af45dadc5362c95d",
+  "size": 33613
+ },
+ "S/S32-1专项核查-自我交易虚增利润的情形.xlsx": {
+  "sha256": "682fd558dd1d3f2ef21bf1d9d2fa68c2fd965848c3837ef5d01fd8bf0cbe3b43",
+  "size": 35375
+ },
+ "S/S32-2专项核查-与客户或供应商恶意串通提前确认收入虚假增长的情形.xlsx": {
+  "sha256": "1719ab27e8837ba186281b49173c2a4b2d113d65f07c032ff8c2b54cbd820fea",
+  "size": 40847
+ },
+ "S/S32-3专项核查-关联方代为支付成本费用的情形.xlsx": {
+  "sha256": "901def200d117eb894a88df49bb4a00138f9359b5db1b277f38aaecbb54579c3",
+  "size": 38342
+ },
+ "S/S32-4专项检查-保荐机构、PE及其关联方进行利益输送的情形.xlsx": {
+  "sha256": "5dc7dfaf0cf0fbe6d8677196956ba50ec67ea8c9bedb3138a6ec7669c295ad83",
+  "size": 144547
+ },
+ "S/S32-5 专项核查-体外资金支付货款承担成本的情形.xlsx": {
+  "sha256": "29d5175f2852b82c227027a4517c61cedec8eb5eb790780afdc653d696e57ab4",
+  "size": 171674
+ },
+ "S/S32-6专项核查-互联网造假虚增收入的情形.xlsx": {
+  "sha256": "f18d877c5bb3f94f301e54d85019d6dd892fefeda351f3fdfdce93392b1c45f4",
+  "size": 50072
+ },
+ "S/S32-7专项核查-成本费用资本化的情形.xlsx": {
+  "sha256": "5992a8ee8552cbef067c953f14ab23f9bac299a4fb4254ad2929015e55e584d9",
+  "size": 41957
+ },
+ "S/S32-8 专项核查-压缩员工薪金的情形.xlsx": {
+  "sha256": "a0199c3c44364533c124e82321ab4d81f91b4e47272e253de6163f677b897a10",
+  "size": 35368
+ },
+ "S/S32-9专项核查-延迟成本费用增加利润的情形.xlsx": {
+  "sha256": "61a71779ebd42147e86b2c3c10016d4034a02c320eb15ea95fd5cccb375876e0",
+  "size": 50332
+ },
+ "S/S33-1财务报告内部控制制度.xlsx": {
+  "sha256": "84135ddfd90d7e5e137bd957e48315bbf7905c6a6841a691b68be3de7fd6429c",
+  "size": 37639
+ },
+ "S/S33-2财务与非财务信息印证.xlsx": {
+  "sha256": "8098e2d49183e72496a61e2c070c3dc56f22f72571dfbdbed4323c9b55e72336",
+  "size": 35285
+ },
+ "S/S33-3盈利异常增长和异常交易.xlsx": {
+  "sha256": "535fcf09257b1b453a63fa2e4e45eb61288b1b4c49d3323594cdc410a243659a",
+  "size": 39487
+ },
+ "S/S33-4关联方关系及其交易.xlsx": {
+  "sha256": "311239b89cacda6d54fe4236d5c9d293cd6599349133c66e2f9a0c5f8891d83c",
+  "size": 174416
+ },
+ "S/S33-5收入及毛利率.xlsx": {
+  "sha256": "ea58f57fedaa843980a77a3d4a99f9295d9a163b1ef2cbbd8e1d947d202e5327",
+  "size": 32199
+ },
+ "S/S33-6主要客户和供应商.xlsx": {
+  "sha256": "6b2de711f4190e5ef4be186729d12b4185c278b5cb758b4d7e7a7696aa0d2b62",
+  "size": 45805
+ },
+ "S/S33-7存货及其他资产.xlsx": {
+  "sha256": "acd8ec5bb430674a7f6ca03bdb8adb1a525e8cd97f7bd486a98173a528e7cd32",
+  "size": 43848
+ },
+ "S/S33-8现金收付交易.xlsx": {
+  "sha256": "83006b7445b889fb7e355d21c01efae2bda93d6fd45771d67799c3ce815a6e1d",
+  "size": 23065
+ },
+ "S/S33-9财务异常信息.xlsx": {
+  "sha256": "e394466013f17d8fc1009fb50426b79977de4bcfbd5cd440ddc59ead1b10fd4c",
+  "size": 39137
+ },
+ "S/S34 -0证监会及沪深北证券交易所需会计师核查事项清单.xlsx": {
+  "sha256": "01384841c6b006cd7b048b230bf78bc3595c3039aa3dd24ec7bfb1c5a8c3d6b6",
+  "size": 32557
+ },
+ "S/S34-1 军工等涉秘业务企业信息披露豁免.xlsx": {
+  "sha256": "13b5154df74dd0e5f2f80b6db0f39f9c649ade5a87d373270ed369719df867bb",
+  "size": 18809
+ },
+ "S/S34-10 财务性投资.xlsx": {
+  "sha256": "476a4312e0e13441983db9f8f3418ef8e6b431d45b982a2d39e72e22e9bb4db3",
+  "size": 17650
+ },
+ "S/S34-11 业务重组.xlsx": {
+  "sha256": "94442ad6cdbcd26c59413858e03e3414b47a860a37650c112fa59b83279b1e10",
+  "size": 26224
+ },
+ "S/S34-12 经营业绩下滑.xlsx": {
+  "sha256": "e5417cca337ce7fe842ff6c75b7b5e86c5b99c86c71a6808e063888a02ab3532",
+  "size": 17692
+ },
+ "S/S34-13 持续经营能力.xlsx": {
+  "sha256": "16b4547837e58bbb543f9a653590642a1a1920f717819a7b26f14d2f5a759947",
+  "size": 18075
+ },
+ "S/S34-14 财务内控.xlsx": {
+  "sha256": "795ab315528c968b6fe40bba425db6aa9e76879857ebebc4f79c770087e0720b",
+  "size": 19597
+ },
+ "S/S34-15 现金交易.xlsx": {
+  "sha256": "928ed7654bad065b53612f2e5042b7993f68bf4c409d29dfe9adf17f86cb7e41",
+  "size": 20826
+ },
+ "S/S34-16 第三方回款.xlsx": {
+  "sha256": "1b9a2b821e9bb8e01fad7e46b9ec5d468d29638f69bb880c433796790fb1f38a",
+  "size": 28374
+ },
+ "S/S34-17 会计政策、会计估计变更和差错更正.xlsx": {
+  "sha256": "c44d63eee1d9895f20b8205f91ae6359b7e849dba336cd161192cd8a7bda2178",
+  "size": 22068
+ },
+ "S/S34-18 引用第三方数据.xlsx": {
+  "sha256": "08d9bb183a5b349221fa20ace80bad80104649b45a32cddfc3e8427d57a1fe4a",
+  "size": 21982
+ },
+ "S/S34-19 经销商模式.xlsx": {
+  "sha256": "a81a354e8d7b7f08fec76eabc3e4e37e63bda75bb00e85fe5ec8c555dbf25db1",
+  "size": 20053
+ },
+ "S/S34-2 期权激励计划.xlsx": {
+  "sha256": "4c8c35ca8ae879ea182389afb75a7ae55666d758ef21993d240d0a17a15e039e",
+  "size": 27261
+ },
+ "S/S34-20 劳务外包.xlsx": {
+  "sha256": "fe3c5152c0125f4e7b96af441e0547fefda16919368c967406af544e4d729363",
+  "size": 715008
+ },
+ "S/S34-21 委外加工.xlsx": {
+  "sha256": "1cbc5e63d6f8e6d92da36b41c4960cf4a4c0a080c4903ce0cf4d84810030b4fb",
+  "size": 717600
+ },
+ "S/S34-22 股权集中企业的公司治理有效性、内控规范性与独立性.xlsx": {
+  "sha256": "02d350e49dd40950a9a4ead58cec11d1f7a2c7e9dea83befd8d3e0e5975692ee",
+  "size": 718460
+ },
+ "S/S34-23 通过互联网开展业务相关信息系统核查.xlsx": {
+  "sha256": "d03c1dcb37be68853c10f7dd4f8012c6843ee2ea7f91691ac6e1948ffe5b4425",
+  "size": 21780
+ },
+ "S/S34-24 信息系统专项核查.xlsx": {
+  "sha256": "b34fe9540e2a9659793652675e424acb274992899800aa3623b2d32f00e92ebc",
+  "size": 24948
+ },
+ "S/S34-25 资金流水核查.xlsx": {
+  "sha256": "73d92bbc0405d67e9d0af98684b1793b45ee69ad4883bdfaf6670e9a112036cd",
+  "size": 32723
+ },
+ "S/S34-26 尚未盈利或最近一期存在累计未弥补亏损.xlsx": {
+  "sha256": "6dea19a09c6f526b2742a26df6cdfd54980db953bf30ff83c7acecb9f672153e",
+  "size": 17594
+ },
+ "S/S34-27 研发投入的认定及内控.xlsx": {
+  "sha256": "889b507b321f2c79a1bbe9f354365c7833b7f65297132b2ad6aae3c59f3842d8",
+  "size": 25314
+ },
+ "S/S34-28 研发支出资本化.xlsx": {
+  "sha256": "6952615089d5077ea6d0e860e22f01f980ee5670e418bd4b031201aa0703a147",
+  "size": 19086
+ },
+ "S/S34-29 科研项目相关政府补助的会计处理.xlsx": {
+  "sha256": "5e4fd6aa3fe4cd12ce4c24ccf1e00e2d09dfc1fa3bdbba69d11a0954252f5bf2",
+  "size": 18953
+ },
+ "S/S34-3 股份支付.xlsx": {
+  "sha256": "58a6c1b04c260481224afda95a582c0ea6bf38dd4094b514d5715d4329278697",
+  "size": 24458
+ },
+ "S/S34-30 对赌协议.xlsx": {
+  "sha256": "d5312af35e2a8b99556430728f1dd5ae7e8d6a9544c901fd6c59a552ac8900eb",
+  "size": 21485
+ },
+ "S/S34-31 存货.xlsx": {
+  "sha256": "ab1c024bf352e65418fbea672fafd00dfa2507d111af0bbfddd7b7df83bc0144",
+  "size": 764143
+ },
+ "S/S34-32 期间费用核查.xlsx": {
+  "sha256": "f2d3b7e794b2e2ebbcad0088ea56bb0baa6faf57e6797902978727ff830be244",
+  "size": 17297
+ },
+ "S/S34-33 商誉减值核查.xlsx": {
+  "sha256": "ab4610a7d50edff58551ac136622a48e42355244fa436e290334de17a36a1988",
+  "size": 18404
+ },
+ "S/S34-34 涉农企业.xlsx": {
+  "sha256": "87484657e3cd92d0708176b4997bef4ae1dc16c5384c18a7cac00deaee40aee2",
+  "size": 28050
+ },
+ "S/S34-35 收入核查.xlsx": {
+  "sha256": "5036978e8420ca389ec8d63a39a8c18eb42fc6dfe5ecff0ea588cb620b044909",
+  "size": 28472
+ },
+ "S/S34-36 投资收益占比.xlsx": {
+  "sha256": "61eca0209f49e7ad29f35725db546bf609c8cc649bf7feba731874abd5426e71",
+  "size": 18160
+ },
+ "S/S34-37 现金流异常.xlsx": {
+  "sha256": "63d55a003e4b44dfd0859a91a5840ac3e011471e57713cee7d508a5fb8174af5",
+  "size": 740974
+ },
+ "S/S34-38 估值调整协议.xlsx": {
+  "sha256": "8bdffb049cdd623e55e2185c43f8f2e0dce9a0b6fa253039ac5020e25a1cf656",
+  "size": 719356
+ },
+ "S/S34-39 应收票据和应收款项融资.xlsx": {
+  "sha256": "a8d63c34b05d2cfe61976b85de0bc5513188843ccb6a5f8e70f7d4e7e8949d5f",
+  "size": 17021
+ },
+ "S/S34-4 关联交易.xlsx": {
+  "sha256": "76c0283fd788638f0ac0559eef77caa087764852592714c4c1be34bb840abef7",
+  "size": 28902
+ },
+ "S/S34-40 在建工程核查.xlsx": {
+  "sha256": "be496c9fc4d179671e7ae87a2775038808b3c91982472a9e29473c0f4beba946",
+  "size": 17325
+ },
+ "S/S34-41 主要客户和供应商核查.xlsx": {
+  "sha256": "0e1fe7cb0ee13a883427eb205330ad303e5b70999eb2a1c81b06d19616c9f011",
+  "size": 19096
+ },
+ "S/S34-5 应收账款减值.xlsx": {
+  "sha256": "ac07359900611f47f860ee8a0741411795e687313820f8b44e044eaeb7560664",
+  "size": 18262
+ },
+ "S/S34-6 固定资产使用及减值.xlsx": {
+  "sha256": "86486d14ec5b6f4e64b81cf6bcccce1b10be51c6067cdab7336c422e04888283",
+  "size": 18093
+ },
+ "S/S34-7 税收优惠.xlsx": {
+  "sha256": "3d746d95df60568d72172c2c1ee5d10f65c66da9758c58ed9cb464e51e523447",
+  "size": 18352
+ },
+ "S/S34-8 合并中无形资产认定与客户关系.xlsx": {
+  "sha256": "900c1f0764efb70652f5669c97de471d12e2b60f077e55695fd40f63c6104550",
+  "size": 29291
+ },
+ "S/S34-9 共同投资.xlsx": {
+  "sha256": "b35fb9e40fcb7f16ecf884dfca1a076493353519f582fb612904a1f0b5c597cb",
+  "size": 22422
+ },
+ "S/S35-1 关联交易.xlsx": {
+  "sha256": "9d71caa0ad0184f8b0b837eea29a4e0d98a0205e510e75da06cb706092a5266d",
+  "size": 23930
+ },
+ "S/S35-2 财务性投资核查.xlsx": {
+  "sha256": "58e6165d5c5d28a8b462816d121cff41d31f3555d6eced895f9d498f637ab849",
+  "size": 20858
+ },
+ "S/S35-3 现金分红核查.xlsx": {
+  "sha256": "3ae5f3ea09c02e69b554581720fce4969234d6890fba6b27d440ac9f6f2632c1",
+  "size": 19892
+ },
+ "S/S35-4 商誉减值.xlsx": {
+  "sha256": "96ac32dc38c2499bf649c6ac9a720b9b62f678912188976c6f8f5e1898e0fc45",
+  "size": 17863
+ },
+ "S/S35-5 募集资金涉及收购核查要点.xlsx": {
+  "sha256": "23656887fcc087d475e6642e42966d4fc034a227a6a6e00b3477fdcd207400da",
+  "size": 18039
+ },
+ "S/S4 非货币性资产交换202401.xlsx": {
+  "sha256": "d47a80b935b6e38eb2660fdd82c55f9c0d6f8f582b221f5804e2af7721472516",
+  "size": 39321
+ },
+ "S/S5 债务重组202401.xlsx": {
+  "sha256": "f6f9029fcdc44e194c4b85d96dc4ff12c7ec674e62d449332faeb5a37e13261e",
+  "size": 40512
+ },
+ "S/S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx": {
+  "sha256": "666ca21e87c21a3947a1ece87327d1f68d929fb20f0fe19777a936a6e888e748",
+  "size": 56832
+ },
+ "S/S8 租赁.xlsx": {
+  "sha256": "58e3f9c6f050f65c408a349a302a357ff1d0aabbf552f8d94d036e807ec5220d",
+  "size": 30882
+ },
+ "S/S9 对电子商务的考虑.xlsx": {
+  "sha256": "af038baefae24ff1a2095c6b74bd4f97ef60c9fe2844aa80a3bbf1596c484472",
+  "size": 47764
+ },
+ "_reference/因素分析法毛利分析、工程施工、合同项目、贸易等特殊行业底稿参考示例.xlsx": {
+  "sha256": "4f81ba6ff99ea72e3fe96d5f128fe5593e6efc1949e5531c4f2f7decba894368",
+  "size": 72265
+ },
+ "_reference/应收账款预期信用损失计提及保理合同分析参考示例.xlsx": {
+  "sha256": "89a882bd20e533d0b1226f73ec180542c438d12ccf30c4e48fd5f129090a0214",
+  "size": 347745
+ },
+ "_reference/营业收入五步法、主要责任人代理人、知识产权分析参考示例.xlsx": {
+  "sha256": "6e634c46073f02ebf878ad2ef8ec5b51669744c2ef01d8a176f66073180113f2",
+  "size": 262931
+ }
+}

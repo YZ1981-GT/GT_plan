@@ -17,6 +17,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_models import WorkingPaper, WpIndex
+from app.services.wp_export.self_evidence import (
+    build_self_evidence_banner,
+    needs_self_evidence,
+)
 from app.services.wp_export.wp_file_resolver import VERDICT_LABELS, resolve_wp_file
 
 logger = logging.getLogger(__name__)
@@ -25,6 +29,64 @@ STORAGE_ROOT = Path("storage")
 
 #: ZIP 内跳过清单的文件名（下划线前缀让它排在循环目录之前，用户一眼能看到）
 _SKIPPED_MANIFEST_NAME = "_未导出清单.txt"
+
+#: 自证边车文件后缀 —— 与底稿同名、同目录，紧邻可见。
+#:
+#: 🔴 为什么用边车 txt 而不是往 xlsx 里盖章（2026-08-10 实证裁决）：
+#: `backend/wp_templates/` 下 351 个 xlsx 里 **182 个含 drawing / 50 个含 media /
+#: 1 个含 chart**，而 openpyxl 的读-改-写 round-trip **会丢弃**图形、图片、图表。
+#: 批量打包若为盖一行自证而把这些模板过一遍 openpyxl，等于用「说明清楚了」
+#: 换「模板内容被削」——代价完全不划算。
+#: 故批量路径保持 `zf.write` 原字节不动，自证走同名边车 + `_未导出清单.txt` 两处。
+_SELF_EVIDENCE_SIDECAR_SUFFIX = ".自证说明.txt"
+
+#: 每个 verdict 档的处置建议 —— 单一真源（R1.5）。
+#:
+#: 🔴 键集必须覆盖 `WP_FILE_VERDICTS` 里除 `file` 之外的全部档位：清单按
+#: 「出现的档位」逐条取建议，缺键会退到 `_VERDICT_ADVICE_FALLBACK`，
+#: 那是兜底而非正解 —— 守卫按「建议条数 ≥ 档位数」断言，新增 verdict 档
+#: 若忘了补建议，条数仍够但内容是兜底话术，故另有守卫扫键集完整性。
+_VERDICT_ADVICE: dict[str, str] = {
+    "empty": (
+        "该底稿尚未生成实体文件（file_path 为空）。"
+        "请在底稿列表中打开并保存一次，或用「生成底稿」重新生成后再导出。"
+    ),
+    "missing": (
+        "路径已配置但磁盘上找不到文件（可能被移动或清理）。"
+        "请用「生成底稿」重新生成，或联系管理员核查存储。"
+    ),
+    "template_fallback": (
+        "ZIP 内该份是**空白模板**而非您的录入内容。"
+        "若底稿界面已有数据，请改用底稿页的「导出数据」获取含录入内容的版本。"
+    ),
+}
+
+#: 未登记档位的兜底建议（出现即说明 `_VERDICT_ADVICE` 该补键了）
+_VERDICT_ADVICE_FALLBACK = "请在底稿列表中打开该底稿核查，或联系管理员。"
+
+
+def _render_sidecar(
+    *,
+    banner: str,
+    wp_code: str,
+    wp_name: str,
+    raw_path: str | None,
+) -> str:
+    """渲染单份底稿的自证边车内容。
+
+    文案主体（`banner`）来自 `self_evidence` 共享件，本函数只做排版与排查信息，
+    **不硬写任何自证中文**（R1.3：守卫扫本文件源码钉死）。
+    """
+    lines = [
+        banner,
+        "",
+        f"底稿：{wp_code} {wp_name}",
+    ]
+    if raw_path:
+        lines.append(f"原始 file_path：{raw_path}")
+    lines.append("")
+    lines.append("（本说明由系统在导出时生成，与同名底稿文件一并放置便于对照）")
+    return "\n".join(lines) + "\n"
 
 
 def _render_skipped_manifest(
@@ -40,18 +102,24 @@ def _render_skipped_manifest(
     既不知道少了哪些、也不知道原因（"很多模板导不出来都是空的"）。清单让
     「导出不全」这件事自证，而不是让人以为内容本来就空。
     """
-    lines = [
-        "底稿批量导出 — 未导出清单",
-        "",
-        f"项目：{project_id}",
-        f"应导出：{total} 份    已导出：{written} 份    未导出：{len(skipped)} 份",
-        "",
-        "未导出明细（按原因分组）：",
-    ]
-
     by_verdict: dict[str, list[dict[str, str]]] = {}
     for item in skipped:
         by_verdict.setdefault(item.get("verdict", "missing"), []).append(item)
+
+    # `template_fallback` 实际**进了** ZIP（内容是空白模板），与真正未导出的分开计数，
+    # 否则"未导出 N 份"会与 ZIP 里的文件数矛盾，用户对不上账。
+    fallback_n = len(by_verdict.get("template_fallback", []))
+    missing_n = len(skipped) - fallback_n
+
+    lines = [
+        "底稿批量导出 — 内容提示清单",
+        "",
+        f"项目：{project_id}",
+        f"应导出：{total} 份    已写入 ZIP：{written} 份",
+        f"未导出（无文件）：{missing_n} 份    已导出但为空白模板：{fallback_n} 份",
+        "",
+        "明细（按原因分组）：",
+    ]
 
     for verdict, items in sorted(by_verdict.items()):
         label = VERDICT_LABELS.get(verdict, verdict)
@@ -64,15 +132,17 @@ def _render_skipped_manifest(
                 f"    原因：{item.get('reason', '')}"
             )
 
-    lines.extend(
-        [
-            "",
-            "处置建议：",
-            "  · 「未配置底稿文件路径」/「底稿文件不存在」→ 该底稿尚未生成实体文件，",
-            "    请先在底稿列表中打开并保存一次，或用「生成底稿」重新生成。",
-            "  · 「已回退空白模板」→ ZIP 内该份为空白模板，尚无录入内容。",
-        ]
-    )
+    # ─── 处置建议：**逐档给**，条数恒等于出现的档位数（R1.5）───────────────
+    # 🔴 改造前是写死的 2 条 bullet 覆盖 3 个档位，一旦三档同时出现就
+    #    "建议条数 < 档位数"，等于有档位无处置指引。现在从 `_VERDICT_ADVICE`
+    #    单一真源按出现的档位取，结构上保证一一对应。
+    lines.append("")
+    lines.append("处置建议：")
+    for verdict in sorted(by_verdict):
+        label = VERDICT_LABELS.get(verdict, verdict)
+        advice = _VERDICT_ADVICE.get(verdict, _VERDICT_ADVICE_FALLBACK)
+        lines.append(f"  · 「{label}」→ {advice}")
+
     return "\n".join(lines) + "\n"
 
 
@@ -138,6 +208,9 @@ class WpDownloadService:
 
         written = 0
         skipped: list[dict[str, str]] = []
+        #: 进了 ZIP 但内容是空白模板的底稿（`template_fallback`）——
+        #: 它们不属"未导出"，但对用户同样是"打开是空的"，故一并进清单（R1.4）。
+        fallback_noted: list[dict[str, str]] = []
         seen_arc: dict[str, int] = {}
 
         buf = io.BytesIO()
@@ -183,8 +256,47 @@ class WpDownloadService:
                 zf.write(res.path, arc_name)
                 written += 1
 
-            # 🔴 跳过清单必须进 ZIP：原实现只写后端 warning 日志，用户下载完
+                # ─── 自证边车（R1.1 / R1.4）────────────────────────────
+                # 🔴 `verdict == 'template_fallback'` 的底稿**进了 ZIP 但是空白模板**。
+                #    改造前它既不进跳过清单（清单只收 path 不可达的），产物里也没有
+                #    任何说明 ⇒ 用户看到一堆空模板，误认为"底稿本来就没数据"。
+                #    真实库这一档 1670 份，正是用户反馈的主要来源。
+                kind = needs_self_evidence(
+                    verdict=res.verdict,
+                    html_data=None,       # 打包路径不读 html_data（原字节直传）
+                    has_entry_rows=False,  # 同上：不查库，避免 N+1
+                )
+                if kind is not None:
+                    banner = build_self_evidence_banner(
+                        kind=kind,
+                        verdict=res.verdict,
+                        detail=f"{idx.wp_code} {idx.wp_name}",
+                    )
+                    zf.writestr(
+                        f"{arc_name}{_SELF_EVIDENCE_SIDECAR_SUFFIX}",
+                        _render_sidecar(
+                            banner=banner,
+                            wp_code=idx.wp_code or "",
+                            wp_name=idx.wp_name or "",
+                            raw_path=res.raw,
+                        ).encode("utf-8"),
+                    )
+                    # 同时进清单，让"少了什么/为什么"在一个地方看全（R1.4）
+                    fallback_noted.append(
+                        {
+                            "wp_code": idx.wp_code or "",
+                            "wp_name": idx.wp_name or "",
+                            "audit_cycle": cycle,
+                            "verdict": res.verdict,
+                            "reason": res.reason,
+                        }
+                    )
+
+            # 🔴 清单必须进 ZIP：原实现只写后端 warning 日志，用户下载完
             #    完全不知道少了哪些底稿、为什么少（"导出来是空的"无从排查）。
+            #    且必须把 `template_fallback` 一并列出 —— 它们**进了** ZIP，
+            #    所以不在 `skipped` 里，但内容是空白模板，对用户同样是"没数据"。
+            skipped = skipped + fallback_noted
             if skipped:
                 zf.writestr(
                     _SKIPPED_MANIFEST_NAME,

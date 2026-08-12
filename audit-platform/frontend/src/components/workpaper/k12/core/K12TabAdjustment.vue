@@ -19,6 +19,13 @@
         <el-button size="small" :loading="aiLoading" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="k12"
+          sheet="K12-3"
+          :disabled="props.isReadonly"
+          @imported="emit('imported')"
+        />
         <GtReviewTrigger section-id="K12-3-adjustment" label="💬 复核" />
         <el-button
           type="primary"
@@ -269,6 +276,7 @@ import { useAuditContext } from '@/composables/useAuditContext'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
+const CycleImportExportDropdown = defineAsyncComponent(() => import('../../shared/CycleImportExportDropdown.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -282,6 +290,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
+  /** 导入完成 → 父宿主重载 allResponses（父绑定 @imported="selfLoad()"） */
+  (e: 'imported'): void
 }>()
 
 // ─── Composables ─────────────────────────────────────────────────────────────

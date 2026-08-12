@@ -71,6 +71,7 @@
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @imported="selfLoad()"
         />
 
         <!-- K5-3 调整分录 -->
@@ -82,6 +83,7 @@
           :is-readonly="isReadonly"
           @save="handleChildSave"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          @imported="selfLoad()"
         />
 
         <!-- K5-4 产品质量保修检查 -->
@@ -346,7 +348,10 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 
 // ─── TB自动取数（预计负债） ────────────────────────────────────────────────────
 /**
- * 🔴 科目码取自 `k5AccountScope`（报表行 BS-068/BS-094 映射解析，兜底 2801）。
+ * 🔴 科目码取自 `k5AccountScope`（报表行 **BS-065**，两准则同号，兜底 2801）。
+ *    旧注释写 BS-068/BS-094 已于 2026-08-09 按 report_config 连库对账改正：
+ *    BS-068 实为**其他非流动负债**（L7 的行，`TB('2911')` 且 2911 全库零命中）、
+ *    BS-094 名对但 formula 为 NULL（后果 TRACE_ONLY：退兜底 2801，金额对、溯源失真）。
  * 历史实现写死 `2701` = 长期应付款（L5 科目）→ 取到别的循环的余额当预计负债显示。
  *
  * render 已下发 `tb_values.provisions_*`，本函数只在 seed 缺失时兜底请求。

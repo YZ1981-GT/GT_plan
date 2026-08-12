@@ -193,15 +193,25 @@ def _sync_export_workpaper_xlsx(
     schema: dict,
     html_data: dict[str, Any],
     project_meta: dict[str, Any],
+    has_entry_rows: bool = False,
+    entry_payloads: Any = None,
 ) -> BytesIO:
     """同步导出函数（在 run_in_executor 中调用）。
 
-    加载致同模板 xlsx → 按 schema 4 路径写入 → 返回 BytesIO。
+    加载致同模板 xlsx → 按 schema 4 路径写入 → 按需加自证 sheet → 返回 BytesIO。
 
     Args:
         schema: wp_render_schema YAML 解析后的 dict
         html_data: working_paper.parsed_data['html_data'] 中对应数据
         project_meta: 项目元数据（entity_name, period_end, index_no, page_no 等）
+        has_entry_rows: 该底稿在 `checklist_responses` 是否有**非空**行。
+            仅用于自证分档：`html_data` 空时区分"从没填过"（`html_data_absent`）
+            与"填了但没写进 xlsx"（`entry_not_in_xlsx`）——真实库 131 份有录入的
+            底稿里 126 份属后者，两者的处置建议完全不同（R1.8）。
+            默认 `False` 保持既有调用方行为不变（additive）。
+        entry_payloads: `entry_payload_reader.read_entry_payloads()` 的产出
+            （`EntryPayloadResult`）。给出则在产物里**追加**一张录入清单 sheet；
+            为 `None` 则完全跳过该步。默认 `None` ⇒ 既有调用方零改动（additive）。
 
     Returns:
         BytesIO 包含导出的 xlsx 数据
@@ -261,6 +271,22 @@ def _sync_export_workpaper_xlsx(
         except Exception as e:
             logger.debug("worksheet 维度计算失败，忽略: %s", e)
 
+    # 2.5 自证（R1.2 / R1.8）—— 产物必须自己说清"为什么是空的"
+    _stamp_export_self_evidence(
+        wb,
+        html_data=html_data,
+        has_entry_rows=bool(has_entry_rows),
+    )
+
+    # 2.6 录入清单 sheet（R2.1~R2.8）—— 把 checklist_responses 接进产物。
+    # 🔴 只**追加** sheet，模板既有 sheet 逐格不动（R2.3）：模板单元格回填需
+    #    per-cycle 地址映射，而 `structure.json` 全库 0 个、`item_id` 形态 211 种，
+    #    没有可用映射真源。硬塞会把数据写进错格子 —— 错数比无数更难发现。
+    if entry_payloads is not None:
+        from app.services.wp_export.entry_sheet_writer import write_entry_sheet
+
+        write_entry_sheet(wb, entry_payloads)
+
     # 3. 保存到 BytesIO
     buf = BytesIO()
     wb.save(buf)
@@ -270,11 +296,72 @@ def _sync_export_workpaper_xlsx(
     return buf
 
 
+#: 自证 sheet 名 —— 前缀 `_` 让它排在业务 sheet 之前，用户打开就看到。
+_SELF_EVIDENCE_SHEET_NAME = "_导出说明"
+
+
+def _stamp_export_self_evidence(
+    wb: Any,
+    *,
+    html_data: dict[str, Any],
+    has_entry_rows: bool,
+) -> None:
+    """按需给导出产物加一张自证 sheet。
+
+    ## 🔴 为什么另建 sheet 而不是往模板第 1 行盖章
+
+    本函数拿到的 `wb` 是**加载后的致同模板**，第 1 行通常是表头/单位名称。
+    直接 `stamp_self_evidence(ws, ...)` 会覆写掉模板表头 —— 那是把"说明清楚"
+    换成"内容被削"，不划算。故另建一张 sheet 并插到最前。
+
+    ## 判定与 R1.6
+
+    走 `needs_self_evidence` 单一判据。`verdict` 传 `'file'` —— 本路径的模板已
+    成功加载，文件层面必然 OK；真正要区分的是 `html_data` 空/缺键两档。
+    正常态（`html_data` 非空）判据返 `None`，本函数直接 return，**不给正常
+    产物加任何 sheet**（R1.6 禁噪声）。
+    """
+    from app.services.wp_export.self_evidence import (
+        SELF_EVIDENCE_DATA_START_ROW,
+        build_self_evidence_banner,
+        needs_self_evidence,
+        stamp_self_evidence,
+    )
+
+    kind = needs_self_evidence(
+        verdict="file",
+        html_data=html_data,
+        has_entry_rows=has_entry_rows,
+    )
+    if kind is None:
+        return
+
+    banner = build_self_evidence_banner(kind=kind)
+
+    # sheet 名去重（模板极小概率已有同名）
+    name = _SELF_EVIDENCE_SHEET_NAME
+    seq = 1
+    while name in wb.sheetnames:
+        seq += 1
+        name = f"{_SELF_EVIDENCE_SHEET_NAME}{seq}"
+
+    ws = wb.create_sheet(title=name, index=0)
+    stamp_self_evidence(ws, banner)
+    ws.cell(
+        row=SELF_EVIDENCE_DATA_START_ROW,
+        column=1,
+        value="（本页由系统在导出时生成；其余工作表为致同模板原样内容）",
+    )
+    ws.column_dimensions["A"].width = 100
+
+
 async def export_workpaper_xlsx(
     wp_code: str,
     html_data: dict[str, Any],
     schema: dict,
     project_meta: dict[str, Any],
+    has_entry_rows: bool = False,
+    entry_payloads: Any = None,
 ) -> BytesIO:
     """异步导出底稿 xlsx（致同模板填值还原）。
 
@@ -290,6 +377,10 @@ async def export_workpaper_xlsx(
             - period_end: 审计截止日
             - index_no: 索引号
             - page_no: 页码（默认 '1/1'）
+        has_entry_rows: 该底稿在 `checklist_responses` 是否有非空行（自证分档用，
+            见 `_sync_export_workpaper_xlsx`）。默认 `False` ⇒ 既有调用方零改动。
+        entry_payloads: 录入载荷（`EntryPayloadResult`），给出则追加录入清单 sheet。
+            默认 `None` ⇒ 既有调用方零改动。
 
     Returns:
         BytesIO 包含导出的 xlsx 数据
@@ -316,6 +407,8 @@ async def export_workpaper_xlsx(
             schema,
             html_data,
             project_meta,
+            has_entry_rows,
+            entry_payloads,
         )
 
     return result

@@ -19,6 +19,13 @@
         <el-button size="small" type="primary" text :loading="aiLoading" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="k12"
+          sheet="K12-2"
+          :disabled="props.isReadonly"
+          @imported="emit('imported')"
+        />
         <GtReviewTrigger section-id="K12-2-detail" label="💬 复核" />
       </div>
     </div>
@@ -227,6 +234,7 @@ import { generateK12AiText } from '../../composables/useK12AiText'
 
 const GtIndexChip = defineAsyncComponent(() => import('../../GtIndexChip.vue'))
 const GtReviewTrigger = defineAsyncComponent(() => import('../../GtReviewTrigger.vue'))
+const CycleImportExportDropdown = defineAsyncComponent(() => import('../../shared/CycleImportExportDropdown.vue'))
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -239,6 +247,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
+  /** 导入完成 → 父宿主重载 allResponses（父绑定 @imported="selfLoad()"） */
+  (e: 'imported'): void
 }>()
 
 // ─── Detail Row 数据 ─────────────────────────────────────────────────────────

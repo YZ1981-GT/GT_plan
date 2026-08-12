@@ -4202,3 +4202,291 @@ jobs:
           src/components/workpaper/composables/__tests__/e1NegativeBalance.spec.ts
           src/components/workpaper/composables/__tests__/e1CurrencyScope.spec.ts
           src/components/workpaper/composables/__tests__/e1FxNoteSectionMap.spec.ts
+  procedure-trim-intelligence:
+    # 程序裁剪与人员委派智能化 —— 后端守卫 + 迁移幂等 + 变异检验
+    # （procedure-trimming-and-delegation-intelligence Task 1/2/9/10/11/12/14/21/22/23/24）
+    #
+    # 🔴 本 job 同时装 python 与 node：两个变异脚本**跨前后端**（T22-6/T22-11 打后端、
+    #    其余 10 条打前端 composables 与 ProcedureTrimming.vue），缺 vitest 会 NO-JSON
+    #    ⇒ 基线 fatal ⇒ 脚本 exit 2。两脚本原写死 `cmd /c npm`（Windows 专有），
+    #    Task 24 已改为按 os.name 分支，否则在 ubuntu-latest 上恒红。
+    #
+    # 拦五类已实测缺陷：
+    # 1. **additive 扩展偷偷删存量**：`TrimReasonCode` 从 4 值扩到 8 值，任一既有值被
+    #    「优化」掉即红；前端镜像 `trimReasonCodes.ts` 与后端枚举**逐值交叉锁死**
+    #    （一侧新增而另一侧未跟进 → 下拉里显示裸码）。
+    # 2. **`reason_code` 必须条件写入**：无条件写进 canonical entry 的返回 dict 会让存量
+    #    payload 键集变化 ⇒ 防篡改 hash 全变 ⇒ 在途 preview 凭证**全部 409**（R8.9）。
+    # 3. **迁移幂等 + ORM 列集精确相等**：`suggestion_state` 迁移二次应用须零变更；列清单
+    #    由**扫全部 V*.sql** 派生，禁手写按迁移号分组的常量（迁移号永不复用）。漏加 ORM
+    #    `mapped_column` 会让列在表里存在而代码写不进去。
+    # 4. **`no_data` 自动裁集合零回归**：真实库 `procedure_instances` 0 条已裁剪 ⇒ 只能用
+    #    构造输入 characterization；唯一分歧输入类 `is_mandatory=true` 靠「ORM 无该列 +
+    #    `_to_dict` 不下发」证明不可达，`_to_dict` 一旦下发它，等价论证的前提即失效。
+    # 5. **连库判据在 CI 会 skip**：三个守卫的真实库断言按 `pytest.skip('真实库不可达')`
+    #    降级 ⇒ ⚠️ **本 job 绿不代表连库判据被执行过**，真实验收另见 Task 25。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect whether this spec's surface changed
+        id: scope
+        run: |
+          # GitHub Actions 没有 per-job 的 paths 过滤（paths 只能挂 workflow 级
+          # on.push / on.pull_request，加上去会波及本文件其余 139 个 job）
+          # ⇒ 这里用无第三方依赖的 git diff 门控。
+          #
+          # 方向必须 fail-open-toward-running：base 取不到或 diff 失败时 run=true。
+          # 反向（默认跳过）会让门控一坏就静默关闸 —— 那是假绿。
+          set -u
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          PATTERN='^(backend/app/services/(procedure_|b50_risk_reader|trim_decision_context|workpaper_entry_probe|note_content_utils)|backend/app/routers/procedure_|backend/app/models/|backend/migrations/|backend/tests/procedure_trim/|backend/scripts/check/mutate_|audit-platform/frontend/src/services/|audit-platform/frontend/src/views/ProcedureTrimming\.vue|audit-platform/frontend/src/views/__tests__/|audit-platform/frontend/src/components/workpaper/(composables|delegation|trim)/|audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment\.vue|\.github/workflows/governance-checks\.yml)'
+          RUN=true
+          if [ -n "${BASE:-}" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            if CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}" 2>/dev/null); then
+              if printf '%s\n' "$CHANGED" | grep -Eq "$PATTERN"; then RUN=true; else RUN=false; fi
+            fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "scope: run=$RUN base=${BASE:-<none>}"
+      - uses: actions/setup-python@v5
+        if: steps.scope.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install backend deps
+        if: steps.scope.outputs.run == 'true'
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps (required by cross-side mutation scripts)
+        if: steps.scope.outputs.run == 'true'
+        run: npm ci
+        working-directory: audit-platform/frontend
+      # 🔴 pytest 一律从**仓库根**跑：这些守卫用相对路径读 backend/ 下的源码与 migrations，
+      #    从 backend/ 跑会拼成 backend/backend/... 而假红（平台已实测 17 例）。
+      - name: Backend guards (B50 reader / decision context / entry probe / reason code / note linkage)
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pytest backend/tests/procedure_trim/ -q
+      - name: Migration idempotency + ORM column-set equality (suggestion_state)
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pytest backend/tests/procedure_trim/test_suggestion_state_migration.py -q
+      # 变异检验：每条必须打红并字节级还原；GREEN / ANCHOR-MISS / WRONG-TEST / NO-JSON
+      # 四态均非零退出。判定按**失败测试名集合求差集**，不看退出码（本面有预存在红）。
+      # 🔴 T23-6 首轮实测 GREEN，暴露判据写成 `toContain('COMMON_SKIP_REASONS')` 被**模板
+      #    消费点**骗绿（该标识符在裁剪页出现两次：声明 + v-for）⇒ 已改声明级带定界符判据。
+      # 运行时较长（合计 40 条变异，每条跑一轮 pytest + 一轮 vitest）。若需缩短，两脚本
+      # 均支持 `--only` / `--only-prefix`（如 `--only-prefix T22`）按族单跑。
+      - name: Mutation check T10/T22 family (every guard must go red, then restore)
+        if: steps.scope.outputs.run == 'true'
+        run: python backend/scripts/check/mutate_trim_decision_guards.py
+      - name: Mutation check T23 family (retired baselines must stay load-bearing)
+        if: steps.scope.outputs.run == 'true'
+        run: python backend/scripts/check/mutate_task23_baseline_guards.py
+
+  procedure-trim-intelligence-frontend:
+    # 程序裁剪与人员委派智能化 —— 前端纯函数守卫 + 跨前后端交叉锁死
+    # （同 spec Task 3/4/5/6/7/8/13/15/16/17/18/19/20/21/23/24）
+    #
+    # 拦五类「四层验证（Volar / vitest / get_diagnostics / HEAD-swap）全绿、只有守卫或
+    # 浏览器才暴露」的形态：
+    # ① **模板里的零声明自由调用**：`suggestionOf(row)` 等 5 个标识符曾全文零声明、运行即
+    #    ReferenceError，而 SFC 模板表达式不参与 TS 类型检查 ⇒ 判据把模板自由调用集合
+    #    **冻结**为恰 ['calc','var']（两个 CSS 函数，非 JS 标识符）。
+    # ② **脚本有声明而模板无渲染宿主**（①的对偶）：逐循环覆盖面板 14 个绑定齐备却没有
+    #    el-dialog 本体，点按钮只把一个没人读的 ref 置真。
+    # ③ **名字存在类判据被子串骗过**：`toContain('<GtTrimAdequacyReview')` 被
+    #    `<GtTrimAdequacyReviewXX` 骗过、`.gt-proc-nlink__hint` 被 `__hintX` 骗过、
+    #    `toContain('COMMON_SKIP_REASONS')` 被模板消费点骗过 ⇒ 一切类名/标签名/标识符判据
+    #    必须带定界符并先 stripComments（并配 raw 侧命中数 > clean 侧的反向自检）。
+    # ④ **负载/资历的双真源**：前端自算「底稿张数」与后端「非终态任务数」口径不同；
+    #    `ROLE_PRIORITY` 是排序优先级（越小越前、兜底 90），**语义方向与资历相反**，
+    #    挪到资历尺子上会变成「未登记角色资历最高」。负载缺失必须显示「负载未知」而非 0。
+    # ⑤ **委派 409 有三个语义**（stale / assigned_conflict / SOD）：一刀切「请重新预览」
+    #    会让 SOD 冲突反复做无用功；零目标时 apply 返 200 + applied:0，不单列一态会把
+    #    「一行未动」稳定显示成「委派成功」。
+    #
+    # ⚠️ `get_diagnostics` 在 `ProcedureTrimming.vue` 上实测**恒返 0**（连
+    #    `const x: number = '字符串'` 都不报）⇒ 该文件类型面只能靠隔离 tsconfig + probe.ts
+    #    核（全项目 vue-tsc 4G/8G 堆均 OOM），故这些 vitest 守卫是它唯一的自动化闸。
+    #
+    # 🔴 不用 defaults.working-directory：scope 门控步骤必须在**仓库根**跑 git diff，
+    #    故 npm 步骤逐个显式指定 working-directory（同 h-cycle-frontend 的写法）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect whether this spec's surface changed
+        id: scope
+        run: |
+          # GitHub Actions 没有 per-job 的 paths 过滤（paths 只能挂 workflow 级
+          # on.push / on.pull_request，加上去会波及本文件其余 139 个 job）
+          # ⇒ 这里用无第三方依赖的 git diff 门控。
+          #
+          # 方向必须 fail-open-toward-running：base 取不到或 diff 失败时 run=true。
+          # 反向（默认跳过）会让门控一坏就静默关闸 —— 那是假绿。
+          set -u
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          PATTERN='^(backend/app/services/(procedure_|b50_risk_reader|trim_decision_context|workpaper_entry_probe|note_content_utils)|backend/app/routers/procedure_|backend/app/models/|backend/migrations/|backend/tests/procedure_trim/|backend/scripts/check/mutate_|audit-platform/frontend/src/services/|audit-platform/frontend/src/views/ProcedureTrimming\.vue|audit-platform/frontend/src/views/__tests__/|audit-platform/frontend/src/components/workpaper/(composables|delegation|trim)/|audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment\.vue|\.github/workflows/governance-checks\.yml)'
+          RUN=true
+          if [ -n "${BASE:-}" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            if CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}" 2>/dev/null); then
+              if printf '%s\n' "$CHANGED" | grep -Eq "$PATTERN"; then RUN=true; else RUN=false; fi
+            fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "scope: run=$RUN base=${BASE:-<none>}"
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        if: steps.scope.outputs.run == 'true'
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Run trim decision / delegation / note-linkage / zero-regression guards
+        if: steps.scope.outputs.run == 'true'
+        working-directory: audit-platform/frontend
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/b50Completeness.spec.ts
+          src/components/workpaper/composables/__tests__/procedureTrimDecision.spec.ts
+          src/components/workpaper/composables/__tests__/procedureTrimDecision.behavior.spec.ts
+          src/components/workpaper/composables/__tests__/trimNoDataZeroRegression.spec.ts
+          src/components/workpaper/composables/__tests__/trimReasonCodes.spec.ts
+          src/components/workpaper/composables/__tests__/trimAggregateGate.spec.ts
+          src/components/workpaper/composables/__tests__/completenessExemption.spec.ts
+          src/components/workpaper/composables/__tests__/delegationSuggestion.spec.ts
+          src/components/workpaper/composables/__tests__/delegationSeniority.spec.ts
+          src/components/workpaper/delegation/__tests__/delegationSuggestionTable.spec.ts
+          src/views/__tests__/b50BadgeSingleSource.spec.ts
+          src/views/__tests__/trimDecisionWiring.spec.ts
+          src/views/__tests__/trimDegradationConsistency.spec.ts
+          src/views/__tests__/trimAdequacyReview.spec.ts
+          src/views/__tests__/completenessScopeOverride.spec.ts
+          src/views/__tests__/noteLinkageHost.spec.ts
+          src/views/__tests__/delegationLoadSingleSource.spec.ts
+          src/views/__tests__/delegationSuggestionApply.spec.ts
+
+  wp-import-export-lifecycle:
+    # 底稿导入导出全生命周期守卫（spec workpaper-import-export-lifecycle-closure）
+    #
+    # 挂载 12 个后端守卫文件 + 五类覆盖元守卫 + 两个幂等脚本 --check。
+    # 背景：本 spec 立项台账多处与实证不符（模块数 102→99、三态端点 314→308、
+    # 三态齐全前缀 36→100），且发现 4 类「四层守卫全绿但用户点了就错」的缺陷：
+    #   ① 956 份底稿 file_path 直指模板库且 955 份跨项目共享 —— 保存即污染
+    #      运行时权威模板 + 串数据（已迁移，本 job 的 templates_readonly 拦回退）
+    #   ② h5/n4 的路径形态端点从未 include_router，挂 dropdown 必 404
+    #   ③ l4 后端不收 sheet 参数，FastAPI 静默丢弃 ⇒ 导出内容与页面不符
+    #   ④ 场景文案里写了 Markdown，纯文本插值渲染成字面量星号
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+      - name: 元守卫（五类覆盖 + CI 接线自检）
+        # 五类覆盖：产物自证 / 数据源接通 / registry 三向锁死 / 孤儿基线 / 模板库只读
+        #   逐类至少一个守卫文件存在、非空壳、未被整体 skip、且至少一个做过变异检验
+        # CI 接线：yaml 可解析 + 无重名 job（后者会静默覆盖前者）+ 引用路径存在
+        #   + 16 个守卫全部挂载 + 幂等脚本只许 --check + 严格 step 未被 `|| true` 消音
+        run: |
+          python -m pytest -q \
+            backend/tests/test_ie_lifecycle_guard_coverage.py \
+            backend/tests/test_ie_lifecycle_ci_wiring.py
+      - name: 产物自证 + 下载清单
+        run: |
+          python -m pytest -q \
+            backend/tests/services/test_wp_export_self_evidence.py \
+            backend/tests/services/test_wp_download_manifest.py
+      - name: 数据源接通（载荷读取 + 录入 sheet 落盘）
+        run: |
+          python -m pytest -q \
+            backend/tests/services/test_entry_payload_reader.py \
+            backend/tests/services/test_export_entry_sheet.py
+      - name: registry 三向锁死 + 端点可达性
+        run: |
+          python -m pytest -q \
+            backend/tests/test_ie_route_inventory.py \
+            backend/tests/test_ie_prefix_reachability.py
+      - name: 四场景 UI 单一真源 + 批量场景/门控
+        run: |
+          python -m pytest -q \
+            backend/tests/test_bulk_scenario_ui_single_source.py \
+            backend/tests/services/test_scenario_registry.py \
+            backend/tests/services/test_bulk_mode_mismatch.py \
+            backend/tests/services/test_archive_gating.py \
+            backend/tests/services/test_bulk_visible_filter_granularity.py
+      - name: 模板库只读 + 解引用脚本行为
+        run: |
+          python -m pytest -q \
+            backend/tests/test_wp_templates_readonly.py \
+            backend/tests/scripts/test_wp_template_deref.py
+      - name: 幂等脚本 --check（registry 生成器 / catalog IE 缺口）
+        # 🔴 只跑 --check：这两个脚本的 --apply 会改 catalog 与生成文件，
+        # CI 里必须只读。--check 非 0 即说明版本库里的产物与生成器输出不一致。
+        run: |
+          python backend/scripts/fix/gen_cycle_import_export_registry.py --check
+          python backend/scripts/fix/fix_acnr_catalog_ie_gap.py --check
+      - name: 真实库四场景往返验收
+        # 🔴 报告模式：本 job 跑在 CI 的空库上，`--limit` 找不到合法对象会
+        # 正确地报「无法验收」并 exit 2 —— 那是**期望行为**而非失败。
+        # 真实验收由开发者在有数据的环境跑（2026-08-12 已实测 12/12 通过：
+        # D1 46 非空行 / L1 33 / J2 25，产物逐条找回、模板 21 sheet 无损）。
+        # 挂在 CI 里的价值是「脚本本身可执行、不会 import 错”。
+        continue-on-error: true
+        run: python backend/scripts/diagnose/verify_ie_lifecycle_live.py --limit 1
+      - name: 变异检验清单自检（不执行变异）
+        # 只跑 --list：校验 expect 字段能匹配真实测试名、缺口已登记、
+        # 理由表无 stale/未知键。真正执行变异需改文件，不适合 CI 并发环境。
+        run: python backend/scripts/diagnose/mutate_ie_lifecycle_guards.py --list
+
+  wp-import-export-lifecycle-frontend:
+    # 前端侧：接线闭环 + registry 门面锁死 + 孤儿基线 + 四场景渲染管线
+    #
+    # 🔴 `ieOrphanBaseline.spec.ts` 有 1 条**有意保持红色**的占位断言
+    # （剩 6 个孤儿各有实证阻塞，逐条写在 ORPHAN_BASELINE 注释里），
+    # 故该文件用 continue-on-error 单列，不阻断 PR；其余三个严格阻断。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install deps
+        run: npm ci
+      - name: 接线闭环 + registry 锁死 + 四场景渲染
+        run: |
+          npx vitest run --silent=true \
+            src/components/workpaper/__tests__/ieWiringIntegrity.spec.ts \
+            src/components/workpaper/shared/__tests__/cycleImportExportRegistry.spec.ts \
+            src/components/workpaper/bulk-tab/__tests__/WpBulkImportExport.spec.ts
+      - name: 孤儿基线（含有意留红的占位断言，报告模式）
+        continue-on-error: true
+        run: |
+          npx vitest run --silent=true \
+            src/components/workpaper/__tests__/ieOrphanBaseline.spec.ts

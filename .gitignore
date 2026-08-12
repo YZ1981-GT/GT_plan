@@ -162,3 +162,13 @@ tools/officecli/_word_probe*
 backend/health.json
 # Vite 依赖预构建缓存
 .vite/
+
+# 变异检验产物（spec: workpaper-import-export-lifecycle-closure Task 21）
+# 报告可由 `mutate_ie_lifecycle_guards.py --run` 随时重跑，不入库；
+# `.mutbak` 是脚本被强杀后的备份残留，用 `--restore` 收尾，同样不该入库。
+backend/scripts/diagnose/_mutation_reports/
+*.mutbak
+.mut_vitest_*.json
+
+# 🔴 注意：`backend/scripts/fix/_ledgers/` **不在**忽略列表内 —— 那是
+# 模板库解引用迁移（Task 19）的台账，是 `--rollback` 的唯一依据，必须入库。

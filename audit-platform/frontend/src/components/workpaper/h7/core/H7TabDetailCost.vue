@@ -16,6 +16,13 @@
       <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddRow">+ 新增资产行</el-button>
       <span class="chip-wrap"><GtIndexChip value="wp:H7-2" :context-project-id="projectId" /></span>
       <el-tag size="small" type="info">共 {{ rows.length }} 行</el-tag>
+      <CycleImportExportDropdown
+        :wp-id="wpId"
+        api-prefix="h7"
+        sheet="H7-2"
+        :disabled="isReadonly"
+        @imported="emit('imported')"
+      />
     </div>
 
     <!-- 基础信息 -->
@@ -165,6 +172,7 @@ import { ref, computed, onMounted, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import GtIndexChip from '../../GtIndexChip.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useH7DetailCost } from '../../composables/useH7DetailCost'
 
 const props = defineProps<{
@@ -173,6 +181,9 @@ const props = defineProps<{
   allResponses: Map<string, any>
   isReadonly: boolean
 }>()
+
+// 导入完成后由父宿主重载 allResponses（父绑定 @imported="selfLoad()"）
+const emit = defineEmits<{ imported: [] }>()
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 

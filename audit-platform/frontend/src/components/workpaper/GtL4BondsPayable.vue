@@ -39,6 +39,7 @@
         :project-id="props.projectId"
         :is-readonly="isReadonly"
         @navigate="handleNavigate"
+        @imported="selfLoad()"
       />
       <!-- L4-3 划分为金融负债的其他金融工具 -->
       <L4TabFinLiabOther

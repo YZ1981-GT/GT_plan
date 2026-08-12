@@ -4,6 +4,13 @@
     <div class="section-head">
       <h3 class="sheet-title">K5-3 调整分录汇总</h3>
       <div class="head-actions">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="k5"
+          sheet="K5-3"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" type="success" :disabled="isReadonly || !isBalanced" @click="handleSaveWriteback">
           保存&amp;回写
         </el-button>
@@ -223,6 +230,7 @@ import { Delete, MagicStick } from '@element-plus/icons-vue'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 import GtIndexChip from '../../GtIndexChip.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '../../composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 
@@ -238,6 +246,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
+  /** 导入完成 → 父宿主重载 allResponses（父绑定 @imported="selfLoad()"） */
+  (e: 'imported'): void
 }>()
 
 const openReview = inject<(sectionId: string) => void>('openReviewDialog', () => {})

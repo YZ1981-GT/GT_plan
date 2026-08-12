@@ -1,0 +1,163 @@
+{
+ "mode": "apply",
+ "ts": "2026-08-12T09:25:20+00:00",
+ "target_base": "D:\\GT_plan\\backend",
+ "total_rows": 1244,
+ "to_migrate": 3,
+ "skipped_not_template": 1241,
+ "blocked_n": 0,
+ "blocked": [],
+ "out_of_scope_n": 181,
+ "out_of_scope": [
+  {
+   "wp_id": "f12c9f98-6193-442e-b3e0-58a94f0e64f8",
+   "file_path": "/tmp/03ab248f.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "dbac8180-cdb2-4657-8253-03e9bbbe2caf",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B23-11.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "1f2edc3b-bd6b-40c0-a412-a2a0c99198d0",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B30-1.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "4f6bc6bd-39fd-48c0-a412-d2fb8a544679",
+   "file_path": "/tmp/0cfc715f.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "12e7c48b-fe9b-4847-8c42-56c22552d48c",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B30-2.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "37759534-11d2-4bf8-a0b4-37c153378aad",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B30-2B.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "6979d121-f2b8-460a-9c34-b7dd9e60a477",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B30-3.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "08a553b2-93e7-491f-8c60-788d91b9e278",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B30-5.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "19340190-6a86-4f4e-8ea9-4c7183c83e5a",
+   "file_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/B51-3.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "9cce86cc-f485-404f-a4c2-ccbad1777c75",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A1-11.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "35643620-4d1d-470c-8348-2a504245a498",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A1-12.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "c10db499-362b-49d1-aca2-6acd4555e851",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A1-13.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "f62bcc2f-3cc4-4a40-9189-0af67fa50eaf",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A1-14.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "1c4cdc0d-1a8f-4ac1-9e3f-b80651d68579",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A1-15.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "50d6bb21-3483-42dd-8374-eebdc1960785",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A1-16.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "e68da3ce-61c4-4e28-b10e-ea366033d838",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A10-1.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "9bec7188-1331-4cb1-bdbe-e1ddd7391e1e",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A10-2.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "6e6d328c-6995-48d7-ae58-1deef69e3d96",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A11-2.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "569a4a41-4d9c-448b-b2c2-69ca9a8b9ae4",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A12-1.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  },
+  {
+   "wp_id": "75719aaf-b19e-4100-97b0-71cd13d29c4a",
+   "file_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/A13-2.xlsx",
+   "reason": "file_path 指向不存在的文件（无源可复制，属既存缺陷）"
+  }
+ ],
+ "copy_mb": 0.5,
+ "notes": [
+  "空 file_path 的 1564 份不在本迁移范围（无可复制源，属 Task 5 自证层）",
+  "C24 那份 1,033,230 行 checklist 未做任何处理（只改 file_path，不动 checklist）"
+ ],
+ "verdict_before": {
+  "file": 1063,
+  "missing": 181
+ },
+ "verdict_after": {
+  "file": 1063,
+  "missing": 181
+ },
+ "migrated_n": 3,
+ "conflicts_n": 0,
+ "failed_n": 0,
+ "migrated": [
+  {
+   "wp_id": "fd3433f4-0d9d-4804-828a-2fbc0dc832d2",
+   "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+   "wp_code": "D1",
+   "old_path": "wp_templates/D/D1 应收票据.xlsx",
+   "new_path": "storage/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/D/D1.xlsx",
+   "sha256_before": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577",
+   "sha256_after": "e6e8dcf28ba6e7f6fdf9867c3ac43b2f1a72e1a1b6f2aa477f58dfca39097577",
+   "ts": "2026-08-12T09:25:21+00:00"
+  },
+  {
+   "wp_id": "cce17616-9ff4-4030-8468-9ca99b7f8913",
+   "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+   "wp_code": "I4",
+   "old_path": "wp_templates/I/I4 长期待摊费用.xlsx",
+   "new_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/I/I4.xlsx",
+   "sha256_before": "8bfb85884705e47121589227d3212f3e406cab9b4ea6e0736d53b951c65eb8f8",
+   "sha256_after": "8bfb85884705e47121589227d3212f3e406cab9b4ea6e0736d53b951c65eb8f8",
+   "ts": "2026-08-12T09:25:21+00:00"
+  },
+  {
+   "wp_id": "44d11a4f-ba20-4a98-8bde-8011e7f8ff3b",
+   "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+   "wp_code": "S15",
+   "old_path": "wp_templates/S/S15 每股收益和净资产收益率.xlsx",
+   "new_path": "storage/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/S/S15.xlsx",
+   "sha256_before": "b5ac01fffb107257772666a3b04cd7d1ac67de02236c5b8ed19c0ed2205477ef",
+   "sha256_after": "b5ac01fffb107257772666a3b04cd7d1ac67de02236c5b8ed19c0ed2205477ef",
+   "ts": "2026-08-12T09:25:21+00:00"
+  }
+ ],
+ "conflicts": [],
+ "failed": []
+}

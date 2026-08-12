@@ -14,6 +14,13 @@
     <div class="section-header">
       <h3>K5-2 预计负债明细表</h3>
       <div class="header-actions">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="k5"
+          sheet="K5-2"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button size="small" :disabled="isReadonly" @click="handleAddRow">
           <el-icon><Plus /></el-icon> 新增行
         </el-button>
@@ -359,6 +366,7 @@ import { Plus, Delete, ArrowDown, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useK5Detail, LIKELIHOOD_COLOR_MAP } from '../../composables/useK5Detail'
 import GtIndexChip from '../../GtIndexChip.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 
@@ -372,6 +380,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
   (e: 'navigate-sheet', sheetName: string): void
+  /** 导入完成 → 父宿主重载 allResponses（父绑定 @imported="selfLoad()"） */
+  (e: 'imported'): void
 }>()
 
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用

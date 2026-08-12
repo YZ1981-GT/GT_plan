@@ -13,7 +13,9 @@ import {
   calcSubtotal,
 } from '../composables/useG13FormulaEngine'
 import { G13_ACCOUNT_CODE, G13_CHANGE_RATE_THRESHOLD, G13_ADJUDICATION_ITEMS } from '../composables/g13Constants'
-import { G13_IMPORT_EXPORT_SHEETS } from '../composables/useG13ImportExport'
+// G13 的导入导出 sheet 清单真源 = registry（原 `useG13ImportExport.ts` 只是
+// 一份重复常量，已随孤儿处置删除 —— spec: workpaper-import-export-lifecycle-closure Task 16）
+import { CYCLE_IMPORT_EXPORT } from '../shared/cycleImportExportRegistry'
 
 vi.mock('vue', async () => {
   const actual = await vi.importActual('vue')
@@ -132,7 +134,7 @@ describe('G13 集成 — 审定表分组', () => {
 
 describe('G13 集成 — 导入导出', () => {
   it('2张表 G13-2/G13-3', () => {
-    expect(G13_IMPORT_EXPORT_SHEETS).toEqual(['G13-2', 'G13-3'])
+    expect([...CYCLE_IMPORT_EXPORT.g13.sheets]).toEqual(['G13-2', 'G13-3'])
   })
 })
 

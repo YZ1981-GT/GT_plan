@@ -96,6 +96,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @imported="selfLoad()"
           />
           <H7TabDetailFair
             v-else
@@ -103,6 +104,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            @imported="selfLoad()"
           />
         </template>
 
@@ -113,6 +115,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          @imported="selfLoad()"
         />
 
         <!-- H7-4 会计政策检查（CAS5） -->

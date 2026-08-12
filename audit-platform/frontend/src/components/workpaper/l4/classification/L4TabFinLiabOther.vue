@@ -16,6 +16,28 @@
         <el-button size="small" @click="handleReview">
           <el-icon><Check /></el-icon> 复核
         </el-button>
+        <!--
+          🔴 L4-3 不单独挂导入导出下拉（2026-08-12 实证）
+
+          l4 的后端三端点**不接受 sheet 参数**：
+            l4_export_template(wp_id, db, current_user)
+            l4_export_data(wp_id, db, current_user)
+            l4_import_data(wp_id, file, db, current_user)
+          （`app/routers/l4_bonds_payable.py`，整表导出语义）
+
+          FastAPI 对未声明的 query 参数是**静默丢弃**，所以在这里挂
+          `sheet="L4-3"` 不会报错，但导出的内容与 L4-2 完全相同 ——
+          用户会以为拿到的是 L4-3 的数据。不报错、四层守卫全绿，只有对着
+          导出文件核对才发现，属最难查的一类。
+
+          实测 registry 的 69 个多 sheet 前缀里，**只有 l4 一个**不接受 sheet
+          参数（其余 66 个都接受，另 2 个是 h5/n4 路径不可达）。故 l4 只在主表
+          L4-2 保留一个入口，语义即"导出本底稿数据"。
+
+          守卫：后端 `test_ie_prefix_reachability.py` 的 SHEET_AGNOSTIC_PREFIXES
+          钉死这类前缀，并限制它们在前端最多一个挂载点。
+          要让 L4-3 单独导出，须先给后端加 sheet 参数与 L4-3 的列结构（须有源模板依据）。
+        -->
       </div>
     </div>
 

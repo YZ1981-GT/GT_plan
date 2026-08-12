@@ -390,9 +390,31 @@ def make_bulk_visible_filter(
 
     默认以「读详情」可见性判定（可读即可纳入交付 ZIP）。不可见底稿静默返回 False（从 manifest 中
     剔除，不泄露存在性）；wp_id 缺失/非法返回 False。``entry_family`` 仅用于审计/限流归类。
+
+    🔴 **按整稿判定，不传 ``requested_sheet_key``**（2026-08-12 实测修正）
+
+    批量导出的粒度是**整份底稿文件**（一个 `wp_id` 对应一个 xlsx 进 ZIP），
+    不是页面级 sheet 资源。传 `requested_sheet_key` 会额外触发
+    `SheetBindingCatalog` 的 sheet 成员校验，而该 catalog 的候选集来自
+    ``ProcedureRowTask.sheet_key`` —— 实测**只覆盖 19 / 2802 个 wp_index（0.7%）**。
+
+    后果（实测量化）：`visible_filter` 对 99.3% 的底稿返回 False，
+    批量 Tab 导出的 ZIP 里**一份底稿都没有**，且因「不可见项不泄露存在性」
+    连跳过清单都不进 —— 用户拿到的是只含报表/附注/试算表的空壳包，
+    没有任何提示说明底稿去哪了。三个真实项目实测：
+    1025 份 → 0 份、1017 份 → 0 份、340 份 → 0 份进 ZIP。
+
+    修法是**去掉 sheet 维度**而不是给 catalog 补数据：
+      · 批量导出本就不请求某个 sheet，传 sheet_key 属语义错位
+      · 整稿可见性（`wp_id` 维度）才是这里该判的东西
+      · sheet 级隔离仍由页面级入口（`workpaper.detail` 带 sheet 的真实请求）负责，
+        本改动不放宽那条路径
+
+    `sheet_code` 形参保留：调用方（`bulk_export_service`）按位置传它，
+    且它对审计溯源有价值（知道剔除的是哪张表），只是不参与判定。
     """
 
-    async def _visible(wp_id: str | UUID | None, sheet_code: str | None) -> bool:
+    async def _visible(wp_id: str | UUID | None, sheet_code: str | None) -> bool:  # noqa: ARG001
         wid = _coerce_uuid(wp_id)
         if wid is None:
             return False
@@ -403,7 +425,7 @@ def make_bulk_visible_filter(
             action=action,
             method=method,
             wp_id=wid,
-            requested_sheet_key=sheet_code,
+            # 有意不传 requested_sheet_key —— 见 docstring
             entry_kind=entry_kind,
             entry_family=entry_family,
         )

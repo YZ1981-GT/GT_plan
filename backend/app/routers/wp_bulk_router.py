@@ -313,6 +313,62 @@ async def _require_manager_role(
 # ---------------------------------------------------------------------------
 
 
+@router.get("/scenarios")
+async def list_bulk_scenarios(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_project_access("readonly")),
+):
+    """四场景语义 + 当前项目状态下的可用性（R3.7 / R3.8）。
+
+    ## 为什么可用性也由后端算
+
+    前端只要自己判断一次「归档了就禁用导入」，就等于把门控规则抄了第二份 ——
+    后端真正拦下来的是 `workflow_gate._BLOCKED_STATUSES`（含 `archived` 与
+    `review_passed`）在 `bulk_import_service` 的 `dry_run()` / `run()` 两侧
+    调 `classify()` 跳过写入。两份规则一旦分叉，UI 会出现「按钮亮着但导入被静默跳过」
+    或「按钮灰着其实能导」两种都让人不信任的状态。
+
+    ⇒ 本端点直接下发 `disabled` + `disabledReason`，前端**照着渲染即可**，
+      不做任何状态判断。文案同样来自 `scenario_registry` 单一真源。
+
+    Note:
+        `archived_allowed=True` 的场景（两个导出）在归档态下**仍然可用** ——
+        归档后调阅不了就违背了归档的意义（`test_archive_gating.py` 钉死了
+        导出侧不得加状态过滤）。
+    """
+    from app.services.bulk_tab.scenario_registry import scenarios_for_ui
+
+    project = await db.get(Project, project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="项目不存在")
+
+    project_status = getattr(project.status, "value", project.status)
+    is_archived = project_status == ProjectStatus.archived.value
+
+    scenarios: list[dict[str, Any]] = []
+    for spec in scenarios_for_ui():
+        disabled = bool(is_archived and not spec["archivedAllowed"])
+        scenarios.append(
+            {
+                **spec,
+                "disabled": disabled,
+                "disabledReason": (
+                    "项目已归档。归档后底稿不可再被导入覆盖，以保全留痕完整性；"
+                    "如确需修改，请先由项目经理撤销归档。"
+                    if disabled
+                    else None
+                ),
+            }
+        )
+
+    return {
+        "projectStatus": project_status,
+        "isArchived": is_archived,
+        "scenarios": scenarios,
+    }
+
+
 @router.post("/preview-manifest")
 async def preview_manifest(
     project_id: UUID,

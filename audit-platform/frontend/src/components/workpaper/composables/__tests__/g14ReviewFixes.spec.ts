@@ -9,7 +9,9 @@ import { ALL_CYCLE_PROCEDURE_SHEETS } from '../cycleProcedureSheets'
 import { G14_LINE_ITEMS, G14_ACCOUNT_CODE } from '../g14Constants'
 import { G14_NOTE_SECTION } from '../g14NoteSectionMap'
 import { isG14SheetComplete } from '../g14SheetLabels'
-import { G14_IMPORT_EXPORT_SHEETS } from '../useG14ImportExport'
+// G14 导入导出 sheet 清单真源 = registry（原 `useG14ImportExport.ts` 是重复常量，
+// 已随孤儿处置删除 —— spec: workpaper-import-export-lifecycle-closure Task 16）
+import { CYCLE_IMPORT_EXPORT } from '../../shared/cycleImportExportRegistry'
 import { CYCLE_ADJUDICATION_CONFIGS } from '../../shared/cycleAdjudicationConfigs'
 import { FORMULA_ENGINE_INVENTORY } from '../formulaEngineInventory'
 
@@ -71,7 +73,7 @@ describe('G14 review fixes', () => {
   })
 
   it('导入清单仅 G14-2 / G14-3', () => {
-    expect([...G14_IMPORT_EXPORT_SHEETS]).toEqual(['G14-2', 'G14-3'])
+    expect([...CYCLE_IMPORT_EXPORT.g14.sheets]).toEqual(['G14-2', 'G14-3'])
   })
 
   it('已移除 useG14CreImp* 别名与 inventory 登记', () => {

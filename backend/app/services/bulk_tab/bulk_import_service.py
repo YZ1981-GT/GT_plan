@@ -201,6 +201,37 @@ class ImportPlan:
         return self.items
 
 
+def _check_manifest_mode(
+    manifest: dict[str, Any],
+    scenario: str,
+) -> Any:
+    """委托 `scenario_registry.validate_import_mode`，异常一律 fail-closed。
+
+    🔴 校验器自身出错（未知场景键 / 场景不可回传）时**不放行** ——
+    校验失败与"校验通过"必须可区分，否则一个拼错的场景键就会让整条
+    R3.5 防线静默失效（memory 记的 fail-open 掩盖接线错误）。
+    """
+    from app.services.bulk_tab.scenario_registry import (
+        ModeMismatch,
+        validate_import_mode,
+    )
+
+    try:
+        return validate_import_mode(manifest.get("mode"), scenario)
+    except (KeyError, ValueError) as e:
+        logger.error("manifest mode 校验器调用错误 scenario=%r: %s", scenario, e)
+        return ModeMismatch(
+            manifest_mode=str(manifest.get("mode") or ""),
+            expected_mode="data",
+            scenario_key=scenario,
+            message=(
+                f"导入被拒绝：无法校验 ZIP 类型（场景标识 {scenario!r} 无效）。\n"
+                f"  {e}\n"
+                f"  请重新从底稿页的导入入口发起，不要手工拼接请求。"
+            ),
+        )
+
+
 def align(
     manifest_files: list[dict[str, Any]],
     topo_sheets: list[dict[str, Any]],
@@ -375,6 +406,7 @@ async def dry_run(
     strategy: ConflictStrategy = "overwrite",
     *,
     preflight: Callable[[str, str | None], Any] | None = None,
+    scenario: str | None = None,
 ) -> ImportReport:
     """校验 manifest / 文件完整性 / 工作流状态门禁；不写库（Req 2.3）。
 
@@ -416,6 +448,14 @@ async def dry_run(
 
     manifest = reader.manifest
     manifest_files = manifest.get("files", [])
+
+    # ②.5 模板↔数据错用校验（R3.5）—— dry_run 侧也要报，否则用户预检看不到
+    if scenario is not None:
+        mismatch = _check_manifest_mode(manifest, scenario)
+        if mismatch is not None:
+            report.mark("__mode__", "failed", reason=mismatch.message)
+            reader.close()
+            return report
 
     # ③ 获取拓扑顺序 sheet 列表
     from app.services.wp_bulk_tab_export import list_import_sheets
@@ -507,6 +547,7 @@ async def run(
     atomicity: AtomicityMode = AtomicityMode.PER_SHEET,
     progress: Any | None = None,
     preflight: Callable[[str, str | None], Any] | None = None,
+    scenario: str | None = None,
 ) -> ImportReport:
     """正式批量导入：align → 门禁 → 快照 → 逐 sheet import → 报告 → 审计日志。
 
@@ -518,11 +559,14 @@ async def run(
         user: 操作用户（用于权限判断和审计日志）
         atomicity: 原子性策略 per-sheet / all-or-nothing
         progress: 可选进度回调（SSE 等）
+        scenario: 目标场景键（`fill_back` / `refresh_edit`）。给出则校验 ZIP 的
+            `manifest.mode` 与场景是否相符，不符**零写入**直接返回（R3.5）。
+            为 `None` 时跳过该校验 ⇒ 既有调用方行为不变（additive）。
 
     Returns:
         ImportReport（dry_run=False）
 
-    Requirements: 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 4.1, 4.2
+    Requirements: 2.1, 2.2, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3.5, 4.1, 4.2
     """
     report = ImportReport(strategy=strategy, dry_run=False)
 
@@ -546,6 +590,17 @@ async def run(
 
     manifest = reader.manifest
     manifest_files = manifest.get("files", [])
+
+    # ②.5 模板↔数据错用校验（R3.5）
+    # 🔴 必须在 align / 快照 / 任何写入**之前**：拿空白模板包覆盖已录入底稿
+    #    等于清空数据且不可撤销。`manifest_builder` 早已写入 `mode` 字段，
+    #    此前无人读取 —— 本校验是零新增存储的止损。
+    if scenario is not None:
+        mismatch = _check_manifest_mode(manifest, scenario)
+        if mismatch is not None:
+            report.mark("__mode__", "failed", reason=mismatch.message)
+            reader.close()
+            return report
 
     # ③ 获取拓扑顺序 sheet 列表（Req 2.2）
     from app.services.wp_bulk_tab_export import list_import_sheets

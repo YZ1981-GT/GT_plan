@@ -503,22 +503,19 @@ describe('K5 Integration — 附注subscribe + 调整分录EventBus', () => {
   })
 })
 
-// ═══ 7.2-G: useK5ImportExport 初始化验证 ═══
-
-describe('K5 Integration — useK5ImportExport初始化', () => {
-  it('uses http (axios) not native fetch', async () => {
-    const { readFileSync } = await import('fs')
-    const path = await import('path')
-    const filePath = path.resolve(__dirname, '../composables/useK5ImportExport.ts')
-
-    let source: string
-    try {
-      source = readFileSync(filePath, 'utf-8')
-    } catch {
-      return
-    }
-
-    expect(source).toContain("from '@/utils/http'")
-    expect(source).not.toMatch(/\bfetch\s*\(/)
-  })
-})
+// ═══ 7.2-G: 原 useK5ImportExport 初始化验证 —— 已随该 composable 一并删除 ═══
+//
+// spec: workpaper-import-export-lifecycle-closure Task 17
+//
+// `composables/useK5ImportExport.ts` 已删除：它的三态端点
+// （export-template / export-data / import-data）与共享组件
+// `CycleImportExportDropdown` 完全重叠且无额外能力，而 k5 的后端路径形态
+// `/api/workpapers/{wp_id}/k5/*` 三态可达、也接受 sheet 参数 ⇒ 两套并存只会
+// 改一处忘一处。K5TabDetail / K5TabAdjustment 现已挂 dropdown。
+//
+// 🔴 原测试块为什么必须一起删（而不是留着）：它读文件时用了
+//     try { readFileSync(...) } catch { return }
+// —— 文件不存在就**静默 return 而非打红**。留着它等于留一个恒绿的空测试，
+// 正是 memory 记的 fail-open 假绿。接线完整性现由
+// `__tests__/ieWiringIntegrity.spec.ts` 与
+// `backend/tests/test_ie_prefix_reachability.py` 覆盖。
