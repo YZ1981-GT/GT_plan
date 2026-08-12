@@ -53,6 +53,11 @@ import {
   e1NoteTexts,
   e1SummableRows,
 } from '../composables/e1DisclosureScope'
+import {
+  isE1MainRowDeducted,
+  isE1MainRowSlotPrefilled,
+  resolveE1MainRowAmount,
+} from '../composables/e1MainRowPrefill'
 import WpAmountInput from '../shared/WpAmountInput.vue'
 import WpDisclosureConsistencyPanel from '../shared/disclosure/WpDisclosureConsistencyPanel.vue'
 import {
@@ -62,17 +67,29 @@ import {
 import {
   E1_UNRESTRICTED,
   customBucketKey,
+  // 稳定序号：持久化单调计数器（禁 length/max+1，见该模块 nextRestrictedSeq 注释）
+  e1RestrictedSeqKey,
+  nextRestrictedSeq,
+  parseRestrictedSeq,
   e1RestrictedMapKey,
   e1RestrictedRowId,
   normalizeRestrictedPrefill,
   parseManualMap,
   pendingUnclassified,
+  // 待归类面板分区（R8.4）：父科目行与真明细行语义不同，处理方式也不同
+  partitionUnclassified,
   resolveRestrictedRows,
   restrictedTotals,
   serializeManualMap,
   unrestrictedLeaves,
   type E1RestrictedManualMap,
   type E1RestrictedRow,
+  // L2：E1-3 逐户受限归集（与 L1 并存，不互相覆盖 —— 见该模块 L2 段注释）
+  E1_BANK_DETAIL_ROWS_KEY,
+  parseBankDetailRowsForL2,
+  summarizeRestrictedFromAccounts,
+  buildRestrictedReasonText,
+  type E1BankDetailRowLike,
 } from '../composables/e1RestrictedScope'
 import { amountFormatter, amountParser } from '../composables/wpAmountInput'
 import { useAuditContext } from '@/composables/useAuditContext'
@@ -121,7 +138,11 @@ const applicableStandards = useHostApplicableStandards({
  * - 准则列表含本变体前缀 → 适用，渲染录入区
  * - 不含 → 不适用，渲染提示页，三个同步入口全部不写入
  * - 空数组 → fail-open 放行（解析不出不误杀）
- * 只判 entity 维度（listed*/soe*），scope 差异（standalone/consolidated）不触发
+ * 只判 entity 维度（listed、soe 前缀），scope 差异（standalone/consolidated）不触发
+ * 🔴 本行原写 `listed*` + `/` + `soe*`，其中的 `*` `/` 组合**提前闭合了本块注释**
+ *    → 整个 SFC 编译失败（Vite transform 500 / 披露 Tab 在浏览器打不开），
+ *    而 `get_diagnostics` 与 vitest 全绿（守卫只把本文件当文本读、不挂载组件）。
+ *    平台铁律：JSDoc 里禁写含注释定界符的内容。
  * @spec e1-orphan-components-wiring — Task 10
  */
 const variantApplicable = computed<boolean>(() => {
@@ -183,6 +204,13 @@ interface DisclosureRow {
 // （行标签逐字取自源 xlsx 并带 sourceRef，供后端守卫做三向比对；
 //  改造前此处内联两套 ITEMS，且 overseas 行写的是缩写「其中：存放境外」
 //  与源模板/附注的「其中：存放在境外的款项总额」不一致）
+//
+// 🔴 本表**完全数据驱动**（行集 = 真源数组，合计 = e1SummableRows 按 isTotal/isMemo 判定）
+//    ⇒ 真源加/删行无需改本组件；「其中：」备注行两变体走同一条渲染路径，不要另造分支。
+//    soe 侧的「其中：存放在境外的款项总额」行（附注 docx 有、底稿源 xlsx 无）已在真源里补齐。
+// 🔴 底稿 UI 用**源 xlsx 字面**（soe 首行是 A8 的原字），推送附注时由
+//    e1NoteSectionMap.mainRow() 按 noteLabel ?? label 投影成 docx 字面 —— 双口径，
+//    别在此处把 label 改成附注字面（会与源模板/导出模板分叉）。
 const disclosureItems = computed(() => e1MainRows(variant.value))
 
 const endingLabel = computed(() => e1MainColumns(variant.value).ending)
@@ -209,22 +237,28 @@ function loadOpenings(): void {
 }
 loadOpenings()
 
-// 单项期末数：从审定表跨sheet审定数（E1-adj-total-{code}）只读取数
-function effEnding(item: { crossKey: string }): number {
-  if (!item.crossKey) return 0
-  return Number(props.allResponses.get(item.crossKey)?.remark) || 0
+// allResponses 的 remark 读取器（供 e1MainRowPrefill 纯函数消费）
+const remarkGetter = (key: string): string | null | undefined =>
+  props.allResponses.get(key)?.remark
+
+// 单项期末数：审定表跨 sheet 审定数（`E1-adj-total-{code}`）只读取数。
+// 🔴 三个无科目码行（finance_co / accrued / digital）走**语义槽键**
+//    `E1-adj-slot-{key}`，并从 bank/other_mf 里扣减以避免双算 —— 口径与依据见
+//    `composables/e1MainRowPrefill.ts` 文件头（本组件不复现取数逻辑）。
+//    取不到值时纯函数返 null，此处按 0 参与合计但由 `endingResolved` 区分「空白 vs 0」。
+function effEnding(item: { key: string; crossKey: string }): number {
+  return resolveE1MainRowAmount(item, remarkGetter) ?? 0
 }
 // 单项期初数：手工覆盖优先（openingMap 显式含该 key），否则自动预填审定表期初审定数
-// （E1-adj-total-{code}-opening，本年期初=上年年末）。仅在 openingMap 未显式设置时预填。
+// （`E1-adj-total-{code}-opening` 或槽键的 -opening，本年期初=上年年末）。
 function effOpening(item: { key: string; crossKey: string }): number {
   if (item.key in openingMap.value) return Number(openingMap.value[item.key]) || 0
-  if (item.crossKey) return Number(props.allResponses.get(`${item.crossKey}-opening`)?.remark) || 0
-  return 0
+  return resolveE1MainRowAmount(item, remarkGetter, 'opening') ?? 0
 }
-// 某项期初是否自动预填（无手工覆盖且有科目映射且预填值非0）——供 UI 标注
+// 某项期初是否自动预填（无手工覆盖且取到了非 0 预填值）——供 UI 标注
 function isOpeningPrefilled(item: { key: string; crossKey: string }): boolean {
-  return !(item.key in openingMap.value) && !!item.crossKey
-    && (Number(props.allResponses.get(`${item.crossKey}-opening`)?.remark) || 0) !== 0
+  if (item.key in openingMap.value) return false
+  return (resolveE1MainRowAmount(item, remarkGetter, 'opening') ?? 0) !== 0
 }
 
 const disclosureRows = computed<(DisclosureRow & { openingPrefilled: boolean })[]>(() => {
@@ -246,6 +280,14 @@ const disclosureRows = computed<(DisclosureRow & { openingPrefilled: boolean })[
       endingAmount,
       openingAmount,
       openingPrefilled: item.isTotal ? false : isOpeningPrefilled(item),
+      // 🔴 「本项目无此科目」与「余额为 0」必须可区分：纯函数返 null 即前者，
+      //    此时期末列显示「—」而不是 0.00（Property 35）。合计行恒为已解析。
+      endingResolved:
+        item.isTotal || resolveE1MainRowAmount(item, remarkGetter) !== null,
+      // 该行是否由语义槽预填（供「预填」标记）
+      endingSlotPrefilled: isE1MainRowSlotPrefilled(item, remarkGetter),
+      // 该行金额是否已扣除单独列示项（供 tooltip 说明，避免用户以为数字错了）
+      endingDeducted: isE1MainRowDeducted(item, remarkGetter),
     }
   })
 })
@@ -530,9 +572,23 @@ const restrictedManualMap = ref<E1RestrictedManualMap>({})
 /** 已持久化的行（保留审计师录入的受限原因与纯手工行） */
 const restrictedPersisted = ref<E1RestrictedRow[]>([])
 
+/**
+ * 自定义受限类别的**持久化单调计数器**（Property 28）。
+ *
+ * 🔴 不能用 `rows.length` 或「现有最大 seq + 1」—— 删掉某自定义类别再新增会**复用**
+ * 已删序号，历史 cell/备注（按 row id 索引）会串到新类别上。判据见
+ * `e1RestrictedScope.nextRestrictedSeq`。
+ */
+const restrictedSeq = ref(0)
+
 function loadRestricted(): void {
   restrictedManualMap.value = parseManualMap(
     props.allResponses.get(e1RestrictedMapKey(variant.value))?.remark,
+  )
+  // 单调计数器：读回上次的最大序号（缺省 0）。不由行集派生 —— 行集里删掉的序号
+  // 正是不能复用的那些（Property 28）。
+  restrictedSeq.value = parseRestrictedSeq(
+    props.allResponses.get(e1RestrictedSeqKey(variant.value))?.remark,
   )
   const resp = props.allResponses.get(`${storagePrefix.value}-restricted`)
   if (!resp?.remark) {
@@ -578,6 +634,18 @@ const restrictedPending = computed(() =>
   pendingUnclassified(restrictedPrefill.value, restrictedManualMap.value),
 )
 
+/**
+ * 待归类叶子按「无子科目明细的父科目行 / 真明细行」分区（R8.4）。
+ *
+ * 两类语义完全不同、审计师的处理动作也不同（父科目行说明该科目未分户 ⇒ 通常整体
+ * 判「不受限」或走 E1-3 逐户口径 L2；真明细行才逐个归类），故分两张表展示而不是
+ * 混在一起。判据在 `e1RestrictedScope.partitionUnclassified`（只看码形态不看金额）。
+ *
+ * 🔴 两区都渲染、不隐藏任一侧 —— 隐藏父科目行会让「该科目未分户」这一事实消失，
+ *    审计师看不到就不会去 E1-3 填逐户受限金额（L2 链路的入口）。
+ */
+const restrictedPendingParts = computed(() => partitionUnclassified(restrictedPending.value))
+
 /** 被标「不受限」的叶子（金额进 F1-5/F1-6 勾稽差额侧，不隐藏） */
 const restrictedExcluded = computed(() =>
   unrestrictedLeaves(restrictedPrefill.value, restrictedManualMap.value),
@@ -585,6 +653,24 @@ const restrictedExcluded = computed(() =>
 
 /** ②表合计（源 xlsx R23「合  计」；校验预设 F1-4 要求合计 = 明细之和） */
 const restrictedTotal = computed(() => restrictedTotals(restrictedRows.value))
+
+// ─── L2：E1-3 逐户受限归集（源模板 SUMIF 口径）────────────────────────────────
+//
+// 🔴 与上面的 L1（四表叶子按科目名分类）是**两条并存链路**，代码里不得出现
+//    「取其一覆盖另一」的分支 —— 判据与依据见 e1RestrictedScope 的 L2 段注释。
+//    数据源是审计师在 E1-3 手填的 AJ/AK 列（`restrictedAmount`/`restrictedReason`），
+//    不是账户级取数（tb_aux_balance 没有受限金额字段）。
+const bankDetailRowsForL2 = computed<E1BankDetailRowLike[]>(() =>
+  parseBankDetailRowsForL2(props.allResponses.get(E1_BANK_DETAIL_ROWS_KEY)?.remark),
+)
+
+/** L2 归集结果（无受限行时 `rows` 为空、合计为 null → 勾稽 skip 而非误报）。 */
+const restrictedL2 = computed(() =>
+  summarizeRestrictedFromAccounts(
+    bankDetailRowsForL2.value,
+    restrictedPrefill.value.bucketDefs,
+  ),
+)
 
 // ─── 披露内部勾稽（规则全部取自校验预设 F1-1~F1-6 + 源 xlsx 表内公式）──────────
 
@@ -618,6 +704,9 @@ const consistencyResults = computed(() =>
     reportOpening: Number.isFinite(tbValues.value.total_opening)
       ? tbValues.value.total_opening
       : null,
+    // L2（E1-3 逐户）受限合计 —— 两条链路并存，不等时 warning 交审计判断
+    restrictedL2Ending: restrictedL2.value.ending,
+    restrictedL2Opening: restrictedL2.value.opening,
     // 外币原币表**两变体都有**（源 xlsx 逐格实证 R25~R62 逐字相同）。
     //
     // 🔴 纠正一处早先的误判：曾把 `fxRows` 限定为上市变体，理由写成「国企版没有
@@ -696,10 +785,19 @@ async function addRestrictedRow(): Promise<void> {
     })
     const name = value.trim()
     const bucketKey = customBucketKey(name)
+    // 🔴 序号取**持久化单调计数器**而不是 `length` / `max+1` ——
+    //    删掉 custom_保证金_3 再新增，`length`/`max+1` 都会又给 `_3`，
+    //    历史 cell 与备注（按 row id 索引）会串到新类别上（Property 28）。
+    //    判据与依据见 e1RestrictedScope 的 `nextRestrictedSeq`。
+    const seq = nextRestrictedSeq(
+      restrictedRows.value,
+      props.allResponses.get(e1RestrictedSeqKey(variant.value))?.remark,
+    )
+    restrictedSeq.value = seq
     restrictedPersisted.value = [
       ...restrictedPersisted.value,
       {
-        id: e1RestrictedRowId(bucketKey, restrictedPersisted.value.length),
+        id: e1RestrictedRowId(bucketKey, seq),
         bucketKey,
         label: name,
         openingAmount: 0,
@@ -867,6 +965,13 @@ function persistAll(): void {
   )
   items.push({ item_id: rKey, conclusion: null, remark: rJson })
   props.allResponses.set(rKey, items[items.length - 1])
+
+  // 🔴 自定义类别的**单调计数器**必须与行一起落库 —— 只存在内存里的话，
+  //    刷新后 `nextRestrictedSeq` 拿不到已存计数器就退回「现有最大 + 1」，
+  //    删掉末尾类别再新增又会复用旧序号（Property 28 要防的正是这条）。
+  const seqKey = e1RestrictedSeqKey(variant.value)
+  items.push({ item_id: seqKey, conclusion: null, remark: String(restrictedSeq.value) })
+  props.allResponses.set(seqKey, items[items.length - 1])
 
   // 人工归类 map（叶子科目码 → 类别 / 不受限）——「各项目科目命名不同」的关键状态
   const mapKey = e1RestrictedMapKey(variant.value)
@@ -1288,7 +1393,31 @@ onBeforeUnmount(() => {
         </el-table-column>
         <el-table-column :label="endingLabel" width="180" align="right" class-name="auto-calc-col">
           <template #default="{ row }">
-            <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
+            <!-- 🔴 未取到值时显示「—」而非 0.00（本项目无此科目 ≠ 余额为 0） -->
+            <el-tooltip
+              v-if="!row.endingResolved"
+              content="本项目无此科目（审定表未取到该语义槽数据），可在审定表录入未审数后自动带入"
+              placement="top"
+            >
+              <span class="no-account-cell">—</span>
+            </el-tooltip>
+            <template v-else>
+              <el-tooltip
+                v-if="row.endingSlotPrefilled"
+                content="由审定表语义槽自动带入（准则解释 15 号单独列示项，无一级标准科目）"
+                placement="top"
+              >
+                <el-tag size="small" type="success" effect="plain" class="prefill-tag">预填</el-tag>
+              </el-tooltip>
+              <el-tooltip
+                v-if="row.endingDeducted"
+                content="已扣除下方单独列示项（避免与「存放财务公司款项」/「数字货币」双算）"
+                placement="top"
+              >
+                <el-tag size="small" type="warning" effect="plain" class="prefill-tag">已扣减</el-tag>
+              </el-tooltip>
+              <span class="computed-cell">{{ displayPrefs.fmtAmount(row.endingAmount) }}</span>
+            </template>
           </template>
         </el-table-column>
         <el-table-column :label="openingLabel" width="200" align="right">
@@ -1479,48 +1608,130 @@ onBeforeUnmount(() => {
             以下货币资金子科目按科目名判不出受限类别（各项目命名习惯不同，平台不臆造归属）。
             请逐项点选归入某类，或标记为「不受限」。已处理项不再出现在此处。
           </div>
-          <el-table :data="restrictedPending" border size="small" style="width:100%; max-width:900px" max-height="280">
-            <el-table-column label="来源科目" min-width="220">
-              <template #default="{ row }">
-                <span class="ft-code">{{ row.code }}</span>
-                <span class="ft-name">{{ row.name }}</span>
-              </template>
-            </el-table-column>
-            <el-table-column :label="openingLabel" width="140" align="right">
-              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.opening) }}</template>
-            </el-table-column>
-            <el-table-column :label="endingLabel" width="140" align="right">
-              <template #default="{ row }">{{ displayPrefs.fmtAmount(row.closing) }}</template>
-            </el-table-column>
-            <el-table-column label="归类为" width="240">
-              <template #default="{ row }">
-                <el-select
-                  :disabled="isReadonly"
-                  size="small"
-                  placeholder="选择受限类别"
-                  style="width:100%"
-                  @change="(val: string) => assignRestricted(row.code, val)"
-                >
-                  <el-option
-                    v-for="opt in restrictedBucketOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="不受限" width="90" align="center">
-              <template #default="{ row }">
-                <el-button
-                  v-if="!isReadonly"
-                  text
-                  size="small"
-                  @click="assignRestricted(row.code, E1_UNRESTRICTED_KEY)"
-                >标记</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
+
+          <!--
+            R8.4：分两区展示 —— 「无子科目明细的父科目行」与「真明细行」语义不同。
+            判据在 e1RestrictedScope.partitionUnclassified（只看科目码形态，不看金额）。
+          -->
+          <template v-if="restrictedPendingParts.details.length">
+            <div class="pending-group-title" data-testid="pending-group-details">
+              明细科目行
+              <el-tag size="small" type="warning" effect="plain">
+                {{ restrictedPendingParts.details.length }} 项
+              </el-tag>
+              <span class="pending-group-note">逐项归入受限类别，或标记为「不受限」。</span>
+            </div>
+            <el-table
+              :data="restrictedPendingParts.details"
+              border
+              size="small"
+              style="width:100%; max-width:900px"
+              max-height="280"
+            >
+              <el-table-column label="来源科目" min-width="220">
+                <template #default="{ row }">
+                  <span class="ft-code">{{ row.code }}</span>
+                  <span class="ft-name">{{ row.name }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column :label="openingLabel" width="140" align="right">
+                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.opening) }}</template>
+              </el-table-column>
+              <el-table-column :label="endingLabel" width="140" align="right">
+                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.closing) }}</template>
+              </el-table-column>
+              <el-table-column label="归类为" width="240">
+                <template #default="{ row }">
+                  <el-select
+                    :disabled="isReadonly"
+                    size="small"
+                    placeholder="选择受限类别"
+                    style="width:100%"
+                    @change="(val: string) => assignRestricted(row.code, val)"
+                  >
+                    <el-option
+                      v-for="opt in restrictedBucketOptions"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column label="不受限" width="90" align="center">
+                <template #default="{ row }">
+                  <el-button
+                    v-if="!isReadonly"
+                    text
+                    size="small"
+                    @click="assignRestricted(row.code, E1_UNRESTRICTED_KEY)"
+                  >标记</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
+
+          <template v-if="restrictedPendingParts.parents.length">
+            <div class="pending-group-title" data-testid="pending-group-parents">
+              未分户的父科目行
+              <el-tag size="small" type="info" effect="plain">
+                {{ restrictedPendingParts.parents.length }} 项
+              </el-tag>
+              <span class="pending-group-note">
+                该科目在本项目未按户设置子科目（叶子就是一级科目本身）。通常整体判「不受限」，
+                或在 E1-3 按账户逐户填写受限金额与原因（下方 L2 勾稽会与本表合计对照）。
+              </span>
+            </div>
+            <el-table
+              :data="restrictedPendingParts.parents"
+              border
+              size="small"
+              style="width:100%; max-width:900px"
+              max-height="240"
+            >
+              <el-table-column label="来源科目" min-width="220">
+                <template #default="{ row }">
+                  <span class="ft-code">{{ row.code }}</span>
+                  <span class="ft-name">{{ row.name }}</span>
+                  <el-tag size="small" type="info" effect="plain" class="src-tag">未分户</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column :label="openingLabel" width="140" align="right">
+                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.opening) }}</template>
+              </el-table-column>
+              <el-table-column :label="endingLabel" width="140" align="right">
+                <template #default="{ row }">{{ displayPrefs.fmtAmount(row.closing) }}</template>
+              </el-table-column>
+              <el-table-column label="归类为" width="240">
+                <template #default="{ row }">
+                  <el-select
+                    :disabled="isReadonly"
+                    size="small"
+                    placeholder="选择受限类别"
+                    style="width:100%"
+                    @change="(val: string) => assignRestricted(row.code, val)"
+                  >
+                    <el-option
+                      v-for="opt in restrictedBucketOptions"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </template>
+              </el-table-column>
+              <el-table-column label="不受限" width="90" align="center">
+                <template #default="{ row }">
+                  <el-button
+                    v-if="!isReadonly"
+                    text
+                    size="small"
+                    @click="assignRestricted(row.code, E1_UNRESTRICTED_KEY)"
+                  >标记</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </template>
 
           <template v-if="restrictedExcluded.length">
             <div class="pending-hint" style="margin-top:10px">
@@ -1720,6 +1931,9 @@ onBeforeUnmount(() => {
 .indent-row { padding-left: 16px; }
 .opening-cell { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .opening-cell .prefill-tag { flex-shrink: 0; cursor: help; }
+/* 「本项目无此科目」与「余额为 0」必须可区分：前者显示 — 且置灰 */
+.no-account-cell { color: var(--el-text-color-placeholder); cursor: help; }
+.deducted-cell { border-bottom: 1px dashed var(--el-color-warning); cursor: help; }
 .fc-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
 .fc-item-cell { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .fc-item-ops { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
@@ -1805,6 +2019,22 @@ onBeforeUnmount(() => {
   color: #606266;
   line-height: 1.6;
   margin-bottom: 8px;
+}
+/* 待归类两区标题（R8.4：父科目行 / 真明细行语义不同，视觉上分开） */
+.pending-group-title {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b88230;
+}
+.pending-group-note {
+  font-weight: 400;
+  color: #606266;
+  line-height: 1.6;
 }
 .ft-code { font-weight: 600; color: #303133; margin-right: 6px; }
 .ft-name { color: #606266; }

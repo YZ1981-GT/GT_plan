@@ -24,7 +24,14 @@ CHART_CANDIDATES = sorted((_BACKEND / "data").glob("*account_chart*.json"))
 BS002_CODES = {"1001", "1002", "1012"}
 
 #: E0 的已知错误 sheet 名（本 spec 范围外，显式锁定防静默漂移，见脚本 docstring）
+# ── E0 块 sheet / wp_name 的双向锁死常量（`e-cycle-…` spec Task 10 已纠正）──
+#: 改造前的错名（源 xlsx 无此 tab ⇒ prefill 长期定位落空），不得复活
 E0_KNOWN_BAD_SHEET = "审定表E0-1"
+#: 改造前的错误 wp_name（该 sheet 是函证结果汇总表，不是询证函本身）
+E0_KNOWN_BAD_WP_NAME = "银行询证函"
+#: openpyxl 实证的真实 tab 名
+E0_CORRECT_SHEET = "函证结果汇总表E0-1"
+E0_CORRECT_WP_NAME = "函证结果汇总表"
 
 
 @pytest.fixture(scope="module")
@@ -110,17 +117,45 @@ class TestProperty12SheetNamesExist:
                         bad.append((b.get("sheet") or "", c.get("cell_ref") or "", sheet))
         assert bad == [], f"公式引用了不存在的 sheet: {bad}"
 
-    def test_e0_known_bad_sheet_is_locked(self, mapping, source_tabs):
-        """E0 的错误 sheet 名属本 spec 范围外，显式锁定现值防静默漂移。
+    def test_e0_sheet_name_is_corrected_and_bad_name_never_returns(
+        self, mapping, source_tabs
+    ):
+        """E0 块的 sheet 名已由 `e-cycle-…` spec Task 10 纠正 —— 双向锁死。
 
-        改名会让一个长期失效的 prefill 突然开始写入 9 个循环共享的函证 sheet，
-        需独立验证 → 留作后续（见 spec Notes）。
+        改造前是 ``审定表E0-1``（源 xlsx 无此 tab ⇒ prefill 长期定位落空），且
+        ``wp_name='银行询证函'`` 也与该 sheet 无关（函证结果汇总表不是询证函本身）
+        = **双重贴错标签**。Task 10 纠正为 ``函证结果汇总表E0-1`` / ``函证结果汇总表``。
+
+        🔴 本断言由「锁定错名」反转为「锁定正确名 + 错名不得复活」：
+        E0 函证模块跨 9 个循环共享，一旦有人把 sheet 名改回去，那条 prefill 会重新
+        静默失效（而不是报错），故必须双向钉死。
         """
         e0 = [b for b in mapping["mappings"] if b.get("wp_code") == "E0"]
         assert e0, "未找到 E0 块（锁定断言会空转）"
-        assert E0_KNOWN_BAD_SHEET not in source_tabs
-        assert {b.get("sheet") for b in e0} == {E0_KNOWN_BAD_SHEET}, (
-            "E0 的 sheet 名变了 —— 若已修请同步更新本断言与 spec Notes"
+        # 反向自检：错名确实不在源 xlsx 里（这是判它为错名的依据）
+        assert E0_KNOWN_BAD_SHEET not in source_tabs, (
+            f"{E0_KNOWN_BAD_SHEET!r} 竟出现在源 xlsx 里 —— 判为错名的前提不再成立，"
+            "请重新核对 openpyxl 实证"
+        )
+        sheets = {b.get("sheet") for b in e0}
+        assert E0_KNOWN_BAD_SHEET not in sheets, (
+            f"E0 块的错名 {E0_KNOWN_BAD_SHEET!r} 复活了 —— 源 xlsx 无此 tab，"
+            "prefill 会静默定位落空（不报错）"
+        )
+        assert sheets == {E0_CORRECT_SHEET}, (
+            f"E0 块的 sheet 名应为 {E0_CORRECT_SHEET!r}（openpyxl 实证的真实 tab），"
+            f"实为 {sorted(sheets)}"
+        )
+        # 正确名必须真的在源 xlsx 里（否则只是换了另一个错名）
+        assert E0_CORRECT_SHEET in source_tabs, (
+            f"{E0_CORRECT_SHEET!r} 不在源 xlsx 的 tab 清单里"
+        )
+        wp_names = {b.get("wp_name") for b in e0}
+        assert E0_KNOWN_BAD_WP_NAME not in wp_names, (
+            f"E0 块的错误 wp_name {E0_KNOWN_BAD_WP_NAME!r} 复活了"
+        )
+        assert wp_names == {E0_CORRECT_WP_NAME}, (
+            f"E0 块的 wp_name 应为 {E0_CORRECT_WP_NAME!r}，实为 {sorted(wp_names)}"
         )
 
 

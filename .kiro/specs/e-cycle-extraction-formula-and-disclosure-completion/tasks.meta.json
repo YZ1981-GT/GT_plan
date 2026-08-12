@@ -1,0 +1,36 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "20. 变异检验（逐条打红）": [
+      {
+        "executionId": "0e56a617-1430-4fad-94ae-d17cbf8125c9",
+        "chatSessionId": "sess_cd8f2c2b-26d9-41ea-bc16-8e3ac3e4863d",
+        "timestamp": 1786499900104
+      }
+    ],
+    "21. 真实库验收": [
+      {
+        "executionId": "0e56a617-1430-4fad-94ae-d17cbf8125c9",
+        "chatSessionId": "sess_cd8f2c2b-26d9-41ea-bc16-8e3ac3e4863d",
+        "timestamp": 1786499906438
+      },
+      {
+        "executionId": "0e56a617-1430-4fad-94ae-d17cbf8125c9",
+        "chatSessionId": "sess_cd8f2c2b-26d9-41ea-bc16-8e3ac3e4863d",
+        "timestamp": 1786501147915
+      }
+    ],
+    "22. 浏览器实测与数据复原": [
+      {
+        "executionId": "0e56a617-1430-4fad-94ae-d17cbf8125c9",
+        "chatSessionId": "sess_cd8f2c2b-26d9-41ea-bc16-8e3ac3e4863d",
+        "timestamp": 1786501194396
+      },
+      {
+        "executionId": "0e56a617-1430-4fad-94ae-d17cbf8125c9",
+        "chatSessionId": "sess_cd8f2c2b-26d9-41ea-bc16-8e3ac3e4863d",
+        "timestamp": 1786503199147
+      }
+    ]
+  }
+}

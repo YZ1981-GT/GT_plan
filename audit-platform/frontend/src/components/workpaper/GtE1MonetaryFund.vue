@@ -36,11 +36,12 @@
 
       <!-- 四表取数（公式管理）面板：现金/银行/账户清单明细 sheet（仅结构化视图） -->
       <E1FourTableSourcePanel
-        v-if="dualMode.currentMode.value === 'html' && showFtPanel && ftSources.length"
+        v-if="dualMode.currentMode.value === 'html' && showFtPanel && (ftSources.length || ftHasAccountSource)"
         :sources="ftSources"
         :as-of="ftAsOf"
         :is-readonly="isReadonly"
         :has-manual-data="ftHasManualData"
+        :accounts="ftAccountsForPanel"
         @re-extract="reExtractFromFourTable"
       />
 
@@ -174,6 +175,12 @@ import {
   buildAccountListSeedRows,
   buildCrossSheetSeeds,
 } from './composables/e1FourTablePrefill'
+import {
+  normalizeAccountPrefill,
+  buildBankSeedRowsFromAccounts,
+  buildAccountListSeedRowsFromAccounts,
+  buildDigitalSeedRows,
+} from './composables/e1BankAccountPrefill'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -262,12 +269,22 @@ const allResponses: Ref<Map<string, any>> = ref(new Map())
 const fourTablePrefill = computed(() => normalizePrefill(props.htmlData?.four_table_prefill))
 const ftAsOf = computed(() => String((fourTablePrefill.value.meta as any)?.as_of || bsDate.value || ''))
 
-/** 是否显示四表取数面板（现金/银行/账户清单明细 sheet） */
-const showFtPanel = computed(() => ['E1-2', 'E1-3', 'E1-10'].includes(currentSheet.value))
+/**
+ * 账户级取数（`tb_aux_balance` 的「银行账户」维度）。
+ *
+ * 🔴 客户的 `1002 银行存款` 在 `tb_balance` 里**不分户**（叶子恒 1 行）⇒ E1-3 逐户
+ * 列示与 E1-10 账户完整性核对只能靠 aux 维度。账户级有数据时**优先**于叶子口径；
+ * 全空时 `build*FromAccounts` 返 `null`，宿主自动退回叶子口径（Property 8 零回归）。
+ */
+const accountPrefill = computed(() => normalizeAccountPrefill(props.htmlData?.account_prefill))
+
+/** 是否显示四表取数面板（现金/银行/账户清单/数字货币明细 sheet） */
+const showFtPanel = computed(() => ['E1-2', 'E1-3', 'E1-4', 'E1-10'].includes(currentSheet.value))
 /** 当前 sheet 对应的四表来源行 */
 const ftSources = computed(() => {
   if (currentSheet.value === 'E1-2') return fourTablePrefill.value.cash
   if (currentSheet.value === 'E1-3') return [...fourTablePrefill.value.bank, ...fourTablePrefill.value.other]
+  if (currentSheet.value === 'E1-4') return fourTablePrefill.value.digital
   if (currentSheet.value === 'E1-10') return fourTablePrefill.value.bank
   return []
 })
@@ -275,10 +292,37 @@ const ftSources = computed(() => {
 const ftRowsKey = computed(() => {
   if (currentSheet.value === 'E1-2') return 'E1-cash-detail-rows'
   if (currentSheet.value === 'E1-3') return 'E1-bank-detail-rows'
+  // 🔴 E1-4 的持久化键是 `E1-digital-rows`（`E1TabDigitalCurrency.vue` 的 STORAGE_KEY），
+  // 不是 `E1-digital-detail-rows` —— 后者在全前端零消费方，写进去就是孤儿键。
+  if (currentSheet.value === 'E1-4') return 'E1-digital-rows'
   if (currentSheet.value === 'E1-10') return 'E1-account-list-rows'
   return ''
 })
 const ftHasManualData = computed(() => !!ftRowsKey.value && allResponses.value.has(ftRowsKey.value))
+
+/**
+ * 传给溯源面板的账户级载荷 —— **只有 E1-3 / E1-10 传**（那两张才按户列示）。
+ *
+ * 🔴 `undefined`（未传）与「传了但账户为空」是两种状态：前者面板完全不渲染账户级块，
+ * 后者显示「本项目无账户级明细，已退回叶子口径」。E1-2 现金 / E1-4 数字货币没有
+ * 账户维度 ⇒ 必须传 `undefined` 而不是空载荷，否则会显示一条无意义的「无账户级明细」。
+ */
+const ftAccountsForPanel = computed(() =>
+  ['E1-3', 'E1-10'].includes(currentSheet.value) ? accountPrefill.value : undefined,
+)
+
+/** 账户级是否有数据（决定叶子来源为空时面板是否仍显示）。 */
+const ftHasAccountSource = computed(() => {
+  const a = ftAccountsForPanel.value
+  if (!a) return false
+  return (
+    a.accounts.bank.length +
+      a.accounts.other.length +
+      a.accounts.finance_co.length +
+      a.accounts.unassigned.length >
+    0
+  )
+})
 
 function seedRowsKey(key: string, rows: Record<string, unknown>[] | null): void {
   if (!rows || !rows.length) return
@@ -289,12 +333,17 @@ function seedRowsKey(key: string, rows: Record<string, unknown>[] | null): void 
 /** 在无持久化数据时，从四表预填种子填充明细行 + 跨 sheet 聚合键（仅内存，不落库）。 */
 function seedFromFourTable(): void {
   const p = fourTablePrefill.value
+  const ap = accountPrefill.value
   const cashSeed = buildCashSeedRows(p)
-  const bankSeed = buildBankSeedRows(p)
-  const acctSeed = buildAccountListSeedRows(p)
+  // 🔴 账户级优先、叶子口径兜底：`??` 只在账户级返 null（aux 无数据）时回退 ⇒
+  // 账户级全空时产出与改造前逐字节相同（Property 8 零回归支点）。
+  const bankSeed = buildBankSeedRowsFromAccounts(ap, e13Variant.value) ?? buildBankSeedRows(p)
+  const acctSeed = buildAccountListSeedRowsFromAccounts(ap) ?? buildAccountListSeedRows(p)
+  const digitalSeed = buildDigitalSeedRows(p.digital)
   seedRowsKey('E1-cash-detail-rows', cashSeed)
   seedRowsKey('E1-bank-detail-rows', bankSeed)
   seedRowsKey('E1-account-list-rows', acctSeed)
+  seedRowsKey('E1-digital-rows', digitalSeed)
   // 跨 sheet 聚合键：仅当键缺失时种子（供 E1-1 审定表在未打开明细 tab 时直接取数）。
   // 注：明细行持久化时，composable 已一并持久化对应聚合键 → 此处 has() 守卫自然跳过。
   for (const { itemId, remark } of buildCrossSheetSeeds(p)) {
@@ -343,11 +392,18 @@ function reconcileCashAggregateFromRows(): void {
 async function reExtractFromFourTable(): Promise<void> {
   if (isReadonly.value) return
   const p = fourTablePrefill.value
+  const ap = accountPrefill.value
   const key = ftRowsKey.value
   let rows: Record<string, unknown>[] | null = null
   if (currentSheet.value === 'E1-2') rows = buildCashSeedRows(p)
-  else if (currentSheet.value === 'E1-3') rows = buildBankSeedRows(p)
-  else if (currentSheet.value === 'E1-10') rows = buildAccountListSeedRows(p)
+  // E1-3 / E1-10 与种子化同口径：账户级优先、叶子口径兜底（两处必须一致，
+  // 否则「首次种子」与「重新取数」会产出两套行 id ⇒ 行数翻倍或数据错位）
+  else if (currentSheet.value === 'E1-3') {
+    rows = buildBankSeedRowsFromAccounts(ap, e13Variant.value) ?? buildBankSeedRows(p)
+  } else if (currentSheet.value === 'E1-4') rows = buildDigitalSeedRows(p.digital)
+  else if (currentSheet.value === 'E1-10') {
+    rows = buildAccountListSeedRowsFromAccounts(ap) ?? buildAccountListSeedRows(p)
+  }
   if (!key || !rows || !rows.length) return
   const item = { item_id: key, conclusion: null, remark: JSON.stringify(rows) }
   allResponses.value.set(key, item) // 触发 composable watch 重载

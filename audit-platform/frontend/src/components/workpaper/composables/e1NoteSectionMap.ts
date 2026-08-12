@@ -15,6 +15,7 @@
  *  - soe 八、1：主表「货币资金」（项目/期末余额/期初余额）+「受限制的货币资金明细」
  */
 import type { ColumnDef } from './disclosureColumnDefs'
+import { e1MainRows } from './e1DisclosureScope'
 
 export type E1DisclosureVariant = 'listed' | 'soe'
 
@@ -138,7 +139,13 @@ export function buildE1SoeColumns(): Record<string, ColumnDef[]> {
 // ─── 快照行类型（组件层传入，字段与 E1TabDisclosure 行接口对齐）───────────────
 export interface E1MainRowLike {
   key: string
+  /** 底稿 UI 字面（源 xlsx 口径） */
   label: string
+  /**
+   * 附注字面（源 docx 口径）——**可选**。不传时由 `e1MainRows(variant)` 真源按 `key`
+   * 反查（见 `mainRow()`），故调用方无需逐个传；传了则优先。
+   */
+  noteLabel?: string
   endingAmount: number
   openingAmount: number
 }
@@ -201,8 +208,17 @@ export function buildE1SyncPayload(
   applicableStandards: readonly string[] | null | undefined,
   snapshot: E1DisclosureSnapshot,
 ): E1SyncPayload {
+  // 🔴 附注行标签走 **docx 口径**（`noteLabel`），底稿 UI 保留 xlsx 口径（`label`）。
+  // soe 首行底稿是「现金」而附注模板是「库存现金」—— 直接推 `label` 会产生孤儿行
+  // （`sub_table_data` 以行标签匹配）。真源是 `e1DisclosureScope`，此处按 key 反查，
+  // 不要求调用方逐个传 `noteLabel`（少传一个就是一条静默孤儿行）。
+  const noteLabelByKey = new Map<string, string>(
+    e1MainRows(variant)
+      .filter((d) => !!d.noteLabel)
+      .map((d) => [d.key, d.noteLabel as string]),
+  )
   const mainRow = (r: E1MainRowLike) => ({
-    label: r.label,
+    label: r.noteLabel ?? noteLabelByKey.get(r.key) ?? r.label,
     end_amount: num(r.endingAmount),
     prior_amount: num(r.openingAmount),
     ...(isTotalKey(r.key) ? { is_total: true } : {}),

@@ -37,6 +37,7 @@ import {
 import {
   E1_UNRESTRICTED,
   allLeavesTotal,
+  bucketDisplayOrderMap,
   customBucketKey,
   effectiveBucketOf,
   isCustomBucketKey,
@@ -237,10 +238,17 @@ function leaf(
   return { code, name, opening, closing, slot: 'other', autoBucket }
 }
 
+/**
+ * 桶定义样本 —— **数组顺序刻意复现后端真实声明序**（`letter_of_credit` 在
+ * `bank_acceptance` 之前），`displayOrder` 复现源 docx 行序（银行承兑在信用证之前）。
+ *
+ * 🔴 改造前本样本按 docx 序排列，恰好让「行序按数组下标」的旧实现也能通过 ⇒
+ * 掩盖了「声明序 ≠ docx 行序」这个既存缺陷（E-cycle spec R6.7 / Property 36）。
+ */
 const DEFS = [
-  { key: 'bank_acceptance', label: 'BA', isPlatformExtra: false },
-  { key: 'letter_of_credit', label: 'LC', isPlatformExtra: false },
-  { key: 'other', label: 'OT', isPlatformExtra: true },
+  { key: 'letter_of_credit', label: 'LC', isPlatformExtra: false, displayOrder: 1 },
+  { key: 'bank_acceptance', label: 'BA', isPlatformExtra: false, displayOrder: 0 },
+  { key: 'other', label: 'OT', isPlatformExtra: true, displayOrder: 6 },
 ]
 
 function prefill(leaves: E1RestrictedLeaf[]): E1RestrictedPrefill {
@@ -350,13 +358,53 @@ describe('Property 17: 人工归类优先且可精确重算', () => {
     expect(rows[0].endingAmount).toBe(20)
   })
 
-  it('行序按后端 bucketDefs 声明顺序（与源模板行序一致）', () => {
+  /**
+   * 🔴 **诚实改写（E-cycle spec Task 23 / Property 36）**
+   *
+   * 原用例标题写「行序按后端 bucketDefs **声明顺序**（与源模板行序一致）」——
+   * 它声称的等价关系**本就不成立**：后端声明序是**匹配优先级**，被「包含关系必须先
+   * 声明」绑住（`信用证保证金` 含「保证金」须先于兜底桶；`境外冻结存款` 同含「冻结」
+   * 与「境外」须境外优先），产出 `信用证→银行承兑→履约→境外→质押`；而源 docx 行序是
+   * `银行承兑→信用证→履约→质押→境外→法定准备金`（1↔2、4↔5 互换）。
+   *
+   * 现改为按后端下发的 `displayOrder`（真源 = `E1_RESTRICTED_DOCX_ROW_ORDER`）排序，
+   * 并保留一条反向自检证明旧实现（数组下标）会产出与 docx 不符的行序。
+   */
+  it('行序按 displayOrder（= 源 docx 行序），不按数组下标', () => {
     const p = prefill([
       leaf('1012.02', '信用证保证金', 200, 'letter_of_credit'),
       leaf('1012.01', '银行承兑汇票保证金', 100, 'bank_acceptance'),
     ])
     const rows = resolveRestrictedRows({ prefill: p, manualMap: {} })
+    // DEFS 数组里 letter_of_credit 在前，但 displayOrder 说 bank_acceptance 该排第一
+    expect(p.bucketDefs.map((d) => d.key)).toEqual([
+      'letter_of_credit',
+      'bank_acceptance',
+      'other',
+    ])
     expect(rows.map((r) => r.bucketKey)).toEqual(['bank_acceptance', 'letter_of_credit'])
+  })
+
+  it('反向自检：缺 displayOrder 时退化为数组下标（复现旧缺陷形态）', () => {
+    const legacyDefs = DEFS.map(({ displayOrder: _drop, ...rest }) => rest)
+    const p: E1RestrictedPrefill = {
+      leaves: [
+        leaf('1012.02', '信用证保证金', 200, 'letter_of_credit'),
+        leaf('1012.01', '银行承兑汇票保证金', 100, 'bank_acceptance'),
+      ],
+      bucketDefs: legacyDefs,
+      source: { report_row_code: 'BS-002' },
+    }
+    const rows = resolveRestrictedRows({ prefill: p, manualMap: {} })
+    // 旧载荷（无 displayOrder）行序 = 数组下标序 = 与 docx 不符 —— 证明新排序键真的生效
+    expect(rows.map((r) => r.bucketKey)).toEqual(['letter_of_credit', 'bank_acceptance'])
+  })
+
+  it('displayOrder 排序键与后端桶数量对齐（平台补充桶排最后）', () => {
+    const map = bucketDisplayOrderMap(DEFS)
+    expect(map.get('bank_acceptance')).toBe(0)
+    expect(map.get('letter_of_credit')).toBe(1)
+    expect(map.get('other')).toBeGreaterThan(map.get('letter_of_credit') as number)
   })
 
   it('行 id 稳定且不撞键（禁用 label 作 key）', () => {
@@ -440,28 +488,69 @@ describe('组件字面量归零', () => {
 // ─── 主表行真源（源 xlsx 逐字）─────────────────────────────────────────────────
 
 describe('披露主表行单一真源', () => {
-  it('上市 8 行 / 国企 5 行，与源 xlsx R8~R15 / R8~R12 对应', () => {
+  it('上市 8 行 / 国企 6 行；底稿 sourceRef 逐行对应源 xlsx，境外行标 docx 来源', () => {
+    // 🔴 改写理由（Task 15 / Property 41）：**附注行集的真源是源 docx，不是底稿 xlsx**。
+    // 原断言 `E1_MAIN_ROWS_SOE` 恰 5 行 + sourceRef 恰 ['A8'..'A12']，锁死的是「行集
+    // 只许来自 xlsx」这一旧口径；soe docx 货币资金表实为 6 行（末行是正式数据行
+    // 「其中：存放在境外的款项总额」），源 xlsx R13 的括注文字正对应它 ⇒ 补该行后
+    // 行数与 sourceRef 序列必然变化。这里按新口径等强断言（行数 + 逐行来源全序列），
+    // 不放宽为「>=5」之类。
     expect(E1_MAIN_ROWS_LISTED).toHaveLength(8)
-    expect(E1_MAIN_ROWS_SOE).toHaveLength(5)
+    expect(E1_MAIN_ROWS_SOE).toHaveLength(6)
     expect(E1_MAIN_ROWS_LISTED.map((r) => r.sourceRef)).toEqual([
       'A8', 'A9', 'A10', 'A11', 'A12', 'A13', 'A14', 'A15',
     ])
     expect(E1_MAIN_ROWS_SOE.map((r) => r.sourceRef)).toEqual([
       'A8', 'A9', 'A10', 'A11', 'A12',
+      // 源 xlsx 无对应数据行 → 来源标 docx，不得伪造成 'A13'（那是括注文字）
+      'docx:soe/货币资金/r6（源 xlsx 无该行；R13 是括注文字）',
     ])
+    // 前 5 行仍必须是 xlsx 单元格形态（防把 docx 来源乱标到已有行上）
+    for (const ref of E1_MAIN_ROWS_SOE.slice(0, 5).map((r) => r.sourceRef)) {
+      expect(ref).toMatch(/^A\d+$/)
+    }
   })
 
-  it('🔴 国企首行是「现金」，上市是「库存现金」（源模板实证差异，非笔误）', () => {
+  it('🔴 国企首行底稿字面是「现金」，附注字面是「库存现金」（双口径同时成立）', () => {
+    // 改写理由：原断言只钉底稿字面。soe docx r1 是「库存现金」，若直接推 label 会在
+    // 附注产生孤儿行 ⇒ 新增 noteLabel 投影。两侧字面**都要**钉死，缺一侧就会被
+    // 「顺手统一」（无论统一到哪边都会与另一个源模板分叉）。
     expect(E1_MAIN_ROWS_SOE[0].label).toBe('现金')
+    expect(E1_MAIN_ROWS_SOE[0].noteLabel).toBe('库存现金')
     expect(E1_MAIN_ROWS_LISTED[0].label).toBe('库存现金')
+    // listed 两侧同字面 → 不声明 noteLabel（缺省沿用 label）
+    expect(E1_MAIN_ROWS_LISTED[0].noteLabel).toBeUndefined()
   })
 
-  it('🔴 境外款项行只在上市侧，且用源模板全称（改造前底稿写缩写）', () => {
+  it('🔴 境外款项行两变体都有（附注真源是 docx），且用源模板全称 + isMemo', () => {
+    // 改写理由：原断言 `E1_MAIN_ROWS_SOE.some(key === 'overseas') === false`，注释写
+    // 「国企版源 xlsx R13 是括注文字，不是数据行」—— 该 xlsx 事实成立，但它推不出
+    // 「附注也没有这一行」：soe docx r6 是正式数据行。不补该行 ⇒ 附注 八、1 的境外
+    // 款项行永无数据源。故改为 true（等强断言：还要求字面/isMemo/两侧一致）。
     const listedOverseas = E1_MAIN_ROWS_LISTED.find((r) => r.key === 'overseas')
-    expect(listedOverseas?.label).toBe('其中：存放在境外的款项总额')
-    expect(listedOverseas?.isMemo).toBe(true)
-    // 国企版源 xlsx R13 是括注文字，不是数据行
-    expect(E1_MAIN_ROWS_SOE.some((r) => r.key === 'overseas')).toBe(false)
+    const soeOverseas = E1_MAIN_ROWS_SOE.find((r) => r.key === 'overseas')
+    expect(E1_MAIN_ROWS_SOE.some((r) => r.key === 'overseas')).toBe(true)
+    for (const row of [listedOverseas, soeOverseas]) {
+      expect(row?.label).toBe('其中：存放在境外的款项总额')
+      expect(row?.isMemo).toBe(true)
+      expect(row?.crossKey).toBe('')
+    }
+    // 附注字面与底稿字面相同（该行两个源模板用词一致）
+    expect(soeOverseas?.noteLabel).toBe('其中：存放在境外的款项总额')
+    // 位置：紧随合计行之后（与 listed 侧同形态）
+    expect(E1_MAIN_ROWS_SOE[E1_MAIN_ROWS_SOE.length - 1].key).toBe('overseas')
+    expect(E1_MAIN_ROWS_SOE[E1_MAIN_ROWS_SOE.length - 2].isTotal).toBe(true)
+  })
+
+  it('🔴 soe 不得补「存放财务公司款项」「存款应计利息」（准则口径差异，R5.7）', () => {
+    // soe docx 主表只有 6 行；两版不对称是有意的，后端 Property 41 双向锁死。
+    const soeKeys = E1_MAIN_ROWS_SOE.map((r) => r.key)
+    expect(soeKeys).not.toContain('finance_co')
+    expect(soeKeys).not.toContain('accrued')
+    // 对照：listed 确有这两行（证明差异真实存在，不是本文件漏写）
+    const listedKeys = E1_MAIN_ROWS_LISTED.map((r) => r.key)
+    expect(listedKeys).toContain('finance_co')
+    expect(listedKeys).toContain('accrued')
   })
 
   it('列头逐字取自源 xlsx R7（上市两空格 / 国企一空格 + 年初余额）', () => {

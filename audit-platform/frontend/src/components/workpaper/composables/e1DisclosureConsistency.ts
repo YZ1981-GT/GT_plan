@@ -30,6 +30,7 @@
  *       Requirements 9.1, 9.2 / Property 14
  */
 import {
+  WP_CHECK_TOLERANCE,
   eqCheck,
   nz,
   segmentSumCheck,
@@ -89,6 +90,15 @@ export interface E1ConsistencyInput {
    */
   cashEquivalentsEnding?: NullableAmount
   cashEquivalentsOpening?: NullableAmount
+  /**
+   * L2（E1-3 逐户归集）受限合计 —— 由 `summarizeRestrictedFromAccounts()` 产出。
+   *
+   * 🔴 与 `restrictedRows`（L1 = 四表叶子按科目名分类）是**两条并存链路**，
+   * 本引擎只**如实暴露差异**、不取其一覆盖另一（E-cycle spec R8.2 / Property 26）。
+   * 拿不到（审计师未在 E1-3 填 AJ 列）传 `null` → skip 而非误报。
+   */
+  restrictedL2Ending?: NullableAmount
+  restrictedL2Opening?: NullableAmount
 }
 
 // ─── 内部助手 ─────────────────────────────────────────────────────────────────
@@ -232,6 +242,54 @@ export function computeE1Consistency(input: E1ConsistencyInput): WpCheckResult[]
     nz(input.cashEquivalentsOpening),
     rstOpen,
   )
+
+  // ── L1 vs L2：两条受限链路互为独立口径（warn 级，不是 error）───────────────
+  //    L1 = 四表货币资金叶子按科目名自动分类（本表 restrictedRows）
+  //    L2 = E1-3 逐户「受限金额（AJ 列）」按账户性质归集（源模板 SUMIF 口径）
+  //
+  //    🔴 用 `warn` 不用 `error`：两者不等是**审计判断**（叶子命名未体现受限 /
+  //    审计师只在 E1-3 逐户标了受限 / 两侧口径本就可以有差异），不是数据错误。
+  //    也**不得**自动取其一覆盖另一（R8.3：两条链路并存）。
+  const pushL2Check = (
+    period: '期末' | '期初',
+    l1: NullableAmount,
+    l2: NullableAmount,
+  ): void => {
+    const rule =
+      'L1（四表叶子按科目名自动分类）vs L2（E1-3 逐户受限金额 AJ 列按账户性质归集，'
+      + '源模板 SUMIF(E1-3!$D,类别,E1-3!$AB) 口径）。'
+      + '两者不等属审计判断而非数据错误：叶子科目名未体现受限、或审计师只在 E1-3 '
+      + '逐户标注了受限，均会产生差异。**两条链路并存，不自动取其一覆盖另一**，'
+      + '请人工确认②表金额口径。'
+    const label = `受限两口径对比（${period}）`
+    // 🔴 任一侧 null 仍产出**条目**（level='skip'）而不是静默不产出 ——
+    //    与平台 `eqCheck` 口径一致：条目在面板里可见，审计师知道「这条勾稽存在
+    //    但上游数据未就绪」；静默不产出会让人以为「已核对通过」。
+    if (l1 === null || l2 === null) {
+      out.push({
+        label,
+        rule: `${rule}（当前一侧未取到：L1=${l1 === null ? '无' : l1} / L2=${l2 === null ? '无（审计师尚未在 E1-3 填 AJ 列受限金额）' : l2}）`,
+        left: l1,
+        right: l2,
+        diff: null,
+        level: 'skip',
+        refs: [IDX_MAIN, IDX_BANK],
+      })
+      return
+    }
+    const diff = Math.round((l1 - l2) * 100) / 100
+    out.push({
+      label,
+      rule,
+      left: l1,
+      right: l2,
+      diff,
+      level: Math.abs(diff) <= WP_CHECK_TOLERANCE ? 'ok' : 'warn',
+      refs: [IDX_MAIN, IDX_BANK],
+    })
+  }
+  pushL2Check('期末', rstEnd, nz(input.restrictedL2Ending))
+  pushL2Check('期初', rstOpen, nz(input.restrictedL2Opening))
 
   // ── 源 xlsx B16 = B14 − D62：主表合计 = 原币表人民币金额合计 ────────────────
   const leaves = fxLeaves(input.fxRows)

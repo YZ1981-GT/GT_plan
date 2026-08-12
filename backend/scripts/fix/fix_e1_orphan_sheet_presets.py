@@ -247,7 +247,7 @@ def main():
     # Validate block definitions
     errors = validate_blocks()
     if errors:
-        print("❌ Block validation errors:")
+        print("[ERR] Block validation errors:")
         for e in errors:
             print(f"  {e}")
         sys.exit(2)
@@ -257,17 +257,17 @@ def main():
 
     if args.check:
         if plan:
-            print(f"❌ {len(plan)} blocks 未补齐:")
+            print(f"[ERR] {len(plan)} blocks 未补齐:")
             for b in plan:
                 print(f"  {b['sheet']}")
             sys.exit(1)
         else:
-            print(f"✅ E1 orphan sheet presets: 0 欠账（{len(E1_NEW_BLOCKS)} blocks 已全部就位）")
+            print(f"[OK] E1 orphan sheet presets: 0 欠账（{len(E1_NEW_BLOCKS)} blocks 已全部就位）")
             sys.exit(0)
 
     if args.dry_run:
         if not plan:
-            print("✅ 无需变更（所有 blocks 已存在）")
+            print("[OK] 无需变更（所有 blocks 已存在）")
             sys.exit(0)
         print(f"将新增 {len(plan)} blocks:")
         for b in plan:
@@ -276,12 +276,12 @@ def main():
 
     if args.apply:
         if not plan:
-            print("✅ 无需变更")
+            print("[OK] 无需变更")
             sys.exit(0)
         data = apply_plan(data, plan)
         output = json.dumps(data, ensure_ascii=False, indent=2) + "\n"
         DATA_PATH.write_text(output, encoding="utf-8")
-        print(f"✅ 已写入 {len(plan)} blocks")
+        print(f"[OK] 已写入 {len(plan)} blocks")
         for b in plan:
             print(f"  + {b['sheet']}")
 

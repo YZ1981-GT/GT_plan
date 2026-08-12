@@ -23,6 +23,7 @@ import {
   calcChangeRate,
   exceedsThreshold,
 } from './useE1FormulaEngine'
+import { buildE1MainRowSlotWrites } from './e1MainRowPrefill'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 
@@ -501,6 +502,14 @@ export function useE1Adjudication(options: UseE1BaseOptions) {
     const opening = aggregateAuditedByCode('opening')
     for (const [code, amount] of Object.entries(opening)) {
       setLocal(`E1-adj-total-${code}-opening`, String(amount))
+    }
+    // additive：披露主表三个「无科目码行」（存放财务公司款项 / 存款应计利息 / 数字货币）
+    // 的槽键。这三行在附注 docx 里是与银行存款平行的列示行，而审定表按 1001/1002/1012
+    // 三科目归集拿不到它们 ⇒ 披露主表此前恒空（`crossKey: ''` 的注释承诺了预填但零实现）。
+    // 🔴 由纯函数 `buildE1MainRowSlotWrites` 生成（含「三值全 0 则不写 ⇒ 保持空白而非 0」），
+    //    不在此处复现取数口径（应计利息四子项汇总逻辑在 accruedTotalValues 里，复现即双真源）。
+    for (const w of buildE1MainRowSlotWrites(detailRows.value)) {
+      setLocal(w.itemId, w.value)
     }
   }
 

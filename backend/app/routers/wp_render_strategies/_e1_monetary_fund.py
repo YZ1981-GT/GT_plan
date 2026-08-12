@@ -29,10 +29,17 @@ from app.services.four_table import (
     resolve_semantic_accounts,
     select_leaves,
 )
+from app.services.four_table.e1_bank_accounts import (
+    assign_accounts_to_slots,
+    build_e1_account_prefill,
+    fetch_e1_bank_accounts,
+)
 from app.services.four_table.e_cycle_specs import (
     E1_MONETARY_FUND_SPEC,
     E1_SLOT_BANK,
     E1_SLOT_CASH,
+    E1_SLOT_DIGITAL,
+    E1_SLOT_FINANCE_CO,
     E1_SLOT_OTHER,
     E1_TOTAL_SLOT_KEYS,
 )
@@ -42,8 +49,27 @@ from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
-#: 明细预填的三个基础槽（现金/银行/其他货币资金），键名与前端既有契约一致
-_DETAIL_SLOT_KEYS: tuple[str, ...] = (E1_SLOT_CASH, E1_SLOT_BANK, E1_SLOT_OTHER)
+#: 明细预填的槽（R2.1 扩至 5 槽）。
+#:
+#: 🔴 前三个的**键名与顺序**是既有前端契约（`four_table_prefill.{cash,bank,other}`），
+#: 不得改动；`finance_co`/`digital` 是加法式新增（准则解释 15 号「可增设」项，
+#: 两槽在 `e_cycle_specs` 里**故意无兜底码** ⇒ 多数项目 `found=False` 返空列表，
+#: 前端据此显示「本项目无此科目」而不是 0（R2.2/R2.5）。
+_DETAIL_SLOT_KEYS: tuple[str, ...] = (
+    E1_SLOT_CASH,
+    E1_SLOT_BANK,
+    E1_SLOT_OTHER,
+    E1_SLOT_FINANCE_CO,
+    E1_SLOT_DIGITAL,
+)
+
+#: 账户级取数覆盖的槽（`tb_aux_balance` 的 `银行账户` 维度只对存款类科目有意义）。
+#: `finance_co` 一并纳入 —— 存放财务公司款项也是「按户」管理的（R2.3）。
+_ACCOUNT_SLOT_KEYS: tuple[str, ...] = (
+    E1_SLOT_BANK,
+    E1_SLOT_OTHER,
+    E1_SLOT_FINANCE_CO,
+)
 
 #: 金额零值判定阈值（分以下视为 0）
 _ZERO_EPS = 0.005
@@ -131,10 +157,15 @@ def build_e1_detail_rows(
     slot_leaves: dict[str, list[LeafRow]],
     currency_map: dict[str, str],
 ) -> dict[str, list[dict]]:
-    """三个基础槽的明细预填行（前端 `four_table_prefill.{cash,bank,other}`）。
+    """各语义槽的明细预填行（前端 `four_table_prefill.{cash,bank,other,...}`）。
 
     字段与既有前端契约逐字一致（`code/name/currency/opening/increase/decrease/
     ending/source/formula/formulaOpening`），零回归。
+
+    🔴 槽集合由 `_DETAIL_SLOT_KEYS` 声明（R2.1 已扩到 5 槽）。新增的
+    `finance_co`/`digital` 在多数项目 `found=False` ⇒ 该键为 `[]`（**不是缺键、
+    也不产生 0 值占位行**），前端据此显示「本项目无此科目」（R2.2/R2.5）。
+    前三槽的键名与产出顺序**逐字不变** —— Property 9 characterization 钉死。
 
     **过滤全零账户**：这些子科目对金额明细无意义。注意银行账户清单
     （`build_e1_account_list`）**不做**此过滤 —— 见其 docstring。
@@ -305,6 +336,82 @@ def build_e1_parent_check(
     return out
 
 
+#: 账户级取数覆盖的槽（银行存款 / 其他货币资金 / 存放财务公司款项）。
+#: 🔴 `cash`（库存现金）与 `digital`（数字货币）**不参与** —— 前者无银行账户维度，
+#: 后者是数字人民币钱包不走 `aux_type='银行账户'`。
+_ACCOUNT_SLOT_KEYS: tuple[str, ...] = (
+    E1_SLOT_BANK,
+    E1_SLOT_OTHER,
+    E1_SLOT_FINANCE_CO,
+)
+
+
+def _empty_account_prefill() -> dict:
+    """账户级取数的空态载荷。
+
+    🔴 形态必须与 `build_e1_account_prefill` 一致（各槽键存在、值为 `[]`）——
+    前端 `normalizeAccountPrefill` 据「`accounts` 各键为空数组」退回叶子口径；
+    若这里少给键，前端拿到 `undefined` 会与「注入整体失败」不可区分。
+    """
+    return {
+        "accounts": {**{k: [] for k in _ACCOUNT_SLOT_KEYS}, "unassigned": []},
+        "reconcile": {},
+        "meta": {"source": "", "account_count": 0, "parsed_level_dist": {}},
+    }
+
+
+async def _build_account_prefill(
+    ctx: RenderContext,
+    year: int,
+    accounts,
+    slot_leaves: dict[str, list[LeafRow]],
+) -> dict:
+    """账户级取数（`tb_aux_balance` 的 `银行账户` 维度）→ `account_prefill` 载荷。
+
+    客户的 `1002 银行存款` 在 `tb_balance` 里**不分户**（叶子恒 1 行），而 E1-3
+    要逐户列示、E1-10 要做账户完整性核对 —— 账户级明细的唯一来源是 aux 维度。
+
+    加法式：只新增返回键，既有 `four_table_prefill` 逐字不变（Property 9 零回归支点）。
+    aux 无数据 / 取数失败时返 `_empty_account_prefill()`，前端退回叶子口径。
+
+    🔴 **本函数必须有自己的 fail-open** —— 它是加法式新增的一步，若让异常冒泡到
+    `_build_four_table_extraction`，会被那里的 fail-open 吞成「整个 extraction 失败」，
+    把**已经通了的三槽明细预填 / 审定预填 / 受限分类一起打掉**（新功能坏掉不该
+    连累既有功能）。守卫 `test_account_prefill_is_fail_open` 钉死这条。
+    """
+    try:
+        slot_codes: dict[str, list[str]] = {}
+        for slot_key in _ACCOUNT_SLOT_KEYS:
+            slot = (accounts.slots or {}).get(slot_key)
+            codes = [c for c in (getattr(slot, "codes", None) or []) if c]
+            if codes:
+                slot_codes[slot_key] = codes
+        if not slot_codes:
+            return _empty_account_prefill()
+
+        prefixes = [c for codes in slot_codes.values() for c in codes]
+        rows = await fetch_e1_bank_accounts(
+            ctx.db, ctx.project_id, year, account_prefixes=prefixes
+        )
+        if not rows:
+            return _empty_account_prefill()
+
+        assignment = assign_accounts_to_slots(rows, slot_codes)
+        # 勾稽基准取各槽**叶子期末合计**（与 `build_e1_tb_values` 同口径）
+        slot_leaf_closing = {
+            slot_key: sum(r.closing for r in slot_leaves.get(slot_key, []))
+            for slot_key in slot_codes
+        }
+        payload = build_e1_account_prefill(assignment, slot_leaf_closing)
+        # 未声明码的槽也要有键（前端按槽渲染，缺键会退化成「无此科目」的误导态）
+        for slot_key in _ACCOUNT_SLOT_KEYS:
+            payload["accounts"].setdefault(slot_key, [])
+        return payload
+    except Exception as e:  # noqa: BLE001 — 见上方 docstring 的零回归论证
+        logger.warning("E1 render: 账户级取数构建失败（退回叶子口径）: %s", e)
+        return _empty_account_prefill()
+
+
 async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
     """从四表库提取 E1 全套取数结果（明细预填 + 审定预填 + 受限分类 + 溯源）。
 
@@ -313,8 +420,8 @@ async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
     写死任何码都会在部分项目取空或取错（详见 `e_cycle_specs` 模块 docstring）。
 
     Returns:
-        ``{four_table_prefill, adjudication_prefill, restricted_prefill,
-        tb_values, tb_source_codes}``
+        ``{four_table_prefill, account_prefill, adjudication_prefill,
+        restricted_prefill, tb_values, tb_source_codes}``
     """
     accounts = await resolve_semantic_accounts(ctx, E1_MONETARY_FUND_SPEC)
 
@@ -333,6 +440,8 @@ async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
     source_codes = accounts.as_dict()
     source_codes["parent_check"] = build_e1_parent_check(subtree, accounts)
 
+    account_prefill = await _build_account_prefill(ctx, year, accounts, slot_leaves)
+
     return {
         "four_table_prefill": {
             **detail,
@@ -350,6 +459,7 @@ async def _build_four_table_extraction(ctx: RenderContext, year: int) -> dict:
                 ),
             },
         },
+        "account_prefill": account_prefill,
         "adjudication_prefill": build_e1_adjudication_prefill(slot_leaves, accounts),
         "restricted_prefill": build_e1_restricted_prefill(slot_leaves, accounts),
         "tb_values": build_e1_tb_values(slot_leaves),
@@ -442,6 +552,10 @@ async def render(ctx: RenderContext) -> dict | None:
         "four_table_prefill": {
             "cash": [], "bank": [], "other": [], "account_list": [], "meta": {}
         },
+        # 🔴 空态也要给齐全部键（不是缺键）—— 前端 `normalizeAccountPrefill`
+        # 据「accounts 各槽为 []」退回既有 tb_balance 叶子口径（R1.6 零回归）。
+        # 缺键会让「取数整体失败」与「本项目无 aux 数据」不可区分。
+        "account_prefill": _empty_account_prefill(),
         "adjudication_prefill": {},
         "restricted_prefill": {
             "leaves": [],
@@ -472,6 +586,10 @@ async def render(ctx: RenderContext) -> dict | None:
         "project_context": project_context,
         "responses_snapshot": responses_snapshot,
         "four_table_prefill": extraction.get("four_table_prefill") or {},
+        # 🔴 账户级取数（E1-3 逐户 / E1-10 完整性核对的唯一数据源）。
+        # 缺这一键 = 后端算了但前端拿不到 = dead output（平台已踩多次）。
+        # 无 aux 数据时是形态合法的空载荷（各槽 `[]`），前端据此退回叶子口径。
+        "account_prefill": extraction.get("account_prefill") or _empty_account_prefill(),
         "adjudication_prefill": extraction.get("adjudication_prefill") or {},
         "restricted_prefill": extraction.get("restricted_prefill") or {},
         "tb_values": tb_values,

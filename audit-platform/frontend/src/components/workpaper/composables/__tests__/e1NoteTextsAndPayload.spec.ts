@@ -12,13 +12,18 @@ import { readFileSync } from 'fs'
 import { resolve } from 'path'
 
 import {
+  E1_MAIN_ROWS_LISTED,
+  E1_MAIN_ROWS_SOE,
   E1_NOTE_TEXTS_LISTED,
   E1_NOTE_TEXTS_SOE,
   e1LegacyNoteKey,
+  e1MainRows,
   e1NoteTextKey,
   e1NoteTexts,
+  e1SummableRows,
 } from '../e1DisclosureScope'
 import {
+  E1_MAIN_TABLE,
   E1_NOTE_SECTION,
   E1_NOTE_TOTAL_LABEL,
   E1_RESTRICTED_TABLE,
@@ -193,6 +198,106 @@ describe('② 受限表条件表语义（两变体都推）', () => {
     const p = buildE1SyncPayload('listed', 'wp-1', null, snap())
     const rows = p.sub_table_data['货币资金'] as any[]
     expect(rows.find((r) => r.label === '合计')?.is_total).toBe(true)
+  })
+})
+
+// ─── 主表双口径投影（Task 15 / Property 16, 17, 18）─────────────────────────────
+
+/** 从真源行集构造快照 mainRows（只带 key/label/金额，**不传 noteLabel**）。 */
+function mainRowsFromScope(variant: 'listed' | 'soe') {
+  return e1MainRows(variant).map((d, i) => ({
+    key: d.key,
+    label: d.label,
+    endingAmount: i + 1,
+    openingAmount: 100 + i,
+  }))
+}
+
+describe('主表 label / noteLabel 双口径投影', () => {
+  it('🔴 soe 载荷首行标签 == 附注 docx 字面「库存现金」，而真源 label 仍是「现金」', () => {
+    const p = buildE1SyncPayload('soe', 'wp-1', ['soe_standalone'], {
+      mainRows: mainRowsFromScope('soe'),
+    })
+    const rows = p.sub_table_data[E1_MAIN_TABLE] as Array<Record<string, unknown>>
+    // 附注口径（交付件行名，必须与 note_template_soe.json 八、1 逐字一致）
+    expect(rows[0].label).toBe('库存现金')
+    // 底稿口径（源 xlsx A8 字面）—— 两口径**同时**成立，不是「谁改成谁」
+    expect(E1_MAIN_ROWS_SOE[0].label).toBe('现金')
+    expect(E1_MAIN_ROWS_SOE[0].noteLabel).toBe('库存现金')
+  })
+
+  it('投影不依赖调用方传 noteLabel（按 key 从真源反查，少传不产生孤儿行）', () => {
+    // 组件只传 key/label/金额；若投影靠调用方传字段，任何漏传就是一条静默孤儿行
+    const rows = buildE1SyncPayload('soe', 'wp-1', [], {
+      mainRows: [{ key: 'cash', label: '现金', endingAmount: 1, openingAmount: 2 }],
+    }).sub_table_data[E1_MAIN_TABLE] as Array<Record<string, unknown>>
+    expect(rows[0].label).toBe('库存现金')
+  })
+
+  it('调用方显式传 noteLabel 时优先（覆盖能力保留）', () => {
+    const rows = buildE1SyncPayload('soe', 'wp-1', [], {
+      mainRows: [
+        { key: 'cash', label: '现金', noteLabel: '库存现金（覆盖）', endingAmount: 0, openingAmount: 0 },
+      ],
+    }).sub_table_data[E1_MAIN_TABLE] as Array<Record<string, unknown>>
+    expect(rows[0].label).toBe('库存现金（覆盖）')
+  })
+
+  it('未声明 noteLabel 的行原样落 label（listed 侧逐行不变）', () => {
+    const p = buildE1SyncPayload('listed', 'wp-1', ['listed_standalone'], {
+      mainRows: mainRowsFromScope('listed'),
+    })
+    const rows = p.sub_table_data[E1_MAIN_TABLE] as Array<Record<string, unknown>>
+    expect(rows.map((r) => r.label)).toEqual(E1_MAIN_ROWS_LISTED.map((d) => d.label))
+  })
+
+  it('🔴 反向自检：把 mainRow 退回「只用 label」（旧行为替身）→ soe 首行必产出「现金」', () => {
+    // 证明上面的投影断言不空转：本地纯函数复现旧实现，必须给出与附注模板不符的行名
+    const legacyMainRow = (r: { key: string; label: string }) => ({ label: r.label })
+    const legacyRows = mainRowsFromScope('soe').map(legacyMainRow)
+    expect(legacyRows[0].label).toBe('现金')
+    expect(legacyRows[0].label).not.toBe('库存现金')
+  })
+
+  it('🔴 soe 主表 6 行（附注真源是 docx；含末行「其中：存放在境外的款项总额」）', () => {
+    const p = buildE1SyncPayload('soe', 'wp-1', ['soe_standalone'], {
+      mainRows: mainRowsFromScope('soe'),
+    })
+    const rows = p.sub_table_data[E1_MAIN_TABLE] as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(6)
+    expect(rows.map((r) => r.label)).toEqual([
+      '库存现金',
+      '银行存款',
+      '其他货币资金',
+      '数字货币',
+      '合计',
+      '其中：存放在境外的款项总额',
+    ])
+    // 备注行不得被标成合计行（投影器据 is_total 加粗）
+    expect(rows[5].is_total).toBeUndefined()
+    expect(rows[4].is_total).toBe(true)
+  })
+
+  it('🔴 e1SummableRows 不含 memo 行（境外款项是合计之内的再分解，不参与加总）', () => {
+    for (const variant of ['listed', 'soe'] as const) {
+      const summable = e1SummableRows(variant)
+      expect(summable.some((r) => r.key === 'overseas')).toBe(false)
+      expect(summable.some((r) => r.isMemo)).toBe(false)
+      expect(summable.some((r) => r.isTotal)).toBe(false)
+    }
+    // soe：6 行 − 合计 − 境外 = 4 行参与加总
+    expect(e1SummableRows('soe').map((r) => r.key)).toEqual([
+      'cash', 'bank', 'other_mf', 'digital',
+    ])
+  })
+
+  it('🔴 soe 不得补「存放财务公司款项」「存款应计利息」（准则口径差异，R5.7）', () => {
+    const soeNoteLabels = e1MainRows('soe').map((d) => d.noteLabel ?? d.label)
+    expect(soeNoteLabels).not.toContain('存放财务公司款项')
+    expect(soeNoteLabels).not.toContain('存款应计利息')
+    const listedLabels = e1MainRows('listed').map((d) => d.label)
+    expect(listedLabels).toContain('存放财务公司款项')
+    expect(listedLabels).toContain('存款应计利息')
   })
 })
 

@@ -132,12 +132,76 @@ describe('e1FxNoteSectionMap — 章节 / 表名 / 列定义三向对齐模板',
     expect(E1_FX_NOTE_SECTION.listed).not.toBe(E1_FX_NOTE_SECTION.soe)
   })
 
+  it.each(VARIANTS)(
+    '%s：JSDoc 段归属表里的 row_code 必须与模板段序列一致（Property 23 交叉锁死）',
+    (variant) => {
+      // 🔴 段归属表是给他循环看的「谁负责哪一段」说明 —— 记错会让 K/L/D2 按错码声明
+      // `_row_scope` → 服务端 fail-closed 整表跳过写入（表现为「推了但没进附注」）。
+      // 曾把短期借款段记成 `BS-031`（使用权资产 = H8 的报表行），已改 `BS-041`。
+      const src = readFileSync(resolve(__dirname, '../e1FxNoteSectionMap.ts'), 'utf-8')
+      const doc = src.slice(0, src.indexOf('*/'))
+      const documented = Array.from(doc.matchAll(/\|\s*`(BS-\d+)`\s*\|/g)).map((m) => m[1])
+      expect(documented.length, 'JSDoc 段归属表抽取为空（判据空转）').toBeGreaterThan(2)
+
+      const { tbl } = loadTable(variant)
+      const actual = segmentRowCodes(tbl.rows || [])
+      // 该变体的实际段必须全部在文档表里登记（listed 只 3 段是源 docx 事实，不得对齐）
+      const undocumented = actual.filter((c) => !documented.includes(c))
+      expect(
+        undocumented,
+        `模板出现未登记的段 ${undocumented.join(',')} —— 段归属表需补记归属循环`,
+      ).toEqual([])
+      // 反向锁死：BS-031 是 H8 使用权资产，绝不能出现在本表任何一侧
+      expect(documented).not.toContain('BS-031')
+      expect(actual).not.toContain('BS-031')
+    },
+  )
+
+  it('soe 短期借款段 row_code 是 BS-041（BS-031 是使用权资产）', () => {
+    const { tbl } = loadTable('soe')
+    const head = (tbl.rows || []).find(
+      (r: any) => String(r?.label || '').replace(/\s/g, '') === '短期借款',
+    )
+    expect(head, 'soe 外币表缺短期借款段首行').toBeTruthy()
+    expect(String(head.report_row_code)).toBe('BS-041')
+    // 只改 row_code：段的取数科目本来就是对的
+    expect(head.account_codes).toEqual(['2001'])
+  })
+
   it('sheet 名是源 xlsx 真实 tab 名（半角括号，不得用合成标识）', () => {
     expect(E1_FX_DISCLOSURE_SHEET_NAME.listed).toBe('附注披露信息(上市公司)')
     expect(E1_FX_DISCLOSURE_SHEET_NAME.soe).toBe('附注披露信息(国企)')
     for (const v of VARIANTS) {
       expect(E1_FX_DISCLOSURE_SHEET_NAME[v]).not.toMatch(/E1|note|listed|soe/i)
     }
+  })
+})
+
+describe('Property 33 — 外币段按底稿实际币种动态产出（禁写死币种清单）', () => {
+  it('源码不得出现写死的币种清单常量', () => {
+    const src = readFileSync(resolve(__dirname, '../e1FxNoteSectionMap.ts'), 'utf-8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1')
+    // 反向自检：注释真的被剥掉了（原文注释里提到过源模板币种）
+    expect(readFileSync(resolve(__dirname, '../e1FxNoteSectionMap.ts'), 'utf-8')).toContain('*')
+    for (const cur of ['美元', '欧元', '港币', '日元', '澳元']) {
+      expect(src, `源码写死了币种「${cur}」—— 币种集合必须由底稿实际行动态派生`).not.toContain(
+        `'${cur}'`,
+      )
+      expect(src).not.toContain(`"${cur}"`)
+    }
+  })
+
+  it('底稿出现模板里没有的币种（英镑）时必须出现在载荷里（正向证明）', () => {
+    const rows = [
+      ...fxRows(),
+      { groupId: 'g-bank', currency: '英镑', isGroup: false, endForeign: 10, endRate: 9.1, endRmb: 91 },
+    ]
+    const agg = aggregateE1FxByCurrency(rows as E1FxRowLike[])
+    expect(agg.map((a) => a.currency)).toContain('英镑')
+    const payload = buildE1FxSyncPayload('soe', 'wp-1', [], { fxRows: rows as E1FxRowLike[] })!
+    const flat = JSON.stringify(payload.sub_table_data)
+    expect(flat, '英镑未进载荷 ⇒ 币种被写死清单过滤掉了').toContain('英镑')
   })
 })
 

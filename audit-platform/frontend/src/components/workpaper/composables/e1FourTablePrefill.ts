@@ -31,6 +31,17 @@ export interface FourTablePrefill {
   cash: FourTableSourceRow[]
   bank: FourTableSourceRow[]
   other: FourTableSourceRow[]
+  /**
+   * 存放财务公司款项（准则解释 15 号「可增设」项，无一级标准科目 ⇒ 语义定位）。
+   *
+   * 🔴 全库当前恒空（`account_chart` 零命中）= 潜伏态而非当期缺陷。叶子口径暂不
+   * 消费它（既有 `buildBankSeedRows` 保持 bank+other 两槽以守住 Property 9 零回归）；
+   * 账户级口径由 `e1BankAccountPrefill.buildBankSeedRowsFromAccounts` 归入
+   * `group: 'finance'`。
+   */
+  finance_co: FourTableSourceRow[]
+  /** 数字货币（同上，准则解释 15 号增设二级科目）→ E1-4 种子。 */
+  digital: FourTableSourceRow[]
   account_list: Array<{ code: string; name: string; ending: number }>
   meta?: Record<string, unknown>
 }
@@ -43,6 +54,8 @@ export function normalizePrefill(raw: unknown): FourTablePrefill {
     cash: arr(p.cash),
     bank: arr(p.bank),
     other: arr(p.other),
+    finance_co: arr(p.finance_co),
+    digital: arr(p.digital),
     account_list: Array.isArray(p.account_list)
       ? (p.account_list as Array<{ code: string; name: string; ending: number }>)
       : [],

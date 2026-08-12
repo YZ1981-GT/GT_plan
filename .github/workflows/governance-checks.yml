@@ -4103,3 +4103,102 @@ jobs:
         # 判据是「赋值/UPDATE 形态」而非裸标识符 —— 脚本 docstring 必然原样写出
         # 这三个字段名来说明「为什么禁」，裸子串判据会把说明文字数成违规。
         run: python -m pytest backend/tests/test_note_conversion_live_verifier.py -q
+
+  e-cycle-extraction:
+    # E 类账户级取数 / 公式预设覆盖面 / 附注结构与段 row_code 守卫
+    # （e-cycle-extraction-formula-and-disclosure-completion Task 1/2/3/4/5/6/10/12/13）
+    #
+    # 拦六类已实测缺陷：
+    # 1. **`get_active_filter` 漏 await**：它是 `async def`（`app.services.dataset_query`）。
+    #    漏 `await` → `sa.and_(coroutine, ...)` 抛异常 → 被 fail-open 吞成 warning →
+    #    账户级清单**恒空且与「本项目无 aux 数据」不可区分**。该缺陷在 N5 与 D 循环各
+    #    发生过一次（均为 P0）⇒ Property 39 源码级断言「`get_active_filter(` 前紧邻 await」。
+    # 2. **账户级取数只能来自 `tb_aux_balance`**：客户 `1002` 在 `tb_balance` **不分户**
+    #    （叶子恒 1 行）⇒ E1-3 逐户列示与 E1-10 完整性核对拿不到任何账户。
+    #    且 aux 非 active dataset 有完全重复行（裸查翻 2~3 倍）、active 内同账号可有多行
+    #    （`a7fc75e5` 的 ±25,954,468.80）⇒ 必须走 active 过滤 + 按账号 GROUP BY。
+    # 3. **点号边界**：归属槽用 `code == p or code.startswith(p + ".")`，裸 `startswith`
+    #    会让 `10021`（另一个一级科目）被 `1002` 槽吞掉（变异检验实测抓出）。
+    # 4. **原币金额与汇率无数据源**：`tb_aux_balance` 只有 `opening_fc` 且银行账户维度下
+    #    全库为 NULL，**无 `closing_fc`、无汇率列** ⇒ 一律留空，禁由本位币反推（Property 34）。
+    # 5. **公式预设 sheet 必须是源 xlsx 真实 tab**：`审定表E0-1` 不存在（真实为
+    #    `函证结果汇总表E0-1`）；覆盖面按「有预设 / 登记无预设 / 非数据表白名单」三段
+    #    互不相交且并集完备，计数一律用**去重名**口径（`底稿目录` 出现 5 次只是 1 个名）。
+    # 6. **附注行集真源是源 docx 不是底稿 xlsx**：soe 主表 docx 6 行（首行「库存现金」、
+    #    含「其中：存放在境外的款项总额」）而底稿 xlsx 只 5 行且该行是括注；②表第 6 类
+    #    「金融企业法定存款准备金或备付金」在 docx 有、xlsx 无。另 soe 八、92 短期借款段
+    #    `report_row_code` 原写 `BS-031`（**实为使用权资产**）应为 `BS-041` —— 段边界解析
+    #    不出时 `sync_from_workpaper` 走 fail-closed **整表跳过写入**（表现为「推了没进附注」）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Check E1 prefill preset alignment (idempotent)
+        run: python backend/scripts/fix/fix_e1_prefill_presets.py --check
+      - name: Check E1 note structure alignment (idempotent)
+        run: python backend/scripts/fix/fix_note_e1_monetary_fund_structure.py --check
+      - name: Check E1 orphan sheet presets (idempotent)
+        # 🔴 本步同时是 R4.1/R4.2 的判据：脚本输出必须 GBK 可编码。
+        # 该脚本曾有 7 处 emoji（✅/❌）→ Windows GBK 控制台 UnicodeEncodeError →
+        # **退出码非零但改动已落盘**，CI 会红而欠账其实是 0。
+        run: python backend/scripts/fix/fix_e1_orphan_sheet_presets.py --check
+      - name: Run E-cycle extraction / preset / note-structure guards
+        run: >-
+          python -m pytest
+          backend/tests/four_table/test_e1_bank_accounts_live.py
+          backend/tests/four_table/test_e1_bank_accounts.py
+          backend/tests/four_table/test_e1_preset_coverage.py
+          backend/tests/four_table/test_e1_render_account_prefill.py
+          backend/tests/four_table/test_note_e1_structure.py
+          backend/tests/four_table/test_e1_restricted_buckets.py
+          -q
+
+  e-cycle-frontend:
+    # E 类前端守卫（同 spec Task 7/8/9/14/15/16/17/23/24）
+    #
+    # 拦五类「四层验证全绿、只有浏览器才暴露」或「静默失效」的缺陷：
+    # ① **传不存在的 prop 静默失效**：Vue 把未知属性落到根元素当 HTML 属性 ⇒ Volar 零诊断、
+    #    vitest 全绿、Vite transform 200，而组件内部读到 `undefined` ⇒ 整块不渲染。
+    #    平台已踩两次（G5 溯源面板从未渲染过 / G6 传 `report-row` 而真名是 `fallback-row-code`）
+    #    ⇒ 从面板 SFC 的 `defineProps` **动态抽**合法 prop 名与调用点求差集。
+    # ② **展示序与优先级序是两个语义**：`E1_RESTRICTED_BUCKETS` 的声明序既当匹配优先级
+    #    （「信用证保证金」含「保证金」必须先于兜底桶）又被前端当附注行序用，而两者实际
+    #    1↔2、4↔5 互换 ⇒ **附注②表行序与 docx 不符**。现分离为 `displayOrder`，
+    #    守卫双向锁死（打乱声明序 → 分类红/展示序绿；改 source_ref → 展示序红/分类绿）。
+    # ③ **自定义类别序号不得复用**：只取「现有最大 + 1」时，删 `cat_3` 再新增又得 `cat_3`
+    #    ⇒ 历史 cell 串到新列显示错误金额 ⇒ 必须持久化单调计数器。
+    # ④ **主表槽预填的双算风险**：审定表 `1002` 已含 `finance_co`、`1012` 已含 `digital`，
+    #    而附注 docx 把这两项写成**平行列示行** ⇒ 直接填会双算 ⇒ 扣减映射 + PBT 钉死
+    #    合计恒等式。且「取不到值」必须返 null 显示 `—`，无条件写 0 会让
+    #    「本项目无此科目」与「余额确实为 0」不可区分（Property 35）。
+    # ⑤ **金额控件**：EP 2.13.6 的 `el-input-number` **不存在** `formatter` prop ⇒ 千分符
+    #    从未生效；反向边界锁死「折算率/汇率/比例不得套 WpAmountInput」。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Run E-cycle account-level / disclosure / prefill guards
+        run: >-
+          npx vitest run
+          src/components/workpaper/composables/__tests__/e1BankAccountPrefill.spec.ts
+          src/components/workpaper/composables/__tests__/e1HostSeedWiring.spec.ts
+          src/components/workpaper/composables/__tests__/e1SourcePanelWiring.spec.ts
+          src/components/workpaper/composables/__tests__/e1RestrictedSeq.spec.ts
+          src/components/workpaper/composables/__tests__/e1RestrictedL2.spec.ts
+          src/components/workpaper/composables/__tests__/e1MainRowPrefill.spec.ts
+          src/components/workpaper/composables/__tests__/e1NegativeBalance.spec.ts
+          src/components/workpaper/composables/__tests__/e1CurrencyScope.spec.ts
+          src/components/workpaper/composables/__tests__/e1FxNoteSectionMap.spec.ts

@@ -8,9 +8,16 @@
  * |----|----------|---------|
  * | 货币资金 | `BS-002` | **E1（本文件）** |
  * | 应收账款 | `BS-006` | D2 |
- * | 短期借款 | `BS-031` | K |
+ * | 短期借款 | `BS-041` | K |
  * | 长期借款 | `BS-061` | L |
  * | 应付债券 | `BS-062` | L |
+ *
+ * 🔴 短期借款段的 row_code 曾错记为 `BS-031`（那是**使用权资产** = H8 的报表行），
+ * 已由 `fix_note_e1_monetary_fund_structure.py` 改成 `BS-041`（`TB('2001')`，
+ * `report_config` 四准则一致）。两类后果：K 循环按 `BS-041` 声明 `_row_scope` 会
+ * fail-closed 整表跳过写入（表现为「推了但没进附注」）；H8 若接入该表会错配到短期
+ * 借款段。段的 `account_codes:['2001']` 本来就是对的，只有 row_code 错。
+ * （E-cycle spec R7.1 / R7.2，守卫 `test_note_e1_structure.py` Property 23/24）
  *
  * 故载荷必须声明 `sub_table_data._row_scope`，服务端只替换 `BS-002` 段、
  * 段外行原样保留；段边界解析不出时**整表跳过写入**（fail closed），

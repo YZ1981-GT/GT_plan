@@ -103,6 +103,22 @@ E1_RESTRICTED_BUCKETS: tuple[E1RestrictedBucket, ...] = (
         exclude_keywords=("结构性",),
         source_ref="附注披露信息(国企)!A20",
     ),
+    # 🔴 第 6 类（Task 13 新增）：**源 docx 有、底稿源 xlsx 无** —— 附注行集真源是
+    # `docs/模版/…国企财务报表附注….docx`「货币资金」节第 2 张表的 r6，xlsx R17~R21 只 5 类。
+    # 前一轮据 xlsx 把它删掉了，属误删（E-cycle spec R6.1 已裁决）。
+    #
+    # 声明位置：`pledged_deposit` 之后、兜底桶 `other` 之前 —— `other` 的关键词
+    # 「专户/监管」会吃掉「存放中央银行法定准备金专户」之类命名，故必须在它之前。
+    # 实测 212 个真实叶子名无一含本桶关键词 ⇒ 新增前后分类结果逐条相同（Property 21）。
+    # 关键词含 `法定准备金`（不带「存款」二字的简写）—— 客户实际命名有
+    # 「存放中央银行款项-法定准备金」「法定准备金专户」等形态，只写 `法定存款准备金`
+    # 会让它们落到兜底桶 `other`（守卫用该形态的反向自检钉死）。
+    E1RestrictedBucket(
+        key="statutory_reserve",
+        label="金融企业法定存款准备金或备付金",
+        keywords=("法定存款准备金", "存款准备金", "法定准备金", "备付金"),
+        source_ref="国企附注docx!受限制的货币资金明细.r6",
+    ),
     # 兜底桶：确属受限但归不进上面任一类（如投标保证金 / 专项监管专户）
     E1RestrictedBucket(
         key="other",
@@ -116,6 +132,44 @@ E1_RESTRICTED_BUCKETS: tuple[E1RestrictedBucket, ...] = (
 E1_RESTRICTED_BUCKET_BY_KEY: dict[str, E1RestrictedBucket] = {
     b.key: b for b in E1_RESTRICTED_BUCKETS
 }
+
+#: 🔴🔴 **展示序（附注行序）与优先级序（声明序）是两个不同语义，必须分离**（Task 23）
+#:
+#: 一份声明序此前同时承担两个语义，而两者实际不同 —— 声明序被「包含关系必须先声明」
+#: 这条硬约束绑住（`信用证保证金` 含「保证金」须先于兜底桶；`境外冻结存款` 同含「冻结」
+#: 与「境外」须境外优先），产出 `信用证→银行承兑→履约→境外→质押`；
+#: 而源 docx 行序是 `银行承兑→信用证→履约→质押→境外→法定准备金`（**1↔2、4↔5 互换**）。
+#: 前端 `e1RestrictedScope` 的推送排序用的正是桶数组下标 ⇒ **附注行序与 docx 不符**。
+#:
+#: 本元组是**展示序的单一真源**（逐字对应 docx 六类的行序），守卫双向锁死：
+#:   ① 打乱声明序 → 分类结果必红、`displayOrder` 序列不变
+#:   ② 改本元组 → `displayOrder` 必红、分类结果不变
+#: 并断言「本元组顺序 ≠ 声明序」—— 防后来者「顺手统一」两序。
+#:
+#: 🔴 有意不按 `source_ref` 的单元格行号派生：第 6 桶的真源是 **docx** 而非 xlsx，
+#: docx 行号（r6）与 xlsx 行号（A17~A21）不在同一坐标系，混排会把它排到最前。
+E1_RESTRICTED_DOCX_ROW_ORDER: tuple[str, ...] = (
+    "bank_acceptance",
+    "letter_of_credit",
+    "performance",
+    "pledged_deposit",
+    "overseas",
+    "statutory_reserve",
+)
+
+
+def display_order_of(key: str) -> int:
+    """桶的**附注展示序**（越小越靠前）。平台补充桶（不在 docx 行序里）一律排最后。
+
+    纯函数。平台补充桶之间按声明序稳定排序（不返回相同值，避免排序不稳定）。
+    """
+    if key in E1_RESTRICTED_DOCX_ROW_ORDER:
+        return E1_RESTRICTED_DOCX_ROW_ORDER.index(key)
+    base = len(E1_RESTRICTED_DOCX_ROW_ORDER)
+    for i, b in enumerate(E1_RESTRICTED_BUCKETS):
+        if b.key == key:
+            return base + i
+    return base + len(E1_RESTRICTED_BUCKETS)
 
 
 def classify_e1_restricted_leaf(name: str) -> str | None:
@@ -151,12 +205,18 @@ def classify_e1_restricted_leaf(name: str) -> str | None:
 
 
 def bucket_defs_payload() -> list[dict]:
-    """下发前端的桶定义（中文标签的唯一来源，前端不再抄一份）。"""
+    """下发前端的桶定义（中文标签的唯一来源，前端不再抄一份）。
+
+    🔴 数组顺序仍是**声明序 = 匹配优先级**（前端待归类面板按它做「先命中先归类」的说明），
+    附注**展示序**另由 `displayOrder` 字段承载 —— 前端排序键必须用 `displayOrder`，
+    不得再用数组下标（两序不同，用下标会让附注行序与 docx 不符）。
+    """
     return [
         {
             "key": b.key,
             "label": b.label,
             "isPlatformExtra": b.source_ref is None,
+            "displayOrder": display_order_of(b.key),
         }
         for b in E1_RESTRICTED_BUCKETS
     ]

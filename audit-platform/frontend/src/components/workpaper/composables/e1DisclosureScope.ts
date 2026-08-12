@@ -10,16 +10,32 @@
  * |------------|-----------------------------------|--------------------------|
  * | 列头       | `项  目` / `期末数` / `期初数`     | `项 目` / `期末余额` / `年初余额` |
  * | 首行       | `库存现金`                        | **`现金`**               |
- * | 财务公司   | 有 `存放财务公司款项`             | 无                       |
- * | 应计利息   | 有 `存款应计利息`                 | 无                       |
- * | 境外款项   | 有 `其中：存放在境外的款项总额` 行 | **无**（R13 是括注文字） |
+ * | 财务公司   | 有 `存放财务公司款项`             | 无（准则口径差异，禁对齐）|
+ * | 应计利息   | 有 `存款应计利息`                 | 无（同上）               |
+ * | 境外款项   | 有 `其中：存放在境外的款项总额` 行 | 源 xlsx 无（R13 是括注） |
  *
- * 🔴 国企版**没有**「其中：存放在境外的款项总额」数据行 —— 源 xlsx R13 是括注
- * 「（如有因抵押、质押或冻结等对使用有限制、存放在境外、有潜在回收风险的款项应单独说明。）」，
- * 被 md 重建当成数据行落进了附注模板（假行），由 `fix_note_e1_monetary_fund_structure.py` 删除。
+ * ## 🔴 两个真源、两套字面（`label` vs `noteLabel`）
+ *
+ * **附注行集的真源是 `docs/模版/` 的源 docx，不是底稿 xlsx** —— 底稿 xlsx 是「审计师
+ * 录入用的表」，附注 docx 才是「交付件的行集」，两者在 soe 侧就是不一致的（实测）：
+ *
+ * | 项            | 底稿 xlsx（本文件 `label`） | 附注 docx（本文件 `noteLabel`）|
+ * |---------------|----------------------------|-------------------------------|
+ * | soe 首行      | `现金`（A8 逐字）           | `库存现金`（docx r1）          |
+ * | soe 境外款项行 | **无**（R13 是括注文字）     | **有**（docx r6，正式数据行）  |
+ *
+ * 故 soe 主表行集**补 `overseas` 行**（附注侧要这一行，否则该行在附注永无数据源），
+ * 而底稿 UI 首行仍显源 xlsx 字面 `现金`，推送时由 `e1NoteSectionMap.mainRow()` 按
+ * `noteLabel ?? label` 投影成 docx 字面 —— **两口径同时成立**，不是「谁改成谁」。
+ *
+ * soe 比 listed 少「存放财务公司款项」「存款应计利息」两行是**准则口径差异**
+ * （docx 实证 soe 主表只有 6 行），守卫 `TestProperty41VariantAsymmetryIsIntentional`
+ * 双向锁死，**不得顺手对齐**。
  *
  * spec: .kiro/specs/e1-four-table-extraction-and-disclosure-alignment/
  *       Requirements 4.1, 4.2, 4.3, 4.4 / Property 5
+ *       .kiro/specs/e-cycle-extraction-formula-and-disclosure-completion/
+ *       Requirements 5.2~5.8 / Property 16, 17, 18, 41（Task 15）
  */
 
 export type E1DisclosureVariantKey = 'listed' | 'soe'
@@ -27,8 +43,20 @@ export type E1DisclosureVariantKey = 'listed' | 'soe'
 export interface E1MainRowDef {
   /** 稳定标识（持久化与行匹配用，**不可改**） */
   key: string
-  /** 展示名 —— 逐字取自源 xlsx */
+  /** 展示名（底稿 UI 口径）—— 逐字取自源 xlsx */
   label: string
+  /**
+   * 附注口径字面（推送到附注时用），**缺省沿用 `label`**。
+   *
+   * 🔴 双口径由来：**附注行集与行标签的真源是源 docx，底稿字面的真源是源 xlsx**，
+   * 两者在 soe 侧不一致（xlsx A8 是 `现金` / docx r1 是 `库存现金`）。底稿 UI 必须
+   * 保留 xlsx 字面（审计师对着源模板录入），附注必须落 docx 字面（交付件行名要符合
+   * 准则模板，且 `sub_table_data` 以行标签匹配 → 差一个字就产生孤儿行）。
+   *
+   * 故只在「两侧字面不同」的行上声明本字段，由 `e1NoteSectionMap.mainRow()` 做
+   * `noteLabel ?? label` 投影；其余行不声明 = 两侧同字面。
+   */
+  noteLabel?: string
   /**
    * 审定表跨 sheet 取数键。
    *
@@ -77,10 +105,19 @@ export const E1_MAIN_ROWS_LISTED: readonly E1MainRowDef[] = Object.freeze([
   },
 ])
 
-/** 国企披露主表行 —— 源 xlsx「附注披露信息(国企)」R8~R12。 */
+/**
+ * 国企披露主表行 —— 底稿字面取源 xlsx「附注披露信息(国企)」R8~R12，
+ * 附注字面/行集取源 docx soe 货币资金表 r1~r6（见文件头「两个真源」）。
+ */
 export const E1_MAIN_ROWS_SOE: readonly E1MainRowDef[] = Object.freeze([
-  // 🔴 国企版首行字面是「现金」不是「库存现金」（源 xlsx R8）
-  { key: 'cash', label: '现金', crossKey: 'E1-adj-total-1001', sourceRef: 'A8' },
+  // 🔴 底稿字面是「现金」（源 xlsx A8），附注 docx r1 是「库存现金」→ noteLabel 桥接
+  {
+    key: 'cash',
+    label: '现金',
+    noteLabel: '库存现金',
+    crossKey: 'E1-adj-total-1001',
+    sourceRef: 'A8',
+  },
   { key: 'bank', label: '银行存款', crossKey: 'E1-adj-total-1002', sourceRef: 'A9' },
   {
     key: 'other_mf',
@@ -90,6 +127,18 @@ export const E1_MAIN_ROWS_SOE: readonly E1MainRowDef[] = Object.freeze([
   },
   { key: 'digital', label: '数字货币', crossKey: '', sourceRef: 'A11' },
   { key: 'total', label: '合计', crossKey: '', sourceRef: 'A12', isTotal: true },
+  {
+    // 🔴 附注行集真源是 docx：soe docx 货币资金表 r6 是**正式数据行**，
+    // 而源 xlsx R13 是括注文字（「（如有因抵押、质押或冻结等对使用有限制、存放在
+    // 境外、有潜在回收风险的款项应单独说明。）」）。不补这一行，附注 八、1 的
+    // 「其中：存放在境外的款项总额」永无数据源。形态与 listed 侧同名行保持一致。
+    key: 'overseas',
+    label: '其中：存放在境外的款项总额',
+    noteLabel: '其中：存放在境外的款项总额',
+    crossKey: '',
+    sourceRef: 'docx:soe/货币资金/r6（源 xlsx 无该行；R13 是括注文字）',
+    isMemo: true,
+  },
 ])
 
 export function e1MainRows(variant: E1DisclosureVariantKey): readonly E1MainRowDef[] {
