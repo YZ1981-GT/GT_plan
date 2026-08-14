@@ -2,10 +2,10 @@
 
 **最后更新**：2026-08-14
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **9**（2026-08-14 行首锚定正则 `^\s*-\s\[([ x~-])\]\s+\d+\.` 实扫，**9 个目录全部带 tasks.md、无空壳**）/ Archived **550**（2026-08-12 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录）
+**统计**：Active **8**（2026-08-14 行首锚定正则 `^\s*-\s\[([ x~-])\]\s+\d+\.` 实扫得 9，本轮归档 `frontend-excel-io-single-entry-convergence` 后为 8；**8 个目录全部带 tasks.md、无空壳**）/ Archived **551**（2026-08-12 按 `_archive/*/*` 一级子目录实扫 550 + 本轮 1，含 6 个仅剩 evidence 无三件套的历史残留目录）
 
 > **2026-08-14 实扫结果（9 个目录逐一，供下一轮比对）**：
-> `e-cycle-…completion` 24/24 · `frontend-excel-io-single-entry-convergence` 15/18 ·
+> `e-cycle-…completion` 24/24 · ~~`frontend-excel-io-single-entry-convergence` 15/18~~（**本轮已归档**，终态 15/18 + `## Notes` 写明 3 个 `[-]` 的阻塞原因）·
 > `g7-column-alignment-and-extraction-closure` 17/24 · `i-cycle-…closure` 18/24 ·
 > `k-cycle-…closure` 14/25 · `l-cycle-…completion` 3/26 ·
 > `procedure-trim-report-line-account-resolution` 0/16 ·
@@ -48,7 +48,7 @@
 | `g7-column-alignment-and-extraction-closure` | 4/24（`[~]`19） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
 | `l-cycle-extraction-formula-and-disclosure-completion` | 3/26 | L 类（借款/应付债券）取数公式与披露收口 |
 | `workpaper-import-export-lifecycle-closure` | 3/25 | 底稿导入导出生命周期收口（**此前被表头误记为「无 tasks.md 的空壳」，2026-08-12 实扫纠正**） |
-| `frontend-excel-io-single-entry-convergence` | 15/18 | **2026-08-14 收敛完成：46 → 0，`exempt[]` 为空、无一豁免**（守卫 124/124 · 变异 16/16 全 RED · 34 文件 Vite 编译通过 · CI 已挂 job）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 待用户裁决**（`batchExport.ts` 孤儿链「合并导出」用户不可达 —— 删功能还是接线属产品决策）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>剩 3 个 `[-]`：Task 2（B2/B3/B5 迁移前快照的机会窗口已关闭，如实标注不补）· Task 16（变异 14/37 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口，未点到 UI） |
+| ~~`frontend-excel-io-single-entry-convergence`~~ | **已归档** | → `_archive/06-engineering-governance/`（2026-08-14 收敛完成 46 → 0，commit `f049a11f`）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 整链删除**（`batchExport.ts` 孤儿链「合并导出」用户不可达，用户裁决删）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>**提交前发现的清单漏记（最贵一课）**：B2 那批 13 个 confirmation 文件只写在基线 `note` 的自然语言里、`files` 数组为空 ⇒ 按 files 精确 stage 的脚本漏掉它们（远端仍带裸 import，CI 必红）+ Vite 编译扫描只覆盖 33/46 + 进度失真。**此前所有守卫都在验「代码符不符合清单」，没有一条验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 条守卫 + 3 条变异（M18/M19/M20 全 RED）。同域次级坑两个：对账脚本不剥注释会漏检 `import(/* @vite-ignore */ 'exceljs')`；「数量相等 ≠ 集合相等」（曾出现基线 46 / HEAD 46 但各差一个元素）。<br>**终态**：守卫 8 文件 **119** 例全绿 · 变异 **18/18** 全 RED（静态自检 18/18）· Vite 编译 **46/46** · 三件套机器校验零 warning。剩 3 个 `[-]` 均在 tasks.md `## Notes` 写明阻塞原因：Task 2（迁移前快照窗口已关闭，事后补抓＝把错值当基线）· Task 16（变异 18/38 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口） |
 | `procedure-trim-report-line-account-resolution` | 0/16 | **2026-08-12 新建**。裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。立项实证：E 循环 5 条程序名全是「货币资金 …」而 `trial_balance` 只有明细「其他货币资金」(1012)/「银行存款」(1002) ⇒ 单向子串匹配全部落空 ⇒ 重要性判据（决策内核档 7/8）整体空转。净新增仅 2 个后端模块 + 1 处前端优先级调整 —— 三段映射的每一段都已有生产真源（`four_table/*_cycle_specs.py` 的 `row_code` 声明 · `report_config.formula` · `ReportFormulaParser`），索引只做 dispatch、**零 `row_code` 字面量** |
 
 > 🔴 上表 7 个 spec 中前 6 个由**并发会话**推进（tasks.md mtime 秒/分钟级刷新）。
@@ -202,7 +202,7 @@ H0 聚合忽略 `closing_direction` 把 contra 子科目加成正数）。
 
 ---
 
-## 二、已归档 Spec（550 个，15 分类）
+## 二、已归档 Spec（551 个，15 分类）
 
 ```
 _archive/
@@ -212,9 +212,9 @@ _archive/
 ├── 04-infra/                          3
 ├── 04-infra-architecture/            39
 ├── 05-business-features/            239
-├── 06-engineering-governance/        13
+├── 06-engineering-governance/        14
 ├── 07-workpaper-slimdown/            22
-├── 08-disclosure-notes/              78
+├── 08-disclosure-notes/              80   ← 2026-08-14 实扫修正（原记 78，并发会话归档 2 个未更新树状图）
 ├── 09-consolidation-phases/           5
 ├── 10-A~S-workpaper-all-cycles-complete/  31
 ├── 11-confirmation-d0-module/        17
@@ -223,7 +223,15 @@ _archive/
 └── 99-superseded/                     7
 ```
 
-### 最近归档（2026-08-12）
+### 最近归档（2026-08-14）
+
+**→ 06-engineering-governance（+1，前端工程治理域第 4 个 spec）**
+
+| Spec | 说明 |
+|------|------|
+| frontend-excel-io-single-entry-convergence | 前端 Excel 库调用收敛到单一入口（**15/18**，commit `f049a11f`）。**46 个生产文件 / 93 处裸 import → 0，`exempt[]` 为空、无一豁免**。动因：`xlsx@0.18.5` 是 SheetJS 在 npm 的最后一版（已撤出 npm 改 CDN 分发），带 CVE-2023-30533（原型污染）与 CVE-2024-22363（ReDoS），**两个修复版永远不会进 npm**，而项目有 25 处在读用户上传的 xlsx ⇒ 25 个独立攻击面。收敛后防护单点化。<br>性质是**行为等价重构**（产物逐格不变），迁移默认姿势是三个显式关闭 —— `applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的文件加三线表并插行。<br>**顺带修 2 个既有缺陷**：样式模板写非法 OOXML `vertical:'middle'` 致 openpyxl 打不开产出文件 · `ConsolNoteTab.uniqueSheetName` 只 add 不 check（去重是死参数，撞名则整批导出失败）。<br>**删除 2 类零消费方代码**（用户裁决「没用就删」）：`batchExport.ts` + `BatchQueryResultGroup.vue` 整条孤儿链（「合并导出」用户不可达）连带 `headerStyle` 覆写通道 · `sheetMatcher` / `customInstructionSheet` 两项 API（各被后来补出的 `readWorkbookAoa` / 多 sheet 纯 AOA 覆盖，属设计冗余）。<br>🔴 **最贵一课在提交前才发现**：基线 `_progress[].files` 漏记 13 个 confirmation 文件（只写在 `note` 的自然语言里）⇒ 精确 stage 漏文件 + Vite 编译扫描只覆盖 33/46 + 进度失真。**此前全部守卫都在验「代码符不符合清单」，无一验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 守卫 + 3 变异。<br>终态：守卫 **119** 例全绿 · 变异 **18/18** RED · Vite 编译 **46/46** · 三件套零 warning。与同分类 `frontend-consistency-m1` / `dev-tooling-modernization` / `workpaper-maintainability-convergence` 同域 |
+
+### 上一轮归档（2026-08-12）
 
 **→ 05-business-features（+1，程序裁剪/委派域第 3 个 spec）**
 
