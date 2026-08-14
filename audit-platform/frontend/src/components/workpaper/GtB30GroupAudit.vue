@@ -24,6 +24,7 @@ import {
   type TreeNode, type CoverageCell,
 } from './composables/useB30GroupAudit'
 import { useB30Review } from './composables/useB30Review'
+import { createExcelJsWorkbook, loadExcelJsWorkbook } from '@/composables/useExcelIO'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -292,19 +293,18 @@ async function confirmAmendment() {
 // ─── Import / Export ─────────────────────────────────────────────────────────
 
 async function exportTemplate() {
-  const ExcelJS = await import('exceljs')
-  const wb = new ExcelJS.Workbook()
+  // 走 useExcelIO 单一入口（B5 批）。仍是 ExcelJS 引擎，建表逻辑逐行不变。
+  const { wb, toBuffer } = await createExcelJsWorkbook()
   const ws1 = wb.addWorksheet('集团结构')
   ws1.addRow(['名称', '类型', '持股比例(%)', '父节点名称'])
   const ws2 = wb.addWorksheet('组成部分明细')
   ws2.addRow(['名称', '总资产', '营业收入', '利润', '分类', '审计范围', '分配重要性', '审计师', '独立性确认', '胜任能力评估'])
-  const buf = await wb.xlsx.writeBuffer()
+  const buf = await toBuffer()
   downloadBuffer(buf, 'B30_集团审计范围_模板.xlsx')
 }
 
 async function exportData() {
-  const ExcelJS = await import('exceljs')
-  const wb = new ExcelJS.Workbook()
+  const { wb, toBuffer } = await createExcelJsWorkbook()
   const ws1 = wb.addWorksheet('集团结构')
   ws1.addRow(['名称', '类型', '持股比例(%)', '父节点名称'])
   for (const comp of components.value) {
@@ -316,7 +316,7 @@ async function exportData() {
   for (const comp of components.value) {
     ws2.addRow([comp.name, comp.totalAssets || '', comp.revenue || '', comp.profit || '', comp.classification || '', comp.scopeType || '', comp.allocatedMateriality ?? '', comp.auditorName, comp.independence || '', comp.competence || ''])
   }
-  const buf = await wb.xlsx.writeBuffer()
+  const buf = await toBuffer()
   downloadBuffer(buf, `B30_集团审计范围_数据_${props.year}.xlsx`)
 }
 
@@ -334,9 +334,7 @@ async function handleImportFile(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
   try {
-    const ExcelJS = await import('exceljs')
-    const wb = new ExcelJS.Workbook()
-    await wb.xlsx.load(await file.arrayBuffer())
+    const wb = await loadExcelJsWorkbook(file)
     const ws = wb.getWorksheet('组成部分明细')
     if (!ws) { ElMessage.error('格式不符：缺少"组成部分明细"工作表'); return }
     const rows: any[] = []

@@ -14,6 +14,8 @@
  * Spec: .kiro/specs/h8-right-of-use-assets/ | Requirements: 6.4-6.6
  */
 import { ref, computed, watch, type Ref } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import type {
   H8CounterpartAmount,
   H8CounterpartField,
@@ -617,7 +619,6 @@ export function useH8DepreciationAlloc(params: {
 
   /** 客户端 xlsx 导入导出（对齐 H8-8/H8-10） */
   async function exportData(kind: 'template' | 'data'): Promise<void> {
-    const XLSX = await import('xlsx')
     const headers = [
       '使用权资产类别', '折旧总额(H8-8)',
       '营业成本', '制造费用', '销售费用', '管理费用', '研发支出', '其他', '备注',
@@ -635,20 +636,32 @@ export function useH8DepreciationAlloc(params: {
           '其他': r.other || 0,
           '备注': r.remark || '',
         }))
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([headers])
-      : XLSX.utils.json_to_sheet(dataRows, { header: headers })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'H8-9折旧分配')
-    XLSX.writeFile(wb, `H8-9_折旧分配_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+    // 走 useExcelIO 单一入口（B3 批）。模板态 = 只有表头行；数据态 = 表头 + 按 headers
+    // 顺序取值 —— json_to_sheet 与 aoa_to_sheet 对缺失字段同样跳过该单元格，故逐格等价。
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: 'H8-9折旧分配',
+          rows: kind === 'template'
+            ? [headers]
+            : [headers, ...dataRows.map((r) => headers.map((h) => (r as any)[h]))],
+        },
+      ],
+      fileName: `H8-9_折旧分配_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   async function importData(file: File, replace = true): Promise<{ imported: number }> {
-    const XLSX = await import('xlsx')
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rowsRaw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批）。原实现 = read(buffer,{type:'array',cellDates:false})
+    // + sheet_to_json(sheet,{defval:''}) + 取第一个 sheet。
+    // 🔴 cellDates 与 defval 必须显式透传：前者决定日期是 Date 还是序列号，
+    // 后者决定空单元格填 '' 还是被跳过（下游用 ?? / || 取值时两者行为不同）。
+    const { rows: rowsRaw } = await readSheetObjects<Record<string, any>>(file, {
+      cellDates: false,
+      defval: '',
+    })
     const mapped = rowsRaw
       .filter((r) => String(r['使用权资产类别'] || r['类别'] || '').trim())
       .map((r) => {

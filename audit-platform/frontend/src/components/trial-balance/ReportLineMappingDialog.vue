@@ -156,6 +156,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import { api } from '@/services/apiProxy'
 import { reportLineMapping, accountMapping } from '@/services/apiPaths'
 import { useProjectStore } from '@/stores/project'
@@ -522,97 +523,101 @@ async function onReferenceCopy() {
 }
 
 // ─── 导出映射模板（Excel，含必填标注 + 预设库 sheet） ───
-function onExportTemplate() {
-  import('xlsx').then(XLSX => {
-    const wb = XLSX.utils.book_new()
-
-    // Sheet 1：映射规则（当前数据）
-    const data = mergedRows.value.map(r => ({
-      '*科目编码（必填）': r.account_code,
-      '科目名称': r.account_name,
-      '*报表行次编码（必填）': r.report_line_code || '',
-      '*报表行次名称（必填）': r.report_line_name || '',
-      '*报表类型（必填）': r.report_type ? reportTypeLabel(r.report_type) : '',
-      '状态': r.mapped ? (r.is_confirmed ? '已确认' : '待确认') : '⚠未映射-请填写',
-    }))
-    const ws = XLSX.utils.json_to_sheet(data)
-    ws['!cols'] = [{ wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 16 }]
-    XLSX.utils.book_append_sheet(wb, ws, '映射规则')
-
-    // Sheet 2：预设库（所有可选的报表行次，供用户复制粘贴）
-    const presetData = reportLineOptions.value.map((l: any) => ({
-      '报表行次编码': l.report_line_code,
-      '报表行次名称': l.report_line_name,
-      '报表类型': reportTypeLabel(l.report_type),
-    }))
-    const ws2 = XLSX.utils.json_to_sheet(presetData)
-    ws2['!cols'] = [{ wch: 16 }, { wch: 24 }, { wch: 14 }]
-    XLSX.utils.book_append_sheet(wb, ws2, '可选报表行次（预设库）')
-
-    // Sheet 3：填写说明
-    const instructions = [
-      { '说明': '【填写规则】' },
-      { '说明': '1. 带 * 号的列为必填项' },
-      { '说明': '2. "科目编码"为余额表中的一级科目编码（4位）' },
-      { '说明': '3. "报表行次编码"和"报表行次名称"请从"可选报表行次"sheet中选择' },
-      { '说明': '4. "报表类型"可选值：资产负债表 / 利润表' },
-      { '说明': '5. 已有映射的行无需修改，只需补充"⚠未映射"的行' },
-      { '说明': '6. 编辑完成后保存，回到系统点击"导入模板"上传即可' },
-      { '说明': '' },
-      { '说明': '【注意事项】' },
-      { '说明': '- 导入时已存在的映射不会被覆盖' },
-      { '说明': '- 如需修改已有映射，请先在系统中删除再导入' },
-      { '说明': '- 同一科目编码只能映射到一个报表行次' },
-    ]
-    const ws3 = XLSX.utils.json_to_sheet(instructions)
-    ws3['!cols'] = [{ wch: 60 }]
-    XLSX.utils.book_append_sheet(wb, ws3, '填写说明')
-
-    XLSX.writeFile(wb, `映射规则模板_${props.projectId.slice(0, 8)}.xlsx`)
-    ElMessage.success('已导出映射模板（含预设库和填写说明）')
+async function onExportTemplate() {
+  // Sheet 1：映射规则（当前数据）
+  const data = mergedRows.value.map(r => ({
+    '*科目编码（必填）': r.account_code,
+    '科目名称': r.account_name,
+    '*报表行次编码（必填）': r.report_line_code || '',
+    '*报表行次名称（必填）': r.report_line_name || '',
+    '*报表类型（必填）': r.report_type ? reportTypeLabel(r.report_type) : '',
+    '状态': r.mapped ? (r.is_confirmed ? '已确认' : '待确认') : '⚠未映射-请填写',
+  }))
+  // Sheet 2：预设库（所有可选的报表行次，供用户复制粘贴）
+  const presetData = reportLineOptions.value.map((l: any) => ({
+    '报表行次编码': l.report_line_code,
+    '报表行次名称': l.report_line_name,
+    '报表类型': reportTypeLabel(l.report_type),
+  }))
+  // Sheet 3：填写说明
+  const instructions = [
+    { '说明': '【填写规则】' },
+    { '说明': '1. 带 * 号的列为必填项' },
+    { '说明': '2. "科目编码"为余额表中的一级科目编码（4位）' },
+    { '说明': '3. "报表行次编码"和"报表行次名称"请从"可选报表行次"sheet中选择' },
+    { '说明': '4. "报表类型"可选值：资产负债表 / 利润表' },
+    { '说明': '5. 已有映射的行无需修改，只需补充"⚠未映射"的行' },
+    { '说明': '6. 编辑完成后保存，回到系统点击"导入模板"上传即可' },
+    { '说明': '' },
+    { '说明': '【注意事项】' },
+    { '说明': '- 导入时已存在的映射不会被覆盖' },
+    { '说明': '- 如需修改已有映射，请先在系统中删除再导入' },
+    { '说明': '- 同一科目编码只能映射到一个报表行次' },
+  ]
+  // 走 useExcelIO 单一入口（B7 批）。三个 sheet 原本都是 json_to_sheet(对象数组)，
+  // 用 json 形态原样透传 —— 表头由 json_to_sheet 按键并集生成，手写 AOA 不等价。
+  await exportMultiSheetData({
+    sheets: [
+      { sheetName: '映射规则', json: data, colWidths: [{ wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 22 }, { wch: 18 }, { wch: 16 }] },
+      { sheetName: '可选报表行次（预设库）', json: presetData, colWidths: [{ wch: 16 }, { wch: 24 }, { wch: 14 }] },
+      { sheetName: '填写说明', json: instructions, colWidths: [{ wch: 60 }] },
+    ],
+    fileName: `映射规则模板_${props.projectId.slice(0, 8)}.xlsx`,
+    applyStyles: false,
+  successMessage: false,
   })
+  ElMessage.success('已导出映射模板（含预设库和填写说明）')
 }
 
 // ─── 导入映射模板（Excel） ───
+/**
+ * el-upload 的 `before-upload` 钩子 —— **必须同步返回 false** 阻止自动上传
+ *
+ * 原写法是 `import('xlsx').then(async XLSX => {...}); return false`：不等待解析、
+ * 立刻返回 false。若把本函数改成 async，返回值会变成 resolved Promise，
+ * Element Plus 视为「允许上传」，就会真的往 action（这里未设置 = 当前地址）POST
+ * 一个无效请求。故保持同步外壳，解析放到下面的 async 实现里。
+ */
 function onImportTemplate(file: File) {
-  import('xlsx').then(async XLSX => {
-    const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf)
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rows: any[] = XLSX.utils.sheet_to_json(ws)
-
-    if (!rows.length) {
-      ElMessage.warning('文件为空')
-      return
-    }
-
-    // 解析并批量创建映射（兼容带*号和不带*号的列名）
-    const typeMap: Record<string, string> = { '资产负债表': 'balance_sheet', '利润表': 'income_statement', '现金流量表': 'cash_flow', '权益变动表': 'equity_change' }
-    let created = 0
-    let skipped = 0
-    for (const row of rows) {
-      const code = String(row['*科目编码（必填）'] || row['科目编码'] || '').trim()
-      const lineCode = String(row['*报表行次编码（必填）'] || row['报表行次编码'] || '').trim()
-      const lineName = String(row['*报表行次名称（必填）'] || row['报表行次名称'] || '').trim()
-      const typeStr = String(row['*报表类型（必填）'] || row['报表类型'] || '').trim()
-      if (!code || !lineCode || !lineName) { skipped++; continue }
-
-      const reportType = typeMap[typeStr] || 'balance_sheet'
-      try {
-        const res: any = await api.post(`/api/projects/${props.projectId}/report-line-mapping/manual`, {
-          standard_account_code: code,
-          report_type: reportType,
-          report_line_code: lineCode,
-          report_line_name: lineName,
-        })
-        if (res?.created) created++
-        else skipped++
-      } catch { skipped++ }
-    }
-    ElMessage.success(`导入完成：新增 ${created} 条，跳过 ${skipped} 条（已存在或无效）`)
-    await loadMappings()
-  })
+  void doImportTemplate(file)
   return false
+}
+
+async function doImportTemplate(file: File) {
+  // 走 useExcelIO 单一入口（B7 批）。原先 XLSX.read(buf) 不传 type（SheetJS 自行
+  // 按 ArrayBuffer 推断为 'array'）+ sheet_to_json(ws) 对象模式无选项，等价。
+  const { rows } = await readSheetObjects<any>(file)
+
+  if (!rows.length) {
+    ElMessage.warning('文件为空')
+    return
+  }
+
+  // 解析并批量创建映射（兼容带*号和不带*号的列名）
+  const typeMap: Record<string, string> = { '资产负债表': 'balance_sheet', '利润表': 'income_statement', '现金流量表': 'cash_flow', '权益变动表': 'equity_change' }
+  let created = 0
+  let skipped = 0
+  for (const row of rows) {
+    const code = String(row['*科目编码（必填）'] || row['科目编码'] || '').trim()
+    const lineCode = String(row['*报表行次编码（必填）'] || row['报表行次编码'] || '').trim()
+    const lineName = String(row['*报表行次名称（必填）'] || row['报表行次名称'] || '').trim()
+    const typeStr = String(row['*报表类型（必填）'] || row['报表类型'] || '').trim()
+    if (!code || !lineCode || !lineName) { skipped++; continue }
+
+    const reportType = typeMap[typeStr] || 'balance_sheet'
+    try {
+      const res: any = await api.post(`/api/projects/${props.projectId}/report-line-mapping/manual`, {
+        standard_account_code: code,
+        report_type: reportType,
+        report_line_code: lineCode,
+        report_line_name: lineName,
+      })
+      if (res?.created) created++
+      else skipped++
+    } catch { skipped++ }
+  }
+  ElMessage.success(`导入完成：新增 ${created} 条，跳过 ${skipped} 条（已存在或无效）`)
+  await loadMappings()
 }
 
 // ─── 辅助 ───

@@ -11,6 +11,7 @@
  */
 import { ref, computed, toRef, watch, provide, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { api } from '@/services/apiProxy'
 import {
   useB22BControlMatrix,
@@ -148,16 +149,21 @@ async function exportControlMatrix(): Promise<void> {
     return
   }
   try {
-    const XLSX = await import('xlsx')
     const aoa = [
       REGISTER_COLUMNS.map((c) => c.label),
       ...rows.value.map((r) => REGISTER_COLUMNS.map((c) => (r[c.key] as string) ?? '')),
     ]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    ws['!cols'] = REGISTER_COLUMNS.map((c) => ({ wch: c.width ?? 14 }))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '企业层面控制矩阵')
-    XLSX.writeFile(wb, `B22B_企业层面控制矩阵_${props.year || ''}.xlsx`)
+    // 走 useExcelIO 单一入口（B7 批）。
+    await exportMultiSheetData({
+      sheets: [{
+        sheetName: '企业层面控制矩阵',
+        rows: aoa,
+        colWidths: REGISTER_COLUMNS.map((c) => ({ wch: c.width ?? 14 })),
+      }],
+      fileName: `B22B_企业层面控制矩阵_${props.year || ''}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success(`已导出 ${rows.value.length} 项控制`)
   } catch (e) {
     console.error('[B22B] 控制矩阵导出失败', e)

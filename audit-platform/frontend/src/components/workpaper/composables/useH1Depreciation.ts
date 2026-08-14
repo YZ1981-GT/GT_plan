@@ -8,6 +8,8 @@
  * Requirements: 11.1-11.13
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+
+import { readSheetAoa } from '@/composables/useExcelIO'
 import type { ChecklistItem } from './useH1FormData'
 import {
   calcStraightLine,
@@ -1037,16 +1039,23 @@ export function useH1Depreciation(
     importing.value = true
     lastImportWarnings.value = []
     try {
-      const XLSX = await import('xlsx')
-      const buf = await file.arrayBuffer()
-      const wb = XLSX.read(buf, { type: 'array', cellDates: true })
-      const sheetName = wb.SheetNames[0]
+      // 走 useExcelIO 低层入口（B3 批）。原实现 =
+      //   read(buf, { type:'array', cellDates:true })
+      //   + sheet_to_json(sheet, { header:1, defval:'', raw:false })
+      // 三个选项都必须透传：cellDates 决定日期是 Date 还是序列号，raw:false 让数值/日期
+      // 返回格式化字符串（下方 _fmtDateCell / _num 依赖此行为），defval:'' 决定空格填什么。
+      //
+      // 用 readSheetAoa 而非 parseFile —— 本函数自己在前 10 行里按映射字段数打分定位表头行，
+      // parseFile 的「表头固定在某一行」模型表达不了。
+      const { sheetName, rows: aoa } = await readSheetAoa(file, {
+        cellDates: true,
+        defval: '',
+        raw: false,
+      })
       if (!sheetName) {
         lastImportWarnings.value = ['文件中无工作表']
         return null
       }
-      const sheet = wb.Sheets[sheetName]
-      const aoa: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false })
       if (aoa.length < 2) {
         lastImportWarnings.value = ['工作表无数据行']
         return null

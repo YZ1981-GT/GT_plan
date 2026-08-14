@@ -1177,6 +1177,7 @@ import { listAssignments } from '@/services/staffApi'
 import { ROLE_TERMS, newRequestId } from '@/components/workpaper/composables/procedureConsoleOverlay'
 import http from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 
@@ -2383,12 +2384,17 @@ async function exportScheme() {
       ElMessage.warning('暂无可导出的程序数据')
       return
     }
-    const XLSX = await import('xlsx')
-    const wb = XLSX.utils.book_new()
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    ws['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 8 }, { wch: 32 }, { wch: 16 }, { wch: 14 }, { wch: 8 }]
-    XLSX.utils.book_append_sheet(wb, ws, '底稿粗裁方案')
-    XLSX.writeFile(wb, `底稿粗裁方案_${projectId.value.slice(0, 8)}.xlsx`)
+    // 走 useExcelIO 单一入口（B6 批）。三个显式关闭保持产物不变。
+    await exportMultiSheetData({
+      sheets: [{
+        sheetName: '底稿粗裁方案',
+        rows: aoa,
+        colWidths: [{ wch: 12 }, { wch: 12 }, { wch: 40 }, { wch: 8 }, { wch: 32 }, { wch: 16 }, { wch: 14 }, { wch: 8 }],
+      }],
+      fileName: `底稿粗裁方案_${projectId.value.slice(0, 8)}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('裁剪方案已导出')
   } catch (e: any) {
     handleApiError(e, '导出裁剪方案')

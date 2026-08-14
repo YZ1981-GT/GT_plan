@@ -315,6 +315,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
+import { exportMultiSheetData, parseFile } from '@/composables/useExcelIO'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useAlternativeD06Data } from './composables/useAlternativeD06Data'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
@@ -416,11 +417,14 @@ async function handleImportFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   try {
-    const { read, utils } = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = read(buf, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rawRows: Record<string, any>[] = utils.sheet_to_json(ws)
+    // 走 useExcelIO 单一入口（B2 批，与 D05/F05 同构）。
+    // requireFirstCell:false —— 首列「序号」模板说明写「留空即可」；全空行由下方 hasValue 过滤。
+    const { rows: rawRows } = await parseFile(file, {
+      sheetName: '',
+      skipRows: 1,
+      skipExamplePrefix: '',
+      requireFirstCell: false,
+    })
     if (rawRows.length === 0) {
       ElMessage.warning('Excel 文件为空或无法解析')
       return
@@ -459,16 +463,9 @@ async function handleImportFile(event: Event) {
 
 async function handleExportExcel() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
-
     // Sheet 1: 公司清单模板
     const companyHeaders = ['序号', '函证索引号', '供应商/客户名称']
     const companyExample = ['1', 'D0-001', '示例公司（请删除）']
-    const wsCompany = utils.aoa_to_sheet([companyHeaders, companyExample])
-    wsCompany['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 30 }]
-    utils.book_append_sheet(wb, wsCompany, '公司清单')
-
     // Sheet 2~5: 4 区块列头
     const blockSheets: { key: string; name: string }[] = [
       { key: 'block1', name: '①期末余额证据' },
@@ -476,13 +473,6 @@ async function handleExportExcel() {
       { key: 'block3', name: '③本期出库' },
       { key: 'block4', name: '④本期收款' },
     ]
-    for (const { key, name } of blockSheets) {
-      const cols = BLOCK_COLUMN_CONFIGS_D06[key].columns
-      const headers = cols.map(c => c.label)
-      const ws = utils.aoa_to_sheet([headers])
-      ws['!cols'] = cols.map(c => ({ wch: Math.max((c.width || 100) / 8, (c.label?.length || 4) * 2.5) }))
-      utils.book_append_sheet(wb, ws, name)
-    }
 
     // Sheet 6: 填写说明
     const instructions = [
@@ -507,11 +497,30 @@ async function handleExportExcel() {
       ['  4. 收款检查比例 = 区块④收款金额合计 / 本期销售额（自动计算）'],
       ['  5. 出库检查比例 = 区块③出库金额合计 / 本期销售额（自动计算）'],
     ]
-    const instrSheet = utils.aoa_to_sheet(instructions)
-    instrSheet['!cols'] = [{ wch: 80 }]
-    utils.book_append_sheet(wb, instrSheet, '填写说明')
-
-    writeFileXLSX(wb, 'D0-6应收账款及销售替代程序_导入模板.xlsx')
+    // 六个 sheet 全是纯 AOA，rows 与 colWidths 原样传（列宽公式勿改）
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '公司清单',
+          rows: [companyHeaders, companyExample],
+          colWidths: [{ wch: 6 }, { wch: 12 }, { wch: 30 }],
+        },
+        ...blockSheets.map(({ key, name }) => {
+          const cols = BLOCK_COLUMN_CONFIGS_D06[key].columns
+          return {
+            sheetName: name,
+            rows: [cols.map(c => c.label)],
+            colWidths: cols.map(c => ({
+              wch: Math.max((c.width || 100) / 8, (c.label?.length || 4) * 2.5),
+            })),
+          }
+        }),
+        { sheetName: '填写说明', rows: instructions, colWidths: [{ wch: 80 }] },
+      ],
+      fileName: 'D0-6应收账款及销售替代程序_导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('模板已导出')
   } catch (e: any) {
     ElMessage.error('生成模板失败：' + (e?.message || '未知错误'))
@@ -524,9 +533,6 @@ async function handleExportData() {
     return
   }
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
-
     // Sheet 1: 公司汇总
     const summaryHeaders = ['序号', '索引号', '公司名称', '完成度', '收款比例', '出库比例', '是否异常']
     const summaryData = data.companies.value.map(c => [
@@ -538,10 +544,6 @@ async function handleExportData() {
       data.getCheckRatio(c, 'shipment') !== null ? `${data.getCheckRatio(c, 'shipment')!.toFixed(1)}%` : 'N/A',
       data.hasAbnormal(c) ? '是' : '否',
     ])
-    const wsSummary = utils.aoa_to_sheet([summaryHeaders, ...summaryData])
-    wsSummary['!cols'] = [{ wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 8 }]
-    utils.book_append_sheet(wb, wsSummary, '公司汇总')
-
     // 每个区块一个 Sheet
     const blockSheets: { key: BlockType; name: string }[] = [
       { key: 'block1', name: '①期末余额证据' },
@@ -549,25 +551,34 @@ async function handleExportData() {
       { key: 'block3', name: '③本期出库' },
       { key: 'block4', name: '④本期收款' },
     ]
-    for (const { key, name } of blockSheets) {
-      const cols = BLOCK_COLUMN_CONFIGS_D06[key].columns
-      const headers = ['公司名称', ...cols.map(c => c.label)]
-      const rows: any[][] = []
-      for (const company of data.companies.value) {
-        const blockRows = getBlockRows(company, key)
-        for (const row of blockRows) {
-          rows.push([
-            company.entity_name ?? '',
-            ...cols.map(c => row[c.field] ?? ''),
-          ])
-        }
-      }
-      const ws = utils.aoa_to_sheet([headers, ...rows])
-      ws['!cols'] = [{ wch: 20 }, ...cols.map(c => ({ wch: Math.max((c.width || 80) / 8, 10) }))]
-      utils.book_append_sheet(wb, ws, name)
-    }
 
-    writeFileXLSX(wb, 'D0-6应收账款及销售替代程序_数据导出.xlsx')
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '公司汇总',
+          rows: [summaryHeaders, ...summaryData],
+          colWidths: [{ wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 8 }],
+        },
+        ...blockSheets.map(({ key, name }) => {
+          const cols = BLOCK_COLUMN_CONFIGS_D06[key].columns
+          const headers = ['公司名称', ...cols.map(c => c.label)]
+          const rows: any[][] = []
+          for (const company of data.companies.value) {
+            for (const row of getBlockRows(company, key)) {
+              rows.push([company.entity_name ?? '', ...cols.map(c => row[c.field] ?? '')])
+            }
+          }
+          return {
+            sheetName: name,
+            rows: [headers, ...rows],
+            colWidths: [{ wch: 20 }, ...cols.map(c => ({ wch: Math.max((c.width || 80) / 8, 10) }))],
+          }
+        }),
+      ],
+      fileName: 'D0-6应收账款及销售替代程序_数据导出.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('数据已导出')
   } catch (e: any) {
     ElMessage.error('导出失败：' + (e?.message || '未知错误'))

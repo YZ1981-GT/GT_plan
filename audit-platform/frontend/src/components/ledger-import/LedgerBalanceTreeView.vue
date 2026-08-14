@@ -258,6 +258,7 @@ Expose:
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import {
   getLedgerBalanceTree,
   type LedgerBalanceTreeResponse,
@@ -427,8 +428,6 @@ function getSummary({ columns }: { columns: any[] }): string[] {
 }
 
 async function onExportExcel() {
-  // 动态 import xlsx 避免首屏体积
-  const XLSX = await import('xlsx')
   const rows: any[] = []
   filteredTree.value.forEach((node: any) => {
     // 父行
@@ -477,11 +476,15 @@ async function onExportExcel() {
     })
   })
 
-  const ws = XLSX.utils.json_to_sheet(rows)
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, '科目余额树形')
   const filename = `余额树形_${props.year}_第${page.value}页.xlsx`
-  XLSX.writeFile(wb, filename)
+  // 走 useExcelIO 单一入口（B7 批）。原本是 json_to_sheet(对象数组)，
+  // 用 json 形态原样透传 —— 表头由 json_to_sheet 按键并集生成，手写 AOA 不等价。
+  await exportMultiSheetData({
+    sheets: [{ sheetName: '科目余额树形', json: rows }],
+    fileName: filename,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success(`已导出 ${rows.length} 行到 ${filename}`)
 }
 

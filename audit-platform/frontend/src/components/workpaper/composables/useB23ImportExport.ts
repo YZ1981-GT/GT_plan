@@ -8,6 +8,7 @@
  * - rows↔model 纯函数拆出供往返 PBT（Property P2）
  */
 import { ElMessage } from 'element-plus'
+import { createExcelJsWorkbook, loadExcelJsWorkbook } from '@/composables/useExcelIO'
 import { B23_CYCLES } from './b23CycleConfig'
 import type { B23ControlPoint } from './useB23ProcessControl'
 
@@ -73,8 +74,8 @@ export interface B23ImportExportDeps {
 export function useB23ImportExport(deps: B23ImportExportDeps) {
   async function exportData(clientName = 'B23'): Promise<void> {
     try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
+      // 走 useExcelIO 单一入口（B5 批）。仍是 ExcelJS 引擎，建表逻辑逐行不变。
+      const { wb } = await createExcelJsWorkbook()
       for (const def of B23_CYCLES) {
         if (!deps.getApplicability(def.code)) continue
         const ws = wb.addWorksheet(`${def.wpCode} ${def.name}`.slice(0, 31))
@@ -90,8 +91,7 @@ export function useB23ImportExport(deps: B23ImportExportDeps) {
 
   async function exportTemplate(): Promise<void> {
     try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
+      const { wb } = await createExcelJsWorkbook()
       for (const def of B23_CYCLES) {
         const ws = wb.addWorksheet(`${def.wpCode} ${def.name}`.slice(0, 31))
         ws.addRow([...CONTROL_MATRIX_HEADERS])
@@ -102,9 +102,7 @@ export function useB23ImportExport(deps: B23ImportExportDeps) {
 
   async function importData(file: File, mode: 'overwrite' | 'skip' = 'overwrite'): Promise<void> {
     try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
-      await wb.xlsx.load(await file.arrayBuffer())
+      const wb = await loadExcelJsWorkbook(file)
       let imported = 0
       let skippedSheets = 0
       for (const def of B23_CYCLES) {

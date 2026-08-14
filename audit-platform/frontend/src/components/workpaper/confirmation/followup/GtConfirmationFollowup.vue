@@ -147,6 +147,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import type { FollowupRow } from './followupTypes'
 import { useFollowupData } from './composables/useFollowupData'
 import { useMemoCompose } from './composables/useMemoCompose'
@@ -246,14 +247,21 @@ function handleImport() {
 
 async function handleExportTemplate() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
     const headers = ['序号', '函证索引号', '被函证单位', '单位地址', '跟函人员', '跟函日期', '确认场景']
     const example = ['1', 'D0-001', '示例公司（请删除）', '北京市XX区', '张三', '2025-12-31', '现场即时确认']
-    const ws = utils.aoa_to_sheet([headers, example])
-    ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 20 }, { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 14 }]
-    utils.book_append_sheet(wb, ws, '跟函记录')
-    writeFileXLSX(wb, 'D0-3跟函记录导入模板.xlsx')
+    // 单 sheet 纯 AOA；successMessage:false 因原实现不弹提示
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '跟函记录',
+          rows: [headers, example],
+          colWidths: [{ wch: 6 }, { wch: 12 }, { wch: 20 }, { wch: 25 }, { wch: 10 }, { wch: 12 }, { wch: 14 }],
+        },
+      ],
+      fileName: 'D0-3跟函记录导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
   } catch (e: any) {
     console.error('[FollowupD03] Export template error:', e)
   }
@@ -262,7 +270,6 @@ async function handleExportTemplate() {
 async function handleExportData() {
   if (rows.value.length === 0) return
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
     const headers = ['序号', '函证索引号', '被函证单位', '跟函人员', '跟函日期', '确认场景', '控制结论', '签名状态']
     const data = rows.value.map(r => [
       r.seq ?? '', r.confirm_index ?? '', r.entity_name ?? '',
@@ -271,11 +278,18 @@ async function handleExportData() {
       r.control_conclusion === 'pass' ? '通过' : r.control_conclusion === 'fail' ? '未通过' : '未完成',
       r.sign_status === 'signed' ? '已签' : '未签',
     ])
-    const ws = utils.aoa_to_sheet([headers, ...data])
-    ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 8 }]
-    const wb = utils.book_new()
-    utils.book_append_sheet(wb, ws, '跟函数据')
-    writeFileXLSX(wb, 'D0-3跟函数据导出.xlsx')
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '跟函数据',
+          rows: [headers, ...data],
+          colWidths: [{ wch: 6 }, { wch: 12 }, { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 14 }, { wch: 10 }, { wch: 8 }],
+        },
+      ],
+      fileName: 'D0-3跟函数据导出.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
   } catch (e: any) {
     console.error('[FollowupD03] Export data error:', e)
   }

@@ -3,8 +3,18 @@
  *
  * 独立文件避免在巨型 FormulaManagerDialog.vue 中动态导入 exceljs
  * 导致 Vite import-analysis 解析失败。
+ *
+ * B5 批（2026-08-12）：Excel 库调用收敛到 composables/useExcelIO.ts。
+ * 原先这里写的是 `await import(/* @vite-ignore *\/ 'exceljs')` —— 那个 @vite-ignore
+ * 就是为规避上述解析失败加的。动态 import 移进 useExcelIO 后本文件只做**静态**
+ * import，规避不再必要。
+ *
+ * 本文件保持 ExcelJS 引擎未换 SheetJS：它依赖 `views:[{state:'frozen',ySplit:1}]`
+ * 冻结首行，而 xlsx-js-style 的写入端实测**不保留冻结窗格**（ExcelJS 读回
+ * state:"normal"），换引擎会丢功能。
  */
 import { ElMessage } from 'element-plus'
+import { createExcelJsWorkbook } from '@/composables/useExcelIO'
 
 interface FormulaRow {
   row_code?: string
@@ -22,8 +32,7 @@ export async function exportFormulaTemplate(
   selectedPath: string,
 ): Promise<void> {
   try {
-    const ExcelJS = await import(/* @vite-ignore */ 'exceljs')
-    const wb = new ExcelJS.Workbook()
+    const { wb, toBuffer } = await createExcelJsWorkbook()
 
     // ── Sheet 1: 编制说明 ──
     const wsGuide = wb.addWorksheet('编制说明')
@@ -97,7 +106,7 @@ export async function exportFormulaTemplate(
     wsData.views = [{ state: 'frozen', ySplit: 1 }]
 
     // 下载
-    const buffer = await wb.xlsx.writeBuffer()
+    const buffer = await toBuffer()
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')

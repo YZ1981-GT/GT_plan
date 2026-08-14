@@ -266,6 +266,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { exportMultiSheetData, readSheetAoa } from '@/composables/useExcelIO'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { uploadAttachment } from '@/services/commonApi'
@@ -329,35 +330,35 @@ function onImportExportCmd(cmd: string) {
 }
 
 async function exportTemplate() {
-  const XLSX = await import('xlsx')
   const headers = ['序号', '凭证日期', '凭证编号', '编制人', '过账人', '审核人', '支持性文件', '批准过程', '是否偏差', '偏差说明', '索引号']
   const rows = Array.from({ length: 25 }, (_, i) => [i + 1, '', '', '', '', '', '', '', '', '', ''])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'C23-2 样本')
-  XLSX.writeFile(wb, 'C23-2_控制测试样本_模板.xlsx')
+  // 走 useExcelIO 单一入口（B7 批）。原本无 !cols，故不传 colWidths。
+  await exportMultiSheetData({
+    sheets: [{ sheetName: 'C23-2 样本', rows: [headers, ...rows] }],
+    fileName: 'C23-2_控制测试样本_模板.xlsx',
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('模板已导出')
 }
 
 async function exportData() {
-  const XLSX = await import('xlsx')
   const headers = ['序号', '凭证日期', '凭证编号', '编制人', '过账人', '审核人', '支持性文件', '批准过程', '是否偏差', '偏差说明', '索引号']
   const rows = props.samples.map(s => [s.seq, s.date, s.voucherNo, s.preparer, s.poster, s.reviewer, s.supportDoc, s.approval, s.deviation, s.deviationNote, s.indexRef])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'C23-2 样本')
-  XLSX.writeFile(wb, 'C23-2_控制测试样本_数据.xlsx')
+  await exportMultiSheetData({
+    sheets: [{ sheetName: 'C23-2 样本', rows: [headers, ...rows] }],
+    fileName: 'C23-2_控制测试样本_数据.xlsx',
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('数据已导出')
 }
 
 async function onImportFileChange(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]
   if (!file) return
-  const XLSX = await import('xlsx')
-  const buf = await file.arrayBuffer()
-  const wb = XLSX.read(buf, { type: 'array' })
-  const ws = wb.Sheets[wb.SheetNames[0]]
-  const data = XLSX.utils.sheet_to_json<any>(ws, { header: 1 })
+  // 走 useExcelIO 单一入口（B7 批）。原先取第一个 sheet + sheet_to_json(header:1)。
+  const { rows: data } = await readSheetAoa(file)
   // 跳过表头行
   const rows = data.slice(1)
   let imported = 0

@@ -91,6 +91,7 @@
 
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, onMounted } from 'vue'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { useDiffChecklistData } from './composables/useDiffChecklistData'
 import type { DiffChecklistCompany } from './diffChecklistTypes'
 
@@ -253,23 +254,14 @@ function handleExportExcel() {
 
 async function handleExportTemplate() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
-
     // Sheet 1: 数据模板（基础信息）
     const headers = ['序号', '函证索引号', '被询证单位', '科目', 'A回函金额(对方确认)', 'E账面金额(我方账面)']
     const example = ['1', 'D0-001', '示例公司（请删除）', '应收账款', '100000', '100000']
-    const ws = utils.aoa_to_sheet([headers, example])
-    ws['!cols'] = [{ wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 18 }, { wch: 18 }]
-    utils.book_append_sheet(wb, ws, '差异检查表')
 
     // Sheet 2: 未达明细模板（B/C/F/G 调节明细行）
     const subHeaders = ['函证索引号', '调节区块', '货物验收/付款日期', '确认增减日期', '凭证号', '摘要', '金额']
     const subExample1 = ['D0-001', 'B(对方已收我方未付)', '2025-12-28', '2025-12-30', '记-128', '12月发货在途', '5000']
     const subExample2 = ['D0-001', 'F(我方已收对方未付)', '2025-12-29', '2025-12-31', '收-099', '12月回款在途', '3000']
-    const subWs = utils.aoa_to_sheet([subHeaders, subExample1, subExample2])
-    subWs['!cols'] = [{ wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 10 }]
-    utils.book_append_sheet(wb, subWs, '未达明细')
 
     // Sheet 3: 填写说明
     const instructions = [
@@ -305,11 +297,26 @@ async function handleExportTemplate() {
       ['  2. D/H/I 系统自动计算，无需手动填写'],
       ['  3. 示例行请删除后再填写实际数据'],
     ]
-    const instrSheet = utils.aoa_to_sheet(instructions)
-    instrSheet['!cols'] = [{ wch: 65 }]
-    utils.book_append_sheet(wb, instrSheet, '填写说明')
-
-    writeFileXLSX(wb, 'D0-4b差异检查表导入模板.xlsx')
+    // 三个 sheet 全是纯 AOA（表头+示例 / 表头+双示例 / 纯文本说明），
+    // rows 与 colWidths 原样传。successMessage:false 因原实现不弹任何提示。
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '差异检查表',
+          rows: [headers, example],
+          colWidths: [{ wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 18 }, { wch: 18 }],
+        },
+        {
+          sheetName: '未达明细',
+          rows: [subHeaders, subExample1, subExample2],
+          colWidths: [{ wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 18 }, { wch: 10 }],
+        },
+        { sheetName: '填写说明', rows: instructions, colWidths: [{ wch: 65 }] },
+      ],
+      fileName: 'D0-4b差异检查表导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
   } catch (e: any) {
     console.error('[DiffChecklist] Export template error:', e)
   }

@@ -1329,6 +1329,7 @@ import TbVersionDrawer from '@/components/trial-balance/TbVersionDrawer.vue'
 import TbComparisonView from '@/components/trial-balance/TbComparisonView.vue'
 import ReportLineMappingDialog from '@/components/trial-balance/ReportLineMappingDialog.vue'
 import { handleApiError } from '@/utils/errorHandler'
+import { exportMultiSheetData, readSheetAoa } from '@/composables/useExcelIO'
 import { usePenetrate } from '@/composables/usePenetrate'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'
 import { useProjectEvents } from '@/composables/useProjectEvents'
@@ -3617,17 +3618,22 @@ async function saveTbSummary() {
 
 async function exportTbSummary() {
   if (!tbSummaryRows.value.length) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['行次', '项目', '未审数', '审计调整-借', '审计调整-贷', '重分类-借', '重分类-贷', '审定数']
   const dataRows = tbSummaryRows.value.map((r: any) => [
     r.row_code, r.row_name, r.unadjusted, r.aje_dr, r.aje_cr, r.rcl_dr, r.rcl_cr, r.audited,
   ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 }))
-  XLSX.utils.book_append_sheet(wb, ws, '试算平衡表')
   const label = tbSummaryTypes.find(t => t.key === tbSummaryType.value)?.label || ''
-  XLSX.writeFile(wb, `试算平衡表_${label}.xlsx`)
+  // 走 useExcelIO 单一入口（B6 批）。三个显式关闭保持产物不变。
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '试算平衡表',
+      rows: [headers, ...dataRows],
+      colWidths: headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 })),
+    }],
+    fileName: `试算平衡表_${label}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('已导出')
 }
 
@@ -3643,15 +3649,19 @@ async function exportTbSumTemplate() {
     ElMessage.warning('请先刷新加载行次结构')
     return
   }
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['行次', '项目', '未审数']
   const dataRows = tbSummaryRows.value.map((r: any) => [r.row_code, r.row_name, null])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = [{ wch: 12 }, { wch: 30 }, { wch: 16 }]
-  XLSX.utils.book_append_sheet(wb, ws, '模板')
   const label = tbSummaryTypes.find(t => t.key === tbSummaryType.value)?.label || ''
-  XLSX.writeFile(wb, `试算平衡表模板_${label}.xlsx`)
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '模板',
+      rows: [headers, ...dataRows],
+      colWidths: [{ wch: 12 }, { wch: 30 }, { wch: 16 }],
+    }],
+    fileName: `试算平衡表模板_${label}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('模板已导出，填写未审数后导入')
 }
 
@@ -3667,11 +3677,9 @@ async function onTbSumImportFile(e: Event) {
   // 重置 input 以便重复选同一文件
   if (tbSumImportInput.value) tbSumImportInput.value.value = ''
 
-  const XLSX = await import('xlsx')
-  const buf = await file.arrayBuffer()
-  const workbook = XLSX.read(buf, { type: 'array' })
-  const sheet = workbook.Sheets[workbook.SheetNames[0]]
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 })
+  // 走 useExcelIO 单一入口（B6 批）。原先取第一个 sheet + sheet_to_json(header:1)，
+  // readSheetAoa 不传 sheetName 时同样取第一个，选项逐项透传保持等价。
+  const { rows } = await readSheetAoa(file)
 
   if (rows.length < 2) {
     ElMessage.warning('文件为空或格式不正确')

@@ -40,6 +40,16 @@
         </el-alert>
       </div>
 
+      <!-- 编制提示（内嵌源模板 B68:B70 三条替代程序要点，R7.4） -->
+      <details class="gt-confirmation-alternative-k06__tips" data-testid="k06-preparation-notes">
+        <summary>编制提示</summary>
+        <p class="gt-confirmation-alternative-k06__tips-src">源模板编制说明（替代程序要点）：</p>
+        <p v-for="item in K0_ALT_PREPARATION_ITEMS" :key="item.anchor">
+          {{ item.text }}
+          <span class="gt-confirmation-alternative-k06__anchor">源模板 {{ item.anchor }}</span>
+        </p>
+      </details>
+
       <!-- 看板 -->
       <AlternativeD05Dashboard :metrics="data.metrics.value" />
 
@@ -242,24 +252,36 @@
           <!-- 4 区块检查表 -->
           <div class="detail-section">
             <div class="detail-section__header">三、检查过程记录</div>
-            <!-- 非 block3 区块：统一渲染 -->
-            <CheckBlock
-              v-for="bt in blockTypes.filter(b => b !== 'block3')"
-              :key="bt"
-              :config="blockConfigs[bt]"
-              :rows="getBlockRows(selectedCompany, bt)"
-              :totals="data.getBlockTotal(selectedCompany, bt)"
-              :readonly="readonly"
-              :enable-ocr="true"
-              :ocr-loading-row-id="ocrLoadingRowId"
-              @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
-              @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
-              @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-              @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
-            />
+            <!-- 非 block3 区块：统一渲染（每块上方就地展示源模板红字，R7.3） -->
+            <template v-for="bt in blockTypes.filter(b => b !== 'block3')" :key="bt">
+              <div
+                v-if="redHintAnchorOf(bt)"
+                class="src-hint"
+                :data-testid="`k06-red-hint-${bt}`"
+              >
+                <div class="src-hint__badge">源模板要求（{{ redHintAnchorOf(bt) }}）</div>
+                <div class="src-hint__body">{{ K0_ALT_RED_HINT }}</div>
+              </div>
+              <CheckBlock
+                :config="blockConfigs[bt]"
+                :rows="getBlockRows(selectedCompany, bt)"
+                :totals="data.getBlockTotal(selectedCompany, bt)"
+                :readonly="readonly"
+                :enable-ocr="true"
+                :ocr-loading-row-id="ocrLoadingRowId"
+                @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
+                @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
+                @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
+                @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
+              />
+            </template>
             <!-- block3 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
             <div class="split-direction-block">
               <div class="split-direction-block__title">{{ blockConfigs.block3.title }}</div>
+              <div class="src-hint" data-testid="k06-red-hint-block3">
+                <div class="src-hint__badge">源模板要求（{{ redHintAnchorOf('block3') }}）</div>
+                <div class="src-hint__body">{{ K0_ALT_RED_HINT }}</div>
+              </div>
               <el-alert
                 v-if="getBlockRows(selectedCompany, 'block3').some(r => !r.direction)"
                 type="warning" :closable="false" show-icon
@@ -372,6 +394,7 @@
 <script setup lang="ts">
 import { ref, computed, inject, defineAsyncComponent, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { parseFile } from '@/composables/useExcelIO'
 import http from '@/utils/http'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -390,6 +413,14 @@ import GtReviewTrigger from '../../GtReviewTrigger.vue'
 // 复用 D0-5 的 Dashboard 和 Master 组件
 import AlternativeD05Dashboard from '../alternativeD05/AlternativeD05Dashboard.vue'
 import AlternativeD05Master from '../alternativeD05/AlternativeD05Master.vue'
+// 源模板字面真源（红字提示 / 编制说明 3 条，两表逐字相同）—— 真源在 K0-5 目录，
+// 组件内不抄第二份中文（spec k0-confirmation-source-alignment R7.3 / R7.4）
+import {
+  K0_ALT_PREPARATION_ITEMS,
+  K0_ALT_RED_HINT,
+  K0_ALT_RED_HINT_BLOCKS,
+} from '../alternativeK05/k0AlternativeSourceFidelity'
+
 // 复用 D0-5 的 CheckBlock 组件
 import CheckBlock from '../alternativeD05/CheckBlock.vue'
 
@@ -499,6 +530,14 @@ const data = useAlternativeK06Data(props.wpId, props.projectId)
 const blockTypes: BlockType[] = ['block1', 'block2', 'block3', 'block4']
 const blockConfigs = BLOCK_COLUMN_CONFIGS_K06
 
+/**
+ * 该区块在源模板里的红字锚点（无则返 undefined ⇒ 不渲染琥珀块）。
+ * 源模板只有 `O15`/`O26`/`O38` 三处；段④（往来对账）是源外增强区块，**无第 4 处红字**。
+ */
+function redHintAnchorOf(blockType: string): string | undefined {
+  return K0_ALT_RED_HINT_BLOCKS[blockType]
+}
+
 // ─── 选中公司 ────────────────────────────────────────────────────────────────
 
 const selectedCompany = computed<AlternativeCompany | undefined>(() => {
@@ -589,11 +628,14 @@ async function handleImportFile(event: Event) {
 
 async function handleImportFileFallback(file: File) {
   try {
-    const { read, utils } = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = read(buf, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rawRows: Record<string, any>[] = utils.sheet_to_json(ws)
+    // 走 useExcelIO 单一入口（B2 批）。与 D05 同构：`sheet_to_json(ws)` 对象模式 + 取第一个 sheet。
+    // requireFirstCell:false —— 本表首列同为「序号」类可留空列；全空行由下方 hasValue 过滤。
+    const { rows: rawRows } = await parseFile(file, {
+      sheetName: '',
+      skipRows: 1,
+      skipExamplePrefix: '',
+      requireFirstCell: false,
+    })
     if (rawRows.length === 0) {
       ElMessage.warning('Excel 文件为空或无法解析')
       return
@@ -912,6 +954,29 @@ defineExpose({
 .gt-confirmation-alternative-k06__header-tip {
   margin-bottom: 12px;
 }
+
+.gt-confirmation-alternative-k06__tips {
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #606266;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+.gt-confirmation-alternative-k06__tips summary { cursor: pointer; font-weight: 500; }
+.gt-confirmation-alternative-k06__tips-src { margin-top: 6px; font-weight: 500; color: #7A5C22; }
+.gt-confirmation-alternative-k06__anchor { color: #C0C4CC; font-weight: 400; margin-left: 6px; font-size: 11px; }
+
+/* 源模板方法论上下文（琥珀色左边线 + 浅黄背景），与 H0-5 / K0-5 同款 */
+.src-hint {
+  margin: 8px 0;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+.src-hint__badge { font-size: 12px; font-weight: 600; color: #b88230; margin-bottom: 2px; }
+.src-hint__body { font-size: 12px; color: var(--el-text-color-regular); }
 
 .gt-confirmation-alternative-k06__detail {
   margin-top: 16px;

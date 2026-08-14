@@ -8,6 +8,8 @@
  * 联动：从 H8-2 带入②；从 H8-8(含减值) 带入⑦；回写/推送⑧→K11；有迹象强制索引含 H8-11
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import {
   calcImpairmentBookValue,
   calcImpairmentRecoverableAmount,
@@ -645,7 +647,6 @@ export function useH8Impairment(options: {
 
   /** 客户端 xlsx 导入导出（对齐 H8-8 模式，无需后端 cycle IE） */
   async function exportData(kind: 'template' | 'data'): Promise<void> {
-    const XLSX = await import('xlsx')
     const headers = [
       '合同号', '资产名称', '有减值迹象', '迹象说明',
       '账面价值②', '公允减处置③', 'DCF现值④', '可收回金额⑤',
@@ -672,21 +673,33 @@ export function useH8Impairment(options: {
           '索引': r.indexRef || '',
           '备注': r.remark || '',
         }))
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([headers])
-      : XLSX.utils.json_to_sheet(dataRows, { header: headers })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'H8-10减值测算')
-    XLSX.writeFile(wb, `H8-10_减值测算_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+    // 走 useExcelIO 单一入口（B3 批）。模板态 = 只有表头行；数据态 = 表头 + 按 headers
+    // 顺序取值 —— json_to_sheet 与 aoa_to_sheet 对缺失字段同样跳过该单元格，故逐格等价。
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: 'H8-10减值测算',
+          rows: kind === 'template'
+            ? [headers]
+            : [headers, ...dataRows.map((r) => headers.map((h) => (r as any)[h]))],
+        },
+      ],
+      fileName: `H8-10_减值测算_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   async function importData(file: File, replace = true): Promise<{ imported: number }> {
     if (options.isReadonly.value) return { imported: 0 }
-    const XLSX = await import('xlsx')
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rowsRaw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批）。原实现 = read(buffer,{type:'array',cellDates:false})
+    // + sheet_to_json(sheet,{defval:''}) + 取第一个 sheet。
+    // 🔴 cellDates 与 defval 必须显式透传：前者决定日期是 Date 还是序列号，
+    // 后者决定空单元格填 '' 还是被跳过（下游用 ?? / || 取值时两者行为不同）。
+    const { rows: rowsRaw } = await readSheetObjects<Record<string, any>>(file, {
+      cellDates: false,
+      defval: '',
+    })
     const mapped = rowsRaw
       .filter((r) => String(r['资产名称'] || r['合同号'] || '').trim())
       .map((r) => {

@@ -7,6 +7,8 @@
  * - 含减值：减值日前后分段计提；与 H3-10 减值准备勾稽
  */
 import { ref, computed, watch, type Ref } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import type { ChecklistItem } from './useH3FormData'
 import {
   calcStraightLineTest,
@@ -546,7 +548,6 @@ export function useH3Depreciation(params: {
   }
 
   async function exportData(kind: 'template' | 'data'): Promise<void> {
-    const XLSX = await import('xlsx')
     const templateHeaders = branch.value === 'withImpair'
       ? ['资产编号', '类别', '资产名称', '原值', '账面累计折旧', '减值准备', '开始使用日期', '使用年限', '残值率', '账面月折旧', '账面本期折旧', '减值日期', '减值时累计折旧', '备注']
       : ['资产编号', '类别', '资产名称', '管理部门', '原值', '账面累计折旧', '开始使用日期', '使用年限', '残值率', '账面月折旧', '账面本期折旧', '备注']
@@ -583,20 +584,30 @@ export function useH3Depreciation(params: {
             账面本期折旧: row.bookDepreciation || 0,
             备注: row.remark || '',
           }))
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([templateHeaders])
-      : XLSX.utils.json_to_sheet(dataRows, { header: templateHeaders })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, branch.value === 'withImpair' ? 'H3-7含减值' : 'H3-7不含减值')
-    XLSX.writeFile(wb, `H3-7_${branch.value === 'withImpair' ? '含减值' : '不含减值'}_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+    // 模板态 = 只有表头行；数据态 = 表头 + 按 templateHeaders 顺序取值。
+    // json_to_sheet 与 aoa_to_sheet 对缺失字段同样跳过该单元格，故逐格等价。
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: branch.value === 'withImpair' ? 'H3-7含减值' : 'H3-7不含减值',
+          rows: kind === 'template'
+            ? [templateHeaders]
+            : [templateHeaders, ...dataRows.map((r) => templateHeaders.map((h) => (r as any)[h]))],
+        },
+      ],
+      fileName: `H3-7_${branch.value === 'withImpair' ? '含减值' : '不含减值'}_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   async function importData(file: File, replace = true): Promise<{ imported: number }> {
-    const XLSX = await import('xlsx')
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rowsRaw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批）。原实现 = read(buffer,{type:'array',cellDates:false})
+    // + sheet_to_json(sheet,{defval:''}) + 取第一个 sheet，逐项透传保持等价。
+    const { rows: rowsRaw } = await readSheetObjects<Record<string, any>>(file, {
+      cellDates: false,
+      defval: '',
+    })
     const mapped = rowsRaw
       .filter((r) => String(r['资产名称'] || '').trim())
       .map((r) => migrateRaw({

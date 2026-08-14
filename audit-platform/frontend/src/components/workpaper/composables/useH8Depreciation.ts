@@ -9,6 +9,8 @@
  * 出口：depTotal / depreciationByCategory → H8-9；impairmentAmount → H8-10
  */
 import { ref, computed, watch, type Ref } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import { calcDepreciationPeriod } from './useH8CAS21Engine'
 import { calcSubtotal } from './useH8FormulaEngine'
 import {
@@ -864,7 +866,6 @@ export function useH8Depreciation(params: {
   }
 
   async function exportData(kind: 'template' | 'data'): Promise<void> {
-    const XLSX = await import('xlsx')
     const withImpair = branch.value === '含减值'
     const headers = withImpair
       ? ['合同号', '类别', '资产名称', '编号', '原值', '账面累计折旧', '减值准备', '开始使用日期', '使用年限', '租赁期月数', '残值率', '账面月折旧', '账面本期折旧', '减值日期', '备注']
@@ -904,20 +905,28 @@ export function useH8Depreciation(params: {
             账面本期折旧: row.bookDepreciation || 0,
             备注: row.remark || '',
           }))
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([headers])
-      : XLSX.utils.json_to_sheet(dataRows, { header: headers })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, withImpair ? 'H8-8含减值' : 'H8-8不含减值')
-    XLSX.writeFile(wb, `H8-8_${withImpair ? '含减值' : '不含减值'}_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+    // 模板态 = 只有表头行；数据态 = 表头 + 按 headers 顺序取值（与 json_to_sheet 逐格等价）
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: withImpair ? 'H8-8含减值' : 'H8-8不含减值',
+          rows: kind === 'template'
+            ? [headers]
+            : [headers, ...dataRows.map((r) => headers.map((h) => (r as any)[h]))],
+        },
+      ],
+      fileName: `H8-8_${withImpair ? '含减值' : '不含减值'}_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   async function importData(file: File, replace = true): Promise<{ imported: number }> {
-    const XLSX = await import('xlsx')
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rowsRaw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批），cellDates / defval 逐项透传保持等价
+    const { rows: rowsRaw } = await readSheetObjects<Record<string, any>>(file, {
+      cellDates: false,
+      defval: '',
+    })
     const mapped = rowsRaw
       .filter((r) => String(r['资产名称'] || r['合同号'] || '').trim())
       .map((r) => migrateH8DepRaw({

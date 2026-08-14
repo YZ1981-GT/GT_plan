@@ -13,6 +13,8 @@
  * Spec: .kiro/specs/i1-intangible-assets/ | Req: 12.1-12.4, 13.1-13.5
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import type { ChecklistItem } from './useI1FormData'
 import { calcNetValue } from './useI1FormulaEngine'
 import {
@@ -1447,7 +1449,6 @@ export function useI1Impairment(
 
   /** 客户端 xlsx 导出（对齐 H8-10） */
   async function exportImpairmentXlsx(kind: 'template' | 'data'): Promise<void> {
-    const XLSX = await import('xlsx')
     const headers = [
       '类别', '项目名称', '寿命不确定', '有减值迹象', '迹象描述',
       '账面价值②', '公允减处置③', 'DCF现值④', '可收回金额⑤',
@@ -1476,21 +1477,33 @@ export function useI1Impairment(
           '结论': r.conclusion || '',
           '备注': r.remark || '',
         }))
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([headers])
-      : XLSX.utils.json_to_sheet(dataRows, { header: headers })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'I1-12减值测试')
-    XLSX.writeFile(wb, `I1-12_减值准备测试_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+    // 走 useExcelIO 单一入口（B3 批）。模板态 = 只有表头行；数据态 = 表头 + 按 headers
+    // 顺序取值 —— json_to_sheet 与 aoa_to_sheet 对缺失字段同样跳过该单元格，故逐格等价。
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: 'I1-12减值测试',
+          rows: kind === 'template'
+            ? [headers]
+            : [headers, ...dataRows.map((r) => headers.map((h) => (r as any)[h]))],
+        },
+      ],
+      fileName: `I1-12_减值准备测试_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   /** 客户端 xlsx 导入 */
   async function importImpairmentXlsx(file: File, replace = true): Promise<{ imported: number }> {
-    const XLSX = await import('xlsx')
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rowsRaw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批）。原实现 = read(buffer,{type:'array',cellDates:false})
+    // + sheet_to_json(sheet,{defval:''}) + 取第一个 sheet。
+    // 🔴 cellDates 与 defval 必须显式透传：前者决定日期是 Date 还是序列号，
+    // 后者决定空单元格填 '' 还是被跳过（下游用 ?? / || 取值时两者行为不同）。
+    const { rows: rowsRaw } = await readSheetObjects<Record<string, any>>(file, {
+      cellDates: false,
+      defval: '',
+    })
     const mapped = rowsRaw
       .filter((r) => String(r['项目名称'] || r['资产名称'] || '').trim())
       .map((r) => {

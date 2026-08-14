@@ -351,6 +351,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
+import { exportMultiSheetData, parseFile } from '@/composables/useExcelIO'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 // 🔴 与 `http` 并存是有意的：`http.get()` 返回 AxiosResponse（payload 在 .data），
@@ -1181,19 +1182,9 @@ function handleImportClick() {
 
 async function handleDownloadImportTemplate() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
-
     // Sheet 1: 数据模板（固定列头，用户在此填写）
     const headers = ['序号', '索引号', '被询证单位', '地址', '联系人', '联系电话', '科目', '函证金额', '币种', '函证方式', '发函日期']
     const exampleRow = [1, 'D0-001', '示例公司（请删除此行）', '北京市XX区XX路XX号', '张三', '010-12345678', '应收账款', 100000, 'CNY', '积极式', '2025-12-31']
-    const dataSheet = utils.aoa_to_sheet([headers, exampleRow])
-    // 设置列宽
-    dataSheet['!cols'] = [
-      { wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 30 }, { wch: 10 }, { wch: 14 },
-      { wch: 12 }, { wch: 14 }, { wch: 6 }, { wch: 10 }, { wch: 12 },
-    ]
-    utils.book_append_sheet(wb, dataSheet, '函证清单')
 
     // Sheet 2: 填写说明
     const instructions = [
@@ -1222,11 +1213,23 @@ async function handleDownloadImportTemplate() {
       ['  5. 填写完成后保存，回到系统点击「↑导入」上传此文件'],
       ['  6. 导入后可在系统中继续补充回函结果和相符情况'],
     ]
-    const instrSheet = utils.aoa_to_sheet(instructions)
-    instrSheet['!cols'] = [{ wch: 70 }]
-    utils.book_append_sheet(wb, instrSheet, '填写说明')
-
-    writeFileXLSX(wb, '函证清单导入模板.xlsx')
+    // 两个 sheet 均为纯 AOA；successMessage:false 因原实现不弹成功提示
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '函证清单',
+          rows: [headers, exampleRow],
+          colWidths: [
+            { wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 30 }, { wch: 10 }, { wch: 14 },
+            { wch: 12 }, { wch: 14 }, { wch: 6 }, { wch: 10 }, { wch: 12 },
+          ],
+        },
+        { sheetName: '填写说明', rows: instructions, colWidths: [{ wch: 70 }] },
+      ],
+      fileName: '函证清单导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
   } catch (e: any) {
     ElMessage.error('生成模板失败：' + (e?.message || '未知错误'))
   }
@@ -1236,11 +1239,15 @@ async function handleImportFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   try {
-    const { read, utils } = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = read(buf, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rawRows: Record<string, any>[] = utils.sheet_to_json(ws)
+    // 走 useExcelIO 单一入口（B2 批）。
+    // requireFirstCell:false —— 首列「序号」模板说明写「留空则自动生成」；
+    // 全空行由下方 hasValue 过滤（原实现注释也写着「跳过完全空行」）。
+    const { rows: rawRows } = await parseFile(file, {
+      sheetName: '',
+      skipRows: 1,
+      skipExamplePrefix: '',
+      requireFirstCell: false,
+    })
     if (rawRows.length === 0) {
       ElMessage.warning('Excel 文件为空或无法解析')
       return

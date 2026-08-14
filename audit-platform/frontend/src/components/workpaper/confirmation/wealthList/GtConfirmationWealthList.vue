@@ -59,6 +59,7 @@
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { exportMultiSheetData, parseFile } from '@/composables/useExcelIO'
 import { useWealthListData } from './composables/useWealthListData'
 import { WEALTH_LIST_COLUMN_SOURCE, type WealthProductRow } from './wealthListTypes'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
@@ -133,11 +134,20 @@ async function handleImportFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   try {
-    const { read, utils } = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = read(buf, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rawRows: Record<string, any>[] = utils.sheet_to_json(ws)
+    // 走 useExcelIO 单一入口（B2 批）。原实现 `sheet_to_json(ws)` 对象模式 + 取第一个 sheet。
+    //
+    // 🔴 本文件是「示例行判定不能套默认值」的样本：模板示例行首列是 `'E0-6-1'`（索引号），
+    // 不是 `'示例'` —— `parseFile` 默认 `skipExamplePrefix:'示例'` 检查首列，**命中不到它**。
+    // 原实现也没有示例行跳过逻辑（示例行靠用户手删，且其 product_name 含「示例理财产品名称」
+    // 会被当真实数据导入）。故显式传 `''` 保持原行为，不得"顺手修好"。
+    //
+    // requireFirstCell 保持默认 true：本表首列是「索引号」（必填，模板说明列为关键列），
+    // 与 D05/reliability 的「序号可留空」不同 —— 逐文件核对的意义就在这里。
+    const { rows: rawRows } = await parseFile(file, {
+      sheetName: '',
+      skipRows: 1,
+      skipExamplePrefix: '',
+    })
     if (!rawRows.length) {
       ElMessage.warning('Excel 文件为空或无法解析')
       return
@@ -183,16 +193,10 @@ const COL_WIDTHS = [
 
 async function handleExportTemplate() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
     const example = [
       'E0-6-1', '2025-12-31', '示例：招商银行XX分行 / 收件人张三（请删除本行）',
       '示例理财产品名称', '封闭式', '人民币', 1000000, 1012345.67, '2025-06-30', '2026-06-29', '否',
     ]
-    const ws = utils.aoa_to_sheet([SOURCE_LABELS, example])
-    ws['!cols'] = COL_WIDTHS
-    utils.book_append_sheet(wb, ws, '理财产品发函记录')
-
     const instructions = [
       ['E0-6 理财产品发函记录表 — 导入模板说明'],
       [''],
@@ -216,11 +220,15 @@ async function handleExportTemplate() {
       [''],
       ['【注意】本表没有「是否函证」列——入表即视为已决定发函的对象。'],
     ]
-    const instrWs = utils.aoa_to_sheet(instructions)
-    instrWs['!cols'] = [{ wch: 78 }]
-    utils.book_append_sheet(wb, instrWs, '填写说明')
-
-    writeFileXLSX(wb, 'E0-6理财产品发函记录表_导入模板.xlsx')
+    await exportMultiSheetData({
+      sheets: [
+        { sheetName: '理财产品发函记录', rows: [SOURCE_LABELS, example], colWidths: COL_WIDTHS },
+        { sheetName: '填写说明', rows: instructions, colWidths: [{ wch: 78 }] },
+      ],
+      fileName: 'E0-6理财产品发函记录表_导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('模板已导出')
   } catch (e: any) {
     ElMessage.error('生成模板失败：' + (e?.message || '未知错误'))
@@ -233,18 +241,20 @@ async function handleExportData() {
     return
   }
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
     const body = data.rows.value.map((r) =>
       WEALTH_LIST_COLUMN_SOURCE.map((c) => {
         const v = (r as any)[c.field]
         return v == null ? '' : v
       }),
     )
-    const ws = utils.aoa_to_sheet([SOURCE_LABELS, ...body])
-    ws['!cols'] = COL_WIDTHS
-    const wb = utils.book_new()
-    utils.book_append_sheet(wb, ws, '理财产品发函记录')
-    writeFileXLSX(wb, 'E0-6理财产品发函记录表_数据导出.xlsx')
+    await exportMultiSheetData({
+      sheets: [
+        { sheetName: '理财产品发函记录', rows: [SOURCE_LABELS, ...body], colWidths: COL_WIDTHS },
+      ],
+      fileName: 'E0-6理财产品发函记录表_数据导出.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('数据已导出')
   } catch (e: any) {
     ElMessage.error('导出失败：' + (e?.message || '未知错误'))

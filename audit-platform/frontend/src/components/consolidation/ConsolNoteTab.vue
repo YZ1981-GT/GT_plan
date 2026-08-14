@@ -465,6 +465,7 @@ import { useAutoSave } from '@/composables/useAutoSave'
 import { eventBus } from '@/utils/eventBus'
 import type { ConsolCatalogSelectPayload, ConsolTreeAggregatePayload, ConsolNoteAuditAllPayload } from '@/utils/eventBus'
 import { handleApiError } from '@/utils/errorHandler'
+import { exportMultiSheetData, readSheetAoa, readWorkbookAoa } from '@/composables/useExcelIO'
 
 const props = defineProps<{
   projectId: string
@@ -1010,25 +1011,34 @@ async function saveNoteData() {
 async function exportNoteTemplate() {
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
-  const ws = XLSX.utils.aoa_to_sheet([sec.headers, ...(sec.editRows || []).map(() => sec.headers.map(() => ''))])
-  ws['!cols'] = sec.headers.map(() => ({ wch: 18 }))
-  XLSX.utils.book_append_sheet(wb, ws, '模板')
-  XLSX.writeFile(wb, `${sec.title || '附注'}_模板.xlsx`)
+  // 走 useExcelIO 单一入口（B4 批）。三个显式关闭保持产物不变。
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '模板',
+      rows: [sec.headers, ...(sec.editRows || []).map(() => sec.headers.map(() => ''))],
+      colWidths: sec.headers.map(() => ({ wch: 18 })),
+    }],
+    fileName: `${sec.title || '附注'}_模板.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('模板已导出')
 }
 
 async function exportNoteData() {
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const dataRows = sec.editRows.map((r: any) => sec.headers.map((_: string, j: number) => r[j] || ''))
-  const ws = XLSX.utils.aoa_to_sheet([sec.headers, ...dataRows])
-  ws['!cols'] = sec.headers.map(() => ({ wch: 18 }))
-  XLSX.utils.book_append_sheet(wb, ws, '数据')
-  XLSX.writeFile(wb, `${sec.title || '附注'}_数据.xlsx`)
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '数据',
+      rows: [sec.headers, ...dataRows],
+      colWidths: sec.headers.map(() => ({ wch: 18 })),
+    }],
+    fileName: `${sec.title || '附注'}_数据.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('数据已导出')
 }
 
@@ -1038,10 +1048,9 @@ async function onNoteFileSelected(e: Event) {
   const sec = selectedNoteSection.value
   if (!sec?.headers) return
   try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+    // 走 useExcelIO 单一入口（B4 批）。原先取第一个 sheet + sheet_to_json(header:1)，
+    // readSheetAoa 不传 sheetName 时同样取第一个，选项逐项透传保持等价。
+    const { rows: json } = await readSheetAoa(file)
     let startRow = 0
     if (json.length > 0) {
       const firstRow = json[0].map((c: any) => String(c || '').trim())
@@ -1066,23 +1075,52 @@ async function onNoteFileSelected(e: Event) {
 }
 
 // ─── 批量导入导出 ─────────────────────────────────────────────────────────────
+/**
+ * 生成不重复的 sheet 名（章节号前缀 + 标题，截断到 Excel 上限 31 字符）
+ *
+ * 🔴 改造前这个函数**名不副实**：它把名字 `add` 进 `usedNames` 但**从不检查**是否
+ * 已存在 —— `usedNames` 是死参数，去重完全没实现。一旦两个名字截断后相同，
+ * `book_append_sheet` 会抛错，导致**整批导出失败**（不是少一个 sheet）。
+ *
+ * 当前数据下撞不上：实测 282 个 section（18 个被截断）**零重复**，因为 `prefix`
+ * 由唯一的 `section_id` 派生且位于名字最前，不同章节前几个字符就不同。
+ * 但这个「不会撞」依赖章节编号体系的形态 —— 编号变长（如 `五-10-11-12-13`）或
+ * 改成非唯一前缀就会失效。既然函数名已经承诺去重，就把它实现掉。
+ */
 function uniqueSheetName(usedNames: Set<string>, rawName: string, sectionId: string): string {
   const prefix = sectionId.replace(/^五-/, '').replace(/-/g, '.')
-  const name = `${prefix} ${rawName}`.substring(0, 31)
-  usedNames.add(name)
-  return name
+  const base = `${prefix} ${rawName}`.substring(0, 31)
+  if (!usedNames.has(base)) {
+    usedNames.add(base)
+    return base
+  }
+  // 撞名时加 `~n` 后缀，并**为后缀预留位置**后再截断 —— 否则拼完又超 31，
+  // Excel 侧仍会拒绝（这是加后缀去重最容易漏的一步）。
+  for (let n = 2; n < 1000; n += 1) {
+    const suffix = `~${n}`
+    const candidate = base.substring(0, 31 - suffix.length) + suffix
+    if (!usedNames.has(candidate)) {
+      usedNames.add(candidate)
+      return candidate
+    }
+  }
+  // 兜底：极端情况下用时间戳，保证不抛错（宁可名字难看也不让整批导出失败）
+  const fallback = base.substring(0, 24) + `~${Date.now() % 1000000}`
+  usedNames.add(fallback)
+  return fallback
 }
 
 async function batchExportAllData() {
   noteBatchLoading.value = true
   try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.utils.book_new()
     const usedNames = new Set<string>()
     const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
+    // 走 useExcelIO 单一入口（B4 批）：循环内累积 sheet 定义，循环后一次性导出。
+    // uniqueSheetName 已把名字截到 31 字符内，故内部的 slice(0,31) 是无操作。
+    const sheetDefs: { sheetName: string; rows: any[][]; colWidths: { wch: number }[] }[] = []
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
@@ -1092,14 +1130,21 @@ async function batchExportAllData() {
         const sec = detail?.data ?? detail
         if (!sec?.headers?.length) continue
         const rows = sec.rows || []
-        const ws = XLSX.utils.aoa_to_sheet([sec.headers, ...rows])
-        ws['!cols'] = sec.headers.map(() => ({ wch: 16 }))
         const name = uniqueSheetName(usedNames, sec.title || c.title || `表${sheetCount + 1}`, c.section_id)
-        XLSX.utils.book_append_sheet(wb, ws, name)
+        sheetDefs.push({
+          sheetName: name,
+          rows: [sec.headers, ...rows],
+          colWidths: sec.headers.map(() => ({ wch: 16 })),
+        })
         sheetCount++
       }
     }
-    XLSX.writeFile(wb, `合并附注_全部数据_${props.standard}.xlsx`)
+    await exportMultiSheetData({
+      sheets: sheetDefs,
+      fileName: `合并附注_全部数据_${props.standard}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success(`已导出 ${sheetCount} 个附注表格`)
   } catch (e: any) { handleApiError(e, '导出') }
   finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
@@ -1108,13 +1153,13 @@ async function batchExportAllData() {
 async function batchExportAllTemplates() {
   noteBatchLoading.value = true
   try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.utils.book_new()
     const usedNames = new Set<string>()
     const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
     })
     const groups = Array.isArray(data) ? data : (data ?? [])
+    // 同 batchExportAllData，仅差「只写表头行、不写数据行」（B4 批）。
+    const sheetDefs: { sheetName: string; rows: any[][]; colWidths: { wch: number }[] }[] = []
     let sheetCount = 0
     for (const g of groups) {
       for (const c of (g.children || [])) {
@@ -1123,14 +1168,21 @@ async function batchExportAllTemplates() {
         })
         const sec = detail?.data ?? detail
         if (!sec?.headers?.length) continue
-        const ws = XLSX.utils.aoa_to_sheet([sec.headers])
-        ws['!cols'] = sec.headers.map(() => ({ wch: 16 }))
         const name = uniqueSheetName(usedNames, sec.title || c.title || `表${sheetCount + 1}`, c.section_id)
-        XLSX.utils.book_append_sheet(wb, ws, name)
+        sheetDefs.push({
+          sheetName: name,
+          rows: [sec.headers],
+          colWidths: sec.headers.map(() => ({ wch: 16 })),
+        })
         sheetCount++
       }
     }
-    XLSX.writeFile(wb, `合并附注_模板_${props.standard}.xlsx`)
+    await exportMultiSheetData({
+      sheets: sheetDefs,
+      fileName: `合并附注_模板_${props.standard}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success(`已导出 ${sheetCount} 个附注模板`)
   } catch (e: any) { handleApiError(e, '导出') }
   finally { noteBatchLoading.value = false; showNoteBatchDialog.value = false }
@@ -1141,8 +1193,9 @@ async function onNoteBatchImport(e: Event) {
   if (!file || !props.projectId) return
   noteBatchLoading.value = true
   try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    // 走 useExcelIO 单一入口（B4 批）。本函数需遍历**全部** sheet 按标题匹配章节，
+    // 故用整簿读取：一次解析拿到所有 sheet 的 AOA，与原实现等价。
+    const { sheetNames, sheets } = await readWorkbookAoa(file)
     let matched = 0
     const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
@@ -1154,11 +1207,10 @@ async function onNoteBatchImport(e: Event) {
         sectionMap[c.title] = c.section_id
       }
     }
-    for (const sheetName of wb.SheetNames) {
+    for (const sheetName of sheetNames) {
       const sectionId = sectionMap[sheetName]
       if (!sectionId) continue
-      const ws = wb.Sheets[sheetName]
-      const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+      const json: any[][] = sheets[sheetName]
       if (json.length < 2) continue
       const headers = json[0].map((c: any) => String(c || ''))
       const rows = json.slice(1).filter((r: any[]) => r.some(c => c != null && c !== '')).map((r: any[]) => r.map(c => String(c ?? '')))
@@ -1169,7 +1221,7 @@ async function onNoteBatchImport(e: Event) {
       )
       matched++
     }
-    ElMessage.success(`已导入 ${matched} 个附注表格（共 ${wb.SheetNames.length} 个 Sheet）`)
+    ElMessage.success(`已导入 ${matched} 个附注表格（共 ${sheetNames.length} 个 Sheet）`)
   } catch (e: any) { handleApiError(e, '导入') }
   finally {
     noteBatchLoading.value = false
@@ -1195,8 +1247,6 @@ function openNoteFormula() {
 async function exportNoteFormulas() {
   noteBatchLoading.value = true
   try {
-    const XLSX = await import('xlsx')
-    const wb = XLSX.utils.book_new()
     const headers = ['章节ID', '章节标题', '行号', '列号', '公式类型', '公式表达式', '数据来源', '说明']
     const data = await api.get(`P_cn.list(props.standard)${props.standard}`, {
       validateStatus: (s: number) => s < 600,
@@ -1210,10 +1260,16 @@ async function exportNoteFormulas() {
         rows.push([c.section_id, c.title, '所有行', '期初列', 'TB_REF', `=TB(科目名,期初余额)`, '试算表', '从试算表提取期初余额'])
       }
     }
-    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-    ws['!cols'] = headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 }))
-    XLSX.utils.book_append_sheet(wb, ws, '公式规则')
-    XLSX.writeFile(wb, `合并附注_公式模板_${props.standard}.xlsx`)
+    await exportMultiSheetData({
+      sheets: [{
+        sheetName: '公式规则',
+        rows: [headers, ...rows],
+        colWidths: headers.map((_, i) => ({ wch: i < 2 ? 20 : 14 })),
+      }],
+      fileName: `合并附注_公式模板_${props.standard}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success(`已导出公式模板`)
   } catch (e: any) { handleApiError(e, '导出') }
   finally { noteBatchLoading.value = false }
@@ -1229,10 +1285,7 @@ async function onNoteFormulaImport(e: Event) {
       const formulas = JSON.parse(text)
       ElMessage.success(`已导入 ${Array.isArray(formulas) ? formulas.length : 0} 条公式规则（需后端配合存储）`)
     } else {
-      const XLSX = await import('xlsx')
-      const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
-      const ws = wb.Sheets[wb.SheetNames[0]]
-      const json: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+      const { rows: json } = await readSheetAoa(file)
       const ruleCount = Math.max(0, json.length - 1)
       ElMessage.success(`已解析 ${ruleCount} 条公式规则（需后端配合存储）`)
     }
@@ -1293,18 +1346,22 @@ function auditRowClass({ row }: { row: any }) {
 
 async function exportAuditResults() {
   if (!noteAuditResults.value.length) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['章节', '审核规则', '级别', '预期值', '实际值', '差异', '说明']
   const rows = noteAuditResults.value.map((r: any) => [
     r.section_title, r.rule_name,
     r.level === 'error' ? '异常' : r.level === 'warn' ? '警告' : '通过',
     r.expected, r.actual, r.difference, r.message,
   ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...rows])
-  ws['!cols'] = [{ wch: 20 }, { wch: 30 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 30 }]
-  XLSX.utils.book_append_sheet(wb, ws, '审核结果')
-  XLSX.writeFile(wb, `合并附注_审核报告_${props.standard}.xlsx`)
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '审核结果',
+      rows: [headers, ...rows],
+      colWidths: [{ wch: 20 }, { wch: 30 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 30 }],
+    }],
+    fileName: `合并附注_审核报告_${props.standard}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('审核报告已导出')
 }
 

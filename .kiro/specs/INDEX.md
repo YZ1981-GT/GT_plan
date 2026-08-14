@@ -1,8 +1,21 @@
 # 致同审计作业平台 — Spec 开发索引
 
-**最后更新**：2026-08-12
+**最后更新**：2026-08-14
 **当前分支**：`work/2026-05-30-wp-specs`
-**统计**：Active **7**（2026-08-12 行首锚定正则 `^\s*-\s\[([ x~-])\]\s+\d+\.` 实扫，**7 个目录全部带 tasks.md、无空壳**）/ Archived **550**（2026-08-12 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录）
+**统计**：Active **9**（2026-08-14 行首锚定正则 `^\s*-\s\[([ x~-])\]\s+\d+\.` 实扫，**9 个目录全部带 tasks.md、无空壳**）/ Archived **550**（2026-08-12 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录）
+
+> **2026-08-14 实扫结果（9 个目录逐一，供下一轮比对）**：
+> `e-cycle-…completion` 24/24 · `frontend-excel-io-single-entry-convergence` 15/18 ·
+> `g7-column-alignment-and-extraction-closure` 17/24 · `i-cycle-…closure` 18/24 ·
+> `k-cycle-…closure` 14/25 · `l-cycle-…completion` 3/26 ·
+> `procedure-trim-report-line-account-resolution` 0/16 ·
+> `workpaper-import-export-lifecycle-closure` 24/25 · `x3-adjustment-entry-import-export` 25/49
+>
+> 🔴 **下表有两行的进度数已过时**（本轮只更新了 `frontend-excel-io-*` 一行，其余属并发
+> 会话在办、未擅自改其详情以免与正在写的内容打架）：`workpaper-import-export-lifecycle-closure`
+> 表内记 3/25 而实扫 **24/25**；`e-cycle-…completion` 已 **24/24 全完成**（可评估归档）。
+> 另 `x3-adjustment-entry-import-export`（25/49）是并发会话新建，**下表尚无该行** ——
+> Active 从 8 变 9 即因它。
 > 🔴 **2026-08-12 实扫修正了表头三处过时记载**：①Active 写 6 而真实是 7；②「另有 3 个无 tasks.md 的空壳目录」已不成立 —— 其中两个（`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`）早在 2026-08-05 清理入归档区，而 `workpaper-import-export-lifecycle-closure` **有 tasks.md 且进度 3/25**，把它记成空壳会让一个在办 spec 从索引上消失；③Archived 549 → 550（本轮归档 `procedure-trimming-and-delegation-intelligence`）。再次印证本文件 §四 的「凭印象禁令」：完成度与数量一律实扫，别信上一轮写下的数。
 **最高迁移**：**V146**（`procedure_instance_suggestion_state`，并发会话 `procedure-trimming-*` 所加；本 spec 贡献 **V145** `report_config` 双族使用权资产/租赁负债。以磁盘 `backend/migrations/V*.sql` 实扫为准，`R1xx__` 是配对回滚脚本非同号冲突）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
@@ -35,6 +48,7 @@
 | `g7-column-alignment-and-extraction-closure` | 4/24（`[~]`19） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
 | `l-cycle-extraction-formula-and-disclosure-completion` | 3/26 | L 类（借款/应付债券）取数公式与披露收口 |
 | `workpaper-import-export-lifecycle-closure` | 3/25 | 底稿导入导出生命周期收口（**此前被表头误记为「无 tasks.md 的空壳」，2026-08-12 实扫纠正**） |
+| `frontend-excel-io-single-entry-convergence` | 15/18 | **2026-08-14 收敛完成：46 → 0，`exempt[]` 为空、无一豁免**（守卫 124/124 · 变异 16/16 全 RED · 34 文件 Vite 编译通过 · CI 已挂 job）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 待用户裁决**（`batchExport.ts` 孤儿链「合并导出」用户不可达 —— 删功能还是接线属产品决策）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>剩 3 个 `[-]`：Task 2（B2/B3/B5 迁移前快照的机会窗口已关闭，如实标注不补）· Task 16（变异 14/37 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口，未点到 UI） |
 | `procedure-trim-report-line-account-resolution` | 0/16 | **2026-08-12 新建**。裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。立项实证：E 循环 5 条程序名全是「货币资金 …」而 `trial_balance` 只有明细「其他货币资金」(1012)/「银行存款」(1002) ⇒ 单向子串匹配全部落空 ⇒ 重要性判据（决策内核档 7/8）整体空转。净新增仅 2 个后端模块 + 1 处前端优先级调整 —— 三段映射的每一段都已有生产真源（`four_table/*_cycle_specs.py` 的 `row_code` 声明 · `report_config.formula` · `ReportFormulaParser`），索引只做 dispatch、**零 `row_code` 字面量** |
 
 > 🔴 上表 7 个 spec 中前 6 个由**并发会话**推进（tasks.md mtime 秒/分钟级刷新）。

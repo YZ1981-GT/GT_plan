@@ -21,6 +21,8 @@
  * Requirements: 11.1-11.7
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import type { ChecklistItem } from './useI1FormData'
 import {
   calcRemainingLifeAmort,
@@ -1126,7 +1128,6 @@ export function useI1Amortization(
 
   /** 客户端导出对齐源表列的 xlsx（模板/数据） */
   async function exportXlsx(kind: 'template' | 'data' = 'data'): Promise<void> {
-    const XLSX = await import('xlsx')
     const withImpair = amortBranch.value === 'withImpair'
     const headers = [...(withImpair ? EXPORT_HEADERS_WITH_IMPAIR : EXPORT_HEADERS_NO_IMPAIR)]
     const rows = currentRows.value
@@ -1156,22 +1157,34 @@ export function useI1Amortization(
             '使用期限(年)': row.usefulLifeYears || 0,
             残值: row.salvage || 0,
           }))
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([headers])
-      : XLSX.utils.json_to_sheet(dataRows, { header: headers })
-    const wb = XLSX.utils.book_new()
+    // 走 useExcelIO 单一入口（B3 批）。模板态 = 只有表头行；数据态 = 表头 + 按 headers
+    // 顺序取值 —— json_to_sheet 与 aoa_to_sheet 对缺失字段同样跳过该单元格，故逐格等价。
     const sheetName = withImpair ? 'I1-11含减值' : 'I1-10不含减值'
-    XLSX.utils.book_append_sheet(wb, ws, sheetName)
-    XLSX.writeFile(wb, `${sheetName}_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: sheetName,
+          rows: kind === 'template'
+            ? [headers]
+            : [headers, ...dataRows.map((r) => headers.map((h) => (r as any)[h]))],
+        },
+      ],
+      fileName: `${sheetName}_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   /** 客户端导入对齐源表列的 xlsx */
   async function importXlsx(file: File, replace = true): Promise<{ imported: number }> {
-    const XLSX = await import('xlsx')
-    const buffer = await file.arrayBuffer()
-    const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批）。原实现 = read(buffer,{type:'array',cellDates:false})
+    // + sheet_to_json(sheet,{defval:''}) + 取第一个 sheet。
+    // 🔴 cellDates 与 defval 必须显式透传：前者决定日期是 Date 还是序列号，
+    // 后者决定空单元格填 '' 还是被跳过（下游用 ?? / || 取值时两者行为不同）。
+    const { rows: rawRows } = await readSheetObjects<Record<string, any>>(file, {
+      cellDates: false,
+      defval: '',
+    })
     const withImpair = amortBranch.value === 'withImpair'
 
     const mapped: Partial<I1AmortizationRow>[] = rawRows.map((r) => {

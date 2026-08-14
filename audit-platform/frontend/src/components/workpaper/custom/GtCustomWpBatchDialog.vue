@@ -136,6 +136,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { readWorkbookAoa } from '@/composables/useExcelIO'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { api } from '@/services/apiProxy'
 import { handleApiError } from '@/utils/errorHandler'
@@ -221,18 +222,17 @@ async function onExcelChange(file: { raw?: File }) {
   const raw = file?.raw
   if (!raw) return
   try {
-    const XLSX = await import('xlsx')
-    const buf = await raw.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
-    const first = wb.SheetNames[0]
+    // 走 useExcelIO 单一入口（B7 批）。原先取第一个 sheet + sheet_to_json(header:1,
+    // blankrows:false)。用 readWorkbookAoa 是为了保留「没有任何工作表」这个明确错误
+    // —— readSheetAoa 在无 sheet 时不会给出可区分的信号。
+    const { sheetNames, sheets } = await readWorkbookAoa(raw, { blankrows: false })
+    const first = sheetNames[0]
     if (!first) {
       excelError.value = '该 Excel 没有任何工作表'
       return
     }
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[first], {
-      header: 1,
-      blankrows: false,
-    }) as unknown[][]
+    const aoa = sheets[first]
+    const rows = aoa as unknown[][]
     excelItems.value = parseExcelRows(rows)
     if (excelItems.value.length === 0) {
       excelError.value = '未从该 Excel 解析出任何清单行（请检查是否有「编号」「名称」两列）'

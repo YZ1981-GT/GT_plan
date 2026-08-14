@@ -15,6 +15,7 @@
  */
 import { ref, computed, watch, toRef, onMounted, provide } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { useB22AFormData, type ChecklistItem } from './composables/useB22AFormData'
 import {
   useB22AControlMatrix,
@@ -318,16 +319,21 @@ async function exportControlMatrix() {
     return
   }
   try {
-    const XLSX = await import('xlsx')
     const aoa = [
       REGISTER_COLUMNS.map((c) => c.label),
       ...rows.map((r: any) => REGISTER_COLUMNS.map((c) => r[c.key] ?? '')),
     ]
-    const ws = XLSX.utils.aoa_to_sheet(aoa)
-    ws['!cols'] = REGISTER_COLUMNS.map((c) => ({ wch: c.key === 'description' ? 40 : c.key === 'controlPoint' ? 24 : 14 }))
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, '企业层面控制矩阵')
-    XLSX.writeFile(wb, `B22B_企业层面控制矩阵_${props.year || ''}.xlsx`)
+    // 走 useExcelIO 单一入口（B6 批）。三个显式关闭保持产物不变。
+    await exportMultiSheetData({
+      sheets: [{
+        sheetName: '企业层面控制矩阵',
+        rows: aoa,
+        colWidths: REGISTER_COLUMNS.map((c) => ({ wch: c.key === 'description' ? 40 : c.key === 'controlPoint' ? 24 : 14 })),
+      }],
+      fileName: `B22B_企业层面控制矩阵_${props.year || ''}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success(`已导出 ${rows.length} 项控制`)
   } catch (e) {
     console.error('[B22A] 控制矩阵导出失败', e)

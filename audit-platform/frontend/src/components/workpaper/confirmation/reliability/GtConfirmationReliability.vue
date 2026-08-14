@@ -83,6 +83,7 @@
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { exportMultiSheetData, parseFile } from '@/composables/useExcelIO'
 import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import { useReliabilityData } from './composables/useReliabilityData'
@@ -147,6 +148,15 @@ const showD01Dialog = ref(false)
 const importD01Loading = ref(false)
 const importFileInput = ref<HTMLInputElement | null>(null)
 
+/**
+ * 14 列列宽 —— 模板导出与数据导出共用（改造前两处逐字重复，值未变）
+ */
+const RELIABILITY_COL_WIDTHS = [
+  { wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
+  { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
+  { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 },
+]
+
 function handleImportD01() {
   showD01Dialog.value = true
 }
@@ -208,11 +218,16 @@ async function handleImportFile(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file) return
   try {
-    const { read, utils } = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = read(buf, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rawRows: Record<string, any>[] = utils.sheet_to_json(ws)
+    // 走 useExcelIO 单一入口（B2 批）。原实现 `sheet_to_json(ws)` 对象模式 + 取第一个 sheet。
+    // requireFirstCell:false —— 本表首列是「序号」，模板说明写「留空即可」，
+    // 默认要求首列非空会静默丢行；全空行由下方 hasValue 过滤。
+    // skipExamplePrefix:'' —— 原实现无示例行跳过逻辑（示例行首列是 '1' 而非 '示例'）。
+    const { rows: rawRows } = await parseFile(file, {
+      sheetName: '',
+      skipRows: 1,
+      skipExamplePrefix: '',
+      requireFirstCell: false,
+    })
     if (rawRows.length === 0) {
       ElMessage.warning('Excel 文件为空或无法解析')
       return
@@ -259,19 +274,9 @@ async function handleImportFile(event: Event) {
 
 async function handleExportExcel() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
-
     // Sheet 1: 导入模板
     const headers = ['序号', '索引号', '被询证单位', '回函方式', '回函日期', '寄回原件', '身份已确认', '身份确认方式', '邮箱已验证', '邮箱域名', '已致电', '电话来源', '可靠性结论', '备注']
     const exampleRow = ['1', 'D0-001', '示例公司（请删除）', '电子邮件', '2026-01-15', '否', '', '', '', '', '', '', '', '']
-    const ws = utils.aoa_to_sheet([headers, exampleRow])
-    ws['!cols'] = [
-      { wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
-      { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
-      { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 },
-    ]
-    utils.book_append_sheet(wb, ws, '可靠性验证')
 
     // Sheet 2: 填写说明
     const instructions = [
@@ -309,11 +314,15 @@ async function handleExportExcel() {
       ['  4. 私人邮箱（163/qq/gmail）发出的回函应判定为不可靠'],
       ['  5. 不可靠的行将自动触发舞弊信号收集（D0-8第7条）'],
     ]
-    const instrSheet = utils.aoa_to_sheet(instructions)
-    instrSheet['!cols'] = [{ wch: 70 }]
-    utils.book_append_sheet(wb, instrSheet, '填写说明')
-
-    writeFileXLSX(wb, 'D0-7回函可靠性验证_导入模板.xlsx')
+    await exportMultiSheetData({
+      sheets: [
+        { sheetName: '可靠性验证', rows: [headers, exampleRow], colWidths: RELIABILITY_COL_WIDTHS },
+        { sheetName: '填写说明', rows: instructions, colWidths: [{ wch: 70 }] },
+      ],
+      fileName: 'D0-7回函可靠性验证_导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('模板已导出')
   } catch (e: any) {
     ElMessage.error('生成模板失败：' + (e?.message || '未知错误'))
@@ -326,7 +335,6 @@ async function handleExportData() {
     return
   }
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
     const headers = ['序号', '索引号', '被询证单位', '回函方式', '回函日期', '寄回原件', '身份已确认', '身份确认方式', '邮箱已验证', '邮箱域名', '已致电', '电话来源', '可靠性结论', '备注']
     const rows = data.rows.value.map(r => [
       r.seq ?? '',
@@ -344,15 +352,14 @@ async function handleExportData() {
       r.conclusion_status ?? '',
       r.reliability_note ?? '',
     ])
-    const ws = utils.aoa_to_sheet([headers, ...rows])
-    ws['!cols'] = [
-      { wch: 6 }, { wch: 10 }, { wch: 25 }, { wch: 10 }, { wch: 12 },
-      { wch: 8 }, { wch: 10 }, { wch: 12 }, { wch: 10 }, { wch: 14 },
-      { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 20 },
-    ]
-    const wb = utils.book_new()
-    utils.book_append_sheet(wb, ws, '可靠性验证数据')
-    writeFileXLSX(wb, 'D0-7回函可靠性验证_数据导出.xlsx')
+    await exportMultiSheetData({
+      sheets: [
+        { sheetName: '可靠性验证数据', rows: [headers, ...rows], colWidths: RELIABILITY_COL_WIDTHS },
+      ],
+      fileName: 'D0-7回函可靠性验证_数据导出.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
     ElMessage.success('数据已导出')
   } catch (e: any) {
     ElMessage.error('导出失败：' + (e?.message || '未知错误'))

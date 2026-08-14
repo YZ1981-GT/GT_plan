@@ -3,6 +3,8 @@
  * 对齐源表 19 列分段检查 + 检查比例防 DIV/0 + I1-2 / I2 联动
  */
 import { ref, computed, watch, onScopeDispose, type Ref, type ComputedRef } from 'vue'
+
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 import type { ChecklistItem } from './useI1FormData'
 import {
   type I1AdditionCheckRow,
@@ -389,30 +391,43 @@ export function useI1AdditionCheck(
   }
 
   async function exportXlsx(kind: 'template' | 'data' = 'data') {
-    const XLSX = await import('xlsx')
     const headers = [...I1_ADDITION_EXPORT_HEADERS]
     const dataRows = kind === 'template' ? [] : rows.value.map(rowToExportRecord)
-    const ws = kind === 'template'
-      ? XLSX.utils.aoa_to_sheet([headers])
-      : XLSX.utils.json_to_sheet(dataRows, { header: headers })
-    const wb = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(wb, ws, 'I1-5增加检查')
-    const meta = XLSX.utils.aoa_to_sheet([
-      ['检查合计(样本)', summary.value.checkedTotal],
-      ['本期发生额(总体)', summary.value.periodTotal],
-      ['检查比例%', summary.value.coverageRate ?? 'N/A（总体为0）'],
-      ['告警阈值%', coverageThreshold.value],
-    ])
-    XLSX.utils.book_append_sheet(wb, meta, '检查比例')
-    XLSX.writeFile(wb, `I1-5_增加检查_${kind === 'template' ? '模板' : '数据'}.xlsx`)
+
+    // 走 useExcelIO 单一入口（B3 批）。
+    // 原实现模板态用 aoa_to_sheet([headers])、数据态用 json_to_sheet(dataRows, { header })。
+    // 两者都等价于「表头行 + 按 headers 顺序取值的数据行」的 AOA ——
+    // 缺失字段在 json_to_sheet 与 aoa_to_sheet 下同样跳过该单元格（不写 ''），故逐格等价。
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: 'I1-5增加检查',
+          rows: kind === 'template'
+            ? [headers]
+            : [headers, ...dataRows.map((r) => headers.map((h) => (r as any)[h]))],
+        },
+        {
+          sheetName: '检查比例',
+          rows: [
+            ['检查合计(样本)', summary.value.checkedTotal],
+            ['本期发生额(总体)', summary.value.periodTotal],
+            ['检查比例%', summary.value.coverageRate ?? 'N/A（总体为0）'],
+            ['告警阈值%', coverageThreshold.value],
+          ],
+        },
+      ],
+      fileName: `I1-5_增加检查_${kind === 'template' ? '模板' : '数据'}.xlsx`,
+      applyStyles: false,
+      successMessage: false,
+    })
   }
 
   async function importXlsx(file: File, replace = true): Promise<{ imported: number }> {
-    const XLSX = await import('xlsx')
-    const buf = await file.arrayBuffer()
-    const wb = XLSX.read(buf, { type: 'array' })
-    const sheet = wb.Sheets[wb.SheetNames[0]]
-    const raw = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { defval: '' })
+    // 走 useExcelIO 低层入口（B3 批）。原实现 = read(buf,{type:'array'}) +
+    // sheet_to_json(sheet,{defval:''}) + 取第一个 sheet，readSheetObjects 逐项等价。
+    // 🔴 `defval: ''` 必须显式传 —— 不传则空单元格被 SheetJS 跳过，而下方 `?? r.name`
+    // 一类的取值对 undefined 与 '' 行为不同。
+    const { rows: raw } = await readSheetObjects<Record<string, any>>(file, { defval: '' })
     const mapped = raw.map((r) => normalizeI1AdditionRow({
       name: r['资产名称'] ?? r.name,
       entryAmount: r['入账金额'] ?? r.entryAmount,

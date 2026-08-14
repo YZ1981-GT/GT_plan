@@ -192,7 +192,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useFullscreen } from '@/composables/useFullscreen'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { parseFile } from '@/composables/useExcelIO'
+import { exportMultiSheetData, readWorkbookAoa } from '@/composables/useExcelIO'
 import { handleApiError } from '@/utils/errorHandler'
 
 const EQUITY_ITEMS = ['实收资本（或股本）','其他权益工具','资本公积','减：库存股','其他综合收益','专项储备','盈余公积','△一般风险准备','未分配利润']
@@ -538,28 +538,25 @@ function buildNaHeaders(): string[] {
 }
 
 // ─── 导出模板 ────────────────────────────────────────────────────────────────
-async function exportTemplate() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const instr = [[`股比变动${props.changeTimes}次 — 填写说明`],[],
-    ['1. 每家企业有三类工作表：净资产、直接持股模拟、间接持股模拟'],
-    ['2. 按项目名/科目+明细匹配导入'],
-    ['3. 紫色行为自动计算行无需填写'],
-    [`4. 共${colCount.value}列：变动前 + ${props.changeTimes}次变动后`],
-    ['5. 间接持股企业需在基本信息表中设置持股类型为间接'],
-  ]
-  const wsI = XLSX.utils.aoa_to_sheet(instr); wsI['!cols']=[{wch:60}]
-  XLSX.utils.book_append_sheet(wb, wsI, '填写说明')
+/**
+ * 构造「每家企业的净资产 / 直接模拟 / 间接模拟」三类 sheet 定义
+ *
+ * 模板导出与数据导出的这部分原本是逐字符相同的两份复制，抽出以消除重复。
+ * sheet 名超 31 字符由 exportMultiSheetData 内部 slice(0,31) 处理，
+ * 与原先显式的 .substring(0,31) 等价。
+ */
+function buildCompanySheetDefs() {
   const naH = buildNaHeaders(); const sH = buildSimHeaders()
+  const defs: { sheetName: string; rows: any[][]; colWidths: { wch: number }[] }[] = []
+
   for (let ci = 0; ci < props.companies.length; ci++) {
     const comp = props.companies[ci]; const cd = companyData[ci]; if (!cd) continue
     // 净资产表
     const naD = cd.naRows.map(r => [r.item,...(r.vals||[]).map(v=>v??'')])
-    const wsN = XLSX.utils.aoa_to_sheet([naH,...naD]); wsN['!cols']=naH.map(()=>({wch:16}))
-    XLSX.utils.book_append_sheet(wb, wsN, `${comp.name}-净资产`.substring(0,31))
+    defs.push({ sheetName: `${comp.name}-净资产`, rows: [naH,...naD], colWidths: naH.map(()=>({wch:16})) })
     // 直接持股模拟
     const sD = cd.simRows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
-    const wsS = XLSX.utils.aoa_to_sheet([sH,...sD]); wsS['!cols']=sH.map(()=>({wch:14}))
-    XLSX.utils.book_append_sheet(wb, wsS, `${comp.name}-直接模拟`.substring(0,31))
+    defs.push({ sheetName: `${comp.name}-直接模拟`, rows: [sH,...sD], colWidths: sH.map(()=>({wch:14})) })
   }
   // 间接持股模拟
   for (let ici = 0; ici < indirectList.value.length; ici++) {
@@ -567,49 +564,59 @@ async function exportTemplate() {
     for (let ci = 0; ci < props.companies.length; ci++) {
       const rows = getIndirectSimRows(ci, ici)
       const iD = rows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
-      const wsI2 = XLSX.utils.aoa_to_sheet([sH,...iD]); wsI2['!cols']=sH.map(()=>({wch:14}))
-      XLSX.utils.book_append_sheet(wb, wsI2, `${indComp.name}-间接模拟`.substring(0,31))
+      defs.push({ sheetName: `${indComp.name}-间接模拟`, rows: [sH,...iD], colWidths: sH.map(()=>({wch:14})) })
     }
   }
-  XLSX.writeFile(wb, `股比变动${props.changeTimes}次_模板.xlsx`)
+  return defs
+}
+
+async function exportTemplate() {
+  const instr = [[`股比变动${props.changeTimes}次 — 填写说明`],[],
+    ['1. 每家企业有三类工作表：净资产、直接持股模拟、间接持股模拟'],
+    ['2. 按项目名/科目+明细匹配导入'],
+    ['3. 紫色行为自动计算行无需填写'],
+    [`4. 共${colCount.value}列：变动前 + ${props.changeTimes}次变动后`],
+    ['5. 间接持股企业需在基本信息表中设置持股类型为间接'],
+  ]
+  // 走 useExcelIO 单一入口（B4 批）。三个显式关闭保持产物不变：
+  // applyStyles:false 不套三线表、successMessage:false 因下方自弹提示。
+  await exportMultiSheetData({
+    sheets: [
+      { sheetName: '填写说明', rows: instr, colWidths: [{wch:60}] },
+      ...buildCompanySheetDefs(),
+    ],
+    fileName: `股比变动${props.changeTimes}次_模板.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('模板已导出，含净资产+直接模拟+间接模拟工作表')
 }
 
 // ─── 导出数据 ────────────────────────────────────────────────────────────────
 async function exportData() {
-  const XLSX = await import('xlsx'); const wb = XLSX.utils.book_new()
-  const naH = buildNaHeaders(); const sH = buildSimHeaders()
-  for (let ci = 0; ci < props.companies.length; ci++) {
-    const comp = props.companies[ci]; const cd = companyData[ci]; if (!cd) continue
-    const naD = cd.naRows.map(r => [r.item,...(r.vals||[]).map(v=>v??'')])
-    const wsN = XLSX.utils.aoa_to_sheet([naH,...naD]); wsN['!cols']=naH.map(()=>({wch:16}))
-    XLSX.utils.book_append_sheet(wb, wsN, `${comp.name}-净资产`.substring(0,31))
-    const sD = cd.simRows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
-    const wsS = XLSX.utils.aoa_to_sheet([sH,...sD]); wsS['!cols']=sH.map(()=>({wch:14}))
-    XLSX.utils.book_append_sheet(wb, wsS, `${comp.name}-直接模拟`.substring(0,31))
-  }
-  for (let ici = 0; ici < indirectList.value.length; ici++) {
-    const indComp = indirectList.value[ici]
-    for (let ci = 0; ci < props.companies.length; ci++) {
-      const rows = getIndirectSimRows(ci, ici)
-      const iD = rows.map(r => [r.subject,r.detail,...(r.dc||[]).map(v=>v??'')])
-      const wsI2 = XLSX.utils.aoa_to_sheet([sH,...iD]); wsI2['!cols']=sH.map(()=>({wch:14}))
-      XLSX.utils.book_append_sheet(wb, wsI2, `${indComp.name}-间接模拟`.substring(0,31))
-    }
-  }
-  XLSX.writeFile(wb, `股比变动${props.changeTimes}次_数据.xlsx`); ElMessage.success('数据已导出')
+  // 与 exportTemplate 的差异仅在于「无说明 sheet」+ 文件名/提示语（B4 批）。
+  await exportMultiSheetData({
+    sheets: buildCompanySheetDefs(),
+    fileName: `股比变动${props.changeTimes}次_数据.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
+  ElMessage.success('数据已导出')
 }
 
 async function onFileSelected(e: Event) {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return
   try {
-    const XLSX = await import('xlsx'); const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' })
+    // 走 useExcelIO 单一入口（B4 批）。本函数需在**多个** sheet 之间按公司名
+    // 逐家模糊匹配（一份文件里有 公司数 × 3 个 sheet），故用整簿读取：
+    // 一次解析拿到全部 sheet 的 AOA，与原先 read 一次 + 多次 sheet_to_json 等价。
+    const { sheetNames, sheets } = await readWorkbookAoa(file)
     let matched = 0
     for (let ci = 0; ci < props.companies.length; ci++) {
       const comp = props.companies[ci]; const cd = companyData[ci]; if (!cd) continue
-      const naSheet = wb.SheetNames.find(sn => sn.includes(comp.name) && sn.includes('净资产'))
+      const naSheet = sheetNames.find(sn => sn.includes(comp.name) && sn.includes('净资产'))
       if (naSheet) {
-        const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[naSheet], { header: 1 })
+        const json: any[][] = sheets[naSheet]
         for (let i = 1; i < json.length; i++) {
           const r = json[i]; const item = String(r?.[0]||'').trim(); if (!item) continue
           const target = cd.naRows.find(row => row.item === item)
@@ -619,9 +626,9 @@ async function onFileSelected(e: Event) {
         }
       }
       // 直接持股模拟
-      const simSheet = wb.SheetNames.find(sn => sn.includes(comp.name) && (sn.includes('直接模拟') || (sn.includes('模拟') && !sn.includes('间接'))))
+      const simSheet = sheetNames.find(sn => sn.includes(comp.name) && (sn.includes('直接模拟') || (sn.includes('模拟') && !sn.includes('间接'))))
       if (simSheet) {
-        const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[simSheet], { header: 1 })
+        const json: any[][] = sheets[simSheet]
         for (let i = 1; i < json.length; i++) {
           const r = json[i]; const subj = String(r?.[0]||'').trim(); if (!subj) continue
           const det = String(r?.[1]||'').trim()
@@ -635,12 +642,12 @@ async function onFileSelected(e: Event) {
     // 间接持股模拟导入（#9 修复：按 sheet 名匹配企业名而非灌入所有 ci）
     for (let ici = 0; ici < indirectList.value.length; ici++) {
       const indComp = indirectList.value[ici]
-      const indSheet = wb.SheetNames.find(sn => sn.includes(indComp.name) && sn.includes('间接模拟'))
+      const indSheet = sheetNames.find(sn => sn.includes(indComp.name) && sn.includes('间接模拟'))
       if (indSheet) {
         // 只对第一家直接持股企业(ci=0)灌入间接持股数据，避免重复
         const ci = 0
         const rows = getIndirectSimRows(ci, ici)
-        const json: any[][] = XLSX.utils.sheet_to_json(wb.Sheets[indSheet], { header: 1 })
+        const json: any[][] = sheets[indSheet]
         for (let i = 1; i < json.length; i++) {
           const r = json[i]; const subj = String(r?.[0]||'').trim(); if (!subj) continue
           const det = String(r?.[1]||'').trim()

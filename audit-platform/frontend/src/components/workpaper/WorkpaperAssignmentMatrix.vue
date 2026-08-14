@@ -197,6 +197,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ElMessageBox } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 
 interface WpItem {
   id: string
@@ -426,7 +427,6 @@ function cellTitle(cell: MatrixCell): string {
 
 /** 导出矩阵为 Excel（客户端 SheetJS） */
 async function exportMatrix() {
-  const XLSX = await import('xlsx')
   const header = [
     '审计人员', '角色',
     ...cycleColumns.value.map(c => `${c} ${CYCLE_NAMES[c] || ''}`),
@@ -438,12 +438,16 @@ async function exportMatrix() {
     r.total_assigned, r.total_completed,
   ])
   const sheetLabel = mode.value === 'reviewer' ? '复核委派矩阵' : '编制委派矩阵'
-  const ws = XLSX.utils.aoa_to_sheet([header, ...body])
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, sheetLabel)
+
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, '')
   const fname = [sheetLabel, (props.projectName || '').trim(), stamp].filter(Boolean).join('_') + '.xlsx'
-  XLSX.writeFile(wb, fname)
+  // 走 useExcelIO 单一入口（B7 批）。原本无 !cols，故不传 colWidths。
+  await exportMultiSheetData({
+    sheets: [{ sheetName: sheetLabel, rows: [header, ...body] }],
+    fileName: fname,
+    applyStyles: false,
+    successMessage: false,
+  })
 }
 
 /** 一键均衡：把当前可见循环内全部未分配底稿一次送入委派弹窗，用户选多人+"均匀轮询/智能推荐"策略即均衡 */

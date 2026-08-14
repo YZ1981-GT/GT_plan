@@ -488,6 +488,7 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElNotification } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import {
   getWorksheetTree,
 } from '@/services/consolidationApi'
@@ -989,8 +990,6 @@ function copyDrillDownTable() {
 async function exportDrillDown() {
   const rows = currentDrillDownRows.value
   if (!rows.length) return
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const isLeaf = drillDownLevel.value === 'leaf'
   const headers = isLeaf
     ? ['序号', '末级企业', '企业代码', '上级单位', '金额', '占比']
@@ -999,10 +998,17 @@ async function exportDrillDown() {
     ? [i + 1, r.company_name, r.company_code, r.parent_name, r.amount, `${r.ratio}%`]
     : [i + 1, r.company_name, r.company_code, r.amount, `${r.ratio}%`, r.source]
   )
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  ws['!cols'] = headers.map(() => ({ wch: 16 }))
-  XLSX.utils.book_append_sheet(wb, ws, '汇总穿透')
-  XLSX.writeFile(wb, `汇总穿透_${drillDownCell.itemName}.xlsx`)
+  // 走 useExcelIO 单一入口（B7 批）。
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: '汇总穿透',
+      rows: [headers, ...dataRows],
+      colWidths: headers.map(() => ({ wch: 16 })),
+    }],
+    fileName: `汇总穿透_${drillDownCell.itemName}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('已导出')
 }
 

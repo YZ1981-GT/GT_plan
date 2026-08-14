@@ -96,6 +96,7 @@
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import { useDiffReconcileData } from './composables/useDiffReconcileData'
 import { useDiffAnalysis } from './composables/useDiffAnalysis'
 import { useD01DiffImport } from './composables/useD01DiffImport'
@@ -140,6 +141,10 @@ const isNewFormat = computed(() => props.htmlData?._format === 'diff-reconcile-v
 const data = useDiffReconcileData({
   htmlData: () => props.htmlData,
   readonly: props.readonly,
+  // 🔴 必须传 —— 缺了 projectId 则 PM 自动取数整条链路静默失效
+  // （与本 spec Wave 7 抓的「能力写好但零消费方」同族）
+  projectId: props.projectId,
+  year: props.year,
 })
 
 // ─── 分析层 ──────────────────────────────────────────────────────────────────
@@ -251,18 +256,9 @@ function handleExportExcel() {
 
 async function handleExportTemplate() {
   try {
-    const { utils, writeFileXLSX } = await import('xlsx')
-    const wb = utils.book_new()
-
     // Sheet 1: 数据模板
     const headers = ['序号', '函证索引号', '被询证单位', '科目', '发函金额', '回函金额', '差异类型', '是否调整', '差异说明']
     const example = ['1', 'D0-001', '示例公司（请删除）', '应收账款', '100000', '99000', '时间性差异', '否', '在途款项']
-    const ws = utils.aoa_to_sheet([headers, example])
-    ws['!cols'] = [
-      { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 20 },
-    ]
-    utils.book_append_sheet(wb, ws, '差异明细')
 
     // Sheet 2: 填写说明
     const instructions = [
@@ -291,11 +287,23 @@ async function handleExportTemplate() {
       ['  3. 金额列请填纯数字，不要带"元"或千分位逗号'],
       ['  4. 也可使用"从 D0-1 带入"按钮自动带入不符项'],
     ]
-    const instrSheet = utils.aoa_to_sheet(instructions)
-    instrSheet['!cols'] = [{ wch: 60 }]
-    utils.book_append_sheet(wb, instrSheet, '填写说明')
-
-    writeFileXLSX(wb, 'D0-4差异调节导入模板.xlsx')
+    // 两个 sheet 均为纯 AOA；successMessage:false 因原实现不弹提示
+    await exportMultiSheetData({
+      sheets: [
+        {
+          sheetName: '差异明细',
+          rows: [headers, example],
+          colWidths: [
+            { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 12 }, { wch: 12 },
+            { wch: 12 }, { wch: 12 }, { wch: 8 }, { wch: 20 },
+          ],
+        },
+        { sheetName: '填写说明', rows: instructions, colWidths: [{ wch: 60 }] },
+      ],
+      fileName: 'D0-4差异调节导入模板.xlsx',
+      applyStyles: false,
+      successMessage: false,
+    })
   } catch (e: any) {
     console.error('[DiffReconcile] Export template error:', e)
   }

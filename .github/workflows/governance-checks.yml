@@ -1901,8 +1901,13 @@ jobs:
           cache: pip
       - name: Install test dependencies
         run: pip install pytest hypothesis
+      # 🔴 2026-08-12（本 spec Task 21 的 CI 接线守卫首跑即抓出）：
+      #    原先引用的 `test_i1_asset_categories.py` **从未存在**（其判据并入了
+      #    `test_i_cycle_accounts.py`），`test_i_cycle_leaf_aggregation.py` 实名是
+      #    `test_leaf_aggregation.py`。pytest 遇到不存在的路径会整 job 红，
+      #    也就是说这个 job **自建起就没真跑过**（或长期红着没人管）。
       - name: Run I-cycle account & extraction tests
-        run: python -m pytest backend/tests/four_table/test_i_cycle_accounts.py backend/tests/four_table/test_i1_asset_categories.py backend/tests/four_table/test_i_cycle_leaf_aggregation.py -q
+        run: python -m pytest backend/tests/four_table/test_i_cycle_accounts.py backend/tests/four_table/test_leaf_aggregation.py -q
       - name: Run I-cycle formula preset tests
         run: python -m pytest backend/tests/test_i_cycle_formula_presets.py -q
 
@@ -1924,6 +1929,49 @@ jobs:
         run: npm ci
       - name: Run I-cycle frontend tests
         run: npx vitest run src/components/workpaper/composables/__tests__/iCycleNoteSubtableContract.spec.ts src/components/workpaper/composables/__tests__/iCycleDisclosureWiring.spec.ts src/components/workpaper/composables/__tests__/iDisclosureColumns.spec.ts src/components/workpaper/composables/__tests__/iCycleAccountScope.spec.ts src/components/workpaper/composables/__tests__/i1CategoryScope.spec.ts
+      # ── i-cycle-extraction-formula-and-disclosure-closure Task 21 补充 ──
+      # 动态可扩类别行（Property 20~25）与审定表带入 seed（Task 17）两组守卫
+      # 原先不在 CI 内：前者护住 I1 两版 3+4 处 / I2 上市 1 处可扩位与
+      # 「key 不复用已删序号」，后者护住 `adjudication_prefill` 的消费侧接线
+      # （六个 SFC 若退回 dead output 状态，只有这组能发现）。
+      - name: Run I-cycle dynamic rows & adjudication seed guards
+        run: npx vitest run src/components/workpaper/composables/__tests__/iCycleDynamicRows.spec.ts src/components/workpaper/composables/__tests__/iCycleAdjudicationSeed.spec.ts
+
+  i-cycle-extraction-closure:
+    # I 循环取数 / 公式 / 披露 / 附注收口
+    # （i-cycle-extraction-formula-and-disclosure-closure Task 21 / Requirements 11.4）
+    #
+    # 与既有 `i-cycle-extraction` / `note-i-cycle-structure` 的分工：
+    #   既有两个 job 来自前一个 spec（…-four-table-extraction-and-disclosure-alignment），
+    #   跑 `test_i_cycle_accounts` / `test_i1_asset_categories` /
+    #   `test_i_cycle_leaf_aggregation` / `test_i_cycle_formula_presets` /
+    #   `test_note_i_cycle_structure` + `fix_note_i_cycle_structure.py --check`。
+    #   本 job 补齐本 spec 新增且**原先不在任何 job 内**的两个守卫与一个幂等脚本：
+    #     · test_i_cycle_row_code_evidence.py —— 行编码与 report_config 的逐行对账
+    #       （Property 1/2：改动前 11/12 失败，是本 spec 的立项判据）
+    #     · test_i5_absent_account.py —— I5 空兜底三态 + 叶子聚合纯函数
+    #       （Property 6 + Property 3 补强的 8 条常驻判据）
+    #     · fix_i_cycle_prefill_presets.py --check —— 预设幂等（Property 8~14）
+    #   为便于单 job 定位失败，这里把四个守卫一起跑（重复执行成本 < 10s）。
+    #
+    # 无 DB 依赖：四个守卫与两个 --check 均实测 rc=0 / 0 skipped（读快照与源 xlsx，不连库）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: pip install pytest openpyxl hypothesis
+      - name: Run I-cycle extraction closure guards
+        run: python -m pytest backend/tests/four_table/test_i_cycle_row_code_evidence.py backend/tests/four_table/test_i_cycle_accounts.py backend/tests/four_table/test_i5_absent_account.py backend/tests/test_i_cycle_formula_presets.py -q
+      - name: Run I-cycle note structure guards (source defects + md5 freeze)
+        run: python -m pytest backend/tests/test_note_i_cycle_structure.py -q
+      - name: Check note structure script is idempotent
+        run: python backend/scripts/fix/fix_note_i_cycle_structure.py --check
+      - name: Check prefill presets script is idempotent
+        run: python backend/scripts/fix/fix_i_cycle_prefill_presets.py --check
 
   k-cycle-four-table-extraction:
     # K3~K13 四表取数 / 科目映射 / 损益口径 / 公式预设守卫
@@ -1966,8 +2014,84 @@ jobs:
           cache-dependency-path: audit-platform/frontend/package-lock.json
       - name: Install dependencies
         run: npm ci
-      - name: Run K-cycle account scope & wiring guards
-        run: npx vitest run src/components/workpaper/composables/__tests__/kCycleAccountScope.spec.ts src/components/workpaper/composables/__tests__/kCycleFourTableWiring.spec.ts --silent=true || echo "::warning::K-cycle frontend guards not yet created (Task 22 pending)"
+      # 🔴 2026-08-12 修两处假绿（k-cycle-extraction-formula-and-disclosure-closure Task 23）：
+      #   ① 原步骤尾部挂 `|| echo "::warning::…"` ⇒ 前端守卫真失败也只留一条 warning、
+      #      job 照绿。该 spec 的 Wave 4 已交付 `kCycleAccountScope.spec.ts`（44 例），
+      #      不存在"尚未创建"的前提，兜底子句纯属假绿。
+      #   ② 原过滤器含 `kCycleFourTableWiring.spec.ts` —— **该文件从未存在**。
+      #      vitest 的位置参数是**子串过滤器**而非文件路径：只要有一个过滤器命中，
+      #      不命中的那个被**静默忽略**（本地实测：两个过滤器 → `Test Files 1 passed (1)`
+      #      且 exit 0）。于是 yml 读起来像跑了两组守卫、实际只跑一组，
+      #      属"看得见的覆盖面"与"真实覆盖面"脱钩。已换成真实存在的
+      #      `kCycleAccountScopeCrossLock.spec.ts`（前后端 row_code 交叉锁死）。
+      #      该类脱钩现由 `test_k_cycle_ci_wiring.py` 逐个过滤器解析真实文件钉死。
+      - name: Run K-cycle account scope & cross-lock guards
+        run: npx vitest run src/components/workpaper/composables/__tests__/kCycleAccountScope.spec.ts src/components/workpaper/composables/__tests__/kCycleAccountScopeCrossLock.spec.ts --silent=true
+
+  k-cycle-extraction-formula-closure:
+    # K 循环取数 / 公式预设 / 披露块收口守卫
+    # （k-cycle-extraction-formula-and-disclosure-closure Task 23，Requirement 13.10/13.11）
+    #
+    # 与上面 `k-cycle-four-table-extraction` 的分工：那个 job 是前一个 spec 的
+    # K3~K13 取数纠偏；本 job 收的是**本 spec 新增**的判据 —— 声明真源单一化、
+    # 共享 `parent_check` 三口径、源模板事实冻结、26 个披露块覆盖面与无环。
+    #
+    # 🔴 **不含 4 个连库守卫**（`test_k_cycle_row_code_evidence` /
+    #   `test_k_cycle_resolution_live` / `test_cycle_specs_row_code_evidence` /
+    #   `verify_k_cycle_live`），这是**显式登记的取舍**而非遗漏：
+    #   它们按 Property 1 要求「连不上库判红而非 skip」，而 CI 的 postgres 服务只跑
+    #   `V*.sql` 迁移，`report_config` / `account_chart` **都不由迁移灌数**
+    #   （已扫全部 V*.sql，两张表 0 条 INSERT）⇒ 放进 CI 必然全红。
+    #   仓库现有连库 job 之所以能绿，是因为那些测试在表空时 skip；本 spec 的守卫
+    #   刻意拒绝 skip。故连库判据留在本地/预发布闸门执行，由
+    #   `test_k_cycle_ci_wiring.py::test_db_guards_are_registered_as_local_only`
+    #   钉死「要么进 CI、要么在登记名单里」，防止无声掉队。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # 🔴 装全量 requirements 而不是挑几个包：本 job 的守卫 import 真实生产模块
+      #   （`app.routers.wp_render_strategies` / `app.services.prefill_engine` /
+      #   `app.services.formula_engine`），它们的 import 闭包含 FastAPI、
+      #   pydantic-settings、SQLAlchemy 等。挑包装会在 CI 上以 ImportError 收场，
+      #   而本地全绿 —— 属"只有 CI 才暴露"的假绿。`PyYAML`（CI 接线守卫要用）
+      #   与 `openpyxl`（源模板事实守卫要用）都已在 requirements.txt 内。
+      - name: Install dependencies
+        run: |
+          python -m pip install -U pip
+          pip install -r backend/requirements.txt
+      - name: Run K-cycle declaration & extraction guards
+        run: >-
+          python -m pytest
+          backend/tests/four_table/test_k_cycle_extraction.py
+          backend/tests/four_table/test_k1_k2_spec_single_source.py
+          backend/tests/four_table/test_k2_account_scope.py
+          backend/tests/four_table/test_cycle_specs_row_code_evidence.py
+          -q
+      - name: Run K1 preset guards (four_table 侧 + formula_management 侧)
+        run: >-
+          python -m pytest
+          backend/tests/four_table/test_k1_formula_presets.py
+          backend/tests/formula_management/test_k1_formula_presets.py
+          -q
+      - name: Run K source-template fact guards (openpyxl 直读源 xlsx)
+        run: python -m pytest backend/tests/test_k_source_template_facts.py -q
+      - name: Run K-cycle preset closure guards (含 26 个披露块覆盖面与无环)
+        run: python -m pytest backend/tests/four_table/test_k_cycle_preset_closure.py -q
+      - name: Run K-cycle CI wiring guards (本 job 自身的接线不得脱钩)
+        run: python -m pytest backend/tests/test_k_cycle_ci_wiring.py -q
+      - name: Check K-cycle prefill presets idempotent (--check)
+        run: python backend/scripts/fix/fix_k_cycle_prefill_presets.py --check
+      - name: Check K-cycle disclosure presets idempotent (--check)
+        run: python backend/scripts/fix/fix_k_cycle_disclosure_presets.py --check
+      # 附注段首码：`--check` 同时看守「码齐备」「无码行没被偷偷造码」「多 owner 章节
+      # 都进了补码计划、单 owner 章节都登记了豁免」三件事（后者从
+      # note_workpaper_sync_registry.json 反查 owner 数，不靠硬编码名单）。
+      - name: Check note K report_row_code idempotent (--check)
+        run: python backend/scripts/fix/fix_note_k_report_row_codes.py --check
+
   note-e1-structure:
     # 附注 E1 货币资金章节结构守卫（五、1 / 八、1）
     # （e1-four-table-extraction-and-disclosure-alignment Task 11/12/13）
@@ -4490,3 +4614,198 @@ jobs:
         run: |
           npx vitest run --silent=true \
             src/components/workpaper/__tests__/ieOrphanBaseline.spec.ts
+
+  excel-io-single-entry-convergence:
+    # 前端 Excel 库调用单一入口守卫
+    # （spec: frontend-excel-io-single-entry-convergence，2026-08-12 收敛完成 46 → 0）
+    #
+    # 动因是安全：`xlsx@0.18.5` 是 npm 上最后一版，带两个**永远不会修复**的 CVE
+    # （CVE-2023-30533 原型污染 / CVE-2024-22363 ReDoS）—— SheetJS 已撤出 npm，
+    # 修复版只在自家 CDN。散点直连意味着每处「读上传文件」都是独立攻击面，
+    # 故全部收敛到 `composables/useExcelIO.ts`，防护（`_BLOCKED_KEYS`）只做一次。
+    #
+    # ci.yml 的前端 job 虽然跑 `npx vitest run` 全量，但它串在 vue-tsc、
+    # 十几个 grep 守卫与 build 之间，且当前因其他 spec 的在途工作本就是红的 ——
+    # 前序任一失败就到不了这里。故独立成 job，与 disclosure-columns-coverage /
+    # note-inventory-structure 同款做法：确保「收敛回退」这类回归不被别的失败掩盖。
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install deps
+        run: npm ci
+      # 收敛守卫（含终态「生产文件零裸 import」+ 基线防漂移 + exempt stale 检测）
+      # 与安全加固、L1 新增 API 契约、行为等价快照、ExcelJS 侧入口
+      - name: 零裸 import / 基线 / 豁免 stale + 安全 + 新 API + 等价 + ExcelJS
+        run: |
+          npx vitest run --silent=true \
+            src/composables/__tests__/excelIoConvergence.spec.ts \
+            src/composables/__tests__/useExcelIO.security.spec.ts \
+            src/composables/__tests__/useExcelIO.newApi.spec.ts \
+            src/composables/__tests__/excelIoEquivalence.spec.ts \
+            src/composables/__tests__/useExcelIO.excelJs.spec.ts \
+            src/composables/__tests__/useExcelIO.spec.ts \
+            src/components/consolidation/__tests__/consolNoteSheetName.spec.ts \
+            src/components/query/__tests__/queryExport.spec.ts
+      # Vite transform 编译扫描 —— 拦「静态检查全绿但浏览器 500」那一类
+      #
+      # 2026-08-14 实测：`ReportLineMappingDialog.vue` 多一个 `}` ⇒ Vite transform 500
+      # → 整个 TrialBalance 路由崩，而 get_diagnostics（Volar）/ vitest 107 例 /
+      # 变异 13 条**全绿**。只有 vue/compiler-sfc 自己会报。
+      #
+      # 本步启一个临时 dev server 后逐文件请求 transform URL。之所以不用 `npm run build`
+      # 代替：build 也能抓语法错，但它跑全量打包（分钟级）且失败信息不定位到源文件行列；
+      # 而 dev transform 是按需单文件编译，报错带 `行:列` + frame，定位直接。
+      # 🔴 用 --from-baseline 而非默认的「git 改动」模式：PR checkout 后工作树是干净的，
+      # `git status --porcelain` 返回空 ⇒ 脚本报「无待扫文件」退出 0 = **空转假绿**。
+      # --from-baseline 从收敛基线 JSON 的 _progress[].files 读全部迁移文件（单一真源，
+      # 不随手抄清单 stale），并在文件被重命名/删除而基线未同步时主动报错。
+      - name: Vite transform 编译扫描（基线记录的全部迁移文件）
+        run: |
+          npx vite --port 3099 --strictPort > /tmp/vite.log 2>&1 &
+          for i in $(seq 1 40); do
+            curl -sf "http://localhost:3099/" > /dev/null && break
+            sleep 1
+          done
+          node scripts/check_vite_transform.mjs --port 3099 --from-baseline
+          EXIT=$?
+          kill %1 2>/dev/null || true
+          exit $EXIT
+      - name: 变异清单静态自检（不执行变异）
+        # 只跑 --list：校验每条变异的锚点在目标文件命中**恰好 1 次**、
+        # 每条 expect 能在其 spec 里找到。真正执行变异要临时改生产代码，
+        # 不适合 CI 并发环境（与 wp-import-export-lifecycle 同款取舍）。
+        #
+        # 这一步拦的是两类只在手工跑 --run 时才暴露的 stale：锚点漂移
+        # （生产代码重构后不再命中 → ANCHOR-MISS）与测试名漂移（expect 失配 →
+        # WRONG-TEST，或更坏：误配到另一条测试上，于是「看起来 RED」但钉的不是原意）。
+        # 2026-08-12 实测踩过三次（M7/M8 锚点写的是迁移前代码、M12 缩进猜错）。
+        run: node scripts/mutate_excel_io_guards.mjs --list
+
+  g7-column-alignment:
+    # G7 列对齐与取数收口（g7-column-alignment-and-extraction-closure Task 21）
+    #
+    # 与既有 `note-g7-structure` 的分工：那个 job 管**四个幂等脚本 --check + 结构契约**；
+    # 本 job 管**列结构三向对齐的源侧判据**与**取数补齐裁决**，两者交集仅
+    # `test_note_g7_structure.py`，且本 job 只取其中 Task 3 新增的 `TestCheckModeStrength`
+    # 一个类（不重复跑整文件）。
+    #
+    # 拦六类已实测缺陷：
+    # 1. **边①（源 xlsx ↔ 附注 seed）列结构欠账**：56 处偏差归零后防漂回；
+    #    诊断脚本的三张豁免表（单槽占位 / 平台约束 / 转角标题）只许缩短不许扩张。
+    # 2. **标签列头原文被"统一成好看的那种"**：源 xlsx 实为 `项  目`（双空格 13 张）/
+    #    `项 目`（单空格 3 张）/`项目`（1 张）。此前 facts 的 `label_header` 是
+    #    `_norm()` 去掉全部空白后的派生值 ⇒ 双空格与无空格恒判相等，三个守卫结构性
+    #    看不见 15 处偏差。现下发 `label_header_raw` 逐字判据（raw≠norm 恰 14 张，反面锚定）。
+    # 3. **`--check` 弱于 `--dry-run` 的平台级假绿**：`_note_structure_kit.run_section()`
+    #    的 check 分支原先只跑 `validate_section`（表名清单 + text_sections），
+    #    **完全不跑 `apply_plan`** ⇒ headers/columns/rows/guidance 偏差全看不见。
+    #    实测形态：同一时刻 `--dry-run` 报 2 处变更而 `--check` 报 0 项欠账。
+    #    24 个幂等脚本共用这条通路，各 spec 普遍拿「`--check` 0 欠账」当验收判据。
+    # 4. **源模板自身内容缺陷被当成平台 bug 反复"修"**：5 条登记（公式引用错列 /
+    #    两段上期数逐格相同 / 行 187 与 186 逐字相同 / 编号缺 (2) / 主体名空行）。
+    #    探针必须走 `data_only=False` 读**公式原文** —— 取值路径上这类错误结构性看不见。
+    # 5. **取数"补齐"制造第二真源**：15 个 sheet 逐条裁决为「不该补」。四表数据经
+    #    G7-2 单一入口进入 G7 域，族 render 再接一次会让同一个 `1511` 余额有两个真源。
+    #    含反面锚定：族 render 真出现四表键就打红，提醒复核。
+    # 6. **槽级 `row_code` 缺失致假冲突告警**（H2/H3/H7/D6 已声明 + I3/D1/D2 三条裁决）。
+    #
+    # 🔴 只读，不写库；`-rs` 让「PG 不可达」的 skip 原因出现在日志里（静默 skip 是假绿源）。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt -q
+      # 🔴 pytest 一律从**仓库根**跑（从 backend/ 跑会让用相对路径的测试假红）；
+      #    只有迁移这一步需要 cwd=backend（`from app.core...` 依赖该 import root）。
+      - name: Run migrations (report_config，供槽级 row_code 连库守卫)
+        run: python -c "import asyncio; from app.core.migration_runner import MigrationRunner; asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending())"
+        working-directory: backend
+      - name: 边① 源 xlsx ↔ 附注 seed 列结构对齐（须 0 欠账 + 39 项自检全过）
+        run: python backend/scripts/diagnose/diagnose_g7_column_alignment.py --check
+      - name: 源模板事实投影 + 源模板自身缺陷登记（data_only=False 读公式）
+        run: python -m pytest backend/tests/four_table/test_g7_column_source_facts.py -q
+      - name: 幂等脚本 --check 强度：不得弱于 --dry-run（行为级判据）
+        run: python -m pytest "backend/tests/test_note_g7_structure.py::TestCheckModeStrength" -v
+      - name: G7 取数补齐裁决（15 sheet + 四表单一入口 + 族 render 反面锚定）
+        run: python -m pytest backend/tests/g7_extraction/test_g7_extraction_scope_adjudication.py -q
+      - name: 槽级 row_code 登记与裁决（连库，read-only）
+        run: python -m pytest backend/tests/four_table/test_semantic_slot_row_code.py -v --tb=short -rs
+      - name: 变异登记表静态自检（不执行变异）
+        # 只跑 --list：校验每条锚点在目标文件命中**恰好 1 次**、replacement 非空操作、
+        # expect_test 能在其测试源里定位。真正执行变异要临时改生产代码，
+        # 不适合 CI 并发环境（与 excel-io-single-entry-convergence 同款取舍）。
+        #
+        # 拦三类只在手工跑全量变异时才暴露的 stale：锚点漂移（重构后不再命中 →
+        # ANCHOR-MISS）、变异空操作（replacement == anchor → 必然假 GREEN）、
+        # 测试名漂移（expect 失配 → WRONG-TEST，或更坏：误配到另一条测试上，
+        # 于是「看起来 RED」但钉的不是原意）。
+        # 该校验器自身已过元检验：5 种失效形态（锚点 0 命中 / 多命中 / 空操作 /
+        # 测试名漂移 / .bak 残留）全部打红，证明不是恒绿步骤。
+        run: python backend/scripts/diagnose/mutate_g7_column_alignment_guards.py --list
+
+  g7-column-alignment-frontend:
+    # G7 列对齐前端守卫（g7-column-alignment-and-extraction-closure Task 21）
+    #
+    # 三向对齐 = 源 xlsx facts（`backend/data/g7_column_source_facts.json`，随仓库跟踪）
+    #          ↔ 附注 seed（`note_template_{listed,soe}.json`）
+    #          ↔ 运行时披露模型（`g7{Listed,Soe}DisclosureModel.ts`）
+    # 三者任一侧改动而另两侧未同步即打红；facts JSON 被篡改也打红（守卫读它做判据）。
+    #
+    # 契约守卫覆盖 **38 张**全部运行时表（listed 15 / soe 23，13 个章节）。
+    # 此前只按 `G7_NOTE_SECTION` 过滤覆盖主章节 11 张，跨章 27 张零覆盖 ⇒
+    # 那 15 处标签列头原文偏差里有一半藏在跨章表里。含覆盖面回退反面锚定
+    # （主章节 11 / 跨章 27 两个数字都钉死）与 3 个纯文字章节登记（交叉锁死「确实零表」）。
+    #
+    # 两变体披露模型另拦：`labelHeader` 必须逐字等于源原文（禁统一空格）；
+    # soe 侧 `_removed_table_keys` 逐章节差集（此前整条链是死的：`buildRemovedTableKeys`
+    # 与 `dataTableNames` 调用数均为 0、`markG7SoeSynced` 不存在 ⇒ soe 删表/改名后
+    # 附注 `sub_table_data` 永久残留过时明细，而 listed 侧同能力早已接通）。
+    # 越权删门控按「章节**声明**是否有 tables」判，不按运行时推送数
+    # （纯文字章节有 narratives 也会进载荷，按推送数门控会删别的底稿的表）。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: 三向对齐守卫（facts ↔ seed ↔ 运行时，含 label_header_raw 逐字）
+        run: npx vitest run g7ColumnThreeWayAlignment
+        working-directory: audit-platform/frontend
+      - name: 披露载荷契约（38 张运行时表全覆盖 + 覆盖面回退反面锚定）
+        run: npx vitest run g7NoteSubtableContract
+        working-directory: audit-platform/frontend
+      - name: 两变体披露模型（labelHeader 原文 / soe _removed_table_keys 逐章节）
+        run: npx vitest run g7ListedDisclosureModel g7SoeDisclosureModel
+        working-directory: audit-platform/frontend

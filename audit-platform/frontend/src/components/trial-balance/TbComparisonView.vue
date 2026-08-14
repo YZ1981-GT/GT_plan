@@ -65,6 +65,7 @@
 import { ref, computed, watch } from 'vue'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { useTbComparison } from '@/composables/useTbComparison'
+import { exportMultiSheetData } from '@/composables/useExcelIO'
 import http from '@/utils/http'
 import type { Ref } from 'vue'
 
@@ -161,8 +162,6 @@ function compRowClassName({ row }: { row: any }) {
 }
 
 async function doExport() {
-  const XLSX = await import('xlsx')
-  const wb = XLSX.utils.book_new()
   const headers = ['科目编码', '科目名称', '本年审定', ...comparison.targets.value.flatMap(t => [t.label + ' 审定', '变动额', '变动率(%)'])]
   const dataRows = filteredRows.value.map(r => {
     const row: any[] = [r.standard_account_code, r.account_name, r.current_audited]
@@ -171,9 +170,13 @@ async function doExport() {
     }
     return row
   })
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows])
-  XLSX.utils.book_append_sheet(wb, ws, '对比报告')
-  XLSX.writeFile(wb, `试算表对比_${props.year}.xlsx`)
+  // 走 useExcelIO 单一入口（B7 批）。原本无 !cols，故不传 colWidths。
+  await exportMultiSheetData({
+    sheets: [{ sheetName: '对比报告', rows: [headers, ...dataRows] }],
+    fileName: `试算表对比_${props.year}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
 }
 </script>
 

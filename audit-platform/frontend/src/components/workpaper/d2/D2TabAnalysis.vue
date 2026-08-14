@@ -437,14 +437,14 @@ function importAgingCompare(file: File): boolean {
 
 // ─── 通用 xlsx 导出/导入辅助 ──────────────────────────────────────────────
 function _exportXlsx(filename: string, headers: string[], rows: any[][]): void {
-  import('exceljs').then(({ Workbook }) => {
-    const wb = new Workbook()
+  // 走 useExcelIO 单一入口（B5 批）。仍是 ExcelJS 引擎，建表逻辑逐行不变。
+  createExcelJsWorkbook().then(({ wb, toBuffer }) => {
     const ws = wb.addWorksheet('数据')
     ws.addRow(headers)
     for (const row of rows) ws.addRow(row)
     // 列宽自适应
     headers.forEach((_, i) => { ws.getColumn(i + 1).width = 16 })
-    wb.xlsx.writeBuffer().then((buffer) => {
+    toBuffer().then((buffer) => {
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -457,30 +457,27 @@ function _exportXlsx(filename: string, headers: string[], rows: any[][]): void {
 }
 
 function _importXlsx(file: File, onParsed: (data: any[]) => void): void {
-  import('exceljs').then(({ Workbook }) => {
-    const reader = new FileReader()
-    reader.onload = async (e) => {
-      const wb = new Workbook()
-      await wb.xlsx.load(e.target?.result as ArrayBuffer)
-      const ws = wb.worksheets[0]
-      if (!ws) return
-      const headers: string[] = []
-      const data: any[] = []
-      ws.eachRow((row, rowNum) => {
-        if (rowNum === 1) {
-          row.eachCell((cell) => { headers.push(String(cell.value ?? '')) })
-        } else {
-          const obj: any = {}
-          row.eachCell((cell, colNum) => {
-            obj[headers[colNum - 1] || colNum - 1] = cell.value
-            obj[colNum - 1] = cell.value
-          })
-          data.push(obj)
-        }
-      })
-      onParsed(data)
-    }
-    reader.readAsArrayBuffer(file)
+  // 走 useExcelIO 单一入口（B5 批）。仍是 ExcelJS 引擎，解析逻辑逐行不变。
+  // 原先用 FileReader 读成 ArrayBuffer 再 load，loadExcelJsWorkbook 直接收 File
+  // （内部走 file.arrayBuffer()，与 readAsArrayBuffer 等价），故省掉那一层。
+  loadExcelJsWorkbook(file).then((wb) => {
+    const ws = wb.worksheets[0]
+    if (!ws) return
+    const headers: string[] = []
+    const data: any[] = []
+    ws.eachRow((row: any, rowNum: number) => {
+      if (rowNum === 1) {
+        row.eachCell((cell: any) => { headers.push(String(cell.value ?? '')) })
+      } else {
+        const obj: any = {}
+        row.eachCell((cell: any, colNum: number) => {
+          obj[headers[colNum - 1] || colNum - 1] = cell.value
+          obj[colNum - 1] = cell.value
+        })
+        data.push(obj)
+      }
+    })
+    onParsed(data)
   })
 }
 

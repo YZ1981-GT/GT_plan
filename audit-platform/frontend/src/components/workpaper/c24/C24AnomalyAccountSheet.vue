@@ -123,7 +123,7 @@
 <script setup lang="ts">
 import { ref, defineAsyncComponent } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import * as XLSX from 'xlsx'
+import { exportMultiSheetData, readSheetObjects } from '@/composables/useExcelIO'
 
 const GtIndexChip = defineAsyncComponent(() => import('../GtIndexChip.vue'))
 
@@ -168,8 +168,7 @@ function handleImportExport(command: string) {
 }
 
 /** 导出空白模板（含编制说明） */
-function exportTemplate() {
-  const wb = XLSX.utils.book_new()
+async function exportTemplate() {
 
   // Sheet1: 编制说明
   const guideData = [
@@ -204,9 +203,7 @@ function exportTemplate() {
     ['- "操作用户"列为匹配键，不要修改或删除。'],
     ['- 如导入的用户名与系统中不完全一致则无法匹配，请确保名称相同。'],
   ]
-  const wsGuide = XLSX.utils.aoa_to_sheet(guideData)
-  wsGuide['!cols'] = [{ wch: 16 }, { wch: 14 }, { wch: 60 }]
-  XLSX.utils.book_append_sheet(wb, wsGuide, '编制说明')
+
 
   // Sheet2: 数据模板（带当前用户列表，可编辑列为空）
   const headers = ['操作用户', '用户岗位', '编制数', '过账数', '审核数', '在清单中', '是否异常', '异常说明', '结论', '索引号']
@@ -214,27 +211,43 @@ function exportTemplate() {
     r.user, '', r.prepareCount, r.postCount, r.reviewCount,
     r.inList ? '是' : '否', '', '', '', '',
   ])
-  const wsData = XLSX.utils.aoa_to_sheet([headers, ...data])
-  wsData['!cols'] = headers.map((h, i) => ({ wch: Math.max(h.length * 2, ...(data.map(r => String(r[i] ?? '').length)), 10) }))
-  XLSX.utils.book_append_sheet(wb, wsData, 'C24-4异常账户')
-
-  XLSX.writeFile(wb, `C24-4_异常账户_导入模板.xlsx`)
+  // 走 useExcelIO 单一入口（B7 批）。本文件原本是全库**唯一的静态 import**
+  // （`import * as XLSX from 'xlsx'`），会把 xlsx 打进主包；收敛后变成入口内的动态
+  // import，顺带修掉这个体积问题。
+  await exportMultiSheetData({
+    sheets: [
+      { sheetName: '编制说明', rows: guideData, colWidths: [{ wch: 16 }, { wch: 14 }, { wch: 60 }] },
+      {
+        sheetName: 'C24-4异常账户',
+        rows: [headers, ...data],
+        colWidths: headers.map((h, i) => ({ wch: Math.max(h.length * 2, ...(data.map(r => String(r[i] ?? '').length)), 10) })),
+      },
+    ],
+    fileName: `C24-4_异常账户_导入模板.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('模板导出成功，请参照"编制说明"sheet填写后导入')
 }
 
 /** 导出当前账户列表为 Excel */
-function exportToExcel() {
+async function exportToExcel() {
   const headers = ['操作用户', '用户岗位', '编制数', '过账数', '审核数', '在清单中', '是否异常', '异常说明', '结论', '索引号']
   const data = props.rows.map(r => [
     r.user, r.role, r.prepareCount, r.postCount, r.reviewCount,
     r.inList ? '是' : '否', r.abnormal, r.note, r.conclusion, r.indexRef || '',
   ])
-  const ws = XLSX.utils.aoa_to_sheet([headers, ...data])
-  // 列宽自适应
-  ws['!cols'] = headers.map((h, i) => ({ wch: Math.max(h.length * 2, ...(data.map(r => String(r[i] ?? '').length)), 8) }))
-  const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'C24-4异常账户')
-  XLSX.writeFile(wb, `C24-4_异常账户分析_${new Date().toISOString().slice(0, 10)}.xlsx`)
+  await exportMultiSheetData({
+    sheets: [{
+      sheetName: 'C24-4异常账户',
+      rows: [headers, ...data],
+      // 列宽自适应（原样保留：按表头与数据的最大字符数算）
+      colWidths: headers.map((h, i) => ({ wch: Math.max(h.length * 2, ...(data.map(r => String(r[i] ?? '').length)), 8) })),
+    }],
+    fileName: `C24-4_异常账户分析_${new Date().toISOString().slice(0, 10)}.xlsx`,
+    applyStyles: false,
+    successMessage: false,
+  })
   ElMessage.success('导出成功')
 }
 
@@ -246,10 +259,8 @@ async function onFileSelected(event: Event) {
   input.value = ''
 
   try {
-    const ab = await file.arrayBuffer()
-    const wb = XLSX.read(ab, { type: 'array' })
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const jsonRows = XLSX.utils.sheet_to_json<Record<string, any>>(ws)
+    // 走 useExcelIO 单一入口（B7 批）。原先取第一个 sheet + sheet_to_json 对象模式无选项。
+    const { rows: jsonRows } = await readSheetObjects<Record<string, any>>(file)
 
     if (jsonRows.length === 0) {
       ElMessage.warning('导入文件为空')
