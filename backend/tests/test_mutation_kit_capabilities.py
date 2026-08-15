@@ -406,6 +406,77 @@ def test_check_anchors_reports_drift(fake_repo: Path) -> None:
     assert rc == 1, "锚点漂移必须非零退出"
 
 
+def test_subset_run_exit_code_not_penalized_by_coverage(fake_repo: Path, monkeypatch) -> None:
+    """🔴 子集运行不得因「覆盖面不完整」而非零退出。
+
+    子集（`--run M01`）天然只覆盖少数守卫文件。若把 `is_complete(full_run=False)`
+    算进退出码，「只跑一条变异确认它还红」这个最常用动作会永远失败。
+    该缺陷由 Task 11 迁移 e-cycle 时暴露：判定矩阵 6/6 逐一相同却 RC=1。
+
+    此处用替身 runner 让变异判 RED（不真跑 pytest），只验退出码逻辑。
+    """
+    from _mutation_kit import cli as cli_mod
+
+    def stub_runner(_repo, _args, timeout=1800):  # noqa: ANN001, ARG001
+        return RunResult(failed=set(), summary="stub 0 failed", passed=1)
+
+    calls = {"n": 0}
+
+    def stub_after_mutation(_repo, _args, timeout=1800):  # noqa: ANN001, ARG001
+        calls["n"] += 1
+        # 基线（第 1 次）空集；变异后（第 2 次起）返回 want 命中
+        if calls["n"] == 1:
+            return RunResult(failed=set(), summary="stub baseline", passed=1)
+        return RunResult(
+            failed={"test_alpha.py::test_alpha_one"},
+            summary="stub mutated",
+            passed=0,
+            name2file={"test_alpha.py::test_alpha_one": "test_alpha.py"},
+        )
+
+    monkeypatch.setattr(cli_mod, "run_pytest", stub_after_mutation)
+    two = [_mut(), _mut(id="M02", anchor="    return 2", new="    return 888")]
+    rc = run_cli(
+        mutations=two,
+        guard_files={"test_alpha.py": "夹具", "test_beta.py": "夹具（本子集覆盖不到）"},
+        repo=fake_repo,
+        backend_args=["-q"],
+        guard_roots=("guards",),
+        argv=["--run", "M01"],
+    )
+    assert rc == 0, "子集运行全 RED 时必须返回 0，不得因覆盖面不全被判失败"
+    assert stub_runner is not None  # 保留引用，避免 linter 误删
+
+
+def test_full_run_exit_code_still_requires_coverage(fake_repo: Path, monkeypatch) -> None:
+    """反向自检：全量运行仍必须满足覆盖面，否则上一条会把覆盖面机制整个废掉。"""
+    from _mutation_kit import cli as cli_mod
+
+    calls = {"n": 0}
+
+    def stub(_repo, _args, timeout=1800):  # noqa: ANN001, ARG001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return RunResult(failed=set(), summary="stub baseline", passed=1)
+        return RunResult(
+            failed={"test_alpha.py::test_alpha_one"},
+            summary="stub mutated",
+            passed=0,
+            name2file={"test_alpha.py::test_alpha_one": "test_alpha.py"},
+        )
+
+    monkeypatch.setattr(cli_mod, "run_pytest", stub)
+    rc = run_cli(
+        mutations=[_mut()],
+        guard_files={"test_alpha.py": "夹具", "test_beta.py": "夹具（无变异覆盖）"},
+        repo=fake_repo,
+        backend_args=["-q"],
+        guard_roots=("guards",),
+        argv=["--run", "all"],
+    )
+    assert rc == 1, "全量运行有覆盖面缺口时必须非零退出"
+
+
 def test_run_aborts_on_stale_backup(fake_repo: Path) -> None:
     """残留备份意味着上一轮被中断、基线已被污染 ⇒ 必须 ABORT 而不是继续。"""
     (fake_repo / "src" / "target.py.mutbak").write_bytes(b"stale")

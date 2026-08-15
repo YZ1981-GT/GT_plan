@@ -129,7 +129,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 用临时目录 + 替身文件做被测对象，**不拿真实生产文件**做共享件的测试素材
   - _Requirements: 6.5_
 
-- [ ] 11. 迁移范式基准：`mutate_e_cycle_guards.py`
+- [x] 11. 迁移范式基准：`mutate_e_cycle_guards.py`
   - **迁移的第一个**。迁移前先跑一遍**全量**变异，存下判定矩阵（变异 id → 四态 + 打红测试名集合）作等价性基线（Property 26）
   - 🔴 迁移前必查：`mutate_e_cycle_guards.py` 的 M09/M10/M29 锚在 `backend/data/note_template_soe.json`，该文件长期带并发 K 循环的未提交改动。跑全量变异会改它 ⇒ **开工前先确认该文件当前状态并与并发会话协调**；若不可协调，改用「按变异分批 + 每批后立即 md5 复核」并在实录写明
   - 迁移后重跑同一变异集，判定矩阵**逐一比对**必须相同（Property 26）
@@ -444,3 +444,38 @@ Wave 1 给 `mutate_report_line_resolution_guards.py` 登记豁免时（12:14）�
 | `guard_files` 强制 | 模块级常量，靠约定 | **必填关键字参数**，签名层面不可能省略 |
 | `--list` 校验 | 只打印 | 四项校验（声明 / 锚点唯一 / 文件存在 / want 可定位） |
 | 作用域自证 | 无 | `Mutation.scope_check`，落在作用域外判 ANCHOR-MISS 而非 GREEN |
+
+### Wave 4 实录之一：迁移范式基准 mutate_e_cycle_guards.py（Task 11，2026-08-15）
+
+**992 → 500 行（减 492）**，29 条变异声明**零改动**。
+
+#### 迁移策略：声明零改动，只换实现
+
+用 `from _mutation_kit import Mutation as Mut` 别名 —— 共享件的 `Mutation` 字段本就是照该脚本的 `Mut` 设计的（id/side/path/kind/anchor/want/why/new/anchor2/line/block_open/tags 逐一对齐），所以 29 条声明连一个字符都不用改。这把等价性风险压到最低：**变量没动过，只是判定逻辑换成了共享件的同名实现**。
+
+删掉的是 486 行自带实现（`md5`/`read_lines`/`find_anchor`/`block_range`/`apply_mutation`/`run_backend`/`run_frontend`/`matched`/`_guard_files_of`/`restore_all`/`select`/`check_anchors`/`run_one`/`main`）。保留 `REPO`/`FRONTEND`/`BASELINE_*`/`BE_PYTEST_ARGS`/`_FE_JSON`/`SPEC_GUARD_FILES`/路径常量/`MUTATIONS`。
+
+切片用行首锚点 + assert + 改完结构核验（AST 查「顶层函数/类必须为空」、`MUTATIONS` 必须仍 29 条、七个必留 token 必须还在、`def main(` 必须已消失）。
+
+#### Property 26 等价性验证
+
+| 判据 | 迁移前 | 迁移后 | 结论 |
+|---|---|---|---|
+| `--check-anchors` 输出（29 行 OK/MISS） | 29 OK / 0 MISS | 29 OK / 0 MISS | **逐行相同** |
+| be 子集 6 条的 verdict | 6× RED | 6× RED | 相同 |
+| 6 条的 `added` 失败名集合 | — | — | **逐条集合相同** |
+| 6 条的 `hit`（want 命中项） | — | — | **逐条集合相同** |
+| 还原 md5 | 全部成功 | 全部成功 | 相同 |
+| `--list` 校验（新能力） | 只打印 | 29 条声明 + 17 个分母文件全可定位 | 新增通过 |
+
+**子集选取的理由**：M01/M02/M13（`e1_bank_accounts.py`）· M07/M15（`e1_restricted_buckets.py`）· M20（`fix_e1_prefill_presets.py`），覆盖 replace / insert / move / swap 四种 kind，且**全部锚在非并发文件上**。
+
+🔴 **未做全量 29 条的等价性比对，原因与替代证据如实登记**：M09/M10/M29 锚在 `backend/data/note_template_soe.json`，该文件在本 Wave 开工时仍带并发 K 循环的未提交改动（`M ` +202/−98，mtime 距探测仅数分钟；`note_template_listed.json` 亦 +280/−77）。跑这三条会备份→改→还原该文件，若并发会话在同一窗口内也写它，我的还原就会**覆盖它的新改动 = 回退事故**（memory 明确记过这类事故）。fe 侧 14 条每条要跑 `vitest run e1 E1`（609 例 ≈ 30s），两遍共约 14 分钟，期间并发改动会让基线漂移、判定不可比。替代证据 = 只读的 `--check-anchors` 对**全部 29 条**逐行相同（它覆盖了 M09/M10/M29 的锚点定位），加上 be 子集的完整判定矩阵比对。
+
+#### 🔴 迁移过程暴露共享件一个真实缺陷：子集运行恒非零退出
+
+`--run M01,M02,...` 的判定矩阵 6/6 逐一相同，却 **RC=1**。追因：`cli.run_cli` 的退出码写成 `all_red and tally.is_complete(full_run)`，而 `is_complete(full_run=False)` 按设计返回 False（子集不做覆盖面结论）⇒ **子集运行永远返回 1**。后果是「只跑一条变异确认它还红」这个最常用动作在 CI 或脚本里恒失败。
+
+修法：覆盖面只在全量运行时参与退出码（`coverage_ok = tally.is_complete(True) if full_run else True`）。补两条守卫：`test_subset_run_exit_code_not_penalized_by_coverage`（子集全 RED 必返 0）与 `test_full_run_exit_code_still_requires_coverage`（**反向自检**：全量运行有缺口仍须非零，否则前一条会把覆盖面机制整个废掉）。冻结基线 63 → **65**（来源已在常量处注明）。
+
+这条缺陷**只有在真实迁移中用子集比对时才会暴露** —— Wave 3 的自举变异全程用 `--run all`，恒定走 full_run 分支。它印证了 Task 11 把范式基准放在迁移第一位的判断：第一个真实调用方就该由能力最全的那个脚本充当。

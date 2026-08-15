@@ -54,7 +54,9 @@ BE_ARGS = [
 ]
 
 #: 冻结基线（2026-08-15 亲测）。改这个数必须同时说明来源。
-BASELINE_BE_PASSED = 63
+#: 62 -> 63：M02 判 GREEN 后补 test_find_anchor_rejects_multiline_anchor。
+#: 63 -> 65：Task 11 迁移时暴露「子集运行恒非零退出」缺陷，补两条退出码守卫。
+BASELINE_BE_PASSED = 65
 
 MUTATIONS: list[Mutation] = [
     Mutation(

@@ -379,5 +379,11 @@ def run_cli(
     if left:
         print(f"[FATAL] 残留备份 {len(left)} 个，需手动 --restore")
         return 5
-    all_red = counts.get(RED) == len(results) and results
-    return 0 if (all_red and tally.is_complete(full_run)) else 1
+    # 🔴 覆盖面只在**全量运行**时参与退出码：子集运行（`--run M01,M02`）天然覆盖不全，
+    # 把 `is_complete(full_run=False)` 算进退出码会让子集运行**恒非零** —— 于是
+    # 「只跑一条变异确认它还红」这个最常用的动作在 CI 或脚本里永远失败。
+    # 该缺陷是 Task 11 迁移 e-cycle 时用 `--run M01,...` 做等价性比对才暴露的：
+    # 判定矩阵 6/6 逐一相同却 RC=1。
+    all_red = bool(results) and counts.get(RED) == len(results)
+    coverage_ok = tally.is_complete(True) if full_run else True
+    return 0 if (all_red and coverage_ok) else 1
