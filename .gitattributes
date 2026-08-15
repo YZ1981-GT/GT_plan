@@ -3,3 +3,10 @@
 # 带 CRLF 的 .sh 在 Git Bash / WSL / Linux 容器里会报 $'\r': command not found。
 # 仓库内全部 .sh 在 index 中本就是 LF，故此规则不产生行尾 churn，只保证 checkout 后仍是 LF。
 *.sh text eol=lf
+
+# git hook 脚本同样强制 LF（它们没有 .sh 后缀，上面那条管不到）。
+# 2026-08-12 实测：`.git-hooks/pre-commit` 与 `pre-push` 在 checkout 后是 CRLF，
+# 直接用 bash 跑会报 `$'\r': command not found` + `syntax error near unexpected token`
+# ⇒ hook 在 WSL / Linux / CI 上**完全不执行**（静默失去防护）。
+# Windows 上 git 自带的 MSYS bash 容忍 CRLF，故本机看不出问题 —— 这正是它能长期潜伏的原因。
+.git-hooks/* text eol=lf

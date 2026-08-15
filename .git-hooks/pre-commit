@@ -30,15 +30,37 @@ if [ -z "$PY" ]; then
     exit 0
 fi
 
-echo "[pre-commit] 执行文件行数门禁..."
-if ! "$PY" backend/scripts/check/check_file_size.py; then
+# 🔴 必须只传**暂存文件**（增量门禁），不能空参数调用。
+#
+# `check_file_size.py` 在 `args.files` 为空时走 `scan_default()` **全仓扫描** ——
+# 而全仓当前有 161 个预存在超限（`migration_runner.py` / `ai_models.py` /
+# `audit_platform_models.py` 等历史大文件未同步进 whitelist）⇒ 空参数调用必 exit 1
+# ⇒ **任何提交都被拒**（这正是本 hook 长期未被安装的原因）。
+#
+# 该脚本的形参注释写的就是「检查文件路径（pre-commit 传入）」、docstring 写
+# 「新加文件强制不超限（不在 whitelist 即检查）」—— 增量才是设计意图。
+# whitelist 文件的「膨胀 >5%」与 HARD_CAPS 防回弹在增量口径下**照常生效**
+# （本次触碰了才检查，正是防打磨倒退所需）。
+# 全仓欠账由 CI 的 `file-size-guard` job 负责暴露，不该阻塞本地提交。
+echo "[pre-commit] 执行文件行数门禁（仅暂存文件）..."
+SIZE_ARGS=()
+while IFS= read -r f; do
+    case "$f" in
+        *.py | *.vue | *.ts | *.tsx) SIZE_ARGS+=("$f") ;;
+    esac
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+if [ ${#SIZE_ARGS[@]} -eq 0 ]; then
+    echo "[pre-commit] ✅ 文件行数门禁通过（无匹配暂存文件）"
+elif ! "$PY" backend/scripts/check/check_file_size.py "${SIZE_ARGS[@]}"; then
     echo ""
     echo "[pre-commit] ❌ 文件行数超限/膨胀（见上方明细）"
     echo "          请拆分文件或抽伴生模块（优先），确有必要再更新 whitelist 基线"
     echo "          紧急救急：git commit --no-verify"
     exit 1
+else
+    echo "[pre-commit] ✅ 文件行数门禁通过（${#SIZE_ARGS[@]} 个暂存文件）"
 fi
-echo "[pre-commit] ✅ 文件行数门禁通过"
 
 # ── 3. UTF-8 完整性检查（暂存的 .vue/.ts/.py 文件）──
 echo "[pre-commit] 执行 UTF-8 完整性检查..."
