@@ -34,13 +34,24 @@ export interface I2SyncFromWorkpaperPayload {
   columns?: Record<string, ColumnDef[]>
 }
 
-// 研发投入按性质表（本期/上期 × 费用化/资本化），label 取自 I2TabDisclosureListed
+/**
+ * 研发支出按费用性质表 —— **两级表头**（源模板 `附注披露（上市公司）` B7:C7「本期发生额」/
+ * D7:E7「上期发生额」，B8~E8 各为「费用化金额」「资本化金额」；A7:A8 合并为「项  目」）。
+ *
+ * 🔴 禁止标 `flat: true`：`note_sub_table_projector._extract_column_groups` 的规则是
+ * 「任一列 flat=True → 整表返回 []」，push 路径的两级表头会被静默压扁成单级
+ * （命中「底稿→附注同步不得压扁列结构」铁律，与 D2 把 6 列压成 2 列同型）。
+ *
+ * key / label / group 与 `note_template_listed.json` §五、27「研发支出」逐字同构
+ * （seed 侧真源 = `backend/scripts/fix/fix_note_i_cycle_structure.py:_I2_NATURE_COLUMNS`），
+ * 保证 seed 快照与 push 快照落到同一列结构。
+ */
 const I2_NATURE_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '项  目', is_label: true, flat: true },
-  { key: '本期费用化金额', label: '本期费用化', format: 'amount', flat: true },
-  { key: '本期资本化金额', label: '本期资本化', format: 'amount', flat: true },
-  { key: '上期费用化金额', label: '上期费用化', format: 'amount', flat: true },
-  { key: '上期资本化金额', label: '上期资本化', format: 'amount', flat: true },
+  { key: '项目', label: '项  目', is_label: true },
+  { key: 'cur_expense', label: '费用化金额', group: '本期发生额', format: 'amount' },
+  { key: 'cur_capitalize', label: '资本化金额', group: '本期发生额', format: 'amount' },
+  { key: 'prior_expense', label: '费用化金额', group: '上期发生额', format: 'amount' },
+  { key: 'prior_capitalize', label: '资本化金额', group: '上期发生额', format: 'amount' },
 ]
 
 // 上市开发支出滚动表（两级表头扁平合并）
@@ -155,27 +166,36 @@ export function buildI2ListedMovementSubTable(rows: I2MovementRow[]): Record<str
   ]
 }
 
+/**
+ * 研发支出（按费用性质）子表。
+ *
+ * 🔴 行字段名必须与 `I2_NATURE_COLUMNS[].key` 逐字一致 —— 投影器按
+ * `r.get(column.key)` 取值，改一侧不改另一侧 ⇒ 整表值全空（表头在、数据没了）。
+ * 标签列键取 `项目`（模板同名），并同时写通用 `label` 供合计/兜底路径使用。
+ */
 export function buildI2ListedNatureSubTable(rows: I2NatureRow[]): Record<string, unknown>[] {
   const data = rows.filter((r) => !r.isTotal)
   const mapped = data
     .filter((r) => r.name || r.currentExpensed || r.currentCapitalized || r.priorExpensed || r.priorCapitalized)
     .map((r) => ({
+      项目: r.name,
       label: r.name,
-      本期费用化金额: r.currentExpensed,
-      本期资本化金额: r.currentCapitalized,
-      上期费用化金额: r.priorExpensed,
-      上期资本化金额: r.priorCapitalized,
+      cur_expense: r.currentExpensed,
+      cur_capitalize: r.currentCapitalized,
+      prior_expense: r.priorExpensed,
+      prior_capitalize: r.priorCapitalized,
       row_type: 'data' as const,
     }))
   const sum = summarizeNature(data)
   return [
     ...mapped,
     {
+      项目: '合计',
       label: '合计',
-      本期费用化金额: sum.currentExpensed,
-      本期资本化金额: sum.currentCapitalized,
-      上期费用化金额: sum.priorExpensed,
-      上期资本化金额: sum.priorCapitalized,
+      cur_expense: sum.currentExpensed,
+      cur_capitalize: sum.currentCapitalized,
+      prior_expense: sum.priorExpensed,
+      prior_capitalize: sum.priorCapitalized,
       is_total: true,
       row_type: 'total' as const,
     },

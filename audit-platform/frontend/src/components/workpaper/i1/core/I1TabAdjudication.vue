@@ -118,6 +118,17 @@
         </el-tag>
       </div>
       <div class="toolbar-right">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="fourTableSeeding"
+            data-testid="i1-pull-four-table"
+            @click="pullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <span class="chip-wrap"><GtIndexChip value="wp:I1-1" :context-project-id="projectId" /></span>
         <el-tag size="small" class="nav-chip" @click="navigateTo('I1-2')">I1-2 →</el-tag>
         <el-tag size="small" class="nav-chip" @click="navigateTo('I1-3')">I1-3 →</el-tag>
@@ -798,7 +809,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, onBeforeUnmount } from 'vue'
+import { inject, ref, computed, toRef, onMounted, onBeforeUnmount, type ComputedRef } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI1Adjudication, type I1BlockType, type I1AdjudicationRow, type I1NetValueRow } from '../../composables/useI1Adjudication'
 import { useI1CrossSheet } from '../../composables/useI1CrossSheet'
@@ -811,6 +822,15 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
+import { useICycleAdjudicationSeeding } from '../../composables/useICycleAdjudicationSeeding'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -891,6 +911,59 @@ const {
 )
 
 const publishing = ref(false)
+
+// ─── 从四表库带入未审数（消费 render 的 adjudication_prefill，按类别名匹配行） ───
+//
+// 🔴 改造前后端每次 render 都算并下发 `adjudication_prefill`（I1 走 category 模式：
+//    三段 × 11 类），而前端**零消费方** —— 与 H 循环踩过的 dead output 同型。
+//
+// 🔴 I1 是唯一的三段循环，`updateCell(block, rowId, field, value)` 是**四参**：
+//    三段的 rowKey+field 完全相同（都是 `unadjusted`），只有 block 能区分 ——
+//    漏传 block 会让后两段静默覆盖第一段。block 由 `blockOf` 给出
+//    （后端段键 `amortization` → 前端 `amort` 的翻译在 iCycleAdjudicationSeed 里）。
+const I1_SEED_BLOCK_ROWS: Record<string, ComputedRef<I1AdjudicationRow[]>> = {
+  cost: costRows,
+  amort: amortRows,
+  impairment: impairmentRows,
+}
+
+/** 三段行合并成 seed 的行集；跳过小计行（不该被带入覆盖） */
+const i1SeedRows = computed(() => {
+  const out: Array<{ rowId: string; label: string }> = []
+  for (const list of Object.values(I1_SEED_BLOCK_ROWS)) {
+    for (const r of list.value) {
+      if (r.isSubtotal) continue
+      out.push({ rowId: r.rowId, label: String(r.category ?? '') })
+    }
+  }
+  return out
+})
+
+const {
+  seeding: fourTableSeeding,
+  hasPrefill: hasFourTablePrefill,
+  hint: fourTableHint,
+  pullFromFourTable,
+} = useICycleAdjudicationSeeding({
+  wpCode: 'I1',
+  htmlData: computed(() => props.htmlData),
+  rows: i1SeedRows,
+  isReadonly: computed(() => Boolean(props.isReadonly)),
+  // 读值须按 block 定位 —— 三段行键在各自数组内唯一，但跨段可能重名
+  readCell: (cell) => {
+    for (const list of Object.values(I1_SEED_BLOCK_ROWS)) {
+      const row = list.value.find((r) => r.rowId === cell.rowKey)
+      if (!row) continue
+      const v = (row as unknown as Record<string, unknown>)[cell.field]
+      return v == null || v === 0 ? null : Number(v)
+    }
+    return null
+  },
+  applyCell: (cell, block) => {
+    if (!block) return // 段键反查失败 ⇒ 不猜 block（宁缺勿造，避免写错段）
+    updateCell(block as I1BlockType, cell.rowKey, cell.field as keyof I1AdjudicationRow, cell.amount)
+  },
+})
 
 // ─── 从集中登记带入调整（三科目：1701原值[资产借方] / 1702累计摊销[备抵credit] / 1703减值准备[备抵credit]；带入期末 AJE/RJE） ───
 const bringInCostRows = computed(() =>
@@ -1234,9 +1307,7 @@ function navigateTo(wpCode: string): void {
 // ─── Amount Formatter ────────────────────────────────────────────────────────
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null) return '-'
-  if (Math.abs(value) < 0.005) return '-'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 
 function fmtPct(rate: number | null | undefined): string {

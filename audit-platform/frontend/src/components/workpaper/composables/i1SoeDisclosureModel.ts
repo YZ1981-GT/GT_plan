@@ -59,6 +59,13 @@ export interface I1SoeMoveAmounts {
 
 export interface I1SoeCategoryMove extends I1SoeMoveAmounts {
   key: string
+  /**
+   * 自定义类别的中文名（默认 12 类不带，label 取自 `I1_SOE_CATEGORIES`）。
+   * 🔴 源模板四层末各一个 `……` 可扩位（原价/累计摊销/减值/账面价值），
+   * 审计师增行时把名字存在这里，随 layers 数据一起持久化 —— 类别集因此
+   * 从数据派生而非写死常量，稳定 key 不复用已删序号（Task 13 / Property 21·23）。
+   */
+  label?: string
 }
 
 export interface I1SoeLayerBlock {
@@ -105,13 +112,16 @@ export function recomputeI1SoeDerivedLayers(layers: I1SoeLayerBlock[]): I1SoeLay
   const impair = byLayer.get('impair')
   if (!cost || !amort) return layers
 
-  const carryingCats: I1SoeCategoryMove[] = I1_SOE_CATEGORIES.map((c) => {
+  // 类别集从数据派生（默认 12 类 + 自定义），使自定义类别在账面价值层也联动
+  const effectiveCats = resolveI1SoeCategories(layers)
+  const carryingCats: I1SoeCategoryMove[] = effectiveCats.map((c) => {
     const cc = cost.categories.find((x) => x.key === c.key) || emptyMove(c.key)
     const ac = amort.categories.find((x) => x.key === c.key) || emptyMove(c.key)
     const ic = impair?.categories.find((x) => x.key === c.key) || emptyMove(c.key)
     const begin = num(cc.begin) - num(ac.begin) - num(ic.begin)
     const end = resolveCategoryEnd(cc, false) - resolveCategoryEnd(ac, false) - resolveCategoryEnd(ic, false)
-    return { key: c.key, begin, increase: 0, decrease: 0, end }
+    const label = _SOE_DEFAULT_LABEL.get(c.key) ? undefined : c.label
+    return { key: c.key, label, begin, increase: 0, decrease: 0, end }
   })
 
   return layers.map((l) => {
@@ -162,7 +172,7 @@ export function flattenI1SoeMovement(layers: I1SoeLayerBlock[]): Array<{
       end: tot.end,
       allNa: false,
     })
-    for (const cat of I1_SOE_CATEGORIES) {
+    for (const cat of resolveI1SoeCategories(layers)) {
       const m = block.categories.find((c) => c.key === cat.key) || emptyMove(cat.key)
       out.push({
         layer: block.layer,
@@ -216,4 +226,120 @@ export interface I1SoeSyncSnapshot {
   noteSale: string
   noteTitle: string
   amortAlloc?: import('./i1DisclosureEnhance').I1AmortAllocSummary
+}
+
+// ── 动态可扩类别（Task 13 / R7.1 国企四层末 `……` 可扩位）───────────────────
+//
+// 🔴 源模板国企披露 sheet 每层（原价/累计摊销/减值/账面价值）末尾各有一个 `……`
+// 可扩位。国企版类别是「跨四层共享」的（同一类别在四层都出现），故自定义类别
+// 通过 `I1SoeCategoryMove.label` 随数据携带（default 12 类的 label 仍取自
+// `I1_SOE_CATEGORIES` 常量，自定义类别的 label 存在数据里）。
+//
+// key 用单调计数器 `soe_custom_${seq}`，**不复用已删序号**（撞键会让旧数据串台，
+// H7 已踩）；seq = max(现有全部 custom seq, 0) + 1。
+
+const _SOE_DEFAULT_KEYS = new Set(I1_SOE_CATEGORIES.map((c) => c.key))
+const _SOE_CUSTOM_KEY_RE = /^soe_custom_(\d+)$/
+
+/** default 类别 key → label（自定义类别不在此表，label 随数据） */
+const _SOE_DEFAULT_LABEL = new Map(I1_SOE_CATEGORIES.map((c) => [c.key, c.label]))
+
+/**
+ * 从 layers 数据派生「有效类别序列」= 默认 12 类 + 数据里出现的自定义类别（按 seq 升序）。
+ *
+ * 自定义类别的 label 取自任一层该 key 的 move.label（首个非空）。渲染 / flatten /
+ * recompute 全部改用本函数，不再直接遍历 `I1_SOE_CATEGORIES`，这样自定义类别一处新增
+ * 即在四层同时出现。
+ */
+export function resolveI1SoeCategories(
+  layers: I1SoeLayerBlock[],
+): Array<{ key: string; label: string; removable: boolean }> {
+  const out = I1_SOE_CATEGORIES.map((c) => ({ key: c.key, label: c.label, removable: c.key !== 'other' }))
+  const seen = new Set(_SOE_DEFAULT_KEYS)
+  const customs: Array<{ key: string; label: string; seq: number }> = []
+  for (const block of layers) {
+    for (const m of block.categories) {
+      if (seen.has(m.key)) continue
+      const mm = _SOE_CUSTOM_KEY_RE.exec(m.key)
+      if (!mm) continue
+      seen.add(m.key)
+      customs.push({ key: m.key, label: String(m.label || m.key), seq: Number(mm[1]) })
+    }
+  }
+  customs.sort((a, b) => a.seq - b.seq)
+  for (const c of customs) out.push({ key: c.key, label: c.label, removable: true })
+  return out
+}
+
+/** 数据里现存自定义类别的最大 seq（0 = 无自定义类别）。 */
+export function maxI1SoeCustomSeq(layers: I1SoeLayerBlock[]): number {
+  let maxSeq = 0
+  for (const block of layers) {
+    for (const m of block.categories) {
+      const mm = _SOE_CUSTOM_KEY_RE.exec(m.key)
+      if (mm) maxSeq = Math.max(maxSeq, Number(mm[1]))
+    }
+  }
+  return maxSeq
+}
+
+/**
+ * 下一个自定义类别 key（单调计数器，**不复用已删序号**）。
+ *
+ * 🔴 只看「数据里现存最大 seq」会在删掉最大号后回退、下一个 key 复用已删序号
+ * （撞键 → 旧持久化数据串台，H7 已踩）。故传入 `seqFloor` = 持久化的单调计数器，
+ * key = `max(现存最大, seqFloor) + 1`。调用方（composable）负责持久化该计数器。
+ */
+export function nextI1SoeCustomKey(layers: I1SoeLayerBlock[], seqFloor = 0): string {
+  const next = Math.max(maxI1SoeCustomSeq(layers), seqFloor) + 1
+  return `soe_custom_${next}`
+}
+
+/**
+ * 在四层同时新增一个自定义类别（撞名拒绝 → 返回 null）。
+ *
+ * @param label 用户输入的类别名（已 trim；空或与现有 label 撞名则拒绝）
+ * @param seqFloor 持久化单调计数器，防复用已删序号（见 `nextI1SoeCustomKey`）
+ * @returns `{ layers, key, seq }` 或 null；调用方据 `seq` 回写持久化计数器
+ */
+export function addI1SoeCategory(
+  layers: I1SoeLayerBlock[],
+  label: string,
+  seqFloor = 0,
+): { layers: I1SoeLayerBlock[]; key: string; seq: number } | null {
+  const trimmed = (label || '').trim()
+  if (!trimmed) return null
+  // 撞名检测：默认类别 label + 已有自定义类别 label
+  const existingLabels = new Set<string>(resolveI1SoeCategories(layers).map((c) => c.label))
+  if (existingLabels.has(trimmed)) return null
+  const key = nextI1SoeCustomKey(layers, seqFloor)
+  const seq = Number(_SOE_CUSTOM_KEY_RE.exec(key)![1])
+  const next = layers.map((block) => ({
+    ...block,
+    categories: [...block.categories, { key, label: trimmed, begin: 0, increase: 0, decrease: 0, end: 0 }],
+  }))
+  return { layers: next, key, seq }
+}
+
+/** 从四层同时删除一个自定义类别（默认类别不可删 → 返回 null）。 */
+export function removeI1SoeCategory(
+  layers: I1SoeLayerBlock[],
+  key: string,
+): I1SoeLayerBlock[] | null {
+  if (_SOE_DEFAULT_KEYS.has(key) || !_SOE_CUSTOM_KEY_RE.test(key)) return null
+  return layers.map((block) => ({
+    ...block,
+    categories: block.categories.filter((c) => c.key !== key),
+  }))
+}
+
+/** 某 key 的展示 label（默认类别取常量，自定义取数据里的 label）。 */
+export function i1SoeCategoryLabel(key: string, layers: I1SoeLayerBlock[]): string {
+  const def = _SOE_DEFAULT_LABEL.get(key)
+  if (def) return def
+  for (const block of layers) {
+    const m = block.categories.find((c) => c.key === key)
+    if (m && m.label) return String(m.label)
+  }
+  return key
 }

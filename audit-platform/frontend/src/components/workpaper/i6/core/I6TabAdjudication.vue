@@ -99,6 +99,17 @@
           <GtIndexChip v-if="discVis.soe" value="Note:八、67" :context-project-id="projectId" />
         </div>
         <div class="toolbar-right">
+          <el-tooltip :content="fourTableHint" placement="top">
+            <el-button
+              size="small"
+              :disabled="isReadonly || !hasFourTablePrefill"
+              :loading="fourTableSeeding"
+              data-testid="i6-pull-four-table"
+              @click="pullFromFourTable"
+            >
+              从四表库带入未审数
+            </el-button>
+          </el-tooltip>
           <span class="chip-wrap"><GtIndexChip value="wp:I6-1" :context-project-id="projectId" /></span>
           <span
             v-if="!linkagePanel.i2DataReady"
@@ -290,6 +301,21 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
+import {
+  iCycleAccountCode,
+  iCycleQueryCodes,
+  iCycleSpec,
+} from '../../composables/iCycleAccountScope'
+import { useICycleAdjudicationSeeding } from '../../composables/useICycleAdjudicationSeeding'
+import { iCycleSeedSpec } from '../../composables/iCycleAdjudicationSeed'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   wpId: string
@@ -325,7 +351,49 @@ const tbUnadjusted = adj.tbUnadjusted
 const tbDifference = adj.tbDifference
 const detailCrossValidation = adj.detailCrossValidation
 
-// ─── 从集中登记带入调整（6602 研发费用，损益借方；带入本期 AJE/RJE） ───
+// ─── 从四表库带入未审数（消费 render 的 adjudication_prefill，按费用类别名匹配行） ───
+//
+// 🔴 改造前后端每次 render 都算并下发 `adjudication_prefill`，前端**零消费方**。
+// 🔴 I6 是损益类：后端按 `mode='occurrence'` 取**本期发生额**（非余额），
+//    落到本表的 `本期未审` 列。行标签与列字段**都是中文**（该 composable 的行模型如此），
+//    被守卫与 `iCycleSeedSpec('I6')` 交叉锁死 —— 英文化会让写入静默失效。
+const i6SeedLabelField = iCycleSeedSpec('I6')?.labelField ?? '类别'
+const i6SeedRows = computed(() =>
+  adj.rows.value.map((r) => ({
+    rowId: r.rowId,
+    label: String((r as unknown as Record<string, unknown>)[i6SeedLabelField] ?? ''),
+  })),
+)
+const {
+  seeding: fourTableSeeding,
+  hasPrefill: hasFourTablePrefill,
+  hint: fourTableHint,
+  pullFromFourTable,
+} = useICycleAdjudicationSeeding({
+  wpCode: 'I6',
+  htmlData: computed(() => props.htmlData),
+  rows: i6SeedRows,
+  isReadonly: computed(() => Boolean(props.isReadonly)),
+  readCell: (cell) => {
+    const row = adj.rows.value.find((r) => r.rowId === cell.rowKey)
+    if (!row) return null
+    const v = (row as unknown as Record<string, unknown>)[cell.field]
+    return v == null || v === 0 ? null : Number(v)
+  },
+  applyCell: (cell) => adj.updateCell(cell.rowKey, cell.field as never, cell.amount),
+})
+
+// ─── 从集中登记带入调整（研发费用，损益借方；带入本期 AJE/RJE） ───
+//
+// 🔴 科目码走 `iCycleAccountScope` 单一真源（render 下发的 tb_source_codes 优先、
+//    常量仅兜底），**禁止硬编码字面量** —— 改造前写死 '6602'（管理费用）导致
+//    拉不到研发费用的调整分录、且 substantive:adjudicated 载荷带错码使附注失联。
+const i6AccountCodes = computed(() => iCycleQueryCodes(tbSourceCodes.value, 'I6'))
+const i6AccountCode = computed(() => iCycleAccountCode(tbSourceCodes.value, 'I6'))
+const i6SubjectLabel = computed(() => {
+  const name = iCycleSpec('I6')?.accountName || '研发费用'
+  return i6AccountCode.value ? `${name}(${i6AccountCode.value})` : name
+})
 const bringInRows = computed(() =>
   adj.rows.value.map((r) => ({ rowKey: r.rowId, name: r.类别, aje: r.本期AJE, rje: r.本期RJE })),
 )
@@ -338,11 +406,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '6602',
+  subjectPrefix: i6AccountCodes as any,
   direction: 'debit',
-  subjectCode: '6602',
+  subjectCode: i6AccountCode as any,
   wpCode: 'I6',
-  subjectLabel: '研发费用(6602)',
+  subjectLabel: i6SubjectLabel as any,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) =>
     adj.updateCell(rowKey, field === 'rje' ? '本期RJE' : '本期AJE', value),
@@ -405,9 +473,7 @@ function handleApplyNoteDraft(): void {
 }
 
 function fmtAmount(v: number | null | undefined): string {
-  if (v == null) return '-'
-  if (Math.abs(v) < 0.005) return '-'
-  return v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(v)
 }
 
 function fmtRate(rate: number | null | undefined): string {

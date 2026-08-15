@@ -29,6 +29,17 @@
 
     <div class="tab-toolbar">
       <div class="toolbar-right">
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="fourTableSeeding"
+            data-testid="i5-pull-four-table"
+            @click="pullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <GtIndexChip value="wp:I5-1" :context-project-id="projectId" />
         <el-tag size="small" type="info">{{ rows.length }} 个项目</el-tag>
         <el-tag size="small" type="success">审定 {{ fmtAmount(subtotals.audited) }}</el-tag>
@@ -471,6 +482,22 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
+import {
+  iCycleAccountCode,
+  iCycleQueryCodes,
+  iCycleAccountAbsent,
+  iCycleSpec,
+} from '../../composables/iCycleAccountScope'
+import { useICycleAdjudicationSeeding } from '../../composables/useICycleAdjudicationSeeding'
+import { iCycleSeedSpec } from '../../composables/iCycleAdjudicationSeed'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   wpId: string
@@ -533,7 +560,48 @@ const {
   },
 )
 
-// ─── 从集中登记带入调整（1911 其他非流动资产，资产借方；带入 AJE/RJE） ───
+// ─── 从四表库带入未审数（消费 render 的 adjudication_prefill，按项目名匹配行） ───
+//
+// 🔴 改造前后端每次 render 都算并下发 `adjudication_prefill`，前端**零消费方**。
+// 🔴 I5 的 `1911` 全库两张科目表都不存在 ⇒ 该段通常进 `absentSlots`，
+//    按钮禁用 + tooltip 如实说明「本项目无此科目」，**绝不填 0**。
+const i5SeedLabelField = iCycleSeedSpec('I5')?.labelField ?? 'projectName'
+const i5SeedRows = computed(() =>
+  rows.value.map((r) => ({
+    rowId: r.rowId,
+    label: String((r as unknown as Record<string, unknown>)[i5SeedLabelField] ?? ''),
+  })),
+)
+const {
+  seeding: fourTableSeeding,
+  hasPrefill: hasFourTablePrefill,
+  hint: fourTableHint,
+  pullFromFourTable,
+} = useICycleAdjudicationSeeding({
+  wpCode: 'I5',
+  htmlData: computed(() => props.htmlData),
+  rows: i5SeedRows,
+  isReadonly: computed(() => Boolean(props.isReadonly)),
+  readCell: (cell) => {
+    const row = rows.value.find((r) => r.rowId === cell.rowKey)
+    if (!row) return null
+    const v = (row as unknown as Record<string, unknown>)[cell.field]
+    return v == null || v === 0 ? null : Number(v)
+  },
+  applyCell: (cell) => updateCell(cell.rowKey, cell.field as never, cell.amount),
+})
+
+// ─── 从集中登记带入调整（其他非流动资产，资产借方；带入 AJE/RJE） ───
+// 🔴 科目码走 iCycleAccountScope 单一真源：render 下发 tb_source_codes 优先，
+//    未下发时回退段兜底码。I5 的兜底码是**空**（`1911` 全库两张科目表都不存在，
+//    宁缺勿造）⇒ 此处可能返空串，属正确行为，界面据 i5AccountAbsent 提示。
+const i5QueryCodes = computed(() => iCycleQueryCodes(tbSourceCodes.value, 'I5'))
+const i5AccountCode = computed(() => iCycleAccountCode(tbSourceCodes.value, 'I5'))
+const i5AccountAbsent = computed(() => iCycleAccountAbsent(tbSourceCodes.value, 'I5'))
+const i5AccountLabel = computed(() => {
+  const name = iCycleSpec('I5')?.accountName || '其他非流动资产'
+  return i5AccountCode.value ? `${name}(${i5AccountCode.value})` : name
+})
 const bringInRows = computed(() =>
   rows.value.map((r) => ({ rowKey: r.rowId, name: r.projectName, aje: r.aje, rje: r.rje })),
 )
@@ -546,11 +614,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1911',
+  subjectPrefix: i5QueryCodes as any,
   direction: 'debit',
-  subjectCode: '1911',
+  subjectCode: i5AccountCode as any,
   wpCode: 'I5',
-  subjectLabel: '其他非流动资产(1911)',
+  subjectLabel: i5AccountLabel as any,
   rows: bringInRows,
   updateCell: (rowKey: string, field: any, value: number) => updateCell(rowKey, field, value),
   totalAudited: () => subtotals.value.audited,
@@ -681,9 +749,7 @@ onUnmounted(() => {
 })
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null) return '-'
-  if (Math.abs(value) < 0.005) return '-'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 </script>
 

@@ -37,6 +37,17 @@
           {{ Math.abs(tbDifference) > 0.01 ? `TB差异 ${fmtAmount(tbDifference)}` : '✓ TB一致' }}
         </el-tag>
         <el-tag v-if="crossCheck.hasWarning" size="small" type="warning">与明细勾稽差异</el-tag>
+        <el-tooltip :content="fourTableHint" placement="top">
+          <el-button
+            size="small"
+            :disabled="isReadonly || !hasFourTablePrefill"
+            :loading="fourTableSeeding"
+            data-testid="i4-pull-four-table"
+            @click="pullFromFourTable"
+          >
+            从四表库带入未审数
+          </el-button>
+        </el-tooltip>
         <el-button size="small" @click="navigateTo('I4-2')">I4-2 →</el-button>
         <el-button size="small" @click="navigateTo('I4-3')">I4-3 →</el-button>
         <el-button size="small" @click="navigateTo('I4-6')">I4-6 →</el-button>
@@ -441,6 +452,16 @@ import GtIndexChip from '../../GtIndexChip.vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
+import { useICycleAdjudicationSeeding } from '../../composables/useICycleAdjudicationSeeding'
+import { iCycleSeedSpec } from '../../composables/iCycleAdjudicationSeed'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   wpId: string
@@ -499,6 +520,39 @@ const {
     onSave: (itemId: string, value: any) => emit('save', itemId, value),
   },
 )
+
+// ─── 从四表库带入未审数（消费 render 的 adjudication_prefill，按科目名匹配行） ───
+//
+// 🔴 改造前后端每次 render 都算并下发 `adjudication_prefill`，而前端**零消费方**
+//    （六个 I 宿主全 MISS）—— 与 H 循环踩过的 dead output 同型。本块补上消费侧。
+// 口径：手工优先（冲突进确认框）/ 幂等（值相同不写）/「无此科目 ≠ 为 0」/ 未命中不兜底。
+const i4SeedLabelField = iCycleSeedSpec('I4')?.labelField ?? 'projectName'
+const i4SeedRows = computed(() =>
+  rows.value.map((r) => ({
+    rowId: r.rowId,
+    label: String((r as unknown as Record<string, unknown>)[i4SeedLabelField] ?? ''),
+  })),
+)
+const {
+  seeding: fourTableSeeding,
+  hasPrefill: hasFourTablePrefill,
+  hint: fourTableHint,
+  pullFromFourTable,
+} = useICycleAdjudicationSeeding({
+  wpCode: 'I4',
+  htmlData: computed(() => props.htmlData),
+  rows: i4SeedRows,
+  isReadonly: computed(() => Boolean(props.isReadonly)),
+  // 🔴 `0` 视为未填：I4 新建行的未审数初始化为 0，若把 0 当「已录入」则带入对新行完全无效
+  readCell: (cell) => {
+    const row = rows.value.find((r) => r.rowId === cell.rowKey)
+    if (!row) return null
+    const v = (row as unknown as Record<string, unknown>)[cell.field]
+    return v == null || v === 0 ? null : Number(v)
+  },
+  // I4 是单段循环 ⇒ block 恒 undefined，用三参 updateCell
+  applyCell: (cell) => updateCell(cell.rowKey, cell.field as never, cell.amount),
+})
 
 // ─── 从集中登记带入调整（1801 长期待摊费用，资产借方；带入 AJE/RJE） ───
 const bringInRows = computed(() =>
@@ -580,9 +634,7 @@ function navigateTo(wpCode: string): void {
 }
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null) return '-'
-  if (Math.abs(value) < 0.005) return '-'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 </script>
 

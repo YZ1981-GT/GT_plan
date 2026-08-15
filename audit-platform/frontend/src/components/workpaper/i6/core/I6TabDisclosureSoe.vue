@@ -154,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onBeforeUnmount, watch } from 'vue'
+import { inject, computed, ref, onBeforeUnmount, watch } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
@@ -162,6 +162,7 @@ import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI6Disclosure, type I6DisclosureRow } from '../../composables/useI6Disclosure'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 
 const props = defineProps<{
   wpId: string
@@ -174,7 +175,9 @@ const props = defineProps<{
 const emit = defineEmits<{ 'save': [itemId: string, value: any] }>()
 
 const router = useRouter()
-const displayPrefs = useDisplayPrefsStore()
+// 🔴 inject 分支让宿主 provide 的偏好优先于全局 store；
+//    必须 setup 顶层（写进函数体静默失效）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {
   const route = buildNoteJumpRoute(props.projectId || '', 'I6', target)

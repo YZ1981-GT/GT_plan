@@ -1,9 +1,17 @@
 /**
  * I 循环（I1~I6）披露子表 ↔ note_template 契约测试
  *
- * 接入共享 helper P1~P6，`columnsPending` 为空（Wave 4 已补齐）。
+ * 接入共享 helper P1~P6，`columnsPending` 为空（12 张表全部真校验）。
+ *
+ * 🔴 **columns 必须来自生产载荷，禁止在本文件手写副本**（Task 15 实测踩到的假绿）：
+ * 原先 I1 国企传的是本文件里手抄的 `I1_SOE_COLUMNS`，与生产
+ * `i1DisclosureSyncPayload.I1_SOE_COLUMNS` 有三处分叉（标签列 key `label` vs 模板
+ * 的 `项目`、label 半角 `项目` vs 模板全角 `项  目`、生产侧整表缺 `flat` 表态），
+ * 于是 P3/P5 对着手抄件恒绿、真正推给附注的列结构却违约 —— 表现为附注两级表头被
+ * `_infer_groups_from_headers` 凭空反猜。故一律 `import` 生产常量 / 调 `build*Payloads`。
  *
  * Spec: i-cycle-four-table-extraction-and-disclosure-alignment Task 5.6
+ *       + i-cycle-extraction-formula-and-disclosure-closure Task 15
  */
 import { describe, it, expect } from 'vitest'
 import { runDisclosureSubtableContract } from './_disclosureSubtableContract.helper'
@@ -15,7 +23,11 @@ import {
   I1_SOE_SUBTABLE,
   I1_LEGACY_OBSOLETE_TABLES,
 } from '../i1NoteSectionMap'
-import { buildI1ListedColumns, buildI1ListedSyncPayloads } from '../i1DisclosureSyncPayload'
+import {
+  buildI1ListedColumns,
+  buildI1ListedSyncPayloads,
+  I1_SOE_COLUMNS,
+} from '../i1DisclosureSyncPayload'
 
 // ── I2 开发支出 ──────────────────────────────────────────────────
 import {
@@ -83,17 +95,6 @@ const i1ListedCols = buildI1ListedColumns({
   ],
 } as any)
 
-// I1 SOE: 只有 movement 表在模板里有 columns
-const I1_SOE_COLUMNS: Record<string, any[]> = {
-  [I1_SOE_SUBTABLE.movement]: [
-    { key: 'label', label: '项  目', is_label: true, flat: true },
-    { key: 'begin', label: '期初余额', format: 'amount', flat: true },
-    { key: 'increase', label: '本期增加', format: 'amount', flat: true },
-    { key: 'decrease', label: '本期减少', format: 'amount', flat: true },
-    { key: 'end', label: '期末余额', format: 'amount', flat: true },
-  ],
-}
-
 runDisclosureSubtableContract({
   cycle: 'I1',
   variants: [
@@ -102,19 +103,15 @@ runDisclosureSubtableContract({
       section: I1_NOTE_SECTION.listed,
       subtables: I1_LISTED_SUBTABLE,
       columns: i1ListedCols,
-      // 表1「无形资产情况」的 columns 由前端动态类别生成，模板侧无 columns 定义
-      columnsPending: {
-        [I1_LISTED_SUBTABLE.movement]: '列转置由前端动态类别生成，模板 columns=0',
-      },
     },
     {
       variant: 'soe',
       section: I1_NOTE_SECTION.soe,
       subtables: I1_SOE_SUBTABLE,
+      // 🔴 必须用生产代码导出的常量，禁止在 spec 里手写一份副本：
+      //    副本曾与生产值三处分叉（标签列 key `label`↔`项目`、label 半角↔全角、
+      //    生产侧整表漏 `flat`），P3/P5 因此对生产代码长期空转（Task 15 实测）。
       columns: I1_SOE_COLUMNS,
-      columnsPending: {
-        [I1_SOE_SUBTABLE.dataResource]: '列转置结构复杂（H7 式），同步载荷暂不推送',
-      },
     },
   ],
 })
@@ -158,10 +155,6 @@ runDisclosureSubtableContract({
       section: I3_NOTE_SECTION.listed,
       subtables: I3_LISTED_SUBTABLE,
       columns: i3ListedPayload[0]?.columns ?? {},
-      // 表3「商誉减值测试关键假设」模板 headers[0] 是示例数据非列头（动态结构）
-      columnsPending: {
-        [I3_LISTED_SUBTABLE.assumptions]: '模板 headers[0] 为示例数据残留，非标签列头',
-      },
     },
     {
       variant: 'soe',

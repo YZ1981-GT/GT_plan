@@ -54,40 +54,57 @@
       <template #header>
         <div class="block-title">
           <span>① 研发投入按性质（本期/上期 × 费用化/资本化）</span>
-          <el-button size="small" plain :disabled="isReadonly" @click="addNatureRow">+ 行</el-button>
+          <el-button size="small" plain :disabled="isReadonly" @click="handleAddNatureRow">+ 费用性质</el-button>
         </div>
       </template>
       <p class="hint">应披露本期及上期发生额，并分别列示费用化金额和资本化金额（15号文第二十六条）。</p>
+      <p class="hint">源模板固定 6 类（人工费/材料费/水电燃气费/折旧费/无形资产摊销/外购在研项目）不可删；「+ 费用性质」对应源表可扩位，需先命名。</p>
       <el-table :data="natureRows" border size="small" max-height="320" show-summary :summary-method="natureSummaryMethod">
         <el-table-column type="index" width="40" />
-        <el-table-column label="项目" min-width="140">
+        <el-table-column label="项  目" min-width="140">
           <template #default="{ row }">
             <el-input v-if="!isReadonly" v-model="row.name" size="small" />
             <span v-else>{{ row.name }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="本期费用化" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" v-model="row.currentExpensed" :disabled="isReadonly" />
-            <span v-else>{{ fmtNum(row.currentExpensed) }}</span>
-          </template>
+        <el-table-column label="本期发生额" align="center">
+          <el-table-column label="费用化金额" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" v-model="row.currentExpensed" :disabled="isReadonly" />
+              <span v-else>{{ fmtNum(row.currentExpensed) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="资本化金额" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" v-model="row.currentCapitalized" :disabled="isReadonly" />
+              <span v-else>{{ fmtNum(row.currentCapitalized) }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="本期资本化" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" v-model="row.currentCapitalized" :disabled="isReadonly" />
-            <span v-else>{{ fmtNum(row.currentCapitalized) }}</span>
-          </template>
+        <el-table-column label="上期发生额" align="center">
+          <el-table-column label="费用化金额" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" v-model="row.priorExpensed" :disabled="isReadonly" />
+              <span v-else>{{ fmtNum(row.priorExpensed) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="资本化金额" width="120" align="right">
+            <template #default="{ row }">
+              <WpAmountInput v-if="!isReadonly" v-model="row.priorCapitalized" :disabled="isReadonly" />
+              <span v-else>{{ fmtNum(row.priorCapitalized) }}</span>
+            </template>
+          </el-table-column>
         </el-table-column>
-        <el-table-column label="上期费用化" width="120" align="right">
+        <el-table-column label="操作" width="64" align="center">
           <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" v-model="row.priorExpensed" :disabled="isReadonly" />
-            <span v-else>{{ fmtNum(row.priorExpensed) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="上期资本化" width="120" align="right">
-          <template #default="{ row }">
-            <WpAmountInput v-if="!isReadonly" v-model="row.priorCapitalized" :disabled="isReadonly" />
-            <span v-else>{{ fmtNum(row.priorCapitalized) }}</span>
+            <el-button
+              v-if="!isReadonly && !isI2NatureDefaultRow(row)"
+              size="small"
+              type="danger"
+              link
+              @click="handleRemoveNatureRow(row)"
+            >删</el-button>
+            <span v-else class="muted">—</span>
           </template>
         </el-table-column>
       </el-table>
@@ -289,11 +306,12 @@
 
 <script setup lang="ts">
 import { ref, toRef, inject, watch, onBeforeUnmount } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI2Disclosure } from '../../composables/useI2Disclosure'
+import { isI2NatureDefaultRow, type I2NatureRow } from '../../composables/i2DisclosureModel'
 import { buildI2ListedSyncPayloads } from '../../composables/i2DisclosureSyncPayload'
 import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
@@ -336,9 +354,48 @@ const {
   noteText, noteCap, noteImpairTest, notePurchased,
   auditNote, auditConclusion,
   natureSummary, movementSummary, natureVsMovementDiff, noteTarget,
-  addNatureRow, addMovementRow, addImportantRow, addImpairmentRow,
+  addNatureRow, removeNatureRow, addMovementRow, addImportantRow, addImpairmentRow,
   onMovementChange, autoFillFromSources, getListedSnapshot, persistAll,
 } = disc
+
+/**
+ * 增行前必先命名（平台底稿交互铁律：动态行新增需命名的必须先 prompt）。
+ * 对齐源模板 `附注披露（上市公司）!A15 = ……` 唯一可扩位；撞名由
+ * `addI2NatureRow` 纯函数判定并返回 false，此处只负责提示。
+ */
+async function handleAddNatureRow(): Promise<void> {
+  if (props.isReadonly) return
+  let name = ''
+  try {
+    const { value } = await ElMessageBox.prompt('请输入费用性质名称', '新增费用性质', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      inputPlaceholder: '如：委外研发费、专利申请费',
+      inputValidator: (v: string) => (String(v ?? '').trim() ? true : '名称不能为空'),
+    })
+    name = String(value ?? '').trim()
+  } catch {
+    return // 用户取消
+  }
+  if (!addNatureRow(name)) {
+    ElMessage.warning(`「${name}」与源模板固定类别或已有行重名，请换一个名称`)
+    return
+  }
+  ElMessage.success(`已新增费用性质「${name}」`)
+}
+
+async function handleRemoveNatureRow(row: I2NatureRow): Promise<void> {
+  if (props.isReadonly) return
+  if (isI2NatureDefaultRow(row)) {
+    ElMessage.warning('源模板固定的 6 类费用性质不可删除')
+    return
+  }
+  if (!removeNatureRow(row.rowId)) {
+    ElMessage.warning('该行不可删除')
+    return
+  }
+  ElMessage.success('已删除')
+}
 
 function handleAutoFill() {
   const r = autoFillFromSources() as { ok: boolean; message: string; unmatched?: string[] }
@@ -416,13 +473,19 @@ function fmtNum(v: number): string {
 }
 
 function natureSummaryMethod({ columns }: { columns: { label?: string }[] }) {
+  const s = natureSummary.value
+  // 🔴 两级表头下四个金额列的叶子 label 重复（「费用化金额」「资本化金额」各出现两次），
+  // 无法按 label 唯一匹配 ⇒ 按出现次序取值（源模板列序：本期费用化/本期资本化/上期费用化/上期资本化）。
+  const ordered = [s.currentExpensed, s.currentCapitalized, s.priorExpensed, s.priorCapitalized]
+  let seen = 0
   return columns.map((col, i) => {
     if (i === 0) return '合计'
     const l = col.label || ''
-    if (l.includes('本期费用化')) return fmtNum(natureSummary.value.currentExpensed)
-    if (l.includes('本期资本化')) return fmtNum(natureSummary.value.currentCapitalized)
-    if (l.includes('上期费用化')) return fmtNum(natureSummary.value.priorExpensed)
-    if (l.includes('上期资本化')) return fmtNum(natureSummary.value.priorCapitalized)
+    if (l === '费用化金额' || l === '资本化金额') {
+      const v = ordered[seen]
+      seen += 1
+      return v == null ? '' : fmtNum(v)
+    }
     return ''
   })
 }
@@ -461,6 +524,7 @@ onBeforeUnmount(() => autoSync.cancelPending())
 .block-title { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .hint { font-size: 12px; color: #64748b; margin: 0 0 8px; }
 .hint-blue { font-size: 12px; color: #1d4ed8; margin: 8px 0 0; }
+.muted { color: #cbd5e1; }
 .formula-cell { color: #6366f1; font-weight: 500; border-bottom: 1px dashed #a5b4fc; }
 .mt8 { margin-top: 8px; }
 .audit-card { margin-top: 12px; }

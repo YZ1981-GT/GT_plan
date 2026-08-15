@@ -156,7 +156,7 @@ describe('useI6FormulaEngine PBT', () => {
     it('P7: |bookingDate - documentDate| ≤ 5天 → isCutoffCrossover returns false', () => {
       fc.assert(
         fc.property(
-          fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+          fc.date({ noInvalidDate: true, min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
           fc.integer({ min: 0, max: 5 }),
           fc.boolean(),
           (baseDate, daysDiff, addOrSubtract) => {
@@ -175,7 +175,7 @@ describe('useI6FormulaEngine PBT', () => {
     it('P7b: |bookingDate - documentDate| > 5天 → isCutoffCrossover returns true', () => {
       fc.assert(
         fc.property(
-          fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+          fc.date({ noInvalidDate: true, min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
           fc.integer({ min: 6, max: 365 }),
           fc.boolean(),
           (baseDate, daysDiff, addOrSubtract) => {

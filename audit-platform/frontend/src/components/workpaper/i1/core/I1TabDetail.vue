@@ -251,12 +251,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, toRef, onMounted, watch, type Ref } from 'vue'
+import { inject, ref, computed, toRef, onMounted, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { WarningFilled } from '@element-plus/icons-vue'
 import { useI1Detail, type I1DetailTab, type I1DetailRow } from '../../composables/useI1Detail'
 import { useI1ImportExport } from '../../composables/useI1ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   wpId: string
@@ -466,9 +474,7 @@ function getSummaryValue(row: Record<string, any>, col: { key: string; type: str
 }
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null) return '-'
-  if (Math.abs(value) < 0.005) return '-'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 </script>
 

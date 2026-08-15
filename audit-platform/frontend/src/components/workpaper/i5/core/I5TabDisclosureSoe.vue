@@ -164,13 +164,14 @@
  * I5TabDisclosureSoe — 附注披露（国有企业）
  * 对齐源表 + 同步附注八、32
  */
-import { computed, ref, onBeforeUnmount, watch } from 'vue'
+import { inject, computed, ref, onBeforeUnmount, watch } from 'vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'
 import { useI5Disclosure } from '../../composables/useI5Disclosure'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 
 const props = defineProps<{
   wpId: string
@@ -185,8 +186,11 @@ const emit = defineEmits<{
   'save': [itemId: string, value: any]
 }>()
 
-const displayPrefs = useDisplayPrefsStore()
+// 🔴 inject 分支让宿主 provide 的偏好优先于全局 store；
 
+//    必须 setup 顶层（写进函数体静默失效）。
+
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 const variant = ref<'soe'>('soe')
 const disc = useI5Disclosure(
   computed(() => props.wpId),

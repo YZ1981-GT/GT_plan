@@ -22,6 +22,17 @@
     </div>
 
     <div class="tab-toolbar">
+      <el-tooltip :content="fourTableHint" placement="top">
+        <el-button
+          size="small"
+          :disabled="Boolean(props.isReadonly) || !hasFourTablePrefill"
+          :loading="fourTableSeeding"
+          data-testid="i2-pull-four-table"
+          @click="pullFromFourTable"
+        >
+          从四表库带入未审数
+        </el-button>
+      </el-tooltip>
       <GtIndexChip value="wp:I2-1" :context-project-id="props.projectId" />
       <GtIndexChip value="wp:I2-2" :context-project-id="props.projectId" />
       <GtIndexChip value="wp:I2-3" :context-project-id="props.projectId" />
@@ -267,7 +278,22 @@ import { Download } from '@element-plus/icons-vue'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { getICycleSourceConfig, extractTbSourceCodes } from '../../composables/useICycleFourTableSource'
+import {
+  iCycleAccountCode,
+  iCycleQueryCodes,
+  iCycleSpec,
+} from '../../composables/iCycleAccountScope'
+import { useICycleAdjudicationSeeding } from '../../composables/useICycleAdjudicationSeeding'
+import { iCycleSeedSpec } from '../../composables/iCycleAdjudicationSeed'
 import http from '@/utils/http'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   sheetName: string
@@ -284,6 +310,17 @@ const openReviewDialog = inject<(section: string) => void>('openReviewDialog', (
 
 const sourceConfig = getICycleSourceConfig('I2')
 const tbSourceCodes = computed(() => extractTbSourceCodes(props.htmlData))
+
+// ─── 科目口径单一真源（render 下发的 tb_source_codes 优先，常量只作兜底 + 展示） ───
+// 🔴 改造前本文件写死 `1717` —— 全库两张科目表都无此码（正确码 1704，account_chart 实证），
+//    既让「带入调整」拉不到任何分录，又把审定数回写到不存在的科目。
+const i2AccountCode = computed(() => iCycleAccountCode(tbSourceCodes.value, 'I2'))
+const i2QueryCodes = computed(() => iCycleQueryCodes(tbSourceCodes.value, 'I2'))
+const i2SubjectLabel = computed(() => {
+  const code = i2AccountCode.value
+  const name = iCycleSpec('I2')?.accountName || '开发支出'
+  return code ? `${name}(${code})` : name
+})
 
 const tbData = computed<I2TbData>(() => {
   const raw = props.allResponses.get('I2-tb-data')
@@ -320,10 +357,14 @@ async function handleLoadTb(silent = false): Promise<void> {
 
 async function writebackTb(auditedAmount: number) {
   if (!props.wpId || !props.projectId) return
+  // 🔴 回写科目码必须走单一真源（render 下发优先 → 兜底 1704）。
+  //    改造前写死 `1717` —— 全库两张科目表都无此码 ⇒ 审定数被回写到不存在的科目。
+  const accountCode = i2AccountCode.value
+  if (!accountCode) return // 无口径 ⇒ 不回写（宁缺勿造，避免污染 trial_balance）
   try {
-    await http.post(`/workpapers/${props.wpId}/writeback-trial-balance`, {
+    await http.post(`/api/workpapers/${props.wpId}/writeback-trial-balance`, {
       project_id: props.projectId,
-      account_code: '1717',
+      account_code: accountCode,
       audited_amount: auditedAmount,
     })
   } catch {
@@ -351,6 +392,38 @@ const displayRows = computed(() => [
   { ...diffRow.value, _footer: true },
 ])
 
+// ─── 从四表库带入未审数（消费 render 的 adjudication_prefill，按项目名匹配行） ───
+//
+// 🔴 改造前后端每次 render 都算并下发 `adjudication_prefill`，前端**零消费方**
+//    （与 H 循环踩过的 dead output 同型）。I2 是六循环里唯一的**双期**结构：
+//    同一行产 `beginUnadj` + `endUnadj` 两格。
+const i2SeedLabelField = iCycleSeedSpec('I2')?.labelField ?? 'projectName'
+const i2SeedRows = computed(() =>
+  rows.value.map((r) => ({
+    rowId: r.rowId,
+    label: String((r as unknown as Record<string, unknown>)[i2SeedLabelField] ?? ''),
+  })),
+)
+const {
+  seeding: fourTableSeeding,
+  hasPrefill: hasFourTablePrefill,
+  hint: fourTableHint,
+  pullFromFourTable,
+} = useICycleAdjudicationSeeding({
+  wpCode: 'I2',
+  htmlData: computed(() => props.htmlData),
+  rows: i2SeedRows,
+  isReadonly: computed(() => Boolean(props.isReadonly)),
+  readCell: (cell) => {
+    const row = rows.value.find((r) => r.rowId === cell.rowKey)
+    if (!row) return null
+    const v = (row as unknown as Record<string, unknown>)[cell.field]
+    return v == null || v === 0 ? null : Number(v)
+  },
+  // I2 用 `updateRow`（三参），非 `updateCell`
+  applyCell: (cell) => updateRow(cell.rowKey, cell.field as never, cell.amount),
+})
+
 // ─── 从集中登记带入调整（1717 开发支出，资产借方；单一「账项调整」列 endAdj，读实时值增量累加） ───
 const bringInRows = computed(() =>
   rows.value.map((r) => ({ rowKey: r.rowId, name: r.projectName, aje: 0, rje: 0 })),
@@ -364,11 +437,11 @@ const {
 } = useAdjudicationBringIn({
   projectId: computed(() => props.projectId) as any,
   year: useAuditContext().year as any,
-  subjectPrefix: '1717',
+  subjectPrefix: i2QueryCodes as any,
   direction: 'debit',
-  subjectCode: '1717',
+  subjectCode: i2AccountCode as any,
   wpCode: 'I2',
-  subjectLabel: '开发支出(1717)',
+  subjectLabel: i2SubjectLabel as any,
   rows: bringInRows,
   // 单一「账项调整」列：aje/rje 净额均累加至 endAdj（读取实时值做增量累加）
   updateCell: (rowKey: string, _field: any, value: number) => {
@@ -456,9 +529,7 @@ onMounted(() => {
 })
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return '—'
-  if (Math.abs(value) < 0.005) return '—'
-  return value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 </script>
 

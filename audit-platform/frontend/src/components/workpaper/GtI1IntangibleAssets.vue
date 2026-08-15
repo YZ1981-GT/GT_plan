@@ -377,7 +377,7 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
   // 乐观更新本地 Map
   allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items: [{ item_id: itemId, conclusion: null, remark: strVal }],
     })
@@ -390,8 +390,14 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1701,1702,1703' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      // 🔴 `year` 是后端 `GET /api/projects/{pid}/trial-balance` 的**必填** Query
+      //    （`trial_balance.py: year: int = Query(...)`）—— 不传直接 422。
+      //    K 循环范式一律 `year: props.year`；I 循环曾整体漏传 ⇒ 叠加缺 `/api` 前缀
+      //    共三层错误，全被 `_silent: true` + catch 吞掉，表现为「TB 取数恒 0」。
+      //    注：`account_prefix` 后端并未声明（FastAPI 静默忽略），实际过滤靠下方
+      //    `code.startsWith(...)` 客户端筛选；保留该参数以便将来后端支持。
+      params: { account_prefix: '1701,1702,1703', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -422,7 +428,7 @@ async function selfLoad(): Promise<void> {
       }
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'i1-intangible-assets' },
         _silent: true,
       } as any)

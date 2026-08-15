@@ -121,7 +121,8 @@ describe('i2DisclosureSyncPayload', () => {
       { rowId: '1', name: '人工费', currentExpensed: 10, currentCapitalized: 20, priorExpensed: 0, priorCapitalized: 0 },
     ])
     expect(rows.at(-1)?.label).toBe('合计')
-    expect(rows.at(-1)?.['本期资本化金额']).toBe(20)
+    // 行字段名对齐 I2_NATURE_COLUMNS[].key（模板 §五、27 同构），投影器按 key 取值
+    expect(rows.at(-1)?.['cur_capitalize']).toBe(20)
   })
 
   it('summarizeMovement 与 recalc 一致', () => {

@@ -58,12 +58,19 @@ const I3_SOE_FLAT_COLUMNS: ColumnDef[] = [
   { key: '期末余额', label: '期末余额', format: 'amount', flat: true },
 ]
 
-// 关键假设参数表（资产组/毛利率/增长率/折现率）— 模板侧动态结构不固化 columns
+/**
+ * 关键假设参数表（资产组/毛利率/增长率/折现率）。
+ *
+ * 🔴 与 `note_template_listed` §五、28「商誉减值测试关键假设」逐字同构（Task 15）：
+ * 三个比率列 `format: 'percent'`（**不是** amount：不套千分符与「元」单位），
+ * 并标 `flat: true` —— 此前既无 `flat` 也无 `group`（P3「未表态」），
+ * 会让后端 `_infer_groups_from_headers` 对 4 列 headers 反猜父表头。
+ */
 const I3_ASSUMPTION_COLUMNS: ColumnDef[] = [
-  { key: 'label', label: '资产组/业务', is_label: true },
-  { key: '毛利率', label: '毛利率' },
-  { key: '增长率', label: '增长率' },
-  { key: '折现率', label: '折现率' },
+  { key: 'label', label: '资产组/业务', is_label: true, flat: true },
+  { key: '毛利率', label: '毛利率', format: 'percent', flat: true },
+  { key: '增长率', label: '增长率', format: 'percent', flat: true },
+  { key: '折现率', label: '折现率', format: 'percent', flat: true },
 ]
 
 // 业绩承诺表（项目/业绩承诺完成情况/商誉减值金额）

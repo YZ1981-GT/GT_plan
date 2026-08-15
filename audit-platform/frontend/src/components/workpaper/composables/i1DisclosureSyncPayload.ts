@@ -29,6 +29,19 @@ import {
   formatAmortAllocNote,
 } from './i1DisclosureEnhance'
 import type { ColumnDef } from './disclosureColumnDefs'
+import { i1CategoryColumnKey } from './i1CategoryScope'
+
+/**
+ * 类别列的稳定 key（`{slot.key}_{seq}`，Task 12 / Property 20）。
+ *
+ * 🔴 禁用中文 label 作 key —— 两个类别改成同名 label 会撞键、列与数据串台（H7 已踩）。
+ * `buildI1ListedColumns`（列头）与 `buildI1ListedSubTableData`（行字段）必须用**同一** key
+ * 生成规则，否则 note 投影器 `r.get(column.key)` 恒 None、整表渲染空白。
+ * 两者都按 `cats` 同序迭代取 `idx`，故同一次推送内列与行逐一对齐。
+ */
+function i1CatColKey(c: { key: string; label: string }, idx: number): string {
+  return i1CategoryColumnKey({ key: c.key, label: c.label, seq: idx + 1, removable: c.key !== 'other' })
+}
 
 export interface I1SyncFromWorkpaperPayload {
   wp_id: string
@@ -41,14 +54,17 @@ export interface I1SyncFromWorkpaperPayload {
 }
 
 /**
- * 上市变动表列头随类别动态（key=类别 label + 合计），逐字对齐 buildI1ListedSubTableData 行键。
- * 附属子表列头静态源对齐。
+ * 上市变动表列头随类别动态（key=稳定 `{slot.key}_{seq}`、label=类别中文名 + 合计），
+ * 列 key 逐字对齐 buildI1ListedSubTableData 行字段。附属子表列头静态源对齐。
  */
 export function buildI1ListedColumns(state: I1ListedSyncSnapshot): Record<string, ColumnDef[]> {
   const cats = state.categories || []
+  // 🔴 `flat: true` 必须声明：本表是「项目 + N 个类别 + 合计」的单级表头列转置表，
+  // 不标 flat 时后端 `_infer_groups_from_headers` 会对 ≥4 列共享前缀的 headers 反猜父表头
+  // （note_template_listed §五、26「无形资产情况」的 columns 侧同样标 flat=true，两侧同构）。
   const movement: ColumnDef[] = [
-    { key: 'label', label: '项目', is_label: true },
-    ...cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' as const })),
+    { key: 'label', label: '项目', is_label: true, flat: true },
+    ...cats.map((c, idx) => ({ key: i1CatColKey(c, idx), label: c.label, format: 'amount' as const })),
     { key: '合计', label: '合计', format: 'amount' },
   ]
   return {
@@ -83,14 +99,31 @@ export function buildI1ListedColumns(state: I1ListedSyncSnapshot): Record<string
   }
 }
 
-/** 国企变动表列头（项目/期初余额/本期增加/本期减少/期末余额），键对齐 flattenI1SoeMovement 输出 */
-const I1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
+/**
+ * 国企变动表列头（项目/期初余额/本期增加/本期减少/期末余额），键对齐 flattenI1SoeMovement 输出。
+ *
+ * 🔴 与 `note_template_soe` §八、27 逐字同构（Task 15）：
+ * label 用全角双空格「项  目」（= 模板 `headers[0]`，P5 判据），并标 `flat: true`（P3 判据）。
+ * 此前这里写 `label: '项目'` 且无 `flat`，但契约 spec 传的是它自己手写的一份副本
+ * ⇒ P3/P5 对**生产代码**从未真正生效（假绿）。现由 spec 直接消费本常量。
+ */
+export const I1_SOE_COLUMNS: Record<string, ColumnDef[]> = {
   [I1_SOE_SUBTABLE.movement]: [
-    { key: 'label', label: '项目', is_label: true },
-    { key: 'begin', label: '期初余额', format: 'amount' },
-    { key: 'increase', label: '本期增加', format: 'amount' },
-    { key: 'decrease', label: '本期减少', format: 'amount' },
-    { key: 'end', label: '期末余额', format: 'amount' },
+    { key: 'label', label: '项  目', is_label: true, flat: true },
+    { key: 'begin', label: '期初余额', format: 'amount', flat: true },
+    { key: 'increase', label: '本期增加', format: 'amount', flat: true },
+    { key: 'decrease', label: '本期减少', format: 'amount', flat: true },
+    { key: 'end', label: '期末余额', format: 'amount', flat: true },
+  ],
+  // 数据资源子表：国企版模板同样有此表（§八、27），列集与上市版一致。
+  // 载荷当前不推该表（`buildI1SoeSubTableData` 只产 movement），但列头声明保留
+  // 与模板同构 ⇒ 将来接推送时不必再补，且契约 P3/P5 立即覆盖。
+  [I1_SOE_SUBTABLE.dataResource]: [
+    { key: 'label', label: '项目', is_label: true, flat: true },
+    { key: '外购的数据资源无形资产', label: '外购的数据资源无形资产', format: 'amount', flat: true },
+    { key: '自行开发的数据资源无形资产', label: '自行开发的数据资源无形资产', format: 'amount', flat: true },
+    { key: '其他方式取得的数据资源无形资产', label: '其他方式取得的数据资源无形资产', format: 'amount', flat: true },
+    { key: '合计', label: '合计', format: 'amount', flat: true },
   ],
 }
 
@@ -106,9 +139,9 @@ export function buildI1ListedSubTableData(state: I1ListedSyncSnapshot): Record<s
       label: def.label,
       is_total: def.kind === 'calc' || def.kind === 'book' || def.kind === 'subtotal',
     }
-    for (const c of cats) {
-      row[c.label] = i1ListedCellValue(state.movement, def, c.key)
-    }
+    cats.forEach((c, idx) => {
+      row[i1CatColKey(c, idx)] = i1ListedCellValue(state.movement, def, c.key)
+    })
     row['合计'] = i1ListedTotalCellValue(state.movement, def, cats)
     rows.push(row)
   }

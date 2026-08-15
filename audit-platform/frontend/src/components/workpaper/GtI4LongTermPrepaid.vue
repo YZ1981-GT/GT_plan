@@ -293,7 +293,7 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
   }
   allResponses.value.set(itemId, payload)
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items: [payload],
     })
@@ -306,8 +306,9 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '1801' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
+      params: { account_prefix: '1801', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -347,7 +348,7 @@ async function selfLoad(): Promise<void> {
       }
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'i4-long-term-prepaid' },
         _silent: true,
       } as any)

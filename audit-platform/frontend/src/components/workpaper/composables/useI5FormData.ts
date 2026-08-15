@@ -106,7 +106,7 @@ export function useI5FormData(
   async function _doSave(items: ChecklistItem[]): Promise<boolean> {
     if (!wpId.value || items.length === 0) return true
     try {
-      await http.put(`/workpapers/${wpId.value}/checklist-responses`, {
+      await http.put(`/api/workpapers/${wpId.value}/checklist-responses`, {
         project_id: projectId.value,
         items: items.map((item) => ({
           item_id: item.item_id,
@@ -277,7 +277,7 @@ export function useI5FormData(
         allResponses.value = map
         renderMeta.value = html
       } else {
-        const res = await http.get(`/workpapers/${wpId.value}/render-config`, {
+        const res = await http.get(`/api/workpapers/${wpId.value}/render-config`, {
           params: { force_component_type: 'i5-other-noncurrent-assets' },
           _silent: true,
         } as any)
@@ -350,7 +350,7 @@ export function useI5FormData(
     }
 
     try {
-      const res = await http.get(`/projects/${projectId.value}/trial-balance`, {
+      const res = await http.get(`/api/projects/${projectId.value}/trial-balance`, {
         params: { account_prefix: '1911' },
         _silent: true,
       } as any)

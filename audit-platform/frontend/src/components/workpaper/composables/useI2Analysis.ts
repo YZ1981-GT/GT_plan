@@ -180,7 +180,7 @@ export function useI2Analysis(params: {
   async function fetchRevenueFromTb(projectId: string): Promise<{ ok: boolean; message: string }> {
     if (!projectId) return { ok: false, message: '缺少项目ID，无法从 TB 取数' }
     try {
-      const res = await http.get(`/projects/${projectId}/trial-balance`, {
+      const res = await http.get(`/api/projects/${projectId}/trial-balance`, {
         params: { account_prefix: '6001' },
         _silent: true,
       } as any)

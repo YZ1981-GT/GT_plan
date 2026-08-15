@@ -483,7 +483,7 @@ async function saveResponse(_sheetCode: string, data: Record<string, any>): Prom
   // 乐观更新本地 Map
   for (const it of items) allResponses.value.set(it.item_id, it)
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items,
     })
@@ -506,7 +506,7 @@ async function selfLoad(): Promise<void> {
       }
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'i2-development-expenditure' },
         _silent: true,
       } as any)

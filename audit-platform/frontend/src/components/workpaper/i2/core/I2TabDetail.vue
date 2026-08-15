@@ -230,6 +230,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useI2Detail } from '../../composables/useI2Detail'
 import { useI2ImportExport } from '../../composables/useI2ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   sheetName: string
@@ -393,8 +401,7 @@ async function onFileSelected(e: Event) {
 }
 
 function fmtAmount(value: number | null | undefined): string {
-  if (value == null || Math.abs(Number(value)) < 0.005) return '—'
-  return Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(value)
 }
 </script>
 

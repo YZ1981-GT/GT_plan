@@ -691,7 +691,7 @@ function onSamplesFilled(payload: { samples?: any[] }) {
 async function _loadTb6602(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
       params: { account_prefix: '6602' },
       _silent: true,
     } as any)

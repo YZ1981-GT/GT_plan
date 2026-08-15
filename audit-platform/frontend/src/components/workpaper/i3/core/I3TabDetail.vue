@@ -425,7 +425,11 @@
 import { computed, toRef, watch, ref, inject, type Ref } from 'vue'
 import { ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { fmtAmount } from '@/utils/formatters'
+// 🔴 原先直接用 `@/utils/formatters` 的底层 fmtAmount —— 那一层不读用户偏好
+//    （单位「元/万元」与 showZero 都取不到）。改为委托 displayPrefs 单一真源。
+function fmtAmount(value: number | null | undefined): string {
+  return displayPrefs.fmtAmount(value)
+}
 import {
   useI3Detail,
   type I3DetailRow,
@@ -435,6 +439,14 @@ import {
 import { useI3CrossSheet } from '../../composables/useI3CrossSheet'
 import { useI3ImportExport } from '../../composables/useI3ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+
+// 🔴 金额展示走 displayPrefs 单一真源（千分符 / 2 位小数 / 单位「元」/ showZero 偏好）。
+//    必须 setup **顶层** inject —— 写进函数体会静默失效（平台铁律）。
+//    DisplayPrefs_Key 只能从 composables/displayPrefsKey 引入，
+//    从 @/stores/displayPrefs 连带引会让整页崩（该 store 没有这个导出）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{
   wpId: string

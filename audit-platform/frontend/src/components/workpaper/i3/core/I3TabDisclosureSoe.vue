@@ -227,6 +227,7 @@ import {
 import { resolveI3NoteSectionTarget } from '../../composables/i3NoteSectionMap'
 import { buildI3SoeSyncPayloads } from '../../composables/i3DisclosureSyncPayload'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 
 const props = defineProps<{
   wpId: string
@@ -244,7 +245,9 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
-const displayPrefs = useDisplayPrefsStore()
+// 🔴 inject 分支让宿主 provide 的偏好优先于全局 store；
+//    必须 setup 顶层（写进函数体静默失效）。
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 const router = useRouter()
 // 跳转回附注模块（披露表 → 附注为单向推送；此处仅导航，方便相互编辑确认）
 function jumpToNote(target: DisclosureVariant): void {

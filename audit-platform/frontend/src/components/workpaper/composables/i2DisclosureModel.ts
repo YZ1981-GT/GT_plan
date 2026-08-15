@@ -153,6 +153,51 @@ export function defaultNatureRows(): I2NatureRow[] {
   return I2_NATURE_DEFAULT_NAMES.map((name) => emptyNatureRow({ name }))
 }
 
+/** 行名归一（去首尾空白 + 折叠内部空白），仅用于撞名比较 */
+function _normNatureName(name: unknown): string {
+  return String(name ?? '').trim().replace(/\s+/g, '')
+}
+
+/** 该行是否源模板固定的 6 类费用性质（`A9:A14`）—— 固定类别不可删 */
+export function isI2NatureDefaultRow(row: I2NatureRow): boolean {
+  const key = _normNatureName(row?.name)
+  if (!key) return false
+  return I2_NATURE_DEFAULT_NAMES.some((n) => _normNatureName(n) === key)
+}
+
+/**
+ * 研发支出按费用性质增行 —— 对齐源模板 `附注披露（上市公司）!A15 = ……` 唯一可扩位。
+ *
+ * 纯函数（与 `addI1SoeCategory` 同范式）：**命名非法或撞名一律返回 `null`**，
+ * 由调用方（组件 `ElMessageBox.prompt`）负责提示，绝不产生无名行。
+ * 撞名比较覆盖「源模板 6 个固定类别 + 现存全部行」，归一后比较。
+ */
+export function addI2NatureRow(
+  rows: readonly I2NatureRow[],
+  label: string,
+): I2NatureRow[] | null {
+  const name = String(label ?? '').trim()
+  const key = _normNatureName(name)
+  if (!key) return null
+  const taken = new Set<string>([
+    ...I2_NATURE_DEFAULT_NAMES.map(_normNatureName),
+    ...rows.map((r) => _normNatureName(r?.name)),
+  ])
+  if (taken.has(key)) return null
+  return [...rows, emptyNatureRow({ name })]
+}
+
+/** 删除自定义费用性质行；源模板固定 6 类或找不到 rowId 时返回 `null`（不改数据） */
+export function removeI2NatureRow(
+  rows: readonly I2NatureRow[],
+  rowId: string,
+): I2NatureRow[] | null {
+  const idx = rows.findIndex((r) => r?.rowId === rowId)
+  if (idx < 0) return null
+  if (isI2NatureDefaultRow(rows[idx])) return null
+  return rows.filter((_, i) => i !== idx)
+}
+
 export function emptyMovementRow(partial?: Partial<I2MovementRow>): I2MovementRow {
   const row: I2MovementRow = {
     rowId: partial?.rowId || _id('mov'),

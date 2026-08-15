@@ -289,7 +289,7 @@ async function handleChildSave(itemId: string, value: any): Promise<void> {
   // 乐观更新本地 Map
   allResponses.value.set(itemId, { item_id: itemId, conclusion: null, remark: strVal })
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items: [{ item_id: itemId, conclusion: null, remark: strVal }],
     })
@@ -308,7 +308,7 @@ async function saveResponse(_sheetCode: string, data: Record<string, any>): Prom
   }))
   for (const it of items) allResponses.value.set(it.item_id, it)
   try {
-    await http.put(`/workpapers/${props.wpId}/checklist-responses`, {
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, {
       project_id: props.projectId,
       items,
     })
@@ -321,15 +321,16 @@ async function saveResponse(_sheetCode: string, data: Record<string, any>): Prom
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
-    const res = await http.get(`/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: '6602' },
+    const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
+      // `year` 是后端必填 Query（`trial_balance.py`），不传 422。与 K 循环范式一致。
+      params: { account_prefix: '6604', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
     let u6602 = 0, a6602 = 0
     for (const item of list) {
       const code = String(item.standard_account_code ?? item.account_code ?? '')
-      if (code.startsWith('6602')) {
+      if (code.startsWith('6604')) {
         const debit = Number(item.borrowing_amount ?? item.period_debit ?? item.debit_amount ?? 0)
         const credit = Number(item.lending_amount ?? item.period_credit ?? item.credit_amount ?? 0)
         const net = item.unadjusted_amount != null && item.unadjusted_amount !== ''
@@ -359,7 +360,7 @@ async function selfLoad(): Promise<void> {
       }
     } else {
       // selfLoad: 自行调用 render-config
-      const res = await http.get(`/workpapers/${props.wpId}/render-config`, {
+      const res = await http.get(`/api/workpapers/${props.wpId}/render-config`, {
         params: { force_component_type: 'i6-research-development-expense' },
         _silent: true,
       } as any)
