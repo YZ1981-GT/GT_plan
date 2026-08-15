@@ -1,6 +1,8 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import type { UseE1BaseOptions, ChecklistItem } from './useE1Adjudication'
 import { parseNum, calcCashBalance, calcFxConvert, sumField } from './useE1FormulaEngine'
+// 本位币判定的单一真源（该模块零 import，不构成循环依赖）
+import { isBaseCurrency } from './e1BankAccountPrefill'
 import { eventBus } from '@/utils/eventBus'
 import { api } from '@/services/apiProxy'
 
@@ -101,8 +103,56 @@ function generateRowId(section: BankDetailSection, group: BankDetailGroup): stri
   return `bank-${section}-${group}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * 一行在 `multi` 口径下的三种形态。
+ *
+ * 存在的理由：E1-3 的行有三个来源，它们对「原币列」的能力根本不同 ——
+ * 账户级 `rmb` 版按设计**不下发**原币列（两 variant 字段集不同是 AC 1.9 的意图）、
+ * 叶子口径兜底种子的 `fc` 列**结构性恒 0**（叶子行是科目级汇总，没有账户更没有币种）、
+ * 审计师在 `仅人民币` 版录入时界面根本不显示原币列。若 `multi` 口径无条件由原币列
+ * 派生本位币列，这三类行的真实金额都会被 0 覆盖。
+ */
+export type FxForm = 'base-identity' | 'foreign-pending' | 'fc-authoritative'
+
+/**
+ * 判定一行的 fx 形态（`multi` 口径的分派依据）。
+ *
+ * 🔴 **判据用 `fxCurrency` 而不用 `fxRate`**：`fxRate` 经 `loadFromResponses` 归一后
+ * 「缺失」会回落 1，若拿它区分形态，`foreign-pending`（外币待录入，汇率显式为 0）
+ * 会被误判成 `base-identity`，于是给外币行按汇率 1 反填原币 —— 那正是 Property 34
+ * 明令禁止的「由本位币金额反推原币/汇率」。`fxCurrency` 有确定的回落值（`'人民币'`），
+ * 且 `isBaseCurrency()` 是既有单一真源。
+ */
+export function classifyFxForm(
+  row: Pick<BankDetailRow, 'openingFc' | 'increaseFc' | 'decreaseFc' | 'adjustmentFc' | 'fxCurrency'>,
+): FxForm {
+  const hasFc =
+    parseNum(row.openingFc) !== 0 ||
+    parseNum(row.increaseFc) !== 0 ||
+    parseNum(row.decreaseFc) !== 0 ||
+    parseNum(row.adjustmentFc) !== 0
+  if (hasFc) return 'fc-authoritative'
+  return isBaseCurrency(String(row.fxCurrency ?? '')) ? 'base-identity' : 'foreign-pending'
+}
+
 function recalcRow(row: BankDetailRow, variant: BankDetailVariant): BankDetailRow {
   if (variant === 'multi') {
+    // 形态 A：只有本位币列 ⇒ 原币 == 本位币、汇率 = 1 是**恒等事实**（不是反推）。
+    // 本位币六列保留输入值，原币小计列镜像本位币 —— 否则界面会出现
+    // 「本位币期末 327,095.20 / 原币期末 0」的自相矛盾，审计师无法判断哪个可信。
+    // 不镜像 adjustmentFc（它在 USER_FIELDS 里会落库，改它等于篡改录入值）。
+    if (classifyFxForm(row) === 'base-identity') {
+      const ending = calcCashBalance(row.opening, row.increase, row.decrease)
+      const audited = ending + row.adjustment
+      const endingFc = ending
+      return {
+        ...row, ending, audited, endingFc, auditedFc: endingFc + row.adjustmentFc,
+        accountStatementDiff: audited - row.statementBalance,
+        confirmDiff: row.confirmAmount !== 0 ? audited - row.confirmAmount : 0,
+      }
+    }
+    // 形态 B（外币待录入，fxRate 为 0）与形态 C（原币权威）走原有派生：
+    // B 的结果是本位币列全 0 + note 提示手工录入（Property 34 要的正是这个）。
     const endingFc = calcCashBalance(row.openingFc, row.increaseFc, row.decreaseFc)
     const auditedFc = endingFc + row.adjustmentFc
     const opening = calcFxConvert(row.openingFc, row.fxRate)
@@ -173,7 +223,18 @@ export function useE1BankDetail(options: UseE1BaseOptions & { variant: Ref<BankD
           reconciliationIndexNo: String(r.reconciliationIndexNo || ''),
           restrictedAmount: parseNum(r.restrictedAmount), restrictedReason: String(r.restrictedReason || ''),
           interestRate: parseNum(r.interestRate), note: String(r.note || ''),
-          fxCurrency: String(r.fxCurrency || '人民币'), fxRate: parseNum(r.fxRate) || 1,
+          fxCurrency: String(r.fxCurrency || '人民币'),
+          // 🔴 fxRate 三态必须可区分，不能写 `parseNum(r.fxRate) || 1`：
+          //   缺失（rmb 形态种子 / 历史数据 / rmb 版手工录入）→ 1，因为「该行只有
+          //     本位币列」等价于「原币与本位币恒等」，这是形态 A 的默认；
+          //   显式 0 → **保持 0**。账户级种子对非本位币账户正是下发 fxRate: 0 来表达
+          //     「四表无汇率数据、需手工录入」（Property 34）。`|| 1` 会把它压成 1，
+          //     使「待录入」标记丢失、界面显示一个看似已填好的汇率 1 = 事实上的臆造；
+          //   其他 → parseNum 原值。
+          fxRate:
+            r.fxRate === null || r.fxRate === undefined || r.fxRate === ''
+              ? 1
+              : parseNum(r.fxRate),
           openingFc: parseNum(r.openingFc), increaseFc: parseNum(r.increaseFc),
           decreaseFc: parseNum(r.decreaseFc), endingFc: 0,
           adjustmentFc: parseNum(r.adjustmentFc), auditedFc: 0,

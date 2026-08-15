@@ -357,3 +357,145 @@ describe('构造数据自证（防判据空转）', () => {
     expect(Number(target?.opening)).toBeCloseTo(EXPECT.opening, 2)
   })
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Task 7 / Property 11：落库形态 —— 判据必须落在序列化输出上
+// ═══════════════════════════════════════════════════════════════════════════
+
+const CROSS_SHEET_KEYS = [
+  'E1-bank-detail-principal-opening-unaudited',
+  'E1-bank-detail-principal-total-unaudited',
+  'E1-bank-detail-institution-opening-unaudited',
+  'E1-bank-detail-institution-total-unaudited',
+  'E1-bank-detail-finance-opening-unaudited',
+  'E1-bank-detail-finance-total-unaudited',
+  'E1-bank-detail-other-opening-unaudited',
+  'E1-bank-detail-other-total-unaudited',
+] as const
+
+/** 读落库形态（serializeRows 的真实输出），而不是内存 rows。 */
+function persistedRows(h: Harness): RowJson[] {
+  const raw = h.allResponses.value.get(STORAGE_KEY)?.remark
+  if (!raw) throw new Error('尚无落库形态 —— persistToResponses 没跑到')
+  return JSON.parse(raw) as RowJson[]
+}
+
+function crossSheetSnapshot(h: Harness): Record<string, string | null> {
+  const out: Record<string, string | null> = {}
+  for (const k of CROSS_SHEET_KEYS) out[k] = h.allResponses.value.get(k)?.remark ?? null
+  return out
+}
+
+describe('落库形态：被抹零的 0 不得覆盖录入值（Property 11 / AC 3.1、3.3、3.4）', () => {
+  it('在 multi 版编辑一格后落库的本位币列仍是录入值（不是派生失败的 0）', () => {
+    vi.useFakeTimers()
+    try {
+      const h = mountBankDetail(accountSeed('rmb'), 'multi')
+      const row = payloadRow(h)
+      // 触发一次真实编辑 → scheduleSave → 2 秒后 persistToResponses → serializeRows
+      h.api.updateCell(row.id, 'statementBalance', 1)
+      vi.advanceTimersByTime(2100)
+
+      const persisted = persistedRows(h)
+      const target = persisted.find((r) => r.accountNo === '023900017110777')
+      expect(target, '落库形态里应有该账户行').toBeTruthy()
+      expect(Number(target?.opening)).toBeCloseTo(EXPECT.opening, 2)
+      expect(Number(target?.increase)).toBeCloseTo(EXPECT.increase, 2)
+      expect(Number(target?.decrease)).toBeCloseTo(EXPECT.decrease, 2)
+      h.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('运行时切 variant 后再编辑，落库值不被 variant 派生结果污染', () => {
+    vi.useFakeTimers()
+    try {
+      const h = mountBankDetail(leafSeed(), 'rmb')
+      h.variant.value = 'multi'
+      const row = payloadRow(h)
+      h.api.updateCell(row.id, 'statementBalance', 2)
+      vi.advanceTimersByTime(2100)
+
+      const target = persistedRows(h).find((r) => Number(r.opening) !== 0)
+      expect(target, '落库形态里应有非 0 期初的行').toBeTruthy()
+      expect(Number(target?.opening)).toBeCloseTo(EXPECT.opening, 2)
+      h.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('形态 B（外币待录入）的落库值与写入时一致，0 是写入时就是 0 而非被算成 0（AC 3.4）', () => {
+    vi.useFakeTimers()
+    try {
+      const foreign: RowJson = {
+        id: 'bank-principal-institution-acct-usd-9',
+        section: 'principal',
+        group: 'institution',
+        bankName: '花旗银行',
+        accountNo: 'USD-9',
+        opening: 0,
+        increase: 0,
+        decrease: 0,
+        adjustment: 0,
+        fxCurrency: '美元',
+        fxRate: 0,
+        openingFc: 0,
+        increaseFc: 0,
+        decreaseFc: 0,
+        adjustmentFc: 0,
+      }
+      const h = mountBankDetail([foreign], 'multi')
+      h.api.updateCell('bank-principal-institution-acct-usd-9', 'statementBalance', 3)
+      vi.advanceTimersByTime(2100)
+
+      const target = persistedRows(h).find((r) => r.accountNo === 'USD-9')
+      expect(target).toBeTruthy()
+      expect(Number(target?.opening)).toBe(0)
+      // 关键：汇率仍是 0（待录入），没被回落成 1
+      expect(Number(target?.fxRate)).toBe(0)
+      h.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Task 7 / Property 12：跨 sheet 聚合键不得因 variant 切换而变
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('跨 sheet 聚合键在 variant 切换前后一致（Property 12 / AC 3.2、3.5）', () => {
+  for (const source of SOURCES) {
+    it(`${source.name}｜切 variant 前后八个聚合键取值相同`, async () => {
+      const h = mountBankDetail(source.build('rmb'), 'rmb')
+      const before = crossSheetSnapshot(h)
+      // 前置自证：聚合键真的被写了（watch 带 immediate: true），否则本条恒真
+      expect(
+        Object.values(before).some((v) => v !== null),
+        '聚合键一个都没写 ⇒ 判据空转',
+      ).toBe(true)
+
+      h.variant.value = 'multi'
+      await Promise.resolve()
+      const after = crossSheetSnapshot(h)
+
+      expect(after).toEqual(before)
+      h.unmount()
+    })
+  }
+
+  it('E1-1 审定表读取的 institution 期末聚合等于本位币期末（不因 variant 改变）', async () => {
+    const h = mountBankDetail(accountSeed('rmb'), 'rmb')
+    const key = 'E1-bank-detail-institution-total-unaudited'
+    const atRmb = Number(h.allResponses.value.get(key)?.remark ?? NaN)
+    expect(atRmb).toBeCloseTo(EXPECT.ending, 2)
+
+    h.variant.value = 'multi'
+    await Promise.resolve()
+    const atMulti = Number(h.allResponses.value.get(key)?.remark ?? NaN)
+    expect(atMulti).toBeCloseTo(EXPECT.ending, 2)
+    h.unmount()
+  })
+})

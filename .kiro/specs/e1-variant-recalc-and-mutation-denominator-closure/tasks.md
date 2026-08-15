@@ -76,7 +76,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 反向自检：把某在办 spec 的目录名改成不存在的值，失效检测必须打红
   - _Requirements: 5.4, 5.6, 8.5_
 
-- [ ] 5. `classifyFxForm` + `recalcRow` 三形态
+- [x] 5. `classifyFxForm` + `recalcRow` 三形态
   - 在 `composables/useE1BankDetail.ts` 新增导出纯函数 `classifyFxForm(row): FxForm`，签名见 design.md §Components
   - 判据用 `fxCurrency` + `isBaseCurrency()`（既有单一真源），**不用 `fxRate`** —— 用 fxRate 会把形态 B 误判成 A 从而臆造汇率 1（Property 34 禁止）。这条理由写进函数注释
   - 改 `recalcRow` 的 `multi` 分支按三形态分派：形态 A 保留本位币六列 + `endingFc` 镜像本位币；形态 B 保持现状（全 0）；形态 C 保持现状（由 fc 派生）（Property 1/2/3/13）
@@ -86,7 +86,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 跑 Task 1 的守卫，确认此前红的形态断言转绿、`rmb` 零回归断言仍绿
   - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.6_
 
-- [ ] 6. `loadFromResponses` 的 fxRate 三态归一
+- [x] 6. `loadFromResponses` 的 fxRate 三态归一
   - 把 `fxRate: parseNum(r.fxRate) || 1` 改为显式三态：`(r.fxRate === null || r.fxRate === undefined || r.fxRate === '') ? 1 : parseNum(r.fxRate)`
   - 注释写明**为什么缺失回落 1**（「缺失 = 该行只有本位币列 = 原币与本位币恒等」），而不是「历史如此」（Property 9）
   - 确认形态 B 的行加载后 `fxRate` 为 0，且界面提示走既有 `FOREIGN_FC_HINT` 单一真源，**不新造第二份文案**（Property 2）
@@ -94,7 +94,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 与 Task 5 碰同一文件，串行或一次落地
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.6_
 
-- [ ] 7. 落库形态与跨 sheet 聚合守卫
+- [x] 7. 落库形态与跨 sheet 聚合守卫
   - 在 Task 2 的守卫文件里补：断言 `serializeRows(rows, USER_FIELDS)` 输出的 JSON 里每行 `opening`/`increase`/`decrease`/`adjustment` 等于**写入时**的值（Property 11）
   - 判据必须落在**序列化输出**上，不是内存 `rows` —— 落库形态由 `USER_FIELDS` 决定，两者可能不同
   - 断言 `syncCrossSheetTotals()` 的四个跨 sheet 键（`E1-bank-detail-{principal,institution,finance,other}-{opening,total}-unaudited`）在 variant 切换前后取值相同（Property 12）
@@ -338,3 +338,45 @@ expect(row.endingFc).toBeCloseTo(calcCashBalance(row.opening, row.increase, row.
 
 `e1BankDetailFxForm`：形态 C 由原币派生（1000×7.2 等值取自实测复算）· rmb 分支两条 · 缺失 `fxRate` 回落 1 · 真实汇率原样保留 · 形态 B 本位币列为 0（Property 34）。
 `e1BankVariantIntegrity`：三来源 × rmb 消费 5 条 · 账户级 multi→multi · 叶子 rmb 消费 · 写入侧前提两条（账户级 rmb 版确实不下发原币列、multi 版确实下发）· 构造数据结构与金额自证 2 条。
+
+### Wave 2 实录：三形态 + 三态归一 + 落库与聚合守卫（Task 5 / 6 / 7，2026-08-15）
+
+改动集中在 `composables/useE1BankDetail.ts`（**+62 / −1**，该文件上次实质改动是 2026-07-23，无并发冲突），种子侧与持久化层**一行未动**。
+
+**Task 5**：新增导出 `FxForm` 类型与 `classifyFxForm()`；`recalcRow` 的 `multi` 分支前插形态 A 分支。`isBaseCurrency` 从 `e1BankAccountPrefill` 引入 —— 该模块**零 import**，不构成循环依赖（开工前查过三个候选模块的 import 图）。
+
+**Task 6**：`fxRate: parseNum(r.fxRate) || 1` 改为显式三态，注释写明「缺失回落 1 是因为『该行只有本位币列』等价于『原币与本位币恒等』」而非「历史如此」。
+
+**Task 7**：在 `e1BankVariantIntegrity.spec.ts` 追加 7 例，判据落在**序列化输出**与**聚合键取值**上：`persistedRows()` 读 `allResponses[STORAGE_KEY].remark`（`serializeRows` 的真实产物，非内存 `rows`），`crossSheetSnapshot()` 读八个跨 sheet 键。落库形态用 `vi.useFakeTimers()` 推进 `scheduleSave` 的 2 秒窗口拿到，不用手搓。
+
+#### 结果
+
+| 项 | 数值 |
+|---|---|
+| 两个守卫文件 | 41 → **48 例全绿**（Task 7 追加 7 例） |
+| Wave 1 的 24 条红 | **全部转绿** |
+| Wave 1 的 17 条零回归基线 | **仍绿** |
+| e1 全域回归 | **148 suites / 609 passed / 0 failed** |
+
+609 与 e-cycle spec 冻结基线 `BASELINE_FE_PASSED = 568` 之差恰为 **41**（= 本 spec 新增例数），交叉印证零既有守卫被打破。
+
+#### 变异检验 4/4 全 RED（GREEN=0 / ANCHOR-MISS=0 / WRONG-TEST=0）
+
+还原后 md5 与基线逐字相符、复跑回到 48 passed。
+
+| 变异 | 判定 | 新增失败 |
+|---|---|---|
+| M1 删掉形态 A 分支（退回无条件由原币派生） | RED | **22** 条 |
+| M2 `fxRate` 显式 0 被压成 1（三态退回两态） | RED | 3 条 |
+| M3 形态判据改用 `fxRate` 而非 `fxCurrency` | RED | 2 条 |
+| M4 `endingFc` 镜像改回由 fc 列算 | RED | 1 条 |
+
+🔴 **M1 打红的 22 条里包含 Task 7 那 7 条**（「在 multi 版编辑一格后落库的本位币列仍是录入值」「切 variant 前后八个聚合键取值相同」×3「E1-1 审定表读取的 institution 期末聚合…」等）。这一点必须单独记：Task 7 的守卫是**在修复之后**写的、一上手就是绿的，属 memory 警告的「守卫把错值当基线锁死」高风险形态。它们能被 M1 打红，才证明承重。
+
+🔴 **M3 的 RED 验证了 design.md 里那个判据取舍不是纸上推演**：把形态判据从 `fxCurrency` 换成 `fxRate === 1` 后，`fc 列全 0 且本位币 → base-identity` 与 `空 fxCurrency 按本位币处理` 两条立刻红 —— 因为归一后「缺失」也回落 1，拿 `fxRate` 判形态会把外币待录入误判成本位币恒等，进而按汇率 1 反填原币（Property 34 明令禁止）。
+
+#### 🔴 自己又踩了写在自己 design.md 里的坑
+
+M2/M4 首轮报 **ANCHOR-MISS（命中 0 次）**：锚点写成了多行、含 `\n`，而工作树是 CRLF ⇒ 字节匹配必然失败。这条坑 design.md §Components 明文写着「`anchor` 非空且**不含 `\n`**」，仍然踩到。
+
+⇒ **给 Wave 3 共享件的硬结论**：「不含 `\n`」不能只写在文档里，必须在 `Mutation` 的**声明期校验**里直接拒绝（`spec.py` 的职责），否则每个调用方都会各踩一次。同理 Wave 1 实录之二记的「锚点落在作用域外」也要在声明期或 `--list` 阶段拦住 —— 两条合起来说明：变异脚本的正确性判据本身就该由共享件强制，而不是靠每个作者记得。
