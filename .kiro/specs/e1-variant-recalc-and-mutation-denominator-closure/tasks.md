@@ -35,7 +35,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
 
 ## Tasks
 
-- [ ] 1. 形态判定与 fxRate 三态守卫（先打红）
+- [x] 1. 形态判定与 fxRate 三态守卫（先打红）
   - 新建 `audit-platform/frontend/src/components/workpaper/composables/__tests__/e1BankDetailFxForm.spec.ts`
   - 断言 `classifyFxForm` 的三形态划分：fc 列任一非 0 ⇒ `fc-authoritative` · fc 全 0 且 `isBaseCurrency(fxCurrency)` ⇒ `base-identity` · fc 全 0 且非本位币 ⇒ `foreign-pending`（Property 1/2/3）
   - 断言 `recalcRow(row,'multi')` 在形态 A 下**本位币六列与输入逐字相等**、`ending` 按 `calcCashBalance` 算出（Property 1）；形态 B 下本位币列为 0 且 `fxRate` 保持 0（Property 2）；形态 C 下与修复前逐字相同（Property 3）
@@ -47,7 +47,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - PBT（`fast-check`，仓库已有）：任意 fc 列组合下「任一非 0 ⇒ 恒为形态 C」
   - _Requirements: 1.1, 1.2, 1.6, 2.1, 2.2, 2.3_
 
-- [ ] 2. 跨层端到端守卫（先打红）
+- [x] 2. 跨层端到端守卫（先打红）
   - 新建 `composables/__tests__/e1BankVariantIntegrity.spec.ts`
   - 判据形态：**从写入侧出发、经序列化、到消费侧**，断言本位币金额守恒。禁止只测纯函数返回值 —— 那正是本缺陷穿过 29 条变异 + 568 例守卫的原因
   - 链路 = `buildBankSeedRowsFromAccounts(p, variantA)`（或 `buildBankSeedRows(p)`，或手工构造的录入行）→ `JSON.stringify` → 塞进 `allResponses` 的 `E1-bank-detail-rows` → `useE1BankDetail({ variant: ref(variantB) })` → `rows.value` 的本位币列
@@ -290,3 +290,51 @@ commit `45bca0ef`，7 个脚本 / 3108 行入库。
 🔴 **M3 首轮判成 GREEN，实为变异脚本的锚点缺陷 —— 这条教训要带进 Wave 3 的共享件设计**：正则 `"reason": "[^"]{20,}"` 命中的是豁免表顶部 `_schema.reason` 那条**文档说明**，而 `validate_entry` 只校验 `exemptions[]` 内的项 ⇒ 变异落在被测判据的**作用域之外**。按四态定义应记 ANCHOR-MISS，但「新增失败集合是否为空」这个判定式**识别不出「锚点落在作用域外」**，于是把脚本缺陷误报成守卫缺陷。修法是改用 JSON 结构定位（天然落在 `exemptions[0]` 内）并加一句作用域自证断言。⇒ **共享件的 `--list` 校验除了「锚点命中恰好 1 次」，还应支持调用方声明作用域自证**（Requirement 6.7 的实现要覆盖这一形态）。
 
 另一处踩坑：首轮用 `Path.write_text()` 还原，Windows 把 LF 写成 CRLF ⇒ 内容对但 **md5 不符**。全程改 `read_bytes`/`write_bytes` 后逐字相符。这正是 design.md 给共享件定的硬约束（「写回不改 CRLF」）在自己身上先验证了一次。
+
+### Wave 1 实录之三：两个守卫先打红（Task 1 + Task 2，2026-08-15）
+
+产物：`__tests__/e1BankDetailFxForm.spec.ts`（19 例）· `__tests__/e1BankVariantIntegrity.spec.ts`（22 例）。
+
+**先打红基线：41 例 / 24 红，且「标 🔴 的全红、未标记的全绿」—— 假绿 0 / 意外红 0。**
+
+| 文件 | 例数 | 红 | 绿（零回归基线） |
+|---|---|---|---|
+| `e1BankDetailFxForm.spec.ts` | 19 | **13** | 6 |
+| `e1BankVariantIntegrity.spec.ts` | 22 | **11** | 11 |
+
+**观察窗口的选择（Task 1 的关键设计）**：`recalcRow` 未导出，但**不为测试而导出** —— 导出它只能测到它自己，测不到 `loadFromResponses` 的字段归一（`fxRate: parseNum(r.fxRate) || 1` 那行恰是缺陷的一半）。改用 `useE1BankDetail` composable 作观察窗口，经 `@vue/test-utils` 的 `mount` 挂在真实组件上下文里（裸调用会让 `onBeforeUnmount` 脱离组件实例，且 `watch(variant)` 的重算依赖 watch 真实触发）。`classifyFxForm` 用**动态 import + 存在性断言**，这样函数尚不存在时只让那一组红，不至于整个文件 collect error。
+
+#### 🔴 三处判据缺陷（都是我自己写守卫时踩的，逐一记下形态）
+
+**① 断言右侧不得用被测输出算期望值（假绿）**。`Property 13`「原币小计镜像本位币」原本写成：
+
+```ts
+expect(row.endingFc).toBeCloseTo(calcCashBalance(row.opening, row.increase, row.decrease), 2)
+```
+
+缺陷会把 `row.opening` 抹成 0 ⇒ 右侧算出 0，左侧 `endingFc` 也是 0 ⇒ **恒真式**。首轮该条标了预期红却 passed。修法：期望值取自**输入的原始数**（`calcCashBalance(848871.86, 120000, 641776.66)`）。
+
+**② 预期红的标记规则不能用粗判据**。Task 2 首轮用 `vb === 'multi'` 一律标 🔴，结果「账户级 multi 写入 → multi 消费」标了红却 passed —— 该组合 fc 列齐备（multi 版对本位币账户下发 `openingFc = opening`，恒等事实），multi 消费本就能算对。改用显式预期矩阵 `expectedRedBeforeFix(source, va, vb)`，按「写入侧 fc 是否齐备」+「写入动作本身是否被抹零」两个维度算：
+
+| 来源 | 写入 variant | fc 齐备 | rmb 消费 | multi 消费 |
+|---|---|---|---|---|
+| 账户级种子 | rmb | 否 | 绿 | **红** |
+| 账户级种子 | multi | **是**（本位币恒等） | 绿 | 绿 |
+| 叶子口径兜底 | 任意 | 否（fc 恒 0） | 绿 | **红** |
+| 手工录入 | rmb | 否 | 绿 | **红** |
+| 手工录入 | multi | — | **红** | **红** |
+
+**③ 构造数据自证不能被缺陷带红**。首轮「三个来源都产出了行且带金额」这条因手工录入在 multi 版被抹零而红 —— 于是分不清「构造数据没生效」与「缺陷生效了」。拆成两条：结构自证（行数 + `opening` 字段存在，不受缺陷影响）与金额自证（只对 `zeroedOnWrite=false` 的组合断言）。
+
+#### 🔴 实测发现缺陷的第三个面（比立项登记的更严重）
+
+上表末行「手工录入 / multi 写入」两格都红，追因后确认：**在「人民币及外币」版直接手工填本位币金额（不填原币列），`updateCell` 内的 `recalcRow(row, 'multi')` 当场就把它抹成 0，`scheduleSave` 2 秒后落库的就是 0。**
+
+这不是「切 variant 才丢」，是**填完即失**。而「在 multi 版只填本位币列」是完全正常的用法 —— 该版界面同时显示本位币与原币两组列，审计师若手上只有人民币账户数据，自然只填本位币那组。
+
+立项时 requirements.md 登记的三个面是「种子行 / 切 variant / 落库不可恢复」，此处是第四种触发路径，已由 `zeroedOnWrite` 维度纳入判据矩阵，并单独立一条 `🔴 手工录入在 multi 版下被 updateCell 当场抹零`。Wave 2 的修复必须同时覆盖它（形态 A 判定发生在 `recalcRow` 内，故一处修复即可覆盖，但**必须有这条守卫钉住**）。
+
+#### 绿的 17 例即零回归基线（Wave 2 改实现后必须仍绿）
+
+`e1BankDetailFxForm`：形态 C 由原币派生（1000×7.2 等值取自实测复算）· rmb 分支两条 · 缺失 `fxRate` 回落 1 · 真实汇率原样保留 · 形态 B 本位币列为 0（Property 34）。
+`e1BankVariantIntegrity`：三来源 × rmb 消费 5 条 · 账户级 multi→multi · 叶子 rmb 消费 · 写入侧前提两条（账户级 rmb 版确实不下发原币列、multi 版确实下发）· 构造数据结构与金额自证 2 条。
