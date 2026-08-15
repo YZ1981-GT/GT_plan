@@ -1,0 +1,150 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "5. seed 侧标签列 key 统一（4 个既有幂等脚本）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660359
+      },
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293690189
+      }
+    ],
+    "6. A 类 6 张补 `group`（含连带消除 label 前缀）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660454
+      }
+    ],
+    "7. D 类剩余 label 逐字取源 xlsx": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660514
+      }
+    ],
+    "8. 数据列 key 改动量化闸（只读，Task 9/10/11 硬前置）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660580
+      }
+    ],
+    "9. C 类静态数据列 key 对齐（16 处）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660628
+      }
+    ],
+    "10. C 类动态列 key 对齐（5 处）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660675
+      }
+    ],
+    "11. E 类列数裁决与落地（soe 5 处，差 1 列）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660724
+      }
+    ],
+    "12. 披露载荷契约扩容到 38 张全部运行时表": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660773
+      }
+    ],
+    "13. `_removed_table_keys` 逐章节判定": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660817
+      }
+    ],
+    "14. 槽级 `row_code` 落地 5 条": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660903
+      }
+    ],
+    "15. D1 / D2 两条处置（撤回或修真源）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660949
+      }
+    ],
+    "16. G7 权益法族 / 子公司族取数补齐判定": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293660993
+      }
+    ],
+    "17. 源模板自身缺陷登记表 + stale 检测": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661033
+      }
+    ],
+    "18. 变异检验（100% RED，三态可区分）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661075
+      }
+    ],
+    "19. 幂等双证": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661117
+      }
+    ],
+    "20. 广域回归与零回归证明": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661161
+      }
+    ],
+    "21. CI job 挂载": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661209
+      }
+    ],
+    "22. 真实库只读验收": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661282
+      }
+    ],
+    "23. 浏览器实测（四步齐全 + 数据复原）": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661341
+      }
+    ],
+    "24. 收口：tmp 清理与 spec 实录": [
+      {
+        "executionId": "d9129e21-df3c-4ba3-9ed7-1a3a76039dbe",
+        "chatSessionId": "sess_30917246-6f89-43ce-85e3-05da033e14ad",
+        "timestamp": 1786293661386
+      }
+    ]
+  }
+}

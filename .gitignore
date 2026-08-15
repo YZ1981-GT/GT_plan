@@ -108,6 +108,13 @@ COMMIT_MSG_TMP.txt
 _tmp_*
 _probe*.py
 _dump_*.py
+# 🔴 上面只收了 `_tmp_*`（带前导下划线），而各 spec 会话实际大量产出的是**无下划线**的
+#    `tmp_*` 与 `backend/scripts/diagnose/_wip_*` —— 二者此前均未收录，长期污染
+#    `git status`（2026-08-12 G7 收口前根目录积了 487 个 `tmp_*`）。
+#    正式产物一律用真名（`diagnose_*.py` / `verify_*_live.py` / `mutate_*.py` / `test_*.py`），
+#    不会被这两条命中；诊断中间产物本就不该入库。
+tmp_*
+_wip_*
 
 # 开发日志
 backend_dev.log

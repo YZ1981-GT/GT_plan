@@ -229,51 +229,55 @@
                       </template>
                     </el-table-column>
 
-                    <el-table-column
-                      v-for="column in effectiveColumns(table)"
-                      :key="column.key"
-                      :label="column.label"
-                      :width="column.width"
-                      min-width="118"
-                      :align="column.type === 'text' ? 'left' : 'right'"
-                    >
-                      <template #default="{ row }">
-                        <span
-                          v-if="row.kind === 'subtotal' || row.kind === 'total' || row.kind === 'group'"
-                          class="computed-value"
+                    <!--
+                      两级表头：相邻同 `column.group` 的列合并到父表头下（对齐源模板合并
+                      单元格）。分块逻辑在 `buildG7HeaderBlocks()`，与上市 Tab 同一份实现。
+                      改造前此处是扁平 v-for、只读 label/width/type ⇒ `group` 是死代码，
+                      源模板 13 张两级表在浏览器里全渲染成单层（5 组一样的「期末数|期初数」
+                      分不清属于哪家公司）。
+                    -->
+                    <template v-for="(blk, bi) in headerBlocks(table)" :key="`blk-${bi}`">
+                      <el-table-column v-if="blk.group" :label="blk.group" align="center">
+                        <el-table-column
+                          v-for="column in blk.columns"
+                          :key="column.key"
+                          :label="column.label"
+                          :width="column.width"
+                          min-width="118"
+                          :align="column.type === 'text' ? 'left' : 'right'"
                         >
-                          {{
-                            row.kind === 'group'
-                              ? '—'
-                              : formatCell(computedCell(table, row, column.key), column.type)
-                          }}
-                        </span>
-                        <el-input
-                          v-else-if="column.type === 'text'"
-                          v-model="row.values[column.key]"
-                          size="small"
-                          :disabled="isReadonly"
-                          @change="scheduleSave"
-                        />
-                        <el-input-number
-                          v-else-if="column.type === 'percent'"
-                          v-model="row.values[column.key]"
-                          size="small"
-                          controls-position="right"
-                          :precision="4"
-                          :min="0"
-                          :max="100"
-                          :disabled="isReadonly"
-                          @change="scheduleSave"
-                        />
-                        <WpAmountInput
-                          v-else
-                          :model-value="row.values[column.key]"
-                          :disabled="isReadonly"
-                          @update:model-value="row.values[column.key] = $event; scheduleSave()"
-                        />
-                      </template>
-                    </el-table-column>
+                          <template #default="{ row }">
+                            <G7DisclosureCell
+                              :row="row"
+                              :column="column"
+                              :mode="cellMode(row)"
+                              :computed-text="cellComputedText(table, row, column)"
+                              :readonly="isReadonly"
+                              @change="scheduleSave"
+                            />
+                          </template>
+                        </el-table-column>
+                      </el-table-column>
+
+                      <el-table-column
+                        v-else
+                        :label="blk.columns[0].label"
+                        :width="blk.columns[0].width"
+                        min-width="118"
+                        :align="blk.columns[0].type === 'text' ? 'left' : 'right'"
+                      >
+                        <template #default="{ row }">
+                          <G7DisclosureCell
+                            :row="row"
+                            :column="blk.columns[0]"
+                            :mode="cellMode(row)"
+                            :computed-text="cellComputedText(table, row, blk.columns[0])"
+                            :readonly="isReadonly"
+                            @change="scheduleSave"
+                          />
+                        </template>
+                      </el-table-column>
+                    </template>
 
                     <el-table-column v-if="table.dynamic" label="操作" fixed="right" width="64">
                       <template #default="{ row }">
@@ -390,6 +394,7 @@ import {
   G7_SOE_DISCLOSURE_SECTIONS,
   buildG7SoeColumns,
   buildG7SoeSyncPayloads,
+  markG7SoeSynced,
   createG7SoeDisclosureState,
   g7SoeChapterSections,
   resolveG7SoeTableColumns,
@@ -400,6 +405,10 @@ import {
   type G7DisclosureValue,
   type G7SoeDisclosureState,
 } from './g7SoeDisclosureModel'
+import { buildG7HeaderBlocks, type G7HeaderBlock } from './g7DisclosureHeaderBlocks'
+import { describeSyncError, describeSyncTailFailure } from './g7DisclosureSyncFeedback'
+import G7DisclosureCell from './G7DisclosureCell.vue'
+import { pickColumnsForPayload } from './g7PayloadColumns'
 import { tableMetaSources } from './g7DisclosureTableMeta'
 import { seedG7MovementFromLeafCategories, type G7LeafBucketSlot } from '../../composables/g7FourTableSeed'
 // 🔴 科目码单一真源：运行态取宿主 provide 的 tb_source_codes（报表映射解析结果），
@@ -410,7 +419,8 @@ import {
 } from '../../composables/g7AccountScope'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
 import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureConsistencyPanel.vue'
-import WpAmountInput from '../../shared/WpAmountInput.vue'
+// 金额录入已下沉到 `G7DisclosureCell.vue`（两级表头改造），此处不再直接用 WpAmountInput；
+// 样式 `.disclosure-table :deep(.el-input-number)` 仍对子组件渲染出的控件生效，故保留 CSS。
 import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { buildG7ConsistencyChecks, type G7ConsistencyInput } from '../../composables/g7DisclosureConsistency'
@@ -551,7 +561,9 @@ const consistencyChecks = computed(() => {
   const mainRows = (state.tables['lte-detail'] ?? [])
     .filter(r => r.id !== 'lte-detail-total' && !r.isStructure)
     .map(r => ({
-      name: String(r.values?.['项目'] ?? r.label ?? ''),
+      // 行名真源是 `G7DisclosureRow.label`（同 listed 侧）；`values` 只存数据列。
+      // 🔴 `r.values?.['项目']` 是恒 undefined 的死 fallback，已移除。
+      name: String(r.label ?? ''),
       openingBook: Number(r.values?.['openingBook'] ?? 0) || null,
       totalIncrease: (() => {
         const keys = ['addition', 'equityProfit', 'oci', 'otherEquity', 'other']
@@ -706,6 +718,34 @@ function removeRow(table: G7DisclosureTable, rowId: string): void {
 /** 该槎位当前的实体名清单（缺省回退默认清单，与 resolveG7SoeTableColumns 同源）。 */
 function entitySlotNames(slotConfig: { slot: string }): string[] {
   return state.entitySlots?.[slotConfig.slot] ?? []
+}
+
+/**
+ * 该表的表头块（两级表头渲染用）。分块实现在 `buildG7HeaderBlocks()`，
+ * 与上市 Tab 共用一份，禁止在此另写一套按 group 归并的逻辑。
+ */
+function headerBlocks(table: G7DisclosureTable): G7HeaderBlock[] {
+  return buildG7HeaderBlocks(effectiveColumns(table))
+}
+
+/**
+ * 计算行判定 —— **保留国企 Tab 原语义**：`kind` 为 subtotal / total / group 都不可录入。
+ * 单元格组件不自作判断（上市 Tab 不含 group 分支，下沉会串味）。
+ */
+function cellMode(row: { kind?: string }): 'computed' | 'editable' {
+  return row.kind === 'subtotal' || row.kind === 'total' || row.kind === 'group'
+    ? 'computed'
+    : 'editable'
+}
+
+/** 计算行显示文本 —— 国企 Tab 的 `group` 行显示 `—`（原语义逐字保留）。 */
+function cellComputedText(
+  table: G7DisclosureTable,
+  row: { kind?: string },
+  column: G7DisclosureColumn,
+): string {
+  if (row.kind === 'group') return '—'
+  return formatCell(computedCell(table, row as never, column.key), column.type)
 }
 
 /** 解析某表的有效列集（slotConfig 时动态生成）。 */
@@ -915,6 +955,17 @@ function applySavedState(saved: Partial<G7SoeDisclosureState>): void {
     }
   }
   if (saved.texts && typeof saved.texts === 'object') Object.assign(state.texts, saved.texts)
+  // 🔴 必须恢复 `previouslySyncedTables`（Task 13）：`serialisableState()` 一直在
+  // 持久化它，但改造前**载入时不读回** ⇒ 每次打开底稿基线都退回 `{}`，
+  // 差集恒空、`_removed_table_keys` 永不上报（写了也白写）。
+  if (saved.previouslySyncedTables && typeof saved.previouslySyncedTables === 'object') {
+    state.previouslySyncedTables = Object.fromEntries(
+      Object.entries(saved.previouslySyncedTables).map(([k, v]) => [
+        k,
+        Array.isArray(v) ? [...v] : [],
+      ]),
+    )
+  }
   if (saved.entitySlots && typeof saved.entitySlots === 'object') {
     if (!state.entitySlots) state.entitySlots = {}
     for (const [slot, names] of Object.entries(saved.entitySlots)) {
@@ -1052,29 +1103,61 @@ async function syncToDisclosureNotes(): Promise<void> {
   if (isSyncing.value || props.isReadonly || !props.projectId) return
   isSyncing.value = true
   try {
-    await persist()
-    const payloads = buildG7SoeSyncPayloads(serialisableState())
-    const result: any = await api.post(
-      `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
-      {
-        wp_id: props.wpId,
-        current_standard: CURRENT_STANDARD,
-        year: resolveAuditYear(props.htmlData as Record<string, any> | null),
-        items: payloads.map(payload => ({
-          sheet_name: SHEET_NAME,
-          section_id: payload.noteSectionId,
-          sub_table_data: payload.subTableData,
-          columns: soeColumns,
-        })),
-      },
-    )
-    const data = result?.data ?? result
-    dispatchNoteUpdated()
-    ElMessage.success(
-      `已同步 ${Number(data?.rows_synced ?? 0)} 行到 ${Number(data?.sections_synced ?? payloads.length)} 个附注章节（含合并范围变化与八、18）`,
-    )
-  } catch {
-    ElMessage.warning('同步附注失败，请检查国企附注章节映射后重试')
+    // ── ① 真同步：失败 ⇒ 附注确实没落地 ────────────────────────────────
+    // 🔴 与 ② 分段的理由见 `g7DisclosureSyncFeedback.ts`：原先一个 try 包住整条链 +
+    //    裸 catch，实测「已同步 128 行到 14 个附注章节」与「同步附注失败，请检查国企
+    //    附注章节映射」**同时出现**，而库里 13 章节全部写入 ⇒ 失败提示是误报，
+    //    还把排查方向指向根本没问题的章节映射，并诱使重复写库。
+    let data: any
+    let payloads: ReturnType<typeof buildG7SoeSyncPayloads>
+    try {
+      await persist()
+      payloads = buildG7SoeSyncPayloads(serialisableState())
+      const result: any = await api.post(
+        `/api/projects/${props.projectId}/disclosure-notes/sync-batch-from-workpaper`,
+        {
+          wp_id: props.wpId,
+          current_standard: CURRENT_STANDARD,
+          year: resolveAuditYear(props.htmlData as Record<string, any> | null),
+        // 🔴 列元数据必须按 payload 实含表名收窄（`pickColumnsForPayload`）：
+        // 原实现给每个 section 都发**全部 23 张表**的列定义，于是 A 章节的记录里也被
+        // 写入 B 章节表的列头。B 类改 key 后这会让「列已是 label / 行还是 `项目`」
+        // 的错配窗口从「本章节」放大到「任何被同步过的章节」，而投影器兜底是
+        // **单向**的（只能 label→旧 key，不能旧 key→label）⇒ 存量行名会读成空。
+          items: payloads.map(payload => ({
+            sheet_name: SHEET_NAME,
+            section_id: payload.noteSectionId,
+            sub_table_data: payload.subTableData,
+            columns: pickColumnsForPayload(payload.subTableData, soeColumns),
+          })),
+        },
+      )
+      data = result?.data ?? result
+    } catch (err: unknown) {
+      // 🔴 绝不吞异常：原始 err 进控制台，提示带真实原因（后端 detail / HTTP 状态）
+      console.error('[G7 国企披露] 同步到附注失败（附注未落地）', err)
+      ElMessage.error(`同步附注失败：${describeSyncError(err)}`)
+      return
+    }
+
+    // ── ② 成功后的收尾：失败 ⇒ 附注**已落地**，绝不能报「同步失败」──────────
+    const okText =
+      `已同步 ${Number(data?.rows_synced ?? 0)} 行到 ` +
+      `${Number(data?.sections_synced ?? payloads.length)} 个附注章节（含合并范围变化与八、18）`
+    try {
+      // 🔴 同步成功后必须回写「本次各章节实际推送的表名」基线并落库（Task 13）：
+      // 少了这一步，`previouslySyncedTables` 永远停在 `{}`，`buildRemovedTableKeys`
+      // 的被减数恒空 ⇒ `_removed_table_keys` 永不上报 ⇒ 删表后附注永久残留过时明细。
+      // 顺序必须是「同步成功 → 更新基线 → persist」：先 persist 会把旧基线写回，
+      // 而在 `api.post` 失败时不更新基线才是对的（那次推送没落地）。
+      state.previouslySyncedTables = markG7SoeSynced(serialisableState(), payloads)
+      await persist()
+      dispatchNoteUpdated()
+      ElMessage.success(okText)
+    } catch (err: unknown) {
+      console.error('[G7 国企披露] 同步已落地，但同步基线回写失败', err)
+      ElMessage.warning(describeSyncTailFailure(okText, err))
+    }
   } finally {
     isSyncing.value = false
   }

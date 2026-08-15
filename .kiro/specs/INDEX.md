@@ -6,7 +6,7 @@
 
 > **2026-08-14 实扫结果（9 个目录逐一，供下一轮比对）**：
 > `e-cycle-…completion` 24/24 · ~~`frontend-excel-io-single-entry-convergence` 15/18~~（**本轮已归档**，终态 15/18 + `## Notes` 写明 3 个 `[-]` 的阻塞原因）·
-> `g7-column-alignment-and-extraction-closure` 17/24 · `i-cycle-…closure` 18/24 ·
+> `g7-column-alignment-and-extraction-closure` **24/24（2026-08-12 全交付，待归档）** · `i-cycle-…closure` 18/24 ·
 > `k-cycle-…closure` 14/25 · `l-cycle-…completion` 3/26 ·
 > `procedure-trim-report-line-account-resolution` 0/16 ·
 > `workpaper-import-export-lifecycle-closure` 24/25 · `x3-adjustment-entry-import-export` 25/49
@@ -45,7 +45,7 @@
 | `e-cycle-extraction-formula-and-disclosure-completion` | 21/24（`[-]`1 / `[~]`2） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
 | `i-cycle-extraction-formula-and-disclosure-closure` | 9/25 | I 类（无形资产/商誉/长期待摊）取数/公式/披露收口 |
 | `k-cycle-extraction-formula-and-disclosure-closure` | 5/25 | K 类取数公式与披露收口 |
-| `g7-column-alignment-and-extraction-closure` | 4/24（`[~]`19） | G7 长期股权投资列结构对齐与取数闭合。核心 = 补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（既有两个守卫各自只覆盖两条边，故 32 处列偏差长期逃逸） |
+| `g7-column-alignment-and-extraction-closure` | **24/24（全交付 2026-08-12）** | G7 长期股权投资列结构对齐与取数闭合。补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（56 个偏差点 → 0），并新增**第四边：渲染层**（浏览器实测发现两级表头 **0/38 张从未渲染** —— 模型的 `group` 是 additive 死代码，任何 `.vue` 零引用；修复后 20 张）。另修掉平台级假绿「`_note_structure_kit` 的 `--check` 弱于 `--dry-run`」（24 个幂等脚本共用）。🔴 **10 个正式产物仍 `??` 未跟踪**（含 facts JSON 与全部守卫本体）⇒ CI job 在干净 checkout 下必挂，需先 `git add` |
 | `l-cycle-extraction-formula-and-disclosure-completion` | 3/26 | L 类（借款/应付债券）取数公式与披露收口 |
 | `workpaper-import-export-lifecycle-closure` | 3/25 | 底稿导入导出生命周期收口（**此前被表头误记为「无 tasks.md 的空壳」，2026-08-12 实扫纠正**） |
 | ~~`frontend-excel-io-single-entry-convergence`~~ | **已归档** | → `_archive/06-engineering-governance/`（2026-08-14 收敛完成 46 → 0，commit `f049a11f`）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 整链删除**（`batchExport.ts` 孤儿链「合并导出」用户不可达，用户裁决删）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>**提交前发现的清单漏记（最贵一课）**：B2 那批 13 个 confirmation 文件只写在基线 `note` 的自然语言里、`files` 数组为空 ⇒ 按 files 精确 stage 的脚本漏掉它们（远端仍带裸 import，CI 必红）+ Vite 编译扫描只覆盖 33/46 + 进度失真。**此前所有守卫都在验「代码符不符合清单」，没有一条验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 条守卫 + 3 条变异（M18/M19/M20 全 RED）。同域次级坑两个：对账脚本不剥注释会漏检 `import(/* @vite-ignore */ 'exceljs')`；「数量相等 ≠ 集合相等」（曾出现基线 46 / HEAD 46 但各差一个元素）。<br>**终态**：守卫 8 文件 **119** 例全绿 · 变异 **18/18** 全 RED（静态自检 18/18）· Vite 编译 **46/46** · 三件套机器校验零 warning。剩 3 个 `[-]` 均在 tasks.md `## Notes` 写明阻塞原因：Task 2（迁移前快照窗口已关闭，事后补抓＝把错值当基线）· Task 16（变异 18/38 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口） |
