@@ -1,0 +1,48 @@
+{
+  "_doc": "变异脚本治理豁免登记表。spec e1-variant-recalc-and-mutation-denominator-closure（Requirements 5.4/5.6/7.5/8.1/8.5）。两个守卫读它：test_mutation_kit_scripts_tracked.py（未入库豁免）与 test_mutation_kit_adoption.py（未用共享件豁免）。",
+  "_why": "在办 spec 的变异脚本正被并发会话编辑，代它们入库或迁移会与其打架（memory 已实证并发会话会互相回退同一文件）。豁免不是免责声明——每项必须带撤销条件，且守卫会在其 spec 归档后主动提示撤销，防止豁免变成永久后门（e-cycle spec 的 M20 变异针对的正是「白名单成了免责声明」这一形态）。",
+  "_schema": {
+    "script": "仓库相对路径，必填",
+    "spec": "`.kiro/specs/` 下的目录名，必填。失效检测靠它：该目录不在 active 区（= spec 已归档）时守卫提示撤销",
+    "reason": "必填，≥10 字，说明为什么现在不能动它",
+    "registered_at": "必填，YYYY-MM-DD",
+    "revoke_when": "必填，撤销条件的自然语言描述"
+  },
+  "exemptions": [
+    {
+      "script": "backend/scripts/diagnose/mutate_k_cycle_guards.py",
+      "spec": "k-cycle-extraction-formula-and-disclosure-closure",
+      "reason": "spec 在办（实扫 19/25），并发会话正在编辑该脚本 —— 立项调查时其 mtime 距调查时点不足 5 分钟，且 git 里为未跟踪态。代它入库或迁移共享件都会与该会话打架。",
+      "registered_at": "2026-08-15",
+      "revoke_when": "k-cycle spec 归档后，由接手方入库并迁移共享件"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_i_cycle_guards.py",
+      "spec": "i-cycle-extraction-formula-and-disclosure-closure",
+      "reason": "spec 在办（实扫 23/24）。该脚本已被并发会话 git add 进 index（`A ` 态）但尚未提交，说明其推进方正准备随自己的 commit 一并入库；本 spec 不得代为提交，亦不迁移。",
+      "registered_at": "2026-08-15",
+      "revoke_when": "i-cycle spec 归档后，由接手方迁移共享件（入库由其推进方自行完成）"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_ie_lifecycle_guards.py",
+      "spec": "workpaper-import-export-lifecycle-closure",
+      "reason": "spec 在办（实扫 24/25）。脚本本体已入库，故 tracked 守卫本不需要豁免；此项是为 adoption 守卫（未迁共享件）登记，避免在该 spec 收口途中改动它的判定逻辑。",
+      "registered_at": "2026-08-15",
+      "revoke_when": "workpaper-import-export-lifecycle-closure 归档后迁移共享件"
+    },
+    {
+      "script": "backend/scripts/check/mutate_report_line_resolution_guards.py",
+      "spec": "procedure-trim-report-line-account-resolution",
+      "reason": "spec 在办且**正在开工中** —— 本守卫上线后第一次运行就抓到它，而立项调查（2026-08-15 约 11:20）时该文件尚不存在，实测 mtime 12:08 距抓到时点仅 6 分钟，其推进方显然仍在编辑。代它入库会与该会话打架。",
+      "registered_at": "2026-08-15",
+      "revoke_when": "procedure-trim-report-line-account-resolution 归档后，由接手方入库并迁移共享件（该脚本自带四态判定与 5 个被测守卫，迁移成本低）"
+    },
+    {
+      "script": "backend/scripts/diagnose/mutate_wp_export_resolver_guards.py",
+      "spec": "workpaper-import-export-lifecycle-closure",
+      "reason": "归属经三条判据查清：其变异目标 `wp_export/wp_file_resolver.py` 正是该在办 spec 的核心真源（design.md 把 VERDICT_LABELS / WP_FILE_VERDICTS 列为单一真源），且 mtime 2026-08-09 早于该 spec 自己的 mutate_ie_lifecycle_guards.py(08-12)，属前身工作产物。docstring 写的 `wp-export-file-path-resolution` 从未建过 spec 目录。按 AC 5.4 不动在办 spec 的脚本，入库与迁移均交其推进方裁决。",
+      "registered_at": "2026-08-15",
+      "revoke_when": "workpaper-import-export-lifecycle-closure 归档后，由接手方判定入库或删除（其目标文件与测试当前均存在，脚本主体有效）"
+    }
+  ]
+}

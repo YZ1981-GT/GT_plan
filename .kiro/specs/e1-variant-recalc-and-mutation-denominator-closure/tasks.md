@@ -58,7 +58,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - **必须先红**：至少 rmb→multi 与「叶子口径→multi」两组必红。逐条记录红的测试名（Property 14 的前置证据）
   - _Requirements: 1.3, 4.1, 4.2, 4.3, 4.5_
 
-- [ ] 3. 未入库变异脚本入库 + 归属查清
+- [x] 3. 未入库变异脚本入库 + 归属查清
   - 7 个 `backend/scripts/check/mutate_task{13,14,18,19,20,21,23}_*.py` 属已归档 `procedure-trimming-and-delegation-intelligence`(26/26)，当前 `??` 未跟踪 ⇒ 入库（Property 16）
   - 入库前逐个跑只读子命令（`--list` 或等价）确认可运行、退出码 0 且输出非空；不可运行的**不入库**，如实登记原因（Property 17）
   - `mutate_wp_export_resolver_guards.py` 归属未明 ⇒ 按「内容关键词 + mtime + 对应守卫文件所属 spec」三条判归属，给出明确结论（入库 / 删除），写进实录，**不留 `??`**（Property 19）
@@ -67,7 +67,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - **不得** `git add` 在办 spec 的 3 个脚本（`k_cycle` / `i_cycle` / `ie_lifecycle`）（Property 18）
   - _Requirements: 5.1, 5.2, 5.3, 5.5_
 
-- [ ] 4. 变异脚本跟踪守卫 + 豁免表
+- [x] 4. 变异脚本跟踪守卫 + 豁免表
   - 新建 `backend/data/mutation_kit_exemptions.json`，schema 见 design.md §Data Models（`script`/`spec`/`reason`/`registered_at`/`revoke_when` 五个必填）
   - 登记在办 spec 的 3 个脚本，`reason` 写明「spec 在办 + 并发会话在编辑」，`revoke_when` 写「spec 归档后」
   - 新建 `backend/tests/test_mutation_kit_scripts_tracked.py`：扫 `backend/scripts/{check,diagnose}/mutate*.py`，未被 git 跟踪且不在豁免表 ⇒ 失败（Property 16）
@@ -239,3 +239,54 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
 - E1-10 交叉核对把科目码当账号比对（e-cycle spec 登记的另一处存量口径问题）—— 与本 spec 无文件重叠，建议并入存量口径回填 spec。
 - 存量 `el-input-number :formatter` 千分符空操作（40+ 处，EP 2.13.6 无该 prop）—— 属另一个待立 spec。
 - 迁移中发现的他 spec 判据缺陷（Property 28）—— 只登记。
+
+### Wave 1 实录之一：变异脚本入库（Task 3，2026-08-15）
+
+commit `45bca0ef`，7 个脚本 / 3108 行入库。
+
+**AC 5.3「确认可运行」的判据被现实改写**：任务原文写「至少 `--list` 或等价只读子命令不报错」，实测 8 个待入库脚本里**只有 `mutate_task13` 有只读子命令**（`--anchors`），其余只有 `--only`/`--restore`，无参数运行即执行变异改生产代码。改用**外部只读探针**提供等价能力 —— import 模块取 `MUTATIONS` 后逐条数锚点命中行数（模块级已用 AST 静态确认无副作用、7 个全有 `__main__` 守护）。判据四项：模块可 import · `MUTATIONS` 非空 · 目标文件存在 · 锚点可唯一定位。**「6/8 缺只读子命令」这件事本身登记为 Wave 4 迁移时要补的能力。**
+
+**结果 84 条变异 / 90 处锚点**：
+
+| 脚本 | 变异 | 锚点 | 可唯一定位 | 漂移 |
+|---|---|---|---|---|
+| `mutate_task13_wiring_guards.py` | 5 | 9 | 9 | 0 |
+| `mutate_task14_cscope_guards.py` | 14 | 14 | 14 | 0 |
+| `mutate_task18_suggestion_guards.py` | 7 | 7 | 7 | 0 |
+| `mutate_task19_apply_guards.py` | 12 | 12 | 12 | 0 |
+| `mutate_task20_review_guards.py` | 14 | 14 | 14 | 0 |
+| `mutate_task21_note_linkage_guards.py` | 20 | 20 | 20 | 0 |
+| `mutate_task23_baseline_guards.py` | 12 | 12 | **10** | **2** |
+
+🔴 **探针首轮有两处自身缺陷，修正后才得出上表**（对应 memory「ANCHOR-MISS 优先怀疑脚本缺陷」）：
+
+| 首轮误报 | 真因 | 修法 |
+|---|---|---|
+| `task14` 14 条全 `PATH-MISSING`、mid 显示 `?` | 该脚本**无类定义**，`MUTATIONS` 元素是 **dict**（键 `id`/`file`/`anchor`/…），路径字段叫 `file` 而非 `path`，且已是绝对 `WindowsPath` | 取值改为兼容 dict 与对象两形态，`PATH_FIELDS` 补 `file` |
+| `task19` M5 报 `HITS=2` | 探针用 `anchor.strip() in line` 匹配，把锚点的 6 空格缩进抹掉后，4 空格的另一行（L3611）也算进来。用原始锚点只命中 L3582 | 改「原始锚点精确子串」优先，`strip` 仅作参考回退 |
+
+**登记未修（Property 28）**：`mutate_task23_baseline_guards.py` 的 **T23-4 / T23-8** 锚点 `? Number((ctx.accounts as any)[accountName]?.amount)` 在 `ProcedureTrimming.vue` **零命中**（放宽到 `ctx.accounts as any` 仍 0 行）。真因是取金额逻辑已重构为独立函数 `resolveAccountAmount`（L2981 注释「金额走与 `buildAndDecide` **同一个** `resolveAccountAmount`」），而该文件最后一次实质改动正是 procedure-trim 自己的归档 commit `af060c4d` ⇒ **这两条变异在该 spec 归档时就已失效**。之所以无人发现，恰恰因为脚本从未入库、没有 CI 跑它们 —— 这条因果关系是本 spec R5 存在的最直接理由。
+
+**归属查清（AC 5.2 / Property 19）**：`mutate_wp_export_resolver_guards.py` **不入库**。三条判据：① 其变异目标 `wp_export/wp_file_resolver.py` 正是**在办** spec `workpaper-import-export-lifecycle-closure`(24/25) 的核心真源（该 spec 的 design.md 把 `VERDICT_LABELS` / `WP_FILE_VERDICTS` 列为单一真源）② mtime 2026-08-09 早于该 spec 自己的 `mutate_ie_lifecycle_guards.py`(08-12)，属前身工作产物 ③ docstring 写的 `wp-export-file-path-resolution` 在 `.kiro/specs/` 与 `_archive/` 下**均无对应目录**（从未建过）。结论 = 归在办 spec、登记豁免、由其推进方裁决入库或删除（其目标文件与测试当前均存在，脚本主体有效）。
+
+**未触碰**：`mutate_k_cycle_guards.py` · `mutate_i_cycle_guards.py` · `mutate_ie_lifecycle_guards.py`（Property 18）。提交用 `git commit -- <pathspec>` 限定 —— 因为 index 里有并发 i-cycle 会话预先 `git add` 的 8 个文件（含 `mutate_i_cycle_guards.py` 本身），直接 `git commit` 会把它们一起提交。提交后复核这 8 个仍为 staged 未提交态。
+
+### Wave 1 实录之二：跟踪守卫与豁免表（Task 4，2026-08-15）
+
+产物：`backend/data/mutation_kit_exemptions.json` · `backend/tests/test_mutation_kit_scripts_tracked.py`（12 例）· `backend/tests/test_mutation_kit_exemptions.py`（10 例）。**22 passed**。
+
+🔴 **守卫上线第一次运行就抓到一个立项调查时不存在的欠账**：`backend/scripts/check/mutate_report_line_resolution_guards.py`（436 行，`??` 未跟踪）。它属**在办** spec `procedure-trim-report-line-account-resolution` 的 Task 13，实测 mtime **12:08:10** 而抓到时点是 12:14 —— 距创建仅 6 分钟，并发会话正在写。已登记豁免（不代它入库）。这比任何人工构造的变异都更有力地证明了守卫在承重：**它抓的不是历史欠账，是正在产生的欠账**。
+
+豁免表现有 5 项：`k_cycle` · `i_cycle` · `ie_lifecycle` · `report_line_resolution` · `wp_export_resolver`，全部指向在办 spec，每项带 `reason` + `registered_at` + `revoke_when`。
+
+**变异检验 3/3 全 RED**（GREEN=0 / ANCHOR-MISS=0 / WRONG-TEST=0），还原后 md5 与基线逐字相符、复跑回到 22 passed：
+
+| 变异 | 判定 | 命中 |
+|---|---|---|
+| M1 把某豁免项的 `spec` 换成已归档的 spec 名 | RED | `test_no_stale_exemption_after_spec_archived` |
+| M2 移除一条豁免项（未入库脚本应被抓） | RED | `test_every_mutation_script_is_tracked_or_exempt` |
+| M3 把 `exemptions[0].reason` 改短 | RED | `test_every_entry_has_valid_fields` |
+
+🔴 **M3 首轮判成 GREEN，实为变异脚本的锚点缺陷 —— 这条教训要带进 Wave 3 的共享件设计**：正则 `"reason": "[^"]{20,}"` 命中的是豁免表顶部 `_schema.reason` 那条**文档说明**，而 `validate_entry` 只校验 `exemptions[]` 内的项 ⇒ 变异落在被测判据的**作用域之外**。按四态定义应记 ANCHOR-MISS，但「新增失败集合是否为空」这个判定式**识别不出「锚点落在作用域外」**，于是把脚本缺陷误报成守卫缺陷。修法是改用 JSON 结构定位（天然落在 `exemptions[0]` 内）并加一句作用域自证断言。⇒ **共享件的 `--list` 校验除了「锚点命中恰好 1 次」，还应支持调用方声明作用域自证**（Requirement 6.7 的实现要覆盖这一形态）。
+
+另一处踩坑：首轮用 `Path.write_text()` 还原，Windows 把 LF 写成 CRLF ⇒ 内容对但 **md5 不符**。全程改 `read_bytes`/`write_bytes` 后逐字相符。这正是 design.md 给共享件定的硬约束（「写回不改 CRLF」）在自己身上先验证了一次。
