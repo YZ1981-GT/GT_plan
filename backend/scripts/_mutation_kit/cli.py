@@ -207,7 +207,7 @@ def _run_one(
                 )
             else:
                 res = runner()
-                v, added, gone, hit = judge(m.want, baseline, res.failed)
+                v, added, gone, hit = judge(m.want, baseline, res.failed, m.wants)
                 rec.update(
                     verdict=v, summary=res.summary, added=added, gone=gone, hit=hit,
                     added_files=sorted(guard_files_of(added, res.name2file)),

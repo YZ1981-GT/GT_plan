@@ -120,6 +120,81 @@ def test_line_disambiguation_requires_exact_match(fake_repo: Path) -> None:
         find_anchor(lines, "    return 1", want_line=1)
 
 
+def test_scope_relative_locate_resolves_ambiguous_anchor(fake_repo: Path) -> None:
+    """scope 相对定位：anchor 多处命中时靠附近的唯一行 + offset 消歧。"""
+    _write(
+        fake_repo / "src" / "amb.py",
+        "def a():\n    return 1\n\n\ndef b():\n    return 1\n",
+    )
+    lines = read_lines(fake_repo / "src" / "amb.py")
+    with pytest.raises(AnchorMiss, match="命中 2 次"):
+        find_anchor(lines, "    return 1")
+    # 用 `def b():` 作 scope，offset=1 指向它下面那行
+    assert find_anchor(lines, "    return 1", scope="def b():", offset=1) == 5
+    assert find_anchor(lines, "    return 1", scope="def a():", offset=1) == 1
+
+
+def test_scope_survives_line_shift_while_absolute_line_would_not(fake_repo: Path) -> None:
+    """🔴 scope 比 line 强在哪：文件上方增删行后 scope 仍有效、绝对行号会失效。
+
+    Wave 3 的 M12 正是写了 `line=155` 而那行早已是别的内容（`--list` 当场拦住）。
+    """
+    body = "def a():\n    return 1\n\n\ndef b():\n    return 1\n"
+    fp = fake_repo / "src" / "shift.py"
+    _write(fp, body)
+    lines = read_lines(fp)
+    idx_before = find_anchor(lines, "    return 1", scope="def b():", offset=1)
+    assert find_anchor(lines, "    return 1", want_line=idx_before + 1) == idx_before
+
+    # 在文件**顶部**插入两行（模拟上游改动）
+    _write(fp, "# new header\n# another\n" + body)
+    lines2 = read_lines(fp)
+    assert find_anchor(lines2, "    return 1", scope="def b():", offset=1) == idx_before + 2
+    with pytest.raises(AnchorMiss, match="内容不符"):
+        find_anchor(lines2, "    return 1", want_line=idx_before + 1)
+
+
+def test_scope_must_be_unique(fake_repo: Path) -> None:
+    _write(fake_repo / "src" / "dupscope.py", "mark\n    return 1\nmark\n    return 1\n")
+    lines = read_lines(fake_repo / "src" / "dupscope.py")
+    with pytest.raises(AnchorMiss, match="scope 命中 2 次"):
+        find_anchor(lines, "    return 1", scope="mark", offset=1)
+
+
+def test_scope_offset_out_of_range_is_rejected(fake_repo: Path) -> None:
+    lines = read_lines(fake_repo / "src" / "target.py")
+    with pytest.raises(AnchorMiss, match="越界"):
+        find_anchor(lines, "    return 1", scope="def f():", offset=9999)
+
+
+def test_scope_offset_pointing_to_wrong_line_is_rejected(fake_repo: Path) -> None:
+    lines = read_lines(fake_repo / "src" / "target.py")
+    with pytest.raises(AnchorMiss, match="不是 anchor"):
+        find_anchor(lines, "    return 1", scope="def f():", offset=0)
+
+
+def test_scope_and_line_are_mutually_exclusive_at_declaration() -> None:
+    errs = validate_mutation(_mut(scope="def f():", offset=1, line=2))
+    assert any("互斥" in e for e in errs), errs
+
+
+def test_offset_without_scope_is_rejected() -> None:
+    errs = validate_mutation(_mut(offset=3))
+    assert any("offset" in e for e in errs), errs
+
+
+def test_wants_with_empty_pattern_is_rejected() -> None:
+    """空模式会匹配任何失败名 = 放弃判据。"""
+    errs = validate_mutation(_mut(wants=("test_a", "")))
+    assert any("空串" in e for e in errs), errs
+
+
+def test_want_or_wants_at_least_one_required() -> None:
+    errs = validate_mutation(_mut(want="", wants=()))
+    assert any("want" in e for e in errs), errs
+    assert validate_mutation(_mut(want="", wants=("test_a",))) == []
+
+
 def test_find_anchor_rejects_multiline_anchor(fake_repo: Path) -> None:
     """🔴 定位期也必须拒绝含换行的锚点 —— 与声明期那道是**两层独立防护**。
 
@@ -272,7 +347,27 @@ def test_verdict_ignores_exit_code_by_construction() -> None:
     import inspect
 
     params = set(inspect.signature(judge).parameters)
-    assert params == {"want", "baseline_failed", "current_failed"}, params
+    assert params == {"want", "baseline_failed", "current_failed", "wants"}, params
+    forbidden = {"exit_code", "returncode", "rc", "proc", "process"}
+    assert not (params & forbidden), f"judge 不得接触退出码：{params & forbidden}"
+
+
+def test_verdict_supports_multi_target_wants() -> None:
+    """多目标 want：任一命中即 RED（迁移 trim_decision / note_conversion 时补的能力）。"""
+    v, _, _, hit = judge("", set(), {"test_b", "test_c"}, wants=("test_c", "test_zzz"))
+    assert v == RED and hit == ["test_c"]
+
+
+def test_verdict_multi_target_union_with_single_want() -> None:
+    """want 与 wants 同时给时取并集。"""
+    _, _, _, hit = judge("test_a", set(), {"test_a", "test_c"}, wants=("test_c",))
+    assert hit == ["test_a", "test_c"]
+
+
+def test_verdict_multi_target_all_miss_is_wrong_test() -> None:
+    """反向自检：多目标全不命中仍须判 WRONG-TEST，不得因「有多个模式」而放宽。"""
+    v, _, _, hit = judge("", set(), {"test_other"}, wants=("test_a", "test_b"))
+    assert v == WRONG_TEST and hit == []
 
 
 def test_gone_items_are_reported(fake_repo: Path) -> None:

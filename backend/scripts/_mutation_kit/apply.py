@@ -37,18 +37,18 @@ def apply_mutation(m: Mutation, repo: Path) -> None:
     lines = read_lines(target)
 
     if m.kind == "replace":
-        i = find_anchor(lines, m.anchor, m.line)
+        i = find_anchor(lines, m.anchor, m.line, m.scope, m.offset)
         lines[i] = m.new + eol_of(lines[i])
     elif m.kind == "delete":
-        i = find_anchor(lines, m.anchor, m.line)
+        i = find_anchor(lines, m.anchor, m.line, m.scope, m.offset)
         del lines[i]
     elif m.kind == "insert":
-        i = find_anchor(lines, m.anchor, m.line)
+        i = find_anchor(lines, m.anchor, m.line, m.scope, m.offset)
         eol = eol_of(lines[i]) or "\n"
         payload = [s + eol for s in m.new.rstrip("\n").split("\n")]
         lines[i + 1 : i + 1] = payload
     elif m.kind in ("swap", "move"):
-        ia = find_anchor(lines, m.anchor, m.line)
+        ia = find_anchor(lines, m.anchor, m.line, m.scope, m.offset)
         ib = find_anchor(lines, m.anchor2)
         a0, a1 = block_range(lines, ia, m.block_open)
         b0, b1 = block_range(lines, ib, m.block_open)

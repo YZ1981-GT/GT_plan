@@ -27,21 +27,25 @@ ERROR = "ERROR"
 ALL_VERDICTS = (RED, GREEN, WRONG_TEST, ANCHOR_MISS, ERROR)
 
 
-def matched(want: str, names: set[str]) -> list[str]:
-    """``want`` 在失败名集合里的命中项。
+def matched(want: str, names: set[str], wants: tuple[str, ...] = ()) -> list[str]:
+    """``want`` / ``wants`` 在失败名集合里的命中项（多目标取并集）。
 
     两种写法都支持：
 
     - 裸方法名 ``test_xxx``：按 nodeid **末段前缀**匹配（吃掉 parametrize 的 ``[...]``）
     - 带文件/类的片段或前端中文标题：按子串匹配
+
+    多目标（``wants``）是迁移 `mutate_trim_decision_guards`（`expect_red: tuple`）与
+    `mutate_note_conversion_section_mapping_guards`（`expect_tests: list`）时补的 ——
+    一条变异常常同时打红多条判据，只允许单目标会逼作者挑一条写、丢掉其余信息。
     """
+    patterns = [p for p in ((want,) + tuple(wants)) if p]
     out: set[str] = set()
     for n in names:
-        if want in n:
-            out.add(n)
-            continue
-        if n.split("::")[-1].startswith(want):
-            out.add(n)
+        for pat in patterns:
+            if pat in n or n.split("::")[-1].startswith(pat):
+                out.add(n)
+                break
     return sorted(out)
 
 
@@ -49,15 +53,17 @@ def judge(
     want: str,
     baseline_failed: set[str],
     current_failed: set[str],
+    wants: tuple[str, ...] = (),
 ) -> tuple[str, list[str], list[str], list[str]]:
     """返回 ``(verdict, added, gone, hit)``。
 
     ``gone``（基线里有而现在没有的失败项）不参与判定，但要报出来 —— 它通常意味着
     基线本身不稳定（随机顺序、共享状态），此时差集判定的可信度下降。
+    （本 kit 在基线非空时直接 ABORT，故正常流程下 ``gone`` 恒为空。）
     """
     added = sorted(current_failed - baseline_failed)
     gone = sorted(baseline_failed - current_failed)
-    hit = matched(want, set(added))
+    hit = matched(want, set(added), wants)
     if not added:
         return GREEN, added, gone, hit
     if hit:

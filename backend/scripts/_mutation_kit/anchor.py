@@ -65,10 +65,47 @@ def strip_eol(line: str) -> str:
     return line[: len(line) - len(e)] if e else line
 
 
-def find_anchor(lines: list[str], anchor: str, want_line: int = 0) -> int:
-    """返回锚点行下标（0-based）。四重断言任一不成立即抛 :class:`AnchorMiss`。"""
+def find_anchor(
+    lines: list[str],
+    anchor: str,
+    want_line: int = 0,
+    scope: str = "",
+    offset: int = 0,
+) -> int:
+    """返回锚点行下标（0-based）。四重断言任一不成立即抛 :class:`AnchorMiss`。
+
+    三种消歧方式，优先级 scope > want_line > 唯一命中：
+
+    - ``scope`` **相对定位**：`scope` 必须唯一命中，取 `scope_idx + offset` 那行并
+      验证它逐字等于 `anchor`。比绝对行号稳 —— 文件上下增删行不影响它。
+    - ``want_line`` 绝对行号（1-based），该行必须逐字等于 `anchor`
+    - 都不给时要求 `anchor` 在全文唯一命中
+    """
     if "\n" in anchor or "\r" in anchor:
         raise AnchorMiss("锚点含换行 —— CRLF 工作树下必然 MISS，改用单行锚点")
+
+    if scope:
+        if "\n" in scope or "\r" in scope:
+            raise AnchorMiss("scope 含换行 —— 同 anchor，必须单行")
+        shits = [i for i, ln in enumerate(lines) if strip_eol(ln) == scope]
+        if len(shits) != 1:
+            raise AnchorMiss(
+                f"scope 命中 {len(shits)} 次（应为 1），行号："
+                f"{'; '.join(str(h + 1) for h in shits[:8]) or '无'}\n  {scope!r}"
+            )
+        idx = shits[0] + offset
+        if not (0 <= idx < len(lines)):
+            raise AnchorMiss(
+                f"scope+offset 越界：scope 在 L{shits[0] + 1}，offset={offset}，"
+                f"文件 {len(lines)} 行"
+            )
+        if strip_eol(lines[idx]) != anchor:
+            raise AnchorMiss(
+                f"scope+offset 指向的 L{idx + 1} 不是 anchor\n"
+                f"  期望 {anchor!r}\n  实为 {strip_eol(lines[idx])!r}"
+            )
+        return idx
+
     hits = [i for i, ln in enumerate(lines) if strip_eol(ln) == anchor]
     if want_line:
         idx = want_line - 1

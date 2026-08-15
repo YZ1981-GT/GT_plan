@@ -56,7 +56,8 @@ BE_ARGS = [
 #: 冻结基线（2026-08-15 亲测）。改这个数必须同时说明来源。
 #: 62 -> 63：M02 判 GREEN 后补 test_find_anchor_rejects_multiline_anchor。
 #: 63 -> 65：Task 11 迁移时暴露「子集运行恒非零退出」缺陷，补两条退出码守卫。
-BASELINE_BE_PASSED = 65
+#: 65 -> 77：Task 12 为迁移吸收 scope 相对定位与多目标 wants 两项能力，补 12 条守卫。
+BASELINE_BE_PASSED = 77
 
 MUTATIONS: list[Mutation] = [
     Mutation(
@@ -246,6 +247,31 @@ MUTATIONS += [
             "并配 scope_check 双重确认改动落在被测结构内 —— "
             "Wave 1 正是因为锚点落到 _schema 文档说明上而把脚本缺陷误报成 GREEN。",
         scope_check=_exemption_field_is("registered_at", "2026/08/15"),
+    ),
+    # ── Task 12 为迁移吸收的两项新能力（相对定位 / 多目标 want）───────────────
+    Mutation(
+        id="M17", side="be", path=f"{KIT}/anchor.py", kind="replace",
+        anchor="    if scope:",
+        new="    if False:",
+        want="test_scope_relative_locate_resolves_ambiguous_anchor",
+        wants=(
+            "test_scope_survives_line_shift_while_absolute_line_would_not",
+            "test_scope_must_be_unique",
+        ),
+        why="删掉 scope 相对定位分支 ⇒ 退回「只能用绝对行号消歧」。绝对行号一改文件就失效"
+            "（Wave 3 的 M12 写 line=155 而那行早已是别的内容），而 scope+offset 只要"
+            "scope 行还唯一就有效 —— 这条能力是迁移 mutate_trim_decision_guards 时吸收的。"
+            "本条用多目标 wants 声明，正好也在验第二项新能力。",
+    ),
+    Mutation(
+        id="M18", side="be", path=f"{KIT}/verdict.py", kind="replace",
+        anchor="    patterns = [p for p in ((want,) + tuple(wants)) if p]",
+        new="    patterns = [p for p in (want,) if p]",
+        want="test_verdict_supports_multi_target_wants",
+        wants=("test_verdict_multi_target_union_with_single_want",),
+        why="让 matched 丢掉 wants 只看 want ⇒ 多目标退化成单目标。迁移 trim_decision"
+            "（expect_red: tuple）与 note_conversion（expect_tests: list）都依赖多目标，"
+            "退化后它们的判定会从 RED 变 WRONG-TEST（命中不到被挑掉的那些模式）。",
     ),
 ]
 

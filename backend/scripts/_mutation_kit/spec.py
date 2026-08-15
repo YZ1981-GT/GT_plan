@@ -70,6 +70,22 @@ class Mutation:
     line: int = 0
     block_open: str = ""
     tags: tuple[str, ...] = field(default_factory=tuple)
+    #: 多目标期望：任一命中即判 RED。与 :attr:`want` 二选一（都给则并集）。
+    #:
+    #: 迁移 `mutate_trim_decision_guards`（`expect_red: tuple`）与
+    #: `mutate_note_conversion_section_mapping_guards`（`expect_tests: list`）时补的能力 ——
+    #: 一条变异常常同时打红多条判据，只允许单目标会逼作者挑一条写、丢掉其余信息。
+    wants: tuple[str, ...] = field(default_factory=tuple)
+    #: **相对定位**：`anchor` 多处命中时，先用 `scope` 锚定附近一个唯一行，
+    #: 再取 `scope_idx + offset` 那行并验证它逐字等于 `anchor`。
+    #:
+    #: 🔴 比 :attr:`line`（绝对行号）更稳：绝对行号一改文件就失效 ——
+    #: 本 spec Wave 3 的 M12 就是写了 `line=155` 而那行早已是别的内容
+    #: （`--list` 校验当场拦住）。迁移 `mutate_trim_decision_guards` 时把它的
+    #: `scope`+`offset` 机制吸收进来。与 :attr:`line` 互斥。
+    scope: str = ""
+    #: 相对 `scope` 命中行的偏移（可负）。仅当 `scope` 非空时生效。
+    offset: int = 0
     #: 变异写盘后立刻调用，入参是变异后的**文件字节**，返回 False 即判 ANCHOR-MISS。
     #:
     #: 🔴 存在的理由（2026-08-15 实测）：四态判定式「新增失败集合是否为空」
@@ -110,10 +126,27 @@ def validate_mutation(m: Mutation) -> list[str]:
         if m.anchor != m.anchor.rstrip("\n\r"):
             errs.append("anchor 带行尾字符 —— 应传去掉行尾后的整行文本")
 
-    if not m.want:
-        errs.append("want 为空 —— 无期望打红的测试则无法判 RED/WRONG-TEST")
+    if not m.want and not m.wants:
+        errs.append("want / wants 都为空 —— 无期望打红的测试则无法判 RED/WRONG-TEST")
+    if m.wants and any(not w for w in m.wants):
+        errs.append("wants 里有空串 —— 空模式会匹配任何失败名，等于放弃判据")
     if not m.why or len(m.why) < 8:
         errs.append("why 缺失或过短 —— 必须写明为什么这条变异不是无效变异")
+
+    if m.scope:
+        if "\n" in m.scope or "\r" in m.scope:
+            errs.append("scope 含换行 —— 同 anchor，必须单行")
+        if not m.scope.strip():
+            errs.append("scope 是纯空白 —— 无法唯一定位")
+        if m.line:
+            errs.append(
+                "scope 与 line 互斥：前者是相对定位（scope 行 + offset），"
+                "后者是绝对行号，同时给会让消歧依据不明确"
+            )
+        if m.scope == m.anchor and m.offset == 0:
+            errs.append("scope 等于 anchor 且 offset=0 —— 相对定位退化成无效消歧")
+    elif m.offset:
+        errs.append("offset 非 0 但未给 scope —— offset 只在相对定位下生效")
 
     if m.kind in ("replace", "insert"):
         if not m.new:
