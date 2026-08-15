@@ -48,6 +48,9 @@ _BACKEND = _HERE.parents[2]  # backend/
 _SVC_PATH = _BACKEND / "app" / "services" / "trim_decision_context.py"
 _ROUTER_PATH = _BACKEND / "app" / "routers" / "procedures.py"
 
+#: 本 spec（procedure-trimming-and-delegation-intelligence）交付的七键。
+#: 🔴 保留为独立常量而非并进下方全集 —— 它承担「这七键一个都不许丢」这条**零回归**
+#: 判据（后续 spec 只能 additive 加键，不能改动或移除既有键）。
 _SEVEN_KEYS = {
     "accounts",
     "materiality",
@@ -57,6 +60,14 @@ _SEVEN_KEYS = {
     "workpaper_entry",
     "degradations",
 }
+
+#: 当前完整键集 = 上面七键 + 后续 spec additive 追加的键。
+#:
+#: 追加记录（每次 additive 都在此登记，使「谁加的、为什么」可追溯）：
+#: - ``report_line_amounts``：spec ``procedure-trim-report-line-account-resolution``
+#:   Task 7 —— 裁剪判据的科目金额改走「程序 → 报表行 → 报表公式」，
+#:   原按科目名子串匹配的路径保留为兜底（该 spec R5.1）。
+_CONTEXT_KEYS = _SEVEN_KEYS | {"report_line_amounts"}
 
 
 def _svc():
@@ -396,14 +407,29 @@ def test_router_registers_route_and_is_get_only():
 # 类 A-2：`_degradation` 契约 —— cause 只允许出现在 accounts 维度（裁决 2）
 # ═══════════════════════════════════════════════════════════════════════════
 def test_degradation_dimension_domain_is_exactly_five():
+    """维度取值域封闭（禁扩散）。
+
+    🔴 测试名里的 ``five`` 是本 spec 交付时的计数，现为 **six** ——
+    ``report_line`` 由 spec ``procedure-trim-report-line-account-resolution`` Task 7
+    additive 追加。测试名有意保留（变异检验按失败测试名集合求差集，改名会让
+    历史基线断链）；真正的判据是下面两条断言：既有五维一个不许丢 + 总数封闭。
+    """
     mod = _svc()
-    assert set(mod.DEGRADATION_DIMENSIONS) == {
+    legacy_five = {
         "accounts",
         "materiality",
         "risk",
         "completeness_override",
         "workpaper_entry",
     }
+    actual = set(mod.DEGRADATION_DIMENSIONS)
+    assert legacy_five <= actual, (
+        f"既有维度被移除：{sorted(legacy_five - actual)} —— 后续 spec 只能加不能删"
+    )
+    assert actual == legacy_five | {"report_line"}, (
+        f"维度取值域出现未登记的扩散：{sorted(actual - legacy_five - {'report_line'})}；"
+        "新增维度必须同时在本判据里登记，否则「随手加一个维度」不会被发现"
+    )
 
 
 def test_degradation_rejects_unregistered_dimension():
@@ -459,8 +485,21 @@ def _healthy_session(**kw):
 
 
 def test_returns_exactly_seven_keys():
+    """返回键集封闭。
+
+    🔴 测试名里的 ``seven`` 是本 spec 交付时的计数，现为 **eight**
+    （``report_line_amounts`` 由 ``procedure-trim-report-line-account-resolution``
+    Task 7 additive 追加，登记见 ``_CONTEXT_KEYS``）。名字有意保留 —— 见
+    ``test_degradation_dimension_domain_is_exactly_five`` 的说明。
+
+    两条断言各有分工：``_SEVEN_KEYS`` 子集关系 = 零回归（既有键一个不许丢）；
+    等值 = 封闭性（随手加键不会被漏过）。
+    """
     ctx = _build(_healthy_session())
-    assert set(ctx) == _SEVEN_KEYS, f"键集不符：{sorted(ctx)}"
+    assert _SEVEN_KEYS <= set(ctx), (
+        f"既有键被移除：{sorted(_SEVEN_KEYS - set(ctx))} —— 后续 spec 只能 additive"
+    )
+    assert set(ctx) == _CONTEXT_KEYS, f"键集不符：{sorted(ctx)}"
 
 
 def test_healthy_path_has_no_degradation_for_three_dimensions():
@@ -1080,12 +1119,20 @@ def test_completeness_override_none_is_distinct_from_empty_dict():
 # 类 B-8：全维度同时失败仍不抛异常（fail-soft 但不静默）
 # ═══════════════════════════════════════════════════════════════════════════
 def test_all_dimensions_failing_still_returns_seven_keys_with_degradations():
+    """全维度失败仍返完整键集（fail-soft 但不静默）。
+
+    🔴 测试名里的 ``seven`` 现为 **eight** —— 见
+    ``test_degradation_dimension_domain_is_exactly_five`` 的说明。
+    """
     ctx = _build(
         _FakeSession(
             raise_on={"trial_balance", "materiality", "wp_index", "responses", "cscope"}
         )
     )
-    assert set(ctx) == _SEVEN_KEYS
+    assert _SEVEN_KEYS <= set(ctx), (
+        f"既有键在全失败态下丢失：{sorted(_SEVEN_KEYS - set(ctx))}"
+    )
+    assert set(ctx) == _CONTEXT_KEYS
     assert ctx["accounts"] == {}
     assert ctx["materiality"] is None
     assert ctx["risk"] == {}

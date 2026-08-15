@@ -409,11 +409,19 @@ describe('[类 A] 内存内变异：判据施加于真实源码后必须能打�
     ).toBe(true)
 
     // 变异 = 复现改造前的丢弃形态（金额恒 null ⇒ 重要性维度静默失效、永不产生建议）
+    //
+    // 🔴 锚点容纳两代取金额形态，因为宿主的取值路径已迁移过一次：
+    //    ① 旧：`Number((ctx.accounts as any)[accountName]?.amount)`（直接读 accounts）
+    //    ② 现：`resolvedAmount.amount`（经统一入口 `resolveAccountAmount`，
+    //       spec procedure-trim-report-line-account-resolution 把金额来源改为
+    //       报表行映射优先、科目名匹配兜底，两处消费点收口到一个函数）
+    //    只锚 ① 会在迁移后以「变异未施加」的形态**假红**（判据其实还有效，
+    //    只是锚点失配）。承重不变：变异后 `referencesAmountValue` 必须判「未引用」。
     const mutated = body.replace(
-      /Number\(\(ctx\.accounts as any\)\[accountName\]\?\.amount\)/,
+      /Number\(\(ctx\.accounts as any\)\[accountName\]\?\.amount\)|resolvedAmount\.amount/,
       'null',
     )
-    expect(mutated, '变异未施加（取金额锚点未命中真实源码）').not.toBe(body)
+    expect(mutated, '变异未施加（取金额锚点未命中真实源码，两代形态都没匹配上）').not.toBe(body)
     expect(
       referencesAmountValue(mutated).referenced,
       '退回「丢弃 amount」后判据仍判「已引用」⇒ 判据空转，金额消费被删掉时不会转红',
@@ -429,7 +437,10 @@ describe('[类 A] 内存内变异：判据施加于真实源码后必须能打�
     expect(
       scanned,
       '取金额那一行被过滤掉了 ⇒ 过滤过宽，判据在「丢弃 amount」的实现上会恒绿',
-    ).toMatch(/\?\.amount/)
+      // 🔴 只认 `?.amount` 会在取值路径迁移后假红：现行写法是 `resolvedAmount.amount`
+      //    （经统一入口，无可选链）。判据关心的是「取值行活过了过滤」，
+      //    与它用不用可选链无关。
+    ).toMatch(/\.amount\b/)
     // 反向自检：把过滤放宽成「任何含 amount 的行都剥掉」，真实取值行即被吞
     const overBroad = body.split('\n').filter((ln) => !/amount/.test(ln)).join('\n')
     expect(

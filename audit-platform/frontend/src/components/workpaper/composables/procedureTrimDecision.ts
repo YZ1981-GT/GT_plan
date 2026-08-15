@@ -120,6 +120,30 @@ export interface TrimMaterialityInput {
   trivialThreshold: number
 }
 
+/**
+ * 报表行溯源（`accountAmount` 来自报表行映射时的出处）。
+ *
+ * spec: procedure-trim-report-line-account-resolution R6.1
+ */
+export interface TrimReportLineTrace {
+  /** 报表行编码（如 BS-002） */
+  rowCode: string
+  /** 报表行名（如 货币资金） */
+  rowName: string
+  /** 命中的取数公式原文 */
+  formula: string | null
+  /** 参与计算的标准科目码 */
+  standardCodes: string[]
+}
+
+/**
+ * `accountAmount` 的来源标识。
+ *
+ * `report_line` = 经「程序 → 报表行 → 报表公式」取数（与报表页同一引擎，可靠）；
+ * `account_name` = 按程序名子串匹配科目名取试算表余额（兜底，可靠性较低，界面须标注）。
+ */
+export type TrimAmountSourceTag = 'report_line' | 'account_name' | null
+
 export interface TrimDecisionInput {
   procedure: TrimProcedureInput
   /** 科目余额；`null` = 该科目未在试算表出现 */
@@ -135,6 +159,17 @@ export interface TrimDecisionInput {
   /** 完整性豁免的循环级判据（调用方已合并项目覆盖） */
   completenessSensitiveCycle: boolean
   completenessSource: CompletenessExemptionSource
+  /**
+   * 🔴 **只进 evidence，不参与任何档位判断**（spec R5.4）。
+   *
+   * 九档的条件表达式一律不引用它 —— 「同一个金额，因为取数路径不同而得出不同裁剪
+   * 结论」在审计上说不通，且会让改造前后的行为无法做零回归对照。
+   * 守卫 `trimDecisionAmountSourceNeutrality.spec.ts` 按「`decideTrim` 函数体内零出现」
+   * 与「三种取值下 verdict/reasonCode/narrative 完全相同」双向钉死。
+   */
+  amountSource?: TrimAmountSourceTag
+  /** 🔴 同上：只进 evidence，不参与判断。`accountAmount` 非报表行来源时为 null。 */
+  reportLine?: TrimReportLineTrace | null
 }
 
 export interface TrimEvidence {
@@ -167,6 +202,14 @@ export interface TrimEvidence {
   completenessSource: CompletenessExemptionSource
   completenessExempt: boolean
   completenessUsingPlatformDefault: boolean
+  // ── 金额来源溯源（纯留痕，不参与判断）──
+  /**
+   * `accountAmount` 是怎么来的。复核者据此判断该金额的可靠性：
+   * `report_line` 与报表页同口径；`account_name` 是按程序名猜的科目，可靠性较低。
+   */
+  amountSource?: TrimAmountSourceTag
+  /** 报表行溯源四项（`amountSource === 'report_line'` 时非空） */
+  reportLine?: TrimReportLineTrace | null
 }
 
 export interface TrimDecision {
@@ -337,6 +380,11 @@ function buildEvidence(
     completenessSource: exemption.source,
     completenessExempt: exemption.exempt,
     completenessUsingPlatformDefault: exemption.usingPlatformDefault,
+    // 🔴 溯源字段的**唯一**写入点。缺省时如实写 null（不编造来源）——
+    //    `undefined` 与 `null` 在这里语义相同（都表示"没告知"），统一成 null
+    //    使复核视图不必两种都判。
+    amountSource: input.amountSource ?? null,
+    reportLine: input.reportLine ?? null,
   }
 }
 

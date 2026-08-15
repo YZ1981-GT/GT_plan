@@ -2027,6 +2027,19 @@ jobs:
       #      该类脱钩现由 `test_k_cycle_ci_wiring.py` 逐个过滤器解析真实文件钉死。
       - name: Run K-cycle account scope & cross-lock guards
         run: npx vitest run src/components/workpaper/composables/__tests__/kCycleAccountScope.spec.ts src/components/workpaper/composables/__tests__/kCycleAccountScopeCrossLock.spec.ts --silent=true
+      # fail closed 的原因字段必须真被消费（additive 字段最常见的死法是「加了没人用」）
+      - name: Run row-scope fail-closed message guards
+        run: npx vitest run src/components/workpaper/composables/__tests__/rowScopeFailure.spec.ts --silent=true
+      # K11 披露表按负数填列（Requirement 8.7）：原状只有文案说负数、代码零翻转
+      - name: Run K11 disclosure sign guards
+        run: npx vitest run src/components/workpaper/composables/__tests__/k11DisclosureSign.spec.ts --silent=true
+      # ── k-cycle-extraction-formula-and-disclosure-closure Task 21 ──
+      # 附注载荷契约（Property 36~38、42~45）。判**推送侧**而非 seed 侧：
+      # ①无账龄的 11 个循环源码零引用账龄模块 ②子表名不含表头文字/英文列 key
+      # ③`_note_texts` 每处赋值都有空文本闸门 ④中文 title 按链路解析（字面量／
+      # 元组／调用方穿透三种落法都要认）。seed 侧由后端 `aging_payload` 守卫管。
+      - name: Run K-cycle note payload contract guards
+        run: npx vitest run src/components/workpaper/composables/__tests__/kCycleNoteContract.spec.ts --silent=true
 
   k-cycle-extraction-formula-closure:
     # K 循环取数 / 公式预设 / 披露块收口守卫
@@ -2082,6 +2095,27 @@ jobs:
         run: python -m pytest backend/tests/four_table/test_k_cycle_preset_closure.py -q
       - name: Run K-cycle CI wiring guards (本 job 自身的接线不得脱钩)
         run: python -m pytest backend/tests/test_k_cycle_ci_wiring.py -q
+      # 段首码与结构对齐的正交性：共享 kit 重写 rows 时必须搬运 report_row_code，
+      # 否则「结构脚本」与「段首码脚本」两个 --check 永远不可能同时归零。
+      - name: Run note structure kit row-code carry guards
+        run: python -m pytest backend/tests/services/test_note_structure_kit_row_codes.py -q
+      # fail closed 必须给**可诊断**原因：三种成因（准则未设 / 表名不一致 /
+      # 模板缺段首码）修法完全不同，只报「解析失败」等于把三条岔路合成死胡同。
+      - name: Run row-scope fail-closed diagnosis guards
+        run: python -m pytest backend/tests/four_table/test_row_scope_failclosed_diagnosis.py -q
+      # 附注结构三向比对：源 xlsx（唯一裁决者）↔ 模板 JSON ↔ 前端 sheet 名常量。
+      # 类 A（判据源自检）一红则类 B 的红不可解读，故两类同文件同跑。
+      - name: Run note K structure three-way closure guards
+        run: python -m pytest backend/tests/services/test_note_k_structure_closure.py -q
+      # 8.2/8.4/8.5：两版列头必须保持分变体（统一成一份 ⇒ 一侧用语整体错且不报错）；
+      # 8.6：源模板缺陷按意图实现并登记（配 stale 检测）；8.7：K11 披露表按负数填列。
+      - name: Run note K column-variant & source-defect guards
+        run: python -m pytest backend/tests/services/test_note_k_column_variant_alignment.py -q
+      # 10.x：账龄字面单一真源（两版首档不同，禁统一）、账龄作列的 5 张表不得改成行、
+      # 月度细分行保留、K3 独立表、11 个无账龄循环反向锁死（配扫描面非空自检）。
+      # 12.x：子表名逐字命中模板表名、禁混入表头文字/英文 key、多表循环须清孤儿。
+      - name: Run note K aging & payload closure guards
+        run: python -m pytest backend/tests/services/test_note_k_aging_and_payload_closure.py -q
       - name: Check K-cycle prefill presets idempotent (--check)
         run: python backend/scripts/fix/fix_k_cycle_prefill_presets.py --check
       - name: Check K-cycle disclosure presets idempotent (--check)
@@ -2091,6 +2125,11 @@ jobs:
       # note_workpaper_sync_registry.json 反查 owner 数，不靠硬编码名单）。
       - name: Check note K report_row_code idempotent (--check)
         run: python backend/scripts/fix/fix_note_k_report_row_codes.py --check
+      # 可扩位行：`……` 标 expandable 才是「在这里加行」的落点；标成 data 会被
+      # 结构脚本当占位垃圾删掉（后果是功能消失而非报错）。`--check` 同时做
+      # 「本脚本 11 处 + 结构脚本 18 处 == 源侧 29 处」的闭环自检。
+      - name: Check note K expandable rows idempotent (--check)
+        run: python backend/scripts/fix/fix_note_k_expandable_rows.py --check
 
   note-e1-structure:
     # 附注 E1 货币资金章节结构守卫（五、1 / 八、1）
@@ -4808,4 +4847,197 @@ jobs:
         working-directory: audit-platform/frontend
       - name: 两变体披露模型（labelHeader 原文 / soe _removed_table_keys 逐章节）
         run: npx vitest run g7ListedDisclosureModel g7SoeDisclosureModel
+        working-directory: audit-platform/frontend
+
+  report-line-account-resolution:
+    # 裁剪判据的报表行科目定位 —— 后端守卫 + 变异检验
+    # （procedure-trim-report-line-account-resolution Task 1/2/6/7/13）
+    #
+    # ## 本 job 在防什么
+    #
+    # 裁剪判据的重要性维度（决策内核档 7/8）原先靠**程序名 ↔ 科目名子串匹配**定位科目
+    # 余额，在真实数据上大面积失效（E 循环 5 条程序名一律「货币资金 …」，而试算表里
+    # 只有明细「银行存款」「其他货币资金」⇒ 解析不出 ⇒ 金额恒 null ⇒ 该维度整体空转）。
+    # 改为「程序 → 报表行 → 报表公式 → 金额」后，三类缺陷必须被守卫挡住：
+    #
+    # 1. **双真源漂移**：跨循环索引若自己抄一份 row_code，某循环改了报表行号索引不
+    #    跟随，而两侧各自的单测都全绿（各用自己的常量构造样本）⇒ 判据 = 索引代码剥注释
+    #    后**零**报表行编码字面量 + 与 11 个 per-cycle 声明逐字交叉锁死。
+    # 2. **编造 0**：非 resolved 态若给 0.0，该程序会被误判成「低于任何阈值」而产生
+    #    裁剪建议，而正确结论是「这个判据对它不可用」⇒ 判据查 `is not None` 而非 falsy，
+    #    并配反向自检（喂 amount=0.0 的样本必须被抓到）。
+    # 3. **additive 注入即死代码**：上下文第八键装配好了但返回语句忘了带 ⇒ 前端永远读到
+    #    undefined，而后端所有单测都绿 ⇒ 判据用 AST 抽返回 dict 的键与 `_RESULT_KEYS`
+    #    逐字比对。
+    #
+    # ## ⚠️ 连库判据在 CI 会 skip
+    #
+    # 三个守卫的真实库断言按 `pytest.skip('真实库不可达')` 降级 ⇒ **本 job 绿不代表连库
+    # 判据被执行过**。真实库验收另见
+    # `backend/scripts/diagnose/verify_report_line_amounts_live.py`（本地跑，只读）。
+    #
+    # 同理变异检验用 `--skip-live-only`：M8/M9/M11 三条的预期红判据**只有**连库判据，
+    # CI 无库时它们 skip ⇒ 变异后仍 skip ⇒ 差集为空 ⇒ 会被误判成 GREEN 而让本 job
+    # **假红**。这三条须在本地连库环境验证（已实测 17/17 RED）。
+    #
+    # 本 job 同时装 python 与 node：变异脚本**跨前后端**（M12~M17 打前端 composables
+    # 与 ProcedureTrimming.vue），缺 vitest 会 NO-REPORT ⇒ 基线 fatal。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect whether this spec's surface changed
+        id: scope
+        run: |
+          # GitHub Actions 没有 per-job 的 paths 过滤（paths 只能挂 workflow 级
+          # on.push / on.pull_request，加上去会波及本文件其余 150 个 job）
+          # ⇒ 用无第三方依赖的 git diff 门控。
+          #
+          # 方向必须 fail-open-toward-running：base 取不到或 diff 失败时 run=true。
+          # 反向（默认跳过）会让门控一坏就静默关闸 —— 那是假绿。
+          set -u
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          PATTERN='^(backend/app/services/(four_table/|trim_report_line_amounts|trim_decision_context|report_engine|report_config_service|standard_unification_service)|backend/tests/procedure_trim/|backend/scripts/check/mutate_report_line_resolution_guards|backend/scripts/diagnose/verify_report_line_amounts_live|audit-platform/frontend/src/services/commonApi\.ts|audit-platform/frontend/src/views/ProcedureTrimming\.vue|audit-platform/frontend/src/views/__tests__/|audit-platform/frontend/src/components/workpaper/composables/|\.github/workflows/governance-checks\.yml)'
+          RUN=true
+          if [ -n "${BASE:-}" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            if CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}" 2>/dev/null); then
+              if printf '%s\n' "$CHANGED" | grep -Eq "$PATTERN"; then RUN=true; else RUN=false; fi
+            fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "scope: run=$RUN base=${BASE:-<none>}"
+      - uses: actions/setup-python@v5
+        if: steps.scope.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install backend deps
+        if: steps.scope.outputs.run == 'true'
+        run: pip install -r requirements.txt -q
+        working-directory: backend
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps (required by cross-side mutation script)
+        if: steps.scope.outputs.run == 'true'
+        run: npm ci
+        working-directory: audit-platform/frontend
+      # pytest 一律从**仓库根**跑：这些守卫用相对路径读 backend/ 下的源码，
+      # 从 backend/ 跑会拼成 backend/backend/... 而假红（平台已实测 17 例）。
+      - name: Cross-cycle report line index guards
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pytest backend/tests/procedure_trim/test_report_line_index.py -q
+      - name: Report line amount guards (four states + never fabricate zero)
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pytest backend/tests/procedure_trim/test_trim_report_line_amounts.py -q
+      - name: Decision context additive wiring (eighth key + legacy seven unchanged)
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pytest backend/tests/procedure_trim/test_trim_context_report_line_wiring.py -q
+      # CI 接线自检（Property 22）：job 可解析 / 无重名 / 引用文件已入库 /
+      # 门控 PATTERN 覆盖本 spec 面 / 变异脚本带 --skip-live-only。
+      # 🔴 常驻而非一次性脚本 —— 否则改坏 workflow（重名 job 被静默去重、门控写坏导致
+      #    job 恒跳过、引用一个未入库的测试）都不会被发现，而 CI 一片绿。
+      - name: CI wiring self-check (parsable / no dup jobs / refs tracked / gate covers surface)
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pytest backend/tests/procedure_trim/test_report_line_ci_wiring.py -q
+      # 变异检验：每条必须打红并字节级还原。判定按**失败测试名集合求差集**，不看退出码。
+      # GREEN / ANCHOR-MISS / NO-REPORT 三态均非零退出。
+      # 本地连库环境实测 17/17 RED；CI 跳过 M8/M9/M11（见上方说明）。
+      - name: Mutation check (every guard must go red, then restore byte-for-byte)
+        if: steps.scope.outputs.run == 'true'
+        run: python backend/scripts/check/mutate_report_line_resolution_guards.py --skip-live-only
+
+  report-line-account-resolution-frontend:
+    # 裁剪判据的报表行科目定位 —— 前端纯函数守卫
+    # （同 spec Task 3/9/10/11/12）
+    #
+    # 拦三类「Volar / vitest / get_diagnostics 三层全绿、只有守卫或浏览器才暴露」的形态：
+    #
+    # ① **两处取金额各算一份**：改造前 `buildAndDecide`（喂决策内核）与 `toReviewRow`
+    #    （喂裁剪充分性复核视图）各自从 ctx.accounts 取一次。给报表行加优先级时只改
+    #    一处，复核视图就会显示旧口径金额，而**复核者无从知道该信哪个** ⇒ 判据 =
+    #    宿主里**零处**直接从 accounts 取 .amount（全部经 resolveAccountAmount），
+    #    并配双向反向自检（3 种非法写法必抓 / 3 种合法写法不得误命中）。
+    # ② **决策内核被金额来源污染**：amountSource / reportLine 只进 evidence，
+    #    九档条件表达式一律不引用 —— 「同一个金额，因为取数路径不同而得出不同裁剪结论」
+    #    在审计上说不通 ⇒ 判据 = decideTrim 函数体内零出现这两个名字 + 三种取值下
+    #    verdict/reasonCode/narrative 完全相同（六个档位各验一遍）。
+    # ③ **兜底来源不可辨**：account_name 是按程序名猜科目名取的余额，可靠性低于报表行
+    #    取数。门控必须显式比较 `source === 'account_name'`，不能只判「有没有
+    #    reportLine」（后者在不可解析态下也非空，会把兜底态标成报表行来源）。
+    #
+    # 另有一条跨前后端交叉锁死：normalize_wp_code（Python）与 subjectPrefixOf
+    # （TS 正则）两侧语言不同无法共享实现，前端守卫**现场从 .py 抽正则字面量**比对。
+    #
+    # ## ⚠️ 已知的上游未入库依赖（本 job 在干净 checkout 下会因此挂）
+    #
+    # 依赖闭包实测 132 个文件，其中 **2 个在 HEAD 中不存在**（工作树有、从未 commit）：
+    #
+    #   audit-platform/frontend/src/components/workpaper/composables/completenessExemption.ts
+    #   audit-platform/frontend/src/components/workpaper/composables/b50Completeness.ts
+    #
+    # 前者被**已 commit 的** `procedureTrimDecision.ts` 直接 import ⇒ HEAD 自身不自洽，
+    # 干净 checkout 下 Vite 解析不到该模块，本 job 与既有的
+    # `procedure-trim-intelligence-frontend` **都会挂**。
+    #
+    # 归属：`procedure-trimming-and-delegation-intelligence`（该 spec 已标记 26/26 完成，
+    # 但这两个交付物从未入库）。本 spec 不代为 add —— 它们各自还有配套的未提交测试
+    # （`completenessExemption.spec.ts` / `b50Completeness.spec.ts` 亦为未跟踪），
+    # 一并入库属于替另一个 spec 收口。**本 job 首次在 CI 上变红时请先核查这两个文件
+    # 是否已入库，再排查本 spec 的判据。**
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect whether this spec's frontend surface changed
+        id: scope
+        run: |
+          set -u
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          PATTERN='^(audit-platform/frontend/src/services/commonApi\.ts|audit-platform/frontend/src/views/ProcedureTrimming\.vue|audit-platform/frontend/src/views/__tests__/|audit-platform/frontend/src/components/workpaper/composables/|backend/app/services/four_table/report_line_index\.py|\.github/workflows/governance-checks\.yml)'
+          RUN=true
+          if [ -n "${BASE:-}" ] && [ "$BASE" != "0000000000000000000000000000000000000000" ]; then
+            if CHANGED=$(git diff --name-only "$BASE" "${{ github.sha }}" 2>/dev/null); then
+              if printf '%s\n' "$CHANGED" | grep -Eq "$PATTERN"; then RUN=true; else RUN=false; fi
+            fi
+          fi
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "scope: run=$RUN base=${BASE:-<none>}"
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps
+        if: steps.scope.outputs.run == 'true'
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Amount source priority guards
+        if: steps.scope.outputs.run == 'true'
+        run: npx vitest run src/views/__tests__/trimAmountSourcePriority.spec.ts
+        working-directory: audit-platform/frontend
+      - name: Decision kernel neutrality guards
+        if: steps.scope.outputs.run == 'true'
+        run: npx vitest run src/components/workpaper/composables/__tests__/trimDecisionAmountSourceNeutrality.spec.ts
+        working-directory: audit-platform/frontend
+      # 零回归：本 spec 改动了 procedureTrimDecision.ts 与 ProcedureTrimming.vue，
+      # 既有裁剪守卫必须零新增失败（含 M3/M4 两条内存内变异 —— 它们锚定取金额那一行，
+      # 取值路径迁移到统一入口后锚点已同步更新，承重不变）。
+      - name: Zero-regression for existing trim guards
+        if: steps.scope.outputs.run == 'true'
+        run: npx vitest run src/views/__tests__/trimAdequacyReview.spec.ts src/views/__tests__/trimDecisionWiring.spec.ts src/views/__tests__/trimDegradationConsistency.spec.ts src/components/workpaper/composables/__tests__/procedureTrimDecision.spec.ts src/components/workpaper/composables/__tests__/procedureTrimDecision.behavior.spec.ts
         working-directory: audit-platform/frontend

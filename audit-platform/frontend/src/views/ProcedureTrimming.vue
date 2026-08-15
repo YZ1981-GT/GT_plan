@@ -357,6 +357,19 @@
                   {{ reasonCodeLabel(suggestionOf(row)!.reasonCode) || '建议裁剪' }}
                 </el-tag>
               </el-tooltip>
+              <!-- 兜底来源显式标注（spec procedure-trim-report-line-account-resolution R6.3）：
+                   「科目名匹配」是按程序名猜科目名取的余额，可靠性低于报表行取数
+                   （后者与报表页同一取数引擎）。复核者必须能一眼看出这个差别，
+                   否则会把一个猜出来的金额当成审定数据去评价裁剪的适当性。
+                   门控显式比较 `_amountSource === 'account_name'` —— 不能只判「有没有
+                   reportLine」，那在不可解析态下也非空，会把兜底态标成报表行来源。 -->
+              <el-tooltip
+                v-if="row._amountSource === 'account_name'"
+                content="本条建议的科目余额来自「按程序名匹配科目名」的兜底路径，未能定位到报表行取数公式，可靠性低于报表行映射，请复核该金额是否对应本程序的审计对象"
+                placement="top"
+              >
+                <el-tag type="info" size="small" effect="plain">科目名匹配</el-tag>
+              </el-tooltip>
               <template v-if="canManage">
                 <el-button size="small" type="warning" text @click="confirmSuggestion(row)">确认</el-button>
                 <el-button size="small" text @click="rejectSuggestion(row)">驳回</el-button>
@@ -1132,6 +1145,16 @@ import {
   decideTrim,
   type TrimDecision, type SubjectDataState, type TrimRiskInput,
 } from '@/components/workpaper/composables/procedureTrimDecision'
+// 🔴 本页取金额的唯一入口（spec procedure-trim-report-line-account-resolution）——
+//    报表行映射优先、科目名匹配兜底。`buildAndDecide` 与 `toReviewRow` 都走它，
+//    使裁剪页与复核视图对同一程序恒得同一金额（R6.2）。
+import {
+  aggregateGateKey,
+  amountSourceLabel,
+  amountSourceTrace,
+  resolveAccountAmount,
+  toDecisionReportLine,
+} from '@/components/workpaper/composables/trimAmountSource'
 import { evaluateAggregateGate } from '@/components/workpaper/composables/trimAggregateGate'
 import {
   COMPLETENESS_CYCLE_RULES,
@@ -1390,6 +1413,34 @@ function resolveAccountName(p: any, ctx: TrimDecisionContext): string | null {
   return null
 }
 
+/**
+ * 给裁剪理由追加金额来源溯源（R6.1 / R6.4）。
+ *
+ * 质控复核合伙人要能追查「这条裁剪建议的金额是怎么算出来的」，否则无法评价该裁剪的
+ * 适当性。溯源短语由 `trimAmountSource.amountSourceTrace` 统一生成（不在此处拼第二套
+ * 文案），并从 **evidence** 取来源 —— 不是再解析一次，否则文案里说的来源可能与
+ * 决策内核实际用的那个金额来源不一致。
+ *
+ * 无可追加内容时原样返回（避免产出「…（取自 ）」这种残缺文本）。
+ */
+function withAmountTrace(
+  narrative: string, evidence: any, accountName: string | null,
+): string {
+  const source = evidence?.amountSource ?? null
+  if (!source) return narrative
+  const trace = amountSourceTrace({
+    source,
+    rowCode: evidence?.reportLine?.rowCode ?? null,
+    rowName: evidence?.reportLine?.rowName ?? null,
+    formula: evidence?.reportLine?.formula ?? null,
+    // 🔴 `TrimEvidence` **没有** accountName 字段（它只留金额与判据数值），
+    //    故兜底来源的科目名必须由调用方另传，否则文案退化成「按科目名匹配」而
+    //    看不出是哪个科目 —— 那正是复核者最需要的一条信息。
+    accountName,
+  })
+  return trace ? `${narrative}（${trace}）` : narrative
+}
+
 /** B50 科目项 → 决策内核的 `TrimRiskInput`；缺该科目返回 null（未评估 ≠ 低风险）。 */
 function toRiskInput(raw: any): TrimRiskInput | null {
   if (!raw || typeof raw !== 'object') return null
@@ -1432,10 +1483,14 @@ function buildAndDecide(
     if (String((info as any)?.cycle || '').toUpperCase() === cycle) { cycleHasData = true; break }
   }
 
+  // 🔴 金额一律经 `resolveAccountAmount` —— 它是本页取金额的**唯一**入口
+  //    （spec procedure-trim-report-line-account-resolution R5.1 / R6.2）。
+  //    优先报表行映射（与报表页同一取数引擎），未命中才退回科目名匹配。
+  //    科目名解析仍由本页的 `resolveAccountName` 负责并**传入**，
+  //    使运行时只有一份科目名解析生效（B50 风险定位也用它，不能有第二份）。
   const accountName = resolveAccountName(p, ctx)
-  const accountAmount = accountName !== null
-    ? Number((ctx.accounts as any)[accountName]?.amount)
-    : null
+  const resolvedAmount = resolveAccountAmount(p, ctx, accountName)
+  const accountAmount = resolvedAmount.amount
 
   // 完整性豁免：项目级覆盖优先于平台默认清单，`source` 如实标注来源
   const override = ctx.completeness_override
@@ -1468,6 +1523,9 @@ function buildAndDecide(
       hasWorkpaperEntry: (ctx.workpaper_entry || {})[String(p?.wp_code || '')] === true,
     },
     accountAmount: (accountAmount !== null && Number.isFinite(accountAmount)) ? accountAmount : null,
+    // 🔴 只进 evidence，不参与任何档位判断（R5.4，有源码级守卫钉死）
+    amountSource: resolvedAmount.source,
+    reportLine: toDecisionReportLine(resolvedAmount),
     subjectDataState,
     cycleHasData,
     materiality: mat
@@ -2536,10 +2594,13 @@ async function confirmSmartTrim() {
       clearRowSuggestion(p)
       const d = decide(p)
       if (!d) { if (p._applicable) keepCount++; continue }
+      const rowAccountName = ctx ? resolveAccountName(p, ctx as TrimDecisionContext) : null
       if (d.verdict === 'auto_trim') {
         p._applicable = false
         p.status = 'not_applicable'
-        p.skip_reason = d.narrative
+        // 🔴 追加金额来源溯源（R6.1）：质控复核合伙人要能追查「这个金额是怎么算出来的」，
+        //    否则无法评价该裁剪的适当性。空串时不拼接（避免「…（取自 ）」残缺文本）。
+        p.skip_reason = withAmountTrace(d.narrative, d.evidence, rowAccountName)
         p._reason_code = d.reasonCode
         trimCount++
       } else if (d.verdict === 'suggest_trim') {
@@ -2551,9 +2612,13 @@ async function confirmSmartTrim() {
         //    整条建议态链（建议条 → 汇总闸 → 批量确认）从未跑通过。
         p._suggest = true
         p._suggestReasonCode = d.reasonCode
-        p._suggestNarrative = d.narrative
-        p._decisionAccountName = resolveAccountName(p, ctx as TrimDecisionContext)
+        p._suggestNarrative = withAmountTrace(d.narrative, d.evidence, rowAccountName)
+        p._decisionAccountName = rowAccountName
         p._decisionEvidence = d.evidence
+        // 🔴 来源标识挂在行上供**模板门控**用（`source === 'account_name'` 时渲染
+        //    「科目名匹配」标记）。取自 evidence 而不是再算一次 —— 再算一次就有可能
+        //    与决策内核用的那个金额来源不一致，而标记本身就是在说明那个金额的可靠性。
+        p._amountSource = d.evidence.amountSource ?? null
         suggestCount++
         if (p._applicable) keepCount++
       } else if (p._applicable) {
@@ -2713,6 +2778,7 @@ function clearRowSuggestion(row: any) {
   row._suggest = false
   row._suggestReasonCode = null
   row._suggestNarrative = null
+  row._amountSource = null
   row._decisionAccountName = null
   row._decisionEvidence = null
 }
@@ -2760,7 +2826,12 @@ const performanceMateriality = computed<number | null>(
  *    结构保证，而不是靠两处各写一份映射再期望它们一致。
  */
 const suggestedGateItems = computed(() => suggestedRows.value.map(p => ({
-  accountName: String(p._decisionAccountName ?? p.wp_code ?? p.procedure_code ?? ''),
+  // 🔴 去重键走 `aggregateGateKey`（报表行 → 科目名 → 底稿编号），**不能**裸用 wp_code。
+  //    闸门按此键去重，语义是「同一笔科目余额只算一次错报敞口」。报表行映射生效后，
+  //    同一报表行常有多条程序（实测 E 循环 4 条都落 BS-002 货币资金），裸用 wp_code 会
+  //    把同一笔 8,607,977.04 算成 4 笔 34,431,908.16 ⇒ 误触闸门 ⇒ 批量确认被过度阻断。
+  //    改造前该缺陷被数据掩盖：科目名解析不出时金额也是 null（计 0），合计恒 0。
+  accountName: aggregateGateKey(p._decisionEvidence, p._decisionAccountName, p.wp_code ?? p.procedure_code),
   amount: Number(p._decisionEvidence?.accountAmount ?? 0),
   reasonCode: String(p._suggestReasonCode ?? ''),
 })))
@@ -2913,9 +2984,12 @@ function toReviewRow(p: any, cycle: string): ReviewProcedureRow {
   //    产出一个看起来合理但张冠李戴的金额。未覆盖时如实置 null（视图统计为"金额未知"）。
   const covered = ctx !== null && trimContextCycles.value.has(String(cycle).toUpperCase())
   const accountName = covered ? resolveAccountName(p, ctx as TrimDecisionContext) : null
-  const rawAmount = accountName !== null
-    ? Number((ctx as TrimDecisionContext).accounts?.[accountName]?.amount)
-    : Number.NaN
+  // 🔴 金额走与 `buildAndDecide` **同一个** `resolveAccountAmount` —— 复核视图
+  //    自己再算一份会让同一程序在两处显示两个金额，而复核者无从知道该信哪个（R6.2）。
+  //    `covered` 门控保留：未覆盖该循环时不解析（否则最长匹配会跨循环命中别的科目）。
+  const resolvedAmount = covered
+    ? resolveAccountAmount(p, ctx as TrimDecisionContext, accountName)
+    : null
   const risk = covered ? toRiskInput(((ctx as TrimDecisionContext).risk || {})[accountName ?? '']) : null
   return {
     wpCode: String(p?.wp_code || ''),
@@ -2926,7 +3000,7 @@ function toReviewRow(p: any, cycle: string): ReviewProcedureRow {
     reasonCode: p?.suggestion_state?.reason_code ?? null,
     rejected: p?.suggestion_state?.rejected === true,
     accountName,
-    accountAmount: Number.isFinite(rawAmount) ? rawAmount : null,
+    accountAmount: resolvedAmount?.amount ?? null,
     riskLevel: risk?.maxRisk ?? null,
     riskSpecial: risk?.hasSpecial === true,
     // 🔴 风险维度整体不可用（B50 未填）时 riskKnown 恒 false ——「未评估」不得被

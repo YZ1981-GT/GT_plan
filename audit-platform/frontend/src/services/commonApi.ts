@@ -392,10 +392,49 @@ export async function fetchB50RiskRows(projectId: string): Promise<{
 
 /** 降级标注：`cause` 是 accounts 维度**专属**可选字段（其余维度只有 dimension+reason）。 */
 export interface TrimDecisionDegradation {
-  dimension: 'accounts' | 'materiality' | 'risk' | 'completeness_override' | 'workpaper_entry'
+  dimension:
+    | 'accounts'
+    | 'materiality'
+    | 'risk'
+    | 'completeness_override'
+    | 'workpaper_entry'
+    /** 报表行取数维度（spec procedure-trim-report-line-account-resolution Task 7） */
+    | 'report_line'
   reason: string
   /** 仅 accounts 维度出现：query_failed / not_imported / no_material_accounts */
   cause?: 'query_failed' | 'not_imported' | 'no_material_accounts'
+}
+
+/**
+ * 一条底稿的报表行科目金额（后端 `trim_report_line_amounts.ReportLineAmount`）。
+ *
+ * 🔴 `status !== 'resolved'` 时 `amount` 恒为 `null`，**绝不为 `0`** —— 编造 0 会让
+ * 该程序被误判成「低于任何阈值」而产生裁剪建议，而正确结论是「这个判据对它不可用」。
+ * 消费方一律先判 `status`，不要直接用 `amount ?? 0`。
+ *
+ * 四态成因各自可区分（`reason` 写明细节）：
+ * - `no_report_line`：该底稿没有报表行落点（未登记 / 声明为空 / 非科目余额驱动循环）
+ * - `formula_unavailable`：报表行存在但公式缺失、含 `ROW()` 引用、或求值失败
+ * - `standard_unset`：项目适用准则未确定（未设置 / 两处声明分叉 / 无对应配置）
+ */
+export interface TrimReportLineAmount {
+  status: 'resolved' | 'no_report_line' | 'formula_unavailable' | 'standard_unset'
+  /** 🔴 非 resolved 态恒 null */
+  amount: number | null
+  /** 报表行编码（如 BS-002），溯源用 */
+  row_code: string
+  /** 报表行名（如 货币资金）—— 审计师据它发现「行名与循环语义不符」 */
+  row_name: string
+  /** 命中的取数公式原文 */
+  formula: string | null
+  /** 参与计算的标准科目码 */
+  standard_codes: string[]
+  /** 实际使用的准则变体 */
+  applicable_standard: string
+  /** 报表行编码的取值出处（如 e_cycle_specs.E1_REPORT_ROW_CODE） */
+  source_symbol: string
+  /** 非 resolved 态的中文原因 */
+  reason: string
 }
 
 export interface TrimDecisionContext {
@@ -415,6 +454,17 @@ export interface TrimDecisionContext {
   completeness_override: Record<string, boolean> | null
   /** {wp_code: bool}；空 dict 必伴随一条 workpaper_entry degradation */
   workpaper_entry: Record<string, boolean>
+  /**
+   * {wp_code: 报表行科目金额}；空 dict 必伴随一条 `report_line` degradation。
+   *
+   * 键是 `procedure_instances.wp_code` **原样**（含 `D2-1至D2-4` 这类区间型），
+   * 故按 `p.wp_code` 直接查即命中；`resolveAccountAmount` 另有归一兜底
+   * （防后端将来改成按底稿主码下发）。
+   *
+   * 🔴 消费方一律经 `trimAmountSource.resolveAccountAmount()` 取金额，不要自己读这个
+   * 字段 —— 裁剪页与复核视图各读一次就会分叉，而复核者无从知道该信哪个。
+   */
+  report_line_amounts: Record<string, TrimReportLineAmount>
   /** 🔴 前端摘要降级标注的**唯一来源** —— 不要自行判断「某维度是不是空的」 */
   degradations: TrimDecisionDegradation[]
 }
@@ -450,6 +500,10 @@ export async function fetchTrimDecisionContext(
     risk_dimension_available: p?.risk_dimension_available === true,
     completeness_override: p?.completeness_override ?? null,
     workpaper_entry: asObj(p?.workpaper_entry),
+    // 🔴 缺失时兜成 `{}` 而不是留 `undefined`：让每个调用方各自兜底会产生
+    //    「一处判 undefined、一处判空对象」的不一致。空对象的语义已由
+    //    `report_line` degradation 承载（后端保证空 dict 必伴随标注）。
+    report_line_amounts: asObj(p?.report_line_amounts),
     degradations: Array.isArray(p?.degradations) ? p.degradations : [],
   }
 }

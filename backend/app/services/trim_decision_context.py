@@ -78,6 +78,11 @@ from app.services.b50_risk_reader import (
     cycle_for_account,
     load_b50_accounts,
 )
+from app.services.trim_report_line_amounts import (
+    AMOUNT_STANDARD_UNSET,
+    ReportLineAmount,
+    resolve_trim_report_line_amounts,
+)
 from app.services.workpaper_entry_probe import probe_workpaper_entries_detailed
 
 logger = logging.getLogger(__name__)
@@ -88,6 +93,8 @@ DIM_MATERIALITY = "materiality"
 DIM_RISK = "risk"
 DIM_COMPLETENESS_OVERRIDE = "completeness_override"
 DIM_WORKPAPER_ENTRY = "workpaper_entry"
+#: 报表行科目金额维度（spec procedure-trim-report-line-account-resolution Task 7）
+DIM_REPORT_LINE = "report_line"
 
 DEGRADATION_DIMENSIONS: frozenset[str] = frozenset({
     DIM_ACCOUNTS,
@@ -95,6 +102,7 @@ DEGRADATION_DIMENSIONS: frozenset[str] = frozenset({
     DIM_RISK,
     DIM_COMPLETENESS_OVERRIDE,
     DIM_WORKPAPER_ENTRY,
+    DIM_REPORT_LINE,
 })
 
 # ── accounts 维度三态成因码（cause 只允许出现在 accounts 维度）─────────────────
@@ -132,6 +140,10 @@ _RESULT_KEYS: tuple[str, ...] = (
     "risk_dimension_available",
     "completeness_override",
     "workpaper_entry",
+    # 🔴 additive 第八键（spec procedure-trim-report-line-account-resolution Task 7）——
+    #    既有七键的装配逻辑逐字不动。它们有三个现存消费方（档 4 数据存在性 /
+    #    复核视图金额未知统计 / resolveAccountName），改结构会三处同时波及。
+    "report_line_amounts",
     "degradations",
 )
 
@@ -498,6 +510,96 @@ async def _load_workpaper_entry(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 维度 6：报表行科目金额（重要性判据的金额来源，additive）
+# ═══════════════════════════════════════════════════════════════════════════
+def _report_line_amount_as_dict(item: ReportLineAmount) -> dict:
+    """dataclass → 可 JSON 序列化的 dict（``standard_codes`` 元组转列表）。
+
+    键名与前端 ``TrimReportLineAmount`` 接口逐字对应；``amount`` 为 ``None`` 时
+    **保留该键并置 null**（不省略）—— 省略会让前端 `hasOwnProperty` 判空与
+    「后端没下发这个维度」不可区分。
+    """
+    return {
+        "status": item.status,
+        "amount": item.amount,
+        "row_code": item.row_code,
+        "row_name": item.row_name,
+        "formula": item.formula,
+        "standard_codes": list(item.standard_codes),
+        "applicable_standard": item.applicable_standard,
+        "source_symbol": item.source_symbol,
+        "reason": item.reason,
+    }
+
+
+async def _load_report_line_amounts(
+    db: AsyncSession, project_id: UUID, year: int, cycles: list[str],
+) -> tuple[dict[str, dict], list[dict]]:
+    """装配 ``{wp_code: 报表行金额}``（spec Requirement 4.5 / 5.5）。
+
+    目标清单复用 :func:`_collect_probe_wp_codes` —— 与底稿录入探测**同一口径**。
+    不新建第二套目标集：两套目标集会让「某程序有录入探测结果但没有金额」这种
+    半开状态出现，而两侧各自的守卫都查不出（各自只看自己那套）。
+
+    三条降级路径各自可区分：
+
+    - 目标清单查询失败 → ``{}`` + degradation
+    - 目标清单为空（本项目无带底稿编号的程序实例）→ ``{}`` + degradation
+    - 金额解析整体失败 → ``{}`` + degradation
+
+    另有一条**非空但整体不可用**的标注：全部项都是「项目准则未确定」时加一条
+    degradation，使摘要区能告知审计师「去项目设置里确认适用准则」，
+    而不是让他逐条看 61 个相同的 reason。
+
+    🔴 单个 wp_code 解析失败**不**产生 degradation —— 那是该底稿自己的三态之一
+    （``reason`` 里已写明成因），前端按行标注即可。把它升级成维度级降级会让
+    「一个底稿没落点」看起来像「整个维度失效」。
+    """
+    try:
+        codes = await _collect_probe_wp_codes(db, project_id, cycles)
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            "裁剪判据：报表行取数目标清单查询失败 project=%s: %s", project_id, e,
+        )
+        return {}, [_degradation(
+            DIM_REPORT_LINE,
+            "报表行取数目标清单查询失败，本次不使用报表行映射的科目金额",
+        )]
+
+    if not codes:
+        return {}, [_degradation(
+            DIM_REPORT_LINE,
+            "本项目无带底稿编号的程序实例，报表行取数目标为空",
+        )]
+
+    try:
+        resolved = await resolve_trim_report_line_amounts(db, project_id, year, codes)
+    except Exception as e:  # noqa: BLE001
+        logger.error(
+            "裁剪判据：报表行科目金额解析整体失败 project=%s year=%s: %r",
+            project_id, year, e,
+        )
+        return {}, [_degradation(
+            DIM_REPORT_LINE,
+            "报表行科目金额解析失败，本次退回按科目名匹配取金额",
+        )]
+
+    payload = {code: _report_line_amount_as_dict(item) for code, item in resolved.items()}
+
+    degradations: list[dict] = []
+    if payload and all(
+        item["status"] == AMOUNT_STANDARD_UNSET for item in payload.values()
+    ):
+        sample = next(iter(payload.values()))
+        degradations.append(_degradation(
+            DIM_REPORT_LINE,
+            sample.get("reason")
+            or "本项目适用会计准则未确定，报表行取数整体不可用，已退回按科目名匹配取金额",
+        ))
+    return payload, degradations
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 装配入口
 # ═══════════════════════════════════════════════════════════════════════════
 async def build_trim_decision_context(
@@ -505,7 +607,7 @@ async def build_trim_decision_context(
 ) -> dict:
     """一次性装配三维判据上下文（只读，fail-soft 但不静默伪装）。
 
-    返回**恰好**七键::
+    返回**恰好**八键::
 
         {
           "accounts": {科目名: {"amount": float, "cycle": str}},
@@ -514,10 +616,17 @@ async def build_trim_decision_context(
           "risk_dimension_available": bool,
           "completeness_override": {cycle: bool} | None,
           "workpaper_entry": {wp_code: bool},
+          "report_line_amounts": {wp_code: {status, amount, row_code, row_name, formula,
+                                            standard_codes, applicable_standard,
+                                            source_symbol, reason}},
           "degradations": [{"dimension": str, "reason": str, "cause"?: str}],
         }
 
     ``cycles`` 为空表示「全部科目余额驱动循环」（不过滤）。
+
+    🔴 ``report_line_amounts`` 是 additive 第八键（spec
+    procedure-trim-report-line-account-resolution）——前七键的装配逻辑逐字未动，
+    故「新键缺失时前端退回科目名兜底」是结构性保证而非约定。
     """
     degradations: list[dict] = []
 
@@ -536,6 +645,11 @@ async def build_trim_decision_context(
     entry, entry_deg = await _load_workpaper_entry(db, project_id, cycles or [])
     degradations.extend(entry_deg)
 
+    report_lines, rl_deg = await _load_report_line_amounts(
+        db, project_id, year, cycles or []
+    )
+    degradations.extend(rl_deg)
+
     return {
         "accounts": accounts,
         "materiality": materiality,
@@ -543,5 +657,6 @@ async def build_trim_decision_context(
         "risk_dimension_available": risk_available,
         "completeness_override": override,
         "workpaper_entry": entry,
+        "report_line_amounts": report_lines,
         "degradations": degradations,
     }

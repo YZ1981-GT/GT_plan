@@ -546,10 +546,16 @@ describe('判据 C: 导出方案含理由码与理由文本两列', () => {
     expect(/skip_reason/.test(body), '导出行未读 skip_reason 原文').toBe(true)
   })
 
-  it("列宽 ws['!cols'] 项数与表头列数相等（漏一项会让末列挤成默认宽）", () => {
-    const m = body.match(/ws\['!cols'\]\s*=\s*\[([^\]]*)\]/)
-    expect(m, "未找到 ws['!cols']").not.toBeNull()
+  it('列宽项数与表头列数相等（漏一项会让末列挤成默认宽）', () => {
+    // 🔴 锚点容纳两种写法：直接给 sheet 赋 `ws['!cols'] = [...]`（旧）与
+    //    经导出 helper 传 `colWidths: [...]`（现行）。
+    //    本条原先只锚 `ws['!cols']`，而宿主早已重构成 `colWidths` ⇒ 判据以
+    //    「未找到」的形态**假红**（实际列宽项数与表头列数是相等的）。假红比假绿更隐蔽：
+    //    下次真漏了一项列宽，看到红会以为还是这个老问题而放过。
+    const m = body.match(/(?:ws\['!cols'\]\s*=|colWidths\s*:)\s*\[([^\]]*)\]/)
+    expect(m, "未找到列宽声明（既无 ws['!cols'] 也无 colWidths）—— 锚点已漂移").not.toBeNull()
     const widths = (m![1].match(/\{\s*wch:/g) ?? []).length
+    expect(widths, '列宽声明里一个 wch 都没抽到 —— 锚点命中了但内容不对').toBeGreaterThan(0)
     expect(widths, `列宽项数 ${widths} 与表头列数 ${header.length} 不等`).toBe(header.length)
   })
 

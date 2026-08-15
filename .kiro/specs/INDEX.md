@@ -2,13 +2,13 @@
 
 **最后更新**：2026-08-15
 **当前分支**：`work/2026-08-12-g7-column-alignment-closure`
-**统计**：Active **7**（2026-08-15 实扫 `.kiro/specs/*/` 共 9 个目录，其中**带 tasks.md 的 7 个**、**空壳 2 个**；本日先归档 `g7-column-alignment-and-extraction-closure` 由 8 → 7，再归档 `e-cycle-extraction-formula-and-disclosure-completion` 由 7 → 6，随后新建 `e1-variant-recalc-and-mutation-denominator-closure` 由 6 → 7）/ Archived **553**（2026-08-15 归档后**重新实扫** `_archive/*/*` 一级子目录所得，含 6 个仅剩 evidence 无三件套的历史残留目录）
+**统计**：Active **6**（2026-08-15 实扫 `.kiro/specs/*/` 共 9 个目录，其中**带 tasks.md 的 7 个**、**空壳 2 个**；本日先归档 `g7-column-alignment-and-extraction-closure` 由 8 → 7，再归档 `e-cycle-extraction-formula-and-disclosure-completion` 由 7 → 6，随后新建 `e1-variant-recalc-and-mutation-denominator-closure` 由 6 → 7，最后归档 `procedure-trim-report-line-account-resolution` 由 7 → 6）/ Archived **554**（2026-08-15 归档后**重新实扫** `_archive/*/*` 一级子目录所得，含 6 个仅剩 evidence 无三件套的历史残留目录）
 
 > **2026-08-15 实扫结果（9 个目录逐一，供下一轮比对）**：
 > ~~`e-cycle-…completion` **24/24**~~（**本日第二个归档** → `_archive/08-disclosure-notes/`） ·
 > `i-cycle-…closure` **23/24**（`[ ]`1） ·
 > `k-cycle-…closure` **19/25**（`[ ]`6） · `l-cycle-…completion` 3/26 ·
-> `procedure-trim-report-line-account-resolution` 0/16 ·
+> ~~`procedure-trim-report-line-account-resolution` 16/16~~（**本日第三个归档** → `_archive/05-business-features/`） ·
 > `workpaper-import-export-lifecycle-closure` 24/25（`[-]`1） ·
 > `x3-adjustment-entry-import-export` **33/53** ·
 > ~~`g7-column-alignment-and-extraction-closure` 24/24~~（**本轮已归档** → `_archive/08-disclosure-notes/`）
@@ -63,7 +63,6 @@
 | `workpaper-import-export-lifecycle-closure` | 3/25 | 底稿导入导出生命周期收口（**此前被表头误记为「无 tasks.md 的空壳」，2026-08-12 实扫纠正**） |
 | ~~`frontend-excel-io-single-entry-convergence`~~ | **已归档** | → `_archive/06-engineering-governance/`（2026-08-14 收敛完成 46 → 0，commit `f049a11f`）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 整链删除**（`batchExport.ts` 孤儿链「合并导出」用户不可达，用户裁决删）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>**提交前发现的清单漏记（最贵一课）**：B2 那批 13 个 confirmation 文件只写在基线 `note` 的自然语言里、`files` 数组为空 ⇒ 按 files 精确 stage 的脚本漏掉它们（远端仍带裸 import，CI 必红）+ Vite 编译扫描只覆盖 33/46 + 进度失真。**此前所有守卫都在验「代码符不符合清单」，没有一条验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 条守卫 + 3 条变异（M18/M19/M20 全 RED）。同域次级坑两个：对账脚本不剥注释会漏检 `import(/* @vite-ignore */ 'exceljs')`；「数量相等 ≠ 集合相等」（曾出现基线 46 / HEAD 46 但各差一个元素）。<br>**终态**：守卫 8 文件 **119** 例全绿 · 变异 **18/18** 全 RED（静态自检 18/18）· Vite 编译 **46/46** · 三件套机器校验零 warning。剩 3 个 `[-]` 均在 tasks.md `## Notes` 写明阻塞原因：Task 2（迁移前快照窗口已关闭，事后补抓＝把错值当基线）· Task 16（变异 18/38 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口） |
 | `e1-variant-recalc-and-mutation-denominator-closure` | 0/19 | **2026-08-15 新建**（承接 `e-cycle-…completion` 归档时登记未修的两项）。**A 组**修 E1-3 `multi` 口径抹零：`recalcRow` 的 multi 分支无条件由原币列派生（`useE1BankDetail.ts` L105~L119），而 `loadFromResponses` 对 `fxRate` 缺失回落 **1**、对 `openingFc` 等回落 **0**（L176~L179 不对称）⇒ 只有本位币列的行切到 multi 版后真实金额被 0 覆盖。<br>**立项新查三项超出原登记**：①影响面含**审计师手工录入的行**（不止种子行）②`USER_FIELDS`（L92~L98）同含本位币四列与原币五列 ⇒ `serializeRows` 把 0 落库、原值**不可恢复**，触发条件仅「切一次 variant + 改任一格 + 2 秒」；`syncCrossSheetTotals` 的 watch 带 `immediate:true` ⇒ E1-1 审定表 TB 核对基准同步归零（实测横幅「审定合计 0.00 ≠ TB 4467536.12」）③叶子口径 `buildBankSeedRows` 无条件给 `fxRate:1` + fc 全 0 ⇒ **aux 侧无银行账户数据的项目在 multi 版金额恒零，连 variant 都不用切**（改造前的存量缺陷，账户级取数只是把它改善为「先开 multi 即正确」）。<br>修复落在**消费侧**（三形态判定 `base-identity`/`foreign-pending`/`fc-authoritative`，判据用 `fxCurrency` 而非 `fxRate` —— 用 fxRate 会把「外币待录入」误判成「本位币恒等」从而臆造汇率 1，违反 Property 34），种子侧一行不动（AC 1.9 的 variant 字段集差异已被守卫锁死）。<br>**B 组**推广 `mutate_e_cycle_guards.py` 的**覆盖面分母**范式：平台 17 个变异脚本 / 9657 行，分母 **3/17** · 静态锚点自检 **1/17** · 冻结基线 **1/17**，仅 e-cycle 那个 11/11。收敛成 `backend/scripts/_mutation_kit/`（8 模块），`run_cli` 的 `guard_files` 设**必填**让「没有分母」在签名层面不可能。<br>🔴 **顺带修一个已归档 spec 的产物欠账**：7 个 `mutate_task*.py` 属已归档 `procedure-trimming-and-delegation-intelligence`(26/26)，归档 commit 只带了 `mutate_trim_decision_guards.py`，这 7 个至今 `??` 未入库。<br>在办 spec 的 3 个脚本（`k_cycle`/`i_cycle`/`ie_lifecycle`）**不迁只登记豁免**，豁免表带失效检测（spec 一归档即提示撤销）。 |
-| `procedure-trim-report-line-account-resolution` | 0/16 | **2026-08-12 新建**。裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。立项实证：E 循环 5 条程序名全是「货币资金 …」而 `trial_balance` 只有明细「其他货币资金」(1012)/「银行存款」(1002) ⇒ 单向子串匹配全部落空 ⇒ 重要性判据（决策内核档 7/8）整体空转。净新增仅 2 个后端模块 + 1 处前端优先级调整 —— 三段映射的每一段都已有生产真源（`four_table/*_cycle_specs.py` 的 `row_code` 声明 · `report_config.formula` · `ReportFormulaParser`），索引只做 dispatch、**零 `row_code` 字面量** |
 
 > 🔴 g7 与 e-cycle 双双归档后，上表**剩下的 5 个活行全部由并发会话推进**（tasks.md mtime
 > 秒/分钟级刷新），另 `x3-adjustment-entry-import-export`（实扫 33/53，并发新建）**本表尚无行**。
@@ -85,7 +84,31 @@
 > **`h-cycle-extraction-formula-and-disclosure-completion`(18/18)** 已于 2026-08-10 归档（见 §二）。
 > **`procedure-trimming-and-delegation-intelligence`(26/26)** 已于 2026-08-12 归档（见 §二）。
 
-**2026-08-15 归档（2 个，均 → `08-disclosure-notes`）**：
+**2026-08-15 归档（3 个：2 → `08-disclosure-notes`、1 → `05-business-features`）**：
+
+---
+
+**其三**（后继于同域 `procedure-trimming-and-delegation-intelligence`(26/26)，归入 `_archive/05-business-features/`）：
+
+`procedure-trim-report-line-account-resolution`(**16/16**) —— 裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。
+
+**立项缺陷已修复（浏览器实测）**：E 循环改造前 **0 条**金额类建议（程序名一律「货币资金 …」而 `trial_balance` 只有明细「银行存款」「其他货币资金」⇒ 单向子串匹配全落空 ⇒ 金额恒 `null`⇒ 重要性判据整体空转）→ 现 **4 条**「金额低于实际执行重要性」，金额 **8,607,977.04**，溯源含报表行编码 + 行名 + 公式原文。零漂移（基线工具 verify 差异 0 项 + 独立同口径交叉核实 6 域全一致）。
+
+**净新增 = 2 后端模块 + 1 前端纯函数模块**：三段映射每段都委托既有真源（`four_table/*_cycle_specs.py` 的 `row_code` · `report_config.formula` · `ReportFormulaParser`），索引**零 `BS-*`/`IS-*`/`IMP-*` 字面量** + 与 11 个 per-cycle 声明逐字交叉锁死。
+
+**design 未预见的实现判定 —— 两组准则字段分叉时宁缺勿造**：平台有 `applicable_standard_v2`（权威真源）与 `template_type`+`report_scope`（**报表页实际用的**，缺失时兜底 `soe_standalone`）两组，实测 32 个项目 24 未设 / 7 一致 / **1 分叉**（`0ec33ac9` 331 条程序，`v2=soe_standalone` 而 `template_type=listed`）⇒ 分叉时返 `standard_unset` + ERROR 日志、**不出数**（报表页必须出报表所以兜底，而裁剪判据是自动裁掉审计程序的依据，用说不清的准则算出的金额去裁程序风险高得多）。连带：`derive_applicable_standards` **永不为空**，故 R3.3 的「未设置」不能靠它判。
+
+**浏览器实测暴露并已修的缺陷**：汇总闸按 `accountName` 去重，而报表行映射生效后该键退化成 `wp_code` ⇒ 4 条程序落同一报表行（同一笔 8,607,977.04）被算成 4 个科目 **34,431,908.16（虚高 4 倍）** ⇒ 超实际执行重要性 ⇒ **过度阻断批量确认**。改造前被数据掩盖（金额是 `null` 计 0，合计恒 0、闸门不亮）。修法 = 新增 `aggregateGateKey`（报表行 → 科目名 → 底稿编号退化）+ 5 条守卫含反向自检（旧键必复现虚高与误触）。
+
+**归档复盘补齐三项**：①删死代码 `traceArgsOf`（零消费方）②新建**常驻** CI 接线守卫 `test_report_line_ci_wiring.py`(12 例) —— 原用一次性脚本校验致 **Property 22 无常驻判据**，将来重名 job 被 yaml 静默去重 / 门控 PATTERN 写坏致 job 恒跳过 / 引用未入库测试都不会被发现而 CI 一片绿；含内存内变异自检（不对共享热点 yml 做磁盘变异）③扫全部新增导出符号消费方 ⇒ 死代码 **0**、22 个 Property **全部**有守卫引用。
+
+**终态**：后端 `procedure_trim` **419 passed**（新增 94 例）/ 前端 10 文件 **360 passed** / 变异 **17/17 RED**（每条命中的正是预期判据、还原 md5 一致、`.bak` 零残留）/ 真实库验收 **PASS**（36 项独立算术复核全一致，独立复核走「极简线性符号解析器 + 直接 SQL 聚合」与 `ReportFormulaParser` 实现路径完全不同）/ 准则变体 `soe_standalone` VERIFIED、`listed_*` 与 `soe_consolidated` **UNVERIFIABLE**（库中无该变体项目，不用构造数据冒充）。
+
+🔴 **顺带修复上游 spec 的入库欠账（否则本 spec 的 CI job 在干净 checkout 下必挂）**：已 commit 的 `procedureTrimDecision.ts` import 的 `completenessExemption.ts`（连同 `b50Completeness.ts`）**在 HEAD 中不存在** —— 归属 `procedure-trimming-and-delegation-intelligence`(标记 26/26 但从未入库)，导致**既有的** `procedure-trim-intelligence-frontend` job 也已必挂。本轮连同各自配套测试一并入库（39 例全绿），CI 依赖闭包复查 **160 文件 / 0 未跟踪**。
+
+**登记的既有问题（非本 spec 引入）**：`BS-055` 跨准则同码异义（listed「应付股利」/ soe「短期借款」，`m_cycle_specs.M1` 指向它 ⇒ 国企项目行名不符，但两变体 `formula` 均为 `None` ⇒ 返 `formula_unavailable` **不出数**，验收脚本分级 LOW）· J1/J2 声明的 `row_code` 与循环语义不符（`BS-051` 实为持有待售负债、`BS-069` 实为非流动负债合计且公式全 `ROW()`，索引如实跟随声明正是零字面量的设计目的）· `test_task23_zero_regression::test_linkage_module_is_new_not_a_rewrite` 恒红（判据 `_git_show(...) is None` 而该文件已进 HEAD 396 行，只读 HEAD 不依赖工作树 ⇒ 与本 spec 无关）。
+
+**新登记的坑**：前端 vitest 里 `await import('字面量')` 被 Vite 在**转换期**解析，模块不存在 → 整文件 collection error + `Tests no tests`（零断言执行）⇒ 说明符存变量 + `/* @vite-ignore */` · `fs_append` 的内容会被并发会话的完整重写覆盖（实测 85 秒内被整段重写）⇒ 加挂后必须**立即**用不依赖行号的归因型判据复验 · PowerShell 的 `Measure-Object -Line` **不计空行**，据它切字节区间必错位 · 交叉核实自己会造假漂移（本轮两次：漏 `is_deleted=false` 过滤、快照键名写错）· 变异脚本运行期间**不能并行**跑同一组测试（会读到变异中间态而假红）。
 
 ---
 
