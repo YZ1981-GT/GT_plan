@@ -1,0 +1,241 @@
+# Implementation Plan
+
+## Overview
+
+两组任务：**A 组**（Task 1、2、5、6、7、15、18）修 E1-3 `multi` 口径抹零；**B 组**（Task 3、4、8~14、16）把变异检验样板收敛成 `backend/scripts/_mutation_kit/` 并推广。Task 17、19 是两组共用的收口。
+
+顺序原则沿用平台惯例：**判据先行**（守卫先打红再改实现）· 每个 Wave 末尾配变异检验 · 浏览器实测与真实库验收放最后。
+
+A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组变异）依赖 Wave 3（共享件）。这是有意的耦合：让推广的第一个用例就是本 spec 自己。
+
+## Task Dependency Graph
+
+```json
+{
+  "waves": [
+    { "wave": 1, "name": "判据先行与产物入库", "tasks": ["1", "2", "3", "4"], "parallel": true },
+    { "wave": 2, "name": "A 组实现：三形态与三态归一", "tasks": ["5", "6", "7"], "depends_on": [1] },
+    { "wave": 3, "name": "B 组共享件", "tasks": ["8", "9", "10"], "depends_on": [1] },
+    { "wave": 4, "name": "B 组迁移与采纳守卫", "tasks": ["11", "12", "13", "14"], "depends_on": [3] },
+    { "wave": 5, "name": "变异、CI、实测与回归", "tasks": ["15", "16", "17", "18", "19"], "depends_on": [2, 3, 4] }
+  ],
+  "notes": [
+    "Task 1/2 必须在 Task 5/6 之前对**当前实现**打红 —— 打不红说明判据无效，不是代码没问题。",
+    "Task 3（脚本入库）与 A 组零文件重叠，可完全并行；它是 Wave 4 迁移的前置。",
+    "Task 4（跟踪守卫 + 豁免表）依赖 Task 3 的入库结果才能归零，故 Task 3 先完成。",
+    "Task 5（recalcRow 三形态）与 Task 6（fxRate 三态）碰同一文件 useE1BankDetail.ts，必须串行：先 5 后 6，或一次落地。",
+    "🔴 Task 6 依赖 Task 5：形态 B 要靠 fxRate===0 显示「待录入」，而三态归一是它的前提；但形态判定本身用 fxCurrency 不用 fxRate，故 Task 5 可先独立完成并自证。",
+    "Task 11（迁 e_cycle）必须是迁移的第一个 —— 它是唯一 11/11 的范式基准，若共享件表达不出它的某项能力，改共享件而不是削减该脚本。",
+    "Task 15（A 组变异）依赖 Wave 3 共享件 + Wave 2 实现 + Task 1/2 守卫三者全绿。",
+    "Task 18（浏览器实测）是最后一步，必须在 Task 17 CI 接线后做，且实测前后要做库侧基线/复原双证。",
+    "🔴 全程不得触碰 mutate_k_cycle_guards.py / mutate_i_cycle_guards.py / mutate_ie_lifecycle_guards.py（在办 spec，Property 18）。"
+  ]
+}
+```
+
+## Tasks
+
+- [ ] 1. 形态判定与 fxRate 三态守卫（先打红）
+  - 新建 `audit-platform/frontend/src/components/workpaper/composables/__tests__/e1BankDetailFxForm.spec.ts`
+  - 断言 `classifyFxForm` 的三形态划分：fc 列任一非 0 ⇒ `fc-authoritative` · fc 全 0 且 `isBaseCurrency(fxCurrency)` ⇒ `base-identity` · fc 全 0 且非本位币 ⇒ `foreign-pending`（Property 1/2/3）
+  - 断言 `recalcRow(row,'multi')` 在形态 A 下**本位币六列与输入逐字相等**、`ending` 按 `calcCashBalance` 算出（Property 1）；形态 B 下本位币列为 0 且 `fxRate` 保持 0（Property 2）；形态 C 下与修复前逐字相同（Property 3）
+  - 断言 `recalcRow(row,'rmb')` 输出与修复前逐字相同（Property 4）——**零回归支点**，把修复前的期望值硬编码为基线常量并注明「值来自修复前实测而非预期」
+  - 断言 `loadFromResponses` 的 fxRate 三态：缺失（`undefined`/`null`/`''`）→ 1 · 显式 `0` → **0** · 其他 → 原值（Property 8/9）
+  - 断言形态 A 下 `endingFc === calcCashBalance(opening,increase,decrease)`（Property 13）—— 防「本位币有值而原币显 0」的自相矛盾
+  - 历史数据兼容：用不含 `fxRate` 键的行 JSON 作输入，断言本位币列非 0（Property 10）
+  - **必须先红**：`classifyFxForm` 尚不存在 ⇒ import 失败即红；三态断言在当前 `|| 1` 实现下必红。跑一次记录红的条数与测试名，写进本文件实录
+  - PBT（`fast-check`，仓库已有）：任意 fc 列组合下「任一非 0 ⇒ 恒为形态 C」
+  - _Requirements: 1.1, 1.2, 1.6, 2.1, 2.2, 2.3_
+
+- [ ] 2. 跨层端到端守卫（先打红）
+  - 新建 `composables/__tests__/e1BankVariantIntegrity.spec.ts`
+  - 判据形态：**从写入侧出发、经序列化、到消费侧**，断言本位币金额守恒。禁止只测纯函数返回值 —— 那正是本缺陷穿过 29 条变异 + 568 例守卫的原因
+  - 链路 = `buildBankSeedRowsFromAccounts(p, variantA)`（或 `buildBankSeedRows(p)`，或手工构造的录入行）→ `JSON.stringify` → 塞进 `allResponses` 的 `E1-bank-detail-rows` → `useE1BankDetail({ variant: ref(variantB) })` → `rows.value` 的本位币列
+  - `variantA × variantB` **四组合**全覆盖（rmb→rmb / rmb→multi / multi→rmb / multi→multi）× **三来源**（账户级 / 叶子口径 / 手工录入）（Property 5）
+  - 叶子口径单独一条（Property 6）：`buildBankSeedRows` 产出的行在 `multi` 下本位币金额非 0 ——**这条在改造前就该红**，与 variant 切换无关
+  - 手工录入路径用 `addRow` + `updateCell` 真实走一遍，不手搓 row 对象（否则测不到 `updateCell` 里的 `recalcRow(row, variant.value)`）
+  - 文件头注释写明**断言半径**：跨了种子 → 序列化 → 加载 → 重算四层，以及为什么单层守卫不够（引用既有守卫「multi 版必须下发原币列」措辞准确但半径只到纯函数输出这一事实）（Property 15）
+  - **必须先红**：至少 rmb→multi 与「叶子口径→multi」两组必红。逐条记录红的测试名（Property 14 的前置证据）
+  - _Requirements: 1.3, 4.1, 4.2, 4.3, 4.5_
+
+- [ ] 3. 未入库变异脚本入库 + 归属查清
+  - 7 个 `backend/scripts/check/mutate_task{13,14,18,19,20,21,23}_*.py` 属已归档 `procedure-trimming-and-delegation-intelligence`(26/26)，当前 `??` 未跟踪 ⇒ 入库（Property 16）
+  - 入库前逐个跑只读子命令（`--list` 或等价）确认可运行、退出码 0 且输出非空；不可运行的**不入库**，如实登记原因（Property 17）
+  - `mutate_wp_export_resolver_guards.py` 归属未明 ⇒ 按「内容关键词 + mtime + 对应守卫文件所属 spec」三条判归属，给出明确结论（入库 / 删除），写进实录，**不留 `??`**（Property 19）
+  - 归属判据不得只看文件名（memory 实证：`tmp_t22_base.json` 名字带 t22 但属他 spec）
+  - 入库后逐个 `git ls-files --error-unmatch` 复核并把结果贴进实录（Property 16）
+  - **不得** `git add` 在办 spec 的 3 个脚本（`k_cycle` / `i_cycle` / `ie_lifecycle`）（Property 18）
+  - _Requirements: 5.1, 5.2, 5.3, 5.5_
+
+- [ ] 4. 变异脚本跟踪守卫 + 豁免表
+  - 新建 `backend/data/mutation_kit_exemptions.json`，schema 见 design.md §Data Models（`script`/`spec`/`reason`/`registered_at`/`revoke_when` 五个必填）
+  - 登记在办 spec 的 3 个脚本，`reason` 写明「spec 在办 + 并发会话在编辑」，`revoke_when` 写「spec 归档后」
+  - 新建 `backend/tests/test_mutation_kit_scripts_tracked.py`：扫 `backend/scripts/{check,diagnose}/mutate*.py`，未被 git 跟踪且不在豁免表 ⇒ 失败（Property 16）
+  - 新建 `backend/tests/test_mutation_kit_exemptions.py`：豁免项缺任一必填字段 ⇒ 失败；`reason` < 10 字 ⇒ 失败；**豁免项的 spec 目录已不在 `.kiro/specs/` 下（= 已归档）⇒ 失败并提示撤销**（Property 30）
+  - 豁免表 JSON 解析失败时守卫**失败**而非静默跳过（fail-closed）
+  - 反向自检：把某在办 spec 的目录名改成不存在的值，失效检测必须打红
+  - _Requirements: 5.4, 5.6, 8.5_
+
+- [ ] 5. `classifyFxForm` + `recalcRow` 三形态
+  - 在 `composables/useE1BankDetail.ts` 新增导出纯函数 `classifyFxForm(row): FxForm`，签名见 design.md §Components
+  - 判据用 `fxCurrency` + `isBaseCurrency()`（既有单一真源），**不用 `fxRate`** —— 用 fxRate 会把形态 B 误判成 A 从而臆造汇率 1（Property 34 禁止）。这条理由写进函数注释
+  - 改 `recalcRow` 的 `multi` 分支按三形态分派：形态 A 保留本位币六列 + `endingFc` 镜像本位币；形态 B 保持现状（全 0）；形态 C 保持现状（由 fc 派生）（Property 1/2/3/13）
+  - `rmb` 分支**一行不改**（Property 4）
+  - 不改 `buildBankSeedRowsFromAccounts` / `buildBankSeedRows` 的任何一行（Property 7）—— 种子侧 variant 分流是 AC 1.4 的设计意图，既有守卫已锁死
+  - 不新增 `BankDetailRow` 字段、不改 `USER_FIELDS`、不落库 `fxForm`（形态是推导出来的，落库即产生第二真源）
+  - 跑 Task 1 的守卫，确认此前红的形态断言转绿、`rmb` 零回归断言仍绿
+  - _Requirements: 1.1, 1.2, 1.4, 1.5, 1.6_
+
+- [ ] 6. `loadFromResponses` 的 fxRate 三态归一
+  - 把 `fxRate: parseNum(r.fxRate) || 1` 改为显式三态：`(r.fxRate === null || r.fxRate === undefined || r.fxRate === '') ? 1 : parseNum(r.fxRate)`
+  - 注释写明**为什么缺失回落 1**（「缺失 = 该行只有本位币列 = 原币与本位币恒等」），而不是「历史如此」（Property 9）
+  - 确认形态 B 的行加载后 `fxRate` 为 0，且界面提示走既有 `FOREIGN_FC_HINT` 单一真源，**不新造第二份文案**（Property 2）
+  - 历史兼容验证（Property 10）：取真实库里既有的 `E1-bank-detail-rows`（若存在）或构造无 `fxRate` 键的行，断言加载后本位币列非 0
+  - 与 Task 5 碰同一文件，串行或一次落地
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.6_
+
+- [ ] 7. 落库形态与跨 sheet 聚合守卫
+  - 在 Task 2 的守卫文件里补：断言 `serializeRows(rows, USER_FIELDS)` 输出的 JSON 里每行 `opening`/`increase`/`decrease`/`adjustment` 等于**写入时**的值（Property 11）
+  - 判据必须落在**序列化输出**上，不是内存 `rows` —— 落库形态由 `USER_FIELDS` 决定，两者可能不同
+  - 断言 `syncCrossSheetTotals()` 的四个跨 sheet 键（`E1-bank-detail-{principal,institution,finance,other}-{opening,total}-unaudited`）在 variant 切换前后取值相同（Property 12）
+  - 形态 B 的行落库值必须与写入时一致（不被派生结果覆盖），即「真外币未录汇率」的 0 是写入时就是 0，不是被算成 0（Property 11 的 AC 3.4 分支）
+  - **不在持久化层加防御**：不写「落库前检查是否变 0」那类补丁（会掩盖真因，且分不清合法 0）
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
+
+- [ ] 8. 共享件骨架：`spec.py` / `anchor.py` / `apply.py`
+  - 新建 `backend/scripts/_mutation_kit/`（`__init__.py` 公开 API）
+  - `spec.py`：`Mutation` 数据类（字段见 design.md §Components）+ 声明期校验（`kind` 合法 · `anchor` 非空且**不含 `\n`** · `want` 非空 · `why` 非空）
+  - `anchor.py`：锚点定位。**行级唯一 + 行号消歧 + 该行逐字相等 + 命中数恰好 1** 四重断言；`splitlines(keepends=True)` 保留行尾，CRLF 安全（工作树是 CRLF，含 `\n` 的锚点必然 MISS）
+  - `apply.py`：备份 / 应用（replace·delete·insert·swap·move 五种 kind）/ 还原。还原写在 `finally`；还原后用 **md5 与变异前逐字比对**，不符时抛异常并打印两个 md5（不信「写回成功」）
+  - 截取块（swap/move）用**括号配对**且**先跳参数列表**，禁固定字符窗口 —— TS 返回类型注解 `): Promise<{...}>` 与 Python 多行签名都会骗到「第一个 `{`」
+  - 零新增第三方依赖：只用 `dataclasses`/`pathlib`/`hashlib`/`re`（Property 25）
+  - _Requirements: 6.1, 6.6_
+
+- [ ] 9. 共享件执行与判定：`runner.py` / `verdict.py` / `coverage.py` / `cli.py`
+  - `runner.py`：pytest 与 vitest 执行 + **失败测试名集合**提取（pytest 用 `-rf` 解析；vitest 用 `--reporter=json` 取 `fullName`）。子进程一律 `subprocess.run([...])` **不经 shell**（`-k "a or b"` 经 shell 会被拆成多个位置参数）
+  - `verdict.py`：四态判定（RED / GREEN / ANCHOR-MISS / WRONG-TEST），判据是**新增失败集合的差集**，退出码不作判据
+  - `coverage.py`：覆盖面分母 tally —— 输入守卫文件全集，输出「未被任何变异打红」的清单，报告末尾打印（Property 21）
+  - `cli.py`：`--list` / `--check-anchors` / `--run` / `--restore` 统一入口
+    - `--check-anchors` **只读**：执行后目标文件 md5 全不变、无 `.bak`/`.mutbak` 残留、无新增文件（Property 23）
+    - `--list` **不得只打印**：同时校验「锚点命中恰好 1 次 + 替换文本 ≠ 锚点 + `want` 可定位到真实测试」，任一不满足即非零退出（Property 24）——g7 spec 教训：只打印的 `--list` 在 CI 里恒绿
+  - `run_cli()` 的 `guard_files` 设为**必填关键字参数** —— 让「没有分母」在签名层面不可能（Property 21）
+  - 冻结基线：`baseline_backend_passed` / `baseline_frontend_passed` 不符时打印 WARN 含实测值与基线值；注释要求改基线必须说明来源（Property 22）
+  - _Requirements: 6.2, 6.3, 6.4, 6.7_
+
+- [ ] 10. 共享件自身守卫
+  - 新建 `backend/tests/test_mutation_kit_capabilities.py`，七项能力每项一条**行为**测试，判据是「故意破坏后必失败」而非「函数存在」（Property 20）
+  - 具体：锚点唯一性（构造同名多处命中 ⇒ 必报 ANCHOR-MISS） · md5 还原核验（篡改还原内容 ⇒ 必抛） · 分母 tally（声明 3 个守卫文件但只有 2 个被打红 ⇒ 报告必列出第 3 个） · 四态（构造四种情形各自命中对应态） · `--check-anchors` 只读（跑前后 md5 比对） · `--list` 校验（构造 want 定位不到的变异 ⇒ 必非零退出） · 冻结基线（实测 ≠ 基线 ⇒ 必 WARN）
+  - 反向自检：把上述任一断言的被测代码改坏，对应测试**必须**打红（写进实录，没打红=守卫有缺陷）
+  - 用临时目录 + 替身文件做被测对象，**不拿真实生产文件**做共享件的测试素材
+  - _Requirements: 6.5_
+
+- [ ] 11. 迁移范式基准：`mutate_e_cycle_guards.py`
+  - **迁移的第一个**。迁移前先跑一遍**全量**变异，存下判定矩阵（变异 id → 四态 + 打红测试名集合）作等价性基线（Property 26）
+  - 🔴 迁移前必查：`mutate_e_cycle_guards.py` 的 M09/M10/M29 锚在 `backend/data/note_template_soe.json`，该文件长期带并发 K 循环的未提交改动。跑全量变异会改它 ⇒ **开工前先确认该文件当前状态并与并发会话协调**；若不可协调，改用「按变异分批 + 每批后立即 md5 复核」并在实录写明
+  - 迁移后重跑同一变异集，判定矩阵**逐一比对**必须相同（Property 26）
+  - 若共享件表达不出该脚本的某项能力（如它的 `SPEC_GUARD_FILES` 说明文字、M01 的 want 多目标匹配），**改共享件**而不是削减该脚本的能力
+  - 迁移后确认七项能力齐全（Property 27）
+  - _Requirements: 7.1, 7.3, 7.4_
+
+- [ ] 12. 迁移其余 5 个已归档 spec 的脚本
+  - `mutate_h_cycle_guards.py` · `mutate_g7_column_alignment_guards.py` · `mutate_trim_decision_guards.py` · `mutate_note_conversion_section_mapping_guards.py` · `mutate_note_text_hygiene_and_expandable.py`
+  - 每个都按 Task 11 的等价性流程（迁移前矩阵 → 迁移 → 迁移后矩阵 → 逐一比对）（Property 26）
+  - 顺带补齐它们缺的能力：`g7` 缺 md5 还原核验 · `h_cycle`/`note_text_hygiene`/`note_conversion` 缺 WRONG-TEST 态 · 五个全缺覆盖面分母与静态锚点自检（Property 27）
+  - 补分母时守卫文件全集要**真查**该 spec 的守卫文件（从其 tasks.md 或 CI job 反查），不得随手列几个凑数 —— 分母不全等于分母无效
+  - 迁移中发现的既有判据缺陷（无效变异、锚点已漂移、want 定位不到）**如实登记不顺手改**（Property 28），除非不改无法完成迁移，此时在实录写明理由
+  - _Requirements: 7.1, 7.3, 7.4, 7.6_
+
+- [ ] 13. Task 3 入库脚本的迁移决策
+  - 对 Task 3 入库的 7~8 个脚本，逐个判「迁移后能否复现原判定」
+  - 能复现的迁移（走 Task 11 的等价性流程）；不能复现的**不迁**并写明原因（Property 26 / AC 7.2）
+  - 这批脚本属已归档 spec 且从未入库，可能存在「写完就没再跑过」的情况 ⇒ 先跑一遍取当前判定矩阵，若脚本本身已失效（锚点全 MISS）则登记为「历史产物，保留但不迁」，不强行修复
+  - _Requirements: 7.2_
+
+- [ ] 14. 采纳守卫 + 在办 spec 登记
+  - 新建 `backend/tests/test_mutation_kit_adoption.py`：扫 `backend/scripts/{check,diagnose}/mutate*.py`，未 `from _mutation_kit import` 且不在豁免表 ⇒ 失败（Property 29）
+  - 判据不能是「文件里出现 `_mutation_kit` 字符串」（注释里提一句就绿了）⇒ 用 AST 解析真实 import 语句
+  - 在豁免表补登在办 spec 的 3 个脚本（若 Task 4 已登记则复核其 `reason`/`revoke_when` 仍准确）（Property 18 / AC 7.5）
+  - 变异检验：新增一个不带分母的临时脚本 ⇒ 采纳守卫必红；把某脚本从豁免表移除 ⇒ 必红（Property 29）
+  - 临时脚本用完即删，并复扫确认无残留
+  - _Requirements: 7.5, 8.1, 8.2_
+
+- [ ] 15. A 组变异检验
+  - 用**本 spec 的共享件**新建 `backend/scripts/diagnose/mutate_e1_variant_recalc_guards.py`（自举：推广的第一个真实用例）
+  - `guard_files` 分母 = Task 1/2/7 新建或扩展的守卫文件全集
+  - 变异至少覆盖：形态判定改用 `fxRate` 而非 `fxCurrency`（应打红 Property 2 的外币断言）· 形态 A 分支删掉（退回无条件派生，应打红 Property 1/5/6）· `fxRate` 三态改回 `|| 1`（应打红 Property 8，AC 2.5）· `endingFc` 镜像删掉（应打红 Property 13）· `rmb` 分支动一行（应打红 Property 4 零回归）· 跨层守卫的四组合删一组（应打红覆盖面 tally）
+  - 每条变异的 `why` 写明**为什么这条变异不是无效变异**（e-cycle 的 M3/M15 各踩过一次：删了行为不变 = 无效）（Property 14 / AC 4.4）
+  - 结果必须 **RED**（GREEN=0 / ANCHOR-MISS=0 / WRONG-TEST=0）；四态逐条记录进实录，只看退出码会把后三态误判成 RED
+  - 覆盖面 tally 必须显示「0 个守卫文件未被打红」
+  - _Requirements: 2.5, 4.4_
+
+- [ ] 16. B 组变异检验
+  - 在 Task 15 的脚本里加一组，或另建脚本，覆盖 B 组守卫
+  - 变异至少覆盖：`anchor.py` 的唯一性断言删掉（应打红 Property 20 的唯一性用例）· `apply.py` 的 md5 核验删掉（应打红）· `coverage.py` 的 tally 输出删掉（应打红）· `cli.py` 的 `--check-anchors` 改成会写文件（应打红 Property 23）· `--list` 的校验删掉只留打印（应打红 Property 24）· 豁免表失效检测删掉（应打红 Property 30）
+  - 结果必须全 RED，四态逐条记录
+  - _Requirements: 8.2_
+
+- [ ] 17. CI 接线（归因型验收）
+  - 在 `.github/workflows/governance-checks.yml` 新增 job：A 组前端守卫（vitest）+ B 组后端守卫（pytest）+ 共享件能力守卫 + `--check-anchors` 静态自检
+  - 挂 CI 前逐个验证引用文件 **exists + tracked**（沿用本轮复盘的「37/37」判据形态），干净 checkout 下可跑（Property 31）
+  - 🔴 改 yml 用 `fs_append` 或精确 `str_replace`；验收用**归因型**判据（变动是否落在本 spec 的字节区间内），**不用**「其他 job 一个都没变」的全局等值型 —— 并发会话同时改该文件是常态，全局等值必假红（Property 32）
+  - 记录改动前后的 job 总数与本 spec 新增的 job 名，作归因证据
+  - _Requirements: 8.3, 8.4_
+
+- [ ] 18. 浏览器实测与真实库验收
+  - 实测前：postgres 只读取基线（目标项目的 `E1-bank-detail-rows` + 四个跨 sheet 聚合键 + `E1-bank-variant` 的 md5 与 `updated_at`）
+  - 复现原缺陷路径确认已修：加载 → 点 `(仅人民币)E1-3` → 再点 `(人民币及外币)E1-3`，22 行金额**不得**变 `-`，横幅**不得**出现「审定合计 0.00 ≠ TB数」
+  - 叶子口径兜底路径单独验（Property 6）：选一个 aux 侧无银行账户数据的项目，直接开 `multi` 版，金额不得恒零。若全库无此类项目，如实登记 UNVERIFIABLE 并给替代证据（vitest + 变异）
+  - 手工录入路径验：在 `仅人民币` 版改一格 → 等 2 秒（`scheduleSave` 窗口）→ 切 `人民币及外币` → 再切回 → 金额仍在
+  - 外币行验 Property 2：若有非本位币账户则验「本位币列 0 + 汇率显 0 + note 提示」；全库 `currency_code` 全 `CNY` ⇒ 如实登记 UNVERIFIABLE + 替代证据
+  - 实测后：按基线**逐字节复原**并双重核实（脚本 verify + 独立 SQL 直查）；🔴 复原前先判「差异是谁造成的」—— 把并发会话的新成果当污染去复原就是回退事故（e-cycle Task 22 的实证教训）
+  - 判成败一律**查数据**不看退出码（`--apply` 常被 Ctrl+C 中断但写入已提交）
+  - _Requirements: 1.1, 1.3, 3.1_
+
+- [ ] 19. 回归与清理
+  - 前端：按引用关系反查辐射面跑 vitest（**不跑全量**），至少覆盖 `e1*` 全域 + 本 spec 新建守卫；记录 passed 数并与冻结基线比对
+  - 后端：`backend/tests` 里与 `_mutation_kit` / 豁免表 / 采纳守卫相关的文件；**不跑全量 `backend/tests`**（1522 个文件，前台无中间输出会被误判卡死）
+  - 三件套机器校验：`get_diagnostics` 对本 spec 三个 md 零诊断
+  - 产物入库复核：`git status --porcelain -- <本 spec 产物清单>`，见到 `??` 即 add（memory 铁律：「spec 全绿」≠「产物已入库」，G7 收口时实测 10 个正式产物全未跟踪）
+  - 清理本 spec 自己的 `tmp_*` / `_wip_*` 诊断产物；归属判据 = 前缀 + 内容关键词 + mtime 三条，**不按文件名里的任务号**（`tmp_t22_base.json` 陷阱）
+  - 复扫 `*.mutbak` / `*.bak` 残留为 0
+  - _Requirements: 无新增 AC（收口任务）_
+
+## Notes
+
+### 立项时的实证基线（2026-08-15，只读零改动）
+
+见 requirements.md §实证基线 与 design.md §Notes。关键行号：
+
+| 位置 | 事实 |
+|---|---|
+| `useE1BankDetail.ts` L105~L119 | `recalcRow` 的 `multi` 分支无条件由 fc 列派生并 `...row` 覆盖本位币列 |
+| `useE1BankDetail.ts` L176~L179 | `fxRate: parseNum(r.fxRate) \|\| 1`（回落 1）vs `openingFc: parseNum(r.openingFc)`（回落 0）—— 不对称 |
+| `useE1BankDetail.ts` L193 | `watch(variant, ...)` 切换即全表重算 |
+| `useE1BankDetail.ts` L92~L98 | `USER_FIELDS` 同含本位币四列与原币五列 ⇒ 抹零会落库 |
+| `useE1BankDetail.ts` L248~L250 | `syncCrossSheetTotals` 的 watch 带 `immediate: true` ⇒ 聚合键同步归零 |
+| `useE1BankDetail.ts` L253~L262 | `scheduleSave()` 2 秒 → `persistToResponses()` → `saveImmediate()` 写库 |
+| `e1FourTablePrefill.ts` `buildBankSeedRows.mk()` | 无条件 `fxRate:1` + fc 全 0 ⇒ 叶子口径兜底在 `multi` 版**恒零** |
+| `useE1FormulaEngine.ts` L126~L128 | `calcFxConvert(fc,rate) = fc * rate`，纯乘法 |
+
+### 变异脚本普查（2026-08-15）
+
+17 个脚本 / 9657 行。分母 3/17 · 静态锚点自检 1/17 · 冻结基线 1/17 · WRONG-TEST 13/17 · 锚点唯一性 16/17 · md5 16/17。仅 `mutate_e_cycle_guards.py` 11/11。
+
+**该普查用的是字符存在判据（粗筛），仅用于定缺口规模；Task 10/14 的正式判据必须落在行为/AST 上。** 这一条本身就是本 spec 要防的错的一个实例，故如实标注。
+
+### 与并发会话的边界（开工前必复查）
+
+| 文件 | 立项时状态 | 处置 |
+|---|---|---|
+| `mutate_k_cycle_guards.py` | `??`，mtime 距调查 5 分钟内 | **不碰**，豁免登记 |
+| `mutate_i_cycle_guards.py` | `A `（staged 未提交） | **不碰**，豁免登记 |
+| `mutate_ie_lifecycle_guards.py` | clean，spec 在办 24/25 | **不碰**，豁免登记 |
+| `backend/data/note_template_soe.json` | 带并发 K 循环 +150/-98 未提交改动 | Task 11 跑全量变异会改它 ⇒ 开工前协调 |
+| `.github/workflows/governance-checks.yml` | 带并发 K 循环 +22 未提交改动 | Task 17 用归因型验收 |
+| `useE1BankDetail.ts` / `e1BankAccountPrefill.ts` | 立项时 clean | 开工时复查，若并发在编辑先协调 |
+
+### 明确不做（范围外，登记备查）
+
+- E1-10 交叉核对把科目码当账号比对（e-cycle spec 登记的另一处存量口径问题）—— 与本 spec 无文件重叠，建议并入存量口径回填 spec。
+- 存量 `el-input-number :formatter` 千分符空操作（40+ 处，EP 2.13.6 无该 prop）—— 属另一个待立 spec。
+- 迁移中发现的他 spec 判据缺陷（Property 28）—— 只登记。
