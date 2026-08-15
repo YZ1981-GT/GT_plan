@@ -50,7 +50,62 @@
 
 ---
 
-- [ ] 1. 全库同类判据普查与分级（只读，不改代码）
+- [x] 1. 全库同类判据普查与分级（只读，不改代码）
+
+  ✅ **已交付**（产物：`backend/scripts/check/audit_guard_assertion_grades.py` +
+  `backend/data/guard_assertion_grades.json`）
+
+  **终态**：扫 **4156** 个测试文件，命中 **1511** 条形态 D/E。
+  分层 `P0 119 / P1 45 / P2 1347`；判定 `must_fix 1209 / keep 302`。
+  **19/19 已知锚点全部命中**（脚本 `--check-anchors` 可复现）。
+
+  🔴 **判据迭代了 4 版，每版都靠 `KNOWN_ANCHORS` 的 MISS 报警发现漏洞** ——
+  这是本 Task 最值得沉淀的部分，也印证了「先把已知点写进 spec 再写脚本」的价值：
+
+  | 版本 | 判据 | 命中数 | 漏掉了什么 |
+  |---|---|---|---|
+  | v0 | 正则 `expect\(...(?P<msg>.*?)\)\.toBe\(\d+\)` + `re.S` | **7063** | 跨行误匹配：DOTALL 下把「某个 expect 的开头」与「几十行后另一个 expect 的 `.toBe(数字)`」拼成一条 |
+  | v1 | 改**括号配对**扫描 + 条件①（文件是全量扫描型）+ 条件②「target 必须是模块级」 | **87** | 漏 4 个锚点：`listed = list(iter_shared_tables(...))` 这类**函数内局部变量** |
+  | v2 | 条件②改「赋值右侧含扫描信号」 | 229 | 漏 3 个：**pytest fixture 参数**（`def test_x(expected)` 根本没有赋值语句）+ 私有 helper 调用（`codes = _codes()`） |
+  | v3 | 条件②改「排除全部字面量」 | 1468 | 漏 2 个：`MISSING_SYNC_PATH` / `ORPHAN_BASELINE` —— **模块级登记表本身就是字面量数组**，却是形态 D 的典型 |
+  | v4 | 条件②按**是否模块级分流**：模块级→纳入 / 函数内+字面量→排除 / 函数内+其它→纳入 | **1511** | 19/19 全命中 |
+
+  🔴 **v0 犯的正是本 spec design 的 Property 9 明令禁止的「固定字符窗口 / 跨界正则」**
+  —— 治理脚本自己踩了要治的坑。已改为括号配对（跳字符串与模板串），
+  并补 `[跨界]` 与 `[配对]` 两条反向自检（首版在此必败）。
+
+  **判据设计的关键取舍（如实登记）**：形态 D 的危害只发生在 target 承载
+  「真源规模快照」时。`expect(plan.writes.length).toBe(2)` 这类「造 2 条输入断言
+  2 条写入」是纯函数单测，**完全合法**，任何 spec 改真源都不影响它。
+  但语法上二者不可区分 ⇒ 脚本**不假装能全自动定案**，改为：
+  - 两个必要条件（文件是全量扫描型 ∧ target 非函数内字面量）过滤明显合法项
+  - 三层优先级给出可操作清单：
+    - **P0（119 条 / 19 文件）** = spec 已逐条确认的，确定要改
+    - **P1（45 条）** = 模块级 UPPER_SNAKE 常量（登记表 / 清单，最易被跨 spec 改）
+    - **P2（1347 条）** = 待分批甄别的背景量
+  - 每条带 `needs_human_review: true`
+
+  **跨 spec 加权已实装**（Property 15 / R6.2）：从 `.kiro/specs/*/{tasks,design,requirements}.md`
+  抽文件名建索引（**570** 条），标注每条命中的 `touched_by_active_specs`；
+  被 **2+ 个** active spec 提及的 `keep` 自动抬为 `must_fix`
+  —— 实测精确抓出 3 条 `l2l4DisclosureWiring`（被 `l-cycle-…-completion` + 本 spec 同时提及）。
+
+  **脚本自带三重防空转**：
+  1. 零产出自检（扫到 <200 个测试文件即报 ERROR）—— 首版 `REPO_ROOT` 写
+     `parents[2]` 落在 `backend/` 上，扫到 **0 个文件却以 0 退出**（「命中 0 条」看起来
+     像「平台很干净」），正是本 spec 要治的判据空转形态；已改**双哨兵向上查找**
+  2. 反向自检 16 例（TS 9 / PY 4 / 跨界 1 / 配对 1 / E 1），跑普查前先自检，失败即中止
+  3. `KNOWN_ANCHORS` 覆盖核对（19 个），任一 MISS 即报「判据收窄过头」
+
+  **P0 分布**：`e1BankAccountPrefill`(17) · `g0SummaryLowerZone`(13) ·
+  `test_note_shared_table_segments`(11) · `test_x3_ie_manifest_registration`(10) ·
+  `adjustmentIeContract`(9) · `test_note_i_cycle_structure`(9) · `test_x3_ie_registrar`(8) ·
+  `test_x3_keyfamily_property`(8) · `test_k0_source_template_facts`(7) ·
+  `g7NoteSubtableContract`(6) · **`disclosureSharedTableRowScope`(5 → Task 2 的目标)** ·
+  `cycleImportExportRegistry`(4) · `l2l4DisclosureWiring`(3) · `blockColumnAmountRender`(3) ·
+  `ieWiringIntegrity`(2) · 其余 4 个各 1
+
+  ### 立项时的任务描述（对照用，已全部落实）
 
   - 新建 `backend/scripts/check/audit_guard_assertion_grades.py`，扫
     `audit-platform/frontend/src/**/__tests__/**/*.spec.ts` 与 `backend/tests/**/*.py`
