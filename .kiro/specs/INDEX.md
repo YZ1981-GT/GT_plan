@@ -2,10 +2,11 @@
 
 **最后更新**：2026-08-15
 **当前分支**：`work/2026-08-12-g7-column-alignment-closure`
-**统计**：Active **7**（2026-08-15 实扫 `.kiro/specs/*/` 共 9 个目录，其中**带 tasks.md 的 7 个**、**空壳 2 个**；本轮归档 `g7-column-alignment-and-extraction-closure` 后由 8 → 7）/ Archived **552**（2026-08-15 按 `_archive/*/*` 一级子目录实扫，含 6 个仅剩 evidence 无三件套的历史残留目录）
+**统计**：Active **6**（2026-08-15 实扫 `.kiro/specs/*/` 共 8 个目录，其中**带 tasks.md 的 6 个**、**空壳 2 个**；本日先归档 `g7-column-alignment-and-extraction-closure` 由 8 → 7，再归档 `e-cycle-extraction-formula-and-disclosure-completion` 由 7 → 6）/ Archived **553**（2026-08-15 归档后**重新实扫** `_archive/*/*` 一级子目录所得，含 6 个仅剩 evidence 无三件套的历史残留目录）
 
 > **2026-08-15 实扫结果（9 个目录逐一，供下一轮比对）**：
-> `e-cycle-…completion` **24/24** · `i-cycle-…closure` **23/24**（`[ ]`1） ·
+> ~~`e-cycle-…completion` **24/24**~~（**本日第二个归档** → `_archive/08-disclosure-notes/`） ·
+> `i-cycle-…closure` **23/24**（`[ ]`1） ·
 > `k-cycle-…closure` **19/25**（`[ ]`6） · `l-cycle-…completion` 3/26 ·
 > `procedure-trim-report-line-account-resolution` 0/16 ·
 > `workpaper-import-export-lifecycle-closure` 24/25（`[-]`1） ·
@@ -19,7 +20,15 @@
 > 「带 tasks.md 的 spec 数 7」。②下表三行进度数严重过时：`i-cycle` 表内 9/25 而实扫 **23/24**、
 > `k-cycle` 表内 5/25 而实扫 **19/25**、`x3` 表内无行而实扫 **33/53**。
 > 均属并发会话在办，**未擅自改其详情行**以免与正在写的内容打架，只在此处如实登记实扫值。
-> `e-cycle-…completion` 已 **24/24** 全完成，可评估归档（属并发会话，留给其推进方裁决）。
+> ~~`e-cycle-…completion` 已 **24/24** 全完成，可评估归档（属并发会话，留给其推进方裁决）。~~
+> **已于同日（2026-08-15）复盘后归档** —— 复盘按十二维实证而非只看复选框：产物 47 路径
+> untracked **0**（主交付 commit `2ee7929e`）· CI 7 个 E job 的 **37/37** 文件引用 exists+tracked
+> · 后端 312 passed / 前端 294 passed · 变异**锚点 29/29 OK 0 MISS**（体系未漂移可复现）·
+> 3 个幂等 `--check` 全 0 欠账 · 11 Req / **83 AC 零悬挂** · 41 Property 全被 tasks 引用 ·
+> design 提到的 16 个符号全在生产代码可定位 · 三件套机器校验零诊断。
+> 工作树当时的 4 个 dirty 文件（`governance-checks.yml` / `E1TabDisclosure.vue` /
+> `note_template_soe.json` / `_note_structure_kit.py`）经 diff **逐一归因为并发 K 循环在途**
+> （`carry_row_codes()` / `rowScopeFailure` 共享件 / K job step），非 E 遗留 ⇒ 未随本次归档提交。
 > 🔴 **2026-08-12 实扫修正了表头三处过时记载**：①Active 写 6 而真实是 7；②「另有 3 个无 tasks.md 的空壳目录」已不成立 —— 其中两个（`procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`）早在 2026-08-05 清理入归档区，而 `workpaper-import-export-lifecycle-closure` **有 tasks.md 且进度 3/25**，把它记成空壳会让一个在办 spec 从索引上消失；③Archived 549 → 550（本轮归档 `procedure-trimming-and-delegation-intelligence`）。再次印证本文件 §四 的「凭印象禁令」：完成度与数量一律实扫，别信上一轮写下的数。
 **最高迁移**：**V146**（`procedure_instance_suggestion_state`，并发会话 `procedure-trimming-*` 所加；本 spec 贡献 **V145** `report_config` 双族使用权资产/租赁负债。以磁盘 `backend/migrations/V*.sql` 实扫为准，`R1xx__` 是配对回滚脚本非同号冲突）
 **技术栈**：FastAPI + PostgreSQL + Redis / Vue 3 + Element Plus + Univer
@@ -46,7 +55,7 @@
 
 | spec | 进度 | 一句话 |
 |------|------|--------|
-| `e-cycle-extraction-formula-and-disclosure-completion` | 21/24（`[-]`1 / `[~]`2） | E 类（E0/E1）取数/公式/披露收口。账户级取数走 `tb_aux_balance` 银行账户维度（客户 1002 不分户，叶子恒 1 行） |
+| ~~`e-cycle-extraction-formula-and-disclosure-completion`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-15 复盘后归档，全交付 24/24，主交付 commit `2ee7929e`）。E 类（E0/E1）取数/公式/披露收口。**账户级取数**走 `tb_aux_balance` 的 `aux_type='银行账户'` 维度（此前叶子口径恒 1 行「银行存款」汇总，客户 1002 不分户）⇒ E1-3 出 **22 行逐户**（含开户银行 + 账号，同账号跨行按账号聚合）、E1-10 **保留零余额账户**与金额明细的全零过滤口径显式分离。<br>**浏览器实测抓到两处真实缺陷**：① Property 28 端到端失效（`resolveRestrictedRows` 末尾按**数组下标**重算全部行 id，把 `nextRestrictedSeq` 算好的稳定序号覆盖掉 ⇒ 删 `custom_甲_2` 再新增 `custom_乙` 落库 id 仍是 `_2`，按 row id 索引的历史 reason/金额**串到新类别**上）—— **已修**，原 42 例守卫全绿而缺陷仍在，因为没有一条把纯函数结果串到 `resolveRestrictedRows` 输出；② E1-3 multi 版金额被静默抹零（先点`仅人民币`再点`人民币及外币` ⇒ 22 行金额全变 `-` + 一条错的「审定合计 0.00 ≠ TB 4467536.12」横幅）—— **登记未修**，根因是宿主 `seedFromFourTable()` 只在 `onMounted` 跑一次且 `seedRowsKey` 有 persist-first 短路，种子形态一会话内只按当时 variant 定型一次；**非本 spec 引入**（改造前叶子口径在任何路径下都被抹零，本 spec 把它改善为「先开 multi 即正确」＝部分修复），改法要动种子键按 variant 分离＋新守卫，建议单独立任务。<br>**变异检验 29 条全 RED**，且靠**覆盖面分母**（`SPEC_GUARD_FILES` 17 个守卫文件）抓出一个隐蔽欠账：首轮「21 条全 RED」时仍有 **7 个前端守卫文件从未被任何变异打红** ⇒「变异全红」与「全部守卫都被反证过」是两件事，补 M22~M29 补齐。<br>**Property 34 字面冲突查清**：任务原文「原币/汇率列留空」**对本位币账户不成立且必须不成立**（不下发 `openingFc` 会被 multi recalc 抹零，`fxRate:1` 是恒等事实非反推）；只有非本位币才留 0 + `note` 提示。载荷侧键集实测**根本无原币字段可反推**（全库 308 行 `currency_code` 全 CNY、`opening_fc` 全 NULL）。<br>**终态**：后端 `-k "e1 or e_cycle"` **368 passed** / 1 skipped · 前端 137 suites **568 passed** · CI 挂 `e-cycle-extraction` + `e-cycle-frontend` 两个 job（另有 5 个既有 E job）。<br>**listed 侧 4 项 UNVERIFIABLE 如实登记**（全库 8 个项目 `entity_type` 全 `soe`，listed 披露 Tab 恒显「当前项目不适用」，按约束未改任何项目的 `applicable_standard_v2`）＋ 各配 3~4 类替代证据。收口**零写库**（基线/收尾双 SELECT md5 逐条相同 + `updated_at` 全早于会话 + 网络层 181 条无业务写请求三重证据），清掉本 spec 276 个 `_wip_e_*`。 |
 | `i-cycle-extraction-formula-and-disclosure-closure` | 9/25 | I 类（无形资产/商誉/长期待摊）取数/公式/披露收口 |
 | `k-cycle-extraction-formula-and-disclosure-closure` | 5/25 | K 类取数公式与披露收口 |
 | ~~`g7-column-alignment-and-extraction-closure`~~ | **已归档** | → `_archive/08-disclosure-notes/`（2026-08-15 全交付 24/24，commit `83ccf630`）。G7 长期股权投资列结构对齐与取数闭合。补上「源 xlsx ↔ 模板 seed ↔ 运行时载荷」三向锁死的第三条边（56 个偏差点 → 0），并新增立项时不存在的**第四边：渲染层**（浏览器实测发现两级表头 **0/38 张从未渲染** —— 模型的 `group` 是 additive 死代码，任何 `.vue` 零引用；修复后 20 张）。契约覆盖面 **11 → 38 张**全部运行时表，顺带修掉 15 处此前三条守卫**结构性看不见**的标签列头原文偏差。<br>**修掉一个平台级假绿**：`_note_structure_kit` 的 `--check` 弱于 `--dry-run`（24 个幂等脚本共用）—— 改坏模板一格从报 0 欠账变为报 2 欠账，此前该假绿让所有幂等证空转。<br>**收口复盘追加修 1 项 fail-open**：两个披露 Tab 的 `syncToDisclosureNotes()` 把真同步与收尾刷新塞进同一个 `try`，同步失败会被收尾的成功文案盖成「同步成功」⇒ 拆两段 try（真同步失败 `console.error` + `ElMessage.error` + **return**），错误文案下沉共享 helper `g7DisclosureSyncFeedback.ts`。<br>**终态**：前端 G7 全域 49 文件 **887 passed** · 后端 G7 主域 **2297 passed**（2 例失败已三层归因为并发 K 循环在途）· 变异 **12/12 全 RED**（GREEN=0/MISS=0/WRONG=0）· `--list` **15 锚点**静态自检通过 · CI 挂 `g7-column-alignment` + `g7-column-alignment-frontend` 两个 job。<br>**立项时记的「10 个正式产物 `??` 未跟踪」已解除**（commit 含 16 个新文件，facts JSON 与全部守卫本体已入库，干净 checkout 下 CI 可跑）。 |
@@ -55,10 +64,15 @@
 | ~~`frontend-excel-io-single-entry-convergence`~~ | **已归档** | → `_archive/06-engineering-governance/`（2026-08-14 收敛完成 46 → 0，commit `f049a11f`）。**登记的 4 处既有缺陷已处置：2 修 / 1 撤回误判 / 1 整链删除**（`batchExport.ts` 孤儿链「合并导出」用户不可达，用户裁决删）。动因是 `xlsx@0.18.5` 带两个永不会修的 CVE（SheetJS 已撤出 npm），25 处读上传文件各是独立攻击面。性质为**行为等价重构**，迁移默认姿势是三个显式关闭（`applyStyles`/`includeNoteRow` 两个默认 true 会给 42 个原本无样式的产物加三线表、并在表头前插行）。<br>**两处立项假设被实测推翻**：B5 不是换引擎批而是「入口收两个引擎」（换 SheetJS 要对齐五处语义差异且写不出冻结窗格）；B3 不能用 `parseFile` 而须另开低层薄封装。<br>**顺带修掉三个既有缺陷**：`parseFile` 列索引错位 · 样式模板写出非法 OOXML `vertical:'middle'` 致 openpyxl 打不开文件（影响 12 个走默认样式的调用点，后端 674 处 openpyxl 连带）· 本轮改造引入的括号不配平致 Vite 500（`get_diagnostics`/vitest/变异三层全绿，只有浏览器暴露 ⇒ 已固化成 `check_vite_transform.mjs` 守卫）。<br>**提交前发现的清单漏记（最贵一课）**：B2 那批 13 个 confirmation 文件只写在基线 `note` 的自然语言里、`files` 数组为空 ⇒ 按 files 精确 stage 的脚本漏掉它们（远端仍带裸 import，CI 必红）+ Vite 编译扫描只覆盖 33/46 + 进度失真。**此前所有守卫都在验「代码符不符合清单」，没有一条验「清单本身完不完整」** ⇒ 补 R6.7 / Property 38 + 2 条守卫 + 3 条变异（M18/M19/M20 全 RED）。同域次级坑两个：对账脚本不剥注释会漏检 `import(/* @vite-ignore */ 'exceljs')`；「数量相等 ≠ 集合相等」（曾出现基线 46 / HEAD 46 但各差一个元素）。<br>**终态**：守卫 8 文件 **119** 例全绿 · 变异 **18/18** 全 RED（静态自检 18/18）· Vite 编译 **46/46** · 三件套机器校验零 warning。剩 3 个 `[-]` 均在 tasks.md `## Notes` 写明阻塞原因：Task 2（迁移前快照窗口已关闭，事后补抓＝把错值当基线）· Task 16（变异 18/38 Property，缺口三类各有判据形态原因）· Task 18（B4 需多公司合并数据、C24-4 空态不渲染导出入口） |
 | `procedure-trim-report-line-account-resolution` | 0/16 | **2026-08-12 新建**。裁剪判据的科目金额定位从「程序名 ↔ 科目名子串匹配」改为「程序 → 报表行 → 报表公式 → 金额」。立项实证：E 循环 5 条程序名全是「货币资金 …」而 `trial_balance` 只有明细「其他货币资金」(1012)/「银行存款」(1002) ⇒ 单向子串匹配全部落空 ⇒ 重要性判据（决策内核档 7/8）整体空转。净新增仅 2 个后端模块 + 1 处前端优先级调整 —— 三段映射的每一段都已有生产真源（`four_table/*_cycle_specs.py` 的 `row_code` 声明 · `report_config.formula` · `ReportFormulaParser`），索引只做 dispatch、**零 `row_code` 字面量** |
 
-> 🔴 g7 归档后，上表**剩下的 6 个活行全部由并发会话推进**（tasks.md mtime 秒/分钟级刷新），
-> 另 `x3-adjustment-entry-import-export`（实扫 33/53，并发新建）**本表尚无行**。
+> 🔴 g7 与 e-cycle 双双归档后，上表**剩下的 5 个活行全部由并发会话推进**（tasks.md mtime
+> 秒/分钟级刷新），另 `x3-adjustment-entry-import-export`（实扫 33/53，并发新建）**本表尚无行**。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
-> **`g7-column-alignment-and-extraction-closure`(24/24)** 已于 2026-08-15 归档（见下）。
+> **`g7-column-alignment-and-extraction-closure`(24/24)** 与
+> **`e-cycle-extraction-formula-and-disclosure-completion`(24/24)** 均已于 2026-08-15 归档（见下）。
+> 🔴 **本日 5 个活行（含 2 个空壳）在 git 里全是 `??` 未跟踪** —— 2026-08-15 归档 e-cycle 时
+> `git status` 实录：`i-cycle` / `k-cycle` / `l-cycle` / `x3` 四个**在办 spec 目录**连同两个空壳
+> 目录一并未入库。含义是**它们一旦丢工作树即全部蒸发**，且 INDEX 里登记的进度数无法从 HEAD 复核。
+> 已归档 spec 不受影响（`_archive/**` 已跟踪）。
 > 🔴 **判 Active 数量一律行首锚定正则实扫 `.kiro/specs/*/tasks.md`，别信本表旧数** ——
 > 2026-08-10 实扫发现表头写「Active 4」而真实是 6 个带 tasks.md 的活 spec
 > （`i-cycle` / `k-cycle` / `l-cycle` 三个漏登记）。
@@ -70,8 +84,47 @@
 > **`h-cycle-extraction-formula-and-disclosure-completion`(18/18)** 已于 2026-08-10 归档（见 §二）。
 > **`procedure-trimming-and-delegation-intelligence`(26/26)** 已于 2026-08-12 归档（见 §二）。
 
-**2026-08-15 归档（1 个，→ `08-disclosure-notes`，与前身 `g7-four-table-extraction-and-disclosure-alignment` /
-`g7-linkage-extraction-completion` 同域）**：
+**2026-08-15 归档（2 个，均 → `08-disclosure-notes`）**：
+
+---
+
+**其二**（与前身 `e1-four-table-extraction-and-disclosure-alignment` / `e1-orphan-components-wiring`
+同域，与同命名范式的 `h-cycle-extraction-formula-and-disclosure-completion` 同批）：
+
+`e-cycle-extraction-formula-and-disclosure-completion`(**24/24**) —— E 类（E0/E1）取数 / 公式预设 /
+附注披露收口，主交付 commit **`2ee7929e`**（2026-08-12）。交付内容见 §一 该行；本节只记**归档复盘的判据与教训**。
+
+**归档不是看复选框，是十二维实证**（2026-08-15 复盘轮，零改代码）：产物 47 路径 untracked **0** ·
+CI 7 个 E job 的 **37/37** 文件引用 exists+tracked（干净 checkout 可跑）· 后端 312 passed /
+前端 294 passed（9 文件）· 变异**锚点自检 29/29 OK、0 MISS** · 3 个幂等 `--check` 全 0 欠账 ·
+11 Req / **83 AC 零悬挂** · 41 Property 全被 tasks 引用 · design 提到的 16 个符号全在生产代码
+可定位 · 三件套机器校验零诊断。
+
+🔴 **本轮复盘沉淀的两条通用做法**：
+①**变异锚点自检（`--check-anchors`）是「已归档 spec 是否还可复现」的最便宜判据** —— 只读、不改
+生产代码、秒级完成，却能一次性证明「29 处生产代码结构未漂移 + 变异体系仍然有效」。相比之下
+重跑全量变异要改包含并发在途改动的文件（本 spec 的 M09/M10/M29 锚在 `note_template_soe.json`，
+而该文件当时正带并发 K 循环 +150/-98 未提交改动），风险收益不对称 ⇒ **复盘轮用锚点自检，
+不重跑全量变异**。
+②**工作树 dirty 文件必须逐个 diff 归因，不能按文件名猜归属** —— 本轮 4 个 dirty 文件里
+`E1TabDisclosure.vue`（名字明确是 E 循环的文件）实际是**并发 K 循环**改的（引入 `rowScopeFailure`
+共享件，把 fail-closed 提示从「哪张表」升级为「为什么」），`note_template_soe.json` 改的是少数
+股东权益/合并范围表的动态列稳定 key（H7 范式）而非 E1 货币资金段 —— 靠 `fix_note_e1_monetary_fund_structure.py --check`
+的 4 段全「已对齐」反证了 K 的改动没碰 E 的段。按文件名归属会把别人的在途成果误提交或误回退。
+
+**该 spec 自身最值得复用的一条**：`mutate_e_cycle_guards.py` 把「变异全红」与「守卫全被反证」
+拆成两个判据 —— 用 `SPEC_GUARD_FILES`（17 个守卫文件）作**覆盖面分母**，在 21 条变异全 RED 的
+情况下仍报出 **7 个前端守卫文件从未被任何变异打红**，据此补了 M22~M29。新增守卫文件时若不同步
+加变异，报告末尾会直接显示欠账。**这是 memory 假绿第①源「additive 注入即死代码」在守卫层的
+对应防法**，建议后续 spec 的变异脚本一律照此带分母。
+
+**两处遗留已在 tasks.md 登记**（未修，非本 spec 引入）：E1-3 multi 版 variant 切换抹零（见 §一）·
+E1-10 交叉核对把科目码当账号比对 ⇒ 建议合并进存量口径回填 spec。
+
+---
+
+**其一**（与前身 `g7-four-table-extraction-and-disclosure-alignment` /
+`g7-linkage-extraction-completion` 同域）：
 
 `g7-column-alignment-and-extraction-closure`(**24/24**) —— G7 长期股权投资列结构对齐与取数闭合，
 commit `83ccf630`（分支 `work/2026-08-12-g7-column-alignment-closure`，22 文件 / 16 个新文件）。
