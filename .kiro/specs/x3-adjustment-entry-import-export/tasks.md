@@ -1784,7 +1784,7 @@
       - **清理声明**：`tmp_x3_t112_*` 全部删净（**5 个 `.py`** = `measure` / `probe_g10` / `hits` / `mutate` / `dbg_carrier` · **9 个 `.json`** = `before` / `after` / `final` / `g10_live` / `hits` / `mut_M3` / `mut_M4` / `mut_M4b` / `mut_MC` · **24 个 `.log`** · **1 个目录** `tmp_x3_t112_mutbackup/`（3 份变异备份，删前已逐个复量「当前文件 == 备份」逐字节相同才允许删）；5+9+24+1 = 39 算术自洽）。**入库产物 = `check_x3_deviation_registry.py` + `evidence/deviation_registry.json`**（两者仍 `??`，与本 spec 其余产物同态，任务 14.2 挂 CI 前须 `git add`）。⚠️ ` M .github/workflows/governance-checks.yml`、7 组 `*TabDisclosureListed/Soe.vue`、两个 `*FourTableSourcePanel.vue` 与长驻 pytest 进程属**并发会话**，本轮未读未写、未 kill
       - 🔴 **给任务 13.1 / 14.2 的前置结论**：本表现在**只剩 G1 一组未收口**（`PENDING`，owner 13.1）⇒ 13.1 落值并实现 numerator 活探针后 `--check` 即应 **exit 0**，14.2 可直接把 `--check` 挂成 CI job。挂之前注意两点：① 本表与 checker 都还 `??`，干净 checkout 下 job 必挂 ② G10 的 CI 语义现在**依赖 GS5b 存在**（承载者在位性锁），若 14.2 只挂后端 job 而不挂 `ieWiringIntegrity.spec.ts`，G10 的行为面在 CI 上无人守 —— 建议两者同挂
 
-  - [ ]* 11.3 写 Property 7 属性测试（registry 派生确定且 MANUAL 不受污染）
+  - [x]* 11.3 写 Property 7 属性测试（registry 派生确定且 MANUAL 不受污染）
     - 新建 `components/workpaper/shared/__tests__/x3RegistryDerivation.property.spec.ts`，用 `fast-check`，≥100 次迭代
     - **Property 7: 前端 registry 派生确定且 MANUAL 不受污染**
     - **Validates: Requirements 6.1, 6.2, 6.4**
@@ -1802,7 +1802,7 @@
     - **本 spec 不修它们的行为**（属既有缺陷、半径不同）；守卫基线只收已确证正确的值，已判错位的值一律由本登记表承载
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
 
-  - [-]* 13.2 写 Property 9 属性测试（同源缺陷有消费方或有登记）
+  - [x]* 13.2 写 Property 9 属性测试（同源缺陷有消费方或有登记）
     - 新建 `backend/tests/test_x3_same_origin_property.py`，用 `hypothesis`，≥100 次迭代
     - **Property 9: 同源缺陷有消费方或有登记**
     - **Validates: Requirements 8.1, 8.2, 8.3, 8.6, 8.7**
@@ -1825,7 +1825,7 @@
     - 反向自检：故意把列名写错必须失败
     - _Requirements: 10.11, 6.5, 6.6_
 
-  - [-]* 13.5 写 Property 1 属性测试（导出导入往返恒等，界面读路径可见）
+  - [x]* 13.5 写 Property 1 属性测试（导出导入往返恒等，界面读路径可见）
     - 新建 `backend/tests/test_x3_roundtrip_property.py`，用 `hypothesis`，≥100 次迭代（用 in-memory fake 或事务回滚控制成本）
     - 覆盖含中文/特殊字符的文本字段、任意有限小数金额、`M9-3` 的 `ociBlock` 保留
     - **Property 1: 导出导入往返恒等（界面读路径可见）**
