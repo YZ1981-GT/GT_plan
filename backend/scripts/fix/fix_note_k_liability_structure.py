@@ -53,10 +53,15 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
+# 占位/可扩位词表要 import `app.services.note_expandable_markers`（平台唯一真源），
+# 而本脚本常从仓库根直接执行 ⇒ 必须自己把 `backend/` 放进 sys.path。
+if str(_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_BACKEND))
 DATA_DIR = _BACKEND / "data"
 
 ALIGNED_BY = "k-cycle-disclosure-alignment/liability"
@@ -71,7 +76,32 @@ LEAKED_NAMES = {
     "债券名称": "短期应付债券（续）",
 }
 
-PLACEHOLDER_ROW_LABELS = {"可无限量添加行", "......", "……", "…", "...."}
+# ── 占位说明行 vs 可扩位行 ────────────────────────────────────────────────
+#
+# 🔴 2026-08-12 口径更正（spec `k-cycle-extraction-formula-and-disclosure-closure`
+#    Task 18 / Requirement 9.1~9.2）：同一个 `可无限量添加行` / `……` 标签有**两种**
+#    语义，取决于 `row_type`；本脚本原先一律当垃圾删，与 R9 直接冲突。
+#
+#    * `row_type` 是 `data`/缺省 → **占位说明行**：渲染成一行空披露数据，须删（本意）。
+#    * `row_type == 'expandable'` → **可扩位行**：源模板在该处标了「可无限量增行」，
+#      是给审计师的加行落点，**必须保留**。删掉的后果是**功能消失而非报错**。
+#
+# 词表 import 平台唯一真源 `app.services.note_expandable_markers`（禁另写一份）；
+# `....`（4 点）是本脚本实测过的额外形态，平台词表没有，以本地补充并集进来。
+_LOCAL_EXTRA_PLACEHOLDERS = frozenset({"...."})
+
+try:  # 脚本可能被 importlib 单独加载，容错但不静默
+    from app.services.note_expandable_markers import (
+        EXPANDABLE_ROW_TYPE,
+        LABEL_MARKERS,
+    )
+except ImportError as _err:  # pragma: no cover - 环境异常
+    raise SystemExit(
+        "无法 import app.services.note_expandable_markers —— "
+        f"占位/可扩位判据不得退回本地词表：{_err}"
+    ) from _err
+
+PLACEHOLDER_ROW_LABELS = set(LABEL_MARKERS) | set(_LOCAL_EXTRA_PLACEHOLDERS)
 
 
 def _norm(v: Any) -> str:
@@ -79,6 +109,13 @@ def _norm(v: Any) -> str:
 
 
 _PLACEHOLDER_NORM = {_norm(x) for x in PLACEHOLDER_ROW_LABELS}
+
+
+def _is_expandable_row(row: Any) -> bool:
+    """该行是否已被标成**可扩位行**（保留）而非占位说明行（删）。"""
+    if not isinstance(row, dict):
+        return False
+    return str(row.get("row_type") or "") == EXPANDABLE_ROW_TYPE
 
 
 # ─────────────────────────── 列构造 ───────────────────────────
@@ -296,7 +333,7 @@ PLAN: list[dict[str, Any]] = [
                 # 列键与 `k4NoteSectionMap.ts` 既有 builder 逐字一致（模板 seed 与同步载荷同形）
                 "name": "短期应付债券",
                 "columns": [
-                    _col("bond_name", "债券名称", is_label=True, flat=True),
+                    _col("label", "债券名称", is_label=True, flat=True),
                     _amt("face_value", "面值"),
                     _pct("coupon_rate", "票面利率"),
                     _txt("issue_date", "发行日期"),
@@ -309,7 +346,7 @@ PLAN: list[dict[str, Any]] = [
                 "rename_from": "债券名称",
                 "name": "短期应付债券（续）",
                 "columns": [
-                    _col("bond_name", "债券名称", is_label=True, flat=True),
+                    _col("label", "债券名称", is_label=True, flat=True),
                     _amt("begin_amount", "期初余额"),
                     _amt("issued", "本期发行"),
                     _amt("interest_accrued", "按面值计提利息"),
@@ -430,7 +467,12 @@ def _strip_placeholder_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return [
         r
         for r in rows
-        if str(r.get("row_type", "")) != "header_label" and _norm(r.get("label")) not in _PLACEHOLDER_NORM
+        if str(r.get("row_type", "")) != "header_label"
+        and (
+            _norm(r.get("label")) not in _PLACEHOLDER_NORM
+            # 已标 expandable 的是**可扩位行**，保留（见上方口径更正说明）
+            or _is_expandable_row(r)
+        )
     ]
 
 
@@ -546,7 +588,7 @@ def validate_section(section: dict[str, Any], entry: dict[str, Any]) -> list[str
         for j, row in enumerate(tbl.get("rows") or []):
             if str(row.get("row_type", "")) == "header_label":
                 errs.append(f"{name} 第 {j} 行仍为 header_label 假数据行")
-            if _norm(row.get("label")) in _PLACEHOLDER_NORM:
+            if _norm(row.get("label")) in _PLACEHOLDER_NORM and not _is_expandable_row(row):
                 errs.append(f"{name} 第 {j} 行仍为占位说明行「{row.get('label')}」")
             vals = row.get("values")
             if isinstance(vals, list) and len(vals) != max(len(headers) - 1, 0):

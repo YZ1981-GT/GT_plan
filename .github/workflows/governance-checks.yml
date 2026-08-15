@@ -2040,6 +2040,12 @@ jobs:
       # 元组／调用方穿透三种落法都要认）。seed 侧由后端 `aging_payload` 守卫管。
       - name: Run K-cycle note payload contract guards
         run: npx vitest run src/components/workpaper/composables/__tests__/kCycleNoteContract.spec.ts --silent=true
+      # ── Task 25 浏览器实测所修：「本项目无此科目」不得被伪装成「余额为 0」──
+      # K6 载荷的码列表**非空**（resolver 无反解时返标准码本身）但项目实际没这科目，
+      # 后端用 `empty_reason` 明说；前端只看码列表会判「已取数」⇒ 一片 0.00。
+      # 判据在平台共享件 `tbSourceCodes.ts`，故守卫也放共享件侧（避免逐循环各写一份）。
+      - name: Run tb-source absent (no-account vs zero) guards
+        run: npx vitest run src/components/workpaper/composables/shared/__tests__/tbSourceAbsent.spec.ts --silent=true
 
   k-cycle-extraction-formula-closure:
     # K 循环取数 / 公式预设 / 披露块收口守卫

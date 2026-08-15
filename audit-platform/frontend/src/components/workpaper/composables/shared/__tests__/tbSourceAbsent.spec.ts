@@ -92,6 +92,71 @@ const I1_REAL: TbSourceCodes = {
   provision_standard: ['1702'],
 }
 
+/**
+ * K6-1 实测真实载荷（逐字取自 render-config，勿改）。
+ *
+ * 🔴 与 I5 相反的形态：**码列表非空**（`gross: ['1481']`）但本项目其实没有这个科目。
+ * 原因是 resolver 在 `account_mapping` 无反解记录时把**标准码本身**当原始码返回。
+ * 后端已用 `empty_reason` 明说（它查过 `tb_balance` 有没有匹配叶子），前端只看
+ * 码列表**无法**得出正确结论 ⇒ 判据必须优先听 `empty_reason`。
+ *
+ * 浏览器实测（2026-08-12，重药控股安徽_2025 / K6-1 审定表）：修复前面板照常展示
+ * 「1481 | 1481」+ 一片 `0.00`，把「本项目无此科目」伪装成「有科目、余额为 0」。
+ * 连库核实：该项目 `tb_balance` 里 1481/1482/2245 **零命中**。
+ */
+const K6_REAL: TbSourceCodes = {
+  row_code: 'BS-012',
+  formula: "TB('1481','期末余额')",
+  resolved_from: 'report_config',
+  signed_codes: [['1481', 1]],
+  gross: ['1481'],
+  gross_standard: ['1481'],
+  provision: ['1482'],
+  provision_standard: ['1482'],
+  provision_resolved_from: 'fallback',
+  provision_row_code: 'IMP-007',
+  provision_formula: "TB('1482', '期末余额')",
+  account_name: '持有待售资产',
+  empty_reason:
+    '本项目无此科目：标准科目表有该科目，但本项目的科目表未使用它 —— '
+    + '四表侧无数据可取，请确认业务上是否确实不存在该项目（区别于「余额为 0」）',
+}
+
+describe('🔴 empty_reason 是权威信号（K6 实测缺口）', () => {
+  it('后端给了 empty_reason ⇒ 判 absent，即便码列表非空', () => {
+    expect(hasTbSourceCodes(K6_REAL), '前置：该载荷的码列表确实非空').toBe(true)
+    expect(
+      isTbSourceAbsent(K6_REAL),
+      '只看码列表会把「本项目无此科目」伪装成「余额为 0」—— 正是 Requirement 4.6 要区分的两态',
+    ).toBe(true)
+  })
+
+  it('empty_reason 为 null / 空串 / 全空白 ⇒ 回到按码列表判定', () => {
+    for (const v of [null, undefined, '', '   ']) {
+      expect(
+        isTbSourceAbsent({ ...K6_REAL, empty_reason: v as string | null }),
+        `empty_reason=${JSON.stringify(v)} 时不该判 absent（有码 ⇒ 已取数）`,
+      ).toBe(false)
+    }
+  })
+
+  it('反向自检：空串不得被当成「有原因」（空串是任何字符串的子串，易假绿）', () => {
+    // 判据必须是 trim() 后非空，而不是 `'empty_reason' in src`
+    expect(isTbSourceAbsent({ ...K6_REAL, empty_reason: '' })).toBe(false)
+    expect(isTbSourceAbsent({ row_code: 'BS-012', gross: [], empty_reason: '' })).toBe(true)
+    //                                                    ↑ 这条 absent 来自「码全空 + 有 row_code」，与 empty_reason 无关
+  })
+
+  it('K4 形态（码全空 + 有 empty_reason）也判 absent —— 两条路径都要成立', () => {
+    expect(isTbSourceAbsent({
+      row_code: 'BS-053',
+      gross: [],
+      gross_standard: [],
+      empty_reason: '三表零命中：account_chart / tb_balance / trial_balance 均无该科目',
+    })).toBe(true)
+  })
+})
+
 describe('三态区分：absent / 已取数 / 未下发', () => {
   it('🔴 I5-1 真实载荷（resolved_from=fallback 但码全空）判 absent', () => {
     expect(hasTbSourceCodes(I5_REAL)).toBe(false)

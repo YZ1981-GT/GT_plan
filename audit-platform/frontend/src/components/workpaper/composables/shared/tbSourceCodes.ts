@@ -160,6 +160,17 @@ export interface TbSourceCodes {
   unmapped_candidates?: Array<[string, string]>
   /** 本项目科目表是否可用。false = 未导入 / 查询失败（须与「无此科目」区分） */
   chart_available?: boolean
+  /**
+   * 后端**显式**给出的「取不到数」原因（中文整句，可直接展示）。
+   *
+   * 🔴 它是权威信号，优先于前端按码列表的推断 —— 后端查过 `tb_balance` 里有没有
+   * 匹配叶子，而前端只看得到码列表。两层原因各有文案：
+   * - `EMPTY_REASON_NO_ACCOUNT`：标准科目表里就没这科目（设计期结论，K4）
+   * - `EMPTY_REASON_NOT_IN_PROJECT`：科目存在但本项目没用（运行期降级，K6）
+   *
+   * 非空时**必须**走 `isTbSourceAbsent` 的 absent 态，见该函数的 K6 实测说明。
+   */
+  empty_reason?: string | null
 }
 
 /** 中文化解析来源（UI 全中文化铁律） */
@@ -272,6 +283,16 @@ export function hasTbSourceCodes(src: TbSourceCodes | null | undefined): boolean
  */
 export function isTbSourceAbsent(src: TbSourceCodes | null | undefined): boolean {
   if (!src) return false
+  // 🔴 后端显式给了原因 ⇒ 直接 absent，优先于下面按码列表的推断。
+  //
+  // K6 浏览器实测（2026-08-12，重药控股安徽_2025 / 附注 K6-1）暴露的缺口：
+  // 后端下发 `empty_reason=EMPTY_REASON_NOT_IN_PROJECT`（该项目 tb_balance 里
+  // 1481/1482/2245 **零命中**，已连库核实），但 `gross=['1481']` **非空** ——
+  // resolver 在 `account_mapping` 无反解记录时会把**标准码本身**当原始码返回。
+  // 于是下面的「四个码列表全空」判据返回 false ⇒ 面板照常展示「1481 | 1481」
+  // ⇒ 把「本项目无此科目」伪装成「有科目、余额为 0」，正是 Requirement 4.6
+  // 明令要区分的两态。前端只看码列表**无法**得出正确结论，必须听后端。
+  if (String(src.empty_reason ?? '').trim()) return true
   if (hasTbSourceCodes(src)) return false
   if (src.provision_standard && src.provision_standard.length) return false
   // 段化解析（I 类）：任一段有码就不算 absent

@@ -44,6 +44,16 @@
       <template #title>
         本项目科目表中没有{{ grossLabel }}对应科目 —— 未取数（不是余额为 0）
       </template>
+      <!--
+        🔴 后端给了原因就照原文显示：两层「取不到数」的下一步动作不同 ——
+        `EMPTY_REASON_NO_ACCOUNT`（标准科目表就没这科目，如 K4「其他流动负债」是
+        报表行、由多个明细按性质归集）⇒ 手工填是常态；
+        `EMPTY_REASON_NOT_IN_PROJECT`（科目存在但本项目没用，如 K6 多数项目）⇒
+        要先确认业务上是否确实没有这项。合成一句会让审计师判不出该找谁。
+      -->
+      <p v-if="backendEmptyReason" class="src-alert-note src-alert-reason">
+        {{ backendEmptyReason }}
+      </p>
       <p class="src-alert-note">
         报表行 <code>{{ src.row_code || fallbackRowCode }}</code>
         <template v-if="src.row_name">（{{ src.row_name }}）</template>
@@ -211,6 +221,14 @@ const hasExtraSlotCodes = computed(() =>
  *    这与平台口径「本项目无此科目须显式说明、不得静默」相悖。
  */
 const isAbsent = computed(() => isTbSourceAbsent(props.sourceCodes))
+
+/**
+ * 后端显式给出的「取不到数」原因（中文整句，直接展示）。
+ *
+ * 🔴 不在前端二次解释：后端有两条文案（标准科目表就没有 / 本项目没用），
+ * 前端照原文显示即可；自己拼一句会与后端漂移，且分不出两层。
+ */
+const backendEmptyReason = computed(() => String(props.sourceCodes?.empty_reason ?? '').trim())
 const absentCodesText = computed(() => tbAbsentCodesText(props.sourceCodes))
 
 const visible = computed(
@@ -379,5 +397,11 @@ const rows = computed<SrcRow[]>(() => {
   margin: 6px 0 0;
   color: #606266;
   line-height: 1.6;
+}
+
+/* 后端原因句：比下面的操作说明更醒目（它决定审计师下一步该做什么） */
+.src-alert-reason {
+  color: #303133;
+  font-weight: 500;
 }
 </style>

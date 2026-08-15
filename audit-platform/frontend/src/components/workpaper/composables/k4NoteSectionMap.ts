@@ -67,7 +67,7 @@ function buildSummaryColumns(variant: K4DisclosureVariant): ColumnDef[] {
 /** 上市 短期应付债券明细（源 A19:F19 单行 6 列 / 附注模版 L4614） */
 function buildBondColumns(): ColumnDef[] {
   return [
-    { key: 'bond_name', label: '债券名称', is_label: true, flat: true },
+    { key: 'label', label: '债券名称', is_label: true, flat: true },
     { key: 'face_value', label: '面值', format: 'amount' },
     { key: 'coupon_rate', label: '票面利率', format: 'percent' },
     { key: 'issue_date', label: '发行日期', format: 'text' },
@@ -79,7 +79,7 @@ function buildBondColumns(): ColumnDef[] {
 /** 上市 短期应付债券（续）（源 A25:H25 单行 8 列 / 附注模版 L4623） */
 function buildBondContColumns(): ColumnDef[] {
   return [
-    { key: 'bond_name', label: '债券名称', is_label: true, flat: true },
+    { key: 'label', label: '债券名称', is_label: true, flat: true },
     { key: 'begin_amount', label: '期初余额', format: 'amount' },
     { key: 'issued', label: '本期发行', format: 'amount' },
     { key: 'interest_accrued', label: '按面值计提利息', format: 'amount' },
@@ -206,7 +206,7 @@ export function buildK4SyncPayload(
 
   if (bondRows.length > 0) {
     sub[K4_SUBTABLE.bond] = bondRows.map(r => ({
-      bond_name: r.name || '',
+      label: r.name || '',
       face_value: num(r.faceValue),
       coupon_rate: num(r.couponRate),
       issue_date: r.issueDate || '',
@@ -216,7 +216,7 @@ export function buildK4SyncPayload(
   }
   if (bondContRows.length > 0) {
     sub[K4_SUBTABLE.bondCont] = bondContRows.map(r => ({
-      bond_name: r.name || '',
+      label: r.name || '',
       begin_amount: num(r.beginBalance),
       issued: num(r.issued),
       interest_accrued: num(r.interestAccrued),
