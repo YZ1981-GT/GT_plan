@@ -21,9 +21,15 @@ import {
 import {
   I1_SOE_CATEGORIES,
   I1_SOE_KEYS,
+  addI1SoeCategory,
   createDefaultI1SoeLayers,
   mapToI1SoeCategoryKey,
+  // 🔴 曾漏这一行 ⇒ 国企版披露 tab 挂载即崩「maxI1SoeCustomSeq is not defined」。
+  //    vitest（测的是 model 层，自己 import 了）/ vite transform（单文件编译不解析
+  //    跨模块符号）/ get_diagnostics 四层全绿，只有浏览器实测暴露。见下方 487/546 行用法。
+  maxI1SoeCustomSeq,
   recomputeI1SoeDerivedLayers,
+  removeI1SoeCategory,
   type I1SoeCategoryMove,
   type I1SoeLayerBlock,
 } from './i1SoeDisclosureModel'
@@ -71,6 +77,9 @@ const DATA_RESOURCE_KEY = 'I1-listed-data-resource'
 const CATEGORY_PRESET_KEY = 'I1-listed-category-preset'
 const AMORT_ALLOC_KEY = 'I1-listed-amort-alloc'
 const SOE_AMORT_ALLOC_KEY = 'I1-soe-amort-alloc'
+// 🔴 自定义类别单调计数器（持久化）：防「删掉最大号后 max 回退 → 下一个 key 复用已删序号」
+// （Property 23 / R7.6）。只增不减，删类别不回退它。
+const SOE_CAT_SEQ_KEY = 'I1-soe-cat-seq'
 
 // ─── Listed ──────────────────────────────────────────────────────────────────
 
@@ -171,10 +180,23 @@ export function useI1ListedDisclosure(params: {
     persist()
   }
 
-  function addCategory(label: string): void {
+  /**
+   * 新增自定义类别列（源模板「……」可扩位）。
+   *
+   * 🔴 撞名拒绝 → 返回 false，与国企版 `addCategory` 同构（调用方据此提示）。
+   *    旧实现 `label.trim() || '其他'` 有两个缺陷：
+   *    ① 空名/纯空白**兜底成「其他」**，而「其他」是源模板固定类别 ⇒ 静默造出重复列，
+   *       违反「不产生无名行」口径（国企版是拒绝，两版行为不一致）；
+   *    ② 无撞名检测 ⇒ 同名类别列可无限叠加，而 label 是推附注与交叉核对的匹配键。
+   */
+  function addCategory(label: string): boolean {
+    const trimmed = (label || '').trim()
+    if (!trimmed) return false
+    if (categories.value.some((c) => String(c.label || '').trim() === trimmed)) return false
     const key = `cat_${Date.now().toString(36)}`
-    categories.value = [...categories.value, { key, label: label.trim() || '其他' }]
+    categories.value = [...categories.value, { key, label: trimmed }]
     persist()
+    return true
   }
 
   function removeCategory(key: string): void {
@@ -456,6 +478,8 @@ export function useI1SoeDisclosure(params: {
   const amortAlloc = ref<I1AmortAllocSummary>(aggregateI19AmortAlloc([]))
   const auditNote = ref('')
   const auditConclusion = ref('')
+  // 自定义类别单调计数器（持久化 → 删掉最大号后新增不复用已删序号，Task 13 / R7.6）
+  const catSeqCounter = ref(0)
 
   function load(): void {
     const raw = _parseJson(_getRemark(allResponses.value, I1_SOE_KEYS.layers))
@@ -473,6 +497,12 @@ export function useI1SoeDisclosure(params: {
     noteTitle.value = _getRemark(allResponses.value, I1_SOE_KEYS.noteTitle) || ''
     const aa = _parseJson(_getRemark(allResponses.value, SOE_AMORT_ALLOC_KEY))
     amortAlloc.value = aa && typeof aa === 'object' ? { ...aggregateI19AmortAlloc([]), ...aa } : aggregateI19AmortAlloc([])
+    // 单调计数器：优先取持久化值，兜底取数据里出现的最大 custom seq（防旧数据无计数器时回退）
+    const persistedSeq = Number(_getRemark(allResponses.value, SOE_CAT_SEQ_KEY) || 0)
+    catSeqCounter.value = Math.max(
+      Number.isFinite(persistedSeq) ? persistedSeq : 0,
+      maxI1SoeCustomSeq(layers.value),
+    )
     auditNote.value = _getRemark(allResponses.value, I1_SOE_KEYS.auditNote) || ''
     auditConclusion.value = _getRemark(allResponses.value, I1_SOE_KEYS.auditConclusion) || ''
   }
@@ -490,6 +520,7 @@ export function useI1SoeDisclosure(params: {
     onSave(I1_SOE_KEYS.noteSale, noteSale.value)
     onSave(I1_SOE_KEYS.noteTitle, noteTitle.value)
     onSave(SOE_AMORT_ALLOC_KEY, amortAlloc.value)
+    onSave(SOE_CAT_SEQ_KEY, String(catSeqCounter.value))
     onSave(I1_SOE_KEYS.auditNote, auditNote.value)
     onSave(I1_SOE_KEYS.auditConclusion, auditConclusion.value)
   }
@@ -519,6 +550,38 @@ export function useI1SoeDisclosure(params: {
       }
     }))
     persist()
+  }
+
+  /**
+   * 新增自定义类别（源模板国企四层末 `……` 可扩位，Task 13 / R7.1）。
+   * 撞名拒绝 → 返回 false（调用方据此提示）；成功则四层同时加行并持久化。
+   */
+  function addCategory(label: string): boolean {
+    // 单调计数器作 seqFloor：删掉最大号后新增不复用该号（Property 23）
+    const next = addI1SoeCategory(layers.value, label, catSeqCounter.value)
+    if (!next) return false
+    // 🔴 `addI1SoeCategory` 返回的是 `{ layers, key, seq }` **对象**，不是数组。
+    //    曾写成 `maxI1SoeCustomSeq(next)` / `recomputeI1SoeDerivedLayers(next)`
+    //    ⇒ 对象喂给 `for...of` 抛 `TypeError: layers is not iterable`，
+    //    再被组件 `handleAddSoeCat` 的裸 `catch { /* cancelled */ }` 静默吞掉
+    //    ⇒ 「+ 增加资产类别」点确认后**无提示、无新行、无库写入、控制台无 error**。
+    //    四层守卫全绿的原因：model 层 vitest 用的是正确写法（`res!.layers` / `a.seq`），
+    //    composable 层无测试；`get_diagnostics` 对该类型不匹配**漏报**，
+    //    只有 `tsc --noEmit` 报 TS2345（550/551 两行）。
+    //    seq 直接用返回值，不再从数据反算（doc 明写「调用方据 seq 回写持久化计数器」）。
+    catSeqCounter.value = next.seq
+    layers.value = recomputeI1SoeDerivedLayers(next.layers)
+    persist()
+    return true
+  }
+
+  /** 删除自定义类别（默认 12 类不可删 → 返回 false）。 */
+  function removeCategory(key: string): boolean {
+    const next = removeI1SoeCategory(layers.value, key)
+    if (!next) return false
+    layers.value = recomputeI1SoeDerivedLayers(next)
+    persist()
+    return true
   }
 
   function pullFromSources(opts?: { overwriteNotes?: boolean }): { message: string; count: number } {
@@ -641,6 +704,8 @@ export function useI1SoeDisclosure(params: {
     prepValidation,
     persist,
     updateCategory,
+    addCategory,
+    removeCategory,
     pullFromSources,
   }
 }

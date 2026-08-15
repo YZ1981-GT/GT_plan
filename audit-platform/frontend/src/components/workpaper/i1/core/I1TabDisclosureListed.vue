@@ -400,8 +400,17 @@ async function handleAddCat() {
       cancelButtonText: '取消',
       inputPlaceholder: '如：域名',
     })
-    if (value) addCategory(value)
-  } catch { /* cancelled */ }
+    const name = (value || '').trim()
+    if (!name) return
+    const ok = addCategory(name)
+    if (!ok) ElMessage.warning(`类别「${name}」已存在，未新增`)
+  } catch (e) {
+    // 与国企版同构：区分「用户取消」（reject 'cancel'/'close'）与实现异常，
+    // 异常必须落控制台 + 用户可见提示，不得被裸 catch 吞掉（见 I1TabDisclosureSoe 注释）。
+    if (e === 'cancel' || e === 'close') return
+    console.error('[I1-listed] 新增资产类别列失败', e)
+    ElMessage.error('新增资产类别列失败，请重试；若反复失败请联系管理员')
+  }
 }
 
 function handlePull(overwriteNotes: boolean) {

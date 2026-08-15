@@ -44,6 +44,23 @@ const hasManualValues = computed(() => {
   return currentValues.value.some(r => r.value && r.value !== '—' && r.value !== '0')
 })
 
+/**
+ * 无取数段时的空表文案 —— 必须说清**为什么**没有，不能只显示 Element Plus 默认的
+ * 「No Data」（英文 + 零信息，违反平台「UI 全中文化」与「absent 须显式说明」两条口径）。
+ *
+ * I5-1「其他非流动资产」实测：该循环真源 `I_CYCLE_ACCOUNT_SPECS.I5.fallback` 为空
+ * （`1911` 在全库两张科目表都不存在，宁缺勿造不给兜底码）⇒ `segments` 为 `[]`
+ * ⇒ 面板只剩一个「No Data」空表格 + 一个点了没意义的「🔄 刷新取数」按钮。
+ */
+const emptyText = computed(() =>
+  `本循环（${props.wpCode}）在四表库中没有可取数的科目段 —— `
+  + '通常是本项目科目表里确实没有该科目（属业务事实，审定表相关行留空即可，请勿填 0）。'
+  + '若本项目确有该科目，请检查科目表导入与科目映射。',
+)
+
+/** absent 态下「刷新取数」无意义（没有段可刷），隐藏按钮避免误导 */
+const hasSegments = computed(() => (props.segments || []).length > 0)
+
 async function handleRefresh() {
   if (props.isReadonly) return
 
@@ -76,7 +93,7 @@ async function handleRefresh() {
       <div class="hi-source-panel__header">
         <span class="hi-source-panel__title">🔗 四表取数（公式管理）</span>
         <el-button
-          v-if="!isReadonly"
+          v-if="!isReadonly && hasSegments"
           type="primary"
           plain
           size="small"
@@ -88,7 +105,7 @@ async function handleRefresh() {
       </div>
     </template>
 
-    <el-table :data="currentValues" size="small" style="width: 100%">
+    <el-table :data="currentValues" size="small" style="width: 100%" :empty-text="emptyText">
       <el-table-column prop="label" label="科目/分段" min-width="140" />
       <el-table-column prop="expression" label="取数公式" min-width="180">
         <template #default="{ row }">

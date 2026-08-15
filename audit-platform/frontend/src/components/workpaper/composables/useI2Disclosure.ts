@@ -11,7 +11,8 @@ import {
   type I2ImportantCapRow,
   type I2ImpairmentRow,
   defaultNatureRows,
-  emptyNatureRow,
+  addI2NatureRow,
+  removeI2NatureRow,
   emptyMovementRow,
   emptyImportantRow,
   emptyImpairmentRow,
@@ -110,14 +111,46 @@ export function useI2Disclosure(
     return Math.round((natureSummary.value.currentCapitalized - movementSummary.value.increaseInternal) * 100) / 100
   })
 
-  function addNatureRow() { natureRows.value.push(emptyNatureRow()) }
+  /**
+   * 新增费用性质行（源模板 `A15 = ……` 可扩位）。
+   * 必须先命名：空名/撞名一律拒绝并返回 false，由组件 prompt 提示（禁产生无名行）。
+   */
+  function addNatureRow(label: string): boolean {
+    const next = addI2NatureRow(natureRows.value, label)
+    if (!next) return false
+    natureRows.value = next
+    return true
+  }
+
+  /** 删除自定义费用性质行；源模板固定 6 类不可删（返回 false） */
+  function removeNatureRow(rowId: string): boolean {
+    const next = removeI2NatureRow(natureRows.value, rowId)
+    if (!next) return false
+    natureRows.value = next
+    return true
+  }
   function addMovementRow() { movementRows.value.push(emptyMovementRow()) }
   function addImportantRow() { importantRows.value.push(emptyImportantRow()) }
   function addImpairmentRow() { impairmentRows.value.push(emptyImpairmentRow()) }
 
   function onMovementChange(row: I2MovementRow) { recalcMovementEnd(row) }
 
-  function autoFillFromSources(): { ok: boolean; message: string } {
+  /**
+   * 从 I2-2 明细 / I2-6 资本化时点 / I2-7 项目构成自动取数。
+   *
+   * 🔴 返回类型曾只声明 `{ ok, message }`，而成功路径实际还返回了
+   *    `unmatched` / `fuzzyMatched` 两个清单 ⇒ `tsc` 报 TS2353，
+   *    且**消费方在类型上拿不到这两个字段**（只能从拼好的 `message` 里读文本）。
+   *    未匹配项目清单是审计师要逐个核对的东西，必须可程序化取用。
+   */
+  function autoFillFromSources(): {
+    ok: boolean
+    message: string
+    /** 在 I2-6 里找不到资本化时点的项目名（需审计师逐个核对） */
+    unmatched?: string[]
+    /** 靠模糊匹配对上的项目名（需审计师确认匹配正确） */
+    fuzzyMatched?: string[]
+  } {
     const map = allResponses.value
     const detail = safeParseArray(map.get('I2-2-rows'))
     const cap = safeParseArray(map.get('I2-6-rows'))
@@ -235,6 +268,13 @@ export function useI2Disclosure(
     noteTarget,
     load,
     addNatureRow,
+    // 🔴 曾漏这一行：`removeNatureRow` 函数体写了、却没进 return 清单 ⇒
+    //    `I2TabDisclosureListed.vue` 从 `disc` 解构到的是 `undefined`，
+    //    点「删」即 `TypeError: removeNatureRow is not a function` → **整页「页面渲染出错」白屏**。
+    //    四层守卫全查不出：grep 搜得到定义（看着像接通了）、model 层 vitest 测的是
+    //    `removeI2NatureRow` 纯函数、`tsc --noEmit` **不解析 `.vue`**（SFC 解构错误要 `vue-tsc`）、
+    //    `get_diagnostics` 无报。只有浏览器点一下才暴露。
+    removeNatureRow,
     addMovementRow,
     addImportantRow,
     addImpairmentRow,

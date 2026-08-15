@@ -48,6 +48,38 @@ export interface TbSemanticSlot {
   found?: boolean
 }
 
+/**
+ * **分段**解析的单个段（`four_table/i_cycle_accounts.ISegmentAccounts`）。
+ *
+ * 🔴 为什么不是 :interface:`TbSemanticSlot` —— I 类六循环走的是**段化**解析
+ * （`ICycleAccounts.as_dict()` 下发 `segments`），不是 `semantic_account_resolver`
+ * 的 `slots`。二者字段名不同（`standard`/`original` vs `standard_codes`/`codes`）
+ * 且段没有 `found` 字段（是否「本项目无此科目」由两个码集是否皆空判定）。
+ *
+ * 原先本接口**整个缺失**：`i1AccountScope.ts` 里已经在写 `src?.segments?.find(...)`，
+ * 但类型上没有这个键 —— 消费点读到 `undefined` 时 TS 也拦不住（`html_data` 是 `any`），
+ * 表现为累计摊销/减值段永远退化到兜底码。
+ */
+export interface TbSegmentAccounts {
+  /** 段键：`cost` / `amortization` / `impairment` / `expense` */
+  segment: string
+  /** 中文段名（逐字取自源模板层标题，后端下发） */
+  label?: string
+  /** 段的标准码集（`trial_balance` 查询用） */
+  standard?: string[]
+  /** 段的客户原始码前缀集（`tb_balance` / `tb_aux_balance` 查询用） */
+  original?: string[]
+  /** 标准码是否经 `account_mapping` 精确反解（false = 退化为一级前缀，更宽） */
+  exact?: boolean
+  resolved_from?: TbResolvedFrom
+  /** 备抵段：对聚合结果取绝对值 */
+  absolute?: boolean
+  /** 备抵段：`credit_amount` 是计提（增加） */
+  credit_is_increase?: boolean
+  /** 损益段：取本期发生额（走 `trial_balance`，不用余额表的 debit−credit） */
+  occurrence?: boolean
+}
+
 export interface TbSourceCodes {
   /** 报表行次（如其他应收款 `BS-009`、其他流动资产 `BS-014`） */
   row_code?: string
@@ -84,6 +116,31 @@ export interface TbSourceCodes {
    * 供审计追溯 —— 差异通常意味着客户科目树被改动或数据集不一致。
    */
   parent_check?: { leaf_sum: number; parent: number; diff: number }
+
+  // ── 分段解析专属（`four_table/i_cycle_accounts.ICycleAccounts.as_dict()`）──
+  /**
+   * 各取数段（原值 / 累计摊销 / 减值准备 / 费用），**声明顺序 = 审定表展示顺序**。
+   *
+   * 🔴 与 :prop:`slots` 互斥：I 类六循环只发 `segments`，G/K 类语义解析只发 `slots`。
+   * 二分 `gross`/`provision` 装不下 I1 的三段（`1702 累计摊销` 名称不含「减值准备」
+   * 会被 `split_gross_provision` 判成 gross → 原值口径变净额），故 I 类走段化。
+   */
+  segments?: TbSegmentAccounts[]
+  /** 底稿编码（I 类段化解析回填，便于溯源面板显示归属循环） */
+  wp_code?: string
+  /** 报表行**行名**（行名校验闸的实际命中值，供溯源展示） */
+  row_name?: string
+  /** 命中的 `report_config.applicable_standard` */
+  matched_standard?: string
+  /**
+   * 解析诊断（`row_name_mismatch` / `chart_conflict` / `unclaimed`）。
+   * 🔴 非空**不代表取数失败** —— 多为「报表配置与科目表不一致」，界面应橙色提示供人工复核。
+   */
+  diagnostics?: Array<Record<string, unknown>>
+  /** 叶子和 vs 父科目行的逐段自检 `{段键: {leaf_sum, parent, diff}}` */
+  parent_check_ok?: boolean
+  /** 未归类的叶子科目（原样透出供前端建行，不塞进任何桶） */
+  unmapped?: unknown[]
 
   // ── 语义解析专属（`semantic_account_resolver.SemanticAccountResult.as_dict()`）──
   /** 各语义槽（原值 / 备抵 / 累计折旧 …）。扁平字段是本对象主槽的投影 */
@@ -185,6 +242,75 @@ export function hasTbSourceCodes(src: TbSourceCodes | null | undefined): boolean
     || (src.provision && src.provision.length)
     || (src.gross_standard && src.gross_standard.length)
   )
+}
+
+/**
+ * 「**本项目无此科目**」判定 —— 与「后端根本没下发」严格区分。
+ *
+ * 🔴 为什么必须单独判：`hasTbSourceCodes()` 只看四个码列表，
+ * 而「后端算过、结论是本项目没有这个科目」时码列表也是空的
+ * ⇒ 面板按「禁空洞卡片」整块 `v-if` 隐藏，审计师看到的是**一片空白**，
+ * 既不知道该底稿本该从哪个报表行取数，也不知道为什么没取到。
+ *
+ * I5-1「其他非流动资产」实测（项目：宜宾临港店 soe）：
+ * ```
+ * { row_code: 'BS-037', formula: "TB('1911','期末余额')",
+ *   resolved_from: 'fallback',            ← 注意不是 'none'
+ *   signed_codes: [['1911', 1]],
+ *   gross: [], gross_standard: [], provision: [], provision_standard: [],
+ *   diagnostics: [{ kind: 'unclaimed', code: '1911', chart_name: '' }] }
+ * ```
+ * ⇒ **判据不能只看 `resolved_from === 'none'`**（这里是 `'fallback'`）。
+ * 正解 = 「有实质元信息（报表行 / 公式 / 带符号码）」且「四个码列表全空」。
+ *
+ * 三态因此可以分开表达（平台反复强调的口径）：
+ * | 态 | 判据 | 界面 |
+ * |---|---|---|
+ * | 已取数 | `hasTbSourceCodes()` | 正常展示科目链路 |
+ * | **本项目无此科目** | 本函数 | 显式说明 + 报表行/公式仍要给出，便于追溯 |
+ * | 后端未下发 | `src == null` | 整块隐藏（避免空洞卡片） |
+ */
+export function isTbSourceAbsent(src: TbSourceCodes | null | undefined): boolean {
+  if (!src) return false
+  if (hasTbSourceCodes(src)) return false
+  if (src.provision_standard && src.provision_standard.length) return false
+  // 段化解析（I 类）：任一段有码就不算 absent
+  if ((src.segments || []).some((s) => (s.standard || []).length || (s.original || []).length)) {
+    return false
+  }
+  // 语义解析（G/K 类）：任一槽有码就不算 absent
+  if (Object.values(src.slots || {}).some(
+    (s) => (s?.codes || []).length || (s?.standard_codes || []).length,
+  )) {
+    return false
+  }
+  // 后端确实算过（有报表行 / 公式 / 带符号码）才叫「无此科目」，否则是「没下发」
+  return !!(
+    src.row_code
+    || src.formula
+    || (src.signed_codes && src.signed_codes.length)
+  )
+}
+
+/**
+ * 「本项目无此科目」态的科目码说明 —— 报表公式引用了但科目表里找不到的码。
+ *
+ * 取 `signed_codes` 的标准码（报表公式的 `TB()` 引用），
+ * 再补上 `diagnostics` 里 `kind === 'unclaimed'` 的码（后端已明确标注「科目表无此码」）。
+ */
+export function tbAbsentCodesText(src: TbSourceCodes | null | undefined): string {
+  if (!src) return ''
+  const codes = new Set<string>()
+  for (const [code] of src.signed_codes || []) {
+    if (code) codes.add(String(code))
+  }
+  for (const d of src.diagnostics || []) {
+    if (d && (d as Record<string, unknown>).kind === 'unclaimed') {
+      const c = (d as Record<string, unknown>).code
+      if (c) codes.add(String(c))
+    }
+  }
+  return [...codes].join('、')
 }
 
 /** 附加科目条目（供 v-for） */

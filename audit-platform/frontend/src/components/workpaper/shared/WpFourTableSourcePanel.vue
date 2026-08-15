@@ -3,22 +3,61 @@
     <div class="src-bar">
       <span class="src-title">四表库取数口径</span>
       <el-tag size="small" type="info">报表行 {{ src.row_code || fallbackRowCode }}</el-tag>
-      <el-tag size="small" :type="grossTagType">
-        {{ grossLabel }} {{ resolvedFromLabel(src.resolved_from) }}
+      <!-- 🔴 absent 态不渲染「原值 兜底科目」这类标签：一个码都没取到时说「兜底科目」
+           会让审计师以为已按兜底码取了数（实测 I5-1 的 `1911` 全库不存在） -->
+      <el-tag v-if="isAbsent" size="small" type="info" effect="plain">
+        本项目无此科目
       </el-tag>
-      <el-tag v-if="showProvision" size="small" :type="provTagType">
-        {{ provisionLabel }} {{ resolvedFromLabel(src.provision_resolved_from) }}
-      </el-tag>
-      <el-tag v-if="showProvision && src.use_provision_name_filter" size="small" type="warning">
-        已叠加「{{ provisionFilterLabel }}」名称过滤
-      </el-tag>
-      <el-tag v-if="absentSlotLabels.length" size="small" type="info">
-        本项目无「{{ absentSlotLabels.join('、') }}」科目
-      </el-tag>
-      <el-button size="small" link type="primary" @click="expanded = !expanded">
+      <template v-else>
+        <el-tag size="small" :type="grossTagType">
+          {{ grossLabel }} {{ resolvedFromLabel(src.resolved_from) }}
+        </el-tag>
+        <el-tag v-if="showProvision" size="small" :type="provTagType">
+          {{ provisionLabel }} {{ resolvedFromLabel(src.provision_resolved_from) }}
+        </el-tag>
+        <el-tag v-if="showProvision && src.use_provision_name_filter" size="small" type="warning">
+          已叠加「{{ provisionFilterLabel }}」名称过滤
+        </el-tag>
+        <el-tag v-if="absentSlotLabels.length" size="small" type="info">
+          本项目无「{{ absentSlotLabels.join('、') }}」科目
+        </el-tag>
+      </template>
+      <el-button v-if="!isAbsent" size="small" link type="primary" @click="expanded = !expanded">
         {{ expanded ? '收起明细' : '展开明细' }}
       </el-button>
     </div>
+
+    <!--
+      🔴 「本项目无此科目」必须显式说明，不能整块隐藏（旧行为）。
+      三条信息都要给，否则审计师无从判断该不该手工填：
+      ① 本该从哪个报表行取（`row_code` 已在上方标签）
+      ② 报表公式引用了哪些科目码
+      ③ 结论是「本项目没有」而非「取数失败」，且下一步该做什么
+    -->
+    <el-alert
+      v-if="isAbsent"
+      type="info"
+      show-icon
+      :closable="false"
+      class="src-alert"
+    >
+      <template #title>
+        本项目科目表中没有{{ grossLabel }}对应科目 —— 未取数（不是余额为 0）
+      </template>
+      <p class="src-alert-note">
+        报表行 <code>{{ src.row_code || fallbackRowCode }}</code>
+        <template v-if="src.row_name">（{{ src.row_name }}）</template>
+        <template v-if="absentCodesText">
+          的公式引用 <code>{{ absentCodesText }}</code>，但本项目科目表里不存在该科目
+        </template>
+        <template v-else>在本项目科目表里没有可定位的科目</template>。
+        属业务事实时无需处理（审定表相关行留空即可，<strong>请勿填 0</strong>）；
+        若本项目确有该科目，请检查科目表导入与科目映射。
+      </p>
+      <p v-if="src.formula" class="src-alert-note">
+        报表公式：<code>{{ src.formula }}</code>
+      </p>
+    </el-alert>
 
     <!-- 🔴 报表公式与本项目科目表冲突：以科目表为准，但必须让审计师看见 -->
     <el-alert
@@ -98,6 +137,8 @@
 import { computed, ref } from 'vue'
 import {
   hasTbSourceCodes,
+  isTbSourceAbsent,
+  tbAbsentCodesText,
   tbCodeListText,
   tbConflictTexts,
   tbExtraEntries,
@@ -120,6 +161,18 @@ const props = withDefaults(
     provisionFilterLabel?: string
     /** 附加科目标准码 → 中文名 */
     extraLabels?: Readonly<Record<string, string>>
+    /**
+     * 除主槽（`gross` / `provision`）外还要在明细表里展示的**语义槽键**。
+     *
+     * 🔴 多槽循环必需：`SemanticAccountResult.as_dict()` 的扁平投影只由
+     * `gross` / `provision` 两个槽派生，而 H3 的四槽是
+     * `gross` / `accum_dep` / `accum_amort` / `impairment`（**没有** `provision` 槽）
+     * ⇒ 不声明这三个槽键，累计折旧/累计摊销/减值准备的来源科目码在面板里
+     * 完全看不到（审计 UI 失去逻辑追溯能力）。
+     *
+     * 默认 `[]` ⇒ 既有单槽消费者（K1/K2/F1/E1…）逐字节零回归。
+     */
+    extraSlotKeys?: readonly string[]
     /** 口径说明（允许内嵌 `<code>`/`<strong>`，均为编译期常量） */
     hints?: readonly string[]
     /** 溯源未下发 row_code 时的展示兜底 */
@@ -130,6 +183,7 @@ const props = withDefaults(
     provisionLabel: '',
     provisionFilterLabel: '',
     extraLabels: () => ({}),
+    extraSlotKeys: () => [],
     hints: () => [],
     fallbackRowCode: '',
   },
@@ -138,7 +192,30 @@ const props = withDefaults(
 const expanded = ref(false)
 
 const src = computed<TbSourceCodes>(() => props.sourceCodes || {})
-const visible = computed(() => hasTbSourceCodes(props.sourceCodes))
+
+/** 声明的附加槽里是否有真实命中（多槽循环下主槽可能为空而备抵槽有值） */
+const hasExtraSlotCodes = computed(() =>
+  (props.extraSlotKeys || []).some((k) => {
+    const slot = src.value.slots?.[k]
+    return !!(slot && ((slot.codes?.length ?? 0) || (slot.standard_codes?.length ?? 0)))
+  }),
+)
+
+/**
+ * 「本项目无此科目」态 —— 后端算过但该项目科目表里确实没有对应科目。
+ *
+ * 🔴 旧实现只有 `hasTbSourceCodes || hasExtraSlotCodes` 两项，
+ *    absent 态四个码列表全空 ⇒ 整块 `v-if` 隐藏 ⇒ 审计师看到**一片空白**，
+ *    既不知道该从哪个报表行取数、也不知道为何没取到（I5-1「其他非流动资产」
+ *    的 `1911` 在本项目科目表里不存在，实测面板整块未渲染）。
+ *    这与平台口径「本项目无此科目须显式说明、不得静默」相悖。
+ */
+const isAbsent = computed(() => isTbSourceAbsent(props.sourceCodes))
+const absentCodesText = computed(() => tbAbsentCodesText(props.sourceCodes))
+
+const visible = computed(
+  () => hasTbSourceCodes(props.sourceCodes) || hasExtraSlotCodes.value || isAbsent.value,
+)
 
 /** 无备抵科目的循环（如 K2 其他流动资产）不显示备抵行 */
 const showProvision = computed(() => !!props.provisionLabel)
@@ -207,6 +284,17 @@ const rows = computed<SrcRow[]>(() => {
       role: e.label,
       standard: e.standard,
       original: tbCodeListText(e.originals),
+    })
+  }
+  // 多槽循环的其余语义槽（H3 的累计折旧 / 累计摊销 / 减值准备）
+  // 解析来源写进「口径」列而不新增表列 —— 新增列会改动全部既有消费者的表格布局
+  for (const key of props.extraSlotKeys || []) {
+    const slot = src.value.slots?.[key]
+    if (!slot) continue
+    out.push({
+      role: `${slot.label || key}（${resolvedFromLabel(slot.resolved_from)}）`,
+      standard: tbCodeListText(slot.standard_codes),
+      original: tbCodeListText(slot.codes),
     })
   }
   return out

@@ -11,6 +11,21 @@
  * 2. **幂等** —— 值已相同的格不产生写入（反复点按钮不该刷新 `updated_at`、不该触发同步）。
  * 3. **本项目无此科目 ≠ 该科目为 0** —— 未命中的槽进 `absentSlots`，界面如实说明，
  *    不写 0（E1 的「存放财务公司款项」实证：写 0 会把「不适用」伪装成「已核实为零」）。
+ *
+ *    🔴 **同一条口径有两个入口，早期只堵了前一个**：
+ *    - 入口 A「槽未命中」→ `absentSlots`（本模块一直有）
+ *    - 入口 B「**槽命中但四表金额为 0**」→ `zeroSkipped`（2026-08-15 补）
+ *
+ *    入口 B 的实证（I1-1 宜宾临港店 soe）：后端 `adjudication_prefill` 如实下发了
+ *    3 段 × 6 类别 = 18 行，但该项目 `tb_balance` 无 17xx 余额，每行
+ *    `opening/closing/increase/decrease` 全为 0。旧逻辑把这 18 个 0 当正常写入，
+ *    toast 报「补填 18 格」——审计师据此以为已带入真实数据，实际是把
+ *    「本项目无此科目余额」伪装成了「已核实为零」，与上面第 3 条自相矛盾。
+ *    对照组「和平药房_2024」同一底稿期末 5,445,065.12（非零），证明后端取数无误、
+ *    缺陷只在本模块的写入判定。
+ *
+ *    → 现在「当前格为空 + 四表金额为 0」进 `zeroSkipped` 不写入。审计师若确实要
+ *    记录「已核实为零」，手工填 0 即可（手工优先原则本就允许）。
  * 4. **未能归类的金额不兜底** —— 进 `unclassified` 由审计师分配，绝不塞进「其他」行
  *    （K2 实测把三行坏账准备全堆进「其他」的根因）。
  *
@@ -68,6 +83,14 @@ export interface AdjPrefillPlan {
   unclassified: AdjPrefillUnclassified[]
   /** 本项目无该科目的槽（如实说明，不写 0） */
   absentSlots: Array<{ slotKey: string; label: string }>
+  /**
+   * 四表金额为 0 且当前格为空 → **不写入**（见模块头第 3 条入口 B）。
+   *
+   * 与 `absentSlots` 的区别：`absentSlots` 是「声明的槽在四表里根本没有对应科目」，
+   * 本桶是「科目行下发了但余额为 0」。两者都不该落 0，但提示文案不同，
+   * 故分两个桶，便于界面如实区分。
+   */
+  zeroSkipped: AdjPrefillCell[]
 }
 
 /**
@@ -102,10 +125,18 @@ export function planAdjudicationPrefill(
     identical: 0,
     unclassified: [...(extras.unclassified ?? [])],
     absentSlots: [...(extras.absentSlots ?? [])],
+    zeroSkipped: [],
   }
   for (const cell of cells ?? []) {
     const cur = read(cell)
     if (isBlank(cur)) {
+      // 🔴 入口 B：四表金额为 0 且当前空 → 不写 0（见模块头第 3 条）。
+      // 空格显示与 0 在 UI 上都是「-」（fmtAmount 平台口径），写入没有信息增量，
+      // 却会刷新 updated_at、触发附注同步、并让 toast 谎报「补填 N 格」。
+      if (Math.abs(cell.amount) <= PREFILL_TOLERANCE) {
+        plan.zeroSkipped.push(cell)
+        continue
+      }
       plan.writes.push(cell)
       continue
     }
@@ -151,6 +182,14 @@ export function describeAdjPrefillPlan(plan: AdjPrefillPlan): string {
   }
   if (plan.absentSlots.length) {
     parts.push(`${plan.absentSlots.map((s) => s.label).join('、')} 本项目无此科目`)
+  }
+  if (plan.zeroSkipped.length) {
+    // 🔴 不能说成「已带入」也不能说成「一致」：四表确实下发了这些行，但余额为 0。
+    // 如实告知「未写入」+ 给出手工兜底路径，避免审计师误判已核实。
+    parts.push(
+      `${plan.zeroSkipped.length} 格四表余额为 0，未写入`
+      + '（本项目该科目无余额；如需记录「已核实为零」请手工填 0）',
+    )
   }
   return parts.length ? parts.join('；') : '四表数据与当前未审数一致，无需带入'
 }

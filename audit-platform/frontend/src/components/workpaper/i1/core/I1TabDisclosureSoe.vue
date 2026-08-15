@@ -46,10 +46,27 @@
       <div v-for="(m, i) in prepValidation.warnings" :key="'w'+i" class="prep-warn">⚠ {{ m }}</div>
     </div>
 
+    <div v-if="!isReadonly" class="cat-bar">
+      <el-button size="small" @click="handleAddSoeCat">+ 增加资产类别</el-button>
+      <span class="hint">源模板四层末「……」可扩位：按被审计单位实际类别扩展（四层同步新增）</span>
+    </div>
+
     <section v-for="block in layers" :key="block.layer" class="block">
       <h3 class="block-title">{{ layerTitle(block.layer) }}</h3>
       <el-table :data="blockRows(block)" border size="small" class="wp-table" :row-class-name="rowClass">
-        <el-table-column prop="label" label="项目" min-width="200" />
+        <el-table-column prop="label" label="项目" min-width="200">
+          <template #default="{ row }">
+            <span>{{ row.label }}</span>
+            <el-button
+              v-if="row.removable && !isReadonly"
+              link
+              type="danger"
+              size="small"
+              class="cat-del"
+              @click="handleRemoveSoeCat(row.key)"
+            >删</el-button>
+          </template>
+        </el-table-column>
         <el-table-column label="期初余额" min-width="120" align="right">
           <template #default="{ row }">
             <WpAmountInput
@@ -148,11 +165,11 @@ import { eventBus } from '@/utils/eventBus'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useI1SoeDisclosure } from '../../composables/useI1Disclosure'
 import {
-  I1_SOE_CATEGORIES,
   I1_SOE_GUIDANCE,
   I1_SOE_LAYER_META,
   layerTotal,
   resolveCategoryEnd,
+  resolveI1SoeCategories,
   type I1SoeLayer,
   type I1SoeLayerBlock,
 } from '../../composables/i1SoeDisclosureModel'
@@ -202,11 +219,37 @@ const {
   prepValidation,
   persist,
   updateCategory,
+  addCategory,
+  removeCategory,
   pullFromSources,
 } = useI1SoeDisclosure({
   allResponses: toRef(props, 'allResponses'),
   onSave: (id, v) => emit('save', id, v),
 })
+
+/** 增加自定义资产类别（四层同时新增；先弹 prompt 输名，撞名拒绝）。 */
+async function handleAddSoeCat() {
+  try {
+    const { value } = await ElMessageBox.prompt('资产类别名称', '增加资产类别', {
+      confirmButtonText: '确认',
+      cancelButtonText: '取消',
+      inputPlaceholder: '如：碳排放权',
+    })
+    const name = (value || '').trim()
+    if (!name) return
+    const ok = addCategory(name)
+    if (!ok) ElMessage.warning(`类别「${name}」已存在，未新增`)
+  } catch (e) {
+    // 🔴 曾写成裸 `catch { /* cancelled */ }`，把 `addCategory` 内部抛的
+    //    `TypeError: layers is not iterable` 一起吞了 ⇒ 点确认后**无提示、无新行、
+    //    无库写入、控制台无 error**，缺陷完全不可见（浏览器实测才暴露）。
+    //    ElMessageBox 取消/关闭 reject 的是字符串 'cancel'/'close'，
+    //    据此把「用户取消」与「实现异常」分开，异常必须落到控制台 + 用户可见提示。
+    if (e === 'cancel' || e === 'close') return
+    console.error('[I1-soe] 新增资产类别失败', e)
+    ElMessage.error('新增资产类别失败，请重试；若反复失败请联系管理员')
+  }
+}
 
 const noteFields = [
   { key: 'indefinite', label: '1、寿命不确定', model: noteIndefinite, placeholder: I1_SOE_GUIDANCE.indefinite },
@@ -245,12 +288,13 @@ function blockRows(block: I1SoeLayerBlock) {
     decrease: tot.decrease,
     end: tot.end,
   }]
-  for (const cat of I1_SOE_CATEGORIES) {
+  for (const cat of resolveI1SoeCategories(layers.value)) {
     const m = block.categories.find((c) => c.key === cat.key)
     rows.push({
       kind: 'detail',
       key: cat.key,
       label: cat.label,
+      removable: cat.removable && _SOE_CUSTOM_RE.test(cat.key),
       begin: m?.begin ?? 0,
       increase: m?.increase ?? 0,
       decrease: m?.decrease ?? 0,
@@ -260,8 +304,14 @@ function blockRows(block: I1SoeLayerBlock) {
   return rows
 }
 
+const _SOE_CUSTOM_RE = /^soe_custom_\d+$/
+
 function rowClass({ row }: { row: { kind: string } }) {
   return row.kind === 'total' ? 'row-total' : ''
+}
+
+function handleRemoveSoeCat(key: string) {
+  if (!removeCategory(key)) ElMessage.warning('默认类别不可删除')
 }
 
 function fmt(n: number): string {
