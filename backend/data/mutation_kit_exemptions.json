@@ -1,6 +1,16 @@
 {
   "_doc": "变异脚本治理豁免登记表。spec e1-variant-recalc-and-mutation-denominator-closure（Requirements 5.4/5.6/7.5/8.1/8.5）。两个守卫读它：test_mutation_kit_scripts_tracked.py（未入库豁免）与 test_mutation_kit_adoption.py（未用共享件豁免）。",
   "_why": "在办 spec 的变异脚本正被并发会话编辑，代它们入库或迁移会与其打架（memory 已实证并发会话会互相回退同一文件）。豁免不是免责声明——每项必须带撤销条件，且守卫会在其 spec 归档后主动提示撤销，防止豁免变成永久后门（e-cycle spec 的 M20 变异针对的正是「白名单成了免责声明」这一形态）。",
+  "_revoked_log": [
+    {
+      "script": "backend/scripts/check/mutate_report_line_resolution_guards.py",
+      "spec": "procedure-trim-report-line-account-resolution",
+      "registered_at": "2026-08-15",
+      "revoked_at": "2026-08-15",
+      "why_revoked": "失效检测实战命中：登记后约 100 分钟内，并发会话把该 spec 从 0/16 做完并移入 _archive/05-business-features/，豁免理由「spec 在办」随之失效。复核时该脚本已被其推进方 git add（`A ` 态）⇒ tracked 守卫不再需要豁免，故按 revoke_when 撤销。该脚本转入 Wave 4 的待迁共享件清单（属已归档 spec）。",
+      "note": "本条留档是为了让「豁免被撤销过」可追溯 —— 直接删掉会让下一轮无法判断某脚本是从未登记过还是登记后撤销过。"
+    }
+  ],
   "_schema": {
     "script": "仓库相对路径，必填",
     "spec": "`.kiro/specs/` 下的目录名，必填。失效检测靠它：该目录不在 active 区（= spec 已归档）时守卫提示撤销",
@@ -29,13 +39,6 @@
       "reason": "spec 在办（实扫 24/25）。脚本本体已入库，故 tracked 守卫本不需要豁免；此项是为 adoption 守卫（未迁共享件）登记，避免在该 spec 收口途中改动它的判定逻辑。",
       "registered_at": "2026-08-15",
       "revoke_when": "workpaper-import-export-lifecycle-closure 归档后迁移共享件"
-    },
-    {
-      "script": "backend/scripts/check/mutate_report_line_resolution_guards.py",
-      "spec": "procedure-trim-report-line-account-resolution",
-      "reason": "spec 在办且**正在开工中** —— 本守卫上线后第一次运行就抓到它，而立项调查（2026-08-15 约 11:20）时该文件尚不存在，实测 mtime 12:08 距抓到时点仅 6 分钟，其推进方显然仍在编辑。代它入库会与该会话打架。",
-      "registered_at": "2026-08-15",
-      "revoke_when": "procedure-trim-report-line-account-resolution 归档后，由接手方入库并迁移共享件（该脚本自带四态判定与 5 个被测守卫，迁移成本低）"
     },
     {
       "script": "backend/scripts/diagnose/mutate_wp_export_resolver_guards.py",

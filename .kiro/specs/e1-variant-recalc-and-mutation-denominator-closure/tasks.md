@@ -102,7 +102,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - **不在持久化层加防御**：不写「落库前检查是否变 0」那类补丁（会掩盖真因，且分不清合法 0）
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 8. 共享件骨架：`spec.py` / `anchor.py` / `apply.py`
+- [x] 8. 共享件骨架：`spec.py` / `anchor.py` / `apply.py`
   - 新建 `backend/scripts/_mutation_kit/`（`__init__.py` 公开 API）
   - `spec.py`：`Mutation` 数据类（字段见 design.md §Components）+ 声明期校验（`kind` 合法 · `anchor` 非空且**不含 `\n`** · `want` 非空 · `why` 非空）
   - `anchor.py`：锚点定位。**行级唯一 + 行号消歧 + 该行逐字相等 + 命中数恰好 1** 四重断言；`splitlines(keepends=True)` 保留行尾，CRLF 安全（工作树是 CRLF，含 `\n` 的锚点必然 MISS）
@@ -111,7 +111,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 零新增第三方依赖：只用 `dataclasses`/`pathlib`/`hashlib`/`re`（Property 25）
   - _Requirements: 6.1, 6.6_
 
-- [ ] 9. 共享件执行与判定：`runner.py` / `verdict.py` / `coverage.py` / `cli.py`
+- [x] 9. 共享件执行与判定：`runner.py` / `verdict.py` / `coverage.py` / `cli.py`
   - `runner.py`：pytest 与 vitest 执行 + **失败测试名集合**提取（pytest 用 `-rf` 解析；vitest 用 `--reporter=json` 取 `fullName`）。子进程一律 `subprocess.run([...])` **不经 shell**（`-k "a or b"` 经 shell 会被拆成多个位置参数）
   - `verdict.py`：四态判定（RED / GREEN / ANCHOR-MISS / WRONG-TEST），判据是**新增失败集合的差集**，退出码不作判据
   - `coverage.py`：覆盖面分母 tally —— 输入守卫文件全集，输出「未被任何变异打红」的清单，报告末尾打印（Property 21）
@@ -122,7 +122,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 冻结基线：`baseline_backend_passed` / `baseline_frontend_passed` 不符时打印 WARN 含实测值与基线值；注释要求改基线必须说明来源（Property 22）
   - _Requirements: 6.2, 6.3, 6.4, 6.7_
 
-- [ ] 10. 共享件自身守卫
+- [x] 10. 共享件自身守卫
   - 新建 `backend/tests/test_mutation_kit_capabilities.py`，七项能力每项一条**行为**测试，判据是「故意破坏后必失败」而非「函数存在」（Property 20）
   - 具体：锚点唯一性（构造同名多处命中 ⇒ 必报 ANCHOR-MISS） · md5 还原核验（篡改还原内容 ⇒ 必抛） · 分母 tally（声明 3 个守卫文件但只有 2 个被打红 ⇒ 报告必列出第 3 个） · 四态（构造四种情形各自命中对应态） · `--check-anchors` 只读（跑前后 md5 比对） · `--list` 校验（构造 want 定位不到的变异 ⇒ 必非零退出） · 冻结基线（实测 ≠ 基线 ⇒ 必 WARN）
   - 反向自检：把上述任一断言的被测代码改坏，对应测试**必须**打红（写进实录，没打红=守卫有缺陷）
@@ -380,3 +380,67 @@ expect(row.endingFc).toBeCloseTo(calcCashBalance(row.opening, row.increase, row.
 M2/M4 首轮报 **ANCHOR-MISS（命中 0 次）**：锚点写成了多行、含 `\n`，而工作树是 CRLF ⇒ 字节匹配必然失败。这条坑 design.md §Components 明文写着「`anchor` 非空且**不含 `\n`**」，仍然踩到。
 
 ⇒ **给 Wave 3 共享件的硬结论**：「不含 `\n`」不能只写在文档里，必须在 `Mutation` 的**声明期校验**里直接拒绝（`spec.py` 的职责），否则每个调用方都会各踩一次。同理 Wave 1 实录之二记的「锚点落在作用域外」也要在声明期或 `--list` 阶段拦住 —— 两条合起来说明：变异脚本的正确性判据本身就该由共享件强制，而不是靠每个作者记得。
+
+### Wave 3 实录：共享件 + 自身守卫 + 自举变异（Task 8 / 9 / 10，2026-08-15）
+
+产物：`backend/scripts/_mutation_kit/` **8 个模块**（`__init__` / `spec` / `anchor` / `apply` / `runner` / `verdict` / `coverage` / `cli`，约 46 KB）· `backend/tests/test_mutation_kit_capabilities.py`（**40 例**）· `backend/scripts/diagnose/mutate_mutation_kit_guards.py`（**15 条变异，自举**）。
+
+**零第三方依赖**（Property 25）：AST 扫全部 import，外部依赖集合为空，`backend/requirements.txt` 零改动。
+
+#### 自举变异 15/15 全 RED · 覆盖面 3/3 无 GAP · RC=0
+
+用共享件**给自己**跑变异 —— 它同时是共享件的第一个真实调用方，API 表达不出这套用法就说明设计不足。还原全部成功、md5 逐字相符。
+
+| 变异 | 目标 | 命中 |
+|---|---|---|
+| M01 删锚点唯一性断言 | `anchor.py` | `test_anchor_multiple_hits_is_rejected`（+4） |
+| M02 删**定位期**换行检查 | `anchor.py` | `test_find_anchor_rejects_multiline_anchor` |
+| M03 整行相等改 strip 子串 | `anchor.py` | `test_anchor_substring_does_not_count_as_hit` |
+| M04 删**声明期**换行拒绝 | `spec.py` | `test_multiline_anchor_rejected_at_declaration`（+2） |
+| M05 删「new == anchor」拒绝 | `spec.py` | `test_noop_mutation_also_rejected_at_declaration`（+2） |
+| M06 删还原 md5 核验 | `apply.py` | `test_restore_failure_is_raised_not_swallowed` |
+| M07 删「变异后 md5 未变」检测 | `apply.py` | `test_noop_mutation_reported_as_anchor_miss` |
+| M08 允许空分母 | `coverage.py` | `test_empty_denominator_is_rejected` |
+| M09 报告不列 GAP | `coverage.py` | `test_tally_reports_uncovered_guard_file` |
+| M10 全量运行也走「子集不给结论」分支 | `coverage.py` | 同上（+2） |
+| M11 删作用域自证 | `cli.py` | `test_scope_check_failure_is_anchor_miss_not_green` |
+| M12 `--list` 的 want 定位永远走成功分支 | `cli.py` | `test_list_fails_when_want_cannot_be_located` |
+| M14 豁免项 spec 换成已归档的 | 豁免表 | `test_no_stale_exemption_after_spec_archived` |
+| M15 豁免项 script 指向别处 | 豁免表 | `test_every_mutation_script_is_tracked_or_exempt`（+3，跨两个守卫文件） |
+| M16 登记日期改非 ISO 格式 | 豁免表 | `test_every_entry_has_valid_fields` |
+
+#### 🔴 变异检验抓出的两个真实缺口（都是首轮才暴露的）
+
+**① M02 首轮判 GREEN —— 定位期的换行检查无任何测试覆盖。** 当时只有 `test_multiline_anchor_rejected_at_declaration` 覆盖**声明期**（`spec.validate_mutation`），`anchor.find_anchor` 里那道**定位期**检查删掉后没有一条测试会红。两层是独立防护：绕过 `run_cli` 直接调 `find_anchor` 的调用方（共享件内部的 `block_range`、临时诊断脚本）走的正是定位期那层。补 `test_find_anchor_rejects_multiline_anchor` 后转 RED，冻结基线 62 → **63**（改动处已注明来源，符合 Property 22 的要求）。
+
+**② 覆盖面 tally 首轮报 2 个 GAP —— 「12 条变异全 RED」时仍有两个守卫文件从未被反证。** 缺口是 `test_mutation_kit_exemptions.py` 与 `test_mutation_kit_scripts_tracked.py`：Wave 1 给它们做过 3 条变异全 RED，但用的是临时脚本、跑完即删、**没有固化**。补 M14/M15/M16 后 3/3 归零。
+
+这两条合起来正是 e-cycle 脚本当年抓出「7 个前端守卫文件从未被打红」的同一形态，只是这次发生在共享件自己身上 —— 分母机制在它的第一个用例上就兑现了价值。
+
+#### 🔴 失效检测实战命中（登记后约 100 分钟）
+
+Wave 1 给 `mutate_report_line_resolution_guards.py` 登记豁免时（12:14），其 spec `procedure-trim-report-line-account-resolution` 实扫 0/16 在办。**约 13:50 跑基线时 `test_no_stale_exemption_after_spec_archived` 打红** —— 并发会话已把该 spec 做完并移入 `_archive/05-business-features/`。
+
+复核：该脚本已被其推进方 `git add`（`A ` 态），归档目录尚未 commit（远端也无），说明并发会话正在收口中途。按 `revoke_when` 撤销该豁免项，并在豁免表加 `_revoked_log` 留档 —— **直接删掉会让下一轮无法判断某脚本是从未登记过还是登记后撤销过**。该脚本转入 Wave 4 待迁清单（属已归档 spec）。
+
+**登记一个 schema 缺口（不在本 Wave 修）**：豁免表只能表达「因 spec 在办而暂缓」，无法表达「spec 已归档但尚未迁移」—— 因为失效检测靠「spec 是否在 `.kiro/specs/` 一级下」这个结构事实，已归档的 spec 天然判为失效。当前处置（撤销 + 转待迁清单）是正确流程，但如果 Wave 4 的迁移跨越多个会话，中间态会缺一个登记位。
+
+#### 🔴 tracked 守卫第二次抓到实时产生的欠账
+
+这次是**我自己刚建的** `mutate_mutation_kit_guards.py`：跑变异基线时 RC=4（基线非空），追因发现是该脚本未入库。`git add` 后基线转 63 passed。第一次是 Wave 1 抓到并发会话的 `mutate_report_line_resolution_guards.py`（mtime 距抓到仅 6 分钟）。两次都不是历史欠账，是**正在产生**的欠账。
+
+#### `--list` 在跑变异之前拦住了两处声明错误
+
+- M12 原写 `line=155` 消歧，实际那行是别的内容 ⇒ `--list` 直接报「消歧行号 155 内容不符」并打印期望/实为
+- 顺带发现原本的替换方案会**破坏语法**：`problems.append(` 那处是多行调用，单行替换会留下孤立字符串与右括号 ⇒ 整批测试挂掉，判定退化成 WRONG-TEST/ERROR 而非精确命中。改为条件反转（`if hit_files:` → `if True:`）
+
+这正是 Requirement 6.7 要的：只打印的 `--list` 在 CI 里恒绿，等于没挂。
+
+#### 相对 e-cycle 范式基准的四项新增能力
+
+| 能力 | e-cycle | 共享件 |
+|---|---|---|
+| 声明期校验 | 无（只在定位期查换行） | `validate_all` 对所有子命令无条件生效 |
+| `guard_files` 强制 | 模块级常量，靠约定 | **必填关键字参数**，签名层面不可能省略 |
+| `--list` 校验 | 只打印 | 四项校验（声明 / 锚点唯一 / 文件存在 / want 可定位） |
+| 作用域自证 | 无 | `Mutation.scope_check`，落在作用域外判 ANCHOR-MISS 而非 GREEN |
