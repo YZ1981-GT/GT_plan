@@ -27,14 +27,38 @@
 （`disclosure-note-row-level-merge` / `restricted-assets-note-row-scope-rollout`），
 改动方的 CI 视野里根本没有它。
 
-**后果三条**：
-1. **3 个 blocking CI job 在干净 checkout 下必挂**：`ci.yml` 的 `frontend-build`、
-   `governance-checks.yml` 的 `disclosure-row-level-merge-frontend` 与 `note-restricted-assets-frontend`
-2. **等值断言打死同 it 内的归因断言**：`L163` 的 `.toBe(15)` 先失败 ⇒ 紧随其后 6 条**仍然成立且有价值**
-   的归因断言（`八、93` 必在 / `外币货币性项目` 必不在 / `五、32`·`五、71`·`八、91`·`八、81` 必在）
-   全部拿不到反馈
-3. **复核成本转移给无关方**：每个碰到红的人都要重新走一遍归因（本次实测耗时约 15 分钟才
-   用 `git status` 定位到 `note_template_*.json` 是 `M`）
+🔴 **立项判断的一处修正（2026-08-15 实证后）**：起初写作「3 个 blocking job 在干净
+checkout 下必挂」—— **这是错的**。实际状态是 K 循环整套改动（真源 + 生成器 + 后端守卫）
+**三个文件在工作树里全是 `M`、从未提交**，git HEAD 里三处副本**全是 23/6**：
+
+| 位置 | git HEAD | 工作树磁盘 |
+|---|---|---|
+| 真源 `note_shared_table_segments.json` | 23/6/29 | **24/8/32** |
+| 生成器 `EXPECTED_COUNTS` | 23/6 | **24/8** |
+| 后端守卫 `test_note_shared_table_segments.py` | 23/6 | **24/8** |
+| **前端守卫**（本 spec 目标） | 23/6/29 | 23/6/29（**未同步**） |
+
+⇒ **干净 checkout（CI）当前是全绿的**（四处自洽于 23/6/29）；
+**红只出现在本地工作树**（三处已改、前端未改）。
+
+这不削弱立项理由，反而让它更准确 —— 问题从「已经挂了」变成**「地雷已埋好，K 循环一 commit 就炸」**：
+
+**后果四条**：
+1. **K 循环 commit 的那一刻，3 个 blocking job 立刻挂**：`ci.yml` 的 `frontend-build`、
+   `governance-checks.yml` 的 `disclosure-row-level-merge-frontend` 与
+   `note-restricted-assets-frontend` —— 而挂的原因在**别人的 spec 的产物**里，
+   K 循环推进方既无权限判断也无上下文修
+2. **K 循环推进方本地跑测试现在就能看到红**，但极易误判为「别的 spec 的陈账」而忽略
+   （本次实测归因耗时约 15 分钟才用 `git status` + `git show HEAD:` 三向比对定位清楚）
+3. **等值断言打死同 it 内的归因断言**：`L163` 的 `.toBe(15)` 先失败 ⇒ 紧随其后 6 条
+   **仍然成立且有价值**的归因断言（`八、93` 必在 / `外币货币性项目` 必不在 /
+   `五、32`·`五、71`·`八、91`·`八、81` 必在）全部拿不到反馈
+4. 🔴🔴 **等值断言还掩盖了一个数据丢失级真红达 3 天**：改成地板/不变式判据后，
+   同文件里形态 A 的 `Property 15` 才第一次显现真红 ——
+   `k1NoteSectionMap.ts` 推《其他应收款》/ `k3NoteSectionMap.ts` 推《其他应付款》
+   **均未声明 `_row_scope`** ⇒ 表级整表覆盖会清掉他段（应收股利 `BS-016` /
+   应付股利 `BS-055`·`BS-076`）。这两张表正是 K 循环本次补段首码**才变成共享表**的
+   ⇒ 缺陷与漂移同源、同样会在 commit 时才在 CI 显现
 
 ### 判据形态分级（本 spec 的核心口径）
 
@@ -57,7 +81,9 @@
 
 #### Acceptance Criteria
 
-1.1 WHEN 在干净 checkout 上运行 `disclosureSharedTableRowScope.spec.ts` THEN 13 个测试必须全部通过
+1.1 WHEN 运行 `disclosureSharedTableRowScope.spec.ts` THEN 必须**在两种真源状态下都通过**：
+    ① git HEAD 的 23/6/29（干净 checkout）② 工作树的 24/8/32（K 循环在途改动）
+    —— 这正是「不锁规模」的价值：判据对真源规模不敏感，两态同绿
 
 1.2 WHEN 修正基线 THEN 每处修改必须在注释里写明「变更日期 + 变更来源脚本/spec + 数值变化」，
     对齐后端 `test_note_shared_table_segments.py` 已有的 docstring 范式
@@ -181,9 +207,11 @@
 
 #### Acceptance Criteria
 
-8.1 WHEN 改动完成 THEN 3 个受影响的 blocking job 必须在干净 checkout 下全绿：
-    `ci.yml` · `frontend-build`；`governance-checks.yml` · `disclosure-row-level-merge-frontend`；
+8.1 WHEN 改动完成 THEN 3 个受影响的 blocking job 必须在**两种真源状态下都全绿**
+    （HEAD 的 23/6/29 与工作树的 24/8/32）：`ci.yml` · `frontend-build`；
+    `governance-checks.yml` · `disclosure-row-level-merge-frontend`；
     `governance-checks.yml` · `note-restricted-assets-frontend`
+    —— 单测一种状态不足以证明「判据对真源规模不敏感」
 
 8.2 WHEN 验收 THEN 必须串行跑（`--no-file-parallelism`）避免并发 flaky 污染判断，
     并记录 files/tests 通过数
