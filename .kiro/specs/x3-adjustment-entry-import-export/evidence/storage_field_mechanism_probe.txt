@@ -1,0 +1,195 @@
+==============================================================================
+L2
+  -- audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts  lines=288
+     ITEM_PREFIX = []
+     [conclusion] 11 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {', 'const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }']
+     [remark] 11 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {', 'const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }']
+  -- audit-platform/frontend/src/components/workpaper/composables/useL2Adjustment.ts  lines=388
+     ITEM_PREFIX = []
+     saveField( ITEM_ID_ENTRIES , { remark: JSON.stringify(entries.value) }
+     [conclusion] 1 行: ['saveField: (itemId: string, value: { conclusion?: string; remark?: string }) => Promise<void>']
+     [remark] 4 行: ['saveField: (itemId: string, value: { conclusion?: string; remark?: string }) => Promise<void>', 'debouncedSave(ITEM_ID_ENTRIES, { remark: JSON.stringify(entries.value) })', 'debouncedSave(`L2-L2-3-${field}`, { remark: value })', 'await saveField(ITEM_ID_ENTRIES, { remark: JSON.stringify(entries.value) })']
+  -- L2TabAdjustment.vue 调用: ['loadData']
+     imports: ['useL2FormData <- ../../composables/useL2FormData', 'useL2Adjustment <- ../../composables/useL2Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+L6
+  -- audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts  lines=298
+     ITEM_PREFIX = ['L6-']
+     [conclusion] 12 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'const existing = responses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }', '...(data.conclusion !== undefined ? { conclusion: data.conclusion } : {}),']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = responses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }', '...(data.remark !== undefined ? { remark: data.remark } : {}),']
+  -- audit-platform/frontend/src/components/workpaper/composables/useL6Adjustment.ts  lines=303
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 13 行: ['remark: string', "remark: '',", '{ itemId: `L6-L6-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `L6-L6-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `L6-L6-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `L6-L6-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- L6TabAdjustment.vue 调用: ['loadData', 'saveAndPublish']
+     imports: ['useL6FormData <- ../../composables/useL6FormData', 'useL6Adjustment, type L6AdjustmentEntry <- ../../composables/useL6Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M1
+  -- audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts  lines=351
+     ITEM_PREFIX = ['M1-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM1Adjustment.ts  lines=302
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 13 行: ['remark: string', "remark: '',", '{ itemId: `M1-M1-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M1-M1-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M1-M1-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M1-M1-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M1TabAdjustment.vue 调用: ['loadData', 'saveAndPublish']
+     imports: ['useM1FormData <- ../../composables/useM1FormData', 'useM1Adjustment, type M1AdjustmentEntry <- ../../composables/useM1Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M2
+  -- audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts  lines=351
+     ITEM_PREFIX = ['M2-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM2Adjustment.ts  lines=303
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 13 行: ['remark: string', "remark: '',", '{ itemId: `M2-M2-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M2-M2-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M2-M2-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M2-M2-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M2TabAdjustment.vue 调用: ['loadData', 'saveAdjustmentNote', 'saveAndPublish']
+     imports: ['useM2FormData <- ../../composables/useM2FormData', 'useM2Adjustment, type M2AdjustmentEntry <- ../../composables/useM2Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M3
+  -- audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts  lines=352
+     ITEM_PREFIX = ['M3-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM3Adjustment.ts  lines=301
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 14 行: ['remark: string', "remark: '',", '{ itemId: `M3-M3-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M3-M3-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M3-M3-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M3-M3-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M3TabAdjustment.vue 调用: ['loadData', 'saveAndPublish']
+     imports: ['useM3FormData <- ../../composables/useM3FormData', 'useM3Adjustment, type M3AdjustmentEntry <- ../../composables/useM3Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M4
+  -- audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts  lines=354
+     ITEM_PREFIX = ['M4-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM4Adjustment.ts  lines=302
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 14 行: ['remark: string', "remark: '',", '{ itemId: `M4-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M4-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M4-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M4-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M4TabAdjustment.vue 调用: ['loadData', 'restoreEntries', 'saveAndPublish']
+     imports: ['useM4FormData <- ../../composables/useM4FormData', 'useM4Adjustment, type M4AdjustmentType <- ../../composables/useM4Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M5
+  -- audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts  lines=353
+     ITEM_PREFIX = ['M5-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM5Adjustment.ts  lines=305
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 14 行: ['remark: string', "remark: '',", '{ itemId: `M5-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M5-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M5-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M5-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M5TabAdjustment.vue 调用: ['loadData', 'restoreEntries', 'saveAndPublish']
+     imports: ['useM5FormData <- ../../composables/useM5FormData', 'useM5Adjustment <- ../../composables/useM5Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M6
+  -- audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts  lines=357
+     ITEM_PREFIX = ['M6-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM6Adjustment.ts  lines=345
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 15 行: ['remark: string', "remark: '',", '{ itemId: `M6-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M6-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M6-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M6-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M6TabAdjustment.vue 调用: ['loadData', 'loadFromResponses', 'restoreEntries', 'saveAndPublish']
+     imports: ['useM6FormData <- ../../composables/useM6FormData', 'useM6Adjustment <- ../../composables/useM6Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M7
+  -- audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts  lines=358
+     ITEM_PREFIX = ['M7-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM7Adjustment.ts  lines=325
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 14 行: ['remark: string', "remark: '',", '{ itemId: `M7-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M7-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M7-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M7-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M7TabAdjustment.vue 调用: ['loadData', 'saveAndPublish']
+     imports: ['useM7FormData <- ../../composables/useM7FormData', 'useM7Adjustment, type M7AdjustmentType <- ../../composables/useM7Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M8
+  -- audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts  lines=363
+     ITEM_PREFIX = ['M8-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM8Adjustment.ts  lines=330
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 14 行: ['remark: string', "remark: '',", '{ itemId: `M8-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M8-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M8-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M8-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M8TabAdjustment.vue 调用: ['loadData', 'saveAdjustmentNote', 'saveAndPublish']
+     imports: ['useM8FormData <- ../../composables/useM8FormData', 'useM8Adjustment <- ../../composables/useM8Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M9
+  -- audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts  lines=359
+     ITEM_PREFIX = ['M9-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM9Adjustment.ts  lines=338
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 15 行: ['remark: string', "remark: '',", '{ itemId: `M9-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M9-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M9-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M9-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M9TabAdjustment.vue 调用: ['loadData', 'saveAndPublish']
+     imports: ['useM9FormData <- ../../composables/useM9FormData', 'useM9Adjustment, type M9AdjustmentEntry <- ../../composables/useM9Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+M10
+  -- audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts  lines=353
+     ITEM_PREFIX = ['M10-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  -- audit-platform/frontend/src/components/workpaper/composables/useM10Adjustment.ts  lines=310
+     ITEM_PREFIX = []
+     [conclusion] 0 行: []
+     [remark] 14 行: ['remark: string', "remark: '',", '{ itemId: `M10-3-entry-${n}-type`, data: { remark: entry.type } },', '{ itemId: `M10-3-entry-${n}-desc`, data: { remark: entry.description || null } },', '{ itemId: `M10-3-entry-${n}-category`, data: { remark: entry.category || null } },', '{ itemId: `M10-3-entry-${n}-report`, data: { remark: entry.reportItem || null } },']
+  -- M10TabAdjustment.vue 调用: ['loadData', 'restoreEntries', 'saveAndPublish']
+     imports: ['useM10FormData <- ../../composables/useM10FormData', 'useM10Adjustment <- ../../composables/useM10Adjustment', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+N1
+  -- audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts  lines=537
+     ITEM_PREFIX = ['N1-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  (no useN1Adjustment.ts)
+  -- N1TabAdjustment.vue 调用: ['loadData']
+     imports: ['useN1FormData <- ../../composables/useN1FormData', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+N2
+  -- audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts  lines=359
+     ITEM_PREFIX = ['N2-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  (no useN2Adjustment.ts)
+  -- N2TabAdjustment.vue 调用: ['restoreEntries']
+     imports: ['useN2FormData <- ../../composables/useN2FormData', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+N3
+  -- audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts  lines=375
+     ITEM_PREFIX = ['N3-']
+     saveField( itemId , { conclusion }
+     [conclusion] 14 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }']
+     [remark] 12 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+  (no useN3Adjustment.ts)
+  -- N3TabAdjustment.vue 调用: ['restoreEntries']
+     imports: ['useN3FormData <- ../../composables/useN3FormData', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']
+==============================================================================
+N5
+  -- audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts  lines=401
+     ITEM_PREFIX = ['N5-']
+     saveField( itemId , { conclusion }
+     [conclusion] 12 行: ['conclusion: string | null', 'conclusion: r.conclusion ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'conclusion: item.conclusion || null,', 'await saveField(itemId, { conclusion })', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {']
+     [remark] 11 行: ['remark: string | null', 'remark: r.remark ?? null,', 'async function _doSave(items: Array<{ item_id: string; conclusion: string | null; remark: string | null }>): Promise<void> {', 'remark: item.remark || null,', 'async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {', 'const existing = allResponses.value.get(itemId) || { item_id: itemId, conclusion: null, remark: null }']
+  (no useN5Adjustment.ts)
+  -- N5TabAdjustment.vue 调用: ['loadData', 'saveConclusion', 'saveEntries', 'saveNotes']
+     imports: ['useN5FormData <- ../../composables/useN5FormData', 'useAdjustmentCentralSync, CENTRAL_STATUS_LABELS <- @/components/workpaper/composables/useAdjustmentCentralSync']

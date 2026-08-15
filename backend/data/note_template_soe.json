@@ -11892,11 +11892,11 @@
               "row_type": "total"
             },
             {
-              "label": "其中：软件",
+              "label": "其中：土地使用权",
               "row_type": "data"
             },
             {
-              "label": "土地使用权",
+              "label": "住房使用权",
               "row_type": "data"
             },
             {
@@ -11916,19 +11916,23 @@
               "row_type": "data"
             },
             {
-              "label": "特许权",
+              "label": "特许经营权",
               "row_type": "data"
             },
             {
-              "label": "采矿权",
+              "label": "软件",
               "row_type": "data"
             },
             {
-              "label": "探矿权",
+              "label": "矿产权",
               "row_type": "data"
             },
             {
               "label": "数据资源",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -11941,11 +11945,11 @@
               "row_type": "total"
             },
             {
-              "label": "其中：软件",
+              "label": "其中：土地使用权",
               "row_type": "data"
             },
             {
-              "label": "土地使用权",
+              "label": "住房使用权",
               "row_type": "data"
             },
             {
@@ -11965,19 +11969,23 @@
               "row_type": "data"
             },
             {
-              "label": "特许权",
+              "label": "特许经营权",
               "row_type": "data"
             },
             {
-              "label": "采矿权",
+              "label": "软件",
               "row_type": "data"
             },
             {
-              "label": "探矿权",
+              "label": "矿产权",
               "row_type": "data"
             },
             {
               "label": "数据资源",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -11990,11 +11998,11 @@
               "row_type": "total"
             },
             {
-              "label": "其中：软件",
+              "label": "其中：土地使用权",
               "row_type": "data"
             },
             {
-              "label": "土地使用权",
+              "label": "住房使用权",
               "row_type": "data"
             },
             {
@@ -12014,19 +12022,23 @@
               "row_type": "data"
             },
             {
-              "label": "特许权",
+              "label": "特许经营权",
               "row_type": "data"
             },
             {
-              "label": "采矿权",
+              "label": "软件",
               "row_type": "data"
             },
             {
-              "label": "探矿权",
+              "label": "矿产权",
               "row_type": "data"
             },
             {
               "label": "数据资源",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -12039,11 +12051,11 @@
               "row_type": "total"
             },
             {
-              "label": "其中：软件",
+              "label": "其中：土地使用权",
               "row_type": "data"
             },
             {
-              "label": "土地使用权",
+              "label": "住房使用权",
               "row_type": "data"
             },
             {
@@ -12063,19 +12075,23 @@
               "row_type": "data"
             },
             {
-              "label": "特许权",
+              "label": "特许经营权",
               "row_type": "data"
             },
             {
-              "label": "采矿权",
+              "label": "软件",
               "row_type": "data"
             },
             {
-              "label": "探矿权",
+              "label": "矿产权",
               "row_type": "data"
             },
             {
               "label": "数据资源",
+              "row_type": "data"
+            },
+            {
+              "label": "其他",
               "row_type": "data"
             },
             {
@@ -12232,7 +12248,35 @@
               "row_type": "data"
             }
           ],
-          "guidance": "根据《企业数据资源相关会计处理暂行规定》（财会〔2023〕11号），列示确认为无形资产的数据资源的账面原值、累计摊销、减值准备及账面价值。"
+          "guidance": "根据《企业数据资源相关会计处理暂行规定》（财会〔2023〕11号），列示确认为无形资产的数据资源的账面原值、累计摊销、减值准备及账面价值。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "外购的数据资源无形资产",
+              "label": "外购的数据资源无形资产",
+              "format": "amount"
+            },
+            {
+              "key": "自行开发的数据资源无形资产",
+              "label": "自行开发的数据资源无形资产",
+              "format": "amount"
+            },
+            {
+              "key": "其他方式取得的数据资源无形资产",
+              "label": "其他方式取得的数据资源无形资产",
+              "format": "amount"
+            },
+            {
+              "key": "合计",
+              "label": "合计",
+              "format": "amount"
+            }
+          ]
         }
       ],
       "text_sections": [
@@ -12265,8 +12309,8 @@
       "sort_index": 26,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:08:41"
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-15 14:35:34"
     },
     {
       "section_number": "八、28",
@@ -13274,8 +13318,9 @@
           "guidance": "根据企业实际发生的其他非流动资产逐项列示。"
         },
         {
-          "name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
+          "name": "合同取得成本",
           "headers": [
+            "项  目",
             "[佣金支出]",
             "合计"
           ],
@@ -13295,6 +13340,25 @@
             {
               "label": "期末余额",
               "row_type": "data"
+            }
+          ],
+          "guidance": "披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。",
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cat_1",
+              "label": "[佣金支出]",
+              "format": "amount"
+            },
+            {
+              "key": "合计",
+              "label": "合计",
+              "format": "amount"
             }
           ]
         }
@@ -13318,7 +13382,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 13:57:14"
+      "_aligned_at": "2026-08-12 22:37:09"
     },
     {
       "section_number": "八、33",

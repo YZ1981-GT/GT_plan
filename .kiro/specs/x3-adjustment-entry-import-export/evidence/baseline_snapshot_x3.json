@@ -1,0 +1,5265 @@
+{
+  "_meta": {
+    "spec": "x3-adjustment-entry-import-export",
+    "task": "1.8",
+    "requirement": "1.1~1.7, 10.9, 11.3",
+    "written_at": "2026-08-13T13:39:27+08:00",
+    "generated_by": "backend/scripts/diagnose/snapshot_x3_baseline.py --snapshot",
+    "three_step_method": "当前态快照 → 施加改动 → 对照（R10.9；HEAD-swap 禁用）",
+    "read_only_boundary": {
+      "invoked_suffixes": [
+        "export-template",
+        "export-data"
+      ],
+      "never_invoked": [
+        "import-data"
+      ],
+      "wp_templates_touched": false
+    }
+  },
+  "selfchecks": {
+    "head_swap": {
+      "target": "backend/scripts/diagnose/snapshot_x3_baseline.py",
+      "forbidden_verbs": [
+        "stash",
+        "checkout",
+        "reset"
+      ],
+      "criteria": [
+        "ast_call_arg",
+        "code_line"
+      ],
+      "violations": [],
+      "controls": {
+        "POS-subprocess-list": {
+          "expected_criteria": [
+            "ast_call_arg",
+            "code_line"
+          ],
+          "observed_criteria": [
+            "ast_call_arg",
+            "code_line"
+          ],
+          "verdict": "PASS"
+        },
+        "POS-os-system-string": {
+          "expected_criteria": [
+            "ast_call_arg",
+            "code_line"
+          ],
+          "observed_criteria": [
+            "ast_call_arg",
+            "code_line"
+          ],
+          "verdict": "PASS"
+        },
+        "POS-assign-then-call": {
+          "expected_criteria": [
+            "code_line"
+          ],
+          "observed_criteria": [
+            "code_line"
+          ],
+          "verdict": "PASS"
+        },
+        "NEG-comment": {
+          "expected_criteria": [],
+          "observed_criteria": [],
+          "verdict": "PASS"
+        },
+        "NEG-docstring-single-line": {
+          "expected_criteria": [],
+          "observed_criteria": [],
+          "verdict": "PASS"
+        },
+        "NEG-docstring-multi-line": {
+          "expected_criteria": [],
+          "observed_criteria": [],
+          "verdict": "PASS"
+        },
+        "NEG-backticked-literal": {
+          "expected_criteria": [],
+          "observed_criteria": [],
+          "verdict": "PASS"
+        }
+      },
+      "verdict": "CLEAN"
+    },
+    "volatile_zip_members": {
+      "declared_volatile": [
+        "docProps/core.xml"
+      ],
+      "observed_differing_members": [
+        "docProps/core.xml"
+      ],
+      "raw_bytes_equal": false,
+      "stable_digest_equal": true,
+      "inconclusive": false,
+      "note": "同秒内建两次会字节相同 ⇒ 该轮无法证伪易变名单，但 stable_digest 仍须相等"
+    }
+  },
+  "work_surface": {
+    "target_sheets": [
+      "L2-3",
+      "L6-3",
+      "M1-3",
+      "M2-3",
+      "M3-3",
+      "M4-3",
+      "M5-3",
+      "M6-3",
+      "M7-3",
+      "M8-3",
+      "M9-3",
+      "M10-3",
+      "N1-3",
+      "N2-3",
+      "N3-3",
+      "N5-3"
+    ],
+    "long_prefixes": [
+      "l2-interest-payable",
+      "l6-special-payables",
+      "m1-dividends-payable",
+      "m2-paid-in-capital",
+      "m3-treasury-stock",
+      "m4-capital-reserve",
+      "m5-surplus-reserve",
+      "m6-retained-earnings",
+      "m7-special-reserve",
+      "m8-general-risk-reserve",
+      "m9-other-comprehensive-income",
+      "m10-other-equity-instruments",
+      "n1-deferred-tax-assets",
+      "n2-taxes-payable",
+      "n3-deferred-tax-liabilities",
+      "n5-income-tax-expense"
+    ],
+    "short_by_long": {
+      "l2-interest-payable": "l2",
+      "l6-special-payables": "l6",
+      "m1-dividends-payable": "m1",
+      "m2-paid-in-capital": "m2",
+      "m3-treasury-stock": "m3",
+      "m4-capital-reserve": "m4",
+      "m5-surplus-reserve": "m5",
+      "m6-retained-earnings": "m6",
+      "m7-special-reserve": "m7",
+      "m8-general-risk-reserve": "m8",
+      "m9-other-comprehensive-income": "m9",
+      "m10-other-equity-instruments": "m10",
+      "n1-deferred-tax-assets": "n1",
+      "n2-taxes-payable": "n2",
+      "n3-deferred-tax-liabilities": "n3",
+      "n5-income-tax-expense": "n5"
+    },
+    "code_by_long": {
+      "l2-interest-payable": "L2-3",
+      "l6-special-payables": "L6-3",
+      "m1-dividends-payable": "M1-3",
+      "m2-paid-in-capital": "M2-3",
+      "m3-treasury-stock": "M3-3",
+      "m4-capital-reserve": "M4-3",
+      "m5-surplus-reserve": "M5-3",
+      "m6-retained-earnings": "M6-3",
+      "m7-special-reserve": "M7-3",
+      "m8-general-risk-reserve": "M8-3",
+      "m9-other-comprehensive-income": "M9-3",
+      "m10-other-equity-instruments": "M10-3",
+      "n1-deferred-tax-assets": "N1-3",
+      "n2-taxes-payable": "N2-3",
+      "n3-deferred-tax-liabilities": "N3-3",
+      "n5-income-tax-expense": "N5-3"
+    },
+    "long_by_short": {
+      "l2": "l2-interest-payable",
+      "l6": "l6-special-payables",
+      "m1": "m1-dividends-payable",
+      "m2": "m2-paid-in-capital",
+      "m3": "m3-treasury-stock",
+      "m4": "m4-capital-reserve",
+      "m5": "m5-surplus-reserve",
+      "m6": "m6-retained-earnings",
+      "m7": "m7-special-reserve",
+      "m8": "m8-general-risk-reserve",
+      "m9": "m9-other-comprehensive-income",
+      "m10": "m10-other-equity-instruments",
+      "n1": "n1-deferred-tax-assets",
+      "n2": "n2-taxes-payable",
+      "n3": "n3-deferred-tax-liabilities",
+      "n5": "n5-income-tax-expense"
+    },
+    "code_by_short": {
+      "l2": "L2-3",
+      "l6": "L6-3",
+      "m1": "M1-3",
+      "m2": "M2-3",
+      "m3": "M3-3",
+      "m4": "M4-3",
+      "m5": "M5-3",
+      "m6": "M6-3",
+      "m7": "M7-3",
+      "m8": "M8-3",
+      "m9": "M9-3",
+      "m10": "M10-3",
+      "n1": "N1-3",
+      "n2": "N2-3",
+      "n3": "N3-3",
+      "n5": "N5-3"
+    },
+    "parent_wp_codes": [
+      "L2",
+      "L6",
+      "M1",
+      "M10",
+      "M2",
+      "M3",
+      "M4",
+      "M5",
+      "M6",
+      "M7",
+      "M8",
+      "M9",
+      "N1",
+      "N2",
+      "N3",
+      "N5"
+    ]
+  },
+  "factory_modules": {
+    "l2": {
+      "adapter_value": "_l2_import_export",
+      "target_module": "app.routers.wp_render_strategies._l2_import_export",
+      "declared_sheets": [
+        "L2-2",
+        "L2-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "l6": {
+      "adapter_value": "_l6_import_export",
+      "target_module": "app.routers.wp_render_strategies._l6_import_export",
+      "declared_sheets": [
+        "L6-2",
+        "L6-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m1": {
+      "adapter_value": "_m1_import_export",
+      "target_module": "app.routers.wp_render_strategies._m1_import_export",
+      "declared_sheets": [
+        "M1-2",
+        "M1-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m2": {
+      "adapter_value": "_m2_import_export",
+      "target_module": "app.routers.wp_render_strategies._m2_import_export",
+      "declared_sheets": [
+        "M2-2",
+        "M2-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m3": {
+      "adapter_value": "_m3_import_export",
+      "target_module": "app.routers.wp_render_strategies._m3_import_export",
+      "declared_sheets": [
+        "M3-2",
+        "M3-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m4": {
+      "adapter_value": "_m4_import_export",
+      "target_module": "app.routers.wp_render_strategies._m4_import_export",
+      "declared_sheets": [
+        "M4-2",
+        "M4-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m5": {
+      "adapter_value": "_m5_import_export",
+      "target_module": "app.routers.wp_render_strategies._m5_import_export",
+      "declared_sheets": [
+        "M5-2",
+        "M5-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m6": {
+      "adapter_value": "_m6_import_export",
+      "target_module": "app.routers.wp_render_strategies._m6_import_export",
+      "declared_sheets": [
+        "M6-2",
+        "M6-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m7": {
+      "adapter_value": "_m7_import_export",
+      "target_module": "app.routers.wp_render_strategies._m7_import_export",
+      "declared_sheets": [
+        "M7-2",
+        "M7-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m8": {
+      "adapter_value": "_m8_import_export",
+      "target_module": "app.routers.wp_render_strategies._m8_import_export",
+      "declared_sheets": [
+        "M8-2",
+        "M8-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m9": {
+      "adapter_value": "_m9_import_export",
+      "target_module": "app.routers.wp_render_strategies._m9_import_export",
+      "declared_sheets": [
+        "M9-2",
+        "M9-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "m10": {
+      "adapter_value": "_m10_import_export",
+      "target_module": "app.routers.wp_render_strategies._m10_import_export",
+      "declared_sheets": [
+        "M10-2",
+        "M10-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "n1": {
+      "adapter_value": "_n1_import_export",
+      "target_module": "app.routers.wp_render_strategies._n1_import_export",
+      "declared_sheets": [
+        "N1-2",
+        "N1-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "n2": {
+      "adapter_value": "_n2_import_export",
+      "target_module": "app.routers.wp_render_strategies._n2_import_export",
+      "declared_sheets": [
+        "N2-2",
+        "N2-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "n3": {
+      "adapter_value": "_n3_import_export",
+      "target_module": "app.routers.wp_render_strategies._n3_import_export",
+      "declared_sheets": [
+        "N3-2",
+        "N3-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    },
+    "n5": {
+      "adapter_value": "_n5_import_export",
+      "target_module": "app.routers.wp_render_strategies._n5_import_export",
+      "declared_sheets": [
+        "N5-2",
+        "N5-3"
+      ],
+      "spec_attr": "_SPECS",
+      "three_state_resolved": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "error": null,
+      "ie_sheets_declared": null
+    }
+  },
+  "shape_b_endpoints": {
+    "l2-interest-payable": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.l2_interest_payable",
+        "export-data": "app.routers.l2_interest_payable",
+        "import-data": "app.routers.l2_interest_payable"
+      },
+      "accepts_sheet": {
+        "export-template": false,
+        "export-data": false,
+        "import-data": false
+      },
+      "sheet_default": {},
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "l6-special-payables": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.l6_special_payables",
+        "export-data": "app.routers.l6_special_payables",
+        "import-data": "app.routers.l6_special_payables"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m1-dividends-payable": {
+      "methods": {
+        "export-template": [
+          "POST"
+        ],
+        "export-data": [
+          "POST"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m1_dividends_payable",
+        "export-data": "app.routers.m1_dividends_payable",
+        "import-data": "app.routers.m1_dividends_payable"
+      },
+      "accepts_sheet": {
+        "export-template": false,
+        "export-data": false,
+        "import-data": false
+      },
+      "sheet_default": {},
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m2-paid-in-capital": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m2_paid_in_capital",
+        "export-data": "app.routers.m2_paid_in_capital",
+        "import-data": "app.routers.m2_paid_in_capital"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m3-treasury-stock": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m3_treasury_stock",
+        "export-data": "app.routers.m3_treasury_stock",
+        "import-data": "app.routers.m3_treasury_stock"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m4-capital-reserve": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m4_capital_reserve",
+        "export-data": "app.routers.m4_capital_reserve",
+        "import-data": "app.routers.m4_capital_reserve"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m5-surplus-reserve": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m5_surplus_reserve",
+        "export-data": "app.routers.m5_surplus_reserve",
+        "import-data": "app.routers.m5_surplus_reserve"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m6-retained-earnings": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m6_retained_earnings",
+        "export-data": "app.routers.m6_retained_earnings",
+        "import-data": "app.routers.m6_retained_earnings"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m7-special-reserve": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m7_special_reserve",
+        "export-data": "app.routers.m7_special_reserve",
+        "import-data": "app.routers.m7_special_reserve"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m8-general-risk-reserve": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m8_general_risk_reserve",
+        "export-data": "app.routers.m8_general_risk_reserve",
+        "import-data": "app.routers.m8_general_risk_reserve"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m9-other-comprehensive-income": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m9_other_comprehensive_income",
+        "export-data": "app.routers.m9_other_comprehensive_income",
+        "import-data": "app.routers.m9_other_comprehensive_income"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "m10-other-equity-instruments": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.m10_other_equity_instruments",
+        "export-data": "app.routers.m10_other_equity_instruments",
+        "import-data": "app.routers.m10_other_equity_instruments"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "n1-deferred-tax-assets": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.n1_deferred_tax_assets",
+        "export-data": "app.routers.n1_deferred_tax_assets",
+        "import-data": "app.routers.n1_deferred_tax_assets"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": "N1-2",
+        "export-data": "N1-2",
+        "import-data": "N1-2"
+      },
+      "sheet_candidates": [
+        "N1-2",
+        "N1-4",
+        "N1-5"
+      ],
+      "candidate_provenance": {
+        "query_default": [
+          "N1-2",
+          "N1-2",
+          "N1-2"
+        ],
+        "query_description": [
+          "Sheet编码: N1-2 / N1-4 / N1-5",
+          "Sheet编码: N1-2 / N1-4 / N1-5",
+          "Sheet编码: N1-2 / N1-4 / N1-5"
+        ]
+      }
+    },
+    "n2-taxes-payable": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.n2_taxes_payable",
+        "export-data": "app.routers.n2_taxes_payable",
+        "import-data": "app.routers.n2_taxes_payable"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": null,
+        "export-data": null,
+        "import-data": null
+      },
+      "sheet_candidates": [],
+      "candidate_provenance": {}
+    },
+    "n3-deferred-tax-liabilities": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.n3_deferred_tax_liabilities",
+        "export-data": "app.routers.n3_deferred_tax_liabilities",
+        "import-data": "app.routers.n3_deferred_tax_liabilities"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": "N3-2",
+        "export-data": "N3-2",
+        "import-data": "N3-2"
+      },
+      "sheet_candidates": [
+        "N3-2"
+      ],
+      "candidate_provenance": {
+        "query_default": [
+          "N3-2",
+          "N3-2",
+          "N3-2"
+        ],
+        "query_description": [
+          "Sheet编码: N3-2",
+          "Sheet编码: N3-2",
+          "Sheet编码: N3-2"
+        ]
+      }
+    },
+    "n5-income-tax-expense": {
+      "methods": {
+        "export-template": [
+          "GET"
+        ],
+        "export-data": [
+          "GET"
+        ],
+        "import-data": [
+          "POST"
+        ]
+      },
+      "host_modules": {
+        "export-template": "app.routers.n5_income_tax_expense",
+        "export-data": "app.routers.n5_income_tax_expense",
+        "import-data": "app.routers.n5_income_tax_expense"
+      },
+      "accepts_sheet": {
+        "export-template": true,
+        "export-data": true,
+        "import-data": true
+      },
+      "sheet_default": {
+        "export-template": "N5-5",
+        "export-data": "N5-5",
+        "import-data": "N5-5"
+      },
+      "sheet_candidates": [
+        "N5-2",
+        "N5-5"
+      ],
+      "candidate_provenance": {
+        "query_default": [
+          "N5-5",
+          "N5-5",
+          "N5-5"
+        ],
+        "query_description": [
+          "Sheet编码: N5-2 / N5-5",
+          "Sheet编码: N5-2 / N5-5",
+          "Sheet编码: N5-2 / N5-5"
+        ]
+      }
+    }
+  },
+  "snapshot_1_export_artifacts": {
+    "criterion": "stable_digest = 排除易变 zip 成员后的逐成员摘要（R1.6 的「逐字节不变」落到可复现的产物结构上；raw_sha 含时间戳，只作人工核）",
+    "allowed_suffixes": [
+      "export-template",
+      "export-data"
+    ],
+    "never_invoked": [
+      "import-data"
+    ],
+    "db": {
+      "available": true,
+      "filter": "working_paper.is_deleted = false JOIN wp_index ON wp_index.id = working_paper.wp_index_id",
+      "wp_ids": {
+        "L2": "4d118863-4e92-45c1-9ba5-8f9496f1e380",
+        "L6": "2f711d41-7374-463c-ac2c-87f21c60741e",
+        "M1": "175d60f9-831b-4a7f-b22f-f4fdd3c5e178",
+        "M10": "70283a2a-36ad-430d-b370-b2599f1294cc",
+        "M2": "0082542b-c625-45b9-af4c-01102e1f5688",
+        "M3": "0dbed17c-5de8-4577-aad4-ca0464f50ef5",
+        "M4": "12201a1d-f72b-41d3-beb2-bd0b9fd0827f",
+        "M5": "0834db5b-ffa2-4dcb-afbd-d84cfa273971",
+        "M6": "7966e387-8b3a-4060-9f1b-7709a1e9554b",
+        "M7": "30e1fef9-8689-49ea-8949-949520d80005",
+        "M8": "0a1ed638-b3ca-47d4-8b7d-801244f6686f",
+        "M9": "1a23bbd9-c76a-4465-b15f-965ee2fffd72",
+        "N1": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+        "N2": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
+        "N3": "3091add1-9539-4c58-a8fe-2331df37be93",
+        "N5": "5093cc2b-fcc3-4027-9815-2ac51902580b"
+      },
+      "counts": {
+        "L2": 5,
+        "L6": 4,
+        "M1": 5,
+        "M10": 5,
+        "M2": 4,
+        "M3": 4,
+        "M4": 4,
+        "M5": 4,
+        "M6": 4,
+        "M7": 4,
+        "M8": 4,
+        "M9": 4,
+        "N1": 5,
+        "N2": 5,
+        "N3": 4,
+        "N5": 4
+      },
+      "missing": [],
+      "error": null
+    },
+    "factory_adapter_path": {
+      "l2": {
+        "adapter_target_module": "app.routers.wp_render_strategies._l2_import_export",
+        "declared_sheets": [
+          "L2-2",
+          "L2-3"
+        ],
+        "wp_id": "4d118863-4e92-45c1-9ba5-8f9496f1e380",
+        "sheets": {
+          "L2-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5760,
+                "raw_sha": "74518ba564d6ce6d",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "fd01e9c1affbc579",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "00878097f6a95e71",
+                  "xl/worksheets/sheet1.xml": "d85011c3646a3339",
+                  "xl/worksheets/sheet2.xml": "d9fe5094e004e977"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5760,
+                "raw_sha": "74518ba564d6ce6d",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "fd01e9c1affbc579",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "00878097f6a95e71",
+                  "xl/worksheets/sheet1.xml": "d85011c3646a3339",
+                  "xl/worksheets/sheet2.xml": "d9fe5094e004e977"
+                }
+              }
+            }
+          },
+          "L2-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "5bb3423c0b80cffa",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "06bb7ce938a60319",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "cd3645fe9b5d0a96",
+                  "xl/worksheets/sheet1.xml": "4b576b6c70825216",
+                  "xl/worksheets/sheet2.xml": "917409a68a34cb20"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "5bb3423c0b80cffa",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "06bb7ce938a60319",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "cd3645fe9b5d0a96",
+                  "xl/worksheets/sheet1.xml": "4b576b6c70825216",
+                  "xl/worksheets/sheet2.xml": "917409a68a34cb20"
+                }
+              }
+            }
+          }
+        }
+      },
+      "l6": {
+        "adapter_target_module": "app.routers.wp_render_strategies._l6_import_export",
+        "declared_sheets": [
+          "L6-2",
+          "L6-3"
+        ],
+        "wp_id": "2f711d41-7374-463c-ac2c-87f21c60741e",
+        "sheets": {
+          "L6-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "964c6f08d78bf3c7",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "5fd3b62a95fcbf9d",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "496570fe01b89523",
+                  "xl/worksheets/sheet1.xml": "71e07f692c98897d",
+                  "xl/worksheets/sheet2.xml": "2a4ef2cb5be5fbeb"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "964c6f08d78bf3c7",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "5fd3b62a95fcbf9d",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "496570fe01b89523",
+                  "xl/worksheets/sheet1.xml": "71e07f692c98897d",
+                  "xl/worksheets/sheet2.xml": "2a4ef2cb5be5fbeb"
+                }
+              }
+            }
+          },
+          "L6-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "99d3d29300778cad",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "93bc17d80c763bf3",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "c48b5956be492446",
+                  "xl/worksheets/sheet1.xml": "f46a28a13760460f",
+                  "xl/worksheets/sheet2.xml": "6c53e18c7563db3d"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "99d3d29300778cad",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "93bc17d80c763bf3",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "c48b5956be492446",
+                  "xl/worksheets/sheet1.xml": "f46a28a13760460f",
+                  "xl/worksheets/sheet2.xml": "6c53e18c7563db3d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m1": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m1_import_export",
+        "declared_sheets": [
+          "M1-2",
+          "M1-3"
+        ],
+        "wp_id": "175d60f9-831b-4a7f-b22f-f4fdd3c5e178",
+        "sheets": {
+          "M1-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "cfb3e5091de99506",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2af511dbb463b163",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "673277edbf225f5c",
+                  "xl/worksheets/sheet1.xml": "eb7811962c7941f6",
+                  "xl/worksheets/sheet2.xml": "a603b03878e8d76c"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "cfb3e5091de99506",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2af511dbb463b163",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "673277edbf225f5c",
+                  "xl/worksheets/sheet1.xml": "eb7811962c7941f6",
+                  "xl/worksheets/sheet2.xml": "a603b03878e8d76c"
+                }
+              }
+            }
+          },
+          "M1-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "2b90ecfdcb1dd595",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2dc9b7180e8d0810",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "6ae46073410e6947",
+                  "xl/worksheets/sheet1.xml": "aabf626369415dd5",
+                  "xl/worksheets/sheet2.xml": "f6483592e0170e28"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "2b90ecfdcb1dd595",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2dc9b7180e8d0810",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "6ae46073410e6947",
+                  "xl/worksheets/sheet1.xml": "aabf626369415dd5",
+                  "xl/worksheets/sheet2.xml": "f6483592e0170e28"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m2": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m2_import_export",
+        "declared_sheets": [
+          "M2-2",
+          "M2-3"
+        ],
+        "wp_id": "0082542b-c625-45b9-af4c-01102e1f5688",
+        "sheets": {
+          "M2-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "376e6185f9556fa8",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "d4ae5b998096e17d",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "26b681d8361873d6",
+                  "xl/worksheets/sheet1.xml": "9b66f0b3d7ce376a",
+                  "xl/worksheets/sheet2.xml": "66b1bd143326fb77"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "376e6185f9556fa8",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "d4ae5b998096e17d",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "26b681d8361873d6",
+                  "xl/worksheets/sheet1.xml": "9b66f0b3d7ce376a",
+                  "xl/worksheets/sheet2.xml": "66b1bd143326fb77"
+                }
+              }
+            }
+          },
+          "M2-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "3a12fdec748a29fe",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "c3bc04245b437fbf",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "e1cf438e34aa5d97",
+                  "xl/worksheets/sheet1.xml": "0ca42d43e702cc4a",
+                  "xl/worksheets/sheet2.xml": "4803fdeb88ac4281"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "3a12fdec748a29fe",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "c3bc04245b437fbf",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "e1cf438e34aa5d97",
+                  "xl/worksheets/sheet1.xml": "0ca42d43e702cc4a",
+                  "xl/worksheets/sheet2.xml": "4803fdeb88ac4281"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m3": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m3_import_export",
+        "declared_sheets": [
+          "M3-2",
+          "M3-3"
+        ],
+        "wp_id": "0dbed17c-5de8-4577-aad4-ca0464f50ef5",
+        "sheets": {
+          "M3-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "526c8eafcf539500",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "7c9018d5c5ef5070",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "7b640609b2ddfde0",
+                  "xl/worksheets/sheet1.xml": "a7eed51210c9a1b5",
+                  "xl/worksheets/sheet2.xml": "6f918334e1d07743"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "526c8eafcf539500",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "7c9018d5c5ef5070",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "7b640609b2ddfde0",
+                  "xl/worksheets/sheet1.xml": "a7eed51210c9a1b5",
+                  "xl/worksheets/sheet2.xml": "6f918334e1d07743"
+                }
+              }
+            }
+          },
+          "M3-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "0e445335f88a230f",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "b87ea04472c38164",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "a17d770d4c06587a",
+                  "xl/worksheets/sheet1.xml": "7138f178c72728f8",
+                  "xl/worksheets/sheet2.xml": "c3599b3bb55d92fe"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "0e445335f88a230f",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "b87ea04472c38164",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "a17d770d4c06587a",
+                  "xl/worksheets/sheet1.xml": "7138f178c72728f8",
+                  "xl/worksheets/sheet2.xml": "c3599b3bb55d92fe"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m4": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m4_import_export",
+        "declared_sheets": [
+          "M4-2",
+          "M4-3"
+        ],
+        "wp_id": "12201a1d-f72b-41d3-beb2-bd0b9fd0827f",
+        "sheets": {
+          "M4-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "b035ac7c4197ee61",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "8debd257260558b6",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "446e25092080a2fe",
+                  "xl/worksheets/sheet1.xml": "0a560e6c742841b6",
+                  "xl/worksheets/sheet2.xml": "9ec6b3310f8856c9"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "b035ac7c4197ee61",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "8debd257260558b6",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "446e25092080a2fe",
+                  "xl/worksheets/sheet1.xml": "0a560e6c742841b6",
+                  "xl/worksheets/sheet2.xml": "9ec6b3310f8856c9"
+                }
+              }
+            }
+          },
+          "M4-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "831f33be8038c6c5",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2f8a39d93a5d1d1d",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "48ca4865c95df379",
+                  "xl/worksheets/sheet1.xml": "b2be1a2112e070a4",
+                  "xl/worksheets/sheet2.xml": "2ac9493acac4d0fa"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "831f33be8038c6c5",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2f8a39d93a5d1d1d",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "48ca4865c95df379",
+                  "xl/worksheets/sheet1.xml": "b2be1a2112e070a4",
+                  "xl/worksheets/sheet2.xml": "2ac9493acac4d0fa"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m5": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m5_import_export",
+        "declared_sheets": [
+          "M5-2",
+          "M5-3"
+        ],
+        "wp_id": "0834db5b-ffa2-4dcb-afbd-d84cfa273971",
+        "sheets": {
+          "M5-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "ccf86225d4c3788a",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2c54a9b0e54c712f",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "af6efd0a11bf57ad",
+                  "xl/worksheets/sheet1.xml": "5e12c28d34ac3123",
+                  "xl/worksheets/sheet2.xml": "63ef870e156bc8b7"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "ccf86225d4c3788a",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "2c54a9b0e54c712f",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "af6efd0a11bf57ad",
+                  "xl/worksheets/sheet1.xml": "5e12c28d34ac3123",
+                  "xl/worksheets/sheet2.xml": "63ef870e156bc8b7"
+                }
+              }
+            }
+          },
+          "M5-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "08a897ee3bdd15c0",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "6840e819213054c7",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "b6567d3aa5554444",
+                  "xl/worksheets/sheet1.xml": "daffec9d13f1ee32",
+                  "xl/worksheets/sheet2.xml": "70c219c828b7738d"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "08a897ee3bdd15c0",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "6840e819213054c7",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "b6567d3aa5554444",
+                  "xl/worksheets/sheet1.xml": "daffec9d13f1ee32",
+                  "xl/worksheets/sheet2.xml": "70c219c828b7738d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m6": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m6_import_export",
+        "declared_sheets": [
+          "M6-2",
+          "M6-3"
+        ],
+        "wp_id": "7966e387-8b3a-4060-9f1b-7709a1e9554b",
+        "sheets": {
+          "M6-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "b160a65f0514c275",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "228a53845a3ed756",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "eb550f40983b94d2",
+                  "xl/worksheets/sheet1.xml": "0442044781acb79e",
+                  "xl/worksheets/sheet2.xml": "ed3cab9a496e1fe7"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "b160a65f0514c275",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "228a53845a3ed756",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "eb550f40983b94d2",
+                  "xl/worksheets/sheet1.xml": "0442044781acb79e",
+                  "xl/worksheets/sheet2.xml": "ed3cab9a496e1fe7"
+                }
+              }
+            }
+          },
+          "M6-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "51e08de5448d4dd6",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "a36f51f87e2cfd9f",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "3b5ea8b9dacc4818",
+                  "xl/worksheets/sheet1.xml": "f6bddf700b22da57",
+                  "xl/worksheets/sheet2.xml": "7e3f2e30db92c1aa"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "51e08de5448d4dd6",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "a36f51f87e2cfd9f",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "3b5ea8b9dacc4818",
+                  "xl/worksheets/sheet1.xml": "f6bddf700b22da57",
+                  "xl/worksheets/sheet2.xml": "7e3f2e30db92c1aa"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m7": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m7_import_export",
+        "declared_sheets": [
+          "M7-2",
+          "M7-3"
+        ],
+        "wp_id": "30e1fef9-8689-49ea-8949-949520d80005",
+        "sheets": {
+          "M7-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "98c822827d32daa1",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "f17231cbce087cbf",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "961a00796ccda453",
+                  "xl/worksheets/sheet1.xml": "ad6ee9a07a412cfb",
+                  "xl/worksheets/sheet2.xml": "f37434ae4a6be8bd"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "98c822827d32daa1",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "f17231cbce087cbf",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "961a00796ccda453",
+                  "xl/worksheets/sheet1.xml": "ad6ee9a07a412cfb",
+                  "xl/worksheets/sheet2.xml": "f37434ae4a6be8bd"
+                }
+              }
+            }
+          },
+          "M7-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "feb619c6a9e566f4",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "8caa036184c53611",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "adccce32c09f3db2",
+                  "xl/worksheets/sheet1.xml": "55677d93884c597c",
+                  "xl/worksheets/sheet2.xml": "a0fe41c2c8c95361"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "feb619c6a9e566f4",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "8caa036184c53611",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "adccce32c09f3db2",
+                  "xl/worksheets/sheet1.xml": "55677d93884c597c",
+                  "xl/worksheets/sheet2.xml": "a0fe41c2c8c95361"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m8": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m8_import_export",
+        "declared_sheets": [
+          "M8-2",
+          "M8-3"
+        ],
+        "wp_id": "0a1ed638-b3ca-47d4-8b7d-801244f6686f",
+        "sheets": {
+          "M8-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "3cc7cb9a22b38c92",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "ebeac88b3c66f0f0",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "45e09df81bc561b5",
+                  "xl/worksheets/sheet1.xml": "ca2493145a6bcd7c",
+                  "xl/worksheets/sheet2.xml": "0e5317786414a1d8"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "3cc7cb9a22b38c92",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "ebeac88b3c66f0f0",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "45e09df81bc561b5",
+                  "xl/worksheets/sheet1.xml": "ca2493145a6bcd7c",
+                  "xl/worksheets/sheet2.xml": "0e5317786414a1d8"
+                }
+              }
+            }
+          },
+          "M8-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "a210cc8eb0789597",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "b8526ba4afb02832",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "42085a1a53c0812e",
+                  "xl/worksheets/sheet1.xml": "0e997c82c1db3317",
+                  "xl/worksheets/sheet2.xml": "1fc7cb624f1ef7c6"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "a210cc8eb0789597",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "b8526ba4afb02832",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "42085a1a53c0812e",
+                  "xl/worksheets/sheet1.xml": "0e997c82c1db3317",
+                  "xl/worksheets/sheet2.xml": "1fc7cb624f1ef7c6"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m9": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m9_import_export",
+        "declared_sheets": [
+          "M9-2",
+          "M9-3"
+        ],
+        "wp_id": "1a23bbd9-c76a-4465-b15f-965ee2fffd72",
+        "sheets": {
+          "M9-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "4d266b707f767421",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "442d6482c3ef275a",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "872f5c497fbd98e4",
+                  "xl/worksheets/sheet1.xml": "63a0a29fd6cd6679",
+                  "xl/worksheets/sheet2.xml": "4254e37ff1f9a0b6"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5762,
+                "raw_sha": "4d266b707f767421",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "442d6482c3ef275a",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "872f5c497fbd98e4",
+                  "xl/worksheets/sheet1.xml": "63a0a29fd6cd6679",
+                  "xl/worksheets/sheet2.xml": "4254e37ff1f9a0b6"
+                }
+              }
+            }
+          },
+          "M9-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "18f5d9a5acb7f1b1",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "8ff28c2662245e6e",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "52f2dea95aa3ea66",
+                  "xl/worksheets/sheet1.xml": "8862be8688360e15",
+                  "xl/worksheets/sheet2.xml": "f66a888659b89605"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5788,
+                "raw_sha": "18f5d9a5acb7f1b1",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "8ff28c2662245e6e",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "52f2dea95aa3ea66",
+                  "xl/worksheets/sheet1.xml": "8862be8688360e15",
+                  "xl/worksheets/sheet2.xml": "f66a888659b89605"
+                }
+              }
+            }
+          }
+        }
+      },
+      "m10": {
+        "adapter_target_module": "app.routers.wp_render_strategies._m10_import_export",
+        "declared_sheets": [
+          "M10-2",
+          "M10-3"
+        ],
+        "wp_id": "70283a2a-36ad-430d-b370-b2599f1294cc",
+        "sheets": {
+          "M10-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5764,
+                "raw_sha": "72441fa54689d208",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "a009da7aacf3437a",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fd36778f83e5fb33",
+                  "xl/worksheets/sheet1.xml": "9495751a369366b6",
+                  "xl/worksheets/sheet2.xml": "87df34cb4073df20"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5764,
+                "raw_sha": "72441fa54689d208",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "a009da7aacf3437a",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fd36778f83e5fb33",
+                  "xl/worksheets/sheet1.xml": "9495751a369366b6",
+                  "xl/worksheets/sheet2.xml": "87df34cb4073df20"
+                }
+              }
+            }
+          },
+          "M10-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5789,
+                "raw_sha": "6848c11bcc60a008",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "f7a8e24b83b3ff06",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "6b4354e6b8618cda",
+                  "xl/worksheets/sheet1.xml": "e07260d1f15f0d13",
+                  "xl/worksheets/sheet2.xml": "6fed2a1603650383"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5789,
+                "raw_sha": "6848c11bcc60a008",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "f7a8e24b83b3ff06",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "6b4354e6b8618cda",
+                  "xl/worksheets/sheet1.xml": "e07260d1f15f0d13",
+                  "xl/worksheets/sheet2.xml": "6fed2a1603650383"
+                }
+              }
+            }
+          }
+        }
+      },
+      "n1": {
+        "adapter_target_module": "app.routers.wp_render_strategies._n1_import_export",
+        "declared_sheets": [
+          "N1-2",
+          "N1-3"
+        ],
+        "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+        "sheets": {
+          "N1-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "952b586863d93662",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "c1618f30e221b7ea",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "9eb97d1bdab69c88",
+                  "xl/worksheets/sheet1.xml": "db061afbd75b1291",
+                  "xl/worksheets/sheet2.xml": "694e1c4d5eec6ccd"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "952b586863d93662",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "c1618f30e221b7ea",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "9eb97d1bdab69c88",
+                  "xl/worksheets/sheet1.xml": "db061afbd75b1291",
+                  "xl/worksheets/sheet2.xml": "694e1c4d5eec6ccd"
+                }
+              }
+            }
+          },
+          "N1-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "e73808064aa3d8fc",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "008a9f432f8205d1",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "db18d56db4fd10fe",
+                  "xl/worksheets/sheet1.xml": "1349146d7ff63c6d",
+                  "xl/worksheets/sheet2.xml": "59e75c687b170004"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "e73808064aa3d8fc",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "008a9f432f8205d1",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "db18d56db4fd10fe",
+                  "xl/worksheets/sheet1.xml": "1349146d7ff63c6d",
+                  "xl/worksheets/sheet2.xml": "59e75c687b170004"
+                }
+              }
+            }
+          }
+        }
+      },
+      "n2": {
+        "adapter_target_module": "app.routers.wp_render_strategies._n2_import_export",
+        "declared_sheets": [
+          "N2-2",
+          "N2-3"
+        ],
+        "wp_id": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
+        "sheets": {
+          "N2-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "1e0a5c0b6b39f4b6",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "0f046cadb027a62b",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fb03bca0e53c163c",
+                  "xl/worksheets/sheet1.xml": "5aeb0b1a9a5df32f",
+                  "xl/worksheets/sheet2.xml": "1f6d35505a8f3243"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "1e0a5c0b6b39f4b6",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "0f046cadb027a62b",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fb03bca0e53c163c",
+                  "xl/worksheets/sheet1.xml": "5aeb0b1a9a5df32f",
+                  "xl/worksheets/sheet2.xml": "1f6d35505a8f3243"
+                }
+              }
+            }
+          },
+          "N2-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "299a3d1e022c6b36",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "a0679fb515673f4b",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "d8e21f77900c458f",
+                  "xl/worksheets/sheet1.xml": "3a0e7a27c883a1fd",
+                  "xl/worksheets/sheet2.xml": "89da60719ae2a40d"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "299a3d1e022c6b36",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "a0679fb515673f4b",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "d8e21f77900c458f",
+                  "xl/worksheets/sheet1.xml": "3a0e7a27c883a1fd",
+                  "xl/worksheets/sheet2.xml": "89da60719ae2a40d"
+                }
+              }
+            }
+          }
+        }
+      },
+      "n3": {
+        "adapter_target_module": "app.routers.wp_render_strategies._n3_import_export",
+        "declared_sheets": [
+          "N3-2",
+          "N3-3"
+        ],
+        "wp_id": "3091add1-9539-4c58-a8fe-2331df37be93",
+        "sheets": {
+          "N3-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "1b822b8fa98693db",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "e8edc700c66fad30",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fd95c2a00cc8fec3",
+                  "xl/worksheets/sheet1.xml": "72b9bca8d1ae1416",
+                  "xl/worksheets/sheet2.xml": "947bd4302331e97a"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "1b822b8fa98693db",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "e8edc700c66fad30",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fd95c2a00cc8fec3",
+                  "xl/worksheets/sheet1.xml": "72b9bca8d1ae1416",
+                  "xl/worksheets/sheet2.xml": "947bd4302331e97a"
+                }
+              }
+            }
+          },
+          "N3-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "024fede9071b24cb",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "5c086384e50186cd",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "1e779771c1e33a97",
+                  "xl/worksheets/sheet1.xml": "32bcacbb74aa3472",
+                  "xl/worksheets/sheet2.xml": "54ef99134be517d8"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "024fede9071b24cb",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "5c086384e50186cd",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "1e779771c1e33a97",
+                  "xl/worksheets/sheet1.xml": "32bcacbb74aa3472",
+                  "xl/worksheets/sheet2.xml": "54ef99134be517d8"
+                }
+              }
+            }
+          }
+        }
+      },
+      "n5": {
+        "adapter_target_module": "app.routers.wp_render_strategies._n5_import_export",
+        "declared_sheets": [
+          "N5-2",
+          "N5-3"
+        ],
+        "wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+        "sheets": {
+          "N5-2": {
+            "is_x3_work_surface": false,
+            "zero_regression_scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "010b7ed2cd684818",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "0fbb39ca6232b4bd",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "ca3ac151eb4111a2",
+                  "xl/worksheets/sheet1.xml": "bba31751149e2028",
+                  "xl/worksheets/sheet2.xml": "eabead70ab56695b"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5761,
+                "raw_sha": "010b7ed2cd684818",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "0fbb39ca6232b4bd",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "ca3ac151eb4111a2",
+                  "xl/worksheets/sheet1.xml": "bba31751149e2028",
+                  "xl/worksheets/sheet2.xml": "eabead70ab56695b"
+                }
+              }
+            }
+          },
+          "N5-3": {
+            "is_x3_work_surface": true,
+            "zero_regression_scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+            "actions": {
+              "export-template": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "95bea077c413355d",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "82c539546dddcbcf",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "4210e23721ddf751",
+                  "xl/worksheets/sheet1.xml": "723f51965417a534",
+                  "xl/worksheets/sheet2.xml": "58da43f5dd07f417"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "export-data": {
+                "ok": true,
+                "bytes": 5787,
+                "raw_sha": "95bea077c413355d",
+                "is_zip": true,
+                "member_count": 10,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "82c539546dddcbcf",
+                "members": {
+                  "[Content_Types].xml": "31376d16cf444bfe",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "d3b58263f0f6fe71",
+                  "xl/styles.xml": "ac76fcd77395cfe0",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "4210e23721ddf751",
+                  "xl/worksheets/sheet1.xml": "723f51965417a534",
+                  "xl/worksheets/sheet2.xml": "58da43f5dd07f417"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "shape_b_host_path": {
+      "l2-interest-payable": {
+        "short_prefix": "l2",
+        "wp_id": "4d118863-4e92-45c1-9ba5-8f9496f1e380",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.l2_interest_payable",
+          "export-data": "app.routers.l2_interest_payable",
+          "import-data": "app.routers.l2_interest_payable"
+        },
+        "accepts_sheet": {
+          "export-template": false,
+          "export-data": false,
+          "import-data": false
+        },
+        "sheet_default": {},
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "<handler-default>": {
+                "ok": true,
+                "sheet_arg": null,
+                "bytes": 5247,
+                "raw_sha": "2e74dd483dfc76ac",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "3226c3a018e0ec64",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fbb57ca3d7224ad2",
+                  "xl/worksheets/sheet1.xml": "b861c85845c5f9a4"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "<handler-default>": {
+                "ok": true,
+                "sheet_arg": null,
+                "bytes": 5247,
+                "raw_sha": "9f56fa274ae3d5bc",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "3226c3a018e0ec64",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "fbb57ca3d7224ad2",
+                  "xl/worksheets/sheet1.xml": "b861c85845c5f9a4"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "L2-2"
+        ]
+      },
+      "l6-special-payables": {
+        "short_prefix": "l6",
+        "wp_id": "2f711d41-7374-463c-ac2c-87f21c60741e",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.l6_special_payables",
+          "export-data": "app.routers.l6_special_payables",
+          "import-data": "app.routers.l6_special_payables"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "L6-2": {
+                "ok": true,
+                "sheet_arg": "L6-2",
+                "bytes": 5502,
+                "raw_sha": "a5bf7c96ce78c799",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "aa4f801bae4fc05f",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "a614c89bba82c638",
+                  "xl/worksheets/sheet1.xml": "a150802ae79b3abd"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "L6-2": {
+                "ok": true,
+                "sheet_arg": "L6-2",
+                "bytes": 5502,
+                "raw_sha": "a5bf7c96ce78c799",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "aa4f801bae4fc05f",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "a614c89bba82c638",
+                  "xl/worksheets/sheet1.xml": "a150802ae79b3abd"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "L6-2"
+        ]
+      },
+      "m1-dividends-payable": {
+        "short_prefix": "m1",
+        "wp_id": "175d60f9-831b-4a7f-b22f-f4fdd3c5e178",
+        "methods": {
+          "export-template": [
+            "POST"
+          ],
+          "export-data": [
+            "POST"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m1_dividends_payable",
+          "export-data": "app.routers.m1_dividends_payable",
+          "import-data": "app.routers.m1_dividends_payable"
+        },
+        "accepts_sheet": {
+          "export-template": false,
+          "export-data": false,
+          "import-data": false
+        },
+        "sheet_default": {},
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "<handler-default>": {
+                "ok": true,
+                "sheet_arg": null,
+                "bytes": 6237,
+                "raw_sha": "31e035a369c37700",
+                "is_zip": true,
+                "member_count": 11,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "e6960540b97846a0",
+                "members": {
+                  "[Content_Types].xml": "7f494ffef7f8763d",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "9f80b92319d8b9c2",
+                  "xl/styles.xml": "ceabc26839ae8c52",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "999bb974c6f52be5",
+                  "xl/worksheets/sheet1.xml": "06db7808c967e3ca",
+                  "xl/worksheets/sheet2.xml": "f41ced0e47e56e77",
+                  "xl/worksheets/sheet3.xml": "7dbaa55a22533091"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "<handler-default>": {
+                "ok": false,
+                "sheet_arg": null,
+                "error_class": "ProgrammingError",
+                "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE wp_id ="
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M1-2"
+        ]
+      },
+      "m2-paid-in-capital": {
+        "short_prefix": "m2",
+        "wp_id": "0082542b-c625-45b9-af4c-01102e1f5688",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m2_paid_in_capital",
+          "export-data": "app.routers.m2_paid_in_capital",
+          "import-data": "app.routers.m2_paid_in_capital"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M2-2": {
+                "ok": true,
+                "sheet_arg": "M2-2",
+                "bytes": 6282,
+                "raw_sha": "bec5d5592abb9994",
+                "is_zip": true,
+                "member_count": 11,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "bda016624283dbeb",
+                "members": {
+                  "[Content_Types].xml": "7f494ffef7f8763d",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "9f80b92319d8b9c2",
+                  "xl/styles.xml": "ceabc26839ae8c52",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "9a8744b7ba344f71",
+                  "xl/worksheets/sheet1.xml": "7e5837b88ec71212",
+                  "xl/worksheets/sheet2.xml": "6f1792beec3e82eb",
+                  "xl/worksheets/sheet3.xml": "778554c5abb4ca45"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M2-2": {
+                "ok": false,
+                "sheet_arg": "M2-2",
+                "error_class": "ProgrammingError",
+                "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n                SELECT item_id, value\n                FROM checklist_responses\n                W"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M2-2"
+        ]
+      },
+      "m3-treasury-stock": {
+        "short_prefix": "m3",
+        "wp_id": "0dbed17c-5de8-4577-aad4-ca0464f50ef5",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m3_treasury_stock",
+          "export-data": "app.routers.m3_treasury_stock",
+          "import-data": "app.routers.m3_treasury_stock"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M3-2": {
+                "ok": true,
+                "sheet_arg": "M3-2",
+                "bytes": 5348,
+                "raw_sha": "2e15bedacb5d6038",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "df6aaa6454cd34f7",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "799f2e8bee5ab4c2",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "bd69fcfb9e313ec5",
+                  "xl/worksheets/sheet1.xml": "16c3c0404b4ae193"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M3-2": {
+                "ok": true,
+                "sheet_arg": "M3-2",
+                "bytes": 5348,
+                "raw_sha": "2e15bedacb5d6038",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "df6aaa6454cd34f7",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "799f2e8bee5ab4c2",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "bd69fcfb9e313ec5",
+                  "xl/worksheets/sheet1.xml": "16c3c0404b4ae193"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M3-2"
+        ]
+      },
+      "m4-capital-reserve": {
+        "short_prefix": "m4",
+        "wp_id": "12201a1d-f72b-41d3-beb2-bd0b9fd0827f",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m4_capital_reserve",
+          "export-data": "app.routers.m4_capital_reserve",
+          "import-data": "app.routers.m4_capital_reserve"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M4-2": {
+                "ok": true,
+                "sheet_arg": "M4-2",
+                "bytes": 5280,
+                "raw_sha": "bef2d1bef44020f7",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "01c8cdf387888826",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "799f2e8bee5ab4c2",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "b26201f136ce8e85",
+                  "xl/worksheets/sheet1.xml": "c3572d41a46dfbc3"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M4-2": {
+                "ok": false,
+                "sheet_arg": "M4-2",
+                "error_class": "ProgrammingError",
+                "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M4-2"
+        ]
+      },
+      "m5-surplus-reserve": {
+        "short_prefix": "m5",
+        "wp_id": "0834db5b-ffa2-4dcb-afbd-d84cfa273971",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m5_surplus_reserve",
+          "export-data": "app.routers.m5_surplus_reserve",
+          "import-data": "app.routers.m5_surplus_reserve"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M5-2": {
+                "ok": true,
+                "sheet_arg": "M5-2",
+                "bytes": 5288,
+                "raw_sha": "26fe3a982c6f440b",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "eff35ae911a02c3e",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "799f2e8bee5ab4c2",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "15b438f956d829f1",
+                  "xl/worksheets/sheet1.xml": "f21c23cdd730f5be"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M5-2": {
+                "ok": false,
+                "sheet_arg": "M5-2",
+                "error_class": "ProgrammingError",
+                "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M5-2"
+        ]
+      },
+      "m6-retained-earnings": {
+        "short_prefix": "m6",
+        "wp_id": "7966e387-8b3a-4060-9f1b-7709a1e9554b",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m6_retained_earnings",
+          "export-data": "app.routers.m6_retained_earnings",
+          "import-data": "app.routers.m6_retained_earnings"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M6-2": {
+                "ok": true,
+                "sheet_arg": "M6-2",
+                "bytes": 5190,
+                "raw_sha": "6f5267472b04cd3c",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "d64ff7f75681f8b8",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "ceabc26839ae8c52",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "62332f2984b46d88",
+                  "xl/worksheets/sheet1.xml": "81b8831a38550980"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M6-2": {
+                "ok": false,
+                "sheet_arg": "M6-2",
+                "error_class": "ProgrammingError",
+                "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE working"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M6-2"
+        ]
+      },
+      "m7-special-reserve": {
+        "short_prefix": "m7",
+        "wp_id": "30e1fef9-8689-49ea-8949-949520d80005",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m7_special_reserve",
+          "export-data": "app.routers.m7_special_reserve",
+          "import-data": "app.routers.m7_special_reserve"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M7-2": {
+                "ok": false,
+                "sheet_arg": "M7-2",
+                "error_class": "ModuleNotFoundError",
+                "error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'",
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M7-2": {
+                "ok": false,
+                "sheet_arg": "M7-2",
+                "error_class": "ModuleNotFoundError",
+                "error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M7-2"
+        ]
+      },
+      "m8-general-risk-reserve": {
+        "short_prefix": "m8",
+        "wp_id": "0a1ed638-b3ca-47d4-8b7d-801244f6686f",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m8_general_risk_reserve",
+          "export-data": "app.routers.m8_general_risk_reserve",
+          "import-data": "app.routers.m8_general_risk_reserve"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M8-2": {
+                "ok": true,
+                "sheet_arg": "M8-2",
+                "bytes": 5368,
+                "raw_sha": "25b8aedbeec71c9c",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "bde06a45ab93d864",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "799f2e8bee5ab4c2",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "2d0cd848af8357ee",
+                  "xl/worksheets/sheet1.xml": "e4600346995ce0e6"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M8-2": {
+                "ok": false,
+                "sheet_arg": "M8-2",
+                "error_class": "ImportError",
+                "error": "ImportError: cannot import name 'ChecklistResponse' from 'app.models.audit_platform_models' (D:\\GT_plan\\backend\\app\\models\\audit_platform_models.py)"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M8-2"
+        ]
+      },
+      "m9-other-comprehensive-income": {
+        "short_prefix": "m9",
+        "wp_id": "1a23bbd9-c76a-4465-b15f-965ee2fffd72",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m9_other_comprehensive_income",
+          "export-data": "app.routers.m9_other_comprehensive_income",
+          "import-data": "app.routers.m9_other_comprehensive_income"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M9-2": {
+                "ok": false,
+                "sheet_arg": "M9-2",
+                "error_class": "ModuleNotFoundError",
+                "error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'",
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M9-2": {
+                "ok": false,
+                "sheet_arg": "M9-2",
+                "error_class": "ModuleNotFoundError",
+                "error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M9-2"
+        ]
+      },
+      "m10-other-equity-instruments": {
+        "short_prefix": "m10",
+        "wp_id": "70283a2a-36ad-430d-b370-b2599f1294cc",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.m10_other_equity_instruments",
+          "export-data": "app.routers.m10_other_equity_instruments",
+          "import-data": "app.routers.m10_other_equity_instruments"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M10-2": {
+                "ok": true,
+                "sheet_arg": "M10-2",
+                "bytes": 5120,
+                "raw_sha": "905db2192c47ebe7",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "f77c718c54a5c5b3",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "ceabc26839ae8c52",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "aee68b533d163acb",
+                  "xl/worksheets/sheet1.xml": "9598a3fe521b703e"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "M10-2": {
+                "ok": false,
+                "sheet_arg": "M10-2",
+                "error_class": "ProgrammingError",
+                "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence FROM checklist_responses WHERE workpaper_id = $1 AND item"
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "M10-2"
+        ]
+      },
+      "n1-deferred-tax-assets": {
+        "short_prefix": "n1",
+        "wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.n1_deferred_tax_assets",
+          "export-data": "app.routers.n1_deferred_tax_assets",
+          "import-data": "app.routers.n1_deferred_tax_assets"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": "N1-2",
+          "export-data": "N1-2",
+          "import-data": "N1-2"
+        },
+        "candidate_provenance": {
+          "query_default": [
+            "N1-2",
+            "N1-2",
+            "N1-2"
+          ],
+          "query_description": [
+            "Sheet编码: N1-2 / N1-4 / N1-5",
+            "Sheet编码: N1-2 / N1-4 / N1-5",
+            "Sheet编码: N1-2 / N1-4 / N1-5"
+          ]
+        },
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N1-2": {
+                "ok": true,
+                "sheet_arg": "N1-2",
+                "bytes": 5319,
+                "raw_sha": "9e26ea6ef8bc0caa",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "20a36164326673be",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "247551b4c8fa4348",
+                  "xl/worksheets/sheet1.xml": "fc95bd371ac27cda"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "N1-4": {
+                "ok": true,
+                "sheet_arg": "N1-4",
+                "bytes": 5232,
+                "raw_sha": "8a873d8b41f659cb",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "29c12f027dfc53c8",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "b8cdfb0d9d546013",
+                  "xl/worksheets/sheet1.xml": "4c710cdfb55fa9ce"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "N1-5": {
+                "ok": true,
+                "sheet_arg": "N1-5",
+                "bytes": 5465,
+                "raw_sha": "0c2848bc92e6be6d",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "589211bc36721f31",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "ca159559b78a025a",
+                  "xl/worksheets/sheet1.xml": "0a38ed4588356ac1"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N1-2": {
+                "ok": true,
+                "sheet_arg": "N1-2",
+                "bytes": 5319,
+                "raw_sha": "9e26ea6ef8bc0caa",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "20a36164326673be",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "247551b4c8fa4348",
+                  "xl/worksheets/sheet1.xml": "fc95bd371ac27cda"
+                }
+              },
+              "N1-4": {
+                "ok": true,
+                "sheet_arg": "N1-4",
+                "bytes": 5232,
+                "raw_sha": "8a873d8b41f659cb",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "29c12f027dfc53c8",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "b8cdfb0d9d546013",
+                  "xl/worksheets/sheet1.xml": "4c710cdfb55fa9ce"
+                }
+              },
+              "N1-5": {
+                "ok": true,
+                "sheet_arg": "N1-5",
+                "bytes": 5465,
+                "raw_sha": "0c2848bc92e6be6d",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "589211bc36721f31",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "ca159559b78a025a",
+                  "xl/worksheets/sheet1.xml": "0a38ed4588356ac1"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "N1-2",
+          "N1-4",
+          "N1-5"
+        ]
+      },
+      "n2-taxes-payable": {
+        "short_prefix": "n2",
+        "wp_id": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.n2_taxes_payable",
+          "export-data": "app.routers.n2_taxes_payable",
+          "import-data": "app.routers.n2_taxes_payable"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        },
+        "candidate_provenance": {},
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N2-2": {
+                "ok": true,
+                "sheet_arg": "N2-2",
+                "bytes": 5499,
+                "raw_sha": "8a2fc0c41d603b9b",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "b0fae5c7abe93548",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "8eb8c9e6560f6182",
+                  "xl/worksheets/sheet1.xml": "e019253adf53b777"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N2-2": {
+                "ok": true,
+                "sheet_arg": "N2-2",
+                "bytes": 5499,
+                "raw_sha": "8a2fc0c41d603b9b",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "b0fae5c7abe93548",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "8eb8c9e6560f6182",
+                  "xl/worksheets/sheet1.xml": "e019253adf53b777"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "N2-2"
+        ]
+      },
+      "n3-deferred-tax-liabilities": {
+        "short_prefix": "n3",
+        "wp_id": "3091add1-9539-4c58-a8fe-2331df37be93",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.n3_deferred_tax_liabilities",
+          "export-data": "app.routers.n3_deferred_tax_liabilities",
+          "import-data": "app.routers.n3_deferred_tax_liabilities"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": "N3-2",
+          "export-data": "N3-2",
+          "import-data": "N3-2"
+        },
+        "candidate_provenance": {
+          "query_default": [
+            "N3-2",
+            "N3-2",
+            "N3-2"
+          ],
+          "query_description": [
+            "Sheet编码: N3-2",
+            "Sheet编码: N3-2",
+            "Sheet编码: N3-2"
+          ]
+        },
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N3-2": {
+                "ok": true,
+                "sheet_arg": "N3-2",
+                "bytes": 5228,
+                "raw_sha": "cd9b6fcd9bca4e54",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "d5652bafebb9dbd5",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "ca33a95c34b19489",
+                  "xl/worksheets/sheet1.xml": "77c91b7d4692526d"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N3-2": {
+                "ok": true,
+                "sheet_arg": "N3-2",
+                "bytes": 5228,
+                "raw_sha": "cd9b6fcd9bca4e54",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "d5652bafebb9dbd5",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "ca33a95c34b19489",
+                  "xl/worksheets/sheet1.xml": "77c91b7d4692526d"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "N3-2"
+        ]
+      },
+      "n5-income-tax-expense": {
+        "short_prefix": "n5",
+        "wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+        "methods": {
+          "export-template": [
+            "GET"
+          ],
+          "export-data": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": {
+          "export-template": "app.routers.n5_income_tax_expense",
+          "export-data": "app.routers.n5_income_tax_expense",
+          "import-data": "app.routers.n5_income_tax_expense"
+        },
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": "N5-5",
+          "export-data": "N5-5",
+          "import-data": "N5-5"
+        },
+        "candidate_provenance": {
+          "query_default": [
+            "N5-5",
+            "N5-5",
+            "N5-5"
+          ],
+          "query_description": [
+            "Sheet编码: N5-2 / N5-5",
+            "Sheet编码: N5-2 / N5-5",
+            "Sheet编码: N5-2 / N5-5"
+          ]
+        },
+        "probed": {
+          "export-template": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N5-2": {
+                "ok": true,
+                "sheet_arg": "N5-2",
+                "bytes": 5214,
+                "raw_sha": "146c096d8e911400",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "9ebbb4c7ba2caa97",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "8edf60752a2445e6",
+                  "xl/worksheets/sheet1.xml": "f286898f4f6b9cf5"
+                },
+                "db_free_probe": "SentinelDB"
+              },
+              "N5-5": {
+                "ok": true,
+                "sheet_arg": "N5-5",
+                "bytes": 8109,
+                "raw_sha": "f7bd0ed5908f523f",
+                "is_zip": true,
+                "member_count": 13,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "3b61807a67741fab",
+                "members": {
+                  "[Content_Types].xml": "e675a1370995d883",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "fbd041d5f3aad81b",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "e0d81e9102c68721",
+                  "xl/worksheets/sheet1.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet2.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet3.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet4.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet5.xml": "397cfaa6d650ed56"
+                },
+                "db_free_probe": "SentinelDB"
+              }
+            }
+          },
+          "export-data": {
+            "zero_regression_scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+            "by_sheet": {
+              "N5-2": {
+                "ok": true,
+                "sheet_arg": "N5-2",
+                "bytes": 5214,
+                "raw_sha": "146c096d8e911400",
+                "is_zip": true,
+                "member_count": 9,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "9ebbb4c7ba2caa97",
+                "members": {
+                  "[Content_Types].xml": "ba5af858089dd335",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "26ad8fcc38d41229",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "8edf60752a2445e6",
+                  "xl/worksheets/sheet1.xml": "f286898f4f6b9cf5"
+                }
+              },
+              "N5-5": {
+                "ok": true,
+                "sheet_arg": "N5-5",
+                "bytes": 8109,
+                "raw_sha": "f7bd0ed5908f523f",
+                "is_zip": true,
+                "member_count": 13,
+                "excluded_volatile": [
+                  "docProps/core.xml"
+                ],
+                "stable_digest": "3b61807a67741fab",
+                "members": {
+                  "[Content_Types].xml": "e675a1370995d883",
+                  "_rels/.rels": "c545941ba36c15fc",
+                  "docProps/app.xml": "209fca6b00afe72a",
+                  "xl/_rels/workbook.xml.rels": "fbd041d5f3aad81b",
+                  "xl/styles.xml": "4520f4c9afa12c3c",
+                  "xl/theme/theme1.xml": "d15e8ebf78ef7b97",
+                  "xl/workbook.xml": "e0d81e9102c68721",
+                  "xl/worksheets/sheet1.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet2.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet3.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet4.xml": "397cfaa6d650ed56",
+                  "xl/worksheets/sheet5.xml": "397cfaa6d650ed56"
+                }
+              }
+            }
+          }
+        },
+        "non_x3_candidates": [
+          "N5-2",
+          "N5-5"
+        ]
+      }
+    },
+    "probed_pair_count": 102,
+    "scan_surface_selfcheck": {
+      "factory_prefixes": 16,
+      "shape_b_prefixes": 16,
+      "probed_pairs": 102
+    }
+  },
+  "snapshot_2_route_inventory": {
+    "declared_baselines": {
+      "_BASE_FACTORY_PREFIXES": 62,
+      "_BASE_FULL3_PREFIXES": 100,
+      "_BASE_GROUPS": 107,
+      "_BASE_IE_MODULES": 99,
+      "_BASE_NO_DECORATOR_MODULES": 63,
+      "_BASE_ROUTE_KINDS": {
+        "export-template": 106,
+        "export-data": 102,
+        "import-data": 100
+      },
+      "_BASE_SHAPE_A": 85,
+      "_BASE_SHAPE_B": 22,
+      "_BASE_THREE_STATE_ROUTES": 308,
+      "_TRULY_DEAD_FACTORY_PREFIXES": [
+        "h9",
+        "l2",
+        "l6",
+        "l7",
+        "l8",
+        "m1",
+        "m10",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "n1",
+        "n2",
+        "n3",
+        "n5"
+      ]
+    },
+    "live": {
+      "groups": 107,
+      "full3_prefixes": 100,
+      "shape_a_prefixes": 85,
+      "shape_b_prefixes": 22,
+      "route_kinds": {
+        "export-data": 102,
+        "export-template": 106,
+        "import-data": 100
+      },
+      "three_state_routes": 308,
+      "ie_module_files": 99,
+      "no_decorator_modules": 63,
+      "factory_api_prefixes": 62,
+      "app_routes_total": 2291
+    },
+    "scan_surface_selfcheck": {
+      "app_routes_gt_1000": true,
+      "groups_gt_50": true,
+      "ie_modules_gt_50": true
+    },
+    "target_after_spec": {
+      "three_state_routes": 356,
+      "groups": 123,
+      "full3_prefixes": 116,
+      "shape_a_prefixes": 101,
+      "shape_b_prefixes": 22,
+      "route_kinds": {
+        "export-template": 122,
+        "export-data": 118,
+        "import-data": 116
+      },
+      "ie_module_files": 99,
+      "factory_api_prefixes": 62
+    },
+    "target_deltas": {
+      "three_state_routes": 48,
+      "groups": 16,
+      "full3_prefixes": 16,
+      "shape_a_prefixes": 16,
+      "shape_b_prefixes": 0,
+      "route_kinds": {
+        "export-template": 16,
+        "export-data": 16,
+        "import-data": 16
+      },
+      "ie_module_files": 0,
+      "factory_api_prefixes": 0,
+      "adapter_registry_keys": 0
+    },
+    "x3_short_prefixes_in_groups": [],
+    "note": "16 个短前缀今天在运行期零形态 A 路由（`_TRULY_DEAD_FACTORY_PREFIXES` 覆盖），故 `x3_short_prefixes_in_groups` 现为空；施加后应恰好变成 16 个"
+  },
+  "snapshot_3_adapter_registry": {
+    "key_count": 97,
+    "keys": [
+      "c24-journal",
+      "d1",
+      "d2",
+      "d3",
+      "d4",
+      "d5",
+      "d6",
+      "d7",
+      "e1",
+      "f0",
+      "f1",
+      "f2",
+      "f2-spe",
+      "f2-st",
+      "f2-val",
+      "f3",
+      "f4",
+      "f5",
+      "g0",
+      "g1",
+      "g10",
+      "g11",
+      "g12",
+      "g13",
+      "g14",
+      "g2",
+      "g3",
+      "g4-ecl",
+      "g4-main",
+      "g4-sppi",
+      "g5",
+      "g6-ecl",
+      "g6-main",
+      "g6-sppi",
+      "g7-equity-method",
+      "g7-main",
+      "g7-sub",
+      "g8",
+      "g9",
+      "h0",
+      "h1",
+      "h10",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "h7",
+      "h8",
+      "h9",
+      "i1",
+      "i2",
+      "i3",
+      "i4",
+      "i5",
+      "i6",
+      "j1",
+      "j2",
+      "j3",
+      "k0",
+      "k1",
+      "k10",
+      "k11",
+      "k12",
+      "k13",
+      "k2",
+      "k3",
+      "k4",
+      "k5",
+      "k6",
+      "k7",
+      "k8",
+      "k9",
+      "l0",
+      "l1",
+      "l2",
+      "l3",
+      "l4",
+      "l5",
+      "l6",
+      "l7",
+      "l8",
+      "m1",
+      "m10",
+      "m2",
+      "m3",
+      "m4",
+      "m5",
+      "m6",
+      "m7",
+      "m8",
+      "m9",
+      "n1",
+      "n2",
+      "n3",
+      "n4",
+      "n5"
+    ],
+    "by_key": {
+      "c24-journal": {
+        "adapter_value": "_c24_import_export",
+        "target_module": "app.routers.wp_render_strategies._c24_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "d1": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "d2": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "d3": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "d4": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "d5": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "d6": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "d7": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "e1": {
+        "adapter_value": "_e1_import_export",
+        "target_module": "app.routers.wp_render_strategies._e1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f0": {
+        "adapter_value": "_f0_import_export",
+        "target_module": "app.routers.wp_render_strategies._f0_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f1": {
+        "adapter_value": "_f1_import_export",
+        "target_module": "app.routers.wp_render_strategies._f1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f2": {
+        "adapter_value": "_f2_import_export",
+        "target_module": "app.routers.wp_render_strategies._f2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f2-spe": {
+        "adapter_value": "_f2_special_import_export",
+        "target_module": "app.routers.wp_render_strategies._f2_special_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f2-st": {
+        "adapter_value": "_f2_stocktake_import_export",
+        "target_module": "app.routers.wp_render_strategies._f2_stocktake_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f2-val": {
+        "adapter_value": "_f2_valuation_import_export",
+        "target_module": "app.routers.wp_render_strategies._f2_valuation_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f3": {
+        "adapter_value": "_f3_import_export",
+        "target_module": "app.routers.wp_render_strategies._f3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f4": {
+        "adapter_value": "_f4_import_export",
+        "target_module": "app.routers.wp_render_strategies._f4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "f5": {
+        "adapter_value": "_f5_import_export",
+        "target_module": "app.routers.wp_render_strategies._f5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g0": {
+        "adapter_value": "_g0_confirmation_import_export",
+        "target_module": "app.routers.wp_render_strategies._g0_confirmation_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g1": {
+        "adapter_value": "_g1_trading_financial_assets_import_export",
+        "target_module": "app.routers.wp_render_strategies._g1_trading_financial_assets_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g10": {
+        "adapter_value": "_g10_trading_financial_liabilities_import_export",
+        "target_module": "app.routers.wp_render_strategies._g10_trading_financial_liabilities_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g11": {
+        "adapter_value": "_g11_investment_income_import_export",
+        "target_module": "app.routers.wp_render_strategies._g11_investment_income_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g12": {
+        "adapter_value": "_g12_net_hedge_gains_import_export",
+        "target_module": "app.routers.wp_render_strategies._g12_net_hedge_gains_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g13": {
+        "adapter_value": "_g13_fair_value_changes_import_export",
+        "target_module": "app.routers.wp_render_strategies._g13_fair_value_changes_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g14": {
+        "adapter_value": "_g14_credit_impairment_loss_import_export",
+        "target_module": "app.routers.wp_render_strategies._g14_credit_impairment_loss_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g2": {
+        "adapter_value": "_g2_interest_receivable_import_export",
+        "target_module": "app.routers.wp_render_strategies._g2_interest_receivable_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g3": {
+        "adapter_value": "_g3_dividend_receivable_import_export",
+        "target_module": "app.routers.wp_render_strategies._g3_dividend_receivable_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g4-ecl": {
+        "adapter_value": "_g4_bond_investment_ecl_import_export",
+        "target_module": "app.routers.wp_render_strategies._g4_bond_investment_ecl_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g4-main": {
+        "adapter_value": "_g4_bond_investment_main_import_export",
+        "target_module": "app.routers.wp_render_strategies._g4_bond_investment_main_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g4-sppi": {
+        "adapter_value": "_g4_bond_investment_sppi_import_export",
+        "target_module": "app.routers.wp_render_strategies._g4_bond_investment_sppi_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g5": {
+        "adapter_value": "_g5_long_term_receivable_import_export",
+        "target_module": "app.routers.wp_render_strategies._g5_long_term_receivable_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g6-ecl": {
+        "adapter_value": "_g6_other_bond_investment_ecl_import_export",
+        "target_module": "app.routers.wp_render_strategies._g6_other_bond_investment_ecl_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g6-main": {
+        "adapter_value": "_g6_other_bond_investment_main_import_export",
+        "target_module": "app.routers.wp_render_strategies._g6_other_bond_investment_main_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g6-sppi": {
+        "adapter_value": "_g6_other_bond_investment_sppi_import_export",
+        "target_module": "app.routers.wp_render_strategies._g6_other_bond_investment_sppi_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g7-equity-method": {
+        "adapter_value": "_g7_long_term_equity_method_import_export",
+        "target_module": "app.routers.wp_render_strategies._g7_long_term_equity_method_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g7-main": {
+        "adapter_value": "_g7_long_term_equity_main_import_export",
+        "target_module": "app.routers.wp_render_strategies._g7_long_term_equity_main_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g7-sub": {
+        "adapter_value": "_g7_long_term_equity_subsidiary_import_export",
+        "target_module": "app.routers.wp_render_strategies._g7_long_term_equity_subsidiary_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g8": {
+        "adapter_value": "_g8_other_equity_instruments_import_export",
+        "target_module": "app.routers.wp_render_strategies._g8_other_equity_instruments_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "g9": {
+        "adapter_value": "_g9_other_noncurrent_financial_import_export",
+        "target_module": "app.routers.wp_render_strategies._g9_other_noncurrent_financial_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h0": {
+        "adapter_value": "_h0_confirmation_import_export",
+        "target_module": "app.routers.wp_render_strategies._h0_confirmation_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h1": {
+        "adapter_value": "_h1_import_export",
+        "target_module": "app.routers.wp_render_strategies._h1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h10": {
+        "adapter_value": "_h10_asset_disposal_income_import_export",
+        "target_module": "app.routers.wp_render_strategies._h10_asset_disposal_income_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h2": {
+        "adapter_value": "_h2_import_export",
+        "target_module": "app.routers.wp_render_strategies._h2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h3": {
+        "adapter_value": "_h3_import_export",
+        "target_module": "app.routers.wp_render_strategies._h3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h4": {
+        "adapter_value": "_h4_import_export",
+        "target_module": "app.routers.wp_render_strategies._h4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h5": {
+        "adapter_value": "_h5_import_export",
+        "target_module": "app.routers.wp_render_strategies._h5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h6": {
+        "adapter_value": "_h6_import_export",
+        "target_module": "app.routers.wp_render_strategies._h6_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h7": {
+        "adapter_value": "_h7_import_export",
+        "target_module": "app.routers.wp_render_strategies._h7_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h8": {
+        "adapter_value": "_h8_import_export",
+        "target_module": "app.routers.wp_render_strategies._h8_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "h9": {
+        "adapter_value": "_h9_import_export",
+        "target_module": "app.routers.wp_render_strategies._h9_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "i1": {
+        "adapter_value": "_i1_import_export",
+        "target_module": "app.routers.wp_render_strategies._i1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "i2": {
+        "adapter_value": "_i2_import_export",
+        "target_module": "app.routers.wp_render_strategies._i2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "i3": {
+        "adapter_value": "_i3_import_export",
+        "target_module": "app.routers.wp_render_strategies._i3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "i4": {
+        "adapter_value": "_i4_import_export",
+        "target_module": "app.routers.wp_render_strategies._i4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "i5": {
+        "adapter_value": "_i5_import_export",
+        "target_module": "app.routers.wp_render_strategies._i5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "i6": {
+        "adapter_value": "_i6_import_export",
+        "target_module": "app.routers.wp_render_strategies._i6_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "j1": {
+        "adapter_value": "_j1_import_export",
+        "target_module": "app.routers.wp_render_strategies._j1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "j2": {
+        "adapter_value": "_j2_import_export",
+        "target_module": "app.routers.wp_render_strategies._j2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "j3": {
+        "adapter_value": null,
+        "target_module": null,
+        "importable": null,
+        "is_x3_short_prefix": false
+      },
+      "k0": {
+        "adapter_value": "_k0_confirmation_import_export",
+        "target_module": "app.routers.wp_render_strategies._k0_confirmation_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k1": {
+        "adapter_value": "_k1_import_export",
+        "target_module": "app.routers.wp_render_strategies._k1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k10": {
+        "adapter_value": "_k10_import_export",
+        "target_module": "app.routers.wp_render_strategies._k10_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k11": {
+        "adapter_value": "_k11_import_export",
+        "target_module": "app.routers.wp_render_strategies._k11_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k12": {
+        "adapter_value": "_k12_import_export",
+        "target_module": "app.routers.wp_render_strategies._k12_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k13": {
+        "adapter_value": "_k13_import_export",
+        "target_module": "app.routers.wp_render_strategies._k13_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k2": {
+        "adapter_value": "_k2_import_export",
+        "target_module": "app.routers.wp_render_strategies._k2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k3": {
+        "adapter_value": "_k3_import_export",
+        "target_module": "app.routers.wp_render_strategies._k3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k4": {
+        "adapter_value": "_k4_import_export",
+        "target_module": "app.routers.wp_render_strategies._k4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k5": {
+        "adapter_value": "_k5_import_export",
+        "target_module": "app.routers.wp_render_strategies._k5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k6": {
+        "adapter_value": "_k6_import_export",
+        "target_module": "app.routers.wp_render_strategies._k6_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k7": {
+        "adapter_value": "_k7_import_export",
+        "target_module": "app.routers.wp_render_strategies._k7_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k8": {
+        "adapter_value": "_k8_import_export",
+        "target_module": "app.routers.wp_render_strategies._k8_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "k9": {
+        "adapter_value": "_k9_import_export",
+        "target_module": "app.routers.wp_render_strategies._k9_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l0": {
+        "adapter_value": "_l0_confirmation_import_export",
+        "target_module": "app.routers.wp_render_strategies._l0_confirmation_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l1": {
+        "adapter_value": "_l1_import_export",
+        "target_module": "app.routers.wp_render_strategies._l1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l2": {
+        "adapter_value": "_l2_import_export",
+        "target_module": "app.routers.wp_render_strategies._l2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "l3": {
+        "adapter_value": "_l3_import_export",
+        "target_module": "app.routers.wp_render_strategies._l3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l4": {
+        "adapter_value": "_l4_import_export",
+        "target_module": "app.routers.wp_render_strategies._l4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l5": {
+        "adapter_value": "_l5_import_export",
+        "target_module": "app.routers.wp_render_strategies._l5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l6": {
+        "adapter_value": "_l6_import_export",
+        "target_module": "app.routers.wp_render_strategies._l6_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "l7": {
+        "adapter_value": "_l7_import_export",
+        "target_module": "app.routers.wp_render_strategies._l7_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "l8": {
+        "adapter_value": "_l8_import_export",
+        "target_module": "app.routers.wp_render_strategies._l8_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "m1": {
+        "adapter_value": "_m1_import_export",
+        "target_module": "app.routers.wp_render_strategies._m1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m10": {
+        "adapter_value": "_m10_import_export",
+        "target_module": "app.routers.wp_render_strategies._m10_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m2": {
+        "adapter_value": "_m2_import_export",
+        "target_module": "app.routers.wp_render_strategies._m2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m3": {
+        "adapter_value": "_m3_import_export",
+        "target_module": "app.routers.wp_render_strategies._m3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m4": {
+        "adapter_value": "_m4_import_export",
+        "target_module": "app.routers.wp_render_strategies._m4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m5": {
+        "adapter_value": "_m5_import_export",
+        "target_module": "app.routers.wp_render_strategies._m5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m6": {
+        "adapter_value": "_m6_import_export",
+        "target_module": "app.routers.wp_render_strategies._m6_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m7": {
+        "adapter_value": "_m7_import_export",
+        "target_module": "app.routers.wp_render_strategies._m7_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m8": {
+        "adapter_value": "_m8_import_export",
+        "target_module": "app.routers.wp_render_strategies._m8_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "m9": {
+        "adapter_value": "_m9_import_export",
+        "target_module": "app.routers.wp_render_strategies._m9_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "n1": {
+        "adapter_value": "_n1_import_export",
+        "target_module": "app.routers.wp_render_strategies._n1_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "n2": {
+        "adapter_value": "_n2_import_export",
+        "target_module": "app.routers.wp_render_strategies._n2_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "n3": {
+        "adapter_value": "_n3_import_export",
+        "target_module": "app.routers.wp_render_strategies._n3_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      },
+      "n4": {
+        "adapter_value": "_n4_import_export",
+        "target_module": "app.routers.wp_render_strategies._n4_import_export",
+        "importable": true,
+        "is_x3_short_prefix": false
+      },
+      "n5": {
+        "adapter_value": "_n5_import_export",
+        "target_module": "app.routers.wp_render_strategies._n5_import_export",
+        "importable": true,
+        "is_x3_short_prefix": true
+      }
+    },
+    "x3_short_prefixes": [
+      "l2",
+      "l6",
+      "m1",
+      "m10",
+      "m2",
+      "m3",
+      "m4",
+      "m5",
+      "m6",
+      "m7",
+      "m8",
+      "m9",
+      "n1",
+      "n2",
+      "n3",
+      "n5"
+    ],
+    "x3_targets_today": {
+      "l2": "app.routers.wp_render_strategies._l2_import_export",
+      "l6": "app.routers.wp_render_strategies._l6_import_export",
+      "m1": "app.routers.wp_render_strategies._m1_import_export",
+      "m10": "app.routers.wp_render_strategies._m10_import_export",
+      "m2": "app.routers.wp_render_strategies._m2_import_export",
+      "m3": "app.routers.wp_render_strategies._m3_import_export",
+      "m4": "app.routers.wp_render_strategies._m4_import_export",
+      "m5": "app.routers.wp_render_strategies._m5_import_export",
+      "m6": "app.routers.wp_render_strategies._m6_import_export",
+      "m7": "app.routers.wp_render_strategies._m7_import_export",
+      "m8": "app.routers.wp_render_strategies._m8_import_export",
+      "m9": "app.routers.wp_render_strategies._m9_import_export",
+      "n1": "app.routers.wp_render_strategies._n1_import_export",
+      "n2": "app.routers.wp_render_strategies._n2_import_export",
+      "n3": "app.routers.wp_render_strategies._n3_import_export",
+      "n5": "app.routers.wp_render_strategies._n5_import_export"
+    },
+    "x3_targets_after_spec": {
+      "l2": "app.routers.l2_interest_payable",
+      "l6": "app.routers.l6_special_payables",
+      "m1": "app.routers.m1_dividends_payable",
+      "m10": "app.routers.m10_other_equity_instruments",
+      "m2": "app.routers.m2_paid_in_capital",
+      "m3": "app.routers.m3_treasury_stock",
+      "m4": "app.routers.m4_capital_reserve",
+      "m5": "app.routers.m5_surplus_reserve",
+      "m6": "app.routers.m6_retained_earnings",
+      "m7": "app.routers.m7_special_reserve",
+      "m8": "app.routers.m8_general_risk_reserve",
+      "m9": "app.routers.m9_other_comprehensive_income",
+      "n1": "app.routers.n1_deferred_tax_assets",
+      "n2": "app.routers.n2_taxes_payable",
+      "n3": "app.routers.n3_deferred_tax_liabilities",
+      "n5": "app.routers.n5_income_tax_expense"
+    },
+    "expected_after_spec": "键集规模不变（97）；仅这 16 键的 target_module 从工厂 `_{x}_import_export` 改指专属 router 模块（任务 6.1）",
+    "note": "`x3_targets_after_spec` 是**按 design §C3 规则派生的预期值**，长前缀连字符换下划线即专属模块名；任务 6.1 施加后由 `--compare` 逐键核对"
+  },
+  "snapshot_ci_red_jobs": {
+    "verdict_2_duty": "本 spec 不修这两个红，只保证红的规模不变大",
+    "jobs": {
+      "acnr-ie-catalog-sync": {
+        "observed_exit_code": 1,
+        "observed_at": "2026-08-13T13:39:25+08:00",
+        "reproduce_cmd": "python backend/scripts/acnr/check_ie_catalog_sync.py",
+        "observed_tail": [
+          "✗ [H] Catalog 中 'H7-2' 有 import_export（enabled=true）但 manifest 中未登记",
+          "✗ [H] Catalog 中 'H7-3' 有 import_export（enabled=true）但 manifest 中未登记",
+          "修复方式：更新 manifest YAML 或重新运行 generate_catalog.py 使二者同步。"
+        ],
+        "reused_helper": "backend/scripts/check/check_x3_deviation_registry.py::run_ci_probe",
+        "drift": {
+          "metric": "manifest↔catalog 不一致条目数",
+          "counted_marker_lines": 19,
+          "declared_in_header": 19,
+          "agree": true,
+          "entries": [
+            "✗ [D] 'D1-15'.api_prefix 不一致 — manifest='d1-ecl', catalog='d1'",
+            "✗ [G] 'G4-1'.api_prefix 不一致 — manifest='g4', catalog='g4-main'",
+            "✗ [G] 'G4-2'.api_prefix 不一致 — manifest='g4', catalog='g4-main'",
+            "✗ [G] 'G4-3'.api_prefix 不一致 — manifest='g4', catalog='g4-main'",
+            "✗ [G] 'G6-2'.api_prefix 不一致 — manifest='g6', catalog='g6-main'",
+            "✗ [G] 'G6-3'.api_prefix 不一致 — manifest='g6', catalog='g6-main'",
+            "✗ [G] 'G7-2'.api_prefix 不一致 — manifest='g7', catalog='g7-main'",
+            "✗ [G] 'G7-3'.api_prefix 不一致 — manifest='g7', catalog='g7-main'",
+            "✗ [G] 'G7-4'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [G] 'G7-5'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [G] 'G7-13'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [G] 'G7-14'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [G] 'G7-15'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [G] 'G7-16'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [G] 'G7-17'.api_prefix 不一致 — manifest='g7-method', catalog='g7-equity-method'",
+            "✗ [H] Catalog 中 'H5-2' 有 import_export（enabled=true）但 manifest 中未登记",
+            "✗ [H] Catalog 中 'H5-3' 有 import_export（enabled=true）但 manifest 中未登记",
+            "✗ [H] Catalog 中 'H7-2' 有 import_export（enabled=true）但 manifest 中未登记",
+            "✗ [H] Catalog 中 'H7-3' 有 import_export（enabled=true）但 manifest 中未登记"
+          ],
+          "method": "`python backend/scripts/acnr/check_ie_catalog_sync.py` 全量捕获输出；条目数 = 以 ✗ 起头的行数，并与表头「发现 N 处不一致」交叉核对"
+        }
+      },
+      "check-acnr-catalog-drift": {
+        "observed_exit_code": 1,
+        "observed_at": "2026-08-13T13:39:25+08:00",
+        "reproduce_cmd": "python backend/scripts/acnr/check_catalog_drift.py",
+        "observed_tail": [
+          "-        \"api_prefix\": \"g7-equity-method\",",
+          "+        \"api_prefix\": \"g7-method\",",
+          "... (551 more lines omitted)"
+        ],
+        "reused_helper": "backend/scripts/check/check_x3_deviation_registry.py::run_ci_probe",
+        "drift": {
+          "metric": "committed catalog 与离线重生成结果不一致的 sheet 条目数",
+          "registry_version": "20260727115337",
+          "byte_equal": false,
+          "differing_entry_count": 53,
+          "differing_addr_ids": [
+            "D1/D1-15",
+            "G4/G4-1",
+            "G4/G4-2",
+            "G4/G4-3",
+            "G6/G6-2",
+            "G6/G6-3",
+            "G7/G7-13",
+            "G7/G7-14",
+            "G7/G7-15",
+            "G7/G7-16",
+            "G7/G7-17",
+            "G7/G7-2",
+            "G7/G7-3",
+            "G7/G7-4",
+            "G7/G7-5",
+            "H5/H5-2",
+            "H5/H5-3",
+            "H7/H7-2",
+            "H7/H7-3",
+            "I1/I1",
+            "I1/I1-3",
+            "I1/I1-5",
+            "I1/I1-6",
+            "I1/I1-8",
+            "I1/I1-9",
+            "I2/I2-1",
+            "I2/I2-13",
+            "I2/I2-14",
+            "I2/I2-7",
+            "I3/I3-1",
+            "I3/I3-2",
+            "I3/I3-3",
+            "I3/I3-4",
+            "I3/I3-6",
+            "I3/I3-7",
+            "I4/I4-2",
+            "I4/I4-6",
+            "I5/I5-2",
+            "I5/I5-3",
+            "I6/I6-2",
+            "I6/I6-3",
+            "I6/I6-5",
+            "I6/I6-6",
+            "L1/L1-2",
+            "L1/L1-3",
+            "L3/L3-2",
+            "L3/L3-3",
+            "L4/L4-2",
+            "L4/L4-3",
+            "L5/L5-2",
+            "L5/L5-3",
+            "N4/N4-2",
+            "N4/N4-3"
+          ],
+          "diff_hunks": 53,
+          "diff_changed_lines": 258,
+          "sheets_committed": 1215,
+          "sheets_generated": 1215,
+          "method": "进程内复算（脚本 stdout 会截断 diff，解析不可靠）：`generate_catalog(offline=True, registry_version=<committed 值>)` → `_deterministic_json` → 与 committed 文本比对；条目数按 sheets[].addr_id 逐条比较"
+        }
+      }
+    }
+  }
+}

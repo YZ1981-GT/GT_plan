@@ -1,0 +1,91 @@
+X-3 Deviation_Registry —— 任务 1.7 反向自检实录
+================================================================================
+spec  : .kiro/specs/x3-adjustment-entry-import-export/（Wave 0 任务 1.7）
+被测  : backend/scripts/check/check_x3_deviation_registry.py
+登记表: .kiro/specs/x3-adjustment-entry-import-export/evidence/deviation_registry.json
+日期  : 2026-08-13
+
+判读四态：RED（打红且正是预期那条通道）/ GREEN（守卫缺陷）/
+          ANCHOR-MISS（锚点未命中或命中多处）/ WRONG-TEST（红在别的组上）
+🔴 只看退出码不够 —— `--check` 在 Wave 0 恒为 2（G1 PENDING），故每条变异都比对
+   **状态图**（{组: 状态}）与**具体消息**，并断言除目标组外无其他非基线态变化。
+
+第一批：真改源码，使实测数变化（含任务点名要求的「伪造一条已修好」）
+--------------------------------------------------------------------------------
+=== CONTROL：未变异时的状态图 ===
+exit: 2 states: {"G1": "PENDING"} | G10       4         4   OK
+
+==============================================================================
+MUT-A 伪造 M9-3 已修好（补读回 ⇒ 实测 4→3） —— audit-platform/frontend/src/components/workpaper/composables/useM9Adjustment.ts  md5=7d14b2a21f27504f953940709683f311
+  exit: 2 | G10       4         3   NEEDS_BASELINE_LOWERING
+   [G10 NEEDS_BASELINE_LOWERING] 实测 3 < 基线 4 —— 有 1 条已被修好，必须把 `baseline_count` 同步下调到 3（并写 `baseline_lowered_from`=4 + `lowered_by_task`），否则本表留着虚高基线继续绿 = 自我失效机制被绕过
+  四态判读: RED
+  还原：md5=7d14b2a21f27504f953940709683f311 一致=True
+  git status: (clean)
+
+==============================================================================
+MUT-B 抹掉 M6-3 的读回（新增偏差 ⇒ 实测 4→5） —— audit-platform/frontend/src/components/workpaper/composables/useM6Adjustment.ts  md5=0fd3d9ae49fc1b30f4219b7901cce3b5
+  exit: 2 | G10       4         5   REGRESSION
+   [G10 REGRESSION] 实测 5 > 基线 4 —— 新增偏差，先查改动再谈改基线
+  四态判读: RED
+  还原：md5=0fd3d9ae49fc1b30f4219b7901cce3b5 一致=True
+  git status: (clean)
+
+=== 复原后复跑 ===
+exit: 2 states: {"G1": "PENDING"} | G10       4         4   OK
+
+第二批：结构判据与「--emit 不得顺手下调基线」
+--------------------------------------------------------------------------------
+登记表 md5: 22a491449642e1ad7eec0e129decfe4b
+
+S1 无理由下调基线（4→3）: exit 2
+   RED
+    [G10 STRUCTURE] `baseline_count`=3 低于 design §C7 的 4，但未给出 `baseline_lowered_from`（须等于 design 原值）+ `lowered_by_task` ⇒ 拒绝接受
+
+S2 上调基线（4→5）: exit 2
+   RED
+
+S3 method 含「本地执行」: exit 2
+   RED
+
+S4 三列 null 但抽掉 na_reasons: exit 2
+   RED
+
+S5 合法下调（实测 3 + baseline 3 + lowered_from/by）: exit 2 states {'G1': 'PENDING'}
+   判定: PASS（G10 转 OK ⇒ 任务 11.2 的收敛路径可用、非死分支）
+
+S6 变异态下跑 --emit（无 --set-baselines）: exit 0
+   baseline_count = 4 | measured_count = 3
+   WARN 行: ['[WARN] G10: 实测 3 != 基线 4 —— `--emit` 不动基线，确需变更请显式加 `--set-baselines`（自我失效机制不得被顺手绕过）']
+   判定: PASS（基线未被顺手改）
+
+M9 还原 md5 一致: True
+
+S7 幂等（忽略 _meta.written_at）: PASS
+   ci_job.observed_* 是否保住: {"G2": 1, "G3": 1}
+   收尾 --check exit 2 states {"G1": "PENDING"}
+
+收尾复跑（`--check`）
+--------------------------------------------------------------------------------
+
+组        基线        实测   状态
+--------------------------------------------------------------------------------------------
+G1       16   pending   PENDING
+G2       38        38   OK
+G3       15        15   OK
+G4        5         5   OK
+G5        8         8   OK
+G6       10        10   OK
+G7        2         2   OK
+G8        1         1   OK
+G9        1         1   OK
+G10       4         4   OK
+G11       1         1   OK
+--------------------------------------------------------------------------------------------
+基线合计 101 · 已落值条目 86 · 组数 11
+
+[G1 PENDING] 本组尚无可复算实测数（owner_task=13.1）；已落值 1 / 基线 16，待落 15 条
+[G2 CI] `python backend/scripts/acnr/check_ie_catalog_sync.py` 复算 exit=1，与登记一致
+[G3 CI] `python backend/scripts/acnr/check_catalog_drift.py` 复算 exit=1，与登记一致
+
+[NOT-CLOSED] 1 组未收口：{"G1": "PENDING"}

@@ -99,9 +99,20 @@ GUARD_FILES: dict[str, str] = {
         "audit-platform/frontend/src/components/workpaper/bulk-tab/__tests__"
         "/WpBulkImportExport.spec.ts"
     ),
+    # ── X-3 调整分录 spec 守卫（任务 14.1 追加）──────────────────────────
+    "x3_key_ledger": "backend/tests/test_x3_key_ledger.py",
+    "x3_column_alignment": "backend/tests/test_x3_column_alignment.py",
+    "x3_catalog_registration": "backend/tests/test_x3_catalog_registration.py",
+    "x3_adapter_host": "backend/tests/test_x3_adapter_host_same_module.py",
+    "x3_roundtrip_live": "backend/tests/test_x3_roundtrip_live.py",
+    "x3_ie_wiring": (
+        "audit-platform/frontend/src/components/workpaper/__tests__/ieWiringIntegrity.spec.ts"
+    ),
 }
 
-FRONTEND_GUARD_KEYS = {"orphan_baseline", "wiring_integrity", "registry_lock", "bulk_dialog"}
+FRONTEND_GUARD_KEYS = {
+    "orphan_baseline", "wiring_integrity", "registry_lock", "bulk_dialog", "x3_ie_wiring",
+}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -617,6 +628,71 @@ MUTATIONS: tuple[Mutation, ...] = (
         "_BASE_FULL3_PREFIXES = 100       # 立项: 36 / 我的第 1 轮: 81 / 第 2 轮: 80",
         "_BASE_FULL3_PREFIXES = 36        # MUTATION",
         "test_baseline_numbers_reject_stale_figures",
+    ),
+    # ── X-3 调整分录 spec 变异（任务 14.1）────────────────────────────────
+    Mutation(
+        "X1", "x3_key_ledger",
+        "X3_SHEET_SPECS 装载行改成硬编码空 dict（GS1：从清单装载 vs 硬编码）",
+        "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py",
+        "X3_SHEET_SPECS, COLUMN_ORDER = _load()",
+        "X3_SHEET_SPECS, COLUMN_ORDER = {}, ()  # MUTATION: hardcoded",
+        "test_specs_really_loaded_from_ledger",
+    ),
+    Mutation(
+        "X2", "x3_column_alignment",
+        "COLUMN_ORDER 少一列（GS2：列面对源模板守卫必检等势）",
+        "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py",
+        "X3_SHEET_SPECS, COLUMN_ORDER = _load()",
+        "X3_SHEET_SPECS, COLUMN_ORDER = _load(); COLUMN_ORDER = COLUMN_ORDER[:-1]  # MUTATION: drop last col",
+        "column_order",
+    ),
+    Mutation(
+        "X3", "x3_key_ledger",
+        "storage_field 判据改回常量（GS9：机制↔列守卫不再动态取值）",
+        "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py",
+        'if spec.storage_field not in allowed:',
+        'if False and spec.storage_field not in allowed:  # MUTATION: always pass',
+        "storage_field",
+    ),
+    Mutation(
+        "X4", "x3_ie_wiring",
+        "K8TabAdjustment 的 ITEM_PREFIX 改名（形态④：键族断链）",
+        "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue",
+        "const ITEM_PREFIX = 'K8-3-adj'",
+        "const ITEM_PREFIX = 'K8-3-MUTATED'",
+        "ITEM_PREFIX",
+    ),
+    Mutation(
+        "X5", "x3_catalog_registration",
+        "Preflight 改成键存在即通过（GS4：双向断言变单向空过）",
+        "backend/tests/test_x3_catalog_registration.py",
+        "assert sheet_code in ie_sheets, (",
+        "assert True or sheet_code in ie_sheets, (  # MUTATION: always pass",
+        "preflight",
+    ),
+    Mutation(
+        "X6", "x3_roundtrip_live",
+        "write_rows 异常吞成 WARNING（GS7：取值层异常禁吞）",
+        "backend/tests/test_x3_roundtrip_live.py",
+        'if re.search(r"except\\s+Exception.*?logger\\.warn", source, re.DOTALL):',
+        'if False and re.search(r"except\\s+Exception.*?logger\\.warn", source, re.DOTALL):  # MUTATION',
+        "swallow",
+    ),
+    Mutation(
+        "X7", "x3_ie_wiring",
+        "L6TabAdjustment 删除 @imported 读回（GS5b/GS10：读回可追溯）",
+        "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjustment.vue",
+        '@imported="onImported"',
+        '@imported=""',
+        "imported",
+    ),
+    Mutation(
+        "X8", "x3_adapter_host",
+        "l6 前缀的 adapter 目标模块改回工厂（GS6：split-brain 基线只许下调）",
+        "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py",
+        '"l6": "app.routers.l6_special_payables"',
+        '"l6": "app.routers.wp_render_strategies._l6_import_export"  # MUTATION: factory',
+        "test_violation_set_matches_baseline",
     ),
 )
 

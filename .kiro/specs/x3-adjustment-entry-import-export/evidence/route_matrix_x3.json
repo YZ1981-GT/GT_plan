@@ -1,0 +1,1424 @@
+{
+  "_meta": {
+    "spec": "x3-adjustment-entry-import-export",
+    "task": "1.8",
+    "requirement": "1.2（逐张两列实测值）· 1.1/1.3~1.7 · 10.9",
+    "written_at": "2026-08-13T13:39:27+08:00",
+    "generated_by": "backend/scripts/diagnose/snapshot_x3_baseline.py --snapshot"
+  },
+  "rows": [
+    {
+      "sheet_code": "L2-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "GET,GET,POST",
+        "methods": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "host_module_suffix": "l2_interest_payable"
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "应付利息调整分录汇总L2-3",
+        "addr_id": "L2/L2-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "l2-interest-payable",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.l2_interest_payable"
+        ],
+        "accepts_sheet": {
+          "export-template": false,
+          "export-data": false,
+          "import-data": false
+        },
+        "sheet_default": {}
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "l2",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._l2_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "l2",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.l2_interest_payable",
+        "adapter_target_module": "app.routers.l2_interest_payable",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "L6-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": "l6_special_payables"
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总L6-3",
+        "addr_id": "L6/L6-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "l6-special-payables",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.l6_special_payables"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "l6",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._l6_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "l6",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.l6_special_payables",
+        "adapter_target_module": "app.routers.l6_special_payables",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M1-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": "m1_dividends_payable"
+      },
+      "measured_method_sequence": [
+        "POST",
+        "POST",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M1-3",
+        "addr_id": "M1/M1-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m1-dividends-payable",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "POST"
+          ],
+          "export-template": [
+            "POST"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m1_dividends_payable"
+        ],
+        "accepts_sheet": {
+          "export-template": false,
+          "export-data": false,
+          "import-data": false
+        },
+        "sheet_default": {}
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m1",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m1_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m1",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m1_dividends_payable",
+        "adapter_target_module": "app.routers.m1_dividends_payable",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M2-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M2-3",
+        "addr_id": "M2/M2-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m2-paid-in-capital",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m2_paid_in_capital"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m2",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m2_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m2",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m2_paid_in_capital",
+        "adapter_target_module": "app.routers.m2_paid_in_capital",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M3-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M3-3",
+        "addr_id": "M3/M3-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m3-treasury-stock",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m3_treasury_stock"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m3",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m3_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m3",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m3_treasury_stock",
+        "adapter_target_module": "app.routers.m3_treasury_stock",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M4-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "GET,GET,POST",
+        "methods": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M4-3",
+        "addr_id": "M4/M4-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m4-capital-reserve",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m4_capital_reserve"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m4",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m4_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m4",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m4_capital_reserve",
+        "adapter_target_module": "app.routers.m4_capital_reserve",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M5-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M5-3",
+        "addr_id": "M5/M5-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m5-surplus-reserve",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m5_surplus_reserve"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m5",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m5_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m5",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m5_surplus_reserve",
+        "adapter_target_module": "app.routers.m5_surplus_reserve",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M6-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M6-3",
+        "addr_id": "M6/M6-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m6-retained-earnings",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m6_retained_earnings"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m6",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m6_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m6",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m6_retained_earnings",
+        "adapter_target_module": "app.routers.m6_retained_earnings",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M7-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M7-3",
+        "addr_id": "M7/M7-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m7-special-reserve",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m7_special_reserve"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m7",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m7_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m7",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m7_special_reserve",
+        "adapter_target_module": "app.routers.m7_special_reserve",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M8-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M8-3",
+        "addr_id": "M8/M8-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m8-general-risk-reserve",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m8_general_risk_reserve"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m8",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m8_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m8",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m8_general_risk_reserve",
+        "adapter_target_module": "app.routers.m8_general_risk_reserve",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M9-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M9-3",
+        "addr_id": "M9/M9-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m9-other-comprehensive-income",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m9_other_comprehensive_income"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m9",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m9_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m9",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m9_other_comprehensive_income",
+        "adapter_target_module": "app.routers.m9_other_comprehensive_income",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "M10-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总M10-3",
+        "addr_id": "M10/M10-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "m10-other-equity-instruments",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.m10_other_equity_instruments"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "m10",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._m10_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "m10",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.m10_other_equity_instruments",
+        "adapter_target_module": "app.routers.m10_other_equity_instruments",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "N1-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总N1-3",
+        "addr_id": "N1/N1-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "n1-deferred-tax-assets",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.n1_deferred_tax_assets"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": "N1-2",
+          "export-data": "N1-2",
+          "import-data": "N1-2"
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "n1",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._n1_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "n1",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.n1_deferred_tax_assets",
+        "adapter_target_module": "app.routers.n1_deferred_tax_assets",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "N2-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总表N2-3",
+        "addr_id": "N2/N2-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "n2-taxes-payable",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.n2_taxes_payable"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": null,
+          "export-data": null,
+          "import-data": null
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "n2",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._n2_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "n2",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.n2_taxes_payable",
+        "adapter_target_module": "app.routers.n2_taxes_payable",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "N3-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总表N3-3",
+        "addr_id": "N3/N3-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "n3-deferred-tax-liabilities",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.n3_deferred_tax_liabilities"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": "N3-2",
+          "export-data": "N3-2",
+          "import-data": "N3-2"
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "n3",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._n3_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "n3",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.n3_deferred_tax_liabilities",
+        "adapter_target_module": "app.routers.n3_deferred_tax_liabilities",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    },
+    {
+      "sheet_code": "N5-3",
+      "design_declared": {
+        "shape": "B",
+        "methods_raw": "POST×3",
+        "methods": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "host_module_suffix": null
+      },
+      "measured_method_sequence": [
+        "GET",
+        "GET",
+        "POST"
+      ],
+      "catalog": {
+        "state": "missing(键缺失)",
+        "api_prefix": null,
+        "sheet_name": "调整分录汇总表N5-3",
+        "addr_id": "N5/N5-3",
+        "class_code": "F-调整分录"
+      },
+      "runtime_three_state": {
+        "api_prefix": "n5-income-tax-expense",
+        "shape": "B（/api/{prefix}/{wp_id}/{三态}）",
+        "methods": {
+          "export-data": [
+            "GET"
+          ],
+          "export-template": [
+            "GET"
+          ],
+          "import-data": [
+            "POST"
+          ]
+        },
+        "host_modules": [
+          "app.routers.n5_income_tax_expense"
+        ],
+        "accepts_sheet": {
+          "export-template": true,
+          "export-data": true,
+          "import-data": true
+        },
+        "sheet_default": {
+          "export-template": "N5-5",
+          "export-data": "N5-5",
+          "import-data": "N5-5"
+        }
+      },
+      "shape_a_today": {
+        "short_prefix_has_strict_shape_a": false,
+        "suffixes": []
+      },
+      "adapter_hit": {
+        "api_prefix": "n5",
+        "in_registry": true,
+        "target_module": "app.routers.wp_render_strategies._n5_import_export"
+      },
+      "target_after_spec": {
+        "api_prefix": "n5",
+        "shape": "A（/api/workpapers/{wp_id}/{短前缀}/{三态}，POST×3）",
+        "host_module": "app.routers.n5_income_tax_expense",
+        "adapter_target_module": "app.routers.n5_income_tax_expense",
+        "verdict": "两路同源（single api_prefix, single implementation）"
+      }
+    }
+  ],
+  "conclusions": {
+    "short_prefixes_with_shape_a_today": [],
+    "catalog_enabled_today": [],
+    "adapter_hit_count": 16,
+    "reading": "①16 个短前缀在运行期零形态 A 路由（无路径冲突，新增即可）；②16 张在 catalog 零启用条目 ⇒ bulk 今天从不向这 16 个短前缀取数 ⇒ 任务 6.1 的 adapter 改指在施加当刻行为中性"
+  },
+  "design_cross_check": {
+    "criterion": "运行期实测的 (export-template, export-data, import-data) 方法序列 == design §逐张两列实测值（R1.2）表里那一格声明的方法列",
+    "rows_parsed_from_design": 16,
+    "mismatch_count": 13,
+    "mismatches": {
+      "L6-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M2-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M3-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M5-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M6-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M7-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M8-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M9-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "M10-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "N1-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "N2-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "N3-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      },
+      "N5-3": {
+        "design_says": "POST×3",
+        "design_parsed": [
+          "POST",
+          "POST",
+          "POST"
+        ],
+        "measured": [
+          "GET",
+          "GET",
+          "POST"
+        ],
+        "order": [
+          "export-template",
+          "export-data",
+          "import-data"
+        ]
+      }
+    },
+    "verdict": "DESIGN_TABLE_STALE",
+    "handling": "不一致时以**运行期实测**为准（本表即实测），design 表的方法列须按本表更正；方法基线对任务 5.2「既有形态 B 端点的方法逐字不动」是必要前置"
+  },
+  "route_inventory_baselines": {
+    "declared": {
+      "_BASE_FACTORY_PREFIXES": 62,
+      "_BASE_FULL3_PREFIXES": 100,
+      "_BASE_GROUPS": 107,
+      "_BASE_IE_MODULES": 99,
+      "_BASE_NO_DECORATOR_MODULES": 63,
+      "_BASE_ROUTE_KINDS": {
+        "export-template": 106,
+        "export-data": 102,
+        "import-data": 100
+      },
+      "_BASE_SHAPE_A": 85,
+      "_BASE_SHAPE_B": 22,
+      "_BASE_THREE_STATE_ROUTES": 308,
+      "_TRULY_DEAD_FACTORY_PREFIXES": [
+        "h9",
+        "l2",
+        "l6",
+        "l7",
+        "l8",
+        "m1",
+        "m10",
+        "m2",
+        "m3",
+        "m4",
+        "m5",
+        "m6",
+        "m7",
+        "m8",
+        "m9",
+        "n1",
+        "n2",
+        "n3",
+        "n5"
+      ]
+    },
+    "live": {
+      "groups": 107,
+      "full3_prefixes": 100,
+      "shape_a_prefixes": 85,
+      "shape_b_prefixes": 22,
+      "route_kinds": {
+        "export-data": 102,
+        "export-template": 106,
+        "import-data": 100
+      },
+      "three_state_routes": 308,
+      "ie_module_files": 99,
+      "no_decorator_modules": 63,
+      "factory_api_prefixes": 62,
+      "app_routes_total": 2291
+    },
+    "target_after_spec": {
+      "three_state_routes": 356,
+      "groups": 123,
+      "full3_prefixes": 116,
+      "shape_a_prefixes": 101,
+      "shape_b_prefixes": 22,
+      "route_kinds": {
+        "export-template": 122,
+        "export-data": 118,
+        "import-data": 116
+      },
+      "ie_module_files": 99,
+      "factory_api_prefixes": 62
+    }
+  }
+}

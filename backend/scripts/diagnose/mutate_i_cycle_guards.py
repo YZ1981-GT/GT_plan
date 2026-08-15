@@ -59,6 +59,7 @@ _TESTS = _ROOT / "backend" / "tests"
 _FE = _ROOT / "audit-platform" / "frontend"
 _CB = _FE / "src" / "components" / "workpaper" / "composables"
 _WPC = _FE / "src" / "components" / "workpaper"
+_DATA = _ROOT / "backend" / "data"
 
 _BAK_SUFFIX = ".mutbak"
 
@@ -278,6 +279,92 @@ MUTATIONS: tuple[Mutation, ...] = (
         anchor="`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`",
         replacement="`/api/workpapers/${props.wpId}/sync-from-workpaper`",
         expect_test="canonical",
+        suite="frontend",
+    ),
+    # ── P43：行维度第三边（源 xlsx 首列 ↔ 附注模板 rows）2026-08-15 收口新增 ──────
+    #
+    # 🔴 为什么需要新增这一组：原 14 条变异全部覆盖**列**维度与扩位的**源侧**基线，
+    # 而「模板/前端的行骨架是否等于源模板首列」这条边当时不存在 ⇒ I1 上市减值准备
+    # 减少段丢行 + 多扩位、国企同表 48 行 10 个错类别，两处都躲过了 14 条变异。
+    Mutation(
+        prop="P43",
+        title="附注模板把减值准备减少段第 3 个明细改回 `……`（复现改造前的多扩位形态）",
+        target=_DATA / "note_template_listed.json",
+        # 锚点 = 减值准备层尾 + 「四、账面价值」（实测全文命中 1 次；
+        # 单写「（3）其他减少」会命中 3 次、单写「四、账面价值」命中 6 次）
+        anchor=(
+            '"label": "（3）其他减少",\n'
+            '              "row_type": "data"\n'
+            "            },\n"
+            "            {\n"
+            '              "label": "4.期末余额",\n'
+            '              "row_type": "data"\n'
+            "            },\n"
+            "            {\n"
+            '              "label": "四、账面价值",'
+        ),
+        replacement=(
+            '"label": "……",\n'
+            '              "row_type": "expandable"\n'
+            "            },\n"
+            "            {\n"
+            '              "label": "4.期末余额",\n'
+            '              "row_type": "data"\n'
+            "            },\n"
+            "            {\n"
+            '              "label": "四、账面价值",'
+        ),
+        expect_test="test_row_skeleton_impairment_decrease_has_three_details",
+    ),
+    Mutation(
+        prop="P43",
+        title="幂等脚本的行骨架常量改回旧错值（脚本 ↔ 模板 JSON 双向锁死）",
+        target=_FIX / "fix_note_i_cycle_structure.py",
+        anchor='    "（2）失效且终止确认的部分",\n    "（3）其他减少",\n    "4.期末余额",\n    "四、账面价值",',
+        replacement='    "（2）其他减少",\n    "……",\n    "4.期末余额",\n    "四、账面价值",',
+        # `--check` 会把脚本常量与 JSON 的差记为欠账 ⇒ 改常量不改数据必打红
+        expect_test="test_check_passes",
+    ),
+    Mutation(
+        prop="P43",
+        title="国企主表行骨架去掉「其中：」前缀（首类别行与源模板 A9 断链）",
+        target=_FIX / "fix_note_i_cycle_structure.py",
+        anchor='rows.append(data_row(("其中：" if idx == 0 else "") + cat.label))',
+        replacement="rows.append(data_row(cat.label))",
+        expect_test="test_check_passes",
+    ),
+    # ── P44：前端行模型 ↔ 附注模板行同构（前端消费侧） ────────────────────────
+    Mutation(
+        prop="P44",
+        title="前端上市行模型改回 `imp_dec_ellipsis`（复现凭空第 4 个扩位）",
+        target=_CB / "i1ListedDisclosureModel.ts",
+        anchor="{ key: 'imp_dec_expire', label: '（2）失效且终止确认的部分', indent: 2, kind: 'detail', editable: true },\n  { key: 'imp_dec_other', label: '（3）其他减少', indent: 2, kind: 'detail', editable: true },",
+        replacement="{ key: 'imp_dec_other', label: '（2）其他减少', indent: 2, kind: 'detail', editable: true },\n  { key: 'imp_dec_ellipsis', label: '……', indent: 2, kind: 'ellipsis', editable: true },",
+        expect_test="逐行等于模板 rows",
+        suite="frontend",
+    ),
+    # ── P45：前端类别默认值 ↔ 后端类别真源（消除第二份类别声明） ────────────────
+    Mutation(
+        prop="P45",
+        title="前端上市类别默认值改回自己写死 11 条（复现第二份类别真源）",
+        target=_CB / "i1ListedDisclosureModel.ts",
+        anchor="  I1_DEFAULT_CATEGORIES.map((c) => ({\n    key: I1_STANDARD_TO_LEGACY[c.key] ?? c.key,\n    label: c.label,\n  }))",
+        replacement=(
+            "  [\n"
+            "    { key: 'land', label: '土地使用权' },\n"
+            "    { key: 'housing', label: '房屋使用权' },\n"
+            "    { key: 'patent', label: '专利权' },\n"
+            "    { key: 'knowhow', label: '非专利技术' },\n"
+            "    { key: 'trademark', label: '商标权' },\n"
+            "    { key: 'copyright', label: '著作权' },\n"
+            "    { key: 'franchise', label: '特许权' },\n"
+            "    { key: 'software', label: '软件' },\n"
+            "    { key: 'mining', label: '探矿权/采矿权' },\n"
+            "    { key: 'data', label: '数据资源' },\n"
+            "    { key: 'other', label: '其他' },\n"
+            "  ]"
+        ),
+        expect_test="label 序列逐字等于后端",
         suite="frontend",
     ),
 )

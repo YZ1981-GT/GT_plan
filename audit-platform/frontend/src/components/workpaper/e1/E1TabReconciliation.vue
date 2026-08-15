@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** E1-6 银行存款余额调节表：账户级四类逐笔未达账项。 */
 import { ref, inject, toRef, onMounted, type Ref } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
@@ -316,7 +317,7 @@ function updateItem(
                     </el-table-column>
                     <el-table-column label="金额（元）" width="145" align="right">
                       <template #default="{ row: item }">
-                        <el-input-number :model-value="item.amount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" @change="value => updateItem(row.id, category.key, item.id, 'amount', value ?? 0)" />
+                        <WpAmountInput :model-value="item.amount" :disabled="isReadonly" @change="value => updateItem(row.id, category.key, item.id, 'amount', value ?? 0)" />
                       </template>
                     </el-table-column>
                     <el-table-column label="报表日后处理" width="120" align="center">

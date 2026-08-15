@@ -29,12 +29,22 @@ I6      ``6602``                        ``6602`` 是**管理费用**（全库借
 
 **两个平台级陷阱（本模块自己绕开，不改共享件）**
 
-- **`row_code` 跨准则语义不同**：实证 ``BS-050`` 在 `listed_*` 是「合同负债」
-  ``TB('2205','期末余额')``、在 `soe_*` 才是「其他非流动资产」（formula 为 None）；``BS-040``
-  反过来。而 `resolve_report_line_account_codes` 的最后一级兜底
-  （``applicable_standard NOT LIKE 'project:%' ... LIMIT 1``，无 ``ORDER BY``）会**任取一条**
-  → I5 走 soe 时拿到 listed 的「合同负债」公式，解析出负债科目 ``2205`` 且
-  ``resolved_from='report_config'``。→ 本模块自己查公式并**校验 `row_name`**，行名不符即丢弃。
+- **共享件的最后一级兜底会任取一条配置**：`resolve_report_line_account_codes` 的末级
+  （``applicable_standard NOT LIKE 'project:%' ... LIMIT 1``，无 ``ORDER BY``）在
+  「该 row_code 于本项目适用准则下 formula 为 NULL」时会**任取另一准则的公式**，从而解析出
+  别的科目且 ``resolved_from='report_config'``（看起来很可信）。→ 本模块自己查公式并
+  **校验 `row_name`**，行名不符即丢弃（:func:`row_name_matches`）。
+
+  .. warning::
+     🔴 **本段原先举的例子是错的，且正是 `I_CYCLE_ROW_CODES` 错值的思想来源**（2026-08-09 修）。
+     原文称「``BS-050`` 在 `soe_*` 是『其他非流动资产』、``BS-040`` 反过来」——
+     `report_config` 实证 ``BS-050`` **四准则全部**是「其他应付款」
+     （``TB('2241')`` / standalone 侧另加 ``TB('2231')``）、``BS-040`` 四准则全部是
+     「流动负债：」节标题（formula 为 NULL）。两个码**都不是 I 类的行**。
+     当时按此错误认知把 I5 的 row_code 配成了 ``BS-040``/``BS-050``，再靠行名闸把
+     解析结果全部丢弃 —— 于是「闸门生效」被误读成「设计正确」。
+     ⇒ **行名闸的真实价值是防回退护栏，不是「跨准则语义不同」的补偿**；
+     判某个 row_code 属不属于本循环，一律直接查 `report_config` 的 `row_name`。
 - **二分 gross/provision 装不下 I1 的三段**：``TB('1701')-TB('1702')`` 经
   `split_gross_provision` 会把 ``1702 累计摊销`` 判成 gross（名称不含「减值准备」）→ 原值口径
   变净额。→ 本模块改用**段化声明** :class:`ISegmentSpec`，每段独立认领 / 独立兜底 / 独立方向。
@@ -223,14 +233,41 @@ class ICycleAccounts:
 # 声明（唯一真源）
 # ─────────────────────────────────────────────────────────────────────────────
 
-#: 报表行编码：**按准则不同**（实证同一 row_code 跨准则 row_name 都可能不同）
+#: 报表行编码。**取值 = `report_config` 逐行对账实证值**（2026-08-09）。
+#:
+#: I 类**四准则同码同名同公式**（`listed_standalone` / `listed_consolidated` /
+#: `soe_standalone` / `soe_consolidated` 四行的 `row_name` 与 `formula` 逐字相同），
+#: 故两个键取值相同。**这不是平台通例** —— J/K/L 循环确有「按变体不同」的行
+#: （如 J1 listed `BS-051` / soe `BS-069`），故保留 ``dict[str, dict[str, str]]``
+#: 结构以表达该维度，不塌成 ``dict[str, str]``。守卫 Property 2 显式断言 I 类两侧同码，
+#: 防被按 J1 范式"修正"成两码。
+#:
+#: 🔴 **改造前 12 个取值里 11 个错**（仅 ``I6.listed`` 正确），且是**整体错位**：
+#: listed 侧 ``BS-033/035/037/038/040`` 分别是「开发支出（I2 的行）/ 长期待摊费用（I4 的行）/
+#: 其他非流动资产（I5 的行）/ 非流动资产合计（ROW 派生行）/ 流动负债：（节标题，formula NULL）」；
+#: soe 侧 ``BS-045/046/047/048/050`` + ``IS-024`` 全是负债段与派生行
+#: 「应付账款 / 预收款项 / 合同负债 / 应付职工薪酬 / 其他应付款 / 四、净利润」。
+#: 当时未取到错数的唯一原因是 :func:`row_name_matches` 把错公式全部丢弃 →
+#: 六循环 ``resolved_from`` 全部退化 ``fallback``，报表行解析层等于空转。
+#:
+#: **落地前已做 A/B 对照**（8 真实项目 × 6 循环，同进程内 monkeypatch 跑两遍）：
+#: ``standard`` / ``original`` 码集、``tb_values``、``parent_check``、
+#: ``adjudication_prefill`` **实质差异 0 处**；唯一变化是 ``resolved_from``
+#: 由 ``fallback`` 转 ``report_config`` **34 处**（溯源标签，非取数结果）。
 I_CYCLE_ROW_CODES: dict[str, dict[str, str]] = {
-    "I1": {"listed": "BS-033", "soe": "BS-045"},
-    "I2": {"listed": "BS-035", "soe": "BS-046"},
-    "I3": {"listed": "BS-037", "soe": "BS-047"},
-    "I4": {"listed": "BS-038", "soe": "BS-048"},
-    "I5": {"listed": "BS-040", "soe": "BS-050"},
-    "I6": {"listed": "IS-006", "soe": "IS-024"},
+    # 无形资产 = TB('1701','期末余额') - TB('1702','期末余额')
+    "I1": {"listed": "BS-032", "soe": "BS-032"},
+    # 开发支出 = TB('1704','期末余额')
+    "I2": {"listed": "BS-033", "soe": "BS-033"},
+    # 商誉 = TB('1711','期末余额')
+    "I3": {"listed": "BS-034", "soe": "BS-034"},
+    # 长期待摊费用 = TB('1801','期末余额')
+    "I4": {"listed": "BS-035", "soe": "BS-035"},
+    # 其他非流动资产 = TB('1911','期末余额')；🔴 `1911` 全库两张科目表都不存在
+    # → 段兜底为空 tuple → `found=False`（宁缺勿造），见 I5 段声明
+    "I5": {"listed": "BS-037", "soe": "BS-037"},
+    # 研发费用 = TB('6604','本期发生额')（损益类，走 trial_balance 发生额）
+    "I6": {"listed": "IS-006", "soe": "IS-006"},
 }
 
 #: 报表行**行名**期望语义（行名校验闸 + 冲突诊断共用）

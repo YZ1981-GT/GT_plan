@@ -1,0 +1,3269 @@
+{
+  "_meta": {
+    "spec": "x3-adjustment-entry-import-export",
+    "task": "1.7",
+    "artifact": "Deviation_Registry",
+    "purpose": "承载本 spec 半径外/行为不修的已知偏差。守卫基线只收已确证正确的值（R8.6），已判错位的值一律由本表承载 —— 否则守卫要么把错值锁成基线，要么绕开它们。",
+    "requirements": [
+      "8.3",
+      "8.4",
+      "8.5",
+      "8.6",
+      "8.7",
+      "5.8"
+    ],
+    "design_ref": "design §C7（十一组 G1~G11）+ §用户裁决 2",
+    "generated_by": "python backend/scripts/check/check_x3_deviation_registry.py --emit",
+    "checked_by": "python backend/scripts/check/check_x3_deviation_registry.py --check",
+    "written_at": "2026-08-16T00:14:42+08:00",
+    "column_contract": "每条恒带三列 catalog_value / contract_value / frontend_observed（R8.4）；某列不适用时值为 null 且必须在 na_reasons 里给出理由 —— `--check` 强制。",
+    "verdict_values": [
+      "real_drift",
+      "probe_false_negative"
+    ],
+    "self_invalidation": "每组带 baseline_count；--check 用活探针重算实测数：相等=OK / 实测>基线=REGRESSION / 实测<基线=NEEDS_BASELINE_LOWERING（要求同步下调，不下调即打红）。下调基线的唯一合法形态 = 同时给出 baseline_lowered_from（design §C7 原值）与 lowered_by_task。",
+    "design_baseline": {
+      "G1": 16,
+      "G2": 38,
+      "G3": 15,
+      "G4": 5,
+      "G5": 8,
+      "G6": 10,
+      "G7": 2,
+      "G8": 1,
+      "G9": 1,
+      "G10": 4,
+      "G11": 1
+    },
+    "totals": {
+      "groups": 11,
+      "baseline_sum": 91,
+      "measured_sum": 91,
+      "entries_landed": 91,
+      "pending_groups": []
+    }
+  },
+  "groups": [
+    {
+      "group": "G1",
+      "title": "catalog `class_code = F-调整分录` 且启用 I/E，但 `item_id` 在前端生产代码无消费方",
+      "baseline_count": 10,
+      "measured_count": 10,
+      "status": "measured",
+      "owner_spec": "workpaper-import-export-lifecycle-closure（既有缺陷，不在本 spec 行为半径）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① `from app.services.acnr.catalog import list_sheets` → 取 `class_code == 'F-调整分录'` 且 `import_export.enabled` 为真的条目",
+        "② 逐条取 `import_export.item_id`，用四形态键提取判据（literal + wildcard_prefix + ITEM_PREFIX_form4）在前端**生产代码**（排除 `__tests__` 与 `*.spec.ts`）找消费方",
+        "③ 与 `backend/data/adjustment_ie_contract.json` 的 `sheets[<code>].item_id` 做 catalog / 契约 / 前端三向比对",
+        "④ 分 verdict：前端存在同义真键（catalog 记错）⇒ `real_drift`；键在运行期拼装、字面量不存在（判据假阴性）⇒ `probe_false_negative`",
+        "⑤ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g1_catalog_item_id_without_frontend_consumer",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "denominator_observed": 63,
+          "denominator_note": "分母 = catalog 中 class_code=F-调整分录 且 import_export.enabled 为真的条目数。",
+          "f_adjustment_total": 81,
+          "consumer_found": 53,
+          "no_consumer": 10,
+          "entries_by_verdict": {
+            "real_drift": 10,
+            "probe_false_negative": 0
+          }
+        }
+      },
+      "entries": [
+        {
+          "group": "G1",
+          "key": "H7-3",
+          "sheet_code": "H7-3",
+          "catalog_value": "H7-3-adj-entries",
+          "contract_value": null,
+          "frontend_observed": null,
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "exempt.H7-3(kind=no_backend_spec)",
+            "catalog_value_frontend_hits": [],
+            "note": "catalog item_id 在前端无消费方、无契约对照",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          },
+          "na_reasons": {
+            "frontend_observed": "catalog item_id 在前端无消费方、无契约对照",
+            "contract_value": "契约清单 adjustment_ie_contract.json 无 sheets.H7-3 登记"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "H10-3",
+          "sheet_code": "H10-3",
+          "catalog_value": "H10-aje-rows",
+          "contract_value": null,
+          "frontend_observed": null,
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "exempt.H10-3(kind=out_of_scope_backend_registered)",
+            "catalog_value_frontend_hits": [],
+            "note": "catalog item_id 在前端无消费方、无契约对照",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          },
+          "na_reasons": {
+            "frontend_observed": "catalog item_id 在前端无消费方、无契约对照",
+            "contract_value": "契约清单 adjustment_ie_contract.json 无 sheets.H10-3 登记"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K3-3",
+          "sheet_code": "K3-3",
+          "catalog_value": "K3-3-rows",
+          "contract_value": "K3-3-adj-entries",
+          "frontend_observed": "K3-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K3-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K3-3-adj-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K4-3",
+          "sheet_code": "K4-3",
+          "catalog_value": "K4-3-rows",
+          "contract_value": "K4-3-adj-entries",
+          "frontend_observed": "K4-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K4-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K4-3-adj-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K5-3",
+          "sheet_code": "K5-3",
+          "catalog_value": "K5-3-rows",
+          "contract_value": "K5-3-entries",
+          "frontend_observed": "K5-3-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K5-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K5-3-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K6-3",
+          "sheet_code": "K6-3",
+          "catalog_value": "K6-3-rows",
+          "contract_value": "K6-3-adj-entries",
+          "frontend_observed": "K6-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K6-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K6-3-adj-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K7-3",
+          "sheet_code": "K7-3",
+          "catalog_value": "K7-3-rows",
+          "contract_value": "K7-3-adj-entries",
+          "frontend_observed": "K7-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K7-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K7-3-adj-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K9-3",
+          "sheet_code": "K9-3",
+          "catalog_value": "K9-3-rows",
+          "contract_value": "K9-3-adj-entries",
+          "frontend_observed": "K9-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K9-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K9-3-adj-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "K11-3",
+          "sheet_code": "K11-3",
+          "catalog_value": "K11-3-rows",
+          "contract_value": "K11-3-adj-entries",
+          "frontend_observed": "K11-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "sheets.K11-3.item_id",
+            "catalog_value_frontend_hits": [],
+            "note": "前端用契约值 'K11-3-adj-entries' 消费（catalog 记错）",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          }
+        },
+        {
+          "group": "G1",
+          "key": "L1-3",
+          "sheet_code": "L1-3",
+          "catalog_value": "L1-3-adj-entries",
+          "contract_value": null,
+          "frontend_observed": null,
+          "verdict": "real_drift",
+          "method_ref": "G1.method",
+          "evidence": {
+            "contract_path": "未登记",
+            "catalog_value_frontend_hits": [],
+            "note": "catalog item_id 在前端无消费方、无契约对照",
+            "search_method": "四形态判据（literal + prefix_wildcard + ITEM_PREFIX_form4）"
+          },
+          "na_reasons": {
+            "frontend_observed": "catalog item_id 在前端无消费方、无契约对照",
+            "contract_value": "契约清单 adjustment_ie_contract.json 无 sheets.L1-3 登记"
+          }
+        }
+      ],
+      "baseline_lowered_from": 16,
+      "lowered_by_task": "13.1"
+    },
+    {
+      "group": "G2",
+      "title": "无 manifest 兜底的启用 IE 条目（`generate_catalog.py` 重生成即丢）",
+      "baseline_count": 38,
+      "measured_count": 38,
+      "status": "measured",
+      "owner_spec": "acnr 生成链（裁决 2：本 spec 不修，只登记且不让红的规模变大）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 取 catalog 全部 `import_export.enabled` 条目（实测 337）",
+        "② 取 `backend/data/acnr/sources/*_cycle_ie_manifest.yaml` 的全部 `entries[].sheet_code`（实测 5 文件 / 332 条）",
+        "③ 差集即本组：这些条目在 catalog 里有值、在生成源里没有 ⇒ 跑一次生成器就消失",
+        "④ 复核第二兜底：`backend/data/acnr/global_catalog.overrides.json` 的 `overrides` 段实测为空 ⇒ 无其他存活路径",
+        "⑤ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`；CI 侧退出码见本组 `ci_job.reproduce_cmd`"
+      ],
+      "probe": {
+        "id": "g2_ie_enabled_without_manifest_backing",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "catalog_sheets": 1215,
+          "catalog_ie_enabled": 353,
+          "manifest_files": [
+            "d_cycle_ie_manifest.yaml",
+            "f_cycle_ie_manifest.yaml",
+            "g_cycle_ie_manifest.yaml",
+            "h_cycle_ie_manifest.yaml",
+            "k_cycle_ie_manifest.yaml",
+            "l_cycle_ie_manifest.yaml",
+            "m_cycle_ie_manifest.yaml",
+            "n_cycle_ie_manifest.yaml"
+          ],
+          "manifest_entries": 348,
+          "generator_all_cycles": [
+            "d",
+            "f",
+            "g",
+            "h",
+            "k",
+            "l",
+            "m",
+            "n"
+          ],
+          "overrides_entries": 0,
+          "by_cycle": {
+            "H5": 2,
+            "H7": 2,
+            "I1": 6,
+            "I2": 4,
+            "I3": 6,
+            "I4": 2,
+            "I5": 2,
+            "I6": 4,
+            "L1": 2,
+            "L3": 2,
+            "L4": 2,
+            "L5": 2,
+            "N4": 2
+          }
+        }
+      },
+      "entries": [
+        {
+          "group": "G2",
+          "key": "H5-2",
+          "sheet_code": "H5-2",
+          "catalog_value": "enabled=True api_prefix='h5' item_id='H5-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['h5'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "h_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "H5-3",
+          "sheet_code": "H5-3",
+          "catalog_value": "enabled=True api_prefix='h5' item_id='H5-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['h5'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "h_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=exempt.H5-3(kind=no_backend_spec)"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "H7-2",
+          "sheet_code": "H7-2",
+          "catalog_value": "enabled=True api_prefix='h7' item_id='H7-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['h7'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "h_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "H7-3",
+          "sheet_code": "H7-3",
+          "catalog_value": "enabled=True api_prefix='h7' item_id='H7-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['h7'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "h_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=exempt.H7-3(kind=no_backend_spec)"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I1",
+          "sheet_code": "I1",
+          "catalog_value": "enabled=True api_prefix='i1' item_id='I1-adj-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I1-3",
+          "sheet_code": "I1-3",
+          "catalog_value": "enabled=True api_prefix='i1' item_id='I1-3-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=exempt.I1-3(kind=out_of_scope_backend_registered)"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I1-5",
+          "sheet_code": "I1-5",
+          "catalog_value": "enabled=True api_prefix='i1' item_id='I1-5-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I1-6",
+          "sheet_code": "I1-6",
+          "catalog_value": "enabled=True api_prefix='i1' item_id='I1-6-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I1-8",
+          "sheet_code": "I1-8",
+          "catalog_value": "enabled=True api_prefix='i1' item_id='I1-8-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I1-9",
+          "sheet_code": "I1-9",
+          "catalog_value": "enabled=True api_prefix='i1' item_id='I1-9-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I2-1",
+          "sheet_code": "I2-1",
+          "catalog_value": "enabled=True api_prefix='i2' item_id='I2-1-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i2'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I2-7",
+          "sheet_code": "I2-7",
+          "catalog_value": "enabled=True api_prefix='i2' item_id='I2-7-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i2'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I2-13",
+          "sheet_code": "I2-13",
+          "catalog_value": "enabled=True api_prefix='i2' item_id='I2-13-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i2'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I2-14",
+          "sheet_code": "I2-14",
+          "catalog_value": "enabled=True api_prefix='i2' item_id='I2-14-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i2'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I3-1",
+          "sheet_code": "I3-1",
+          "catalog_value": "enabled=True api_prefix='i3' item_id='I3-adj-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I3-2",
+          "sheet_code": "I3-2",
+          "catalog_value": "enabled=True api_prefix='i3' item_id='I3-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I3-3",
+          "sheet_code": "I3-3",
+          "catalog_value": "enabled=True api_prefix='i3' item_id='I3-3-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=exempt.I3-3(kind=out_of_scope_backend_registered)"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I3-4",
+          "sheet_code": "I3-4",
+          "catalog_value": "enabled=True api_prefix='i3' item_id='I3-4-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I3-6",
+          "sheet_code": "I3-6",
+          "catalog_value": "enabled=True api_prefix='i3' item_id='I3-6-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I3-7",
+          "sheet_code": "I3-7",
+          "catalog_value": "enabled=True api_prefix='i3' item_id='I3-7-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I4-2",
+          "sheet_code": "I4-2",
+          "catalog_value": "enabled=True api_prefix='i4' item_id='I4-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i4'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I4-6",
+          "sheet_code": "I4-6",
+          "catalog_value": "enabled=True api_prefix='i4' item_id='I4-6-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i4'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I5-2",
+          "sheet_code": "I5-2",
+          "catalog_value": "enabled=True api_prefix='i5' item_id='I5-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i5'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I5-3",
+          "sheet_code": "I5-3",
+          "catalog_value": "enabled=True api_prefix='i5' item_id='I5-3-rows' storage_field='remark'",
+          "contract_value": "I5-3-rows",
+          "frontend_observed": "registry['i5'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I6-2",
+          "sheet_code": "I6-2",
+          "catalog_value": "enabled=True api_prefix='i6' item_id='I6-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i6'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I6-3",
+          "sheet_code": "I6-3",
+          "catalog_value": "enabled=True api_prefix='i6' item_id='I6-3-rows' storage_field='remark'",
+          "contract_value": "I6-3-rows",
+          "frontend_observed": "registry['i6'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I6-5",
+          "sheet_code": "I6-5",
+          "catalog_value": "enabled=True api_prefix='i6' item_id='I6-5-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i6'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "I6-6",
+          "sheet_code": "I6-6",
+          "catalog_value": "enabled=True api_prefix='i6' item_id='I6-6-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['i6'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "i_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L1-2",
+          "sheet_code": "L1-2",
+          "catalog_value": "enabled=True api_prefix='l1' item_id='L1-L1-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L1-3",
+          "sheet_code": "L1-3",
+          "catalog_value": "enabled=True api_prefix='l1' item_id='L1-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l1'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L3-2",
+          "sheet_code": "L3-2",
+          "catalog_value": "enabled=True api_prefix='l3' item_id='L3-L3-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L3-3",
+          "sheet_code": "L3-3",
+          "catalog_value": "enabled=True api_prefix='l3' item_id='L3-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l3'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L4-2",
+          "sheet_code": "L4-2",
+          "catalog_value": "enabled=True api_prefix='l4' item_id='L4-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l4'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L4-3",
+          "sheet_code": "L4-3",
+          "catalog_value": "enabled=True api_prefix='l4' item_id='L4-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l4'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L5-2",
+          "sheet_code": "L5-2",
+          "catalog_value": "enabled=True api_prefix='l5' item_id='L5-L5-2-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l5'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "L5-3",
+          "sheet_code": "L5-3",
+          "catalog_value": "enabled=True api_prefix='l5' item_id='L5-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['l5'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "l_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "N4-2",
+          "sheet_code": "N4-2",
+          "catalog_value": "enabled=True api_prefix='n4' item_id='N4-2-detail-rows' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['n4'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "n_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=未登记"
+          }
+        },
+        {
+          "group": "G2",
+          "key": "N4-3",
+          "sheet_code": "N4-3",
+          "catalog_value": "enabled=True api_prefix='n4' item_id='N4-3-adj-entries' storage_field='remark'",
+          "contract_value": null,
+          "frontend_observed": "registry['n4'].sheets 含本 sheet=True",
+          "verdict": "real_drift",
+          "method_ref": "G2.method",
+          "evidence": {
+            "expected_manifest": "n_cycle_ie_manifest.yaml",
+            "manifest_files_present": [
+              "d_cycle_ie_manifest.yaml",
+              "f_cycle_ie_manifest.yaml",
+              "g_cycle_ie_manifest.yaml",
+              "h_cycle_ie_manifest.yaml",
+              "k_cycle_ie_manifest.yaml",
+              "l_cycle_ie_manifest.yaml",
+              "m_cycle_ie_manifest.yaml",
+              "n_cycle_ie_manifest.yaml"
+            ],
+            "generator_all_cycles": [
+              "d",
+              "k",
+              "f",
+              "g",
+              "h",
+              "l",
+              "m",
+              "n"
+            ],
+            "overrides_entries": 0,
+            "loss_on_regeneration": true
+          },
+          "na_reasons": {
+            "contract_value": "契约清单只收调整分录键面；本条取值路径=exempt.N4-3(kind=no_backend_spec)"
+          }
+        }
+      ],
+      "ci_job": {
+        "job": "acnr-ie-catalog-sync",
+        "reproduce_cmd": "python backend/scripts/acnr/check_ie_catalog_sync.py",
+        "observed_exit_code": 1,
+        "observed_at": "2026-08-16T00:14:42+08:00",
+        "observed_tail": [
+          "✗ [H] Catalog 中 'H7-2' 有 import_export（enabled=true）但 manifest 中未登记",
+          "✗ [H] Catalog 中 'H7-3' 有 import_export（enabled=true）但 manifest 中未登记",
+          "修复方式：更新 manifest YAML 或重新运行 generate_catalog.py 使二者同步。"
+        ]
+      }
+    },
+    {
+      "group": "G3",
+      "title": "manifest 与 catalog `api_prefix` 反向不一致（重生成会把 catalog 现值覆盖回 manifest 值）",
+      "baseline_count": 15,
+      "measured_count": 15,
+      "status": "measured",
+      "owner_spec": "g7-column-alignment-and-extraction-closure 等（裁决 2：本 spec 不修，只登记）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 取 manifest 全部 `entries[]` 与 catalog 同 `sheet_code` 条目（实测可比 332 条）",
+        "② 逐条比 `entries[].api_prefix` 与 `import_export.api_prefix`，不等即收录（实测 15 条）",
+        "③ 第三列取 `cycleImportExportRegistry.generated.ts` 里实际存在的前缀键 —— 它派生自 catalog，故用户点下拉打到的是 catalog 值，不是 manifest 值",
+        "④ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`；CI 侧退出码见本组 `ci_job.reproduce_cmd`"
+      ],
+      "probe": {
+        "id": "g3_manifest_vs_catalog_api_prefix",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "compared_entries": 315,
+          "generated_registry_prefixes": 78,
+          "affected_prefix_pairs": [
+            "d1-ecl → d1",
+            "g4 → g4-main",
+            "g6 → g6-main",
+            "g7 → g7-main",
+            "g7-method → g7-equity-method"
+          ]
+        }
+      },
+      "entries": [
+        {
+          "group": "G3",
+          "key": "D1-15",
+          "sheet_code": "D1-15",
+          "catalog_value": "d1",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "d_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "d1-ecl",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G4-1",
+          "sheet_code": "G4-1",
+          "catalog_value": "g4-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g4",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G4-2",
+          "sheet_code": "G4-2",
+          "catalog_value": "g4-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g4",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G4-3",
+          "sheet_code": "G4-3",
+          "catalog_value": "g4-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g4",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=exempt.G4-3(kind=not_cycle_ie_factory_key_shared)"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G6-2",
+          "sheet_code": "G6-2",
+          "catalog_value": "g6-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g6",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G6-3",
+          "sheet_code": "G6-3",
+          "catalog_value": "g6-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g6",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-2",
+          "sheet_code": "G7-2",
+          "catalog_value": "g7-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-3",
+          "sheet_code": "G7-3",
+          "catalog_value": "g7-main",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=exempt.G7-3(kind=no_backend_spec)"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-4",
+          "sheet_code": "G7-4",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-5",
+          "sheet_code": "G7-5",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-13",
+          "sheet_code": "G7-13",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-14",
+          "sheet_code": "G7-14",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-15",
+          "sheet_code": "G7-15",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-16",
+          "sheet_code": "G7-16",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        },
+        {
+          "group": "G3",
+          "key": "G7-17",
+          "sheet_code": "G7-17",
+          "catalog_value": "g7-equity-method",
+          "contract_value": null,
+          "frontend_observed": "registry 前缀键：catalog 值在位=True / manifest 值在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G3.method",
+          "evidence": {
+            "manifest_file": "g_cycle_ie_manifest.yaml",
+            "manifest_api_prefix": "g7-method",
+            "direction": "manifest → catalog（重生成时 manifest 反向覆盖 catalog 现值）"
+          },
+          "na_reasons": {
+            "contract_value": "契约清单不登记 I/E 路由前缀；取值路径=未登记"
+          }
+        }
+      ],
+      "ci_job": {
+        "job": "check-acnr-catalog-drift",
+        "reproduce_cmd": "python backend/scripts/acnr/check_catalog_drift.py",
+        "observed_exit_code": 1,
+        "observed_at": "2026-08-16T00:14:42+08:00",
+        "observed_tail": [
+          "-        \"api_prefix\": \"g7-equity-method\",",
+          "+        \"api_prefix\": \"g7-method\",",
+          "... (551 more lines omitted)"
+        ]
+      }
+    },
+    {
+      "group": "G4",
+      "title": "split-brain：短前缀的形态 A 宿主模块 ≠ adapter 解析到的端点所在模块",
+      "baseline_count": 5,
+      "measured_count": 5,
+      "status": "measured",
+      "owner_spec": "workpaper-import-export-lifecycle-closure Task 25（本 spec 只保持不上升）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① `from tests.test_x3_adapter_host_same_module import split_brain_report, module_path_violations`（任务 1.4 交付的唯一口径，禁再写第二份）",
+        "② `split_brain_report(app)` 逐前缀取「运行期形态 A 端点 `__module__`」与「`_endpoint_for(目标模块, prefix, suffix)` 解析到的端点 `__module__`」",
+        "③ `module_path_violations(...)` 取两侧模块集不等的前缀（实测 5：h7 / l1 / l3 / l4 / l5）",
+        "④ 形态 A 必须按严格口径 `/api/workpapers/{wp_id}/{prefix}/{三态}`；粗口径会多算 h5 / n4（见 G7），🔴 不得据此把本组基线抬到 7",
+        "⑤ 复算命令：`python -m pytest backend/tests/test_x3_adapter_host_same_module.py -q`（从仓库根跑）"
+      ],
+      "probe": {
+        "id": "g4_adapter_host_split_brain",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "comparable_prefixes": 84,
+          "criterion": "严格形态 A = /api/workpapers/{wp_id}/{prefix}/{三态}（粗口径会多算 h5/n4，见 G7）",
+          "reused_from": "backend/tests/test_x3_adapter_host_same_module.py::split_brain_report"
+        }
+      },
+      "entries": [
+        {
+          "group": "G4",
+          "key": "h7",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['H7-2', 'H7-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=['components/workpaper/h7/core/H7TabAdjustment.vue:17', 'components/workpaper/h7/core/H7TabDetailCost.vue:21', 'components/workpaper/h7/core/H7TabDetailFair.vue:21']",
+          "verdict": "real_drift",
+          "method_ref": "G4.method",
+          "evidence": {
+            "runtime_host_modules": [
+              "app.routers.h7_biological_assets"
+            ],
+            "adapter_resolved_modules": [
+              "app.routers.wp_render_strategies._cycle_import_export_common"
+            ],
+            "adapter_target": "app.routers.wp_render_strategies._h7_import_export",
+            "compared_suffixes": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ],
+            "identity_mismatch": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ]
+          },
+          "na_reasons": {
+            "contract_value": "split-brain 属路由宿主面，不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G4",
+          "key": "l1",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L1-2', 'L1-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=[]",
+          "verdict": "real_drift",
+          "method_ref": "G4.method",
+          "evidence": {
+            "runtime_host_modules": [
+              "app.routers.l1_short_term_loans"
+            ],
+            "adapter_resolved_modules": [
+              "app.routers.wp_render_strategies._cycle_import_export_common"
+            ],
+            "adapter_target": "app.routers.wp_render_strategies._l1_import_export",
+            "compared_suffixes": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ],
+            "identity_mismatch": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ]
+          },
+          "na_reasons": {
+            "contract_value": "split-brain 属路由宿主面，不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G4",
+          "key": "l3",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L3-2', 'L3-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=[]",
+          "verdict": "real_drift",
+          "method_ref": "G4.method",
+          "evidence": {
+            "runtime_host_modules": [
+              "app.routers.l3_long_term_loans"
+            ],
+            "adapter_resolved_modules": [
+              "app.routers.wp_render_strategies._cycle_import_export_common"
+            ],
+            "adapter_target": "app.routers.wp_render_strategies._l3_import_export",
+            "compared_suffixes": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ],
+            "identity_mismatch": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ]
+          },
+          "na_reasons": {
+            "contract_value": "split-brain 属路由宿主面，不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G4",
+          "key": "l4",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L4-2', 'L4-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=['components/workpaper/l4/core/L4TabDetail.vue:22']",
+          "verdict": "real_drift",
+          "method_ref": "G4.method",
+          "evidence": {
+            "runtime_host_modules": [
+              "app.routers.l4_bonds_payable"
+            ],
+            "adapter_resolved_modules": [
+              "app.routers.wp_render_strategies._cycle_import_export_common"
+            ],
+            "adapter_target": "app.routers.wp_render_strategies._l4_import_export",
+            "compared_suffixes": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ],
+            "identity_mismatch": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ]
+          },
+          "na_reasons": {
+            "contract_value": "split-brain 属路由宿主面，不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G4",
+          "key": "l5",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L5-2', 'L5-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=[]",
+          "verdict": "real_drift",
+          "method_ref": "G4.method",
+          "evidence": {
+            "runtime_host_modules": [
+              "app.routers.l5_long_term_payables"
+            ],
+            "adapter_resolved_modules": [
+              "app.routers.wp_render_strategies._cycle_import_export_common"
+            ],
+            "adapter_target": "app.routers.wp_render_strategies._l5_import_export",
+            "compared_suffixes": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ],
+            "identity_mismatch": [
+              "export-data",
+              "export-template",
+              "import-data"
+            ]
+          },
+          "na_reasons": {
+            "contract_value": "split-brain 属路由宿主面，不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G5",
+      "title": "形态 A 三态方法不齐（缺态或非 POST；共享下拉三态全 POST ⇒ 该态必 405/404）",
+      "baseline_count": 8,
+      "measured_count": 8,
+      "status": "measured",
+      "owner_spec": "workpaper-import-export-lifecycle-closure（存量缺陷，不在本 spec 行为半径）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 取运行期严格形态 A 三态路由（复用 `tests.test_x3_adapter_host_same_module.strict_shape_a_routes`）",
+        "② 逐前缀取 `route.methods` 并剔除 HEAD / OPTIONS",
+        "③ 判据 = 三态里存在缺态或存在不含 POST 的态（实测 8 个前缀）",
+        "④ 后果面：前端共享 `useWorkpaperImportExport.apiBase()` 三态全 POST（design E4）⇒ 非 POST 的态经共享下拉必 405",
+        "⑤ 挂载面取前端 `api-prefix=\"<前缀>\"` 的 `.vue` 渲染点（实测 h7 已挂 3 处 ⇒ 其导出必 405）",
+        "⑥ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g5_shape_a_three_state_method_gap",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "shape_a_prefixes": 94,
+          "control_all_post_prefixes": 86,
+          "criterion": "三态中存在缺态或非 POST 即收录"
+        }
+      },
+      "entries": [
+        {
+          "group": "G5",
+          "key": "bad-debt-rows",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: []",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=False / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": []
+            },
+            "missing_states": [
+              "import-data"
+            ],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "c24-journal",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: []",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=False / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": [
+                "POST"
+              ]
+            },
+            "missing_states": [],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "h7",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['H7-2', 'H7-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=['components/workpaper/h7/core/H7TabAdjustment.vue:17', 'components/workpaper/h7/core/H7TabDetailCost.vue:21', 'components/workpaper/h7/core/H7TabDetailFair.vue:21'] ⇒ 共享下拉必 405/404",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": [
+                "POST"
+              ]
+            },
+            "missing_states": [],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "j2",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: []",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=False / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": [
+                "POST"
+              ]
+            },
+            "missing_states": [],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "l1",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L1-2', 'L1-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": [
+                "POST"
+              ]
+            },
+            "missing_states": [],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "l3",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L3-2', 'L3-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": [
+                "POST"
+              ]
+            },
+            "missing_states": [],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "l5",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: ['L5-2', 'L5-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=True / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "GET"
+              ],
+              "export-data": [
+                "GET"
+              ],
+              "import-data": [
+                "POST"
+              ]
+            },
+            "missing_states": [],
+            "non_post_states": [
+              "export-data",
+              "export-template"
+            ],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        },
+        {
+          "group": "G5",
+          "key": "offline",
+          "sheet_code": null,
+          "catalog_value": "启用该前缀的 sheet: []",
+          "contract_value": null,
+          "frontend_observed": "派生 registry 在位=False / dropdown 渲染点=[] ⇒ 暂未挂载，用户当前不可见",
+          "verdict": "real_drift",
+          "method_ref": "G5.method",
+          "evidence": {
+            "methods_by_state": {
+              "export-template": [
+                "POST"
+              ],
+              "export-data": [],
+              "import-data": []
+            },
+            "missing_states": [
+              "export-data",
+              "import-data"
+            ],
+            "non_post_states": [],
+            "shared_composable_requires": "POST × 三态（design E4：useWorkpaperImportExport 三态全 POST）"
+          },
+          "na_reasons": {
+            "contract_value": "HTTP 方法面不在调整分录键面 ⇒ 契约清单无对应登记"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G6",
+      "title": "M 族专属通路对未知 sheet 值无可读错误（静默回退全部 / 静默按默认 sheet / service 模块缺失）",
+      "baseline_count": 10,
+      "measured_count": 10,
+      "status": "measured",
+      "owner_spec": "各 M 循环 spec（存量缺陷；本 spec 的 X-3 通路另走共享实现，不改这些分支）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 取运行期形态 B 三态端点 `/api/{长前缀}/{wp_id}/{三态}`，筛出 m1~m10（实测 10 个前缀齐全）",
+        "② `inspect.signature(handler)` 判是否声明 `sheet` 参数 —— 未声明则 FastAPI **静默丢弃**该 query 参数",
+        "③ 从宿主模块源码取 `from app.services.<X> import` 的委派 service 模块，并判该 `.py` 是否真实存在",
+        "④ 在 service 源码上判未知 sheet 的处置：`if sheet and sheet in <白名单> … else <全部>` / `sheet or \"<默认>\"` / `raise HTTPException(… sheet …)`",
+        "⑤ 收录判据 = 三态路径上**不存在**任何针对未知 sheet 值的可读错误；对照组 = 工厂 `_cycle_import_export_common._validate` 必须被判为 `RAISE_ON_SHEET`（否则判据恒真、本组打红）",
+        "⑥ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g6_m_cycle_unknown_sheet_silent",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "m_prefixes_scanned": 10,
+          "control_factory_handling": [
+            "RAISE_ON_SHEET"
+          ],
+          "criterion": "三态路径上不存在任何针对未知 sheet 值的可读错误（400）",
+          "mechanism_note": "四种子形态：no_sheet_param（m1）/ WHITELIST_ELSE_ALL（m2~m6·m8）/ SHEET_OR_DEFAULT（m10，m6·m8 兼有）/ SERVICE_MODULE_MISSING（m7·m9，端点一调即 ImportError）。design §C7 的「静默回退全部」是这四种的概称；条数不变，形态按实测登记。"
+        }
+      },
+      "entries": [
+        {
+          "group": "G6",
+          "key": "m1",
+          "sheet_code": "M1-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M1-3']",
+          "contract_value": "M1-M1-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m1-dividends-payable",
+            "host_modules": [
+              "app.routers.m1_dividends_payable"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m1_dividends_payable_service"
+            ],
+            "unknown_sheet_handling": {
+              "m1_dividends_payable_service": [
+                "NO_SHEET_HANDLING"
+              ]
+            },
+            "mechanism": "m1_dividends_payable_service: NO_SHEET_HANDLING",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m2",
+          "sheet_code": "M2-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M2-3']",
+          "contract_value": "M2-M2-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m2-paid-in-capital",
+            "host_modules": [
+              "app.routers.m2_paid_in_capital"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m2_paid_in_capital_service"
+            ],
+            "unknown_sheet_handling": {
+              "m2_paid_in_capital_service": [
+                "WHITELIST_ELSE_ALL"
+              ]
+            },
+            "mechanism": "m2_paid_in_capital_service: WHITELIST_ELSE_ALL",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m3",
+          "sheet_code": "M3-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M3-3']",
+          "contract_value": "M3-M3-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m3-treasury-stock",
+            "host_modules": [
+              "app.routers.m3_treasury_stock"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m3_treasury_stock_service"
+            ],
+            "unknown_sheet_handling": {
+              "m3_treasury_stock_service": [
+                "WHITELIST_ELSE_ALL"
+              ]
+            },
+            "mechanism": "m3_treasury_stock_service: WHITELIST_ELSE_ALL",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m4",
+          "sheet_code": "M4-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M4-3']",
+          "contract_value": "M4-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m4-capital-reserve",
+            "host_modules": [
+              "app.routers.m4_capital_reserve"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m4_capital_reserve_service"
+            ],
+            "unknown_sheet_handling": {
+              "m4_capital_reserve_service": [
+                "WHITELIST_ELSE_ALL"
+              ]
+            },
+            "mechanism": "m4_capital_reserve_service: WHITELIST_ELSE_ALL",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m5",
+          "sheet_code": "M5-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M5-3']",
+          "contract_value": "M5-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m5-surplus-reserve",
+            "host_modules": [
+              "app.routers.m5_surplus_reserve"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m5_surplus_reserve_service"
+            ],
+            "unknown_sheet_handling": {
+              "m5_surplus_reserve_service": [
+                "WHITELIST_ELSE_ALL"
+              ]
+            },
+            "mechanism": "m5_surplus_reserve_service: WHITELIST_ELSE_ALL",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m6",
+          "sheet_code": "M6-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M6-3']",
+          "contract_value": "M6-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m6-retained-earnings",
+            "host_modules": [
+              "app.routers.m6_retained_earnings"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m6_retained_earnings_service"
+            ],
+            "unknown_sheet_handling": {
+              "m6_retained_earnings_service": [
+                "WHITELIST_ELSE_ALL",
+                "SHEET_OR_DEFAULT"
+              ]
+            },
+            "mechanism": "m6_retained_earnings_service: WHITELIST_ELSE_ALL+SHEET_OR_DEFAULT",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m7",
+          "sheet_code": "M7-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M7-3']",
+          "contract_value": "M7-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m7-special-reserve",
+            "host_modules": [
+              "app.routers.m7_special_reserve"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m7_special_reserve_service"
+            ],
+            "unknown_sheet_handling": {
+              "m7_special_reserve_service": [
+                "SERVICE_MODULE_MISSING"
+              ]
+            },
+            "mechanism": "m7_special_reserve_service: SERVICE_MODULE_MISSING",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m8",
+          "sheet_code": "M8-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M8-3']",
+          "contract_value": "M8-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m8-general-risk-reserve",
+            "host_modules": [
+              "app.routers.m8_general_risk_reserve"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m8_general_risk_reserve_service"
+            ],
+            "unknown_sheet_handling": {
+              "m8_general_risk_reserve_service": [
+                "WHITELIST_ELSE_ALL",
+                "SHEET_OR_DEFAULT"
+              ]
+            },
+            "mechanism": "m8_general_risk_reserve_service: WHITELIST_ELSE_ALL+SHEET_OR_DEFAULT",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m9",
+          "sheet_code": "M9-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M9-3']",
+          "contract_value": "M9-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m9-other-comprehensive-income",
+            "host_modules": [
+              "app.routers.m9_other_comprehensive_income"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m9_other_comprehensive_income_service"
+            ],
+            "unknown_sheet_handling": {
+              "m9_other_comprehensive_income_service": [
+                "SERVICE_MODULE_MISSING"
+              ]
+            },
+            "mechanism": "m9_other_comprehensive_income_service: SERVICE_MODULE_MISSING",
+            "readable_error_on_unknown_sheet": false
+          }
+        },
+        {
+          "group": "G6",
+          "key": "m10",
+          "sheet_code": "M10-3",
+          "catalog_value": "启用该短前缀的 sheet: ['M10-3']",
+          "contract_value": "M10-3-entry-*",
+          "frontend_observed": "派生 registry 短前缀在位=True / 长前缀在位=False",
+          "verdict": "real_drift",
+          "method_ref": "G6.method",
+          "evidence": {
+            "long_prefix": "m10-other-equity-instruments",
+            "host_modules": [
+              "app.routers.m10_other_equity_instruments"
+            ],
+            "sheet_param_declared": {
+              "export-data": true,
+              "export-template": true,
+              "import-data": true
+            },
+            "delegate_services": [
+              "m10_other_equity_instruments_service"
+            ],
+            "unknown_sheet_handling": {
+              "m10_other_equity_instruments_service": [
+                "SHEET_OR_DEFAULT"
+              ]
+            },
+            "mechanism": "m10_other_equity_instruments_service: SHEET_OR_DEFAULT",
+            "readable_error_on_unknown_sheet": false
+          }
+        }
+      ]
+    },
+    {
+      "group": "G7",
+      "title": "`_h5_import_export` / `_n4_import_export` 是父 spec Task 25 的不可删项",
+      "baseline_count": 2,
+      "measured_count": 2,
+      "status": "measured",
+      "owner_spec": "workpaper-import-export-lifecycle-closure Task 25（删除清单须移出这两个模块，R9.4）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 取 catalog 中 `api_prefix ∈ {h5, n4}` 的启用条目（实测 H5-2 / H5-3 · N4-2 / N4-3）",
+        "② 取 `_kfgh_cycle_adapters._PREFIX_TO_MODULE['h5'|'n4']`，判其是否仍指向工厂模块（实测 `_h5_import_export` / `_n4_import_export`）",
+        "③ 判该前缀有无严格形态 A 宿主：实测无 —— 其三态是第三形态 `/api/{prefix}/{三态}`（路径无 `{wp_id}` 段），宿主为专属 router `h5_oil_gas_assets` / `n4_taxes_and_surcharges`",
+        "④ 因果补记（任务 1.4 口径修正一）：二者实质同为「界面走专属 router、bulk 走工厂闭包」的存量不同源，只因 URL 是第三形态才不计入 G4 的 5 例。🔴 不得为「统一口径」把 G4 基线改成 7 —— 那是把口径错误锁成基线",
+        "⑤ 三条活因（catalog 启用 + 无形态 A 宿主 + adapter 指向工厂）任一不成立即应下调本组基线",
+        "⑥ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g7_task25_non_deletable_factory_modules",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "adapter_map_keys": 89,
+          "control_shape_a_prefixes": [
+            "l1",
+            "l3"
+          ],
+          "criterion": "catalog 启用该短前缀 且 运行期无严格形态 A 宿主 且 adapter 仍指向工厂模块"
+        }
+      },
+      "entries": [
+        {
+          "group": "G7",
+          "key": "_h5_import_export",
+          "sheet_code": null,
+          "catalog_value": "启用该短前缀的 sheet: ['H5-2', 'H5-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry['h5'] = ['H5-2', 'H5-3']（下拉按形态 A 拼 URL，而后端只有第三形态 ⇒ 单份通路实为不可达）",
+          "verdict": "real_drift",
+          "method_ref": "G7.method",
+          "evidence": {
+            "adapter_target": "_h5_import_export",
+            "adapter_target_is_factory_module": true,
+            "strict_shape_a_host": null,
+            "third_shape_routes": [
+              "POST /api/h5/export-template → app.routers.h5_oil_gas_assets",
+              "POST /api/h5/export-data → app.routers.h5_oil_gas_assets",
+              "POST /api/h5/import-data → app.routers.h5_oil_gas_assets"
+            ],
+            "why_not_in_g4": "实质同为「界面走专属 router、bulk 走工厂闭包」的存量不同源，只因其 URL 是第三形态 /api/{prefix}/{三态}（无 {wp_id} 段）才不计入 G4 的 5 例（任务 1.4 口径修正一）。🔴 不得为「统一口径」把 G4 基线抬到 7 —— 那是把口径错误锁成基线。",
+            "consequence": "删除该工厂模块会静默切掉 ['H5-2', 'H5-3'] 的批量能力 ⇒ 父 spec Task 25 的删除清单须移出本模块（R9.4）"
+          },
+          "na_reasons": {
+            "contract_value": "本条属模块存活面，非键面；H5-3 取值路径=exempt.H5-3(kind=no_backend_spec)"
+          }
+        },
+        {
+          "group": "G7",
+          "key": "_n4_import_export",
+          "sheet_code": null,
+          "catalog_value": "启用该短前缀的 sheet: ['N4-2', 'N4-3']",
+          "contract_value": null,
+          "frontend_observed": "派生 registry['n4'] = ['N4-2', 'N4-3']（下拉按形态 A 拼 URL，而后端只有第三形态 ⇒ 单份通路实为不可达）",
+          "verdict": "real_drift",
+          "method_ref": "G7.method",
+          "evidence": {
+            "adapter_target": "_n4_import_export",
+            "adapter_target_is_factory_module": true,
+            "strict_shape_a_host": null,
+            "third_shape_routes": [
+              "POST /api/n4/export-template → app.routers.n4_taxes_and_surcharges",
+              "POST /api/n4/export-data → app.routers.n4_taxes_and_surcharges",
+              "POST /api/n4/import-data → app.routers.n4_taxes_and_surcharges"
+            ],
+            "why_not_in_g4": "实质同为「界面走专属 router、bulk 走工厂闭包」的存量不同源，只因其 URL 是第三形态 /api/{prefix}/{三态}（无 {wp_id} 段）才不计入 G4 的 5 例（任务 1.4 口径修正一）。🔴 不得为「统一口径」把 G4 基线抬到 7 —— 那是把口径错误锁成基线。",
+            "consequence": "删除该工厂模块会静默切掉 ['N4-2', 'N4-3'] 的批量能力 ⇒ 父 spec Task 25 的删除清单须移出本模块（R9.4）"
+          },
+          "na_reasons": {
+            "contract_value": "本条属模块存活面，非键面；N4-3 取值路径=exempt.N4-3(kind=no_backend_spec)"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G8",
+      "title": "`N3-3` 源模板笔误（第 2 行标题写成「递延所得税**资产**」+ 第 3 行「编制人：」重复）",
+      "baseline_count": 1,
+      "measured_count": 1,
+      "status": "measured",
+      "owner_spec": "源模板维护方（`backend/wp_templates/` 只读，R11.1 ⇒ 登记不修）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① `find_template_file(<循环>)` 定位源模板（不写文件名字面量），`openpyxl.load_workbook(..., read_only=True)` 打开，tab 取 catalog `sheet_name`",
+        "② 读第 2 行首个非空单元格为标题；期望它包含模板文件名的业务名（业务名取文件名空格后一段，再截掉括号补充）",
+        "③ 读第 3 行全部非空标签，统计重复标签",
+        "④ 收录判据 = 标题不含业务名 或 第 3 行有重复标签（实测仅 N3-3 命中：标题为「递延所得税资产调整分录汇总表」而文件为「N3 递延所得税负债.xlsx」；第 3 行 `编制人：` 出现 2 次）",
+        "⑤ 对照组 = 其余 15 张必须判为正常（若 16 张全被判异常 ⇒ 判据过宽，本组打红）。🔴 括号截断规则必须保留：去掉它会把 `M2-3`（文件「M2 实收资本（股本）」/ 标题「实收资本…」）误判成笔误",
+        "⑥ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g8_source_template_title_typo",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "templates_read": 16,
+          "control_clean_sheets": [
+            "L2-3",
+            "L6-3",
+            "M1-3",
+            "M2-3",
+            "M3-3",
+            "M4-3",
+            "M5-3",
+            "M6-3",
+            "M7-3",
+            "M8-3",
+            "M9-3",
+            "M10-3",
+            "N1-3",
+            "N2-3",
+            "N5-3"
+          ],
+          "criterion": "第 2 行标题不含模板文件业务名（括号补充已截）或第 3 行标签有重复",
+          "paren_rule_note": "M1-3 / M2-3 依赖括号截断规则才判为正常；去掉该规则会多出 M2-3 假阳性"
+        }
+      },
+      "entries": [
+        {
+          "group": "G8",
+          "key": "N3-3",
+          "sheet_code": "N3-3",
+          "catalog_value": "sheet_name='调整分录汇总表N3-3'",
+          "contract_value": "N3-3-entries",
+          "frontend_observed": null,
+          "verdict": "real_drift",
+          "method_ref": "G8.method",
+          "evidence": {
+            "template_file": "backend/wp_templates/N/N3 递延所得税负债.xlsx",
+            "tab": "调整分录汇总表N3-3",
+            "row2_title_observed": "递延所得税资产调整分录汇总表",
+            "row2_title_expected_to_contain": "递延所得税负债",
+            "row2_title_mismatch": true,
+            "row3_labels_observed": [
+              "被审计单位：",
+              "编制人：",
+              "编制人：",
+              "索引号：",
+              "N3-3"
+            ],
+            "row3_duplicated_labels": [
+              "编制人："
+            ],
+            "handling": "源模板只读（R11.1）⇒ 登记不修；导出用 catalog sheet_name，不搬第 2 行标题"
+          },
+          "na_reasons": {
+            "frontend_observed": "前端不渲染源模板第 2/3 行（表头由组件自绘）⇒ 无前端观察面"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G9",
+      "title": "`K3-3` 的上游 `k_cycle_ie_manifest.yaml` 与 catalog 同错（改 catalog 会被重生成打回）",
+      "baseline_count": 1,
+      "measured_count": 1,
+      "status": "measured",
+      "owner_spec": "workpaper-import-export-lifecycle-closure（既有缺陷，不在本 spec 行为半径）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 读 `backend/data/acnr/sources/k_cycle_ie_manifest.yaml` 取 `K3-3` 的 `item_id`（实测 `K3-3-rows`）",
+        "② 读 catalog `K3-3.import_export.item_id`（实测 `K3-3-rows`，与 manifest 同值 ⇒ catalog 的错来自上游）",
+        "③ 读 `backend/data/adjustment_ie_contract.json` 的 `sheets['K3-3'].item_id`（实测 `K3-3-adj-entries`）",
+        "④ 前端 `k3/core/K3TabAdjustment.vue`：`const ITEM_PREFIX = 'K3-3-adj'` + `` `${ITEM_PREFIX}-entries` `` 读写两侧 ⇒ 真键 `K3-3-adj-entries`；`K3-3-rows` 在前端生产代码零命中",
+        "⑤ 收录判据 = manifest 值 == catalog 值 且二者 != 契约清单实测键；任一不成立即应下调本组基线",
+        "⑥ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g9_upstream_manifest_same_error",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "manifest_entries": 348,
+          "criterion": "manifest.item_id == catalog.item_id 且二者 != 契约清单实测键"
+        }
+      },
+      "entries": [
+        {
+          "group": "G9",
+          "key": "k_cycle_ie_manifest.yaml::K3-3",
+          "sheet_code": "K3-3",
+          "catalog_value": "K3-3-rows",
+          "contract_value": "K3-3-adj-entries",
+          "frontend_observed": "K3-3-adj-entries",
+          "verdict": "real_drift",
+          "method_ref": "G9.method",
+          "evidence": {
+            "manifest_file": "backend/data/acnr/sources/k_cycle_ie_manifest.yaml",
+            "manifest_item_id": "K3-3-rows",
+            "contract_path": "sheets.K3-3.item_id",
+            "frontend_evidence": "components/workpaper/k3/core/K3TabAdjustment.vue:179 ITEM_PREFIX='K3-3-adj' + 模板拼接后缀 ['-entries']",
+            "catalog_value_frontend_hits": [],
+            "consequence": "只改 catalog 会被 generate_catalog.py 重生成打回 ⇒ 必须改 manifest",
+            "relation": "与 G1 的 K3-3 是同一处错位的上下游两侧（G1 记 catalog 面，G9 记上游真源面）"
+          }
+        }
+      ]
+    },
+    {
+      "group": "G10",
+      "title": "只写不读：X-3 键族在前端生产代码有写入、零读回路径（用户填完刷新即看不见）",
+      "baseline_count": 0,
+      "measured_count": 0,
+      "status": "measured",
+      "owner_spec": "本 spec（R6.5 / R6.7 使其成为必要条件 ⇒ 任务 4.2 + 11.1 补齐，任务 11.2 下调基线到 0）",
+      "verdict_default": "real_drift",
+      "method": [
+        "① 逐 sheet 取两个前端生产文件：`components/workpaper/composables/use{X}Adjustment.ts` 与 `components/workpaper/{x}/core/{X}TabAdjustment.vue`，先剥注释（防注释里的示例键蒙对）",
+        "② 从**写入侧**表达式派生 entries 键族（`itemId:` / `saveField(` / `debouncedSave(` / `saveBatch(` 的键表达式）—— 模板字面量与单键字面量归约到同一族正则，不写死键表",
+        "③ 解析 `const <ident> = '<字面量>'` 别名（M3/M4/M5/M10 的 `const prefix = '{X}-3-entry-'` 即别名读法）",
+        "④ 在同两文件里找该族的读取表达式：`.get(<键或别名>)` / `startsWith(<族前缀或别名>)`；机制 ① 另判 `getField('3','entries')`（其键在运行期三段拼出、字面量不存在）",
+        "⑤ 收录判据 = 写入命中 > 0 且读取命中 == 0（design §C7 原值 4：L6-3 / M1-3 / M2-3 / M9-3；任务 4.2 + 11.1 施加后实测 0，16/16 READ_OK ⇒ 任务 11.2 按规范下调基线到 0）",
+        "⑥ 对照组 = 其余 12 张必须判为「有读回」，且不允许出现读写双零命中的 sheet（那说明键族派生失效，本组打红）",
+        "🔴 ⑦ 判据强弱的显式裁决（任务 11.2）：**本组只判「读回表达式存在」这一层，弱于 R6.5 / R6.7**。「存在读回表达式」不等于「导入后界面读得到」——`@imported=\"() => {}\"`、处理器只弹成功提示、或只 `loadData()` 而不重跑读回，三种写法下本组照旧判 READ_OK。实测已验证：任务 11.1 的变异 M4（处理器只 `loadData()` 不读回）下本组实测**仍为 0**，只有 GS5b 打红 ⇒ 本组不重复实现该行为判据（避免出现第二份会分叉的行为判据）",
+        "⑧ 行为面承载者 = 前端守卫 `GS5b · X-3 的 @imported → 读回可追溯`（`components/workpaper/__tests__/ieWiringIntegrity.spec.ts`，任务 11.1，R6.5 / R6.7）；本组探针对它做**承载者在位性**交叉引用锁（`diagnostics.behavioral_layer`：describe 块在位 + 读 `@imported` 属性 + 要求重载调用 + 要求与 onMounted 共用的读回 + `violations…toEqual([])` 断言 + `it` 用例 ≥3），任一不成立即整组 `PROBE_SELFCHECK_FAILED` 打红 —— 不许在弱判据上锁 0 而不留痕",
+        "⑨ 行为面复算命令（约 20 秒）：`cd audit-platform/frontend && npx vitest run --silent=true src/components/workpaper/__tests__/ieWiringIntegrity.spec.ts`（基线 32 passed / 0 failed）",
+        "⑩ 本组自我失效演练（任务 11.2 实测）：施加任务 11.1 变异 M3（摘掉某张的读回表达式）⇒ 本组实测 0 → 1、`--check` 判 REGRESSION 且 exit 2 ⇒ 下调后的 0 非恒真",
+        "⑪ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g10_write_only_key_family",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "behavioral_layer": {
+            "carried_by": "GS5b · X-3 的 @imported → 读回可追溯（任务 11.1，R6.5 / R6.7）",
+            "guard_file": "components/workpaper/__tests__/ieWiringIntegrity.spec.ts",
+            "layer_of_this_group": "表达式存在层（弱于 R6.5/R6.7；行为层不在本组）",
+            "present": true,
+            "shape_checks": {
+              "reads_imported_attr": true,
+              "requires_reload_call": true,
+              "requires_shared_readback": true,
+              "asserts_violations_empty": true,
+              "it_cases": 4
+            },
+            "reproduce_cmd": "cd audit-platform/frontend && npx vitest run --silent=true src/components/workpaper/__tests__/ieWiringIntegrity.spec.ts",
+            "known_blind_spot": "任务 11.1 变异 M4（处理器只 loadData() 不读回）⇒ 本组实测仍 0（表达式还在），GS5b 打红 ⇒ 行为面确由 GS5b 承载；本组不重复实现该判据（避免第二份行为判据分叉）",
+            "mutation_that_moves_this_group": "任务 11.1 变异 M3（摘掉读回表达式）⇒ 本组实测 0 → 1 且 --check 打红 REGRESSION"
+          },
+          "scanned_sheets": 16,
+          "control_read_ok": [
+            "L2-3",
+            "L6-3",
+            "M1-3",
+            "M2-3",
+            "M3-3",
+            "M4-3",
+            "M5-3",
+            "M6-3",
+            "M7-3",
+            "M8-3",
+            "M9-3",
+            "M10-3",
+            "N1-3",
+            "N2-3",
+            "N3-3",
+            "N5-3"
+          ],
+          "state_distribution": {
+            "READ_OK": [
+              "L2-3",
+              "L6-3",
+              "M1-3",
+              "M2-3",
+              "M3-3",
+              "M4-3",
+              "M5-3",
+              "M6-3",
+              "M7-3",
+              "M8-3",
+              "M9-3",
+              "M10-3",
+              "N1-3",
+              "N2-3",
+              "N3-3",
+              "N5-3"
+            ],
+            "WRITE_ONLY": [],
+            "NO_HIT": []
+          },
+          "missing_files": [
+            "components/workpaper/composables/useN1Adjustment.ts",
+            "components/workpaper/composables/useN2Adjustment.ts",
+            "components/workpaper/composables/useN3Adjustment.ts",
+            "components/workpaper/composables/useN5Adjustment.ts"
+          ],
+          "criterion": "写入命中 > 0 且读取命中 == 0（键族从写入侧派生，不写死键表；先剥注释）"
+        }
+      },
+      "entries": [],
+      "baseline_lowered_from": 4,
+      "lowered_by_task": "11.2"
+    },
+    {
+      "group": "G11",
+      "title": "`N5-3` 的 `'N5-3-entries'` 字面量属中央同步键，与真数据键同名不同源",
+      "baseline_count": 1,
+      "measured_count": 1,
+      "status": "measured",
+      "owner_spec": "本 spec（登记以防下一轮再按字面量 grep 得出「键不可确证」的错结论）",
+      "verdict_default": "probe_false_negative",
+      "method": [
+        "① 在 `n5/core/N5TabAdjustment.vue`（剥注释后）找 `'N5-3-entries'` 字面量（实测 1 处）",
+        "② 向上找最近的 `useAdjustmentCentralSync({` 调用，判该字面量是否落在其实参块内 ⇒ 是则属**中央同步键**（`source_ref` 组成部分），不是 `checklist_responses.item_id` 落点",
+        "③ 走形态 ④ 三步链取真键：tab 的 `formData.setField('3','entries')` / `getField('3','entries')` → `composables/useN5FormData.ts` 的 `const ITEM_PREFIX = 'N5-'` → `` const itemId = `${ITEM_PREFIX}${sheet}-${field}` `` ⇒ 拼出 `N5-3-entries`",
+        "④ 收录判据 = 字面量全部落在中央同步实参块内 且 三段拼装出的真键与该字面量同名（同名不同源）",
+        "⑤ 反证（判据非空转）：改 `useN5FormData.ts` 的 `ITEM_PREFIX` 值 ⇒ 真键随之变而 tab 内字面量不变 ⇒ 两者确非同源",
+        "⑥ 复算命令：`python backend/scripts/check/check_x3_deviation_registry.py --check`"
+      ],
+      "probe": {
+        "id": "g11_same_name_different_source",
+        "implemented_by": "backend/scripts/check/check_x3_deviation_registry.py",
+        "selfcheck_ok": true,
+        "selfcheck_notes": [],
+        "diagnostics": {
+          "literal_hits": [
+            202
+          ],
+          "central_sync_calls": [
+            197
+          ],
+          "assembled_key": "N5-3-entries",
+          "criterion": "字面量全部落在中央同步实参块内 且 三段拼装出的真键与该字面量同名"
+        }
+      },
+      "entries": [
+        {
+          "group": "G11",
+          "key": "N5-3",
+          "sheet_code": "N5-3",
+          "catalog_value": "import_export 启用=True",
+          "contract_value": "N5-3-entries",
+          "frontend_observed": "`'N5-3-entries'` 字面量 1 处（行 [202]），全部落在 useAdjustmentCentralSync 实参块内 ⇒ 中央同步键；真数据键由 ITEM_PREFIX='N5-' + sheet + field 运行期三段拼出，同名不同源（字面量不是落点）",
+          "verdict": "probe_false_negative",
+          "method_ref": "G11.method",
+          "evidence": {
+            "tab_file": "components/workpaper/n5/core/N5TabAdjustment.vue",
+            "literal_lines": [
+              202
+            ],
+            "central_sync_call_lines": [
+              197
+            ],
+            "formdata_file": "components/workpaper/composables/useN5FormData.ts",
+            "item_prefix": "N5-",
+            "assembly_expression": "const itemId = `${ITEM_PREFIX}${sheet}-${field}`",
+            "assembled_key": "N5-3-entries",
+            "tab_access": "getField('3', 'entries'",
+            "why_false_negative": "按「字面量 grep」判据会得出「键不可确证」的错结论（design E12 → E17 已推翻）；必须走形态 ④ 三步链：tab 的 setField/getField 实参 → use{X}FormData 的 ITEM_PREFIX → 键拼装表达式",
+            "counter_proof": "改 useN5FormData.ts 的 ITEM_PREFIX 值 ⇒ 真键随之变，而 tab 内那处字面量不变 ⇒ 两者确非同源"
+          }
+        }
+      ]
+    }
+  ]
+}

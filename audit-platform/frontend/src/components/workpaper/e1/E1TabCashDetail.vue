@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * E1TabCashDetail.vue — E1-2 现金明细表
  *
@@ -275,13 +276,9 @@ onMounted(() => {
           <!-- 期初余额 -->
           <el-table-column label="期初余额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.opening"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'opening', val ?? 0)"
               />
@@ -291,13 +288,9 @@ onMounted(() => {
           <!-- 本期增加 -->
           <el-table-column label="本期增加" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.increase"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'increase', val ?? 0)"
               />
@@ -307,13 +300,9 @@ onMounted(() => {
           <!-- 本期减少 -->
           <el-table-column label="本期减少" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.decrease"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'decrease', val ?? 0)"
               />

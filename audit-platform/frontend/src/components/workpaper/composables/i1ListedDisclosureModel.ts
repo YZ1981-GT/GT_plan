@@ -16,6 +16,7 @@ import {
   type MovementCellMap,
   type MovementRowDef,
 } from './h1ListedDisclosureModel'
+import { I1_DEFAULT_CATEGORIES, I1_STANDARD_TO_LEGACY } from './i1CategoryScope'
 
 export type { H1ListedCategory as I1ListedCategory, MovementCellMap, MovementRowDef }
 
@@ -34,20 +35,24 @@ export const I1_LISTED_KEYS = {
   auditConclusion: 'I1-listed-audit-conclusion',
 } as const
 
-/** 默认分类列（对齐 Excel B–L；可扩「……」） */
-export const I1_LISTED_DEFAULT_CATEGORIES: readonly H1ListedCategory[] = [
-  { key: 'land', label: '土地使用权' },
-  { key: 'housing', label: '房屋使用权' },
-  { key: 'patent', label: '专利权' },
-  { key: 'knowhow', label: '非专利技术' },
-  { key: 'trademark', label: '商标权' },
-  { key: 'copyright', label: '著作权' },
-  { key: 'franchise', label: '特许权' },
-  { key: 'software', label: '软件' },
-  { key: 'mining', label: '探矿权/采矿权' },
-  { key: 'data', label: '数据资源' },
-  { key: 'other', label: '其他' },
-] as const
+/**
+ * 默认分类列（对齐源模板 `附注披露信息（上市公司）!B10:L10` = `底稿目录!A9:A19`；末尾 `A20` 可扩）。
+ *
+ * 🔴 **label 由 `i1CategoryScope.I1_DEFAULT_CATEGORIES` 派生，本文件不再抄第二份** ——
+ * 改造前这里独立写死 11 条 label，其中 3 条与源模板不一致（`房屋使用权`→应为 `住房使用权`、
+ * `特许权`→`特许经营权`、`探矿权/采矿权`→`矿产权`）。而 label 是推附注的列头文案 + 交叉核对的
+ * 匹配键（`buildI1ListedColumns` 直接取 `c.label`），错 label ⇒ 推给附注的列头与
+ * `note_template_listed`「五、26」的 columns 不同构。
+ *
+ * key 仍走 `I1_STANDARD_TO_LEGACY` 的**历史短 key**（`land`/`housing`/`knowhow`/`mining`/`data`…）
+ * —— 它们已持久化在 `checklist_responses` 的 `I1-listed-movement` 单元格映射里，改 key 会丢数据；
+ * 展示与推送用的稳定列 key 由 `i1CategoryColumnKey()` 另行生成（`{slot.key}_{seq}`）。
+ */
+export const I1_LISTED_DEFAULT_CATEGORIES: readonly H1ListedCategory[] =
+  I1_DEFAULT_CATEGORIES.map((c) => ({
+    key: I1_STANDARD_TO_LEGACY[c.key] ?? c.key,
+    label: c.label,
+  }))
 
 /** 源模板 / note_template 变动行 */
 export const I1_LISTED_MOVEMENT_ROWS: MovementRowDef[] = [
@@ -83,10 +88,15 @@ export const I1_LISTED_MOVEMENT_ROWS: MovementRowDef[] = [
   { key: 'imp_inc_provision', label: '（1）计提', indent: 2, kind: 'detail', editable: true },
   { key: 'imp_inc_other', label: '（2）其他增加', indent: 2, kind: 'detail', editable: true },
   { key: 'imp_inc_ellipsis', label: '……', indent: 2, kind: 'ellipsis', editable: true },
-  { key: 'imp_dec', label: '3.本期减少金额', indent: 1, kind: 'subtotal', sumOf: ['imp_dec_dispose', 'imp_dec_other', 'imp_dec_ellipsis'] },
+  // 🔴 减值准备减少段与账面原值 / 累计摊销两层同构：处置 / 失效且终止确认的部分 / 其他减少
+  // 三个明细 + **无扩位**（源模板 `附注披露信息（上市公司）!A41:A44` 逐格实测：A42=（1）处置 /
+  // A43=（2）失效且终止确认的部分 / A44=（3）其他减少，A45 直接是 4.期末余额）。
+  // 改造前此处丢了「失效且终止确认的部分」并在末尾凭空补了一个 `……` 扩位（疑似自 H1 模型复制），
+  // 导致源模板 3 处扩位被实现成 4 处、且第 33 行披露标签渲染成「（2）其他减少」。
+  { key: 'imp_dec', label: '3.本期减少金额', indent: 1, kind: 'subtotal', sumOf: ['imp_dec_dispose', 'imp_dec_expire', 'imp_dec_other'] },
   { key: 'imp_dec_dispose', label: '（1）处置', indent: 2, kind: 'detail', editable: true },
-  { key: 'imp_dec_other', label: '（2）其他减少', indent: 2, kind: 'detail', editable: true },
-  { key: 'imp_dec_ellipsis', label: '……', indent: 2, kind: 'ellipsis', editable: true },
+  { key: 'imp_dec_expire', label: '（2）失效且终止确认的部分', indent: 2, kind: 'detail', editable: true },
+  { key: 'imp_dec_other', label: '（3）其他减少', indent: 2, kind: 'detail', editable: true },
   { key: 'imp_end', label: '4.期末余额', indent: 1, kind: 'calc', endOf: { begin: 'imp_begin', inc: 'imp_inc', dec: 'imp_dec' } },
 
   { key: 'book_section', label: '四、账面价值', indent: 0, kind: 'section' },

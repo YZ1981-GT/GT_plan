@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * E1TabAdjustment.vue — E1-5 调整分录汇总
  *
@@ -309,13 +310,9 @@ async function generateAuditConclusion(): Promise<void> {
           <!-- 借方 -->
           <el-table-column label="借方" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.debit"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'debit', val ?? 0)"
               />
@@ -325,13 +322,9 @@ async function generateAuditConclusion(): Promise<void> {
           <!-- 贷方 -->
           <el-table-column label="贷方" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.credit"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 @change="(val: number | undefined) => updateCell(row.id, 'credit', val ?? 0)"
               />

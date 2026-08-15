@@ -1,0 +1,355 @@
+==============================================================================
+L2-3  <- useL2Adjustment.ts  exists=True
+  consts: [('ITEM_ID_ENTRIES', 'L2-L2-3-entries')]
+  itemId 模板 x0:
+  save 调用(键,列): [('ITEM_ID_ENTRIES', 'remark'), ('`L2-L2-3-${field}`', 'remark')]
+  -data 族: []
+  .get( 读键: ["'L2-L2-3-conclusion'", "'L2-L2-3-note'", 'ITEM_ID_ENTRIES']
+  fns: ['persistEntries']
+==============================================================================
+L6-3  <- useL6Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `L6-L6-3-entry-${n}-account`
+     `L6-L6-3-entry-${n}-category`
+     `L6-L6-3-entry-${n}-credit`
+     `L6-L6-3-entry-${n}-debit`
+     `L6-L6-3-entry-${n}-desc`
+     `L6-L6-3-entry-${n}-note`
+     `L6-L6-3-entry-${n}-ref`
+     `L6-L6-3-entry-${n}-remark`
+     `L6-L6-3-entry-${n}-report`
+     `L6-L6-3-entry-${n}-type`
+  save 调用(键,列): []
+  -data 族: []
+  .get( 读键: []
+  fns: []
+==============================================================================
+M1-3  <- useM1Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M1-M1-3-entry-${n}-account`
+     `M1-M1-3-entry-${n}-category`
+     `M1-M1-3-entry-${n}-credit`
+     `M1-M1-3-entry-${n}-debit`
+     `M1-M1-3-entry-${n}-desc`
+     `M1-M1-3-entry-${n}-note`
+     `M1-M1-3-entry-${n}-ref`
+     `M1-M1-3-entry-${n}-remark`
+     `M1-M1-3-entry-${n}-report`
+     `M1-M1-3-entry-${n}-type`
+  save 调用(键,列): []
+  -data 族: []
+  .get( 读键: []
+  fns: []
+==============================================================================
+M2-3  <- useM2Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M2-M2-3-entry-${n}-account`
+     `M2-M2-3-entry-${n}-category`
+     `M2-M2-3-entry-${n}-credit`
+     `M2-M2-3-entry-${n}-debit`
+     `M2-M2-3-entry-${n}-desc`
+     `M2-M2-3-entry-${n}-note`
+     `M2-M2-3-entry-${n}-ref`
+     `M2-M2-3-entry-${n}-remark`
+     `M2-M2-3-entry-${n}-report`
+     `M2-M2-3-entry-${n}-type`
+  save 调用(键,列): []
+  -data 族: []
+  .get( 读键: []
+  fns: []
+==============================================================================
+M3-3  <- useM3Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M3-M3-3-entry-${n}-account`
+     `M3-M3-3-entry-${n}-category`
+     `M3-M3-3-entry-${n}-credit`
+     `M3-M3-3-entry-${n}-debit`
+     `M3-M3-3-entry-${n}-desc`
+     `M3-M3-3-entry-${n}-note`
+     `M3-M3-3-entry-${n}-ref`
+     `M3-M3-3-entry-${n}-remark`
+     `M3-M3-3-entry-${n}-report`
+     `M3-M3-3-entry-${n}-type`
+  save 调用(键,列): [('`M3-M3-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M3-M3-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M4-3  <- useM4Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M4-3-entry-${n}-account`
+     `M4-3-entry-${n}-category`
+     `M4-3-entry-${n}-credit`
+     `M4-3-entry-${n}-debit`
+     `M4-3-entry-${n}-desc`
+     `M4-3-entry-${n}-note`
+     `M4-3-entry-${n}-ref`
+     `M4-3-entry-${n}-remark`
+     `M4-3-entry-${n}-report`
+     `M4-3-entry-${n}-type`
+  save 调用(键,列): [('`M4-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M4-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M5-3  <- useM5Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M5-3-entry-${n}-account`
+     `M5-3-entry-${n}-category`
+     `M5-3-entry-${n}-credit`
+     `M5-3-entry-${n}-debit`
+     `M5-3-entry-${n}-desc`
+     `M5-3-entry-${n}-note`
+     `M5-3-entry-${n}-ref`
+     `M5-3-entry-${n}-remark`
+     `M5-3-entry-${n}-report`
+     `M5-3-entry-${n}-type`
+  save 调用(键,列): [('`M5-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M5-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M6-3  <- useM6Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M6-3-entry-${n}-account`
+     `M6-3-entry-${n}-category`
+     `M6-3-entry-${n}-credit`
+     `M6-3-entry-${n}-debit`
+     `M6-3-entry-${n}-desc`
+     `M6-3-entry-${n}-note`
+     `M6-3-entry-${n}-ref`
+     `M6-3-entry-${n}-remark`
+     `M6-3-entry-${n}-report`
+     `M6-3-entry-${n}-type`
+  save 调用(键,列): [('`M6-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M6-3-entry-${i}-data', 'M6-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M7-3  <- useM7Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M7-3-entry-${n}-account`
+     `M7-3-entry-${n}-category`
+     `M7-3-entry-${n}-credit`
+     `M7-3-entry-${n}-debit`
+     `M7-3-entry-${n}-desc`
+     `M7-3-entry-${n}-note`
+     `M7-3-entry-${n}-ref`
+     `M7-3-entry-${n}-remark`
+     `M7-3-entry-${n}-report`
+     `M7-3-entry-${n}-type`
+  save 调用(键,列): [('`M7-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M7-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M8-3  <- useM8Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M8-3-entry-${n}-account`
+     `M8-3-entry-${n}-category`
+     `M8-3-entry-${n}-credit`
+     `M8-3-entry-${n}-debit`
+     `M8-3-entry-${n}-desc`
+     `M8-3-entry-${n}-note`
+     `M8-3-entry-${n}-ref`
+     `M8-3-entry-${n}-remark`
+     `M8-3-entry-${n}-report`
+     `M8-3-entry-${n}-type`
+  save 调用(键,列): [('`M8-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M8-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M9-3  <- useM9Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x11:
+     `M9-3-entry-${n}-account`
+     `M9-3-entry-${n}-category`
+     `M9-3-entry-${n}-credit`
+     `M9-3-entry-${n}-debit`
+     `M9-3-entry-${n}-desc`
+     `M9-3-entry-${n}-note`
+     `M9-3-entry-${n}-ociBlock`
+     `M9-3-entry-${n}-ref`
+     `M9-3-entry-${n}-remark`
+     `M9-3-entry-${n}-report`
+     `M9-3-entry-${n}-type`
+  save 调用(键,列): [('`M9-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M9-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+M10-3  <- useM10Adjustment.ts  exists=True
+  consts: []
+  itemId 模板 x10:
+     `M10-3-entry-${n}-account`
+     `M10-3-entry-${n}-category`
+     `M10-3-entry-${n}-credit`
+     `M10-3-entry-${n}-debit`
+     `M10-3-entry-${n}-desc`
+     `M10-3-entry-${n}-note`
+     `M10-3-entry-${n}-ref`
+     `M10-3-entry-${n}-remark`
+     `M10-3-entry-${n}-report`
+     `M10-3-entry-${n}-type`
+  save 调用(键,列): [('`M10-3-entry-${n}-data`', 'remark')]
+  -data 族: ['M10-3-entry-${n}-data']
+  .get( 读键: []
+  fns: []
+==============================================================================
+N1-3  <- useN1FormData.ts  exists=True
+  consts: [('ITEM_PREFIX', 'N1-')]
+  --- setField 片段 ---
+     function setField(sheet: string, field: string, value: any): Promise<void> {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const conclusion = typeof value === 'string' ? value : JSON.stringify(value)
+         await saveField(itemId, { conclusion })
+       }
+     
+       /**
+        * setTbValues — 从 render-config html_data 的 TB 种子数据设置只读字段。
+        * 用于 FormData 初始化时接收后端自动取数（期初/借方/贷方/期末等TB字段）。
+        * @param values - Record<itemId, value>
+        */
+       function setTbValues(values: Record<string, any>): void {
+         for (const [itemId, value] of Object.entries(values)) {
+           const fullId = itemId.startsWith(ITEM_PREFIX) ? itemId : `${ITEM_PREFIX}${itemId}`
+           const conclusion = typeof value === 'string' ? value : JSON.stringify(value)
+           const existing = allResponses.value.get(fullId) || { item_id: fullId, conclusion: null, remark: null }
+  --- getField 片段 ---
+     function getField(sheet: string, field: string): any {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const resp = allResponses.value.get(itemId)
+         if (!resp) return null
+         // 尝试 JSON 解析（支持存储对象/数组）
+         if (resp.conclusion) {
+           try {
+             return JSON.parse(resp.conclusion)
+           } catch {
+             return resp.conclusion
+           }
+         }
+         return null
+       }
+     
+       /**
+==============================================================================
+N2-3  <- useN2FormData.ts  exists=True
+  consts: [('ITEM_PREFIX', 'N2-')]
+  --- setField 片段 ---
+     function setField(sheet: string, field: string, value: any): Promise<void> {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const conclusion = typeof value === 'string' ? value : JSON.stringify(value)
+         await saveField(itemId, { conclusion })
+       }
+     
+       /**
+        * setTbValues — 从 render-config html_data 的 TB 种子数据设置只读字段。
+        * 用于 FormData 初始化时接收后端自动取数（期初/未审等TB字段）。
+        *
+        * 负债类科目 2221：TB返回的期末余额是贷方口径（正数=贷方余额）。
+        * @param values - Record<itemId, value>
+        */
+       function setTbValues(values: Record<string, any>): void {
+         for (const [itemId, value] of Object.entries(values)) {
+           const fullId = itemId.startsWith(ITEM_PREFIX) ? itemId : `${ITEM_PREFIX}${itemId}`
+  --- getField 片段 ---
+     function getField(sheet: string, field: string): any {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const resp = allResponses.value.get(itemId)
+         if (!resp) return null
+         // 尝试 JSON 解析（支持存储对象/数组）
+         if (resp.conclusion) {
+           try {
+             return JSON.parse(resp.conclusion)
+           } catch {
+             return resp.conclusion
+           }
+         }
+         return null
+       }
+     
+       /**
+==============================================================================
+N3-3  <- useN3FormData.ts  exists=True
+  consts: [('ITEM_PREFIX', 'N3-')]
+  --- setField 片段 ---
+     function setField(sheet: string, field: string, value: any): Promise<void> {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const conclusion = typeof value === 'string' ? value : JSON.stringify(value)
+         await saveField(itemId, { conclusion })
+       }
+     
+       /**
+        * setTbValues — 从 render-config html_data 的 TB 种子数据设置只读字段。
+        * 用于 FormData 初始化时接收后端自动取数（期初/未审等TB字段）。
+        *
+        * 负债类科目 2901：TB返回的期末余额是贷方口径（正数=贷方余额）。
+        * @param values - Record<itemId, value>
+        */
+       function setTbValues(values: Record<string, any>): void {
+         for (const [itemId, value] of Object.entries(values)) {
+           const fullId = itemId.startsWith(ITEM_PREFIX) ? itemId : `${ITEM_PREFIX}${itemId}`
+  --- getField 片段 ---
+     function getField(sheet: string, field: string): any {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const resp = allResponses.value.get(itemId)
+         if (!resp) return null
+         // 尝试 JSON 解析（支持存储对象/数组）
+         if (resp.conclusion) {
+           try {
+             return JSON.parse(resp.conclusion)
+           } catch {
+             return resp.conclusion
+           }
+         }
+         return null
+       }
+     
+       /**
+==============================================================================
+N5-3  <- useN5FormData.ts  exists=True
+  consts: [('ITEM_PREFIX', 'N5-')]
+  --- setField 片段 ---
+     function setField(sheet: string, field: string, value: any): Promise<void> {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const conclusion = typeof value === 'string' ? value : JSON.stringify(value)
+         await saveField(itemId, { conclusion })
+       }
+     
+       // ─── saveField (单字段保存，即时) ──────────────────────────────────────────
+     
+       /**
+        * 保存单个字段（结论/状态/选择类字段立即保存）
+        * @param itemId - 如 "N5-1-audited_amount"
+        * @param value - { conclusion?, remark? }
+        */
+       async function saveField(itemId: string, value: { conclusion?: string; remark?: string }): Promise<void> {
+         // 取消该 item 的 debounce 定时器
+         const timer = _debounceTimers.get(itemId)
+  --- getField 片段 ---
+     function getField(sheet: string, field: string): any {
+         const itemId = `${ITEM_PREFIX}${sheet}-${field}`
+         const resp = allResponses.value.get(itemId)
+         if (!resp) return null
+         // 尝试 JSON 解析（支持存储对象/数组）
+         if (resp.conclusion) {
+           try {
+             return JSON.parse(resp.conclusion)
+           } catch {
+             return resp.conclusion
+           }
+         }
+         return null
+       }
+     
+       /**

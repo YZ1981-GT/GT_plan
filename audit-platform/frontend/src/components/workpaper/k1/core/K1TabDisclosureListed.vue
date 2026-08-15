@@ -142,14 +142,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.endAmount"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateAgingRow(row.rowId, 'endAmount', v ?? 0)"
             />
@@ -158,14 +154,10 @@
         </el-table-column>
         <el-table-column label="上年年末余额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateAgingRow(row.rowId, 'priorAmount', v ?? 0)"
             />
@@ -203,14 +195,10 @@
         <el-table-column label="期末金额" align="center">
           <el-table-column label="账面余额" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.endGross"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 style="width: 100%"
                 @change="(v: number) => disc.updateNatureRow(row.rowId, 'endGross', v ?? 0)"
               />
@@ -219,14 +207,10 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.endProvision"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 style="width: 100%"
                 @change="(v: number) => disc.updateNatureRow(row.rowId, 'endProvision', v ?? 0)"
               />
@@ -244,14 +228,10 @@
         <el-table-column label="上年年末金额" align="center">
           <el-table-column label="账面余额" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.priorGross"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 style="width: 100%"
                 @change="(v: number) => disc.updateNatureRow(row.rowId, 'priorGross', v ?? 0)"
               />
@@ -260,14 +240,10 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.priorProvision"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 style="width: 100%"
                 @change="(v: number) => disc.updateNatureRow(row.rowId, 'priorProvision', v ?? 0)"
               />
@@ -497,14 +473,10 @@
         </el-table-column>
         <el-table-column label="转回或收回金额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.amount"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateReversalRow(row.rowId, 'amount', v ?? 0)"
             />
@@ -552,14 +524,10 @@
         </el-table-column>
         <el-table-column label="核销金额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.amount"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateWriteoffRow(row.rowId, 'amount', v ?? 0)"
             />
@@ -640,14 +608,10 @@
         </el-table-column>
         <el-table-column label="其他应收款期末余额" width="170" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.endBalance"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateTop5Row(row.rowId, 'endBalance', v ?? 0)"
             />
@@ -669,14 +633,10 @@
         </el-table-column>
         <el-table-column label="坏账准备期末余额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.provision"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateTop5Row(row.rowId, 'provision', v ?? 0)"
             />
@@ -753,14 +713,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.endBalance"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateGovGrantRow(row.rowId, 'endBalance', v ?? 0)"
             />
@@ -830,14 +786,10 @@
         </el-table-column>
         <el-table-column label="终止确认金额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.derecognizedAmount"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateTransferRow(row.rowId, 'derecognizedAmount', v ?? 0)"
             />
@@ -905,14 +857,10 @@
         </el-table-column>
         <el-table-column label="期末数" width="180" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.kind === 'data' && !isReadonly"
               :model-value="row.amount"
               size="small"
-              :controls="false"
-              :precision="2"
-              :formatter="amountFormatter"
-              :parser="amountParser"
               style="width: 100%"
               @change="(v: number) => disc.updateContinuedInvolvementRow(row.rowId, 'amount', v ?? 0)"
             />
@@ -989,6 +937,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * K1TabDisclosureListed.vue — 附注披露信息（上市公司）
  *

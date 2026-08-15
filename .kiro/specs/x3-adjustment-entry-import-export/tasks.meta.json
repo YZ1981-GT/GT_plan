@@ -1,0 +1,54 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1.6 扩 GS5 挂载宿主 + GS10 读回宿主守卫": [
+      {
+        "executionId": "e462e97f-ee3f-4986-99b6-47162019ccc8",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786609186241
+      }
+    ],
+    "2.1 `adjustment_ie_contract.json` 迁入与改值（共享文件，防呆）": [
+      {
+        "executionId": "e462e97f-ee3f-4986-99b6-47162019ccc8",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786613843001
+      }
+    ],
+    "2.2 写 Property 8 属性测试（键提取判据四形态）": [
+      {
+        "executionId": "e462e97f-ee3f-4986-99b6-47162019ccc8",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786618084069
+      }
+    ],
+    "2.3 写 Property 10 属性测试（写入列由机制推导）": [
+      {
+        "executionId": "e462e97f-ee3f-4986-99b6-47162019ccc8",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786618084856
+      }
+    ],
+    "3. Checkpoint —— 守卫红/绿分布符合「先打红」设计": [
+      {
+        "executionId": "e462e97f-ee3f-4986-99b6-47162019ccc8",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786622516200
+      }
+    ],
+    "4.1 建 `_x3_adjustment_import_export.py`（唯一真源出口）": [
+      {
+        "executionId": "e462e97f-ee3f-4986-99b6-47162019ccc8",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786624913805
+      }
+    ],
+    "4.2 补齐四张只写不读 sheet 的读回路径（design §C5a）": [
+      {
+        "executionId": "a8295bab-9012-4157-89d4-871659aa124b",
+        "chatSessionId": "sess_d21b1c03-11ba-4745-ba51-187c74fad452",
+        "timestamp": 1786673172918
+      }
+    ]
+  }
+}

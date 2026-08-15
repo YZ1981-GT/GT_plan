@@ -154,13 +154,10 @@
         </el-table-column>
         <el-table-column label="原值" width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.cost"
-              :controls="false"
               size="small"
-              :min="0"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'cost', $event)"
             />
@@ -169,13 +166,10 @@
         </el-table-column>
         <el-table-column label="账面累计摊销" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.bookAccAmortEnd"
-              :controls="false"
               size="small"
-              :min="0"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'bookAccAmortEnd', $event)"
             />
@@ -184,13 +178,10 @@
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairment"
-              :controls="false"
               size="small"
-              :min="0"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'impairment', $event)"
             />
@@ -242,13 +233,10 @@
         </el-table-column>
         <el-table-column label="账面月摊销额" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.bookMonthly"
-              :controls="false"
               size="small"
-              :min="0"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'bookMonthly', $event)"
             />
@@ -408,6 +396,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * I1TabAmortizationWithImpair.vue — I1-11 摊销测算表（含减值）
  * 对齐源 xlsx「累计摊销测算表 I1-11」分段逻辑（Q~W + 月数 I~P）

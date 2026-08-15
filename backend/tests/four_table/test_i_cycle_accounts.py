@@ -39,25 +39,39 @@ from app.services.four_table.i1_asset_categories import (
 
 
 class TestResolveRowCode:
-    """6 循环 × 2 变体 = 12 用例。"""
+    """6 循环 × 2 变体 = 12 用例。
+
+    .. warning::
+       🔴 **本类的期望值曾整体是错的**（2026-08-09 修）。改写前它逐条断言
+       ``I1.listed='BS-033'``（开发支出）/ ``I1.soe='BS-045'``（应付账款）等 11 个错码，
+       即**守卫在保护错的那一侧** —— 这是 `I_CYCLE_ROW_CODES` 错值长期存活的直接原因：
+       任何人把真源改对，这里就会打红，看起来像"改坏了"。
+
+       现期望值全部经 `report_config` 连库对账（见
+       ``test_i_cycle_row_code_evidence.py`` 的类 A 断言，它独立查 DB 自行核算行名）。
+       两个守卫**互相锁死**：这里改回错码 → 那边 Property 42 打红；真源改回错码 →
+       那边 Property 1/2 打红。
+
+       spec: .kiro/specs/i-cycle-extraction-formula-and-disclosure-closure/ AC 1.8
+    """
 
     @pytest.mark.parametrize(
         "wp_code,standards,expected",
         [
-            # listed 变体
-            ("I1", ["listed_standalone"], "BS-033"),
-            ("I2", ["listed_standalone"], "BS-035"),
-            ("I3", ["listed_standalone"], "BS-037"),
-            ("I4", ["listed_standalone"], "BS-038"),
-            ("I5", ["listed_standalone"], "BS-040"),
+            # listed 变体（I 类实证四准则同码同名同公式 → 与 soe 相同）
+            ("I1", ["listed_standalone"], "BS-032"),
+            ("I2", ["listed_standalone"], "BS-033"),
+            ("I3", ["listed_standalone"], "BS-034"),
+            ("I4", ["listed_standalone"], "BS-035"),
+            ("I5", ["listed_standalone"], "BS-037"),
             ("I6", ["listed_standalone"], "IS-006"),
             # soe 变体
-            ("I1", ["soe_standalone"], "BS-045"),
-            ("I2", ["soe_standalone"], "BS-046"),
-            ("I3", ["soe_standalone"], "BS-047"),
-            ("I4", ["soe_standalone"], "BS-048"),
-            ("I5", ["soe_standalone"], "BS-050"),
-            ("I6", ["soe_standalone"], "IS-024"),
+            ("I1", ["soe_standalone"], "BS-032"),
+            ("I2", ["soe_standalone"], "BS-033"),
+            ("I3", ["soe_standalone"], "BS-034"),
+            ("I4", ["soe_standalone"], "BS-035"),
+            ("I5", ["soe_standalone"], "BS-037"),
+            ("I6", ["soe_standalone"], "IS-006"),
         ],
         ids=[
             "I1-listed", "I2-listed", "I3-listed", "I4-listed", "I5-listed", "I6-listed",
@@ -69,7 +83,18 @@ class TestResolveRowCode:
 
     def test_empty_standards_returns_listed(self):
         """无准则时回退 listed。"""
-        assert resolve_row_code("I1", []) == "BS-033"
+        assert resolve_row_code("I1", []) == "BS-032"
+
+    def test_listed_equals_soe_for_all_cycles(self):
+        """I 类两准则同码（防被按 J1「按变体不同」范式误改成两码）。
+
+        实证：`BS-032/033/034/035/037` 与 `IS-006` 在四个 ``applicable_standard``
+        下 row_name 与 formula 均相同，故按准则分流对 I 类是**恒等映射**。
+        """
+        for wp in ("I1", "I2", "I3", "I4", "I5", "I6"):
+            listed = resolve_row_code(wp, ["listed_standalone"])
+            soe = resolve_row_code(wp, ["soe_standalone"])
+            assert listed == soe, f"{wp} 两准则取值不同：listed={listed} soe={soe}"
 
     def test_unknown_wp_code_returns_empty(self):
         """未知 wp_code 返空串。"""
@@ -165,11 +190,17 @@ class TestDetectChartConflict:
     """I2 的 1703 与预期「开发支出」冲突；无 name 的码不判冲突。"""
 
     def test_i2_1703_conflict_with_development(self):
-        """1703=无形资产减值准备 与 I2 预期「开发支出/研发支出」冲突。"""
+        """1703=无形资产减值准备 与 I2 预期「开发支出/研发支出」冲突。
+
+        .. note::
+           ``row_code`` 在 :func:`detect_chart_conflict` 里只作**溯源标签**写进诊断输出，
+           不参与冲突判定。此处传 I2 的正确码 ``BS-033``（2026-08-09 修；改前传的
+           ``BS-035`` 是 I4「长期待摊费用」的码 = 与被修的真源错值同源的残留）。
+        """
         name_lookup = {"1703": "无形资产减值准备"}
         expected = I_CYCLE_EXPECTED_NAMES["I2"]
         conflicts = detect_chart_conflict(
-            ["1703"], name_lookup, expected, row_code="BS-035"
+            ["1703"], name_lookup, expected, row_code="BS-033"
         )
         assert len(conflicts) == 1
         assert conflicts[0]["kind"] == "chart_conflict"
@@ -181,7 +212,7 @@ class TestDetectChartConflict:
         name_lookup = {}  # 1703 查不到名称
         expected = I_CYCLE_EXPECTED_NAMES["I2"]
         conflicts = detect_chart_conflict(
-            ["1703"], name_lookup, expected, row_code="BS-035"
+            ["1703"], name_lookup, expected, row_code="BS-033"
         )
         assert conflicts == []
 
@@ -190,7 +221,7 @@ class TestDetectChartConflict:
         name_lookup = {"1704": "开发支出"}
         expected = I_CYCLE_EXPECTED_NAMES["I2"]
         conflicts = detect_chart_conflict(
-            ["1704"], name_lookup, expected, row_code="BS-035"
+            ["1704"], name_lookup, expected, row_code="BS-033"
         )
         assert conflicts == []
 

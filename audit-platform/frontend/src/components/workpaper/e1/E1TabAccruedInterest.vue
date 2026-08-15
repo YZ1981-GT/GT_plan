@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * E1TabAccruedInterest.vue — E1-20 应计利息
  *
@@ -263,8 +264,7 @@ async function generateAuditConclusion(): Promise<void> {
           </el-table-column>
           <el-table-column label="原币金额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="asAccrued(row).fcAmount" :disabled="isReadonly"
-                :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small"
+              <WpAmountInput :model-value="asAccrued(row).fcAmount" :disabled="isReadonly" size="small"
                 @change="(val: number) => updateCell(row.id, 'fcAmount', val ?? 0)" />
             </template>
           </el-table-column>

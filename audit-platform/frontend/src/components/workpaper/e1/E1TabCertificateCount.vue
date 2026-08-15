@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * E1TabCertificateCount.vue — E1-9 存单盘点
  *
@@ -325,13 +326,9 @@ onMounted(() => {
           </el-table-column>
           <el-table-column label="金额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="asCert(row).amount"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 size="small"
                 @change="(val: number) => updateCell(row.id, 'amount', val ?? 0)"
               />

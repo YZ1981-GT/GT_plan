@@ -120,14 +120,10 @@
           <el-table-column prop="label" label="账　龄" min-width="160" />
           <el-table-column label="期末数" width="170" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.endAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 style="width: 100%"
                 @change="(v: number) => dis.updateAgingRow(row.rowId, 'endAmount', v ?? 0)"
               />
@@ -136,14 +132,10 @@
           </el-table-column>
           <el-table-column label="期初数" width="170" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.priorAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
-                :formatter="amountFormatter"
-                :parser="amountParser"
                 style="width: 100%"
                 @change="(v: number) => dis.updateAgingRow(row.rowId, 'priorAmount', v ?? 0)"
               />
@@ -166,14 +158,10 @@
             <el-table-column label="账面余额" align="center">
               <el-table-column label="金额" width="160" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="period === 'end' ? row.endBalance : row.priorBalance"
                     size="small"
-                    :controls="false"
-                    :precision="2"
-                    :formatter="amountFormatter"
-                    :parser="amountParser"
                     style="width: 100%"
                     @change="(v: number) => dis.updateMethodRow(row.rowKey, period === 'end' ? 'endBalance' : 'priorBalance', v ?? 0)"
                   />
@@ -191,14 +179,10 @@
             <el-table-column label="坏账准备" align="center">
               <el-table-column label="金额" width="160" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="period === 'end' ? row.endProvision : row.priorProvision"
                     size="small"
-                    :controls="false"
-                    :precision="2"
-                    :formatter="amountFormatter"
-                    :parser="amountParser"
                     style="width: 100%"
                     @change="(v: number) => dis.updateMethodRow(row.rowKey, period === 'end' ? 'endProvision' : 'priorProvision', v ?? 0)"
                   />
@@ -239,16 +223,14 @@
           </el-table-column>
           <el-table-column label="账面余额" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.balance" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.balance" size="small" style="width:100%"
                 @change="(v: number) => dis.updateIndividualRow(row.rowId, 'balance', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.balance) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="坏账准备" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.provision" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.provision" size="small" style="width:100%"
                 @change="(v: number) => dis.updateIndividualRow(row.rowId, 'provision', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.provision) }}</span>
             </template>
@@ -280,8 +262,7 @@
           <el-table-column label="期末数" align="center">
             <el-table-column label="账面余额" width="150" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="row.editable && !isReadonly" :model-value="row.endBalance" size="small" :controls="false"
-                  :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+                <WpAmountInput v-if="row.editable && !isReadonly" :model-value="row.endBalance" size="small" style="width:100%"
                   @change="(v: number) => dis.updatePortfolioRow(row.rowId, 'endBalance', v ?? 0)" />
                 <span v-else class="amount-cell" :class="{ 'auto-fill': row.autoFilled }">{{ fmt(row.endBalance) }}</span>
               </template>
@@ -291,8 +272,7 @@
             </el-table-column>
             <el-table-column label="坏账准备" width="150" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="row.editable && !isReadonly" :model-value="row.endProvision" size="small" :controls="false"
-                  :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+                <WpAmountInput v-if="row.editable && !isReadonly" :model-value="row.endProvision" size="small" style="width:100%"
                   @change="(v: number) => dis.updatePortfolioRow(row.rowId, 'endProvision', v ?? 0)" />
                 <span v-else class="amount-cell">{{ fmt(row.endProvision) }}</span>
               </template>
@@ -301,8 +281,7 @@
           <el-table-column label="期初数" align="center">
             <el-table-column label="账面余额" width="150" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="row.editable && !isReadonly" :model-value="row.priorBalance" size="small" :controls="false"
-                  :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+                <WpAmountInput v-if="row.editable && !isReadonly" :model-value="row.priorBalance" size="small" style="width:100%"
                   @change="(v: number) => dis.updatePortfolioRow(row.rowId, 'priorBalance', v ?? 0)" />
                 <span v-else class="amount-cell">{{ fmt(row.priorBalance) }}</span>
               </template>
@@ -312,8 +291,7 @@
             </el-table-column>
             <el-table-column label="坏账准备" width="150" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="row.editable && !isReadonly" :model-value="row.priorProvision" size="small" :controls="false"
-                  :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+                <WpAmountInput v-if="row.editable && !isReadonly" :model-value="row.priorProvision" size="small" style="width:100%"
                   @change="(v: number) => dis.updatePortfolioRow(row.rowId, 'priorProvision', v ?? 0)" />
                 <span v-else class="amount-cell">{{ fmt(row.priorProvision) }}</span>
               </template>
@@ -337,8 +315,7 @@
           <el-table-column label="期末数" align="center">
             <el-table-column label="账面余额" width="150" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.endBalance" size="small" :controls="false"
-                  :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+                <WpAmountInput v-if="!row.isTotal && !isReadonly" :model-value="row.endBalance" size="small" style="width:100%"
                   @change="(v: number) => dis.updateOtherPortfolioRow(row.rowId, 'endBalance', v ?? 0)" />
                 <span v-else class="amount-cell">{{ fmt(row.endBalance) }}</span>
               </template>
@@ -363,8 +340,7 @@
           <el-table-column label="期初数" align="center">
             <el-table-column label="账面余额" width="150" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!row.isTotal && !isReadonly" :model-value="row.priorBalance" size="small" :controls="false"
-                  :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+                <WpAmountInput v-if="!row.isTotal && !isReadonly" :model-value="row.priorBalance" size="small" style="width:100%"
                   @change="(v: number) => dis.updateOtherPortfolioRow(row.rowId, 'priorBalance', v ?? 0)" />
                 <span v-else class="amount-cell">{{ fmt(row.priorBalance) }}</span>
               </template>
@@ -501,16 +477,14 @@
           </el-table-column>
           <el-table-column label="转回或收回金额" width="170" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%"
                 @change="(v: number) => dis.updateReversalRow(row.rowId, 'amount', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.amount) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="转回或收回前累计已计提坏账准备金额" width="220" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.cumulativeProvision ?? 0" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.cumulativeProvision ?? 0" size="small" style="width:100%"
                 @change="(v: number) => dis.updateReversalRow(row.rowId, 'cumulativeProvision', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.cumulativeProvision) }}</span>
             </template>
@@ -574,8 +548,7 @@
           </el-table-column>
           <el-table-column label="核销金额" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%"
                 @change="(v: number) => dis.updateWriteoffRow(row.rowId, 'amount', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.amount) }}</span>
             </template>
@@ -642,8 +615,7 @@
           </el-table-column>
           <el-table-column label="账面余额" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.endBalance" size="small" style="width:100%"
                 @change="(v: number) => dis.updateTop5Row(row.rowId, 'endBalance', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.endBalance) }}</span>
             </template>
@@ -664,8 +636,7 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="150" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.provision" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.provision" size="small" style="width:100%"
                 @change="(v: number) => dis.updateTop5Row(row.rowId, 'provision', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.provision) }}</span>
             </template>
@@ -697,8 +668,7 @@
           </el-table-column>
           <el-table-column label="终止确认金额" width="170" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.derecognizedAmount" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.derecognizedAmount" size="small" style="width:100%"
                 @change="(v: number) => dis.updateTransferRow(row.rowId, 'derecognizedAmount', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.derecognizedAmount) }}</span>
             </template>
@@ -755,8 +725,7 @@
           </el-table-column>
           <el-table-column label="期末金额" width="180" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.kind === 'data' && !isReadonly" :model-value="row.amount" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="row.kind === 'data' && !isReadonly" :model-value="row.amount" size="small" style="width:100%"
                 @change="(v: number) => dis.updateContinuedInvolvementRow(row.rowId, 'amount', v ?? 0)" />
               <span v-else-if="row.kind === 'subtotal'" class="amount-cell is-total">{{ fmt(row.amount) }}</span>
               <span v-else>—</span>
@@ -810,8 +779,7 @@
           </el-table-column>
           <el-table-column label="期末余额" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.endBalance" size="small" :controls="false"
-                :precision="2" :formatter="amountFormatter" :parser="amountParser" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.endBalance" size="small" style="width:100%"
                 @change="(v: number) => dis.updateGovGrantRow(row.rowId, 'endBalance', v ?? 0)" />
               <span v-else class="amount-cell">{{ fmt(row.endBalance) }}</span>
             </template>
@@ -880,6 +848,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * K1TabDisclosureSoe.vue — 附注披露信息（国企）
  *

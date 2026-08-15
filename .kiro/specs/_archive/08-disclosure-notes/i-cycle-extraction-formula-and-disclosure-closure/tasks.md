@@ -2,7 +2,8 @@
 
 ## Overview
 
-24 个任务 / 7 波，收口 I1~I6 六循环的「四表入库 → 底稿取数 → 披露表 → 附注模块」全链。
+25 个任务 / 7 波（Task 1~24 + 归档前复盘 Task 25），收口 I1~I6 六循环的
+「四表入库 → 底稿取数 → 披露表 → 附注模块」全链。
 
 **不重建既有骨架** —— `four_table/i_cycle_{accounts,extraction,prefill}.py` 与 6 份
 `iXNoteSectionMap.ts` 已在位且机制正确（真实库 8 项目 `parent_check` 全部 `diff=0.0`）。
@@ -27,7 +28,7 @@
     { "wave": 4, "name": "附注模板列元数据与表名", "tasks": [10, 11] },
     { "wave": 5, "name": "披露表结构与动态插行", "tasks": [12, 13, 14, 15] },
     { "wave": 6, "name": "前端消费与溯源接线", "tasks": [16, 17, 18] },
-    { "wave": 7, "name": "守卫收口、CI、变异与验收", "tasks": [19, 20, 21, 22, 23, 24] }
+    { "wave": 7, "name": "守卫收口、CI、变异与验收", "tasks": [19, 20, 21, 22, 23, 24, 25] }
   ]
 }
 ```
@@ -1044,6 +1045,215 @@ Wave 1 是全部后续的前提（先打红才能区分「守卫有效」与「�
   </details>
 
   - _Requirements: 8.6, 11.6, 11.7_
+
+- [x] 25. 归档前三件套复盘（2026-08-15）—— 抓出并修掉「行维度完全裸奔」
+
+  ### 🔴🔴 本轮最重要的发现：本 spec 的 CI job 在**干净 checkout 下必红**
+
+  Task 10 的 `--apply` 产出（4 张表补 `columns`）**从未入库** —— HEAD 版
+  `note_template_{listed,soe}.json` 里这 4 张表全是 `cols=0`
+  （`listed/五、26/无形资产情况`、`listed/五、26/确认为无形资产的数据资源`、
+  `soe/八、27/确认为无形资产的数据资源`、`listed/五、28/商誉减值测试关键假设`），
+  而 Task 21 建的 `i-cycle-extraction-closure` job 会跑
+  `test_cols0_target_has_columns`（4 参数化）⇒ **该 job 自建起就没在干净环境里绿过**。
+  这正是 memory 铁律「『spec 全绿』≠『产物已入库』」的又一实例，且是**归档前必须解掉的阻断项**
+  （归档一个 CI 恒红的 spec = 假绿）。处置见下「入库策略」。
+
+  ### 🔴🔴 抓出 2 个真错：行维度三向从来没人比过
+
+  本 spec 的三向比对（Property 16）只比**列**（源表头 ↔ 模板 headers ↔ 载荷 columns），
+  `_SRC_DYNAMIC_MARK_COUNT`（Property 21）只锁**源侧**扩位数。于是下面两处躲过了
+  **38 张列契约 + 12 条扩位基线 + 14 条变异 + 前端 1488 例**：
+
+  | # | 缺陷 | 实证 |
+  |---|---|---|
+  | A | I1 上市「无形资产情况」38 行里第 33/34 行 = `（2）其他减少` + `……`，源模板 `A43:A44` 是 `（2）失效且终止确认的部分` + `（3）其他减少` ⇒ **减值准备减少段丢了一个真实披露项、并凭空多出第 4 个可扩位** | 账面原值层（`A42:A44`）与累计摊销层（`A31:A33`）都有「失效且终止确认的部分」，只有减值准备层没有 = 从 H1 模型复制后漏改（`h1/h7/h8ListedDisclosureModel.ts` 同样有 `imp_dec_ellipsis`） |
+  | B | I1 国企「无形资产情况」是 **48 行 / 10 个类别**：缺「其他」、把源模板「矿产权」拆成「采矿权」+「探矿权」、「特许经营权」写成「特许权」、首类别是「软件」而源模板是「土地使用权」 | 源模板 `A8:A59` 实测 52 行 = 4 层 ×（层标题 + 11 类别 + 扩位）；运行态推送产出的 **52 行是对的**（Task 24 浏览器实测「56 行 → 52 行」），**错的只有 seed 路径** ⇒ 新建项目附注开局就是错类别 |
+
+  🔴 **为什么自洽型判据必然放行**：前端 `I1_LISTED_MOVEMENT_ROWS` 与模板 rows 是**同一处错**
+  （同批生成），任何「模板 ↔ 载荷」双向比对都两侧一起错、仍自洽
+  （memory 已记「自洽性判据只能保证两侧一致、不能保证两侧都对」）。只有拿源 xlsx 当第三边才抓得到。
+
+  ### 🔴 抓出第 3 个真错：`I1_LISTED_DEFAULT_CATEGORIES` 是第二份类别真源且 3 个 label 错
+
+  - 实测 `i1ListedDisclosureModel.I1_LISTED_DEFAULT_CATEGORIES` = `房屋使用权` / `特许权` /
+    `探矿权/采矿权`，而源模板 `附注披露信息（上市公司）!B10:L10` 与 `底稿目录!A9:A19` 都是
+    `住房使用权` / `特许经营权` / `矿产权`（附注模板 JSON 的 13 列 label 也是正确的）
+  - **生产消费的正是这份错的**：`useI1Disclosure.ts` × 5 处 + `I1TabDisclosureListed.vue` × 2 处；
+    而 Task 12 交付的 `i1CategoryScope.resolveI1Categories()`（label 正确、带 `source_ref`、有守卫）
+    **生产零消费方 = 死代码**（只被自己的 spec 引用）⇒ 假绿第①源
+  - 后果：`buildI1ListedColumns()` 直接取 `c.label` 作列头 ⇒ **推给附注的列头 label 与模板不同构**
+    （label 同时是交叉核对的匹配键）
+  - 🔴 Task 24 浏览器实测其实**已经看见**了这个错（原文写「13 列…含「探矿权/采矿权」」），
+    但当时把它当既有事实记下，没跟源模板对一下 ⇒ **「实测到的现状」不能直接当期望值**
+
+  ### ✅ 修复（4 处生产改动，全部对齐源模板）
+
+  1. `i1ListedDisclosureModel.ts`：减值准备减少段 `imp_dec_ellipsis` → `imp_dec_expire`
+     （`（2）失效且终止确认的部分`），`imp_dec_other` 改 `（3）其他减少`，`imp_dec.sumOf` 三项同构；
+     行数仍 38、扩位由 4 → **3**
+  2. `i1DisclosureEnhance.ts`：`impairDec` 由 `_dispose + _other + _ellipsis` 改为
+     `_dispose + _expire + _other`，与同函数内 `costDec`/`amortDec` 逐字同构
+  3. `i1ListedDisclosureModel.I1_LISTED_DEFAULT_CATEGORIES` 改为
+     `I1_DEFAULT_CATEGORIES.map(c => ({ key: I1_STANDARD_TO_LEGACY[c.key] ?? c.key, label: c.label }))`
+     —— label 单一真源，key 保留历史短 key（`land`/`housing`/`knowhow`/`mining`/`data`…
+     已持久化在 `checklist_responses` 的 `I1-listed-movement`，改 key 会丢数据）
+  4. `fix_note_i_cycle_structure.py`：
+     - 新增 `_I1_LISTED_TABLE1_ROW_LABELS`（38 条，source_ref = `附注披露信息（上市公司）!A11:A48`）
+       + `_normalize_i1_listed_table1_rows()` **独立前置步**
+     - 新增 `_i1_soe_table1_rows()`（52 行 = 4 层 ×（层标题 + 11 类别 + 扩位），
+       类别由新增的 `_i1_categories()` 派生，脚本内**零类别字面量**），走 `rule(rows=...)`
+     - 顺带修两处错注释：「4 个 expandable 可扩位」→ 3、「12 个类别列 + 合计 = 13 列」→
+       「项目 + 11 个类别列 + 合计 = 13 列」
+  - 🔴 **上市侧为什么不能走 kit 的 `rule(rows=...)`**：共享 kit 的 `carry_expandable_rows`
+    在「新骨架扩位数 < 旧数」时会把多出来的旧可扩位**再插回来**（它的职责是防结构脚本
+    抹掉合法可扩位），且**不提供 opt-out**；本 spec 边界写明「`_note_structure_kit` 只调用不改」
+    ⇒ 减少扩位这件事只能在 kit 之外做。国企侧扩位数前后都是 4，故可以走 rule 路径 ——
+    两侧形态不同是有意为之，脚本内已留证。
+
+  ### ✅ 守卫（3 组新判据，全部拿源 xlsx 当第三边）
+
+  - **后端** `test_note_i_cycle_structure.py` +7 → **199 passed**（Property 43）：
+    `test_row_skeleton_matches_source_column_a`（I1 两版逐行）·
+    `test_row_skeleton_expandable_count_matches_source`（消费侧扩位数 == 源侧标记数）·
+    `test_row_skeleton_impairment_decrease_has_three_details`（点名钉死三层减少段同构）·
+    `test_row_skeleton_source_anchors_still_valid`（区间首格以「一、」开头 / 区间后一格是「说明」段落）·
+    `test_row_skeleton_registry_covers_all_twelve`（两张登记表恰好二分 12 对 + 理由 ≥20 字闸）
+  - **前端** `iDisclosureColumns.spec.ts` +9 → **24 passed**（Property 44/45）：
+    行 label 逐行等于模板 rows · `ellipsis` 数 == 模板 `expandable` 数 · 三层减少段结构 ·
+    `subtotal.sumOf` 恰好覆盖其后全部明细 · 类别 label/key 逐项等于后端真源 ·
+    该文件代码区禁类别 label 字面量 · 列头 label 由类别默认值驱动
+  - 🔴 **免断言项必须登记实证理由**：`_ROW_SKELETON_NOT_ASSERTED` 10 条 ——
+    「源侧标记 ↔ 模板 expandable」实测**不是** 1:1（I2 两版与 I5 两版的扩位落在动态行表上，
+    模板 expandable=0 是正确形态；I3 上市源侧 0 处而模板 2 处、I6 上市源侧 0 处而模板 1 处，
+    是附注 docx 要求的独立可扩位）。把不成立的关系写成断言 = 锁死错值。
+    我第一版写的 4 条空话理由（「两侧均 0，无信号可断言」12 字）**被自己的理由质量闸打红**，
+    已按各自实测补全
+  - 🔴 **抽取器自身的坑（首版踩到，已落判据）**：从后端 py 抽类别时
+    ①`I1_ASSET_CATEGORIES: tuple[...]` 的类型注解里有 `[]`，按「赋值号后第一个开括号」才不会截到空块
+    ②`key=` 有字面量与**常量引用**两种形态，只认 `key="..."` 会静默漏掉 `key=CATEGORY_OTHER` 的「其他」
+    （被反向自检「应为 11 个」打红）③故补 `seq` 必须 1..N 连续无空洞的自检
+
+  ### ✅ 变异检验 5/5 全 RED（`mutate_i_cycle_guards.py` 14 → **19 条**）
+
+  | 变异 | 打红 |
+  |---|---|
+  | P43 附注模板把减少段第 3 个明细改回 `……` | `test_row_skeleton_impairment_decrease_has_three_details`（+3 连带） |
+  | P43 幂等脚本行骨架常量改回旧错值 | `test_check_passes`（精确命中，脚本 ↔ JSON 双向锁死） |
+  | P43 国企行骨架去掉「其中：」前缀 | `test_check_passes`（精确命中） |
+  | P44 前端行模型改回 `imp_dec_ellipsis` | 「逐行等于模板 rows」（+3 连带） |
+  | P45 前端类别默认值改回自己写死 11 条 | 「label 序列逐字等于后端」（+2 连带） |
+
+  恢复后两侧新增失败均 **0 条**（无残留污染），`.mutbak` 残留 0。
+  🔴 JSON 锚点必须实测唯一：`（3）其他减少` 全文命中 3 次、`四、账面价值` 命中 6 次，
+  只有「减值准备层尾 + 四、账面价值」这段跨行锚点命中 **1** 次。
+
+  ### ✅ 零回归（归因型判据，禁 `git stash` / HEAD-swap）
+
+  按引用关系反查辐射面（`note_template_*` / `fix_note_i_cycle_structure` / `_note_structure_kit`
+  / `i1ListedDisclosureModel` / `i1DisclosureEnhance` / `i1CategoryScope`）得
+  **后端 60 个测试文件 + 前端 50 个 spec**，逐侧做「只回退本轮改动」的前后对照：
+
+  - 后端：AFTER 32 failed / BEFORE 39 failed ⇒ **新增 0 条**，且**顺带修好 7 条**
+    （5 条是本轮新判据转绿 + `test_check_passes[I1_listed/I1_soe]`
+    + 🔴 `four_table/test_note_k_row_code_evidence.py::test_shared_table_manifest_has_no_drift`
+    —— **K 循环的共享表清单守卫本来是红的，被我这处 soe 行骨架修复带绿了**，
+    这是「修对了而不只是自洽」的独立印证）
+  - 前端：辐射面 94 files / 3133 tests，5 个失败文件（`disclosureAutoSyncCoverage` /
+    `k4NoteSectionMap` / `kLiabilityNoteSubtableContract` / `kPlNoteSubtableContract` /
+    `noteSectionMapNamingCoverage`）在**回退我的改动后失败数完全相同**（19 failed / 341 passed）
+    ⇒ 新增 0 条，全属并发会话域（K 循环 / E1 / restricted-assets）
+  - I 循环自身：后端 5 个守卫 + CI 接线守卫 **449 passed**；
+    前端 `i1 iCycle iDisclosure` **28 files / 721 passed**
+  - 幂等六项：`--check` rc=0 · 二次 `--apply` 0 变更 · 两个 JSON md5 逐字节不变 · stderr 无 traceback
+
+  ### ✅ 三件套错基线修正（10 处）
+
+  归档前把文档里会被后来者照抄的错值改掉（memory 铁律「守卫把错值当基线锁死」的文档版）：
+
+  | 文件 | 错基线 | 实测 |
+  |---|---|---|
+  | requirements.md | **两个重复的 `## Glossary` 段**（复制粘贴残留） | 合并为一份（把 `A/B 对照`/`实质差异` 并入详版，另补 `行骨架` 条目） |
+  | requirements.md R1 前言 | 「6/6 全部指向错误报表行」 | 12 个取值里 **11** 个错（listed 与 soe 各一套不同错值） |
+  | requirements.md AC 6.3 / design Property 19 | `底稿目录!A9:A19`「12 类」 | **11 类**（`A20` 才是 `……`） |
+  | requirements.md R7 前言 / design Property 21 | 「I2 上市 1 处；I3/I4/I5/I6 各 0 处」 | I2 上市 **2**（A15/A27）· **I5 上市 1（A18）/ I5 国企 1（A17）** |
+  | requirements.md AC 10.2 | `=#REF!`「15 格」 | **20 格**（A~D × 35~39） |
+  | requirements.md AC 10.3 | 「`D20:L20` 笔误」未标明边界 | B20/C20 正确、**D20:L20 共 9 格**误写；row14 的 B14:L14 全「购置」是对的，不得一起改 |
+  | design Components 表 | 两个 `fix_*` 脚本标「**新建**」 | 两者**都已存在**（2026-08-09 实证 git tracked、`--check` rc=0），实际是「在既有脚本内补」 |
+  | design 前端改动表 | 「`iXNoteSectionMap.ts` 补 columns」 | `columns` 在各 `iXDisclosureSyncPayload.ts`；`iXNoteSectionMap.ts` 只有章节号+表名+准则判定 |
+  | design 前端改动表 | 「`iCycleAccountScope.ts` 复用 `shared/cycleAccountScope.ts` 工厂」 | **有意偏离**（工厂读 `slots` 形态、I 类走 `segments`，二分 gross/provision 装不下 I1 三段），理由已写进 design |
+  | design 守卫表 | 只列 8 个守卫 | 补齐实际交付的 6 个前端守卫 + `test_i_cycle_ci_wiring.py`，变异脚本 14 → 19 条 |
+
+  另新增 AC **5.8 / 5.9 / 6.5 / 7.7** 与 Property **43 / 44 / 45**（本轮修的三处缺陷各有归属 AC，
+  避免「修了但没有 AC 承接」）。
+
+  ### 🔴 产物入库全量核查（46 项清单，逐项查 `git status --porcelain`）
+
+  | 状态 | 数量 | 说明 |
+  |---|---|---|
+  | 已入库且干净 | 22 | 含 `i_cycle_source_defects.py` / `verify_i_cycle_live.py` / 4 个 Task 24 新建守卫 / CI yml |
+  | M 已改未提交 | 15 | Task 4/4b/5/7/8/9/19 的实现与守卫改动 + 4 个共享数据文件 |
+  | **?? 未跟踪** | **7** | 🔴 `test_i_cycle_row_code_evidence.py` · `test_i5_absent_account.py` · `iCycleAccountScope.ts` · `iCycleAdjudicationSeed.ts` · `useICycleAdjudicationSeeding.ts` · `iCycleAdjudicationSeed.spec.ts` · `iCycleDynamicRows.spec.ts` |
+  | 缺文件 | 1 | `backend/scripts/diagnose/diagnose_i_cycle_rowcode.py` |
+
+  🔴 **7 个未跟踪文件里有 4 个被 CI 直接引用** —— 后端 job 引 前两个、前端 job 引 后两个
+  ⇒ pytest / vitest 遇到不存在的路径直接整 job 红。**这是 Task 21 的 CI 接线守卫
+  `test_i_cycle_ci_wiring.py` 抓不到的形态**：它用 `Path.exists()` 判**工作树**里文件是否存在
+  （工作树里确实存在），而 CI 跑的是 `git checkout` 出来的树。
+  ⇒ **建议给该守卫补一条判据：引用的文件必须 `git ls-files --error-unmatch` 得到**
+  （即「已入库」而不只是「本机存在」）。本轮不改该守卫（属 Task 21 作用域，且已在此登记）。
+
+  🔴 **`diagnose_i_cycle_rowcode.py` 不存在且 git 历史里从未出现过** —— Task 6 标记为已交付
+  但该文件磁盘与 HEAD 双查皆无（`git log --all -- <path>` 空），推测当时是以 `_wip_*` 形态
+  写的、被 Task 24 的临时产物清理一并删掉。它**不被任何 CI job 引用**，且其两项职能
+  （row_code ↔ `report_config` 对账 / A/B 金额对照）已被 `verify_i_cycle_live.py` 的
+  判据 D1 与 D4 覆盖（后者还多做了 `claim_segments` 的独立重算）
+  ⇒ **按「功能已被覆盖」结案，不为凑文件名重建一个空壳**，在此如实登记。
+
+  ### 📋 入库策略（并发会话下的归因型分区提交）
+
+  `note_template_{listed,soe}.json` 是多 spec 共享的回退高发文件，实测工作树里
+  **listed 36 张表 / soe 39 张表**相对 HEAD 有变动，绝大多数是并发会话（七、合营企业、
+  五、11 持有待售、五、18 长期股权投资、八、28 等）的未提交成果 ⇒ **整文件提交会卷走别人的活**。
+  故按「变动是否落在我的字节区间内」做**分区暂存**：只把 I 循环 6 个章节
+  （listed `五、26/27/28/29/31/66` + soe `八、27/28/29/30/32/67`）从工作树取、其余保持 HEAD 原样，
+  用 `git hash-object -w` + `git update-index --cacheinfo` 写进 index（**不动工作树**）。
+
+  四个共享数据文件各有独立、可复核的 desired 构造规则：
+
+  | 文件 | desired 构造 | 本次入库 / 不入库 |
+  |---|---|---|
+  | `note_template_listed.json` | HEAD + 仅替换 I 循环 6 个章节 | 入 `五、26 / 五、28 / 五、31`；**12 个并发会话域章节不带**（三、资产减值损失 / 五、1 / 五、8 / 五、11 / 五、18 / 五、42 / 五、44 / 五、64 / 五、65 / 五、68 / 七、1 等） |
+  | `note_template_soe.json` | 同上 | 入 `八、27 / 八、32`；**21 个并发会话域章节不带**（七、合并范围各表 / 八、9 / 八、12 / 八、18 / 八、42 等） |
+  | `prefill_formula_mapping.json` | **在 HEAD 内容上重放本 spec 的幂等脚本 `--apply`** ⇒ 构造上不可能带入别人的改动，重放后 `--check` rc=0 | 工作树里该文件有 **394 个块**跨 D/E/F/G/H/J/K/L/M/N 全循环变动（E1 40 / F2 36 / H1 14 / K1 14 …），全属并发会话，一个都不带 |
+  | `wp_code_overrides.json` | HEAD + 仅新增 `市场平均收益率2017: skip` | **不带** L 循环的两处（删 `函证差异检查表（示例）`、加 `L0-函证差异检查表（示例）`） |
+
+  🔴 **入库前用「模拟干净 checkout」验过**：把 4 个 desired 临时置入工作树，跑两个 CI job 的
+  **完整命令**（含既有 `i-cycle-extraction` job）—— 后端 228 + 199 + 65 + 22 passed、
+  两个 `--check` rc=0、前端 300 + 121 passed，**汇总 rc=0**；随后工作树逐字节还原。
+  这一步是「归档一个 CI 真绿的 spec」的直接证据，也是本轮最该沉淀的做法：
+  **验的必须是「即将提交的字节」，不是当前工作树**。
+
+  ### 📌 本轮登记但不修（越界项，附实证与建议）
+
+  - **`h1/h7/h8ListedDisclosureModel.ts` 同样有 `imp_dec_ellipsis`** —— I1 的错很可能是从
+    H1 复制来的。但 H 循环有自己的源模板（H1 固定资产的减少段是否留扩位需逐格核），
+    属 H 循环 spec 作用域，本轮只登记不改。**建议**：H 循环下一轮收口时用本轮的
+    Property 43/44 范式（源 xlsx 首列 ↔ 模板 rows ↔ 前端行模型）自查一遍。
+  - **`buildI1ListedColumns` 的合计列用中文 `合计` 作 key** —— 与平台「禁中文 label 作 key」
+    铁律形态相同，但它是**固定列**（非动态槽）且 `buildI1ListedSubTableData` 的行字段名与它逐字一致、
+    已推送数据依赖它，改 key 会造失落点 ⇒ 保持现状，登记备查。
+  - **I1 国企主表 seed 的 5 列 columns 已核对无误**（源 `附注披露信息（国有企业）!A7:E7` =
+    项目 / 期初余额 / 本期增加 / 本期减少 / 期末余额），本轮只改行不动列。
+  - 🔴 **`wp_code_overrides.json` 有一个重复键**（`函证差异检查表（示例）` 在第 1183 与 1500 行各一次，
+    **两处值相同** `confirmation-diff-checklist` ⇒ `json.load` 静默取后者，行为上无害）。
+    发现路径值得记：我最初用 `json.loads` → `json.dumps` 往返构造 desired，往返把冗余那行**去掉了**，
+    于是 staged diff 里凭空多出一处「删除别人域的行」。⇒ **对含重复键 / 手工维护的大配置文件做
+    分区暂存时禁用 JSON 往返**，改**文本级插入**（本轮已改成在顶层 `}` 前插一行 + 末键补逗号，
+    并加「out 行序列 == head 行序列 + 1 行」的字节核验；核验不能用 `zip` 逐行比 ——
+    插入点之后整体位移会把位移误报成差异）。该重复键本身属 D0/L0 函证域，本轮只登记不改。
+
+  - _Requirements: 5.8, 5.9, 6.5, 7.7, 11.1, 11.2, 11.3, 11.5_
 
 ---
 

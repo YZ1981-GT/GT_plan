@@ -1,0 +1,6 @@
+# 文件行数门禁白名单 — 历史大文件或设计上必须单文件的脚本
+# 格式：path  baseline_lines（空格分隔）
+backend/scripts/check/check_x3_deviation_registry.py  2436
+backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1243
+backend/scripts/fix/fix_note_i_cycle_structure.py  1247
+backend/tests/test_note_i_cycle_structure.py  806

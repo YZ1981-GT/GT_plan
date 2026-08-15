@@ -94,19 +94,21 @@ listed 侧是**整体错位一个循环**（与 L 循环公式预设「偏移一
 |---|---|
 | `four_table/i_cycle_accounts.py` | `I_CYCLE_ROW_CODES` 6 组取值改正；docstring 更新「本模块自建 row_code 表」的理由说明为「与 `report_config` 对账后的实证值」 |
 | `four_table/i_cycle_specs.py` | 删除（零消费方）；若 `I_PL_CYCLES`/`I_PL_POSITIVE_SIDE` 有消费方则先迁入 `i_cycle_accounts` |
-| `scripts/fix/fix_i_cycle_prefill_presets.py` | **新建** 幂等脚本：I1 块 sheet 名 `审定表I1-1`→`审定表I1`、I2 块 `6602`→`6604` + `account_codes` 自洽、12 张披露 sheet 预设登记 |
-| `scripts/fix/fix_note_i_cycle_structure.py` | **新建** 幂等脚本：4 张表补 `columns`、2 处段落泄漏表名正名/移入 `text_sections` |
+| `scripts/fix/fix_i_cycle_prefill_presets.py` | 🔴 **已存在**（本文初稿写「新建」是错判，2026-08-09 实证该脚本 git tracked、`--check` rc=0）⇒ 实际改动 = 在既有脚本内补 I1 块 sheet 名 `审定表I1-1`→`审定表I1`（做成新旧两键都能找到块的幂等形态）、I2 块 `6602`→`6604` + `account_codes` 自洽、12 张披露 sheet 的**显式无预设登记**。禁新建第二个同域脚本（会造双写者） |
+| `scripts/fix/fix_note_i_cycle_structure.py` | 🔴 **已存在**（同上，893 行）⇒ 实际改动 = 4 张表补 `columns`、2 处段落泄漏表名正名（`合同取得成本`）、**I1 两版主表行骨架对齐源模板首列**（2026-08-15 收口新增，见 Property 43） |
 | `scripts/diagnose/diagnose_i_cycle_rowcode.py` | **新建** 只读诊断：row_code ↔ `report_config` row_name 对账 + A/B 金额对照复算 |
 
 ### 前端改动
 
 | 文件 | 改动 |
 |---|---|
-| `composables/iCycleAccountScope.ts` | **新建**（若不存在）：六循环科目视图单一真源，复用 `shared/cycleAccountScope.ts` 工厂；`isAccountAbsent()` 区分「无此科目」与「余额为 0」 |
-| `iXNoteSectionMap.ts` ×6 | 补 `columns` 的 `flat`/`group` 表态使与模板同构；I1 上市类别列改稳定 key |
+| `composables/iCycleAccountScope.ts` | **新建**：六循环科目视图单一真源。🔴 **有意偏离「复用 `shared/cycleAccountScope.ts` 工厂」** —— 该工厂读 `semantic_account_resolver` 的 `slots` 形态（`slots[key].standard_codes/.codes/.found`，G/K 类在用），而 I 类走 **`segments`** 形态（`segments[].standard/.original`），字段名与结构都不同；工厂的二分 `gross`/`provision` 也装不下 I1 的三段（`1702 累计摊销` 名称不含「减值准备」，`split_gross_provision` 会判成 gross ⇒ 原值口径变净额）。硬套会读到 `undefined` 而**静默退化到兜底码**（四层检查全绿、只有浏览器暴露）。故自建段化视图，但同样「只写声明不写逻辑」 |
+| `iXDisclosureSyncPayload.ts` ×6 | 🔴 **本文初稿写 `iXNoteSectionMap.ts` 是位置错判** —— `columns` 不在 `iXNoteSectionMap.ts`（那里只有章节号 + 表名 + 准则判定），而在各 `iXDisclosureSyncPayload.ts`。改动 = 补 `flat`/`group` 表态使与模板同构（I1 30 处 / I2 28 / I3 21 / I4 9 / I5 9 / I6 3）；I1 上市类别列走 `buildI1ListedColumns(categories)` 动态列 + 稳定 key |
+| `i1ListedDisclosureModel.ts` | 🔴 2026-08-15 收口新增：①减值准备减少段补回「（2）失效且终止确认的部分」、删掉凭空多出的第 4 个 `ellipsis` 行（对齐源 `A41:A44`）②`I1_LISTED_DEFAULT_CATEGORIES` 改为由 `i1CategoryScope.I1_DEFAULT_CATEGORIES` 派生（消除第二份类别真源与 3 处错 label） |
+| `i1DisclosureEnhance.ts` | 同上连带：`impairDec` 由 `_dispose + _ellipsis` 改为 `_dispose + _expire + _other`，与 `costDec`/`amortDec` 同构 |
 | `i1/…TabDisclosure*.vue` | I1 两版四层/三层 `……` 实现为可扩类别行 |
 | `i2/…TabDisclosureListed.vue` | 「研发支出」按费用性质可扩行 |
-| 六个 `IXTabAdjudication.vue` | 挂溯源面板 + 「从四表库带入未审数」按钮（走 `adjudicationPrefillPlan`） |
+| 六个 `IXTabAdjudication.vue` | 挂溯源面板（实际用 `WpFourTableSourcePanel.vue`，I 类走 `segments` 形态故它才是对的宿主）+ 「从四表库带入未审数」按钮（走 `adjudicationPrefillPlan` + `useICycleAdjudicationSeeding`） |
 
 ### 守卫
 
@@ -119,7 +121,14 @@ listed 侧是**整体错位一个循环**（与 L 循环公式预设「偏移一
 | `frontend/…/__tests__/iCycleAccountScope.spec.ts` | R9：读后端 py 源码交叉锁死槽键/row_code/兜底码 |
 | `frontend/…/__tests__/iCycleNoteSubtableContract.spec.ts` | R8：子表名逐字 / columns 同构 / flat 表态 / `_note_texts` title |
 | `frontend/…/__tests__/iCycleDynamicRows.spec.ts` | R7：可扩行 key 稳定不复用 / 骨架行数非写死 |
-| `backend/scripts/diagnose/mutate_i_cycle_guards.py` | R11：变异检验，三态区分 + `.bak` + `--restore` |
+| `frontend/…/__tests__/iDisclosureColumns.spec.ts` | R5/R6/R8/R9：逐张核列 label 与 `group`；Property 30 金额格式；**Property 44/45 行骨架与类别默认值锁到真源**（2026-08-15 新增） |
+| `frontend/…/__tests__/iCycleAdjudicationSeed.spec.ts` | R9.3：段键与后端 py 交叉锁死 / 六 SFC 接线锁死（防 dead output 复发） |
+| `frontend/…/__tests__/i1DisclosureAddCategory.spec.ts` | R7.5/7.6：**composable 层**新增/删除类别（原先只测 model 层 = 假绿根因） |
+| `frontend/…/__tests__/iCycleComposableExports.spec.ts` | R7：SFC 解构键 ⊆ composable return 键（防「写了实现忘了导出」整页白屏） |
+| `frontend/…/shared/__tests__/tbSourceAbsent.spec.ts` | R2.3：「本项目无此科目」三态判据（I5-1 / I1-1 真实载荷逐字固化） |
+| `frontend/…/__tests__/adjudicationPrefillZeroSkip.spec.ts` | R9.3：平台级共享件「四表余额为 0 不写 0」（11 个审定表 Tab 受益） |
+| `backend/tests/test_i_cycle_ci_wiring.py` | R11.4：CI job 引用路径逐个 `Path.exists()` + 原始文本查重名 + 禁 `continue-on-error` |
+| `backend/scripts/diagnose/mutate_i_cycle_guards.py` | R11：变异检验，四态区分（RED/GREEN/ANCHOR-MISS/WRONG-TEST）+ `.mutbak` + `--restore`；**19 条**（原 14 + 2026-08-15 收口新增 P43×3 / P44 / P45） |
 
 ## Data Models
 
@@ -285,7 +294,8 @@ I1 上市披露主表列集必须与源模板 `附注披露信息（上市公司
 **Validates: Requirements 6.1, 6.2**
 
 ### Property 19: I1 类别真源非写死
-I1 类别清单必须派生自源模板 `底稿目录!A9:A19`（12 类）+ `A20` 可扩位；
+I1 类别清单必须派生自源模板 `底稿目录!A9:A19`（🔴 **11 类**，本文初稿写「12 类」是错基线 ——
+`A9:A19` 只有 11 个单元格，`A20` 才是可扩位 `……`；守卫按 openpyxl 实测的 11 断言）+ `A20` 可扩位；
 `i1_asset_categories.py` 的类别声明必须带 `source_ref`。
 
 **Validates: Requirements 6.3**
@@ -296,8 +306,12 @@ I1 上市类别列 key 必须形如 `{slot}_{seq}`，不得用中文 label 作 k
 **Validates: Requirements 6.4**
 
 ### Property 21: 动态可扩行数量与源模板一致
-I1 上市 3 处 + I1 国企 4 处 + I2 上市 1 处 `……` 必须实现为可扩行；
-I3/I4/I5/I6 必须为 0 处（不得凭空加可扩位）。
+I1 上市 3 处 + I1 国企 4 处 + I2 上市 **2** 处 + I2 国企 1 处 + **I5 两版各 1 处** `……`
+必须实现为可扩行；I3/I4/I6 为 0 处（不得凭空加可扩位）。
+🔴 本文初稿写「I2 上市 1 处 / I3~I6 各 0 处」是错基线 —— openpyxl 逐格实测 I2 上市有 A15+A27 两处、
+**I5 上市 A18 / I5 国企 A17 各有一处真实可扩位**。唯一真源 =
+`test_note_i_cycle_structure._SRC_DYNAMIC_MARK_COUNT`（12 个 (循环,变体) 逐格冻结），
+本 Property 的数字以它为准、不以本文正文为准。
 
 **Validates: Requirements 7.1, 7.2, 7.3**
 
@@ -453,3 +467,47 @@ NULL/旧值**前移**，且 `sub_table_data` 的表数与本次推送表数一�
 | 变异检验 | `mutate_i_cycle_guards.py`，三态区分 + 字节级还原 |
 | 真实库 | `verify_i_cycle_live.py`（只读，8 项目 × 6 循环六态输出） |
 | 浏览器 | chrome-devtools 隔离上下文，录数据 → 出数 → 落库 → 复原 |
+
+### Property 43: 行骨架三向一致（源 xlsx 首列 ↔ 附注模板 rows）
+
+附注模板 `tables[].rows` 的 label 序列必须逐行等于源模板披露 sheet 首列的对应区间；
+`row_type='expandable'` 的行数必须等于 `_SRC_DYNAMIC_MARK_COUNT[(cycle,variant)]`。
+
+覆盖范围 = `_ROW_SKELETON_ASSERTED`（I1 listed `A11:A48` 38 行 / I1 soe `A8:A59` 52 行）。
+其余 10 个 (循环,变体) 进 `_ROW_SKELETON_NOT_ASSERTED` 并逐条登记实证理由（≥20 字，
+守卫有理由质量闸）—— 「源侧标记 ↔ 模板 expandable」实测**不是** 1:1 关系，
+把不成立的关系写成断言就是锁死错值。
+
+配三条反向自检：①两张登记表必须恰好二分 12 对（不漏不重）②源侧行区间锚点仍有效
+（区间首格以「一、」开头、区间后一格是「说明」段落）③点名钉死本轮修的减少段结构
+（三层都必须是 处置 / 失效且终止确认的部分 / 其他减少，其后直接是期末余额）。
+
+**为什么必须补**：Property 16 的三向只比**列**，Property 21 只锁**源侧**扩位数 ——
+两者结构上都看不见「模板/前端的行骨架错了」。实测 I1 上市 38 行里第 33/34 行、
+I1 国企整表 48 行 vs 52 行的偏差，躲过了 38 张列契约 + 12 条扩位基线 + 14 条变异。
+
+**Validates: Requirements 5.8, 5.9, 7.7**
+
+### Property 44: 前端行模型 ↔ 附注模板行同构
+
+`I1_LISTED_MOVEMENT_ROWS` 的 label 序列必须逐行等于附注模板「五、26 / 无形资产情况」的
+`rows[].label`；`kind === 'ellipsis'` 的行数必须等于模板 `expandable` 行数（3）；
+`subtotal` 行的 `sumOf` 必须恰好覆盖其后全部缩进更深的明细行（防新增明细漏加进小计）。
+
+期望值取自模板 JSON 真源，**不在守卫里抄第二份字面量**（抄一份等于把当时的值当基线锁死）。
+
+**Validates: Requirements 7.7, 8.4**
+
+### Property 45: 前端类别默认值 ↔ 后端类别真源
+
+`I1_LISTED_DEFAULT_CATEGORIES` 的 label 序列必须逐字等于后端
+`i1_asset_categories.I1_ASSET_CATEGORIES` 按 `seq` 的 label；key 序列必须等于后端标准 key 经
+`I1_STANDARD_TO_LEGACY` 的映射（历史短 key 已持久化在 `checklist_responses`，不得改）；
+`i1ListedDisclosureModel.ts` 的**代码区**（剥掉注释后）不得再出现任何类别 label 字面量。
+
+反向自检：抽取器必须真读到 11 个类别、含本轮修正的三个正确 label、且三个旧错 label
+（`房屋使用权`/`特许权`/`探矿权/采矿权`）已不在真源中 —— 否则本组判据会把错值当期望。
+抽取器本身另有两条自检：`key=` 兼容字面量与常量引用两种形态（首版只认字面量，
+静默漏掉 `key=CATEGORY_OTHER` 的「其他」，被「应为 11 个」这条打红）、`seq` 必须 1..N 连续无空洞。
+
+**Validates: Requirements 6.3, 6.5**

@@ -367,7 +367,9 @@ export function pullDataResourceFromListedMovement(map: MovementCellMap): I1Data
     amortDec: g('amort_dec_dispose') + g('amort_dec_expire') + g('amort_dec_other'),
     impairBegin: g('imp_begin'),
     impairInc: g('imp_inc_provision') + g('imp_inc_other') + g('imp_inc_ellipsis'),
-    impairDec: g('imp_dec_dispose') + g('imp_dec_other') + g('imp_dec_ellipsis'),
+    // 与上面 costDec / amortDec 同构：源模板减值准备减少段是 处置/失效且终止确认的部分/其他减少
+    // 三个明细，无扩位（改造前误用 `imp_dec_ellipsis`，见 i1ListedDisclosureModel 内注释）
+    impairDec: g('imp_dec_dispose') + g('imp_dec_expire') + g('imp_dec_other'),
     note: '',
   }
 }

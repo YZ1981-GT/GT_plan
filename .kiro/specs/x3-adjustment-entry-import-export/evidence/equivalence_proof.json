@@ -1,0 +1,500 @@
+{
+  "_meta": {
+    "spec": "x3-adjustment-entry-import-export",
+    "task": "13.3",
+    "artifact": "Equivalence_Proof",
+    "purpose": "证明 16 张 X-3 的两条通路（UI 形态 A + Bulk adapter）均可达且不经由工厂模块",
+    "generated_at": "2026-08-15T16:20:39.538236+00:00",
+    "requirements": [
+      "9.1",
+      "9.2",
+      "9.3",
+      "9.4",
+      "9.5",
+      "9.6"
+    ]
+  },
+  "summary": {
+    "total_sheets": 16,
+    "verdict_distribution": {
+      "covered_by_non_deletable_module": 16
+    },
+    "all_covered": true
+  },
+  "records": [
+    {
+      "sheet_code": "L2-3",
+      "prefix": "l2",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/l2/export-template",
+          "export-data": "/api/workpapers/{wp_id}/l2/export-data",
+          "import-data": "/api/workpapers/{wp_id}/l2/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "l2",
+        "target_module": "app.routers.l2_interest_payable",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "L6-3",
+      "prefix": "l6",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/l6/export-template",
+          "export-data": "/api/workpapers/{wp_id}/l6/export-data",
+          "import-data": "/api/workpapers/{wp_id}/l6/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "l6",
+        "target_module": "app.routers.l6_special_payables",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M1-3",
+      "prefix": "m1",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m1/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m1/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m1/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m1",
+        "target_module": "app.routers.m1_dividends_payable",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M10-3",
+      "prefix": "m10",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m10/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m10/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m10/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m10",
+        "target_module": "app.routers.m10_other_equity_instruments",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M2-3",
+      "prefix": "m2",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m2/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m2/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m2/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m2",
+        "target_module": "app.routers.m2_paid_in_capital",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M3-3",
+      "prefix": "m3",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m3/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m3/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m3/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m3",
+        "target_module": "app.routers.m3_treasury_stock",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M4-3",
+      "prefix": "m4",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m4/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m4/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m4/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m4",
+        "target_module": "app.routers.m4_capital_reserve",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M5-3",
+      "prefix": "m5",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m5/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m5/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m5/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m5",
+        "target_module": "app.routers.m5_surplus_reserve",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M6-3",
+      "prefix": "m6",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m6/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m6/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m6/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m6",
+        "target_module": "app.routers.m6_retained_earnings",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M7-3",
+      "prefix": "m7",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m7/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m7/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m7/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m7",
+        "target_module": "app.routers.m7_special_reserve",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M8-3",
+      "prefix": "m8",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m8/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m8/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m8/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m8",
+        "target_module": "app.routers.m8_general_risk_reserve",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "M9-3",
+      "prefix": "m9",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/m9/export-template",
+          "export-data": "/api/workpapers/{wp_id}/m9/export-data",
+          "import-data": "/api/workpapers/{wp_id}/m9/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "m9",
+        "target_module": "app.routers.m9_other_comprehensive_income",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "N1-3",
+      "prefix": "n1",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/n1/export-template",
+          "export-data": "/api/workpapers/{wp_id}/n1/export-data",
+          "import-data": "/api/workpapers/{wp_id}/n1/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "n1",
+        "target_module": "app.routers.n1_deferred_tax_assets",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "N2-3",
+      "prefix": "n2",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/n2/export-template",
+          "export-data": "/api/workpapers/{wp_id}/n2/export-data",
+          "import-data": "/api/workpapers/{wp_id}/n2/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "n2",
+        "target_module": "app.routers.n2_taxes_payable",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "N3-3",
+      "prefix": "n3",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/n3/export-template",
+          "export-data": "/api/workpapers/{wp_id}/n3/export-data",
+          "import-data": "/api/workpapers/{wp_id}/n3/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "n3",
+        "target_module": "app.routers.n3_deferred_tax_liabilities",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    },
+    {
+      "sheet_code": "N5-3",
+      "prefix": "n5",
+      "ui_path": {
+        "routes_found": 3,
+        "host_module": "app.routers.wp_render_strategies._x3_adjustment_import_export",
+        "three_state_complete": true,
+        "all_post": true,
+        "details": {
+          "export-template": "/api/workpapers/{wp_id}/n5/export-template",
+          "export-data": "/api/workpapers/{wp_id}/n5/export-data",
+          "import-data": "/api/workpapers/{wp_id}/n5/import-data"
+        }
+      },
+      "bulk_path": {
+        "adapter_prefix": "n5",
+        "target_module": "app.routers.n5_income_tax_expense",
+        "module_importable": true,
+        "module_has_IE_SHEETS": true,
+        "sheet_in_IE_SHEETS": true,
+        "skip_reason": null
+      },
+      "factory_module_referenced": false,
+      "verdict": "covered_by_non_deletable_module"
+    }
+  ],
+  "alive_factory_modules": {
+    "expected": [
+      "_h5_import_export",
+      "_h7_import_export",
+      "_l1_import_export",
+      "_l3_import_export",
+      "_l4_import_export",
+      "_l5_import_export",
+      "_n4_import_export"
+    ],
+    "observed": [
+      "_h5_import_export",
+      "_h7_import_export",
+      "_l1_import_export",
+      "_l3_import_export",
+      "_l4_import_export",
+      "_l5_import_export",
+      "_n4_import_export"
+    ],
+    "match": true,
+    "details": [
+      {
+        "module": "_h5_import_export",
+        "file_exists": true,
+        "production_refs": 3,
+        "alive": true
+      },
+      {
+        "module": "_h7_import_export",
+        "file_exists": true,
+        "production_refs": 2,
+        "alive": true
+      },
+      {
+        "module": "_l1_import_export",
+        "file_exists": true,
+        "production_refs": 2,
+        "alive": true
+      },
+      {
+        "module": "_l3_import_export",
+        "file_exists": true,
+        "production_refs": 2,
+        "alive": true
+      },
+      {
+        "module": "_l4_import_export",
+        "file_exists": true,
+        "production_refs": 2,
+        "alive": true
+      },
+      {
+        "module": "_l5_import_export",
+        "file_exists": true,
+        "production_refs": 2,
+        "alive": true
+      },
+      {
+        "module": "_n4_import_export",
+        "file_exists": true,
+        "production_refs": 3,
+        "alive": true
+      }
+    ],
+    "method": "文件存在 + 生产代码（非测试）有引用 ⇒ alive"
+  },
+  "task25_guidance": {
+    "non_deletable_modules": [
+      "_h5_import_export",
+      "_n4_import_export"
+    ],
+    "reason": "这两个短前缀（h5/n4）在 catalog 已启用（H5-2/H5-3/N4-2/N4-3），运行期无形态 A 宿主，adapter 仍指向工厂模块 ⇒ 删它们会静默切掉这 4 张 sheet 的批量能力",
+    "conclusion": "本 spec 的 16 个工厂模块施加后**零运行期引用** ⇒ Task 25 对这 16 个可执行；但须移出 _h5_import_export 与 _n4_import_export"
+  }
+}

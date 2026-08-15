@@ -1,0 +1,94 @@
+{
+  "confirmed_total": 1898,
+  "ambiguous_total": 179,
+  "batches_by_cycle": [
+    {
+      "cycle": "?",
+      "files": 13,
+      "columns": 25,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "C",
+      "files": 2,
+      "columns": 3,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "D",
+      "files": 57,
+      "columns": 196,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "E",
+      "files": 8,
+      "columns": 30,
+      "active_spec_conflict": true
+    },
+    {
+      "cycle": "F",
+      "files": 37,
+      "columns": 150,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "G",
+      "files": 111,
+      "columns": 356,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "H",
+      "files": 98,
+      "columns": 303,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "I",
+      "files": 31,
+      "columns": 72,
+      "active_spec_conflict": true
+    },
+    {
+      "cycle": "J",
+      "files": 13,
+      "columns": 52,
+      "active_spec_conflict": false
+    },
+    {
+      "cycle": "K",
+      "files": 76,
+      "columns": 248,
+      "active_spec_conflict": true
+    },
+    {
+      "cycle": "L",
+      "files": 47,
+      "columns": 173,
+      "active_spec_conflict": true
+    },
+    {
+      "cycle": "M",
+      "files": 42,
+      "columns": 189,
+      "active_spec_conflict": true
+    },
+    {
+      "cycle": "N",
+      "files": 23,
+      "columns": 62,
+      "active_spec_conflict": true
+    },
+    {
+      "cycle": "S",
+      "files": 17,
+      "columns": 39,
+      "active_spec_conflict": false
+    }
+  ],
+  "ambiguous_by_reason": {
+    "dynamic_label": 170,
+    "no_label": 9
+  }
+}

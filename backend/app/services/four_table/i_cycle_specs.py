@@ -1,123 +1,143 @@
-"""I 循环（无形资产/开发支出/商誉/长期待摊/其他非流动/研发费用）语义科目定位规格。
-
-科目映射真源 = `report_config` DB 实证：
-  I1 `BS-032` = `TB('1701','期末余额')`（无形资产）+ 备抵 `IMP-011`=`TB('1702')`
-  I2 `BS-033` = `TB('1711','期末余额')`（开发支出）
-  I3 `BS-034` = `TB('1721','期末余额')`（商誉）+ 备抵 `IMP-012`=`TB('1722')`
-  I4 `BS-035` = `TB('1801','期末余额')`（长期待摊费用）
-  I5 `BS-039` = `TB('1901','期末余额')`（其他非流动资产）— 🔴 与 K2 共用 1901
-  I6 研发费用 — 🔴 标准码未实证，不给兜底码（`6602` 是管理费用，属 K9）
-  I6 研发费用（IS 行，损益类）
-
-spec: .kiro/specs/semantic-account-resolver-full-rollout/
-
-.. note::
-   **兜底码已逐项 DB 实证**（2026-08-03，双向对账 `account_chart`：① 该码实际叫什么名
-   ② 该名实际挂在哪个码）。曾修正的错码见各槽行内注释。
+"""I 循环语义科目规格 —— **从 :mod:`.i_cycle_accounts` 单向派生**（无独立真源）。
 
 .. warning::
-   🔴 **`account_chart` 并存两套编码体系** —— 同一码在 ``source='client'`` 与
-   ``source='standard'`` 下可能是**完全不同的科目**（实证 10 个项目）::
+   🔴 **本模块不再自己声明 row_code 与兜底码**（2026-08-09 Task 5 收敛）。
 
-       码     client 表（8 项目）    standard 表（5 项目）
-       4001   实收资本               生产成本
-       4101   盈余公积               制造费用
-       4401   其他权益工具           工程施工
-       4301   专项储备               研发支出
+   改造前它与 `i_cycle_accounts.I_CYCLE_ROW_CODES` 是**双真源**：两处各写一份 I 类
+   报表行编码，而只有 `i_cycle_accounts` 那份被 6 个 render 消费。后果是
+   `i_cycle_accounts` 侧 12 个取值里 **11 个错**（listed 侧整体错位一个循环、soe 侧
+   落在负债段）却长期无人察觉 —— 本模块这份是对的，但**零 render 消费方**，
+   改对一处另一处不动。
 
-   故 :func:`resolve_semantic_accounts` 的「**client chart 优先**按名定位」不是优化
-   而是**正确性前提**：硬编码码值 + 走 standard 表会在那 5 个项目取到成本类科目。
-   同族已知现象见 memory「存货科目编码语义在项目间冲突」。
+   现在 row_code 取自 :data:`.i_cycle_accounts.I_CYCLE_ROW_CODES`、
+   兜底码取自 :data:`.i_cycle_accounts.I_CYCLE_SEGMENTS` 的段声明，
+   本模块只做**形态转换**（段化 → `SemanticAccountSpec` 的 gross/provision 二分），
+   供平台级守卫（跨循环兜底码互斥 / row_code 实证对账 / 语义解析覆盖率）消费。
 
-   另：本文件的兜底码只在「按名定位失败」时生效，且要求该码**在本项目科目表里确实存在**
-   （见 `semantic_account_resolver` 定位链路第 ④ 层），故一码两义不会因兜底而取错。
+**为什么保留本模块而不是删掉**
+
+`I_CYCLE_SPECS` 有 6 个跨 spec 消费方（`test_cycle_specs_row_code_evidence` /
+`test_cycle_specs_account_evidence` / `test_semantic_resolver_coverage` /
+`test_render_fetch_smoke` / `diagnose_semantic_migration_candidates` /
+`_wip_conflict_scope`），它们按 `SemanticAccountSpec` 形态迭代 `slots[].
+fallback_standard_codes` 做**跨循环兜底码互斥**判定。删文件会让 I 类整体退出那张
+认领表 —— 那正是当年漏掉「L7 与 K5 都认领 2801」的成因。
+
+**形态转换的两条约定**
+
+1. **段 → 槽**：`cost` / `expense` 段 → ``gross`` 槽；`amortization` /
+   `impairment` 段 → ``provision`` 槽（按 `ISegmentSpec.absolute` 判定，
+   不按段名硬编码）。I1 有两个备抵段（累计摊销 + 减值准备），二分形态下
+   合并进同一个 ``provision`` 槽 —— **这正是 `i_cycle_accounts` 改用段化声明的原因**
+   （见其模块 docstring「二分装不下 I1 的三段」），本模块的二分投影只供守卫用，
+   **不得反向用于取数**。
+2. **`trust_report_config`**：I6 保持 ``False``。实证 ``6604`` 在
+   `account_chart` 的 standard 侧 6 个项目叫「研发费用」，但 **client 侧有 1 个项目
+   叫「勘探费用」** → 对那个项目按 6604 取数会拿到勘探费用，故只靠按科目名定位。
+
+spec: .kiro/specs/i-cycle-extraction-formula-and-disclosure-closure/ Requirement 1.3
 """
 from __future__ import annotations
 
+from .i_cycle_accounts import (
+    I_CYCLE_ROW_CODES,
+    I_CYCLE_SEGMENTS,
+    resolve_row_code,
+)
 from .semantic_account_resolver import SemanticAccountSlot, SemanticAccountSpec
 
 _PROVISION_WORDS = ("减值准备", "坏账准备", "跌价准备", "累计折旧", "累计摊销", "减值损失")
 
-
-def _gross(key, names, fallback, label, extra_excludes=()):
-    return SemanticAccountSlot(
-        key=key, names=names, exclude_names=_PROVISION_WORDS + extra_excludes,
-        fallback_standard_codes=fallback, label=label,
-    )
+#: 不信 `report_config` 兜底层的循环（连带理由见模块 docstring 第 2 条）
+_DISTRUST_REPORT_CONFIG = frozenset({"I6"})
 
 
-def _provision(key, names, fallback, label):
-    return SemanticAccountSlot(
-        key=key, names=names, exclude_names=("减值损失",),
-        fallback_standard_codes=fallback, label=label, is_provision=True,
-    )
+def _slots_for(wp_code: str) -> tuple[SemanticAccountSlot, ...]:
+    """把 :data:`.i_cycle_accounts.I_CYCLE_SEGMENTS` 的段声明投影成 gross/provision 二分。
 
+    Args:
+        wp_code: ``'I1'`` ~ ``'I6'``。
 
-I1_SPEC = SemanticAccountSpec(
-    row_code="BS-032",
-    slots=(
-        _gross("gross", ("无形资产",), ("1701",), "无形资产"),
-        _provision("provision", ("无形资产减值准备",), (), "无形资产减值准备"),
-    ),
-)
+    Returns:
+        至多两个槽（``gross`` 恒有；有备抵段时追加 ``provision``）。
+        兜底码与否决词全部取自段声明，**本函数不写任何科目码字面量**。
+    """
+    segments = I_CYCLE_SEGMENTS.get(wp_code, ())
 
-I2_SPEC = SemanticAccountSpec(
-    row_code="BS-033",
-    slots=(_gross("gross", ("开发支出",), ("1704",), "开发支出"),),
-)
+    gross_names: list[str] = []
+    gross_codes: list[str] = []
+    gross_excludes: list[str] = []
+    prov_names: list[str] = []
+    prov_codes: list[str] = []
+    gross_label = ""
+    prov_label = ""
 
-I3_SPEC = SemanticAccountSpec(
-    row_code="BS-034",
-    slots=(
-        _gross("gross", ("商誉",), ("1711",), "商誉"),
-        _provision("provision", ("商誉减值准备",), (), "商誉减值准备"),
-    ),
-)
+    for seg in segments:
+        if seg.absolute:  # 备抵段（累计摊销 / 减值准备）
+            prov_names.extend(k for k in seg.name_keywords if k not in prov_names)
+            prov_codes.extend(c for c in seg.fallback if c not in prov_codes)
+            prov_label = prov_label or seg.label
+        else:  # 原值段 / 损益段
+            gross_names.extend(k for k in seg.name_keywords if k not in gross_names)
+            gross_codes.extend(c for c in seg.fallback if c not in gross_codes)
+            gross_excludes.extend(
+                k for k in seg.exclude_keywords if k not in gross_excludes
+            )
+            gross_label = gross_label or seg.label
 
-I4_SPEC = SemanticAccountSpec(
-    row_code="BS-035",
-    slots=(_gross("gross", ("长期待摊费用",), ("1801",), "长期待摊费用"),),
-)
-
-I5_SPEC = SemanticAccountSpec(
-    # 🔴 2026-08-03 修正：原写 `BS-039` 实为**资产总计**（公式 `ROW('BS-015')+ROW('BS-038')`）。
-    # 其他非流动资产真实行 = `BS-037` = `TB('1911')`；`1911` 全库两张科目表都不存在
-    # → 层③找不到码，落回空兜底 → `found=False`（宁缺勿造），与改前行为等价但溯源如实。
-    row_code="BS-037",
-    slots=(_gross("gross", ("其他非流动资产",), (), "其他非流动资产"),),
-)
-
-I6_SPEC = SemanticAccountSpec(
-    # 🔴 2026-08-03 修正：原写 `IS-007` 实为**财务费用**（公式 `TB('6603')`，L8 的行）
-    # → 单槽规格下层③会把研发费用静默解析成 6603 财务费用。
-    # 研发费用真实行 = `IS-006` = `TB('6604')`。
-    row_code="IS-006",
-    # 🔴 但**不信层③**：`6604` 在 `account_chart` 里 standard 侧 6 个项目叫「研发费用」，
-    #    client 侧有 1 个项目叫**「勘探费用」** → 对那个项目按 6604 取数会拿到勘探费用。
-    #    故只靠层①②（按科目名逐项目定位），名称不中就 `found=False`。
-    trust_report_config=False,
-    slots=(
+    slots = [
         SemanticAccountSlot(
-            key="gross", names=("研发费用", "研究开发费用"),
-            exclude_names=(),
-            # 不给兜底码，理由同上（`6602` 是管理费用，已被 K9 按 DB 实证认领）
-            fallback_standard_codes=(),
-            label="研发费用",
-        ),
-    ),
-)
+            key="gross",
+            names=tuple(gross_names),
+            # 原值槽必须否决全部备抵词（否则「无形资产减值准备」会被当原值）
+            exclude_names=tuple(dict.fromkeys(_PROVISION_WORDS + tuple(gross_excludes))),
+            fallback_standard_codes=tuple(gross_codes),
+            label=gross_label,
+        )
+    ]
+    if prov_names or prov_codes:
+        slots.append(
+            SemanticAccountSlot(
+                key="provision",
+                names=tuple(prov_names),
+                exclude_names=("减值损失",),
+                fallback_standard_codes=tuple(prov_codes),
+                label=prov_label,
+                is_provision=True,
+            )
+        )
+    return tuple(slots)
 
 
+def _spec_for(wp_code: str) -> SemanticAccountSpec:
+    """构造某 I 循环的 `SemanticAccountSpec`（row_code 与兜底码全部派生）。"""
+    return SemanticAccountSpec(
+        row_code=resolve_row_code(wp_code, ()),  # 空 standards → listed 侧（两侧同码）
+        slots=_slots_for(wp_code),
+        trust_report_config=wp_code not in _DISTRUST_REPORT_CONFIG,
+    )
+
+
+#: {wp_code: SemanticAccountSpec}。**派生自 `i_cycle_accounts`，无独立字面量。**
 I_CYCLE_SPECS: dict[str, SemanticAccountSpec] = {
-    "I1": I1_SPEC, "I2": I2_SPEC, "I3": I3_SPEC,
-    "I4": I4_SPEC, "I5": I5_SPEC, "I6": I6_SPEC,
+    wp: _spec_for(wp) for wp in sorted(I_CYCLE_ROW_CODES)
 }
 
+I1_SPEC = I_CYCLE_SPECS["I1"]
+I2_SPEC = I_CYCLE_SPECS["I2"]
+I3_SPEC = I_CYCLE_SPECS["I3"]
+I4_SPEC = I_CYCLE_SPECS["I4"]
+I5_SPEC = I_CYCLE_SPECS["I5"]
+I6_SPEC = I_CYCLE_SPECS["I6"]
+
+#: 损益类循环（取本期发生额而非期末余额）
 I_PL_CYCLES = frozenset({"I6"})
+#: 损益类的正方向（借方 = 费用增加）
 I_PL_POSITIVE_SIDE: dict[str, str] = {"I6": "debit"}
 
 
 def spec_of(wp_code: str) -> SemanticAccountSpec | None:
+    """按 wp_code 取语义规格（大小写与空白不敏感）。"""
     return I_CYCLE_SPECS.get(str(wp_code or "").strip().upper())
 
 

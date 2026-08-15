@@ -1,0 +1,166 @@
+任务 1.9 实证 —— 四形态键提取判据 + E14 机制↔列判据（前端探针）
+================================================================================
+产出物
+  helper   : audit-platform/frontend/src/components/workpaper/shared/__tests__/helpers/x3KeyProbe.ts
+  消费方   : audit-platform/frontend/src/components/workpaper/composables/__tests__/adjustmentIeContract.spec.ts
+交付顺序留痕
+  上一轮只交付了 helper（47927 字节，mtime 2026-08-13 08:41），消费方 spec 一字未改
+  （mtime 仍是 2026-07-26 12:30，全库对 x3KeyProbe 的引用 0 命中）⇒ 仓库里躺着一个
+  **无消费方的 helper = additive 死代码**。本轮补接消费方，把这条闭合。
+
+--------------------------------------------------------------------------------
+一、16 张逐张探测结果（真实源码实测，与 design §storage_field 机制归类逐条相符）
+--------------------------------------------------------------------------------
+sheet   机制                    写入列       键族                 数据键/族键            后缀数  命中形态
+L2-3    adjustment_savebatch    remark      single_json          L2-L2-3-entries          -     ① 引号字面量
+L6-3    adjustment_savebatch    remark      per_field            L6-L6-3-entry-*         10     ③ 模板字面量（双前缀）
+M1-3    adjustment_savebatch    remark      per_field            M1-M1-3-entry-*         10     ③（双前缀）
+M2-3    adjustment_savebatch    remark      per_field            M2-M2-3-entry-*         10     ③（双前缀）
+M3-3    adjustment_savebatch    remark      per_field_plus_data  M3-M3-3-entry-*         10     ③（双前缀，E19 已证）
+M4-3    adjustment_savebatch    remark      per_field_plus_data  M4-3-entry-*            10     ③
+M5-3    adjustment_savebatch    remark      per_field_plus_data  M5-3-entry-*            10     ③
+M6-3    adjustment_savebatch    remark      per_field_plus_data  M6-3-entry-*            10     ③
+M7-3    adjustment_savebatch    remark      per_field_plus_data  M7-3-entry-*            10     ③
+M8-3    adjustment_savebatch    remark      per_field_plus_data  M8-3-entry-*            10     ③（另有 M8-3-adjustmentNote 非 entries 键）
+M9-3    adjustment_savebatch    remark      per_field_plus_data  M9-3-entry-*            11     ③（含 ociBlock，E20 已证）
+M10-3   adjustment_savebatch    remark      per_field_plus_data  M10-3-entry-*           10     ③
+N1-3    formdata_setfield       conclusion  single_json          N1-3-entries             -     ④ 跨文件运行期拼装 + ① 同键直呼
+N2-3    formdata_setfield       conclusion  single_json          N2-3-entries             -     ④
+N3-3    formdata_setfield       conclusion  single_json          N3-3-entries             -     ④
+N5-3    formdata_setfield       conclusion  single_json          N5-3-entries             -     ④（同名中央同步键已辨明，G11）
+形态分布：① 1 张 · ③ 11 张 · ④ 4 张（其中 N1-3 兼有 ①）；形态 ② 在 X-3 无实例，
+        其正对照取自既有 K 族（ITEM_PREFIX 拼接）——消费方 spec 有一条实测断言。
+机制分布：① 4 张（N1/N2/N3/N5，恒 conclusion）· ② 12 张（恒 remark）—— 16/16 无例外。
+confirmed 16/16 · pending_manual 集合为空（用户裁决 1 成立）。
+
+--------------------------------------------------------------------------------
+二、helper 的 4 处真缺陷（本轮修，逐条给理由）
+--------------------------------------------------------------------------------
+H1 findCalls 不识别可选调用 `callee?.(…)`
+   M 族 11 张的复核入口实测写法是 `openReviewDialog?.('M1-3-adjustment', '调整分录')`
+   （L2 是无 `?.` 的 `openReviewDialog(…)`）⇒ 修前只有 5 张抓到复核键，M 族 10 张的
+   复核键排除集恒空 ⇒ R2.4「排除复核键」对这 10 张整条空转。修后 11 张全部抓到。
+H2 collectWriteSites 只解析 saveBatch 调用实参
+   L6-3 / M1-3 / M2-3 的写入载荷在调用点之外构造（`const items = entries.value.map(...)`
+   里才是 `{ itemId: …, data: { remark: … } }`，调用处是 `saveBatch(items)`）⇒ 修前这
+   三张取不到写入列 ⇒ 机制判不出 ⇒ 被误标 pending_manual（与裁决 1 冲突）。改为按
+   **结构**扫 `{ itemId: …, data: … }` 元素字面量（两个键都在才算，避免把
+   `useAdjustmentCentralSync({ …, itemId })` 的选项对象当写入载荷）。
+H3 「机制歧义」判过宽，把 N1-3 误标 pending_manual
+   N1TabAdjustment 内既 `formData.setField('3','entries', …)`（机制①三步链）又
+   `formData.debouncedSave('N1-3-entries', { conclusion: … })`（同一 formData 门面的
+   直呼形态），键与列**逐字相同** ⇒ 是同一存储目标的两种调用写法，不是歧义。改为
+   「键与列都相同 ⇒ 取机制①并双链留痕；只有真分叉才判歧义」。
+H4 形态④的键被同名非数据键误剔（最贵的一条 —— 正是 E12 那个坑本体）
+   收尾处 `entryKeys.filter(k => !review.has(k) && !csync.has(k))` 无条件执行，把 N5-3
+   由三步链拼出的真数据键 `N5-3-entries` 一并剔掉（tab 内同名字面量属中央同步键、
+   同名纯属巧合，E12 → E17 / G11）⇒ 修前 N5-3 判「键不可确证」，正是 E12 的错结论。
+   改为排除只作用于**字面量扫描**得来的键（机制②），形态④的键来源已证、不按名字剔。
+未改动的部分：四形态提取器骨架、注释剥离器、括号配对/跳参数列表、机制→列的
+   「读机制实现源码载荷键」思路、SourceBundle 注入面、清单读取与 legacy 锚点。
+
+--------------------------------------------------------------------------------
+三、E14 修法（不是把常量 'remark' 换成 'conclusion'）
+--------------------------------------------------------------------------------
+旧：expect(entry.storage_field).toBe('remark')            ← 守卫把错值锁成基线
+新：前端源码 --实测--> 机制 --实测该机制实现的载荷对象字面量--> 应有列 == 清单登记列
+    · 机制① use{X}FormData.setField → saveField(itemId, { conclusion })  ⇒ conclusion
+    · 机制② use{X}Adjustment 的 saveBatch / debouncedSave(itemId,{remark}) ⇒ remark
+    · 判据内不出现任何列名常量；14 张既有 aligned sheet 改判后仍 14/14 绿
+      （逐张实测出唯一写入列 remark，依据链落到 emit('save') / debouncedSave /
+       saveField / saveBatch / allResponses.set 五种真实写入形态之一）
+非退化自检：两条机制必须各推出**不同**的列且都有实例（塌成同一列即红）；
+           机制分布钉死 ①=[N1-3,N2-3,N3-3,N5-3] / ②=12 张。
+E14 回归锚点：旧常量判据对机制①的 4 张全判违规（4/4），机制判据 0 违规；
+             旧判据「碰对了机制②的 12 张」正是它长期被误认为正确的原因。
+后端分工（design §GS9 完整判据 = 两侧之和，已写进 helper 与 spec 的注释）：
+  后端 test_x3_key_ledger.py 的 mechanism 取**清单登记值** ⇒ 只抓「清单内自相矛盾」；
+  「机制是否与前端源码一致」后端读不到 .vue ⇒ 由本前端探针承担。
+
+--------------------------------------------------------------------------------
+四、清单当前值被打红的条目（只改判据，不改清单 ⇒ 红是预期，Wave 1 任务 2.1 转绿）
+--------------------------------------------------------------------------------
+运行：npx vitest run src/components/workpaper/composables/__tests__/adjustmentIeContract.spec.ts
+结果：101 例 = 76 绿 / 25 红
+  既有 33 例（Property 9 ×14 存在性 + ×14 写入列 + Property 11 + 3 条清单卫生 + K12-3）
+       全绿，0 红 —— 含被重写的那 14 例 storage_field 判据
+  新增 68 例 = 43 绿 + 25 红，红分布：
+    Property 10（机制↔列）13 红 = 清单未登记写入列 13 张
+        （L2-3 · L6-3 · M1-3~M10-3 = 12 张 + N5-3）；N1-3/N2-3/N3-3 登记 conclusion
+        与机制推导一致 ⇒ 绿
+    R7.5（observed 键集 == 重扫键集）12 红
+        = 11 条 observed 记的是复核键（L2-3 + M1-3~M10-3，M8-3 另记 M8-3-adjustmentNote）
+        + L6-3 完全无登记；N1/N2/N3/N5 的 {X}-3-entries 与重扫一致 ⇒ 绿
+与任务原文「预期红 11 + 1 + 4」的对照（口径差异，非结论差异）：
+    「11 条复核键」与「L6-3 缺登记」= R7.5 的 12 红，逐条对上；
+    「4 条 storage_field 被判违规」指的是**旧常量判据**对机制①那 4 张（N1/N2/N3/N5）
+     的判定 —— 已由「E14 回归锚点」那条测试机器化钉住（4/4 违规）。修到机制层后，
+     这 4 张里只剩 N5-3 因**未登记**而红，N1/N2/N3 转为绿；按「清单登记列 vs 机制
+     推导列」的实判口径，storage_field 侧的红是 13 条（13 张未登记）。
+
+--------------------------------------------------------------------------------
+五、四条反向自检（物理变异 + 四态判读；每条都指名预期检测通道）
+--------------------------------------------------------------------------------
+基线红 25 条。判读：新增红为空 ⇒ GREEN（判据缺陷）；锚点命中 != 1 ⇒ ANCHOR-MISS；
+红了但新增红不含预期通道 ⇒ WRONG-TEST。
+
+(a) MUT-A  改清单登记列：exempt.N1-3.observed.frontend_field conclusion → remark
+    ⇒ RED，新增红 2/2 命中预期通道：
+       Property 10 — N1-3 · 反向自检(a)
+    md5 还原核对 5fe43fc5b84fca16ea7724eaa2d4b311（与任务 1.1 实录记载的同值）
+    ※ 首轮该条判 ANCHOR-MISS —— 锚点写了含 \n 的跨行文本，本仓库 CRLF 必不命中
+      （踩中已登记的那条坑）。改用行尾无关正则 `\s*` 后命中数 1，转 RED。
+
+(b) MUT-B  强制机制探针返另一种机制：probeSheet 内 mechanism = 'adjustment_savebatch'
+           → 'formdata_setfield'（12 张机制②被标成机制①）
+    ⇒ RED，新增红 2/2 命中预期通道：
+       机制划分非退化（机制①同时推出 conclusion 与 remark） · E14 回归锚点
+    md5 还原核对 61ac8b98dd1c33b299e677c07e6d95c4
+
+(c) MUT-C  改 use{X}FormData 的 ITEM_PREFIX：useN5FormData.ts 'N5-' → 'N5X-'   ← 重点
+    ⇒ RED，新增红 9，3/3 命中预期通道：
+       R2.3 — N5-3 键可确证（转为判「键不可确证」）✔ 这条就是「没蒙对」的证据
+       R2.6 — pending_manual 集合为空 · G11 实证
+       连带（判定正确，非污染）：R7.5 N5-3 · 反向自检(c)/(d) 的前置留痕 ·
+       探针扫描面 · 机制划分非退化 · E14 回归锚点
+    关键点：变异期间 N5TabAdjustment.vue 内那个巧合同名的 'N5-3-entries' 字面量
+            **仍在**（spec 内 expect(tabReal).toContain("'N5-3-entries'") 已留痕），
+            判据照样打红 ⇒ 形态④三步链不是靠同名字面量蒙对的。
+    md5 还原核对 01db5f53c2a5127b9f8fab594341ae73
+
+(d) MUT-D  改 tab 的 setField 实参：N5TabAdjustment.vue setField('3','entries')
+           → setField('3','entriesX')
+    ⇒ RED，新增红 3，2/2 命中预期通道：
+       R7.5 — N5-3（拼出的键变成 N5-3-entriesX，与清单登记键不再相等）
+       G11 实证；连带 反向自检(d) 的前置留痕
+    md5 还原核对 9800a134dd811b06d27eb7999b5e1b85
+
+还原验证：四个被变异文件 md5 逐一与变异前相同；变异全跑完后复跑 = 红 25 条且
+          失败集与基线**逐条相同**；`git status --porcelain` 对
+          backend/data/adjustment_ie_contract.json · useN5FormData.ts ·
+          N5TabAdjustment.vue 三个文件为空（零生产代码/清单改动）。
+
+四条自检同时**落成 spec 内的永久断言**（每次跑都机器校验，不依赖一次性手工变异）：
+  反向自检(a) 用内存篡改清单副本 · (b) 用 mechanismOverride ·
+  (c) 用 SourceBundle 注入改名/改值两个变体 · (d) 用注入改 field/sheet 两个实参变体。
+
+--------------------------------------------------------------------------------
+六、R2.6 零实例分支（用户裁决 1 之后真实 16 张无一 pending）用替身覆盖
+--------------------------------------------------------------------------------
+替身 A：ZZ-3，tab 内无任何持久化调用 ⇒ pendingManual=true、reasons 非空、键集为空。
+替身 B：ZZ-3，形态④三步链**断在步②**（use{X}FormData 无模块级 ITEM_PREFIX），
+        但 tab 内故意留同名字面量 "ZZ-3-entries"（中央同步键）
+        ⇒ 按字面量 grep 会判「已确证」，按三步链判 pendingManual ⇒ E12 那个坑的
+          可执行复现（回归防线）。
+同时断言真实 16 张的 pendingManual 集合 == []（裁决 1）。
+
+--------------------------------------------------------------------------------
+七、边界与未做
+--------------------------------------------------------------------------------
+· 只改判据：未改 backend/data/adjustment_ie_contract.json、未改任何生产代码
+  （迁入 sheets / 改 11 条 observed / 补 storage_field 是 Wave 1 任务 2.1）。
+· 三条铁律未动：对齐方向后端向前端 · dual_write 保持停用 · field_keys 为期望值。
+· 既有 extractKeys（旧两形态提取器）保留，仅被 Property 11 与「旧判据抓不到形态③」
+  那条对照测试使用 —— 它是「新判据补的是真洞」的负对照，不是死代码。
+· ieWiringIntegrity.spec.ts 的 3 条红（GS5 16 个 dropdown 未挂 / GS10 读回宿主）
+  属任务 1.6 的「先打红」，与本任务无因果（本任务未碰该文件，且该文件不 import 本 helper）。

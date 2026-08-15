@@ -12,14 +12,10 @@
     </el-table-column>
     <el-table-column label="账面余额" width="160" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="canEdit(row)"
           :model-value="row.balance"
           size="small"
-          :controls="false"
-          :precision="2"
-          :formatter="amountFormatter"
-          :parser="amountParser"
           style="width: 100%"
           @change="(v: number) => emit('update', row.rowId, 'balance', v ?? 0)"
         />
@@ -44,14 +40,10 @@
     </el-table-column>
     <el-table-column label="坏账准备" width="160" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="canEdit(row)"
           :model-value="row.provision"
           size="small"
-          :controls="false"
-          :precision="2"
-          :formatter="amountFormatter"
-          :parser="amountParser"
           style="width: 100%"
           @change="(v: number) => emit('update', row.rowId, 'provision', v ?? 0)"
         />
@@ -82,6 +74,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * K1StageEclTable.vue — ECL 三阶段坏账准备快照表（上市披露表复用 6 次）
  *

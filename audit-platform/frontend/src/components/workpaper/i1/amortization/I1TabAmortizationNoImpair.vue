@@ -129,12 +129,10 @@
         </el-table-column>
         <el-table-column label="原值" width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.cost"
-              :controls="false"
               size="small"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'cost', $event)"
             />
@@ -143,12 +141,10 @@
         </el-table-column>
         <el-table-column label="累计摊销期初" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.accAmortBegin"
-              :controls="false"
               size="small"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'accAmortBegin', $event)"
             />
@@ -157,12 +153,10 @@
         </el-table-column>
         <el-table-column label="账面累计摊销期末" width="120" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.bookAccAmortEnd"
-              :controls="false"
               size="small"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'bookAccAmortEnd', $event)"
             />
@@ -171,12 +165,10 @@
         </el-table-column>
         <el-table-column label="账面本期摊销" width="110" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.bookPeriodAmort"
-              :controls="false"
               size="small"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'bookPeriodAmort', $event)"
             />
@@ -213,12 +205,10 @@
         </el-table-column>
         <el-table-column label="残值" width="90" align="right">
           <template #default="{ row, $index }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.salvage"
-              :controls="false"
               size="small"
-              :precision="2"
               class="cell-input"
               @change="handleFieldChange($index, 'salvage', $event)"
             />
@@ -333,6 +323,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * I1TabAmortizationNoImpair.vue — I1-10 摊销测算（不含减值·剩余年限法）
  * 对齐源表 F~O，修正本期月数虚增

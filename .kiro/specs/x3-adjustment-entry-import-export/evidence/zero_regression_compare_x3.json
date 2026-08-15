@@ -1,0 +1,2199 @@
+{
+  "_meta": {
+    "spec": "x3-adjustment-entry-import-export",
+    "task": "1.8（--compare，由任务 15.3 消费）",
+    "compared_at": "2026-08-16T00:41:21+08:00",
+    "baseline_written_at": "2026-08-13T13:39:27+08:00"
+  },
+  "snapshot_1": {
+    "compared": 102,
+    "probe_surface_mode": {
+      "baseline": null,
+      "current": "baseline_replay（按基线记下的键逐条重放）"
+    },
+    "replay_coverage": {
+      "criterion": "基线键 → 本轮实际探到的键，逐条对差（未探到的指名列出）",
+      "requested": 102,
+      "probed": 102,
+      "unprobed_keys": [],
+      "extra_keys_not_in_baseline": [],
+      "verdict": "FULL",
+      "note": "`PARTIAL` 不自动等于回归 —— 端点整条消失也会落在这里，由 `--compare` 按 `MISSING`（hard）判"
+    },
+    "by_key": {
+      "factory/l2/L2-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "fd01e9c1affbc579",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: L2-2。支持: ['L2-3']"
+        }
+      },
+      "factory/l2/L2-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "fd01e9c1affbc579",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: L2-2。支持: ['L2-3']"
+        }
+      },
+      "factory/l2/L2-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "06bb7ce938a60319",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d9db20fc1dcdcf80",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/l2/L2-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "06bb7ce938a60319",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d9db20fc1dcdcf80",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/l6/L6-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "5fd3b62a95fcbf9d",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: L6-2。支持: ['L6-3']"
+        }
+      },
+      "factory/l6/L6-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "5fd3b62a95fcbf9d",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: L6-2。支持: ['L6-3']"
+        }
+      },
+      "factory/l6/L6-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "93bc17d80c763bf3",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "11607dcaf2f4b49f",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/l6/L6-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "93bc17d80c763bf3",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "11607dcaf2f4b49f",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m1/M1-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2af511dbb463b163",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M1-2。支持: ['M1-3']"
+        }
+      },
+      "factory/m1/M1-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2af511dbb463b163",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M1-2。支持: ['M1-3']"
+        }
+      },
+      "factory/m1/M1-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2dc9b7180e8d0810",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "dd39de8c51e89a3a",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m1/M1-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2dc9b7180e8d0810",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "dd39de8c51e89a3a",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m10/M10-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "a009da7aacf3437a",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M10-2。支持: ['M10-3']"
+        }
+      },
+      "factory/m10/M10-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "a009da7aacf3437a",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M10-2。支持: ['M10-3']"
+        }
+      },
+      "factory/m10/M10-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "f7a8e24b83b3ff06",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "7cec0870303734a8",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m10/M10-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "f7a8e24b83b3ff06",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "7cec0870303734a8",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m2/M2-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "d4ae5b998096e17d",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M2-2。支持: ['M2-3']"
+        }
+      },
+      "factory/m2/M2-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "d4ae5b998096e17d",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M2-2。支持: ['M2-3']"
+        }
+      },
+      "factory/m2/M2-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "c3bc04245b437fbf",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d8549405135cb89e",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m2/M2-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "c3bc04245b437fbf",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d8549405135cb89e",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m3/M3-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "7c9018d5c5ef5070",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M3-2。支持: ['M3-3']"
+        }
+      },
+      "factory/m3/M3-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "7c9018d5c5ef5070",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M3-2。支持: ['M3-3']"
+        }
+      },
+      "factory/m3/M3-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "b87ea04472c38164",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "2854efcb8c12dd06",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m3/M3-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "b87ea04472c38164",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "2854efcb8c12dd06",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m4/M4-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "8debd257260558b6",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M4-2。支持: ['M4-3']"
+        }
+      },
+      "factory/m4/M4-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "8debd257260558b6",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M4-2。支持: ['M4-3']"
+        }
+      },
+      "factory/m4/M4-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2f8a39d93a5d1d1d",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "ddac77c87c061adf",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m4/M4-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2f8a39d93a5d1d1d",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "ddac77c87c061adf",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m5/M5-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2c54a9b0e54c712f",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M5-2。支持: ['M5-3']"
+        }
+      },
+      "factory/m5/M5-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "2c54a9b0e54c712f",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M5-2。支持: ['M5-3']"
+        }
+      },
+      "factory/m5/M5-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "6840e819213054c7",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "9e1e99b38e760caf",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m5/M5-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "6840e819213054c7",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "9e1e99b38e760caf",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m6/M6-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "228a53845a3ed756",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M6-2。支持: ['M6-3']"
+        }
+      },
+      "factory/m6/M6-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "228a53845a3ed756",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M6-2。支持: ['M6-3']"
+        }
+      },
+      "factory/m6/M6-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "a36f51f87e2cfd9f",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "38a9c5ce855926dc",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m6/M6-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "a36f51f87e2cfd9f",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "38a9c5ce855926dc",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m7/M7-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "f17231cbce087cbf",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M7-2。支持: ['M7-3']"
+        }
+      },
+      "factory/m7/M7-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "f17231cbce087cbf",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M7-2。支持: ['M7-3']"
+        }
+      },
+      "factory/m7/M7-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "8caa036184c53611",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "0277846f910ac9bd",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m7/M7-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "8caa036184c53611",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "0277846f910ac9bd",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m8/M8-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "ebeac88b3c66f0f0",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M8-2。支持: ['M8-3']"
+        }
+      },
+      "factory/m8/M8-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "ebeac88b3c66f0f0",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M8-2。支持: ['M8-3']"
+        }
+      },
+      "factory/m8/M8-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "b8526ba4afb02832",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "94e912cd32c294ce",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m8/M8-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "b8526ba4afb02832",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "94e912cd32c294ce",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m9/M9-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "442d6482c3ef275a",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M9-2。支持: ['M9-3']"
+        }
+      },
+      "factory/m9/M9-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "442d6482c3ef275a",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: M9-2。支持: ['M9-3']"
+        }
+      },
+      "factory/m9/M9-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "8ff28c2662245e6e",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "061c786ab9402b3b",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/m9/M9-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "8ff28c2662245e6e",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "061c786ab9402b3b",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n1/N1-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "c1618f30e221b7ea",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N1-2。支持: ['N1-3']"
+        }
+      },
+      "factory/n1/N1-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "c1618f30e221b7ea",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N1-2。支持: ['N1-3']"
+        }
+      },
+      "factory/n1/N1-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "008a9f432f8205d1",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "7927c96fc195ee9e",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n1/N1-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "008a9f432f8205d1",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "7927c96fc195ee9e",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n2/N2-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "0f046cadb027a62b",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N2-2。支持: ['N2-3']"
+        }
+      },
+      "factory/n2/N2-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "0f046cadb027a62b",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N2-2。支持: ['N2-3']"
+        }
+      },
+      "factory/n2/N2-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "a0679fb515673f4b",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "75166e2c2883e6ae",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n2/N2-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "a0679fb515673f4b",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "75166e2c2883e6ae",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n3/N3-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "e8edc700c66fad30",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N3-2。支持: ['N3-3']"
+        }
+      },
+      "factory/n3/N3-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "e8edc700c66fad30",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N3-2。支持: ['N3-3']"
+        }
+      },
+      "factory/n3/N3-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "5c086384e50186cd",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "965878f2ea751d67",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n3/N3-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "5c086384e50186cd",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "965878f2ea751d67",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n5/N5-2/export-data": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "0fbb39ca6232b4bd",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N5-2。支持: ['N5-3']"
+        }
+      },
+      "factory/n5/N5-2/export-template": {
+        "state": "BROKEN",
+        "scope": "informational（该短前缀在 catalog 零启用 ⇒ bulk 今天从不取数；施加后 adapter 改指专属模块，此 sheet 经短前缀不再可达，但它今天也不可达 ⇒ 非 R1.6 意义上的回归）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "0fbb39ca6232b4bd",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "HTTPException",
+          "error": "HTTPException: 400: 不支持的sheet: N5-2。支持: ['N5-3']"
+        }
+      },
+      "factory/n5/N5-3/export-data": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "82c539546dddcbcf",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "b3629fa2d3858aad",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "factory/n5/N5-3/export-template": {
+        "state": "DIGEST_MISMATCH",
+        "scope": "work_surface（本 spec 作业面，施加后由专属模块接管）",
+        "is_x3": true,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "82c539546dddcbcf",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "b3629fa2d3858aad",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/l2-interest-payable/<handler-default>/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "3226c3a018e0ec64",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "3226c3a018e0ec64",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/l2-interest-payable/<handler-default>/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "3226c3a018e0ec64",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "3226c3a018e0ec64",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/l6-special-payables/L6-2/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "aa4f801bae4fc05f",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "aa4f801bae4fc05f",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/l6-special-payables/L6-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "aa4f801bae4fc05f",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "aa4f801bae4fc05f",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m1-dividends-payable/<handler-default>/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE wp_id ="
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE wp_id ="
+        }
+      },
+      "shapeB/m1-dividends-payable/<handler-default>/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "e6960540b97846a0",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "e6960540b97846a0",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m10-other-equity-instruments/M10-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence FROM checklist_responses WHERE workpaper_id = $1 AND item"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence FROM checklist_responses WHERE workpaper_id = $1 AND item"
+        }
+      },
+      "shapeB/m10-other-equity-instruments/M10-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "f77c718c54a5c5b3",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "f77c718c54a5c5b3",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m2-paid-in-capital/M2-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n                SELECT item_id, value\n                FROM checklist_responses\n                W"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n                SELECT item_id, value\n                FROM checklist_responses\n                W"
+        }
+      },
+      "shapeB/m2-paid-in-capital/M2-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "bda016624283dbeb",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "bda016624283dbeb",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m3-treasury-stock/M3-2/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "df6aaa6454cd34f7",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "df6aaa6454cd34f7",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m3-treasury-stock/M3-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "df6aaa6454cd34f7",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "df6aaa6454cd34f7",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m4-capital-reserve/M4-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]"
+        }
+      },
+      "shapeB/m4-capital-reserve/M4-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "01c8cdf387888826",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "01c8cdf387888826",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m5-surplus-reserve/M5-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"evidence\" does not exist\n[SQL: SELECT item_id, conclusion, evidence, status FROM checklist_responses WHERE workpaper_id = $1]"
+        }
+      },
+      "shapeB/m5-surplus-reserve/M5-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "eff35ae911a02c3e",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "eff35ae911a02c3e",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m6-retained-earnings/M6-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE working"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ProgrammingError",
+          "error": "ProgrammingError: (sqlalchemy.dialects.postgresql.asyncpg.ProgrammingError) <class 'asyncpg.exceptions.UndefinedColumnError'>: column \"value\" does not exist\n[SQL: \n            SELECT item_id, value\n            FROM checklist_responses\n            WHERE working"
+        }
+      },
+      "shapeB/m6-retained-earnings/M6-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "d64ff7f75681f8b8",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d64ff7f75681f8b8",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m7-special-reserve/M7-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'"
+        }
+      },
+      "shapeB/m7-special-reserve/M7-2/export-template": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m7_special_reserve_service'"
+        }
+      },
+      "shapeB/m8-general-risk-reserve/M8-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ImportError",
+          "error": "ImportError: cannot import name 'ChecklistResponse' from 'app.models.audit_platform_models' (D:\\GT_plan\\backend\\app\\models\\audit_platform_models.py)"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ImportError",
+          "error": "ImportError: cannot import name 'ChecklistResponse' from 'app.models.audit_platform_models' (D:\\GT_plan\\backend\\app\\models\\audit_platform_models.py)"
+        }
+      },
+      "shapeB/m8-general-risk-reserve/M8-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "bde06a45ab93d864",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "bde06a45ab93d864",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/m9-other-comprehensive-income/M9-2/export-data": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'"
+        }
+      },
+      "shapeB/m9-other-comprehensive-income/M9-2/export-template": {
+        "state": "SAME_FAILURE",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'"
+        },
+        "current": {
+          "ok": false,
+          "stable_digest": null,
+          "error_class": "ModuleNotFoundError",
+          "error": "ModuleNotFoundError: No module named 'app.services.m9_other_comprehensive_income_service'"
+        }
+      },
+      "shapeB/n1-deferred-tax-assets/N1-2/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "20a36164326673be",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "20a36164326673be",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n1-deferred-tax-assets/N1-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "20a36164326673be",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "20a36164326673be",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n1-deferred-tax-assets/N1-4/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "29c12f027dfc53c8",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "29c12f027dfc53c8",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n1-deferred-tax-assets/N1-4/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "29c12f027dfc53c8",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "29c12f027dfc53c8",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n1-deferred-tax-assets/N1-5/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "589211bc36721f31",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "589211bc36721f31",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n1-deferred-tax-assets/N1-5/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "589211bc36721f31",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "589211bc36721f31",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n2-taxes-payable/N2-2/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "b0fae5c7abe93548",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "b0fae5c7abe93548",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n2-taxes-payable/N2-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "b0fae5c7abe93548",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "b0fae5c7abe93548",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n3-deferred-tax-liabilities/N3-2/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "d5652bafebb9dbd5",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d5652bafebb9dbd5",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n3-deferred-tax-liabilities/N3-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "d5652bafebb9dbd5",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "d5652bafebb9dbd5",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n5-income-tax-expense/N5-2/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "9ebbb4c7ba2caa97",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "9ebbb4c7ba2caa97",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n5-income-tax-expense/N5-2/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "9ebbb4c7ba2caa97",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "9ebbb4c7ba2caa97",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n5-income-tax-expense/N5-5/export-data": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "3b61807a67741fab",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "3b61807a67741fab",
+          "error_class": null,
+          "error": null
+        }
+      },
+      "shapeB/n5-income-tax-expense/N5-5/export-template": {
+        "state": "SAME",
+        "scope": "must_be_stable（R1.6 / R11.2：非 X-3 产物不得变）",
+        "is_x3": false,
+        "baseline": {
+          "ok": true,
+          "stable_digest": "3b61807a67741fab",
+          "error_class": null,
+          "error": null
+        },
+        "current": {
+          "ok": true,
+          "stable_digest": "3b61807a67741fab",
+          "error_class": null,
+          "error": null
+        }
+      }
+    },
+    "state_counts": {
+      "BROKEN": 32,
+      "DIGEST_MISMATCH": 32,
+      "SAME": 27,
+      "SAME_FAILURE": 11
+    },
+    "state_counts_by_scope": {
+      "informational": {
+        "BROKEN": 32
+      },
+      "must_be_stable": {
+        "SAME": 27,
+        "SAME_FAILURE": 11
+      },
+      "work_surface": {
+        "DIGEST_MISMATCH": 32
+      }
+    },
+    "hard_regressions": [],
+    "note": "`informational` 作用域的差异不判回归（那些 sheet 在 catalog 零启用、bulk 改指前后都不取数）；判回归只看 `must_be_stable` 作用域"
+  },
+  "snapshot_2": {
+    "declared_baselines_changed": {
+      "_BASE_FULL3_PREFIXES": {
+        "baseline": 100,
+        "current": 116
+      },
+      "_BASE_GROUPS": {
+        "baseline": 107,
+        "current": 123
+      },
+      "_BASE_IE_MODULES": {
+        "baseline": 99,
+        "current": 100
+      },
+      "_BASE_ROUTE_KINDS": {
+        "baseline": {
+          "export-template": 106,
+          "export-data": 102,
+          "import-data": 100
+        },
+        "current": {
+          "export-template": 122,
+          "export-data": 118,
+          "import-data": 116
+        }
+      },
+      "_BASE_SHAPE_A": {
+        "baseline": 85,
+        "current": 101
+      },
+      "_BASE_THREE_STATE_ROUTES": {
+        "baseline": 308,
+        "current": 356
+      },
+      "_TRULY_DEAD_FACTORY_PREFIXES": {
+        "baseline": [
+          "h9",
+          "l2",
+          "l6",
+          "l7",
+          "l8",
+          "m1",
+          "m10",
+          "m2",
+          "m3",
+          "m4",
+          "m5",
+          "m6",
+          "m7",
+          "m8",
+          "m9",
+          "n1",
+          "n2",
+          "n3",
+          "n5"
+        ],
+        "current": [
+          "h9",
+          "l7",
+          "l8"
+        ]
+      }
+    },
+    "live": {
+      "three_state_routes": {
+        "baseline_live": 308,
+        "current_live": 356,
+        "target_after_spec": 356,
+        "reached_target": true,
+        "unchanged": false
+      },
+      "groups": {
+        "baseline_live": 107,
+        "current_live": 123,
+        "target_after_spec": 123,
+        "reached_target": true,
+        "unchanged": false
+      },
+      "full3_prefixes": {
+        "baseline_live": 100,
+        "current_live": 116,
+        "target_after_spec": 116,
+        "reached_target": true,
+        "unchanged": false
+      },
+      "shape_a_prefixes": {
+        "baseline_live": 85,
+        "current_live": 101,
+        "target_after_spec": 101,
+        "reached_target": true,
+        "unchanged": false
+      },
+      "shape_b_prefixes": {
+        "baseline_live": 22,
+        "current_live": 22,
+        "target_after_spec": 22,
+        "reached_target": true,
+        "unchanged": true
+      },
+      "route_kinds": {
+        "baseline_live": {
+          "export-data": 102,
+          "export-template": 106,
+          "import-data": 100
+        },
+        "current_live": {
+          "export-data": 118,
+          "export-template": 122,
+          "import-data": 116
+        },
+        "target_after_spec": {
+          "export-template": 122,
+          "export-data": 118,
+          "import-data": 116
+        },
+        "reached_target": true,
+        "unchanged": false
+      },
+      "ie_module_files": {
+        "baseline_live": 99,
+        "current_live": 100,
+        "target_after_spec": 99,
+        "reached_target": false,
+        "unchanged": false
+      },
+      "factory_api_prefixes": {
+        "baseline_live": 62,
+        "current_live": 62,
+        "target_after_spec": 62,
+        "reached_target": true,
+        "unchanged": true
+      }
+    },
+    "note": "施加完 Wave 3 后 `reached_target` 应全 True；Wave 0 阶段应全 `unchanged=True`"
+  },
+  "snapshot_3": {
+    "key_count": {
+      "baseline": 97,
+      "current": 97
+    },
+    "keys_added": [],
+    "keys_removed": [],
+    "target_module_changed": {
+      "l2": {
+        "baseline": "app.routers.wp_render_strategies._l2_import_export",
+        "current": "app.routers.l2_interest_payable",
+        "expected_after_spec": "app.routers.l2_interest_payable",
+        "is_x3_short_prefix": true
+      },
+      "l6": {
+        "baseline": "app.routers.wp_render_strategies._l6_import_export",
+        "current": "app.routers.l6_special_payables",
+        "expected_after_spec": "app.routers.l6_special_payables",
+        "is_x3_short_prefix": true
+      },
+      "m1": {
+        "baseline": "app.routers.wp_render_strategies._m1_import_export",
+        "current": "app.routers.m1_dividends_payable",
+        "expected_after_spec": "app.routers.m1_dividends_payable",
+        "is_x3_short_prefix": true
+      },
+      "m10": {
+        "baseline": "app.routers.wp_render_strategies._m10_import_export",
+        "current": "app.routers.m10_other_equity_instruments",
+        "expected_after_spec": "app.routers.m10_other_equity_instruments",
+        "is_x3_short_prefix": true
+      },
+      "m2": {
+        "baseline": "app.routers.wp_render_strategies._m2_import_export",
+        "current": "app.routers.m2_paid_in_capital",
+        "expected_after_spec": "app.routers.m2_paid_in_capital",
+        "is_x3_short_prefix": true
+      },
+      "m3": {
+        "baseline": "app.routers.wp_render_strategies._m3_import_export",
+        "current": "app.routers.m3_treasury_stock",
+        "expected_after_spec": "app.routers.m3_treasury_stock",
+        "is_x3_short_prefix": true
+      },
+      "m4": {
+        "baseline": "app.routers.wp_render_strategies._m4_import_export",
+        "current": "app.routers.m4_capital_reserve",
+        "expected_after_spec": "app.routers.m4_capital_reserve",
+        "is_x3_short_prefix": true
+      },
+      "m5": {
+        "baseline": "app.routers.wp_render_strategies._m5_import_export",
+        "current": "app.routers.m5_surplus_reserve",
+        "expected_after_spec": "app.routers.m5_surplus_reserve",
+        "is_x3_short_prefix": true
+      },
+      "m6": {
+        "baseline": "app.routers.wp_render_strategies._m6_import_export",
+        "current": "app.routers.m6_retained_earnings",
+        "expected_after_spec": "app.routers.m6_retained_earnings",
+        "is_x3_short_prefix": true
+      },
+      "m7": {
+        "baseline": "app.routers.wp_render_strategies._m7_import_export",
+        "current": "app.routers.m7_special_reserve",
+        "expected_after_spec": "app.routers.m7_special_reserve",
+        "is_x3_short_prefix": true
+      },
+      "m8": {
+        "baseline": "app.routers.wp_render_strategies._m8_import_export",
+        "current": "app.routers.m8_general_risk_reserve",
+        "expected_after_spec": "app.routers.m8_general_risk_reserve",
+        "is_x3_short_prefix": true
+      },
+      "m9": {
+        "baseline": "app.routers.wp_render_strategies._m9_import_export",
+        "current": "app.routers.m9_other_comprehensive_income",
+        "expected_after_spec": "app.routers.m9_other_comprehensive_income",
+        "is_x3_short_prefix": true
+      },
+      "n1": {
+        "baseline": "app.routers.wp_render_strategies._n1_import_export",
+        "current": "app.routers.n1_deferred_tax_assets",
+        "expected_after_spec": "app.routers.n1_deferred_tax_assets",
+        "is_x3_short_prefix": true
+      },
+      "n2": {
+        "baseline": "app.routers.wp_render_strategies._n2_import_export",
+        "current": "app.routers.n2_taxes_payable",
+        "expected_after_spec": "app.routers.n2_taxes_payable",
+        "is_x3_short_prefix": true
+      },
+      "n3": {
+        "baseline": "app.routers.wp_render_strategies._n3_import_export",
+        "current": "app.routers.n3_deferred_tax_liabilities",
+        "expected_after_spec": "app.routers.n3_deferred_tax_liabilities",
+        "is_x3_short_prefix": true
+      },
+      "n5": {
+        "baseline": "app.routers.wp_render_strategies._n5_import_export",
+        "current": "app.routers.n5_income_tax_expense",
+        "expected_after_spec": "app.routers.n5_income_tax_expense",
+        "is_x3_short_prefix": true
+      }
+    },
+    "unexpected_changes": {},
+    "note": "键集应恒定；只有 16 个 X-3 短前缀的 target_module 允许变（任务 6.1）"
+  },
+  "ci_red_jobs": {
+    "duty": "裁决 2：本 spec 不修红，但红的规模不得变大",
+    "probe_skipped": false,
+    "probe_skipped_note": null,
+    "jobs": {
+      "acnr-ie-catalog-sync": {
+        "exit_code": {
+          "baseline": 1,
+          "current": 1
+        },
+        "drift_entries": {
+          "baseline": 19,
+          "current": 19
+        },
+        "increased": false
+      },
+      "check-acnr-catalog-drift": {
+        "exit_code": {
+          "baseline": 1,
+          "current": 1
+        },
+        "drift_entries": {
+          "baseline": 53,
+          "current": 53
+        },
+        "increased": false
+      }
+    },
+    "increased_jobs": []
+  },
+  "verdict": "ZERO_REGRESSION",
+  "candidate_surface_drift": {
+    "criterion": "两侧**派生**出的非 X-3 候选 sheet 逐前缀对差（探测面本身按基线键重放）",
+    "judged": false,
+    "prefixes_with_drift": [
+      "m1-dividends-payable",
+      "m10-other-equity-instruments",
+      "m2-paid-in-capital",
+      "m3-treasury-stock",
+      "m4-capital-reserve",
+      "m5-surplus-reserve",
+      "m6-retained-earnings",
+      "m7-special-reserve",
+      "m8-general-risk-reserve",
+      "m9-other-comprehensive-income",
+      "n2-taxes-payable"
+    ],
+    "detail": {
+      "m1-dividends-payable": {
+        "baseline_derived": [
+          "M1-2"
+        ],
+        "current_derived": [
+          "M1-2",
+          "M1-4",
+          "M1-5"
+        ],
+        "only_in_baseline": [],
+        "only_in_current": [
+          "M1-4",
+          "M1-5"
+        ]
+      },
+      "m10-other-equity-instruments": {
+        "baseline_derived": [
+          "M10-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M10-2"
+        ],
+        "only_in_current": []
+      },
+      "m2-paid-in-capital": {
+        "baseline_derived": [
+          "M2-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M2-2"
+        ],
+        "only_in_current": []
+      },
+      "m3-treasury-stock": {
+        "baseline_derived": [
+          "M3-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M3-2"
+        ],
+        "only_in_current": []
+      },
+      "m4-capital-reserve": {
+        "baseline_derived": [
+          "M4-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M4-2"
+        ],
+        "only_in_current": []
+      },
+      "m5-surplus-reserve": {
+        "baseline_derived": [
+          "M5-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M5-2"
+        ],
+        "only_in_current": []
+      },
+      "m6-retained-earnings": {
+        "baseline_derived": [
+          "M6-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M6-2"
+        ],
+        "only_in_current": []
+      },
+      "m7-special-reserve": {
+        "baseline_derived": [
+          "M7-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M7-2"
+        ],
+        "only_in_current": []
+      },
+      "m8-general-risk-reserve": {
+        "baseline_derived": [
+          "M8-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M8-2"
+        ],
+        "only_in_current": []
+      },
+      "m9-other-comprehensive-income": {
+        "baseline_derived": [
+          "M9-2"
+        ],
+        "current_derived": [],
+        "only_in_baseline": [
+          "M9-2"
+        ],
+        "only_in_current": []
+      },
+      "n2-taxes-payable": {
+        "baseline_derived": [
+          "N2-2"
+        ],
+        "current_derived": [
+          "N2-10",
+          "N2-2",
+          "N2-6",
+          "N2-8",
+          "N2-9"
+        ],
+        "only_in_baseline": [],
+        "only_in_current": [
+          "N2-10",
+          "N2-6",
+          "N2-8",
+          "N2-9"
+        ]
+      }
+    },
+    "note": "派生面变化不判回归（R1.6 判的是产物字节，不是脚本的候选推导）；但下一轮重出基线前须先看这一块，免得静默换一批键"
+  },
+  "regressions": []
+}

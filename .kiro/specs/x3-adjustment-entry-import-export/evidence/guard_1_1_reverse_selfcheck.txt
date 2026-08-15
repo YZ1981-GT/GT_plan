@@ -1,0 +1,82 @@
+任务 1.1 反向自检留痕（GS1 + GS9 后端侧守卫 = backend/tests/test_x3_key_ledger.py）
+================================================================================
+判读四态：RED（打红且正是预期那条）/ GREEN（守卫缺陷）/ ANCHOR-MISS（节点未命中）/
+WRONG-TEST（红了但不是预期项）。只看退出码会把后三态误判成 RED。
+
+复算命令（从仓库根跑；两个脚本是本任务的临时产物，交付时已删，内容见下方步骤描述）：
+  python -m pytest backend/tests/test_x3_key_ledger.py -q --tb=no
+
+--------------------------------------------------------------------------------
+[1] 当前态红绿分布（未施加任何变异）
+--------------------------------------------------------------------------------
+80 个用例 = 类 A 10 passed / 类 B 70 failed
+
+  TestLedgerTruthSourceSelfCheck                PASSED  10   ← 类 A，独立口径自检
+  TestLedgerRegistersSixteenX3                  FAILED  17   ← 16 张 + exempt 残留 1
+  TestLedgerEntryDeclaresTripleAndMechanism     FAILED  16
+  TestStorageFieldDerivedFromMechanism          FAILED  17   ← 16 张 + 机制分布 1
+  TestX3SheetSpecsAlignedWithLedger             FAILED  20   ← import 1 + 覆盖 1 + 三重对齐 16
+                                                              + 字面量扫描 1 + 真实装载 1
+红消息前缀：「尚未实现（Wave 1 任务 2.1）」（清单未迁入）/「尚未实现（Wave 2 任务 4.1）」（模块未建）
+
+--------------------------------------------------------------------------------
+[2] 物理变异清单（backend/data/adjustment_ie_contract.json）——「改一列 / 改一机制必打红」
+--------------------------------------------------------------------------------
+做法：read_bytes 取原始字节 + md5；把 M4-3 迁入 sheets（形如 design §Key_Ledger 条目的
+per_field_plus_data 探针值）；只跑三个节点；finally 写回原始字节并比对 md5。
+开跑前检查清单 mtime 新鲜度（<120s 即中止，防与并发会话对撞）。
+
+三个节点：
+  A registered = TestLedgerRegistersSixteenX3::test_sheet_is_registered_in_sheets_section[M4-3]
+  B fields     = TestLedgerEntryDeclaresTripleAndMechanism::test_entry_declares_triple_and_mechanism[M4-3]
+  C gs9        = TestStorageFieldDerivedFromMechanism::test_storage_field_matches_mechanism[M4-3]
+
+清单 md5（变异前）= 5fe43fc5b84fca16ea7724eaa2d4b311  size=61029
+
+变体      mechanism              storage_field  收集数  A       B       C            判读
+--------  ---------------------  -------------  ------  ------  ------  -----------  ------------------
+CONTROL   adjustment_savebatch   remark         3       PASSED  PASSED  PASSED       三条全绿 ⇒ 断言非恒红
+MUT-SF    adjustment_savebatch   conclusion     3       PASSED  PASSED  FAILED       RED（消息=机制↔列不一致）
+MUT-MECH  formdata_setfield      remark         3       PASSED  PASSED  FAILED       RED（消息=机制↔列不一致）
+
+清单 md5（还原后）= 5fe43fc5b84fca16ea7724eaa2d4b311  一致=True
+
+结论：反向自检通过。CONTROL 排除了 ANCHOR-MISS / WRONG-TEST（三条并非恒红）；两个变异
+各自只打红「机制↔列」那一条、未连带打红 A/B ⇒ 判据定位准确、非空转。
+
+--------------------------------------------------------------------------------
+[3] GS1 反假绿：「X3_SHEET_SPECS 从清单装载」的判据能区分三种实现
+--------------------------------------------------------------------------------
+做法：合成三个模块文件（临时目录，零生产代码改动），把守卫的 _MODULE_PATH 指向它们，
+用替身清单（把 M4-3 的 mechanism/storage_field 成对翻到 formdata_setfield/conclusion）
+重新 exec，看 X3_SHEET_SPECS 是否跟着变；同时跑剥注释后的字面量扫描。
+
+合成实现               清单读取次数  storage_field  装载判据  字面量判据  预期符合
+---------------------  ------------  -------------  --------  ----------  --------
+GOOD（从清单装载）     1             'conclusion'   PASS      PASS        ✓
+HARDCODED（写死 dict） 0             'remark'       RED       RED（M4-3） ✓
+LOADS_BUT_OVERRIDES    1             'remark'       RED       RED（M4-3） ✓
+  （源码里确有 json.load，值却被硬编码覆盖 = grep 式守卫必假绿的那类）
+
+结论：两条判据（真实装载行为 + 剥注释后字面量扫描）均能区分，且第三种「装载了但不采用」
+也被抓住 —— 这是 grep 「有没有 json.load」式守卫抓不到的那一类。
+
+--------------------------------------------------------------------------------
+[4] 判据边界（防下一轮高估覆盖面）
+--------------------------------------------------------------------------------
+本文件的 mechanism 取清单登记值 ⇒ 只抓「清单内机制与列自相矛盾」。
+「机制本身是否与前端源码一致」（例：把 N1-3 登记成 adjustment_savebatch + remark，
+两处一起错）要靠任务 1.9 的前端源码机制探针，两侧合起来才是 design §GS9 的完整判据。
+
+--------------------------------------------------------------------------------
+[5] 给任务 2.1 的前置发现（迁入 sheets 会打红一个既有守卫）
+--------------------------------------------------------------------------------
+backend/tests/test_adjustment_ie_contract_guard.py::test_p9_contract_sheets_all_exist_in_backend
+断言「清单 sheets 每条必须在后端工厂 _X_SPECS 里发现得到」，其发现口径是遍历
+wp_render_strategies/*_import_export.py 找 _[A-Z0-9]+_SPECS（实测发现 37 张调整 sheet）。
+16 张 X-3 实测 0/16 命中该口径，且其 specs 将落在专属 X3_SHEET_SPECS（不匹配该正则）
+⇒ 任务 2.1 把 16 条迁入 sheets 的当刻，该既有守卫即打红。
+处置建议：把该守卫的发现口径扩到 X3_SHEET_SPECS（或改判「工厂 _X_SPECS 或 X3_SHEET_SPECS
+二者之一」），别把这条红误读成迁入做错了。
+复算：python -m pytest backend/tests/test_adjustment_ie_contract_guard.py -q
+      （当前态 144 passed / 23 skipped，与本任务交付前一致）

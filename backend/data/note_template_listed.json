@@ -20169,9 +20169,16 @@
           "headers": [
             "项目",
             "土地使用权",
+            "住房使用权",
             "专利权",
             "非专利技术",
+            "商标权",
+            "著作权",
+            "特许经营权",
+            "软件",
+            "矿产权",
             "数据资源",
+            "其他",
             "合计"
           ],
           "rows": [
@@ -20304,12 +20311,12 @@
               "row_type": "data"
             },
             {
-              "label": "（2）其他减少",
+              "label": "（2）失效且终止确认的部分",
               "row_type": "data"
             },
             {
-              "label": "……",
-              "row_type": "expandable"
+              "label": "（3）其他减少",
+              "row_type": "data"
             },
             {
               "label": "4.期末余额",
@@ -20328,7 +20335,75 @@
               "row_type": "data"
             }
           ],
-          "guidance": "【提示：列头按实际无形资产类别列示（参见底稿目录!A9~A19），不存在的类别可删除；数据资源列为固定列。行按四层结构列示：一、账面原值→二、累计摊销→三、减值准备→四、账面价值。各层结构含期初余额、本期增减明细（购置/内部研发/企业合并等）、期末余额。】"
+          "guidance": "【提示：列头按实际无形资产类别列示（参见底稿目录!A9~A19），不存在的类别可删除；数据资源列为固定列。行按四层结构列示：一、账面原值→二、累计摊销→三、减值准备→四、账面价值。各层结构含期初余额、本期增减明细（购置/内部研发/企业合并等）、期末余额。】",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "land_use_right_1",
+              "label": "土地使用权",
+              "format": "amount"
+            },
+            {
+              "key": "housing_use_right_2",
+              "label": "住房使用权",
+              "format": "amount"
+            },
+            {
+              "key": "patent_3",
+              "label": "专利权",
+              "format": "amount"
+            },
+            {
+              "key": "patent_free_tech_4",
+              "label": "非专利技术",
+              "format": "amount"
+            },
+            {
+              "key": "trademark_5",
+              "label": "商标权",
+              "format": "amount"
+            },
+            {
+              "key": "copyright_6",
+              "label": "著作权",
+              "format": "amount"
+            },
+            {
+              "key": "franchise_7",
+              "label": "特许经营权",
+              "format": "amount"
+            },
+            {
+              "key": "software_8",
+              "label": "软件",
+              "format": "amount"
+            },
+            {
+              "key": "mining_right_9",
+              "label": "矿产权",
+              "format": "amount"
+            },
+            {
+              "key": "data_resource_10",
+              "label": "数据资源",
+              "format": "amount"
+            },
+            {
+              "key": "other_11",
+              "label": "其他",
+              "format": "amount"
+            },
+            {
+              "key": "合计",
+              "label": "合计",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "重要单项无形资产",
@@ -20477,7 +20552,35 @@
               "row_type": "data"
             }
           ],
-          "guidance": "根据《企业数据资源相关会计处理暂行规定》（财会〔2023〕11号），列示确认为无形资产的数据资源的账面原值、累计摊销、减值准备及账面价值。"
+          "guidance": "根据《企业数据资源相关会计处理暂行规定》（财会〔2023〕11号），列示确认为无形资产的数据资源的账面原值、累计摊销、减值准备及账面价值。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "项目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "外购的数据资源无形资产",
+              "label": "外购的数据资源无形资产",
+              "format": "amount"
+            },
+            {
+              "key": "自行开发的数据资源无形资产",
+              "label": "自行开发的数据资源无形资产",
+              "format": "amount"
+            },
+            {
+              "key": "其他方式取得的数据资源无形资产",
+              "label": "其他方式取得的数据资源无形资产",
+              "format": "amount"
+            },
+            {
+              "key": "合计",
+              "label": "合计",
+              "format": "amount"
+            }
+          ]
         },
         {
           "name": "未办妥产权证书的土地使用权情况",
@@ -20544,8 +20647,8 @@
       "sort_index": 25,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:08:41"
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-10 12:49:35"
     },
     {
       "section_number": "五、27",
@@ -20997,7 +21100,10 @@
         {
           "name": "商誉减值测试关键假设",
           "headers": [
-            "XX地区铁路运输业务"
+            "资产组/业务",
+            "毛利率",
+            "增长率",
+            "折现率"
           ],
           "rows": [
             {
@@ -21013,7 +21119,30 @@
               "row_type": "data"
             }
           ],
-          "guidance": "提示：应披露商誉减值测试所涉及的资产组或资产组组合，以及确定可收回金额所使用的关键假设和方法。"
+          "guidance": "提示：应披露商誉减值测试所涉及的资产组或资产组组合，以及确定可收回金额所使用的关键假设和方法。列头「资产组/业务」按本项目实际资产组名称列示（源模板示例为「XX地区铁路运输业务」）；行为关键假设参数（毛利率/增长率/折现率）。",
+          "columns": [
+            {
+              "key": "label",
+              "label": "资产组/业务",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "毛利率",
+              "label": "毛利率",
+              "format": "percent"
+            },
+            {
+              "key": "增长率",
+              "label": "增长率",
+              "format": "percent"
+            },
+            {
+              "key": "折现率",
+              "label": "折现率",
+              "format": "percent"
+            }
+          ]
         },
         {
           "name": "业绩承诺完成及商誉减值情况",
@@ -21080,8 +21209,8 @@
       "sort_index": 27,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:08:41"
+      "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
+      "_aligned_at": "2026-08-10 12:20:53"
     },
     {
       "section_number": "五、29",
@@ -21815,8 +21944,9 @@
           "guidance": "注：根据实际情况列示；不存在的项目请删除"
         },
         {
-          "name": "[披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。例如：",
+          "name": "合同取得成本",
           "headers": [
+            "项  目",
             "[佣金支出]",
             "合计"
           ],
@@ -21841,6 +21971,25 @@
               "label": "期末余额",
               "row_type": "data"
             }
+          ],
+          "guidance": "披露与合同取得成本有关的资产相关的信息，包括确定该资产金额所做的判断、该资产的摊销方法、按该资产主要类别披露的期末账面价值以及本期确认的摊销及减值损失金额等。",
+          "columns": [
+            {
+              "key": "项目",
+              "label": "项  目",
+              "is_label": true,
+              "flat": true
+            },
+            {
+              "key": "cat_1",
+              "label": "[佣金支出]",
+              "format": "amount"
+            },
+            {
+              "key": "合计",
+              "label": "合计",
+              "format": "amount"
+            }
           ]
         }
       ],
@@ -21863,7 +22012,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "i-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 13:57:40"
+      "_aligned_at": "2026-08-12 22:37:09"
     },
     {
       "section_number": "五、32",

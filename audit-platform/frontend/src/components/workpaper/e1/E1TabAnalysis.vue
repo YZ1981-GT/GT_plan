@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { inject, onMounted, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useE1Analysis, type AnalysisRow, type AnalysisPeriod } from '../composables/useE1Analysis'
@@ -174,7 +175,7 @@ function handleFillFromAdj(): void {
         <div class="section-actions"><el-button type="primary" size="small" :disabled="isReadonly" @click="analysis.addAnomaly">+ 新增异常</el-button></div>
         <el-table :data="analysis.anomalyRows.value" border stripe size="small">
           <el-table-column label="异常项目" min-width="150"><template #default="{ row }"><el-input :model-value="row.item" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'item', v)" /></template></el-table-column>
-          <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><el-input-number :model-value="row.amount" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number) => analysis.updateAnomaly(row.id, 'amount', v ?? 0)" /></template></el-table-column>
+          <el-table-column label="金额" min-width="130" align="right"><template #default="{ row }"><WpAmountInput :model-value="row.amount" :disabled="isReadonly" size="small" @change="(v: number) => analysis.updateAnomaly(row.id, 'amount', v ?? 0)" /></template></el-table-column>
           <el-table-column label="原因分析" min-width="230"><template #default="{ row }"><div class="ai-cell"><el-input :model-value="row.reason" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'reason', v)" /><el-button text type="primary" :disabled="isReadonly" :loading="isGenerating('analysis-reason')" @click="aiReason(row.item || '异常项目', row.reason, row, v => analysis.updateAnomaly(row.id, 'reason', v))">🤖</el-button></div></template></el-table-column>
           <el-table-column label="风险评估" min-width="180"><template #default="{ row }"><el-input :model-value="row.risk" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'risk', v)" /></template></el-table-column>
           <el-table-column label="应对措施" min-width="180"><template #default="{ row }"><el-input :model-value="row.response" :disabled="isReadonly" @change="(v: string) => analysis.updateAnomaly(row.id, 'response', v)" /></template></el-table-column>

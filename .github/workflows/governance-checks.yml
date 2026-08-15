@@ -5047,3 +5047,122 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         run: npx vitest run src/views/__tests__/trimAdequacyReview.spec.ts src/views/__tests__/trimDecisionWiring.spec.ts src/views/__tests__/trimDegradationConsistency.spec.ts src/components/workpaper/composables/__tests__/procedureTrimDecision.spec.ts src/components/workpaper/composables/__tests__/procedureTrimDecision.behavior.spec.ts
         working-directory: audit-platform/frontend
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # X-3 调整分录导入导出 Guard Suite（spec: x3-adjustment-entry-import-export 任务 14.2）
+  # ═══════════════════════════════════════════════════════════════════════════
+  x3-adjustment-ie-guard-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+
+      - name: Install Python deps
+        run: pip install -r backend/requirements.txt
+
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+
+      # Step 1: Catalog Registrar --check
+      - name: "[X3] Catalog Registrar --check"
+        run: python backend/scripts/fix/fix_x3_adjustment_ie_registration.py --check
+
+      # Step 2: Registry generator --check
+      - name: "[X3] gen_cycle_import_export_registry.py --check"
+        run: python backend/scripts/fix/gen_cycle_import_export_registry.py --check
+
+      # Step 3: Deviation Registry --check
+      - name: "[X3] check_x3_deviation_registry.py --check"
+        run: python backend/scripts/check/check_x3_deviation_registry.py --check
+
+      # Step 4: Backend GS1~GS4, GS6~GS9 (pytest)
+      - name: "[X3] Backend guards GS1-GS4 GS6-GS9"
+        run: |
+          python -m pytest \
+            backend/tests/test_x3_key_ledger.py \
+            backend/tests/test_x3_column_alignment.py \
+            backend/tests/test_x3_catalog_registration.py \
+            backend/tests/test_x3_adapter_host_same_module.py \
+            -v --tb=short
+
+      # Step 5: Frontend vitest (GS5, GS10, registry)
+      - name: "[X3] Frontend guards GS5 GS10 registry"
+        run: |
+          npx vitest run \
+            src/components/workpaper/__tests__/ieWiringIntegrity.spec.ts \
+            src/components/workpaper/shared/__tests__/cycleImportExportRegistry.spec.ts \
+            src/components/workpaper/composables/__tests__/adjustmentIeContract.spec.ts
+        working-directory: audit-platform/frontend
+
+      # Step 6: GS7 真实库往返（CI 空库上正确输出「无法验收」）
+      - name: "[X3] GS7 roundtrip live (continue-on-error)"
+        continue-on-error: true
+        run: python -m pytest backend/tests/test_x3_roundtrip_live.py -v --tb=short
+
+      # Step 7: 变异检验 --list（报告态，不改源码）
+      - name: "[X3] Mutation guard --list"
+        run: python backend/scripts/diagnose/mutate_ie_lifecycle_guards.py --list
+        env:
+          PYTHONIOENCODING: utf-8
+
+  amount-input-migration-typing:
+    # 可编辑金额控件迁移与列类型判据（amount-input-migration-and-column-typing）
+    #
+    # 判据先行 spec：把金额列的 `el-input-number` 迁移到 `WpAmountInput`（EP 2.13.6
+    # 无 :formatter prop，千分符从未生效），并在迁移**前**建立可区分的列类型判据。
+    #
+    # 本 job 守四件事：
+    # 1. **探针能力**（`--self-check`）：判据是「金额语义列 ∧ 控件 ≠ WpAmountInput」，
+    #    **不以 :formatter 存在为必要条件** —— 这正是 Task18 旧探针漏掉 I1-10/I1-11
+    #    （无 formatter 的金额列）的原因。四条替身含「WpAmountInput 用在年限列必报反向违规」。
+    # 2. **变异锚点静态自检**（`--check-anchors`）：4 个变异锚点在目标文件命中唯一，
+    #    防重构后锚点漂移让变异检验静默失效。
+    # 3. **列类型真源 + 正反双向断言 + 组件行为**（三个 vitest spec）：
+    #    - amountColumnSemantics：19 类非金额关键词 / 歧义不静默二选一 / override+全局 label 裁决带 evidence
+    #    - amountInputColumnTyping：三分类无遗漏桶 / 反向 reverse=0 / I1 已迁移零 confirmed /
+    #      Property9（探针禁固定字符窗口）/ has_formatter=false 的 confirmed 存在（证不依赖 formatter）
+    #    - WpAmountInput：千分符（1234567.5→1,234,567.50）/ 防 NaN（Property15）/ 持久化 number（Property16）
+    # 4. **已迁移批次零违规**（`--check-files`）：批1 K1 披露两版 + 批2 I1-10/I1-11
+    #    的金额列必须已是 WpAmountInput（confirmed=0）。
+    #    🔴 不挂全库 `--check`：批3+（D/F/G/H/J 等非 active 循环）尚未迁移，
+    #    全库 confirmed≈1891≠0，挂全库会恒红；批次收口口径见 spec Task 9 规划。
+    #
+    # amountInputColumnTyping.spec 会 spawnSync 调 python 探针实时扫描全库，
+    # 故本 job 先 setup-python（CI 用 python3）再 setup-node。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Probe self-check + mutation anchors static check
+        run: |
+          python backend/scripts/check/audit_amount_input_columns.py --self-check
+          python backend/scripts/check/mutate_amount_column_typing.py --check-anchors
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: Column-typing source + bidirectional assertions + WpAmountInput component
+        run: >-
+          npx vitest run
+          src/components/workpaper/shared/__tests__/amountColumnSemantics.spec.ts
+          src/components/workpaper/shared/__tests__/amountInputColumnTyping.spec.ts
+          src/components/workpaper/shared/__tests__/WpAmountInput.spec.ts
+        working-directory: audit-platform/frontend
+      - name: Migrated batches zero violation (batch1 K1 + batch2 I1-10/I1-11)
+        run: >-
+          python backend/scripts/check/audit_amount_input_columns.py --check-files
+          "i1/amortization/I1TabAmortizationNoImpair.vue,i1/amortization/I1TabAmortizationWithImpair.vue,k1/core/K1TabDisclosureSoe.vue,k1/core/K1TabDisclosureListed.vue"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * E1TabDigitalCurrency.vue — E1-4 数字货币明细表
  *
@@ -442,7 +443,7 @@ function resetDigColDefaults(): void {
           </el-table-column>
           <el-table-column v-if="isDigColVisible('adjustment')" label="账项调整" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.adjustment" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'adjustment', v ?? 0)" />
+              <WpAmountInput :model-value="row.adjustment" :disabled="isReadonly" size="small" @change="(v: number | undefined) => updateCell(row.id, 'adjustment', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="审定原币" width="110" align="right" class-name="auto-calc-col">
@@ -453,7 +454,7 @@ function resetDigColDefaults(): void {
           </el-table-column>
           <el-table-column v-if="isDigColVisible('queryBalance')" label="查询余额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.queryBalance" :disabled="isReadonly" :controls="false" :precision="2" :formatter="amountFormatter" :parser="amountParser" size="small" @change="(v: number | undefined) => updateCell(row.id, 'queryBalance', v ?? 0)" />
+              <WpAmountInput :model-value="row.queryBalance" :disabled="isReadonly" size="small" @change="(v: number | undefined) => updateCell(row.id, 'queryBalance', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="差异" width="110" align="right">

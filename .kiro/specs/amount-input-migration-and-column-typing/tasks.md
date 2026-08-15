@@ -61,7 +61,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
 
 ---
 
-- [ ] 1. 列类型判定单一真源
+- [x] 1. 列类型判定单一真源
 
   - 新建 `audit-platform/frontend/src/components/workpaper/shared/amountColumnSemantics.ts`
   - `AMOUNT_LABEL_PATTERNS`（金额/余额/原值/成本/价值/净额/摊销/折旧/减值/残值/收入/费用/支出…）
@@ -81,7 +81,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
     歧义判定 + override 的 evidence 非空 + 边界声明存在性
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
 
-- [ ] 2. 全库探针（能力必须强于旧探针）
+- [x] 2. 全库探针（能力必须强于旧探针）
 
   - 新建 `backend/scripts/check/audit_amount_input_columns.py`，支持 `--check` / `--json`
   - 🔴 **判据是「金额语义列 ∧ 控件 ≠ WpAmountInput」，不得以 `:formatter` 存在为必要条件**
@@ -99,7 +99,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
   - 禁 fail-open：解析失败记 ERROR 并影响退出码，不得吞异常当 `ok`
   - _Requirements: 2.1, 2.4, 2.5, 2.6_
 
-- [ ] 3. 正反双向断言（解决「反向边界恒真」）
+- [x] 3. 正反双向断言（解决「反向边界恒真」）
 
   - 新建 `.../__tests__/amountInputColumnTyping.spec.ts`
   - **正向**：`confirmed_violation` 按批次筛选后为空（已完成批次）
@@ -117,7 +117,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
     用作「不得被误迁移」的锚点
   - _Requirements: 2.2, 2.3, 3.1, 3.2, 3.3_
 
-- [ ] 4. 变异检验（证明断言有区分能力）
+- [x] 4. 变异检验（证明断言有区分能力）
 
   - 新建 `backend/scripts/check/mutate_amount_column_typing.py`（`--list` / `--only X` / `--restore`）
   - 锚点至少覆盖：
@@ -128,7 +128,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
   - 四态判定（RED / GREEN / ANCHOR-MISS / WRONG-TEST），只有 RED 且命中预期测试名算通过
   - _Requirements: 3.1_
 
-- [ ] 5. 批 1 迁移 — 80 处 `:formatter` 空操作（13 文件）
+- [x] 5. 批 1 迁移 — 80 处 `:formatter` 空操作（13 文件）
 
   - 新建 `backend/scripts/fix/fix_amount_input_batch.py`（幂等 + `--check` + 反向自检 + `--batch N`）
   - 目标文件与处数（实测）：`k1/core/K1TabDisclosureSoe.vue`(21) ·
@@ -158,7 +158,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
   - 辐射面串行跑（`--no-file-parallelism`），禁跑前端全量
   - _Requirements: 4.3, 5.4, 5.5, 6.1, 6.2_
 
-- [ ] 7. 批 2 迁移 — I 循环摊销测算表（本次浏览器实证的漏网点）
+- [x] 7. 批 2 迁移 — I 循环摊销测算表（本次浏览器实证的漏网点）
 
   - 目标：`i1/amortization/I1TabAmortizationNoImpair.vue`（I1-10）与
     `I1TabAmortizationWithImpair.vue`（I1-11）
@@ -184,7 +184,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
   - 数据复原并以 `--diff`「无漂移」为证
   - _Requirements: 4.3, 6.2_
 
-- [ ] 9. 批 3+ 规划（不在本轮执行，只产出可执行清单）
+- [x] 9. 批 3+ 规划（不在本轮执行，只产出可执行清单）
 
   - 用 Task 2 探针对 `confirmed_violation` 剩余项按循环分组，产出批次表
     （循环 / 文件数 / 处数 / 是否与 active spec 冲突）
@@ -200,7 +200,7 @@ I1-10/I1-11 这类无 formatter 的金额列），现有反向边界断言在未
   - 与 active spec 的冲突面标注：涉及 E1/K1/L/M/N 等正在推进的循环时登记「待该 spec 收口后处理」
   - _Requirements: 4.1, 4.5_
 
-- [ ] 10. CI 挂载与收口
+- [x] 10. CI 挂载与收口
 
   - `governance-checks.yml` 新增 blocking job，显式列出跑的文件：
     探针 `--check` + `amountColumnSemantics.spec.ts` + `amountInputColumnTyping.spec.ts`
