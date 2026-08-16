@@ -242,7 +242,15 @@
     `gen.main() == 0`（`--check`）覆盖且工作正常（它正是本次唯一没红的那一侧）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3_
 
-- [ ] 3. `MISSING_SYNC_PATH` 语义拆分
+- [x] 3. `MISSING_SYNC_PATH` 语义拆分
+
+  ✅ **已交付**（`disclosureAutoSyncCoverage.spec.ts`）。拆为 `PERMANENT_EXEMPT`（4）+ `SYNC_PATH_GAP`（2）
+  + `ALL_DECLARED_NO_SYNC` 合并视图 + 墓碑注释块（历史快照，不参与断言）。`toBe(6)` → 双天花板
+  `MAX_PERMANENT_EXEMPT`(≤4) / `MAX_SYNC_PATH_GAP`(≤2)；`SYNC_PATH_GAP` 加「除 L4 外应归零」可收敛断言；
+  `unexpected = actual − (exempt ∪ gap)` 形态 A 保留；两表重复条目互斥断言。顺带修 `resolveDelegate` 假红
+  （旧判据只认 `v-bind="$props"` 把 D2 非标委托误判为无链路）。实测 17/17 全绿。
+  🔴 **并发注记**：2026-08-16 并发 l-cycle 会话把 L2 写权收敛裁决 A 落地 —— L2 接线并移出
+  `PERMANENT_EXEMPT`（count 4→2）。这是他们的合法改动，与本拆分不冲突（拆分结构完好）。
 
   - 拆为 `PERMANENT_EXEMPT`（4 条：H5 listed / L2 ×2 / N4 soe）与 `SYNC_PATH_GAP`（2 条：L4 ×2）
   - 🔴 拆分中**不得丢失**既有依据说明：H5 的三条实证（variant_matrix 两键 null / listed 模板
@@ -255,7 +263,19 @@
   - 保留那段递减史注释（49→…→6）作为演进记录，但标注「数字不再作为断言」
   - _Requirements: 4.2, 4.3, 4.4_
 
-- [ ] 4. 外部锚定解耦（跨 spec 边界，改 `l-cycle` 拥有的文件）
+- [x] 4. 外部锚定解耦（跨 spec 边界，改 `l-cycle` 拥有的文件）
+
+  ✅ **已交付**（`l2l4DisclosureWiring.spec.ts`，l-cycle 的 `??` 未跟踪文件，跨 spec 改动）。
+  `toBe(6)` 正则外部锚定已移除。
+
+  🔴 **本会话发现并修复一个真实假绿（变异检验 M19 抓到）**：初版改造用
+  `stripComments(COVERAGE_RAW)` 全文件 + `includes` 判「四条目仍登记为无链路」。实测
+  `stripComments` 对巨型墓碑 `/* */` 块**不可靠**（`raw=2 / stripped=2`，墓碑里的 L2/L4 快照没被剥掉）
+  ⇒ `[类 A]` 恒有 4 条（删空活跃登记也假绿），`[类 B]`「四条目全部移出」**永远无法转绿**（其注释早已预言）。
+  改为 `declaredNoSyncInCoverage`：按数组名 + 首个行首 `]` **只截 `PERMANENT_EXEMPT`/`SYNC_PATH_GAP`
+  两个活跃数组声明体**，对墓碑与 stripComments 质量都免疫。天花板存在性校验（只认
+  `toBeLessThanOrEqual(MAX_*)`）保留。**真实世界验证**：并发 L2 接线后 `[类 A]` 现正确变红
+  （旧写法会假绿保持）。另加自包含**墓碑免疫替身测试**持久守护该判据。
 
   - `l2l4DisclosureWiring.spec.ts` L842-849 的正则抠数字 + `toBe(6)` 改为语义存在性断言：
     `PERMANENT_EXEMPT` 段内含 `L2TabDisclosureListed.vue`、`SYNC_PATH_GAP` 段内含
@@ -268,7 +288,19 @@
     ⇒ 提交说明须点明跨 spec 改动与原因，避免该 spec 推进方误判为回退
   - _Requirements: 4.1_
 
-- [ ] 5. 天花板余量与失败消息质量
+- [x] 5. 天花板余量与失败消息质量
+
+  ✅ **已交付**（`disclosureColumnsCoverage.spec.ts`）。① 漂移断言拆成两类各给明细
+  `newNoneState`（违规，需补 flat/group）/ `fixedNotRemoved`（已修好未删，请从 allowlist 删）
+  （R5.3 / Property 12）② `ALLOWLIST_*_CEILING` 注释补「贴死无余量 + 缩小必须同步下调天花板」
+  ③ 新增 Property 13 替身验证测试（条目数低于天花板不报红、超过才违规，实测通过）
+  ④ `BUILDER_FLOOR/TABLE_FLOOR` 注释更新实测值（**109 builder / 313 表**，原注释 22/92 已大幅过时；
+  地板仍留 12/60 大余量，有意为之）。
+  🔴 该文件的失败**全是既有跨 spec 红**（非本 spec 引入）：改进后的消息使其可清晰归因。
+  其中 **buildI1「已修好未删」已顺手清理**（i-cycle 的 flat 修复已提交于 `i1DisclosureSyncPayload.ts`、
+  两态一致 ⇒ 安全移除陈旧 allowlist 条目 + 天花板 2/11→1/6，disclosureColumnsCoverage 3→2 红）。
+  余 2 红不修：D4/L4 同表 flat+group（`d4DisclosureModel.ts`/`l4NoteSectionMap.ts` 均 `M` 并发未提交，
+  改了会耦合在途改动）+ P1_ROUTE 缺 J/L/M builder（需 m/j/l-cycle 各自 spec 的 P1 覆盖为真才能登记）。
 
   - `ALLOWLIST_BUILDER_CEILING` / `ALLOWLIST_TABLE_CEILING`（现值 2 / 11，与实际条目数贴死）：
     确认「只许缩」是有意设计，注释补「缩小时必须同步下调天花板」，
@@ -279,7 +311,12 @@
     注释更新实测值
   - _Requirements: 5.1, 5.2, 5.3_
 
-- [ ] 6. 口径写入 steering
+- [x] 6. 口径写入 steering
+
+  ✅ **已交付**。`.kiro/steering/conventions.md` 新增「§守卫判据形态铁律」小节：A/B/C 可用、
+  D/E 禁用分级表 + 本次代价实证（3 blocking job / 7 断言红 / 6 归因断言连坐 / ~15 分钟归因成本 /
+  掩盖数据丢失级真红 3 天）+ 6 条操作口径（规模型用地板+注释记实测、结构不变式优先、等值不污染归因、
+  登记表按语义拆分、跨文件锚定落行为事实、改完必变异检验、单循环硬计数可留但须注明作用域）。
 
   - `.kiro/steering/conventions.md` 补守卫判据形态分级：A（违规清单为空）/ B（地板天花板）/
     C（包含式重点项）可用；D（全局等值）/ E（跨文件抠数字再等值）禁用
@@ -289,7 +326,21 @@
     禁止 `toBe(<实测值>)`
   - _Requirements: 8.5_
 
-- [ ] 7. 变异检验（每个被改判据必须 RED）
+- [x] 7. 变异检验（每个被改判据必须 RED）
+
+  ✅ **已交付**（扩展 `mutate_guard_attribution.py` 至 M1-M18，**实测 18/18 全 RED**，四态统计 `{'RED':18}`）。
+  M1-M11 守 disclosureSharedTableRowScope（Task 2）；M12-M18 守 disclosureAutoSyncCoverage 拆表判据
+  （M12 清单腐烂 / M13 重复条目 / M14 回退 resolveDelegate / M15 缺口表改名 / M16 豁免表当垃圾桶 /
+  M17 天花板恒真 / M18 缺口漏登）。
+
+  🔴 **修了上一会话遗留的 baseline `NameError` bug**（`run_one` 引用 `baseline` 却从未定义 ⇒
+  M12-M17 从未真正跑过 —— 正是「基础设施加了没接上」的死代码形态）。
+  🔴 **并发适配**：并发 L2 接线后 retarget M13（改用稳定豁免 N4 制造重复）/ M17（MAX 设 0 对 count≥1 都红）。
+  🔴 **移除 M19**（跨文件合成变异）：并发真实 L2 接线已充当活变异证明 `[类 A]` 敏感性（[类 A] 已 baseline 红，
+  无法再 pass→fail）；改由 l2l4 自包含替身测试守护，并清掉 M19 相关死代码
+  （`L2L4_GUARD_REL`/`run_rel`/`baseline_may_fail`/`_classify` baseline 分支）。
+  加 `sys.stdout.reconfigure(utf-8)` 防 GBK 管道崩。Property 17（`wired.length≥1` 扫描面地板）已在；
+  Property 18（e1FxNoteSectionMap 反向自检失效风险注释）已补。
 
   - 新建 `backend/scripts/check/mutate_guard_attribution.py`，支持 `--list` / `--only X` / `--restore`
   - 锚点至少覆盖：
@@ -307,7 +358,28 @@
   - 绑定 `e1FxNoteSectionMap.ts` 的反向自检处补风险注释（design Property 18）
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 8. 验收与入库
+- [x] 8. 验收与入库
+
+  ✅ **验收已交付**：
+  - **串行跑 9 文件**（`--no-file-parallelism`）：**Test Files 2 failed | 7 passed (9)；Tests 26 failed | 264 passed (290)**。
+    我 spec 直接拥有的守卫全绿（disclosureSharedTableRowScope / disclosureAutoSyncCoverage / e1Fx* / restrictedAssets* 共 7 文件）。
+    26 个失败**全在 2 个跨 spec 文件、无一由本 spec 引入**：`disclosureColumnsCoverage`(3，d/i/l/m/j-cycle)
+    + `l2l4DisclosureWiring`(23，l-cycle 的 [类 B] Wave-1 TDD 待办红 + [类 A] 因并发 L2 接线正确变红)。
+  - **后端对照组** `test_note_shared_table_segments.py` **61 passed** ✓（本 spec 不碰后端判据，对照组完好）。
+  - **变异检验 18/18 全 RED**（守卫仍有区分力的证据，见 Task 7）。
+  - **干净 checkout（8.1）**：3 个 blocking job 依赖的 disclosureSharedTableRowScope 已由 Task 2 提交且对
+    23/6/29 与 24/8/32 两态都鲁棒（Task 2 立项实证 + 变异 M1/M2 佐证），工作树态本次实测通过。
+  - **git status 产物核查（8.3）**：本 spec 4 个跟踪产物全 `M`（conventions.md / disclosureColumnsCoverage /
+    disclosureSharedTableRowScope / mutate_guard_attribution.py），**无 `??`**；Task 1/2 产物已在 HEAD。
+  - **governance-checks.yml（8.4）**：无需改动 —— disclosureSharedTableRowScope 已被 2 个 blocking job 引用；
+    普查/变异脚本是按需诊断工具、不作 CI gate（避免动这个多 spec 并发编辑的高发文件）。
+  - `_wip_*` 本 spec 临时产物已清（仓库根/frontend 的 `_wip_l2*`/`_wip_mut`/`_wip_accept`；其他会话的不动）。
+
+  🔴 **入库（commit）本会话未执行，如实说明**：`disclosureAutoSyncCoverage.spec.ts` 里本 spec 的 Task 3 拆表
+  与**并发 l-cycle 会话的 L2 接线**在同一文件同区域**交织**，无法干净只提交本 spec 部分；`l2l4DisclosureWiring.spec.ts`
+  是 l-cycle 的 `??` 未跟踪文件。强行 `git add` 会抓入并发在途改动。故 commit 需与 l-cycle 会话**协调**
+  （建议：l-cycle 提交 disclosureAutoSyncCoverage + l2l4；本 spec 的 conventions.md / disclosureColumnsCoverage /
+  disclosureSharedTableRowScope / mutate_guard_attribution.py 可单独提交）。push 前须先 fetch、走 PR 不直推 main。
 
   - 串行跑（`--no-file-parallelism`）：`disclosureSharedTableRowScope` ·
     `disclosureAutoSyncCoverage` · `disclosureColumnsCoverage` · `l2l4DisclosureWiring` ·

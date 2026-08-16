@@ -43,6 +43,13 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+# 🔴 Windows 控制台/管道默认 GBK：print 中文与箭头（`⇒` U+21D2 不在 GBK 码表）在被
+#    `| Select-String` 或重定向到文件时会 UnicodeEncodeError 崩。统一切 utf-8（平台铁律）。
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[attr-defined]
+
 
 def _find_repo_root() -> Path:
     here = Path(__file__).resolve()
@@ -56,8 +63,14 @@ def _find_repo_root() -> Path:
 
 REPO_ROOT = _find_repo_root()
 FRONTEND = REPO_ROOT / "audit-platform" / "frontend"
+
+#: Task 2 的被测守卫（共享表行归属）
 GUARD_REL = "src/components/workpaper/__tests__/disclosureSharedTableRowScope.spec.ts"
 GUARD = FRONTEND / GUARD_REL
+
+#: Task 3 的被测守卫（披露 Tab 同步链路完整性）
+SYNC_GUARD_REL = "src/components/workpaper/__tests__/disclosureAutoSyncCoverage.spec.ts"
+
 MANIFEST = REPO_ROOT / "backend" / "data" / "note_shared_table_segments.json"
 
 
@@ -74,6 +87,11 @@ class Mutation:
     manifest_op: str = ""
     #: 期望打红的测试名片段
     expect_test: str = ""
+    #: 被测守卫的相对路径（默认 Task 2 的守卫；Task 3 的锚点显式指向 `SYNC_GUARD_REL`）
+    #:
+    #: 🔴 泛化前本脚本把守卫路径写死在模块常量里 —— 于是 Task 3 改造完的守卫
+    #:    **没有任何变异检验**，而「没打红 = 守卫有缺陷不是代码没问题」是平台铁律。
+    guard_rel: str = GUARD_REL
 
 
 MUTATIONS: list[Mutation] = [
@@ -180,6 +198,111 @@ MUTATIONS: list[Mutation] = [
 ]
 
 
+MUTATIONS += [
+    # ══════════════════════════════════════════════════════════════════════
+    # Task 3：`disclosureAutoSyncCoverage.spec.ts` —— 拆 MISSING_SYNC_PATH
+    # ══════════════════════════════════════════════════════════════════════
+    Mutation(
+        id="M12",
+        desc="永久豁免表加一条不存在的文件（模拟清单腐烂 / 组件被删改名后没同步）",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        anchor="const PERMANENT_EXEMPT: readonly string[] = [",
+        replacement=(
+            "const PERMANENT_EXEMPT: readonly string[] = [\n"
+            "  'ZZTabDisclosureNotExist.vue',"
+        ),
+        expect_test="防清单腐烂",
+    ),
+    Mutation(
+        id="M13",
+        # 🔴 原用 L2 制造重复；2026-08-16 并发 l-cycle 会话把 L2 接线并移出 PERMANENT_EXEMPT，
+        #    L2 不再是豁免 ⇒ 改用**稳定豁免** N4（源模板「附注披露信息：无」，不会被接线）。
+        desc="把已在永久豁免里的 N4 又塞进缺口表（模拟两表语义混淆 / 复制粘贴登记）",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        anchor="const SYNC_PATH_GAP: readonly string[] = [",
+        replacement=(
+            "const SYNC_PATH_GAP: readonly string[] = [\n"
+            "  'N4TabDisclosureSoe.vue',"
+        ),
+        expect_test="不得有重复条目",
+    ),
+    Mutation(
+        id="M14",
+        desc="回退 resolveDelegate 的放宽（只认 v-bind=$props）—— 应重新把 D2 误判为未登记",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        anchor="  const forwardsKeyProps = /:wp-id|:wpId/.test(tpl)",
+        replacement="  const forwardsKeyProps = false && /:wp-id|:wpId/.test(tpl)",
+        expect_test="都必须已登记",
+    ),
+    Mutation(
+        id="M15",
+        desc="缺口表条目改名（模拟组件重命名后登记表没跟）",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        anchor="completion\n  'L4TabDisclosureListed.vue',",
+        replacement="completion\n  'L4TabDisclosureListedRenamed.vue',",
+        expect_test="防清单腐烂",
+    ),
+    Mutation(
+        id="M16",
+        desc="把**已接线**的 D2 误登记为永久豁免（模拟拿豁免表当垃圾桶用）",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        anchor="const PERMANENT_EXEMPT: readonly string[] = [",
+        replacement=(
+            "const PERMANENT_EXEMPT: readonly string[] = [\n"
+            "  'D2TabDisclosure.vue',"
+        ),
+        expect_test="不得出现同步链路",
+    ),
+    Mutation(
+        id="M17",
+        # 🔴 设 0 而非「实况−1」：PERMANENT_EXEMPT 计数被并发会话动过（4→2），
+        #    设 0 对任意 count≥1 都必红，不依赖当时的具体计数 ⇒ 对并发编辑鲁棒。
+        desc="把天花板收紧到 0（验证天花板真在比较，不是恒真的空操作；count≥1 即红）",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        anchor="  const MAX_PERMANENT_EXEMPT = 4",
+        replacement="  const MAX_PERMANENT_EXEMPT = 0",
+        expect_test="只许缩不许扩",
+    ),
+]
+
+
+MUTATIONS += [
+    # ══════════════════════════════════════════════════════════════════════
+    # Task 7 补：登记表拆分关系（M18）。
+    #
+    # 🔴 原计划有 M19「跨文件：从 PERMANENT_EXEMPT 移除 L2 → 跑 l2l4 其 [类 A] 必红」，
+    #    验证 l2l4 对 disclosureAutoSyncCoverage 登记变化的敏感性。2026-08-16 并发 l-cycle
+    #    会话**真的把 L2 接线并移出了 PERMANENT_EXEMPT**（写权收敛裁决 A）—— 这恰好就是 M19
+    #    想合成的那次变更。实测 l2l4 的 [类 A] 已因此正确变红（用修好的 declaredNoSyncInCoverage；
+    #    旧的全文件 stripComments 写法会因墓碑残留假绿保持）。既然真实系统已越过 M19 的可测状态
+    #    （[类 A] 已 baseline 红，无法再做 pass→fail），改由 l2l4 里的**自包含替身测试**
+    #    `declaredNoSyncInCoverage 只认活跃数组、免疫墓碑注释快照` 持久守护该判据 ——
+    #    对并发在改的文件而言，替身测试比合成变异稳得多。
+    # ══════════════════════════════════════════════════════════════════════
+    Mutation(
+        id="M18",
+        desc="把 L4 两条从 SYNC_PATH_GAP 移除但不补链路 ⇒ L4 变「未登记的无链路 Tab」",
+        target="guard",
+        guard_rel=SYNC_GUARD_REL,
+        # 🔴 唯一锚点：活跃 SYNC_PATH_GAP 的 owner 注释以 `...completion` 结尾接 L4 行；
+        #    墓碑注释块里 L4 的前一行是 `重建。`（无 owner 段）⇒ `completion\n  'L4...` 唯一。
+        anchor=(
+            "completion\n"
+            "  'L4TabDisclosureListed.vue',\n"
+            "  'L4TabDisclosureSoe.vue',"
+        ),
+        replacement="completion\n  // [变异 M18] L4 两条被临时移除：模拟登记表漏登真实缺口",
+        expect_test="都必须已登记",
+    ),
+]
+
+
 def _md5(p: Path) -> str:
     return hashlib.md5(p.read_bytes()).hexdigest()
 
@@ -242,10 +365,10 @@ def _mutate_manifest(op: str, data: dict) -> dict:
     return data
 
 
-def _run_guard() -> tuple[bool, str]:
+def _run_guard(guard_rel: str = GUARD_REL) -> tuple[bool, str]:
     """跑被测守卫，返回 (是否全绿, 输出)。"""
     proc = subprocess.run(
-        ["cmd", "/c", "npx", "vitest", "run", GUARD_REL, "--reporter=dot"],
+        ["cmd", "/c", "npx", "vitest", "run", guard_rel, "--reporter=dot"],
         cwd=str(FRONTEND),
         capture_output=True,
         text=True,
@@ -261,11 +384,16 @@ def _run_guard() -> tuple[bool, str]:
     return (green, out)
 
 
+def _failed_set(out: str) -> set[str]:
+    """从 vitest 输出提取失败测试名集合。"""
+    return {n.strip() for n in re.findall(r"FAIL[^\n]*?>\s*([^\n]+)", out)}
+
+
 def _classify(green: bool, out: str, expect_test: str) -> str:
+    """四态判定（RED / GREEN / WRONG-TEST；ANCHOR-MISS 在 run_one 里判）。"""
     if green:
         return "GREEN"
-    failed_names = re.findall(r"FAIL[^\n]*?>\s*([^\n]+)", out)
-    blob = " ".join(failed_names)
+    blob = " ".join(_failed_set(out))
     if expect_test and expect_test not in blob and expect_test not in out:
         return "WRONG-TEST"
     return "RED"
@@ -273,8 +401,9 @@ def _classify(green: bool, out: str, expect_test: str) -> str:
 
 def run_one(m: Mutation) -> tuple[str, str]:
     """施加变异 → 跑守卫 → 恢复。返回 (四态, 摘要)。"""
-    guard_backup = GUARD.read_text(encoding="utf-8")
-    guard_md5 = _md5(GUARD)
+    guard_path = FRONTEND / m.guard_rel
+    guard_backup = guard_path.read_text(encoding="utf-8")
+    guard_md5 = _md5(guard_path)
     manifest_backup = MANIFEST.read_text(encoding="utf-8")
     manifest_md5 = _md5(MANIFEST)
     note = ""
@@ -286,7 +415,7 @@ def run_one(m: Mutation) -> tuple[str, str]:
                 return ("ANCHOR-MISS", f"锚点命中 {hits} 次（须恰好 1）")
             # 不传 newline：与 `read_text` 的默认通用换行模式往返一致
             #（read 把 CRLF 读成 LF，write 在 Windows 上转回 CRLF ⇒ 字节级还原）
-            GUARD.write_text(mutated, encoding="utf-8")
+            guard_path.write_text(mutated, encoding="utf-8")
         else:
             data = json.loads(manifest_backup)
             before = json.dumps(data, ensure_ascii=False, sort_keys=True)
@@ -299,18 +428,22 @@ def run_one(m: Mutation) -> tuple[str, str]:
                 json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
             )
 
-        green, out = _run_guard()
+        green, out = _run_guard(m.guard_rel)
         state = _classify(green, out, m.expect_test)
-        failed = re.findall(r"FAIL[^\n]*?>\s*([^\n]{0,70})", out)
-        note = f"打红 {len(set(failed))} 项：{'; '.join(sorted(set(failed))[:3])}" if failed else "全绿"
+        failed = sorted(_failed_set(out))
+        note = (
+            f"打红 {len(failed)} 项：{'; '.join(f[:70] for f in failed[:3])}"
+            if failed
+            else "全绿"
+        )
         return (state, note)
     finally:
-        GUARD.write_text(guard_backup, encoding="utf-8")
+        guard_path.write_text(guard_backup, encoding="utf-8")
         MANIFEST.write_text(manifest_backup, encoding="utf-8")
         # 二次校验：逐字节恢复
         bad = []
-        if _md5(GUARD) != guard_md5:
-            bad.append(str(GUARD))
+        if _md5(guard_path) != guard_md5:
+            bad.append(str(guard_path))
         if _md5(MANIFEST) != manifest_md5:
             bad.append(str(MANIFEST))
         if bad:
@@ -347,11 +480,21 @@ def main() -> int:
         return 1
 
     # 前置：未变异时必须全绿，否则四态判定不可信
-    green, _ = _run_guard()
-    if not green:
-        print("[ERROR] 变异前守卫本身就是红的 —— 先修好再做变异检验", file=sys.stderr)
-        return 1
-    print(f"前置检查：未变异时守卫全绿 ✓\n")
+    #
+    # 🔴 必须逐个守卫检查**本轮真正要变异的那些**文件。首版写死 `_run_guard()`（默认参数
+    #    = Task 2 的守卫），于是跑 Task 3 的锚点时前置检查测的是**另一个文件** ——
+    #    Task 3 守卫自己红着也会打印「全绿 ✓」，后面所有 RED/GREEN 判定随之失去意义。
+    #    这正是本 spec 要治的「判据与被判对象错位」在**元层面**的同一个病。
+    for guard_rel in sorted({m.guard_rel for m in todo}):
+        green, _ = _run_guard(guard_rel)
+        if not green:
+            print(
+                f"[ERROR] 变异前守卫本身就是红的 —— 先修好再做变异检验：{guard_rel}",
+                file=sys.stderr,
+            )
+            return 1
+        print(f"前置检查：未变异时守卫全绿 ✓  {guard_rel}")
+    print()
 
     results: list[tuple[str, str, str]] = []
     for m in todo:

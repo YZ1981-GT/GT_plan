@@ -500,6 +500,17 @@ describe('Property 15：推共享表必带 _row_scope', () => {
   })
 })
 
+/**
+ * 🔴 反向自检失效风险登记（spec guard-assertion-attribution-refactor R7.4 / Property 18）：
+ *
+ * 下列自检**硬绑定真实文件** `composables/e1FxNoteSectionMap.ts`（E1 循环的跨循环共享表
+ * 消费者范式），依赖它 ① 声明 `_row_scope` ② 推 `外币货币性项目` ③ 顶部含注释「跨循环共享表」。
+ *
+ * ⚠️ 风险：E1 循环若重构 / 改名 / 删除该文件，或改掉上述三特征之一，本组自检会**失效** ——
+ *    `readFileSync` 找不到文件会抛错（响亮，非静默）；特征变了则断言打红（也响亮）。
+ *    但**绑定必须随 E1 收口同步维护**：G9 曾因反向自检绑定的真实文件被改而翻车一次。
+ *    故显式登记：改 `e1FxNoteSectionMap.ts` 的披露结构时，必须回来核对这三条锚点。
+ */
 describe('🔴 反向自检', () => {
   it('去掉 E1 的 _row_scope 声明 → 判定函数报违规', () => {
     const raw = readFileSync(resolve(COMPOSABLES, 'e1FxNoteSectionMap.ts'), 'utf-8')

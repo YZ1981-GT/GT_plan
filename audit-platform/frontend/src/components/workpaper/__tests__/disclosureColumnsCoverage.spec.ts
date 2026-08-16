@@ -39,8 +39,13 @@ const PAYLOAD_EXPORT_RE = /export\s+(?:async\s+)?(?:function|const)\s+(build[A-Z
 const SNAKE_CASE = /^[a-z_][a-z0-9_]*$/
 
 /**
- * 下限：当前实测 22 个披露 builder / 92 张表（2 个非披露 builder 另行登记）。
- * 设为 12 / 60 留出「循环下线」余量，同时保证 glob 断掉时套件必红。
+ * 下限（形态 B 地板）：**当前实测 109 个披露 builder / 313 张表**
+ * （2026-08-15 实测，含并发在办的 M/J/L 循环；较早期注释的 22/92 已大幅增长）。
+ *
+ * 🔴 设为 12 / 60 是**有意留大余量**：地板的唯一职责是「glob 或发现逻辑失效 →
+ *    扫到 0 个 → 套件必红」，不是逼近实测值。刻意远低于实测（12 ≪ 109）保证任何
+ *    **合法缩减**（某循环被移除 / 合并）都不会假红 —— 这正是形态 B「只防空转与扩张、
+ *    不锁死规模」的正确写法。规模增长时**无需**同步上调本地板。
  */
 const BUILDER_FLOOR = 12
 const TABLE_FLOOR = 60
@@ -93,25 +98,27 @@ const INFERENCE_FALLBACK_ALLOWLIST: Record<string, { reason: string; tables: str
   // 两张同名 `项  目` 表正名（原本同名互相覆盖丢整张表）、`项  目__trial` 孤儿绕过键删净、
   // 主表补 flat、试运行表改源模板两级表头（group 各 span 2）
   // → 按 R3「已修好的表必须从 allowlist 删除」移出（allowlist 只许缩）。
-  buildI1ListedColumns: {
-    reason:
-      'I1 无形资产（批 1~4 之外）：5 表未声明 flat。推断结果均为空 → 现状无害，补 flat 待 I 循环收口',
-    tables: [
-      '⑥重要单项无形资产',
-      '无形资产情况',
-      '未办妥权属证书的土地使用权',
-      '本期摊销费用归属',
-      '确认为无形资产的数据资源',
-    ],
-  },
+  // buildI1ListedColumns 已由 I 循环收口补齐 flat（实扫未声明表 = []；其所在
+  // `i1DisclosureSyncPayload.ts` 已提交，HEAD 与工作树两态一致）→ 按 R3「已修好的表必须从
+  // allowlist 删除」移出（allowlist 只许缩，天花板随之下调 2/11 → 1/6）。
   // buildG7ListedColumns 已由 g7-four-table-extraction-and-disclosure-alignment
   // Task 5.2 补齐 flat/group（实扫未声明表 = []）→ 按 R3「已修好必删」移出。
   // buildG7SoeColumns: 已全部补齐 flat/group 表态（Task 5.2）。
 }
 
-/** allowlist 天花板：只许缩不许扩（新增循环必须直接声明 flat/group） */
-const ALLOWLIST_BUILDER_CEILING = 2
-const ALLOWLIST_TABLE_CEILING = 11
+/**
+ * allowlist 天花板：**只许缩不许扩**（新增循环必须直接声明 flat/group，不得往 allowlist 加条目绕过）。
+ *
+ * 🔴 现值 1 / 6 与实际条目数**贴死无余量**（当前 INFERENCE_FALLBACK_ALLOWLIST =
+ *    仅 buildH1ListedColumns 6 表 = 1 builder / 6 表；buildI1 已随 I 循环补 flat 收口而移出）。
+ *    这是有意设计：贴死 ⇒ 任何「往 allowlist 加条目」的企图都立刻撞天花板打红。
+ *
+ * 🔴 **缩小时必须同步下调本上限** —— 否则天花板会留出「可以偷偷再加回来」的余量，
+ *    等于把「只许缩」偷偷放宽成「可以回弹」。用 `toBeLessThanOrEqual`（而非 `toBe` 等值）
+ *    保证「缩小」本身永远合规、不会因为忘了改上限而假红（见 design Property 13 的替身验证）。
+ */
+const ALLOWLIST_BUILDER_CEILING = 1
+const ALLOWLIST_TABLE_CEILING = 6
 
 /**
  * Property 1（columns 键 ≡ sub_table_data 数据键）**双向**断言需要真实业务快照，
@@ -763,19 +770,38 @@ describe('披露 columns 全 Tab 契约扫描', () => {
       ).toEqual([])
 
       // 2) 已登记的 builder：实扫表名集合必须与声明**完全相等**（不许增长，修好必须删条目）
-      const drift: string[] = []
+      //
+      // 🔴 失败消息按**两种相反语义**分别成清单（spec guard-assertion-attribution-refactor
+      //    R5.3 / Property 12）。拆分前两者共用一句「集合 ≠ 声明」，读 CI 的人无法一眼看出
+      //    到底是「谁少补了声明」还是「谁修好了忘删登记」—— 而这两件事的**责任方与处置动作
+      //    完全相反**：前者要去补 flat/group（写代码），后者要来删 allowlist 条目（清账）。
+      //      · added   = 实扫有、allowlist 没有 ⇒ 新增 None 态表（违规，必须补 flat/group）
+      //      · removed = allowlist 有、实扫没有 ⇒ 已修好未删（应从 allowlist 删除）
+      const newNoneState: string[] = [] // 违规：需补 flat/group
+      const fixedNotRemoved: string[] = [] // 应删：已声明 flat/group 却仍留在 allowlist
       for (const [builder, entry] of Object.entries(INFERENCE_FALLBACK_ALLOWLIST)) {
-        const actual = (undeclared.get(builder) ?? []).slice().sort()
-        const declaredTables = entry.tables.slice().sort()
-        if (JSON.stringify(actual) !== JSON.stringify(declaredTables)) {
-          drift.push(
-            `${builder}：实扫未声明表 ${JSON.stringify(actual)} ≠ allowlist 声明 ${JSON.stringify(declaredTables)}`,
-          )
-        }
+        const actual = new Set(undeclared.get(builder) ?? [])
+        const declaredTables = new Set(entry.tables)
+        const added = [...actual].filter(t => !declaredTables.has(t)).sort()
+        const removed = [...declaredTables].filter(t => !actual.has(t)).sort()
+        if (added.length) newNoneState.push(`${builder}：${JSON.stringify(added)}`)
+        if (removed.length) fixedNotRemoved.push(`${builder}：${JSON.stringify(removed)}`)
       }
-      expect(drift, 'allowlist 与实况漂移：新增的 None 态表必须补 flat/group（不得直接扩 allowlist）；已修好的表必须从 allowlist 删除').toEqual(
-        [],
-      )
+      // 违规类先断言（更紧急、绝不能被掩盖）：新增了 None 态表却没声明 flat/group
+      expect(
+        newNoneState,
+        '【新增 None 态表 → 违规】这些表既无 flat 也无 group 且未在 allowlist 登记，' +
+          '后端会回退 _infer_groups_from_headers 前缀推断、可能凭空造出父表头。' +
+          '请按源模板补 flat（单行表头）或 group（两级表头），不得直接往 allowlist 扩条目绕过。',
+      ).toEqual([])
+      // 清账类后断言：已修好（实扫已不在 None 态）却仍留在 allowlist 的条目
+      expect(
+        fixedNotRemoved,
+        '【已修好未删条目 → 应删】这些表已声明 flat/group（实扫已不在 None 态），' +
+          '但仍留在 INFERENCE_FALLBACK_ALLOWLIST 里。请删除对应表名；' +
+          '若某 builder 的表被删空则整条移除，并同步下调 ALLOWLIST_BUILDER_CEILING / ' +
+          'ALLOWLIST_TABLE_CEILING（天花板只许缩）。',
+      ).toEqual([])
     })
 
     it('allowlist 每条原因必填，条目真实存在，且总量不超天花板', () => {
@@ -792,6 +818,33 @@ describe('披露 columns 全 Tab 契约扫描', () => {
       const tableCount = Object.values(INFERENCE_FALLBACK_ALLOWLIST).reduce((n, e) => n + e.tables.length, 0)
       expect(builderCount, 'allowlist 只许缩不许扩').toBeLessThanOrEqual(ALLOWLIST_BUILDER_CEILING)
       expect(tableCount, 'allowlist 只许缩不许扩').toBeLessThanOrEqual(ALLOWLIST_TABLE_CEILING)
+    })
+
+    /**
+     * 🔴 天花板「只许缩」语义的替身验证（spec guard-assertion-attribution-refactor
+     * R5.2 / design Property 13）。
+     *
+     * 上一条用生产 allowlist 断言「≤ 天花板」，但**通过不代表判据形态正确** ——
+     * 若有人手滑把 `toBeLessThanOrEqual` 写成 `toBe(2)` 等值，生产恰好贴死时照样绿，
+     * 却会在**任何缩小**（把某 builder 修好、删条目）时假红。本条用替身证明：
+     *   ① 条目数**低于**天花板时合规（缩小不打红）；
+     *   ② 条目数**超过**天花板时才违规（扩张被挡）。
+     * 只有 `toBeLessThanOrEqual` 能同时满足这两点，`toBe` 等值会在 ① 处失败。
+     */
+    it('天花板是「只许缩」而非等值：低于上限合规、超过才违规（Property 13 替身验证）', () => {
+      // 替身 allowlist：条目数 = 天花板 − 1（模拟「修好一部分、删条目后缩小」）
+      const shrunk: typeof INFERENCE_FALLBACK_ALLOWLIST = {
+        fakeShrunkBuilderColumns: { reason: '替身：仅用于验证天花板语义', tables: ['t1'] },
+      }
+      const sBuilders = Object.keys(shrunk).length
+      const sTables = Object.values(shrunk).reduce((n, e) => n + e.tables.length, 0)
+      expect(sBuilders, '缩小后 builder 数低于天花板必须合规（等值断言会在此假红）').toBeLessThanOrEqual(
+        ALLOWLIST_BUILDER_CEILING,
+      )
+      expect(sTables, '缩小后表数低于天花板必须合规').toBeLessThanOrEqual(ALLOWLIST_TABLE_CEILING)
+      // 反向：扩张（天花板 + 1）不满足 ≤ ⇒ 会被生产断言挡下
+      expect(ALLOWLIST_BUILDER_CEILING + 1).toBeGreaterThan(ALLOWLIST_BUILDER_CEILING)
+      expect(ALLOWLIST_TABLE_CEILING + 1).toBeGreaterThan(ALLOWLIST_TABLE_CEILING)
     })
   })
 
