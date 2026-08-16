@@ -65,10 +65,31 @@ def compute_section_numbers(
         numbered_items = [it for it in items if "、" in (it.get("note_section") or "")]
         if len(numbered_items) <= 1:
             continue
-        for idx, item in enumerate(numbered_items, 1):
-            section = (item.get("note_section") or "").strip()
-            if section:
-                result[section] = str(idx)
+
+        # 🔴 修复（2026-08-16）：对「八、1」「五、3」等数字编号形式的章节，
+        # 直接取章节号中的数字作为编号（不受 sort_order 错位影响）。
+        # 对「七、本期纳入合并报表...」等文本编号形式的章节，保留连续编号。
+        import re as _re
+        all_numeric = all(
+            _re.match(r"\d+", (it.get("note_section") or "").split("、", 1)[-1] if "、" in (it.get("note_section") or "") else "")
+            for it in numbered_items
+        )
+        if all_numeric:
+            # 数字章节号：直接取数字部分（如 八、1 → "1"，八、94 → "94"）
+            for item in numbered_items:
+                section = (item.get("note_section") or "").strip()
+                sep = section.find("、")
+                if sep >= 0:
+                    suffix = section[sep + 1:]
+                    m = _re.match(r"\d+", suffix)
+                    if m:
+                        result[section] = m.group(0)
+        else:
+            # 文本章节号（如 七、本期纳入...）：按顺序连续编号
+            for idx, item in enumerate(numbered_items, 1):
+                section = (item.get("note_section") or "").strip()
+                if section:
+                    result[section] = str(idx)
     return result
 
 
