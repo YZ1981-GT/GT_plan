@@ -876,11 +876,17 @@
     </el-dialog>
 
     <!-- 公式管理弹窗（与报表页统一） -->
+    <!-- scope + 当前章节必须传：否则 rows（附注行）会被弹窗的报表启发式误判，
+         默认停在「报表 > 资产负债表」而不是本页章节 -->
     <FormulaManagerDialog
       v-model="showNoteFormulaManager"
       :rows="currentNoteFormulaRows"
       :project-id="projectId"
       :year="year"
+      scope="note"
+      :note-section="currentNote?.note_section || ''"
+      :note-section-title="currentNote?.section_title || ''"
+      :template-type="templateType"
       @saved="onFormulaApplied"
       @applied="onFormulaApplied"
     />

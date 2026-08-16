@@ -791,13 +791,14 @@
 
     </div><!-- /gt-rv-table-area -->
 
-    <!-- 公式管理弹窗 -->
+    <!-- 公式管理弹窗（template-type 必传：否则恒按国企版加载 report_config） -->
     <FormulaManagerDialog
       v-model="showFormulaManager"
       :rows="rows"
       :project-id="projectId"
       :year="year"
       scope="report"
+      :template-type="selectedTemplateType"
       @saved="fetchReport"
       @applied="fetchReport"
     />

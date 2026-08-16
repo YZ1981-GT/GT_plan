@@ -572,6 +572,7 @@ import {
   SCOPE_LABEL_MAP as SCOPE_CATALOG_LABEL_MAP,
   type FormulaScope,
 } from '@/composables/useFormulaScopeCatalog'
+import { noteSectionToNodeKey, buildNoteFormulaRows, isNoteDomainNodeKey } from './noteScopeTargeting'
 
 /**
  * scope：当前公式管理器的目标范围
@@ -592,6 +593,15 @@ const props = withDefaults(defineProps<{
   projectId?: string
   year?: number
   scope?: FormulaManagerScope
+  /**
+   * 附注域：调用页当前正在编辑的章节编号（note_section，如「五、1」）。
+   * 打开弹窗时据此自动展开+选中该章节节点，避免落到默认的「报表 > 资产负债表」。
+   */
+  noteSection?: string
+  /** 附注域：当前章节标题（如「货币资金」），用于筛选本章节预设公式（编号体系可能与预设集偏移）。 */
+  noteSectionTitle?: string
+  /** 模板类型（soe / listed / custom）：与调用页保持一致，避免上市版页面加载国企版预设。 */
+  templateType?: string
 }>(), {
   scope: 'report',
 })
@@ -686,7 +696,11 @@ const fmTreeRef = ref<any>(null)
 const expandedKeys = ref<string[]>([])
 const selectedNodeKey = ref('report_balance_sheet')
 const selectedPath = ref('报表 > 资产负债表')
-const fmTemplateType = ref('soe')
+/** 归一化调用页模板类型：仅 soe / listed 两版预设，custom 等按国企版兜底。 */
+function normalizeTemplateType(t?: string): 'soe' | 'listed' {
+  return t === 'listed' ? 'listed' : 'soe'
+}
+const fmTemplateType = ref<string>(normalizeTemplateType(props.templateType))
 
 // 当前 scope 对应的中文 tag（仅展示用，不影响树形导航行为）
 const SCOPE_LABEL_MAP: Record<FormulaManagerScope, string> = {
@@ -761,7 +775,7 @@ async function loadNoteTree() {
         }
       }
       chapterMap[chapter].children.push({
-        key: `note_${sectionId.replace(/[、，。\s]/g, '_')}`,
+        key: noteSectionToNodeKey(sectionId),
         label: title.length > 20 ? title.slice(0, 20) + '...' : title,
         icon: '',
         _sectionTitle: title,
@@ -812,7 +826,7 @@ function buildNoteTreeFromProjectData(notes: Array<{ note_section: string; secti
       chapterMap[chapter] = { label: `${chapter}、${title.split('、')[0] || ''}`, children: [] }
     }
     chapterMap[chapter].children.push({
-      key: `note_${sectionId.replace(/[、，。\s]/g, '_')}`,
+      key: noteSectionToNodeKey(sectionId),
       label: title.length > 24 ? title.slice(0, 24) + '…' : title,
       icon: '',
       _sectionTitle: title,
@@ -1443,16 +1457,19 @@ function findNodePath(nodes: any[], key: string, trail: any[] = []): any[] {
  * openFormulaManager 写入，如 wp_e1_1），打开弹窗后自动展开祖先 + 选中 + 加载其公式，
  * 让用户从审定表点「公式管理」直接落到该底稿 sheet 节点，无需再手动切换。
  */
-async function applyTargetNode() {
-  let target = ''
-  try { target = sessionStorage.getItem('gt-formula-target-node') || '' } catch { /* ignore */ }
-  if (!target) return
-  try { sessionStorage.removeItem('gt-formula-target-node') } catch { /* ignore */ }
-  // 底稿域树来自 ACNR catalog，需先加载完成（idempotent，已加载则立即返回）
+async function applyTargetNode(explicitTarget?: string): Promise<boolean> {
+  let target = explicitTarget || ''
+  if (!target) {
+    try { target = sessionStorage.getItem('gt-formula-target-node') || '' } catch { /* ignore */ }
+    if (!target) return false
+    try { sessionStorage.removeItem('gt-formula-target-node') } catch { /* ignore */ }
+  }
+  // 底稿域树来自 ACNR catalog、附注域树来自项目附注 API，均需先加载完成（idempotent）
   await loadAcnrTree()
+  if (target.startsWith('note_')) await loadNoteTree()
   await nextTick()
   const path = findNodePath(treeData.value, target)
-  if (!path.length) return  // 未匹配（如附注/程序表 sheet_code 不对应）→ 保持默认，不打断
+  if (!path.length) return false  // 未匹配（如附注/程序表 sheet_code 不对应）→ 保持默认，不打断
   const node = path[path.length - 1]
   const isLeaf = !node.children || node.children.length === 0
   // 叶子 → 展开到父；父节点 → 展开自身使子节点可见
@@ -1462,6 +1479,31 @@ async function applyTargetNode() {
   try { fmTreeRef.value?.setCurrentKey(target) } catch { /* ignore */ }
   // 叶子节点触发与 onTreeNodeClick 一致的选择逻辑（设 selectedWpCode/SheetCode + 加载公式）
   if (isLeaf) onTreeNodeClick(node)
+  return true
+}
+
+/**
+ * 附注域打开时定位到调用页当前章节（Fix：此前默认停在「报表 > 资产负债表」）。
+ *
+ * 优先按 note_section 精确定位到树节点；无章节上下文（如全局 ƒx 入口）或章节未在树中
+ * （附注尚未生成）时，退到「附注」域根节点，也不会跑到报表域。
+ */
+async function applyNoteScopeTarget() {
+  await loadNoteTree()
+  const sectionId = (props.noteSection || '').trim()
+  if (sectionId) {
+    const hit = await applyTargetNode(noteSectionToNodeKey(sectionId))
+    if (hit) return
+  }
+  // 兜底：停在附注域根节点，展开可见，面包屑显示附注（含章节标题，若有）
+  selectedNodeKey.value = 'note'
+  selectedPath.value = props.noteSectionTitle
+    ? `附注 > ${props.noteSectionTitle}`
+    : '附注'
+  expandedKeys.value = [...new Set([...expandedKeys.value, 'note'])]
+  if (!notePresetFormulas.value.length) await onImportPresetFormulas()
+  await nextTick()
+  try { fmTreeRef.value?.setCurrentKey('note') } catch { /* ignore */ }
 }
 
 // 初始加载当前报表的数据
@@ -1471,6 +1513,15 @@ watch(visible, async (v) => {
     try {
       sessionStorage.setItem('gt-formula-scope', props.scope || 'report')
     } catch { /* sessionStorage 不可用时忽略 */ }
+    // 模板版本跟随调用页（上市版页面不应加载国企版预设）；弹窗内手动切换仅本次有效
+    const pageTemplate = normalizeTemplateType(props.templateType)
+    if (props.templateType && fmTemplateType.value !== pageTemplate) {
+      fmTemplateType.value = pageTemplate
+      allRowsMap.value = {}
+      notePresetFormulas.value = []
+      noteTreeLoaded.value = false
+      noteTreeChildren.value = []
+    }
     // Req 24.1: 按当前 scope 加载本域公式（不含他域），来源地址经 ACNR 规范化
     loadScopeFormulas()
     // 加载动态附注树
@@ -1492,6 +1543,11 @@ watch(visible, async (v) => {
       expandedKeys.value = [...new Set([...expandedKeys.value, 'trial_balance'])]
       await nextTick()
       try { fmTreeRef.value?.setCurrentKey('tb_detail') } catch { /* ignore */ }
+    } else if (props.scope === 'note' || props.scope === 'consol_note') {
+      // 附注页打开 → 定位到调用页当前章节节点。
+      // props.rows 是附注表格行（row_code 形如「五、1-R1」），不能走下方报表启发式，
+      // 否则前缀全不匹配被兜底成 report_balance_sheet，弹窗默认显示资产负债表公式。
+      await applyNoteScopeTarget()
     } else if (props.rows?.length) {
       // 报表页传入 report_config 行次（row_code 如 BS-001）→ 定位对应报表节点
       const firstCode = props.rows[0]?.row_code || ''
@@ -1611,16 +1667,18 @@ const currentRows = computed(() => {
     return allRowsMap.value[rt] || []
   }
   // 附注节点：显示该章节的预设公式
-  if (selectedNodeKey.value.startsWith('note_') && notePresetFormulas.value.length) {
-    // 从树节点获取 _sectionTitle
+  if (isNoteDomainNodeKey(selectedNodeKey.value) && notePresetFormulas.value.length) {
+    // 从树节点获取 _sectionTitle / _sectionId
     const nodeKey = selectedNodeKey.value
     let targetTitle = ''
+    let targetSectionId = ''
 
     // 在动态树中查找
     for (const chapter of noteTreeChildren.value) {
       for (const child of (chapter.children || [])) {
         if (child.key === nodeKey) {
           targetTitle = child._sectionTitle || child.label
+          targetSectionId = child._sectionId || ''
           break
         }
       }
@@ -1638,30 +1696,24 @@ const currentRows = computed(() => {
         if (targetTitle) break
       }
     }
-
-    if (targetTitle) {
-      return notePresetFormulas.value
-        .filter(f => (f.section_title || '').includes(targetTitle))
-        .map((f, i) => ({
-          id: `note_preset_${i}`,
-          row_code: f.note_section,
-          row_name: f.section_title,
-          formula: f.formula,
-          formula_category: f.category,
-          formula_description: f.description,
-          formula_source: f.source,
-        }))
+    // 树中未命中且当前落在「本页章节」或附注域根节点 → 用调用页传入的章节上下文，
+    // 仍能列出本页对应公式（附注未生成/树未加载时也不至于一把倒出全部）。
+    // 章级节点（note_chapter_*）不套用，否则点章节会错显示成本页章节的公式。
+    if (!targetTitle && !targetSectionId) {
+      const propSection = (props.noteSection || '').trim()
+      const isPageSectionNode = nodeKey === 'note'
+        || (!!propSection && nodeKey === noteSectionToNodeKey(propSection))
+      if (isPageSectionNode) {
+        targetTitle = (props.noteSectionTitle || '').trim()
+        targetSectionId = propSection
+      }
     }
-    // 大类节点：显示全部
-    return notePresetFormulas.value.map((f, i) => ({
-      id: `note_preset_${i}`,
-      row_code: f.note_section,
-      row_name: f.section_title,
-      formula: f.formula,
-      formula_category: f.category,
-      formula_description: f.description,
-      formula_source: f.source,
-    }))
+
+    // 章节命中 → 只列本章节公式；章级节点/无上下文 → 列全部（规则见 noteScopeTargeting）
+    return buildNoteFormulaRows(notePresetFormulas.value, {
+      sectionId: targetSectionId,
+      sectionTitle: targetTitle,
+    })
   }
   // 合并报表节点：显示对应表样的行结构
   if (selectedNodeKey.value.startsWith('consol_')) {
@@ -2274,7 +2326,7 @@ async function onImportPresetFormulas() {
   }
 
   // 附注类 / 表间审核：从附注校验预设公式加载
-  if (selectedNodeKey.value.startsWith('note_') || selectedNodeKey.value.startsWith('cross_')) {
+  if (isNoteDomainNodeKey(selectedNodeKey.value) || selectedNodeKey.value.startsWith('cross_')) {
     try {
       const data = await api.get(P_nt.presetFormulas(fmTemplateType.value), {
         validateStatus: (s: number) => s < 600,
