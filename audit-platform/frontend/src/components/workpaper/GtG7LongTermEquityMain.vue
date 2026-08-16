@@ -228,15 +228,10 @@ const currentSheet = computed(() => {
 
   // 优先匹配中文sheet名
   if (name.includes('附注披露信息（上市公司）') || name.includes('附注披露(上市)') || name.includes('附注-上市')) {
-    // 门控：项目标准不含 listed → 不渲染 Listed Tab（回退 OnlyOffice）
-    const stds = applicableStandards.value
-    if (stds.length > 0 && !stds.some(s => s.includes('listed'))) return ''
+    // 🔴 用户裁决（2026-08-16）：底稿侧不做准则门控，两个版本始终可编辑
     return 'disclosureListed'
   }
   if (name.includes('附注披露信息（国企）') || name.includes('附注披露(国企)') || name.includes('附注-国企')) {
-    // 门控：项目标准不含 soe → 不渲染 SOE Tab（回退 OnlyOffice）
-    const stds = applicableStandards.value
-    if (stds.length > 0 && !stds.some(s => s.includes('soe'))) return ''
     return 'disclosureSOE'
   }
   if (name.includes('底稿目录')) {

@@ -1077,6 +1077,9 @@ async function syncToDisclosureNotes(): Promise<void> {
       )
       data = result?.data ?? result
     } catch (err: unknown) {
+      // 请求被取消（防重复提交 / 组件卸载 / 竞争去重）→ 静默跳过，不误报「同步失败」
+      const e = err as any
+      if (e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError' || e?.__CANCEL__) return
       // 🔴 绝不吞异常：原始 err 进控制台，提示带真实原因（后端 detail / HTTP 状态）
       console.error('[G7 上市披露] 同步到附注失败（附注未落地）', err)
       ElMessage.error(`同步附注失败：${describeSyncError(err)}`)

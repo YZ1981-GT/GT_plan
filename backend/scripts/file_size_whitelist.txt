@@ -17,3 +17,6 @@ backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
 audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue  1700
+audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts

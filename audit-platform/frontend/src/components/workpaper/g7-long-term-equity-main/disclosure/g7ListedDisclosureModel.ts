@@ -316,16 +316,32 @@ const currentPriorColumns = flatCols(cols([
  * 共用一份必然让其中一张与源模板不符。范式参照 soe 侧已正确拆分的
  * `_ASSOC_FS_COLUMNS` / `_ASSOC_PL_COLUMNS`。列 key 不变（`current`/`prior`）。
  */
-const jointVentureFsColumns = flatCols(cols([
-  ['current', '期末数', 'number'],
-  ['prior', '期初数', 'number'],
-]))
+/** 「重要合营企业主要财务信息」矩阵槎位（源模板 A132:C151 只有 1 个单位列，可动态扩展）。 */
+const IMPORTANT_JV_SLOT = 'important-jv'
+const IMPORTANT_JV_SLOT_DEFAULT_NAMES = ['合营企业1']
+/** FS 表子列（源 A132 逐字）。 */
+const IMPORTANT_JV_FS_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '期末数' },
+  { key: 'prior', label: '期初数' },
+]
+/** PL 表子列（源 A152 逐字）。 */
+const IMPORTANT_JV_PL_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '本期发生额' },
+  { key: 'prior', label: '上期发生额' },
+]
 
-/** 「续：重要合营企业本期及上期经营成果」列（源 A152:C163）—— 损益口径。 */
-const jointVenturePlColumns = flatCols(cols([
-  ['current', '本期发生额', 'number'],
-  ['prior', '上期发生额', 'number'],
-]))
+function jvMatrixColumnsFor(
+  names: readonly string[],
+  sub: G7SlotSubColumn[],
+): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(IMPORTANT_JV_SLOT, names, sub)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
 
 // 超额亏损分担额表：单期数值，无跨期/跨主体分组 → flat
 // 🔴 label 逐字取源模板 A220:D232（`本期未确认的损失份额（或本期实现净利润的分享额）`
@@ -630,7 +646,8 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         // 但与本 sheet 另外 4 张表的「项  目」（双空格）不同。R4.4 明确禁止统一，逐表取原文。
         labelHeader: '项 目',
         sourceRows: 'A132:C151',
-        columns: jointVentureFsColumns,
+        columns: jvMatrixColumnsFor(IMPORTANT_JV_SLOT_DEFAULT_NAMES, IMPORTANT_JV_FS_SUB),
+        slotConfig: { slot: IMPORTANT_JV_SLOT, sub: IMPORTANT_JV_FS_SUB },
         rows: annotateEquityBridgeSources(metricRows(
           'important-jv-balance',
           [
@@ -653,9 +670,10 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
             '对合营企业权益投资的账面价值',
             '存在公开报价的权益投资的公允价值',
           ],
-          jointVentureFsColumns,
+          jvMatrixColumnsFor(IMPORTANT_JV_SLOT_DEFAULT_NAMES, IMPORTANT_JV_FS_SUB),
           '被投资单位财务信息（合营、联营）G7-5',
         )),
+        dynamic: true,
       },
       {
         id: 'important-jv-results',
@@ -664,13 +682,15 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         // 🔴 源 A153 原文是「项  目」（双空格）；注意上一张合营表 A132 是**单**空格。
         labelHeader: '项  目',
         sourceRows: 'A152:C163',
-        columns: jointVenturePlColumns,
+        columns: jvMatrixColumnsFor(IMPORTANT_JV_SLOT_DEFAULT_NAMES, IMPORTANT_JV_PL_SUB),
+        slotConfig: { slot: IMPORTANT_JV_SLOT, sub: IMPORTANT_JV_PL_SUB },
         rows: metricRows(
           'important-jv-results',
           ['营业收入', '财务费用', '所得税费用', '净利润', '终止经营的净利润', '其他综合收益', '综合收益总额', '本期收到的股利'],
-          jointVenturePlColumns,
+          jvMatrixColumnsFor(IMPORTANT_JV_SLOT_DEFAULT_NAMES, IMPORTANT_JV_PL_SUB),
           '被投资单位财务信息（合营、联营）G7-5',
         ),
+        dynamic: true,
       },
       {
         id: 'important-associate-balance',
@@ -921,6 +941,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
 /** 各 `slot` 的初始默认实体名（缺省态取值参考，仅在 `state.entitySlots` 未声明该 slot 时生效）。 */
 const G7_LISTED_DEFAULT_SLOT_NAMES: Record<string, string[]> = {
   [OWNERSHIP_CHANGE_SLOT]: OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES,
+  [IMPORTANT_JV_SLOT]: IMPORTANT_JV_SLOT_DEFAULT_NAMES,
   [IMPORTANT_ASSOCIATE_SLOT]: IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES,
 }
 

@@ -15,6 +15,17 @@
       <div class="toolbar-actions">
         <span class="save-status">{{ saveStatus }}</span>
         <el-tag v-if="lastRefreshHint" size="small" type="info" effect="plain">{{ lastRefreshHint }}</el-tag>
+        <el-dropdown size="small" trigger="click" @command="onImportExportCommand">
+          <el-button size="small">导入导出 ▾</el-button>
+          <template #dropdown>
+            <el-dropdown-menu>
+              <el-dropdown-item command="exportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item command="exportData">导出数据</el-dropdown-item>
+              <el-dropdown-item command="importData" :disabled="isReadonly">导入数据</el-dropdown-item>
+            </el-dropdown-menu>
+          </template>
+        </el-dropdown>
+        <input ref="importFileRef" type="file" accept=".xlsx,.xls" style="display:none" @change="onImportFileChange" />
         <el-button
           size="small"
           :disabled="isReadonly"
@@ -483,6 +494,7 @@ const { aiAvailable, loading: aiLoading, generateAndConfirm } = useG7MainAiGener
 const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
 const { sum: decimalSum, sub: decimalSub } = useDecimalCalc()
 const router = useRouter()
+const importFileRef = ref<HTMLInputElement | null>(null)
 
 /** 反向跳转（仅导航，不改数据）：披露表 → 附注模块对应章节；「七、」各子节由区块内 Note 芯片跳转 */
 function jumpToNote(variant: DisclosureVariant = 'soe'): void {
@@ -850,6 +862,100 @@ function serialisableState(): G7SoeDisclosureState {
   }
 }
 
+// ─── 导入导出 ─────────────────────────────────────────────────────────────────
+const DISCLOSURE_SHEET_CODE = 'disclosure-soe'
+
+function onImportExportCommand(command: string): void {
+  switch (command) {
+    case 'exportTemplate':
+      doExportTemplate()
+      break
+    case 'exportData':
+      doExportData()
+      break
+    case 'importData':
+      importFileRef.value?.click()
+      break
+  }
+}
+
+/** 区分 404（后端未实现）vs 其他错误，给出友好提示 */
+function handleImportExportError(err: any, action: string): void {
+  const status = err?.response?.status
+  if (status === 404 || status === 422) {
+    ElMessage.info(`${action}功能开发中，敬请期待`)
+  } else {
+    const msg = err?.response?.data?.detail || err?.response?.data?.message || `${action}失败`
+    ElMessage.error(typeof msg === 'string' ? msg : JSON.stringify(msg))
+  }
+}
+
+async function doExportTemplate(): Promise<void> {
+  try {
+    const response = await api.post(
+      `/api/workpapers/${props.wpId}/g7-main/export-template`,
+      null,
+      { params: { sheet: DISCLOSURE_SHEET_CODE }, responseType: 'blob' },
+    )
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'G7_附注披露信息（国企）_模板.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('模板已导出')
+  } catch (err: any) {
+    handleImportExportError(err, '导出模板')
+  }
+}
+
+async function doExportData(): Promise<void> {
+  try {
+    const response = await api.post(
+      `/api/workpapers/${props.wpId}/g7-main/export-data`,
+      null,
+      { params: { sheet: DISCLOSURE_SHEET_CODE }, responseType: 'blob' },
+    )
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'G7_附注披露信息（国企）_数据.xlsx'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('数据已导出')
+  } catch (err: any) {
+    handleImportExportError(err, '导出数据')
+  }
+}
+
+async function onImportFileChange(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response: any = await api.post(
+      `/api/workpapers/${props.wpId}/g7-main/import-data`,
+      formData,
+      { params: { sheet: DISCLOSURE_SHEET_CODE }, headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    const data = response?.data ?? response
+    const count = data?.imported_count ?? data?.rowCount ?? 0
+    ElMessage.success(`导入完成，共 ${count} 行`)
+    await hydrate()
+  } catch (err: any) {
+    handleImportExportError(err, '导入数据')
+  }
+}
+
 function scheduleSave(options?: { userEdit?: boolean }): void {
   if (props.isReadonly || !hydrated.value) return
   if (options?.userEdit !== false) hasLocalEdits = true
@@ -1134,6 +1240,9 @@ async function syncToDisclosureNotes(): Promise<void> {
       )
       data = result?.data ?? result
     } catch (err: unknown) {
+      // 请求被取消（防重复提交 / 组件卸载 / 竞争去重）→ 静默跳过，不误报「同步失败」
+      const e = err as any
+      if (e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError' || e?.__CANCEL__) return
       // 🔴 绝不吞异常：原始 err 进控制台，提示带真实原因（后端 detail / HTTP 状态）
       console.error('[G7 国企披露] 同步到附注失败（附注未落地）', err)
       ElMessage.error(`同步附注失败：${describeSyncError(err)}`)

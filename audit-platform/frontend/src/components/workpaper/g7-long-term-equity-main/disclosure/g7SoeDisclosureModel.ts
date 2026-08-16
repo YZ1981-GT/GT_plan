@@ -445,15 +445,43 @@ const movementColumns = groupedCols([
   ['closingImpairment', '减值准备期末余额', 'number', undefined],
 ])
 
-const jvFsColumns = flatCols(cols([
-  ['current', '期末数', 'number', 120],
-  ['prior', '期初数', 'number', 120],
-]))
+/** 「重要合营企业主要财务信息」矩阵槎位（源模板 A29:D41 按合营企业 1 横向展开，E~H 预留扩展）。 */
+const JV_FS_SLOT = 'jv-fs-company'
+const JV_FS_SLOT_DEFAULT_NAMES = ['合营企业1']
+// 🔴 子列 label 逐字取源模板 r30（`期末数` / `期初数`），与联营表同口径。
+const JV_FS_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '期末数' },
+  { key: 'prior', label: '期初数' },
+]
 
-const jvPlColumns = flatCols(cols([
-  ['current', '本期发生额', 'number', 120],
-  ['prior', '上期发生额', 'number', 120],
-]))
+function jvFsMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(JV_FS_SLOT, names, JV_FS_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
+
+/** 「续：重要合营企业经营成果」矩阵槎位（源模板 r43:D51，子列为本期/上期）。 */
+const JV_PL_SLOT = 'jv-pl-company'
+const JV_PL_SLOT_DEFAULT_NAMES = ['合营企业1']
+// 🔴 子列 label 逐字取源模板 r44（`本期发生额` / `上期发生额`）。
+const JV_PL_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '本期发生额' },
+  { key: 'prior', label: '上期发生额' },
+]
+
+function jvPlMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(JV_PL_SLOT, names, JV_PL_SUB)
+  return groupedCols(slotCols.map(c => [
+    c.key,
+    c.subLabel ?? '',
+    'number' as G7DisclosureColumnType,
+    c.entityName,
+  ]))
+}
 
 /** 「重要联营企业主要财务信息」矩阵槎位（源模板按合营企业2/联营企业1/2 横向展开）。 */
 const ASSOCIATE_FS_SLOT = 'associate-fs-company'
@@ -1115,9 +1143,11 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         // 其余 7 张是「项  目」（双空格）。R4.4 明确禁止统一，逐表取原文。
         labelHeader: '项 目',
         sourceRows: 'A225:D241',
-        columns: jvFsColumns,
-        rows: annotateEquityBridgeSources(metricRows('jv-fs', jvFsLabels, jvFsColumns, '被投资单位财务信息（合营、联营）G7-5')),
+        columns: jvFsMatrixColumnsFor(JV_FS_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: JV_FS_SLOT, sub: JV_FS_SUB },
+        rows: annotateEquityBridgeSources(metricRows('jv-fs', jvFsLabels, jvFsMatrixColumnsFor(JV_FS_SLOT_DEFAULT_NAMES), '被投资单位财务信息（合营、联营）G7-5')),
         description: '“调整事项”包括正商誉、抵消的未实现内部交易损益、减值准备等。',
+        dynamic: true,
       },
       {
         id: 'important-jv-pl',
@@ -1126,8 +1156,10 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         // 🔴 源 A243 原文是「项  目」（双空格）；注意上一张合营表 A229 是**单**空格。
         labelHeader: '项  目',
         sourceRows: 'A242:D251',
-        columns: jvPlColumns,
-        rows: metricRows('jv-pl', jvPlLabels, jvPlColumns, '被投资单位财务信息（合营、联营）G7-5'),
+        columns: jvPlMatrixColumnsFor(JV_PL_SLOT_DEFAULT_NAMES),
+        slotConfig: { slot: JV_PL_SLOT, sub: JV_PL_SUB },
+        rows: metricRows('jv-pl', jvPlLabels, jvPlMatrixColumnsFor(JV_PL_SLOT_DEFAULT_NAMES), '被投资单位财务信息（合营、联营）G7-5'),
+        dynamic: true,
       },
       {
         id: 'important-associate-fs',
@@ -1340,6 +1372,8 @@ const G7_SOE_DEFAULT_SLOT_NAMES: Record<string, string[]> = {
   [SOLD_FS_POSITION_SLOT]: SOLD_FS_POSITION_SLOT_DEFAULT_NAMES,
   [SOLD_FS_RESULT_SLOT]: SOLD_FS_RESULT_SLOT_DEFAULT_NAMES,
   [OWNERSHIP_CHANGE_SLOT]: OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES,
+  [JV_FS_SLOT]: JV_FS_SLOT_DEFAULT_NAMES,
+  [JV_PL_SLOT]: JV_PL_SLOT_DEFAULT_NAMES,
   [ASSOCIATE_FS_SLOT]: ASSOCIATE_FS_SLOT_DEFAULT_NAMES,
   [ASSOCIATE_PL_SLOT]: ASSOCIATE_PL_SLOT_DEFAULT_NAMES,
 }

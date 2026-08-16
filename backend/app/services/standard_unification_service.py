@@ -133,13 +133,15 @@ def detect_standard_conflict(
     if requested_entity == project_entity:
         return None  # R4.3：仅 scope 维度不同 → 放行（调用方另记 warning）
 
-    return {
-        "project_standard": allowed[0],
-        "requested_standard": requested,
-        "project_entity": project_entity,
-        "requested_entity": requested_entity,
-        "allowed": allowed,
-    }
+    # 🔴 用户裁决（2026-08-16）：底稿不做准则门控，允许在国企项目编辑上市版披露
+    # （合并模块场景：集团国企，下属有上市子公司）。entity 冲突降级为 warning 放行，
+    # 不再 hard block。附注侧仍按项目准则选模板，此处只控制"能否写入"。
+    logger.warning(
+        "standard_conflict: cross-entity sync allowed (user override) "
+        "project_entity=%s requested_entity=%s requested=%s",
+        project_entity, requested_entity, requested,
+    )
+    return None
 
 
 class StandardUnificationService:

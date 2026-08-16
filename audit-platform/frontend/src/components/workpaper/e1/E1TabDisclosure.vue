@@ -148,10 +148,9 @@ const applicableStandards = useHostApplicableStandards({
  * @spec e1-orphan-components-wiring — Task 10
  */
 const variantApplicable = computed<boolean>(() => {
-  const list = applicableStandards.value
-  if (!list || !list.length) return true // fail-open
-  const prefix = (props.variant || 'listed') === 'listed' ? 'listed' : 'soe'
-  return list.some((s: string) => String(s).toLowerCase().startsWith(prefix))
+  // 🔴 用户裁决（2026-08-16）：底稿同时支持国企和上市披露表，不再按项目适用准则过滤。
+  // 合并模块场景下集团可能是国企但下属有上市公司，两个版本都需要可编辑。
+  return true
 })
 
 const { generateText, isGenerating } = useE1AiGenerate(toRef(props, 'wpId') as Ref<string>)

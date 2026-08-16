@@ -158,7 +158,7 @@
  *
  * 科目覆盖：1001 库存现金 / 1002 银行存款 / 1012 其他货币资金
  */
-import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, provide, toRef, inject, defineAsyncComponent, watch } from 'vue'
 import type { Ref } from 'vue'
 import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
@@ -410,6 +410,51 @@ async function reExtractFromFourTable(): Promise<void> {
   await saveImmediate([item])
 }
 
+/**
+ * 从已有的未审聚合键 + 调整分录实时派生 E1-adj-total-* 审定合计，
+ * 确保披露表在审定表未渲染的情况下也能取到值（persist-first：不覆盖已有）。
+ */
+function seedAdjTotalsFromAggregates(): void {
+  const _num = (k: string) => parseFloat(allResponses.value.get(k)?.remark || '0') || 0
+  const _adj = (k: string) => _num(`E1-adjustment-by-item-${k}-ending`)
+
+  // 1001 库存现金审定 = 未审 + AJE/RJE
+  const cash = _num('E1-cash-detail-total-unaudited') + _adj('cash')
+  // 1002 银行存款审定 = 未审 + AJE/RJE
+  const bank = _num('E1-bank-detail-principal-total-unaudited') + _adj('bank_principal')
+  // 1012 其他货币资金审定 = 未审(other + digital) + AJE/RJE
+  const other = _num('E1-bank-detail-other-total-unaudited') + _num('E1-digital-total-unaudited')
+    + _adj('other_mf') + _adj('digital')
+
+  const seeds: Array<[string, number]> = [
+    ['E1-adj-total-1001', cash],
+    ['E1-adj-total-1002', bank],
+    ['E1-adj-total-1012', other],
+  ]
+  for (const [key, val] of seeds) {
+    // persist-first：已有非零值不覆盖（审定表 syncAuditedTotals 已写入的优先）
+    if (allResponses.value.has(key)) continue
+    if (Math.abs(val) < 0.005) continue // 零值不种子（与 buildCrossSheetSeeds 同策略）
+    allResponses.value.set(key, { item_id: key, conclusion: null, remark: String(val) })
+  }
+  // 期初同理
+  const _numO = (k: string) => parseFloat(allResponses.value.get(k)?.remark || '0') || 0
+  const _adjO = (k: string) => _numO(`E1-adjustment-by-item-${k}-opening`)
+  const cashO = _numO('E1-cash-detail-opening-unaudited') + _adjO('cash')
+  const bankO = _numO('E1-bank-detail-principal-opening-unaudited') + _adjO('bank_principal')
+  const otherO = _numO('E1-bank-detail-other-opening-unaudited') + _adjO('other_mf') + _adjO('digital')
+  const seedsO: Array<[string, number]> = [
+    ['E1-adj-total-1001-opening', cashO],
+    ['E1-adj-total-1002-opening', bankO],
+    ['E1-adj-total-1012-opening', otherO],
+  ]
+  for (const [key, val] of seedsO) {
+    if (allResponses.value.has(key)) continue
+    if (Math.abs(val) < 0.005) continue
+    allResponses.value.set(key, { item_id: key, conclusion: null, remark: String(val) })
+  }
+}
+
 // ─── P2#13: 全局告警面板 ─────────────────────────────────────────────────────
 
 const globalAlerts = computed(() => {
@@ -561,7 +606,57 @@ onMounted(() => {
   }
   // 四表取数：无持久化数据时从四表库种子填充明细行 + 跨 sheet 聚合键（persist-first）
   seedFromFourTable()
+
+  // 🔴 修复（2026-08-16）：从附注跳转直接打开披露 Tab 时，E1-adj-total-* 可能不在
+  // allResponses 中（审定表从未在本会话渲染过、syncAuditedTotals 从未执行）。
+  // 从已有的未审聚合键 + 调整分录实时派生审定合计，确保披露表首次渲染即有值。
+  seedAdjTotalsFromAggregates()
 })
+
+// 🔴 修复（2026-08-16）：从附注跳转直接打开披露 Tab 时，props.htmlData 可能在
+// onMounted 时仍为 null（上层 GtWpRenderer 异步加载 render-config）。加 watch
+// 确保 htmlData 到达后补充加载 responses_snapshot + 四表种子。
+watch(
+  () => props.htmlData,
+  (data) => {
+    if (!data) return
+    // 补充 project_context（bs_date + tb_amount）
+    const pctx: any = data.project_context ?? (data as any).projectContext
+    if (pctx) {
+      if (!bsDate.value) bsDate.value = pctx.bs_date || ''
+      const tbEnding = pctx.tb_amount
+      if (tbEnding && !allResponses.value.has('E1-adj-tb-amount-ending')) {
+        allResponses.value.set('E1-adj-tb-amount-ending', {
+          item_id: 'E1-adj-tb-amount-ending', conclusion: null, remark: String(tbEnding),
+        })
+      }
+      const tbOpening = pctx.tb_amount_opening
+      if (tbOpening && !allResponses.value.has('E1-adj-tb-amount-opening')) {
+        allResponses.value.set('E1-adj-tb-amount-opening', {
+          item_id: 'E1-adj-tb-amount-opening', conclusion: null, remark: String(tbOpening),
+        })
+      }
+    }
+    // 补充 responses_snapshot
+    const snapshot = data.responses_snapshot
+    if (snapshot && typeof snapshot === 'object') {
+      for (const [key, val] of Object.entries(snapshot)) {
+        if (allResponses.value.has(key)) continue // persist-first：不覆盖已有
+        const entry = val as Record<string, unknown>
+        allResponses.value.set(key, {
+          item_id: String(entry?.item_id ?? key),
+          conclusion: (entry?.conclusion as string | null) ?? null,
+          remark: (entry?.remark as string | null) ?? null,
+        })
+      }
+    }
+    // 补充四表种子
+    seedFromFourTable()
+    // 补充审定合计种子（从未审+调整实时派生）
+    seedAdjTotalsFromAggregates()
+  },
+  { immediate: false },
+)
 </script>
 
 <style scoped>
