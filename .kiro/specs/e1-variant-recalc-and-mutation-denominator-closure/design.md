@@ -107,11 +107,15 @@ from _mutation_kit import Mutation, run_cli
 批次 1（先入库，不改内容）  7 个 mutate_task*.py + wp_export_resolver（?? 未跟踪）
 批次 2（迁共享件）          e_cycle · h_cycle · g7 · trim_decision
                             · note_conversion · note_text_hygiene  （6 个，已归档）
-批次 3（迁共享件）          批次 1 入库后视其可运行性决定
-不迁（登记豁免）            k_cycle · i_cycle · ie_lifecycle       （3 个，在办）
+不迁（存量冻结名单）        其余全部存量脚本 —— 含批次 1 入库的 7 个、
+                            以及立项时在办、其后归档的 k_cycle · i_cycle ·
+                            l_cycle · ie_lifecycle · report_line_resolution ·
+                            guard_attribution · amount_column_typing
 ```
 
 `mutate_e_cycle_guards.py` 是范式基准，**它的迁移要最先做**：它已具备全部七项能力，迁移中若某项能力在共享件里表达不出来，说明共享件设计不足，此时改共享件而不是削减该脚本的能力。
+
+**🔴 批次表的修订（2026-08-16）**：原表有「批次 3 = 批次 1 入库后视可运行性决定」与「不迁 = 3 个在办 spec 的脚本」。这个划分把「是否迁移」绑在**所属 spec 是否在办**上，而 spec 状态是会变的 —— 实测立项后一周内 `k_cycle` / `i_cycle` / `l_cycle` 三个 spec 全部归档，于是原本「不迁」的脚本自动变成「必迁」，待迁面从 6 个膨胀到 10+ 个（含 1558 行的 `k_cycle` 与 736 行的 `trim_decision`，各需逐条等价性验证）。**归属状态不能当迁移判据**，否则工作量随归档进度无限增长。改为**冻结名单**：批次 2 的 6 个是本 spec 的全部迁移承诺，其余存量一律进名单、只许因被迁移而缩小。
 
 ### B 组：豁免登记表
 
@@ -130,7 +134,12 @@ from _mutation_kit import Mutation, run_cli
 }
 ```
 
-守卫读它做两件事：① 未跟踪/未用共享件的脚本若在豁免表内则跳过；② 若某豁免项的 `spec` 已不在 `.kiro/specs/` 下（= 已归档），**提示该豁免应当撤销**（防止豁免变成永久免责声明 —— 这正是 e-cycle spec 的 M20 变异所针对的形态）。
+**职能范围（2026-08-16 收窄）**：豁免表**只服务入库守卫**（`test_mutation_kit_scripts_tracked.py`）。原设计让它同时服务采纳守卫（未用共享件也走豁免），那使它成为「强制迁移」的管理机构 —— 每归档一个 spec 就有一批豁免失效、一批脚本被迫迁移。采纳守卫改用**冻结名单**后不再读豁免表，两件事解耦：
+
+- **入库**是一次性动作（`git add` 一次即永久成立）⇒ 适合用「豁免 + 失效检测」管理
+- **采纳共享件**是持续性改造（跨越等价性验证、判据形态差异）⇒ 用冻结名单管理，存量不受打扰
+
+故守卫读它只做两件事：① 未被 git 跟踪的脚本若在豁免表内则跳过；② 若某豁免项的 `spec` 已不在 `.kiro/specs/` 下（= 已归档），**提示该豁免应当撤销**（防止豁免变成永久免责声明 —— 这正是 e-cycle spec 的 M20 变异所针对的形态），此时的处置是「由接手方入库」，不是「必须迁移共享件」。已入库的脚本不需要 tracked 豁免，其豁免项应当撤销。
 
 ---
 
@@ -190,7 +199,7 @@ def run_cli(
 | 守卫 | 判据 |
 |---|---|
 | `test_mutation_kit_scripts_tracked.py` | 扫 `mutate*.py`，未被 git 跟踪且不在豁免表 ⇒ 失败 |
-| `test_mutation_kit_adoption.py` | 扫 `mutate*.py`，未 `from _mutation_kit import` 且不在豁免表 ⇒ 失败 |
+| `test_mutation_kit_adoption.py` | 扫 `mutate*.py`，**不在冻结名单**且未 `from _mutation_kit import` ⇒ 失败（AST 判据，非字符串匹配）；名单内未采纳只 INFO；名单**新增条目**即失败 |
 | `test_mutation_kit_exemptions.py` | 豁免项的 spec 已归档 ⇒ 失败（提示撤销）；豁免项缺 reason/registered_at ⇒ 失败 |
 | `test_mutation_kit_capabilities.py` | 共享件自身七项能力的行为测试（不是「函数存在」） |
 
@@ -446,15 +455,15 @@ fc 列任一非 0 时，`recalcRow(row,'multi')` 的输出与修复前实现逐�
 
 **Validates: Requirements 7.6**
 
-### Property 29: 采纳守卫对退化打红
+### Property 29: 采纳守卫对退化打红，且不惊动存量
 
-新增一个不使用共享件的变异脚本时，采纳守卫必须失败；把某脚本从豁免表移除时同样失败。
+新增一个**名单外**、不使用共享件的变异脚本时，采纳守卫必须失败（这是 R8.1 User Story 的实质：下一个 spec 不能又抄一份不带分母的样板）。同时两条反向不变量必须成立：① 冻结名单内未采纳的存量脚本**不得**让守卫失败（只 INFO）—— 否则「归档即必迁」的跑步机会重新出现；② 冻结名单**新增条目**即失败 —— 否则新脚本只要把自己加进名单就能逃避约束，名单退化成免责声明。判据用 AST 解析真实 import 语句，不用字符串匹配（注释里提一句 `_mutation_kit` 就绿是假绿第②源）。
 
 **Validates: Requirements 8.1, 8.2**
 
-### Property 30: 豁免失效可检测
+### Property 30: 入库豁免的失效可检测
 
-豁免项引用的 spec 目录已不在 `.kiro/specs/` 下（= 已归档）时，守卫提示该豁免应当撤销。
+豁免项引用的 spec 目录已不在 `.kiro/specs/` 下（= 已归档）时，守卫提示该豁免应当撤销。豁免表**只服务入库守卫**，故失效后的处置是「由接手方入库」这一次性动作，不再隐含「必须迁移共享件」。已入库脚本的 tracked 豁免属死条目，应当撤销。
 
 **Validates: Requirements 8.5**
 
@@ -513,3 +522,6 @@ fc 列任一非 0 时，`recalcRow(row,'multi')` 的输出与修复前实现逐�
 - 不迁在办 spec 的 3 个脚本（Property 18）。
 - 不顺手修迁移中发现的他 spec 判据缺陷（Property 28）。
 - 不重跑归档 spec 的全量变异去「再证明一次」—— 复盘轮已用 `--check-anchors` 证明 29/29 锚点未漂移。
+- **不迁冻结名单内的存量脚本**（2026-08-16 收敛，见上方批次表修订说明）。
+- **不把自举变异 `mutate_mutation_kit_guards.py` 作为常驻 CI 固件**：它的价值是一次性加固（Wave 3 实测抓出 2 个真实缺口：定位期换行检查无测试覆盖 · 两个治理守卫从未被反证），已兑现。它是「跑变异的框架的守卫的变异」= 第 5~6 层 meta，作为常驻件的边际收益低于维护成本。文件保留作历史证据，Task 16 只做 `--check-anchors` 只读确认。
+- **不为凑「全平台采纳率」去改任何存量脚本的判据形态**。存量脚本的弱判据（如 `mutate_note_text_hygiene` 的 `want=ANY_RED`）与已知缺陷（如 `mutate_note_conversion` 的 M9 永远判不出 RED）一律**只登记**（Property 28）。

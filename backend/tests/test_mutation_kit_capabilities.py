@@ -572,6 +572,53 @@ def test_full_run_exit_code_still_requires_coverage(fake_repo: Path, monkeypatch
     assert rc == 1, "全量运行有覆盖面缺口时必须非零退出"
 
 
+def test_dirty_baseline_aborts_by_default(fake_repo: Path, monkeypatch) -> None:
+    """基线含既存失败时默认 ABORT（返回 4）。"""
+    from _mutation_kit import cli as cli_mod
+
+    def stub(_repo, _args, timeout=1800):  # noqa: ANN001, ARG001
+        return RunResult(failed={"test_pre_existing"}, summary="stub 1 failed", passed=0)
+
+    monkeypatch.setattr(cli_mod, "run_pytest", stub)
+    rc = run_cli(
+        mutations=[_mut()], guard_files={"test_alpha.py": "夹具"}, repo=fake_repo,
+        backend_args=["-q"], guard_roots=("guards",), argv=["--run", "all"],
+    )
+    assert rc == 4
+
+
+def test_dirty_baseline_allowed_when_explicitly_opted_in(fake_repo: Path, monkeypatch) -> None:
+    """🔴 显式允许脏基线时必须继续跑 —— 迁移不该让原本能跑的脚本变成不能跑。
+
+    差集判定 added = current - baseline 在脏基线下仍有效；某些存量脚本
+    （如 mutate_note_text_hygiene_and_expandable）的判据本来就是这个语义。
+    """
+    from _mutation_kit import cli as cli_mod
+
+    calls = {"n": 0}
+    PRE = "test_pre_existing"
+
+    def stub(_repo, _args, timeout=1800):  # noqa: ANN001, ARG001
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return RunResult(failed={PRE}, summary="stub baseline dirty", passed=0)
+        return RunResult(
+            failed={PRE, "test_alpha.py::test_alpha_one"},
+            summary="stub mutated",
+            passed=0,
+            name2file={"test_alpha.py::test_alpha_one": "test_alpha.py"},
+        )
+
+    monkeypatch.setattr(cli_mod, "run_pytest", stub)
+    rc = run_cli(
+        mutations=[_mut()], guard_files={"test_alpha.py": "夹具"}, repo=fake_repo,
+        backend_args=["-q"], guard_roots=("guards",),
+        allow_dirty_baseline=True, argv=["--run", "all"],
+    )
+    assert rc == 0, "脏基线显式允许后，变异仍应正常判 RED 并返回 0"
+    assert calls["n"] >= 2, "必须真的跑到了变异阶段"
+
+
 def test_run_aborts_on_stale_backup(fake_repo: Path) -> None:
     """残留备份意味着上一轮被中断、基线已被污染 ⇒ 必须 ABORT 而不是继续。"""
     (fake_repo / "src" / "target.py.mutbak").write_bytes(b"stale")

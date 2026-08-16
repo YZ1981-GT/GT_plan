@@ -75,6 +75,7 @@ from .spec import KINDS, SIDES, Mutation, validate_all, validate_mutation
 from .verdict import (
     ALL_VERDICTS,
     ANCHOR_MISS,
+    ANY_RED,
     ERROR,
     GREEN,
     RED,
@@ -96,7 +97,7 @@ __all__ = [
     "RunResult", "run_pytest", "run_vitest", "short_nodeid",
     # 判定
     "judge", "matched", "RED", "GREEN", "WRONG_TEST", "ANCHOR_MISS", "ERROR",
-    "ALL_VERDICTS",
+    "ALL_VERDICTS", "ANY_RED",
     # 覆盖面
     "CoverageTally", "guard_files_of",
     # CLI

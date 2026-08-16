@@ -1,219 +1,184 @@
-"""Task 13/14 守卫的变异检验。
+"""Task 13/14 守卫的变异检验（附注文案卫生 + 可扩位行）。
 
-铁律遵循（memory）：
-* 备份落 `.bak` 并提供 `--restore`，还原用 `write_bytes` **字节级**
-  （`Path.write_text` 在 Windows 会把 LF 转 CRLF → 假 DIRTY）；
-* 锚点一律**单行**（CRLF 工作树下跨行锚点必 ANCHOR-MISS）且断言命中数 == 1；
-* 判定按**失败测试名集合差集**，不看退出码（基线可能本就有红）；
-* 三态区分：RED（新增失败）/ GREEN（守卫缺陷）/ ANCHOR-MISS（脚本缺陷）。
+spec: note-template-columns-and-legacy-snapshot-closure（已归档）
+迁移：2026-08-15 由 `e1-variant-recalc-and-mutation-denominator-closure` Task 12 迁到
+`_mutation_kit` 共享件 —— 原先 220 行里约 110 行是自带样板（md5 / 跑测试 / 备份还原 /
+三态判定），现全部来自共享件，本文件只保留 18 条变异声明。
+
+## 迁移时保持的两处原有语义（**不擅自加强判据**）
+
+1. **判据是「任何新增失败即 RED」**（`want=ANY_RED`）—— 原脚本没有记录每条变异期望
+   打红哪条测试，只看差集非空。这是**弱判据**（WRONG-TEST 永不出现），但迁移不该顺手
+   改判据：一旦改错就分不清是迁移引入的还是原本就有的。补具体 want 应另立任务。
+2. **允许脏基线**（`allow_dirty_baseline=True`）—— 原 docstring 明写「基线可能本就有红」，
+   差集 `added = current - baseline` 在脏基线下仍然有效。迁移不该让原本能跑的脚本
+   变成不能跑。
+   🔴 2026-08-15 实测基线确实非空：`test_shared_table_counts_unchanged` 失败，因
+   `note_shared_table_segments.json` 的 counts 由 `{listed:23, soe:6}` 变成
+   `{listed:24, soe:8}` —— 并发 K 循环改了 `note_template_*.json` 后重跑生成器，
+   共享表段增加而该断言未同步。属并发会话范围，本 spec 只登记不修。
 """
+
 from __future__ import annotations
 
-import argparse
-import hashlib
-import os
-import re
-import subprocess
 import sys
 from pathlib import Path
 
-_HERE = Path(__file__).resolve()
-BACKEND = _HERE.parents[2]
-REPO = _HERE.parents[3]
-OUT = _HERE.parent / "mutate_note_text_hygiene_and_expandable.txt"
-_STAMP = "round2"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-TESTS = [
+from _mutation_kit import ANY_RED, Mutation as Mut, run_cli  # noqa: E402
+
+REPO = Path(__file__).resolve().parents[3]
+
+BE_ARGS = [
     "backend/tests/test_note_text_hygiene.py",
     "backend/tests/test_note_expandable_rows.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:cacheprovider",
+    "--continue-on-collection-errors",
 ]
 
-FIXER = BACKEND / "scripts" / "fix" / "fix_note_text_hygiene.py"
-EXPAND_FIX = BACKEND / "scripts" / "fix" / "fix_note_expandable_rows.py"
+#: 🔴 **本脚本不设冻结基线**（传 None），这是有依据的取舍而非遗漏。
+#:
+#: 冻结基线的价值是「守卫例数不该偷偷变少」。但本脚本的被测面
+#:（`test_note_text_hygiene.py` + `test_note_expandable_rows.py`）直接依赖
+#: `note_shared_table_segments.json` 与 `note_template_*.json`，而这些文件是并发会话的
+#: 高频改动区 —— 2026-08-15 实测：15 分钟内 passed 从 **99 → 97**、既存失败从 1 条 → 3 条。
+#: 在这种漂移速度下，冻结基线每次运行都会 WARN，产出的是**噪声而不是信号**，
+#: 而噪声 WARN 会让真正的例数下降被淹没。
+#:
+#: 例数保护改由被测文件自己的守卫承担（它们本就断言共享表张数、行数等结构量）。
+#: 若将来该被测面稳定下来（并发改动收口后），应补回冻结基线并注明当时的实测值。
+BASELINE_BE_PASSED = None
+
+#: 覆盖面分母 —— 本脚本反证的守卫文件全集。
+GUARD_FILES: dict[str, str] = {
+    "test_note_text_hygiene.py": "附注文案卫生（假表头行/可扩位保护/fail-closed）",
+    "test_note_expandable_rows.py": "可扩位行（row_type 单一真源 / 投影 / 导出 / 空表检测）",
+}
+
+FIXER = "backend/scripts/fix/fix_note_text_hygiene.py"
+EXPAND_FIX = "backend/scripts/fix/fix_note_expandable_rows.py"
 # 🔴 判据已从生成器脚本搬到 service 层（Property 38：单一真源）
 # ⇒ M7/M8/M9 必须锚在这里，锚在 build_note_expandable_markers.py 会 ANCHOR-MISS。
-JUDGE = BACKEND / "app" / "services" / "note_expandable_markers.py"
-KIT = BACKEND / "scripts" / "fix" / "_note_structure_kit.py"
-H_POLICY = BACKEND / "scripts" / "fix" / "fix_note_h_policy_chapter_structure.py"
-PROJECTOR = BACKEND / "app" / "services" / "note_sub_table_projector.py"
-EXPORTER = BACKEND / "app" / "services" / "note_word_exporter.py"
-DETECTOR = BACKEND / "app" / "services" / "note_empty_table_detector.py"
-SEGMENTS = BACKEND / "app" / "services" / "note_shared_table_segments.py"
-FE_SKIP = (
-    REPO / "audit-platform" / "frontend" / "src" / "views" / "composables"
-    / "disclosureEmptyTable.ts"
-)
+JUDGE = "backend/app/services/note_expandable_markers.py"
+KIT = "backend/scripts/fix/_note_structure_kit.py"
+H_POLICY = "backend/scripts/fix/fix_note_h_policy_chapter_structure.py"
+PROJECTOR = "backend/app/services/note_sub_table_projector.py"
+EXPORTER = "backend/app/services/note_word_exporter.py"
+DETECTOR = "backend/app/services/note_empty_table_detector.py"
+SEGMENTS = "backend/app/services/note_shared_table_segments.py"
+FE_SKIP = "audit-platform/frontend/src/views/composables/disclosureEmptyTable.ts"
 
-# (id, 文件, 单行锚点, 替换成, 说明)
-MUTATIONS: list[tuple[str, Path, str, str, str]] = [
-    ("M1", FIXER,
-     '    if _norm_ws(text) in {_norm_ws(h) for h in headers if str(h or "").strip()}:',
-     '    if any(_norm_ws(text) in _norm_ws(h) for h in headers if str(h or "").strip()):',
-     "prove_header_artifact 改成子串匹配（业务行会被误判成表头残留）"),
-    ("M2", FIXER,
-     "    if _HTML_RE.search(text):",
-     "    if False:",
-     "prove_header_artifact 去掉 HTML 判据（带 <br/> 的假行证明不了）"),
-    ("M3", FIXER,
-     "        if MARKERS_MOD.match_label_marker(label) is not None:",
-     "        if False:",
-     "plan_header_label_rows 去掉可扩位保护（会把 …… 行当假行删）"),
-    ("M4", FIXER,
-     "        if proof is None:",
-     "        if False:",
-     "plan_header_label_rows 去掉 fail-closed（证明不了也删）"),
-    ("M5", FIXER,
-     "        if scope == PROBE.SCOPE_PARENT:",
-     "        if False:",
-     "run_variant 去掉母公司章排除（越界改 A spec 的表）"),
-    ("M6", FIXER,
-     "            if section_code_of(num) in declared:",
-     "            if False:",
-     "run_variant 去掉 text_sections 冲突避让"),
+
+def _m(mid: str, path: str, anchor: str, new: str, why: str) -> Mut:
+    """本脚本 18 条变异形态一致（单行 replace + 弱判据），故收成一个构造器。"""
+    return Mut(
+        id=mid, side="be", path=path, kind="replace",
+        anchor=anchor, new=new, want=ANY_RED, why=why,
+    )
+
+
+MUTATIONS: list[Mut] = [
+    _m("M1", FIXER,
+       '    if _norm_ws(text) in {_norm_ws(h) for h in headers if str(h or "").strip()}:',
+       '    if any(_norm_ws(text) in _norm_ws(h) for h in headers if str(h or "").strip()):',
+       "prove_header_artifact 改成子串匹配（业务行会被误判成表头残留）"),
+    _m("M2", FIXER,
+       "    if _HTML_RE.search(text):",
+       "    if False:",
+       "prove_header_artifact 去掉 HTML 判据（带 <br/> 的假行证明不了）"),
+    _m("M3", FIXER,
+       "        if MARKERS_MOD.match_label_marker(label) is not None:",
+       "        if False:",
+       "plan_header_label_rows 去掉可扩位保护（会把 …… 行当假行删）"),
+    _m("M4", FIXER,
+       "        if proof is None:",
+       "        if False:",
+       "plan_header_label_rows 去掉 fail-closed（证明不了也删）"),
+    _m("M5", FIXER,
+       "        if scope == PROBE.SCOPE_PARENT:",
+       "        if False:",
+       "run_variant 去掉母公司章排除（越界改 A spec 的表）"),
+    _m("M6", FIXER,
+       "            if section_code_of(num) in declared:",
+       "            if False:",
+       "run_variant 去掉 text_sections 冲突避让"),
     # 🔴 单行锚点：`    "预留",\n    "…",\n)` 在 MARKERS 与 LABEL_MARKERS 末尾**各出现一次**
     # ⇒ 跨行锚点必命中 2 处（ANCHOR-MISS）。改锚在 LABEL_MARKERS 的声明行上。
-    ("M7", JUDGE,
-     "LABEL_MARKERS: tuple[str, ...] = (",
-     'LABEL_MARKERS: tuple[str, ...] = ("可改名",',
-     "LABEL_MARKERS 加回 可改名（示例行名会被标成零可见内容）"),
-    ("M8", JUDGE,
-     "        if cand in normed:",
-     "        if any(cand in k or k in cand for k in normed):",
-     "match_label_marker 改成包含匹配（业务行被误标）"),
+    _m("M7", JUDGE,
+       "LABEL_MARKERS: tuple[str, ...] = (",
+       'LABEL_MARKERS: tuple[str, ...] = ("可改名",',
+       "LABEL_MARKERS 加回 可改名（示例行名会被标成零可见内容）"),
+    _m("M8", JUDGE,
+       "        if cand in normed:",
+       "        if any(cand in k or k in cand for k in normed):",
+       "match_label_marker 改成包含匹配（业务行被误标）"),
     # 🔴 首版 M9 是**无效变异**：只把第 3 个候选换成 rstrip 到底，而 `base`（原样）
     # 仍是第 1 个候选 ⇒ `......` 照样命中，守卫不红是**正确**的。
     # 要复现原缺陷必须把「原样候选」拿掉，让判定只看被剥空的结果。
     # 🔴 第二版锚点又含 `\n`（CRLF 下 0 命中 = ANCHOR-MISS）—— 同一个坑踩了两次。
     # 第三版：锚在 service 层 `label_candidates` 的**单行** for 语句上。
-    ("M9", JUDGE,
-     "    for cand in (base, stripped, tail_trimmed):",
-     "    for cand in (stripped.rstrip(_LABEL_TAIL_PUNCT),):",
-     "label_candidates 去掉原样候选、只留剥到底的（`......` 被吃空 → 漏标 4 行）"),
-    ("M10", EXPAND_FIX,
-     'CONVERTIBLE_FROM = ("data", "")',
-     'CONVERTIBLE_FROM = ("data", "", "total", "header_label")',
-     "CONVERTIBLE_FROM 扩大（合计行/假表头行会被改标）"),
-    ("M11", PROJECTOR,
-     "            if is_zero_visible_row(r):  # 可扩位：零可见内容（Property 33）",
-     "            if False:",
-     "投影器主路径去掉可扩位过滤"),
-    ("M12", PROJECTOR,
-     "                if isinstance(r, dict) and not is_zero_visible_row(r)",
-     "                if isinstance(r, dict)",
-     "投影器降级路径去掉可扩位过滤"),
-    ("M13", EXPORTER,
-     "            rows = [r for r in rows if not _is_zero_visible_row(r)]",
-     "            rows = list(rows)",
-     "Word 导出去掉可扩位过滤（交付件多出占位行）"),
-    ("M14", DETECTOR,
-     '    {"total", "subtotal", "section", "header_label", "expandable"}',
-     '    {"total", "subtotal", "section", "header_label"}',
-     "空表检测 skip 集合去掉 expandable"),
-    ("M15", SEGMENTS,
-     '_TOTAL_ROW_TYPES = frozenset({"total", "header_label"})',
-     '_TOTAL_ROW_TYPES = frozenset({"total", "header_label", "expandable"})',
-     "把 expandable 当无主行（会把可扩位排除出段可写区）"),
+    _m("M9", JUDGE,
+       "    for cand in (base, stripped, tail_trimmed):",
+       "    for cand in (stripped.rstrip(_LABEL_TAIL_PUNCT),):",
+       "label_candidates 去掉原样候选、只留剥到底的（`......` 被吃空 → 漏标 4 行）"),
+    _m("M10", EXPAND_FIX,
+       'CONVERTIBLE_FROM = ("data", "")',
+       'CONVERTIBLE_FROM = ("data", "", "total", "header_label")',
+       "CONVERTIBLE_FROM 扩大（合计行/假表头行会被改标）"),
+    _m("M11", PROJECTOR,
+       "            if is_zero_visible_row(r):  # 可扩位：零可见内容（Property 33）",
+       "            if False:",
+       "投影器主路径去掉可扩位过滤"),
+    _m("M12", PROJECTOR,
+       "                if isinstance(r, dict) and not is_zero_visible_row(r)",
+       "                if isinstance(r, dict)",
+       "投影器降级路径去掉可扩位过滤"),
+    _m("M13", EXPORTER,
+       "            rows = [r for r in rows if not _is_zero_visible_row(r)]",
+       "            rows = list(rows)",
+       "Word 导出去掉可扩位过滤（交付件多出占位行）"),
+    _m("M14", DETECTOR,
+       '    {"total", "subtotal", "section", "header_label", "expandable"}',
+       '    {"total", "subtotal", "section", "header_label"}',
+       "空表检测 skip 集合去掉 expandable"),
+    _m("M15", SEGMENTS,
+       '_TOTAL_ROW_TYPES = frozenset({"total", "header_label"})',
+       '_TOTAL_ROW_TYPES = frozenset({"total", "header_label", "expandable"})',
+       "把 expandable 当无主行（会把可扩位排除出段可写区）"),
     # 🔴 单行锚点：首版写 `  'expandable',\n])` 含换行，CRLF 工作树下 0 命中
     #（ANCHOR-MISS）—— 自己又踩了一次「跨行锚点」的坑。
-    ("M16", FE_SKIP,
-     "  'expandable',",
-     "  // 'expandable',",
-     "前端 skip 集合去掉 expandable（前后端漂移）"),
+    _m("M16", FE_SKIP,
+       "  'expandable',",
+       "  // 'expandable',",
+       "前端 skip 集合去掉 expandable（前后端漂移）"),
     # ── Property 38：`row_type` 判据单一真源，禁写者硬编码 ──────────────────
-    ("M17", KIT,
-     '    return {"label": label, "row_type": row_type_for_label(label)}',
-     '    return {"label": label, "row_type": "data"}',
-     "共享行构造器 data_row 改回硬编码 data（多个 per-cycle 脚本会翻转可扩位）"),
-    ("M18", H_POLICY,
-     '                {"label": r, "row_type": _row_type_for_label(r)} for r in spec["rows"]',
-     '                {"label": r, "row_type": "data"} for r in spec["rows"]',
-     "H 政策章 ADD_TABLES 改回硬编码（深比较整表重写 → 翻回 soe 生物资产 4 行）"),
+    _m("M17", KIT,
+       '    return {"label": label, "row_type": row_type_for_label(label)}',
+       '    return {"label": label, "row_type": "data"}',
+       "共享行构造器 data_row 改回硬编码 data（多个 per-cycle 脚本会翻转可扩位）"),
+    _m("M18", H_POLICY,
+       '                {"label": r, "row_type": _row_type_for_label(r)} for r in spec["rows"]',
+       '                {"label": r, "row_type": "data"} for r in spec["rows"]',
+       "H 政策章 ADD_TABLES 改回硬编码（深比较整表重写 → 翻回 soe 生物资产 4 行）"),
 ]
 
 
-def _md5(p: Path) -> str:
-    return hashlib.md5(p.read_bytes()).hexdigest()
-
-
-def _run_tests() -> set[str]:
-    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
-    r = subprocess.run(
-        [sys.executable, "-m", "pytest", *TESTS, "-q", "--tb=no", "-rf",
-         "-p", "no:cacheprovider", "--continue-on-collection-errors"],
-        cwd=REPO, capture_output=True, text=True, encoding="utf-8",
-        errors="replace", env=env, timeout=1800,
-    )
-    out = (r.stdout or "") + (r.stderr or "")
-    return set(re.findall(r"^(?:FAILED|ERROR)\s+(\S+)", out, re.M))
-
-
-def restore_all() -> list[str]:
-    msgs = []
-    for path in {m[1] for m in MUTATIONS}:
-        bak = path.with_suffix(path.suffix + ".bak")
-        if bak.exists():
-            path.write_bytes(bak.read_bytes())
-            bak.unlink()
-            msgs.append("restored " + path.name)
-    return msgs
-
-
-def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--restore", action="store_true")
-    args = ap.parse_args(argv)
-    if args.restore:
-        for m in restore_all():
-            print(m)
-        return 0
-
-    lines: list[str] = ["stamp=%s" % _STAMP]
-    baseline = _run_tests()
-    lines.append("baseline 失败集合 = %s" % (sorted(baseline) or "空（全绿）"))
-    lines.append("")
-
-    red = green = miss = 0
-    for mid, path, anchor, repl, desc in MUTATIONS:
-        original = path.read_bytes()
-        text = original.decode("utf-8")
-        hits = text.count(anchor)
-        if hits != 1:
-            lines.append("%-4s ANCHOR-MISS hits=%d  %s  [%s]" % (mid, hits, desc, path.name))
-            miss += 1
-            continue
-        # 🔴 **内存优先还原**：`.bak` 曾被外部（并发会话的 tmp 清理）删掉，
-        # 导致 `finally` 里 `bak.read_bytes()` 抛 FileNotFoundError、
-        # 变异**残留在文件里**（2026-08-08 实测踩到 M4）。故以 `original`
-        # 这份内存副本为还原真源，`.bak` 只作二次保险。
-        bak = path.with_suffix(path.suffix + ".bak")
-        bak.write_bytes(original)
-        try:
-            path.write_bytes(text.replace(anchor, repl).encode("utf-8"))
-            after = _run_tests()
-            new = sorted(after - baseline)
-            if new:
-                lines.append("%-4s RED   +%d  %s" % (mid, len(new), desc))
-                for n in new[:4]:
-                    lines.append("        %s" % n.split("::", 1)[-1])
-                red += 1
-            else:
-                lines.append("%-4s GREEN 守卫缺陷！  %s" % (mid, desc))
-                green += 1
-        finally:
-            path.write_bytes(original)
-            if bak.exists():
-                bak.unlink()
-            assert _md5(path) == hashlib.md5(original).hexdigest(), (
-                "还原失败：%s" % path
-            )
-
-    lines.append("")
-    lines.append("汇总：RED=%d  GREEN=%d  ANCHOR-MISS=%d  / 共 %d"
-                 % (red, green, miss, len(MUTATIONS)))
-    OUT.write_text("\n".join(lines), encoding="utf-8")
-    print("\n".join(lines))
-    return 0 if (green == 0 and miss == 0) else 1
-
-
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(
+        run_cli(
+            mutations=MUTATIONS,
+            guard_files=GUARD_FILES,
+            repo=REPO,
+            description="附注文案卫生 + 可扩位行守卫变异检验",
+            backend_args=BE_ARGS,
+            baseline_backend_passed=BASELINE_BE_PASSED,
+            # 原脚本 docstring 明写「基线可能本就有红」；当前确有 1 条并发导致的
+            # 既存失败（见模块 docstring）。差集判定不受既存失败影响。
+            allow_dirty_baseline=True,
+        )
+    )

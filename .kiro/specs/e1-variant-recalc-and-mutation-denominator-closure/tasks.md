@@ -137,27 +137,32 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 迁移后确认七项能力齐全（Property 27）
   - _Requirements: 7.1, 7.3, 7.4_
 
-- [ ] 12. 迁移其余 5 个已归档 spec 的脚本
-  - `mutate_h_cycle_guards.py` · `mutate_g7_column_alignment_guards.py` · `mutate_trim_decision_guards.py` · `mutate_note_conversion_section_mapping_guards.py` · `mutate_note_text_hygiene_and_expandable.py`
+- [ ] 12. 迁移其余 5 个已归档 spec 的脚本 —— **迁移承诺以此 5 个为全部，不随 spec 归档扩张**
+  - 🔴 **范围锁死（2026-08-16 收敛）**：本任务的 5 个 = `h_cycle` · `g7_column_alignment` · `trim_decision` · `note_conversion_section_mapping` · `note_text_hygiene_and_expandable`。**其余存量脚本一律不迁**（R7.5 / design 批次表修订）—— 立项后一周内 `k_cycle`(1558 行) / `i_cycle` / `l_cycle` 三个 spec 全部归档，若沿用「归档即必迁」会让待迁面从 5 膨胀到 10+，且每个都要逐条等价性验证。**归属状态不是迁移判据。**
+  - **已完成 2 个（前序会话，工作树待提交）**：`note_conversion_section_mapping`（277 → 157 行，9 条声明，含 `line` 消歧与 `wants` 多目标）· `note_text_hygiene_and_expandable`（220 → 184 行，18 条声明，`want=ANY_RED` 弱判据 + `allow_dirty_baseline=True`）。两者 `--list` 校验的锚点唯一命中与分母定位均已通过
+  - **待做 3 个**：`h_cycle`（489 行，🔴 用 `groups`「变异 → 测试组」模型，与共享件的 `want` 模型**不同构**，声明需重写，是三者里最实的一件）· `g7_column_alignment`（515 行）· `trim_decision`（736 行，用 `scope`+`offset` 相对定位与 `expect_red` 多目标，共享件已吸收这两项能力）
   - 每个都按 Task 11 的等价性流程（迁移前矩阵 → 迁移 → 迁移后矩阵 → 逐一比对）（Property 26）
   - 顺带补齐它们缺的能力：`g7` 缺 md5 还原核验 · `h_cycle`/`note_text_hygiene`/`note_conversion` 缺 WRONG-TEST 态 · 五个全缺覆盖面分母与静态锚点自检（Property 27）
   - 补分母时守卫文件全集要**真查**该 spec 的守卫文件（从其 tasks.md 或 CI job 反查），不得随手列几个凑数 —— 分母不全等于分母无效
   - 迁移中发现的既有判据缺陷（无效变异、锚点已漂移、want 定位不到）**如实登记不顺手改**（Property 28），除非不改无法完成迁移，此时在实录写明理由
   - _Requirements: 7.1, 7.3, 7.4, 7.6_
 
-- [ ] 13. Task 3 入库脚本的迁移决策
-  - 对 Task 3 入库的 7~8 个脚本，逐个判「迁移后能否复现原判定」
-  - 能复现的迁移（走 Task 11 的等价性流程）；不能复现的**不迁**并写明原因（Property 26 / AC 7.2）
-  - 这批脚本属已归档 spec 且从未入库，可能存在「写完就没再跑过」的情况 ⇒ 先跑一遍取当前判定矩阵，若脚本本身已失效（锚点全 MISS）则登记为「历史产物，保留但不迁」，不强行修复
+- [ ] 13. Task 3 入库脚本的迁移决策 —— **决策为「不迁」，本任务只做登记与实证**
+  - 🔴 **决策（2026-08-16）**：7 个 `mutate_task*.py`（3108 行）**全部不迁**，进冻结名单。理由三条：① R5 的目标是**入库**（防「工作树一丢即蒸发」），Task 3 已达成，迁移共享件是另一件事；② 迁移需逐条等价性验证（Property 26），7 个脚本 84 条变异的验证成本远超收益；③ 它们所属 spec 已归档、无人维护，迁移后的回归风险由本 spec 承担而收益归零
+  - 本任务的实际交付 = **把不迁理由写进冻结名单的注释**（每条一句话，供后来者判断是否值得迁），而不是逐个跑判定矩阵
+  - 顺带登记 Wave 1 已发现的既有缺陷（Property 28，只登记不修）：`mutate_task23_baseline_guards.py` 的 **T23-4 / T23-8** 锚点在 `ProcedureTrimming.vue` 零命中（取金额逻辑已重构为 `resolveAccountAmount`，该 spec 归档时这两条变异就已失效）
   - _Requirements: 7.2_
 
-- [ ] 14. 采纳守卫 + 在办 spec 登记
-  - 新建 `backend/tests/test_mutation_kit_adoption.py`：扫 `backend/scripts/{check,diagnose}/mutate*.py`，未 `from _mutation_kit import` 且不在豁免表 ⇒ 失败（Property 29）
-  - 判据不能是「文件里出现 `_mutation_kit` 字符串」（注释里提一句就绿了）⇒ 用 AST 解析真实 import 语句
-  - 在豁免表补登在办 spec 的 3 个脚本（若 Task 4 已登记则复核其 `reason`/`revoke_when` 仍准确）（Property 18 / AC 7.5）
-  - 变异检验：新增一个不带分母的临时脚本 ⇒ 采纳守卫必红；把某脚本从豁免表移除 ⇒ 必红（Property 29）
+- [ ] 14. 采纳守卫（存量冻结名单形态）+ 豁免表收敛
+  - 🔴 **形态修订（2026-08-16，实现前撤回全局阻断）**：原设计「扫全部 `mutate*.py`，未用共享件且不在豁免表 ⇒ 失败」是**过度强制** —— 已归档 spec 的脚本无法合法豁免（失效检测会打红），于是每归档一个 spec 就强制迁移一批脚本，无自然终点。改为**存量冻结名单**：名单外（= 本 spec 之后新建的）未采纳即失败，名单内只 INFO。收敛可行的依据是本任务与 CI 接线**当时尚未实现**，故是「不建造」而非返工
+  - 新建 `backend/tests/test_mutation_kit_adoption.py`：
+    - `_LEGACY_NOT_REQUIRED` 冻结名单（存量脚本 + 每条一句不迁理由），**只许缩小**（某脚本被迁移后移除），新增条目即失败（否则新脚本把自己加进名单就能逃避约束 = 名单退化成免责声明）
+    - 名单外脚本必须真 `from _mutation_kit import` ⇒ **AST 解析真实 import 语句**，不用字符串匹配（注释里提一句就绿是假绿第②源）
+    - 名单内未采纳的输出 INFO 不失败（Property 29 的反向不变量①：不得让「归档即必迁」跑步机重现）
+  - 豁免表收敛（AC 8.5）：撤销 `k_cycle` / `i_cycle` / `ie_lifecycle` 三项 —— 它们**均已被 git 跟踪**（立项时分别是 `??` / `A ` / clean），tracked 豁免已成死条目；`_revoked_log` 留档撤销理由。只留 `wp_export_resolver`（仍 `??` 未跟踪，其 spec `workpaper-import-export-lifecycle-closure` 仍在 active 区，失效检测不会误报）
+  - 变异检验（Property 29 三条）：① 新增一个名单外、不采纳的临时脚本 ⇒ 必红；② 把某存量脚本移出名单 ⇒ 必红；③ **反向**：名单内未采纳的存量脚本不得让守卫红（否则跑步机重现）
   - 临时脚本用完即删，并复扫确认无残留
-  - _Requirements: 7.5, 8.1, 8.2_
+  - _Requirements: 7.5, 8.1, 8.2, 8.5_
 
 - [ ] 15. A 组变异检验
   - 用**本 spec 的共享件**新建 `backend/scripts/diagnose/mutate_e1_variant_recalc_guards.py`（自举：推广的第一个真实用例）
@@ -168,14 +173,15 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 覆盖面 tally 必须显示「0 个守卫文件未被打红」
   - _Requirements: 2.5, 4.4_
 
-- [ ] 16. B 组变异检验
-  - 在 Task 15 的脚本里加一组，或另建脚本，覆盖 B 组守卫
-  - 变异至少覆盖：`anchor.py` 的唯一性断言删掉（应打红 Property 20 的唯一性用例）· `apply.py` 的 md5 核验删掉（应打红）· `coverage.py` 的 tally 输出删掉（应打红）· `cli.py` 的 `--check-anchors` 改成会写文件（应打红 Property 23）· `--list` 的校验删掉只留打印（应打红 Property 24）· 豁免表失效检测删掉（应打红 Property 30）
-  - 结果必须全 RED，四态逐条记录
+- [ ] 16. B 组变异 —— **已由 Wave 3 自举完成，本任务只做只读确认 + 采纳守卫补一组**
+  - 🔴 **范围收缩（2026-08-16）**：本任务原文要求的六项变异（`anchor.py` 唯一性 · `apply.py` md5 核验 · `coverage.py` tally · `--check-anchors` 只读 · `--list` 校验 · 豁免失效检测）**Wave 3 的 `mutate_mutation_kit_guards.py` 已全部覆盖并实测 15/15 全 RED**（M01~M16），无需重做
+  - 自举变异的定位改为**一次性加固产物，不作常驻 CI 固件**：它是「跑变异的框架的守卫的变异」= 第 5~6 层 meta，价值已在 Wave 3 兑现（抓出两个真实缺口：定位期换行检查无测试覆盖 → 冻结基线 62→63 · 两个治理守卫从未被反证 → 补 M14~M16）。文件保留作历史证据
+  - 本任务实交付两件：① 跑 `mutate_mutation_kit_guards.py --check-anchors`（只读、秒级）确认 15 条锚点在共享件本轮改动后**仍可定位**（体系未漂移的最便宜判据）② 给 Task 14 新建的采纳守卫补一组变异（Property 29 的三条，含反向不变量）
   - _Requirements: 8.2_
 
 - [ ] 17. CI 接线（归因型验收）
-  - 在 `.github/workflows/governance-checks.yml` 新增 job：A 组前端守卫（vitest）+ B 组后端守卫（pytest）+ 共享件能力守卫 + `--check-anchors` 静态自检
+  - 在 `.github/workflows/governance-checks.yml` 新增 job，**只挂三项**（AC 8.3）：① A 组前端守卫（vitest：`e1BankDetailFxForm` + `e1BankVariantIntegrity`）② B 组后端守卫（pytest：共享件能力守卫 + 治理三守卫）③ `--check-anchors` 静态自检
+  - 🔴 **不挂全局采纳强制**：采纳守卫（Task 14）本身作为普通 pytest 用例随②进 CI，但其判据是「冻结名单外必须采纳」而非全局阻断 ⇒ 存量脚本不会让 CI 红。这是本轮收敛的核心，别在接线时把它改回全局
   - 挂 CI 前逐个验证引用文件 **exists + tracked**（沿用本轮复盘的「37/37」判据形态），干净 checkout 下可跑（Property 31）
   - 🔴 改 yml 用 `fs_append` 或精确 `str_replace`；验收用**归因型**判据（变动是否落在本 spec 的字节区间内），**不用**「其他 job 一个都没变」的全局等值型 —— 并发会话同时改该文件是常态，全局等值必假红（Property 32）
   - 记录改动前后的 job 总数与本 spec 新增的 job 名，作归因证据
@@ -201,6 +207,53 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - _Requirements: 无新增 AC（收口任务）_
 
 ## Notes
+
+### 🔴 范围收敛决策（2026-08-16，用户质疑「是否存在过度设计」后重审）
+
+**结论：B 组的「全局强制采纳 + 豁免机构 + 永续迁移」被判定为过度设计并在实现前撤回；A 组与共享件本体、能力守卫、覆盖面分母全部保留。**
+
+#### 病灶定位：一条需求（R8.1）+ 一处未落地的 CI 接线
+
+```
+R8.1 全局扫描 mutate*.py，未 import 共享件即失败
+   └→ 已归档 spec 的脚本无法合法豁免（R8.5 失效检测打红）
+        └→ 每归档一个 spec = 强制迁移它的变异脚本
+             └→ 豁免表 + 失效检测 = 为管理这个强制而生的二级机构
+```
+
+**没有自然终止条件**：实测立项后一周内 `k_cycle`(1558 行) / `i_cycle`(508) / `l_cycle`(270) 三个 spec 全部归档，待迁面从钦定的 5 个膨胀到 10+ 个，每个都要逐条等价性验证，而产出仅是「让 CI 变绿」。
+
+**收敛成本接近零**：重审时实测 `governance-checks.yml` 里 `mutation_kit|e1_variant` **零命中**、Task 14 未实现 ⇒ 跑步机是**尚未建造**的设计，收敛是「不建造」而非返工。
+
+#### 规模量化（判定依据）
+
+| 层 | 规模 | 判定 |
+|---|---|---|
+| A 组业务修复 | +62/−1 行 + 41 例守卫 | **必要**，已入库 |
+| 工具层 `anchor`/`apply`/`runner`/`verdict`/`coverage` | 563 行 | **必要** —— 逐项对应实测坑（CRLF md5 漂移 · vitest JSON 不产出 · `-k` 经 shell 被拆 · 括号配对截块） |
+| 能力守卫 `test_mutation_kit_capabilities.py` | 614 行 / 40 例 | **合理** —— 全是行为测试（构造失效场景→断言必报错），被 12+ 脚本复用的基础库该有此密度 |
+| 覆盖面分母 `coverage.py` | 85 行 | **必要** —— 真实发现「21 条变异全 RED 时 7 个守卫文件从未被反证」 |
+| `cli.py` 四子命令 | 385 行 | 偏大但可辩护（`--list` 四合一有 g7「只打印恒绿」教训背书） |
+| 自举变异 | 292 行 / 15 条 | **一次性价值已兑现，不宜常驻**（第 5~6 层 meta） |
+| 全局强制采纳 + 豁免机构 | 未实现 + 186 行 | **过度，撤回** |
+
+A 组 63 行 ↔ B 组装置约 2455 行。B 组是平台投资、服务对象是所有后续脚本，不完全对等，但「强制全平台迁移」这部分投入产出确实倒挂。
+
+#### 一处定性纠正（防砍错方向）
+
+**病不在「过度防御」，在「过度强制 + 过度 meta 层数」。** 读完共享件 8 个模块 1215 行后确认：每一处 fail-closed（豁免解析失败即抛 · 空分母即抛 · 还原 md5 不符即抛）都有实测事故背书，`test_reverse_selfcheck_*` 是正当技术。把病因定性成「防御过度」会导致去砍那些有据的 fail-closed —— 砍错地方。
+
+#### 修订后的 R8.1 形态：存量冻结名单
+
+- 名单外（= 本 spec 之后新建的脚本）未采纳共享件 ⇒ **失败**（R8.1 User Story「下一个 spec 不能又抄一份不带分母的样板」由此完整覆盖）
+- 名单内未采纳 ⇒ 只 INFO
+- 名单**只许缩小**（某脚本被迁移后移除），新增条目即失败（防名单退化成免责声明）
+- 豁免表收窄为**仅服务入库守卫**：入库是一次性动作（`git add` 一次即永久成立），适合「豁免 + 失效检测」；采纳共享件是持续性改造，用冻结名单管理
+
+#### 归因已查清的两笔（Property 28，只登记不改）
+
+1. **`mutate_note_conversion_section_mapping_guards.py` 的 M9 永远判不出 RED** —— 其 `wants`（`test_self_call_counts_as_consumer` / `test_no_method_is_orphaned`）在 `test_note_conversion_v2_removal.py` 里，而 `BE_ARGS` 只跑 `test_note_conversion_section_mapping.py`。🔴 **归因 = 原脚本固有，非迁移引入**：`git show HEAD` 实测原脚本 `TARGET_TESTS` 同样只有 `section_mapping.py`（`V2R` 仅用作变异目标路径）⇒ 迁移是行为等价的，Property 26 成立。
+2. **`mutate_task23_baseline_guards.py` 的 T23-4 / T23-8 锚点零命中** —— Wave 1 已登记，取金额逻辑重构为 `resolveAccountAmount` 后失效。
 
 ### 立项时的实证基线（2026-08-15，只读零改动）
 

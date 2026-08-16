@@ -26,6 +26,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .verdict import ANY_RED
+
 #: 支持的变异种类。
 #:
 #: - ``replace`` 单行整行替换（``anchor`` 是去掉行尾后的整行文本）
@@ -127,9 +129,19 @@ def validate_mutation(m: Mutation) -> list[str]:
             errs.append("anchor 带行尾字符 —— 应传去掉行尾后的整行文本")
 
     if not m.want and not m.wants:
-        errs.append("want / wants 都为空 —— 无期望打红的测试则无法判 RED/WRONG-TEST")
+        errs.append(
+            "want / wants 都为空 —— 无期望打红的测试则无法判 RED/WRONG-TEST。"
+            '若原判据本就是「任何新增失败即 RED」（迁移等价场景），请显式写 want="*"'
+        )
     if m.wants and any(not w for w in m.wants):
         errs.append("wants 里有空串 —— 空模式会匹配任何失败名，等于放弃判据")
+    if ANY_RED in ((m.want,) + tuple(m.wants)) and (
+        len([p for p in ((m.want,) + tuple(m.wants)) if p]) > 1
+    ):
+        errs.append(
+            f'want="{ANY_RED}"（任何新增失败即 RED）与具体目标混用无意义 —— '
+            "前者已包含后者，混写会让读者以为判据比实际强"
+        )
     if not m.why or len(m.why) < 8:
         errs.append("why 缺失或过短 —— 必须写明为什么这条变异不是无效变异")
 

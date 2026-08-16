@@ -238,12 +238,21 @@ def run_cli(
     baseline_backend_passed: int | None = None,
     baseline_frontend_passed: int | None = None,
     guard_roots: tuple[str, ...] = DEFAULT_GUARD_ROOTS,
+    allow_dirty_baseline: bool = False,
     argv: list[str] | None = None,
 ) -> int:
     """变异检验统一入口。
 
     :param guard_files: **必填** —— 覆盖面分母（守卫文件名 → 归属说明）
     :param baseline_backend_passed: 冻结基线；不符时 WARN（改基线必须说明来源）
+    :param allow_dirty_baseline: 允许基线含既存失败。默认 False（ABORT）。
+
+        差集判定（`added = current - baseline`）在脏基线下**仍然有效**，但基线非空
+        通常意味着环境漂移或依赖问题，此时变异结果的可解读性下降，故默认拦住。
+
+        显式开启的场景只有一个：**迁移等价** —— 某些存量脚本的判据本来就允许脏基线
+        （如 `mutate_note_text_hygiene_and_expandable` 的 docstring 明写「基线可能本就有红」），
+        迁移不该让原本能跑的脚本变成不能跑。开启时必须在调用处写明理由。
     """
     _reconfigure_stdio()
     tally = CoverageTally(guard_files)  # 空分母在此直接抛，不给「后面再说」的机会
@@ -312,9 +321,14 @@ def run_cli(
         baselines[side] = res.failed
         print(f"  {res.summary}")
         print(f"  失败名集合：{sorted(res.failed) or '空集'}")
-        if res.failed:
+        if res.failed and not allow_dirty_baseline:
             print("  [ABORT] 基线非空，变异差集判定不可信")
+            print("          若该脚本的判据本就允许脏基线（差集 added = current - baseline "
+                  "不受既存失败影响），传 allow_dirty_baseline=True 并在脚本里写明理由")
             return 4
+        if res.failed:
+            print(f"  [WARN] 基线非空但已显式允许：{len(res.failed)} 条既存失败。"
+                  "差集判定仍有效，但既存失败的成因应单独查清")
         if frozen is not None and res.passed != frozen:
             print(f"  [WARN] 与冻结基线 {frozen} passed 不符（实测 {res.passed}）"
                   " —— 改基线必须同时说明来源")

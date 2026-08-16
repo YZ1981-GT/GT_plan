@@ -29,6 +29,10 @@ REPO = Path(__file__).resolve().parents[2]
 EXEMPTIONS = REPO / "backend/data/mutation_kit_exemptions.json"
 SPECS_DIR = REPO / ".kiro/specs"
 
+#: 本 spec 目录名 —— 用作「扫描机制是否有效」的结构判据（见
+#: :func:`test_active_spec_scan_is_not_empty`），不用 active spec 的**数量**做判据。
+SELF_SPEC = "e1-variant-recalc-and-mutation-denominator-closure"
+
 REQUIRED_FIELDS = ("script", "spec", "reason", "registered_at", "revoke_when")
 MIN_REASON_LEN = 10
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -111,9 +115,22 @@ def test_no_duplicate_script_entries() -> None:
 
 
 def test_active_spec_scan_is_not_empty() -> None:
-    """扫描本身要有产出 —— 扫到 0 个会让失效检测把**所有**豁免都判成失效（假红）。"""
+    """扫描本身要有产出 —— 扫到 0 个会让失效检测把**所有**豁免都判成失效（假红）。
+
+    🔴 **判据不用「数量 >= N」**：active spec 数随归档进度自然下降，把当时的环境值
+    当基线就是 memory 记的「守卫把错值锁死」的镜像形态（这里表现为假红）。本条第一版
+    写 `len(active) >= 3`，2026-08-16 实测即被打红 —— 当时 active 区只剩 2 个
+    （本 spec + `workpaper-import-export-lifecycle-closure`），而扫描完全正常。
+
+    改用**结构判据**：本 spec 目录若还在磁盘上，就必须能被扫到 —— 扫描路径写错时
+    它同样扫不到，故有区分能力；写成条件形式则本 spec 归档后不会留下假红的雷。
+    """
     active = active_spec_dirs()
-    assert len(active) >= 3, f"active spec 目录只扫到 {len(active)} 个，疑似扫描路径失效：{active}"
+    assert active, "active spec 目录扫到 0 个 ⇒ 扫描路径失效，失效检测会把所有豁免误判为失效"
+    if (SPECS_DIR / SELF_SPEC).is_dir():
+        assert SELF_SPEC in active, (
+            f"本 spec 目录在磁盘上却未被扫到 ⇒ 扫描逻辑失效。实扫：{sorted(active)}"
+        )
 
 
 def test_no_stale_exemption_after_spec_archived() -> None:
