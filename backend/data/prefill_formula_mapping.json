@@ -5375,25 +5375,25 @@
       ],
       "cells": [
         {
-          "cell_ref": "存货成本_A类",
+          "cell_ref": "存货成本_XX分类1",
           "formula": "=AUX('1403','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "A 类存货账面成本（按存货分类维度）"
         },
         {
-          "cell_ref": "存货成本_B类",
+          "cell_ref": "存货成本_XX分类2",
           "formula": "=AUX('1403','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "B 类存货账面成本"
         },
         {
-          "cell_ref": "跌价准备_A类",
+          "cell_ref": "跌价准备_XX分类1",
           "formula": "=AUX('1461','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "A 类已计提跌价准备"
         },
         {
-          "cell_ref": "跌价准备_B类",
+          "cell_ref": "跌价准备_XX分类2",
           "formula": "=AUX('1461','存货分类','XX分类','期末余额')",
           "formula_type": "AUX",
           "description": "B 类已计提跌价准备"
@@ -5408,23 +5408,23 @@
     },
     {
       "wp_code": "F2",
-      "wp_name": "长库龄呆滞超保质期明细",
-      "sheet": "长库龄 呆滞 超过保质期存货明细表F2-48",
+      "wp_name": "XX分类3XX分类4超保质期明细",
+      "sheet": "XX分类3 XX分类4 超过保质期存货明细表F2-48",
       "account_codes": [
         "1403"
       ],
       "cells": [
         {
-          "cell_ref": "长库龄_账面金额",
+          "cell_ref": "XX分类3_账面金额",
           "formula": "=AUX('1403','库龄','XX分类','期末余额')",
           "formula_type": "AUX",
-          "description": "库龄分析维度 → 长库龄账面金额（依赖项目 aux_type=库龄）"
+          "description": "库龄分析维度 → XX分类3账面金额（依赖项目 aux_type=库龄）"
         },
         {
-          "cell_ref": "呆滞_账面金额",
+          "cell_ref": "XX分类4_账面金额",
           "formula": "=AUX('1403','库龄','XX分类','期末余额')",
           "formula_type": "AUX",
-          "description": "库龄分析维度 → 呆滞账面金额"
+          "description": "库龄分析维度 → XX分类4账面金额"
         }
       ]
     },
@@ -7755,37 +7755,37 @@
       "cells": [
         {
           "cell_ref": "金融机构_TOP1_期初余额",
-          "formula": "=AUX('2001','金融机构','TOP1','期初余额')",
+          "formula": "=AUX('2001','金融机构','XX单位1','期初余额')",
           "formula_type": "AUX",
           "description": "短期借款按金融机构辅助核算 TOP1 期初余额"
         },
         {
           "cell_ref": "金融机构_TOP1_期末余额",
-          "formula": "=AUX('2001','金融机构','TOP1','期末余额')",
+          "formula": "=AUX('2001','金融机构','XX单位1','期末余额')",
           "formula_type": "AUX",
           "description": "短期借款按金融机构辅助核算 TOP1 期末余额"
         },
         {
           "cell_ref": "金融机构_TOP2_期初余额",
-          "formula": "=AUX('2001','金融机构','TOP2','期初余额')",
+          "formula": "=AUX('2001','金融机构','XX单位2','期初余额')",
           "formula_type": "AUX",
           "description": "短期借款按金融机构辅助核算 TOP2 期初余额"
         },
         {
           "cell_ref": "金融机构_TOP2_期末余额",
-          "formula": "=AUX('2001','金融机构','TOP2','期末余额')",
+          "formula": "=AUX('2001','金融机构','XX单位2','期末余额')",
           "formula_type": "AUX",
           "description": "短期借款按金融机构辅助核算 TOP2 期末余额"
         },
         {
           "cell_ref": "金融机构_TOP3_期初余额",
-          "formula": "=AUX('2001','金融机构','TOP3','期初余额')",
+          "formula": "=AUX('2001','金融机构','XX单位3','期初余额')",
           "formula_type": "AUX",
           "description": "短期借款按金融机构辅助核算 TOP3 期初余额"
         },
         {
           "cell_ref": "金融机构_TOP3_期末余额",
-          "formula": "=AUX('2001','金融机构','TOP3','期末余额')",
+          "formula": "=AUX('2001','金融机构','XX单位3','期末余额')",
           "formula_type": "AUX",
           "description": "短期借款按金融机构辅助核算 TOP3 期末余额"
         },
@@ -8023,31 +8023,31 @@
       "cells": [
         {
           "cell_ref": "成本中心_TOP1_期初余额",
-          "formula": "=AUX('2701','成本中心','TOP1','期初余额')",
+          "formula": "=AUX('2701','成本中心','XX单位1','期初余额')",
           "formula_type": "AUX",
           "description": "长期应付款按成本中心辅助核算 TOP1 期初余额"
         },
         {
           "cell_ref": "成本中心_TOP1_期末余额",
-          "formula": "=AUX('2701','成本中心','TOP1','期末余额')",
+          "formula": "=AUX('2701','成本中心','XX单位1','期末余额')",
           "formula_type": "AUX",
           "description": "长期应付款按成本中心辅助核算 TOP1 期末余额"
         },
         {
           "cell_ref": "成本中心_TOP2_期初余额",
-          "formula": "=AUX('2701','成本中心','TOP2','期初余额')",
+          "formula": "=AUX('2701','成本中心','XX单位2','期初余额')",
           "formula_type": "AUX",
           "description": "长期应付款按成本中心辅助核算 TOP2 期初余额"
         },
         {
           "cell_ref": "成本中心_TOP2_期末余额",
-          "formula": "=AUX('2701','成本中心','TOP2','期末余额')",
+          "formula": "=AUX('2701','成本中心','XX单位2','期末余额')",
           "formula_type": "AUX",
           "description": "长期应付款按成本中心辅助核算 TOP2 期末余额"
         },
         {
           "cell_ref": "项目名称_TOP1_期末余额",
-          "formula": "=AUX('2701','项目名称','TOP1','期末余额')",
+          "formula": "=AUX('2701','项目名称','XX单位1','期末余额')",
           "formula_type": "AUX",
           "description": "长期应付款按项目名称辅助核算 TOP1 期末余额"
         }
@@ -8063,19 +8063,19 @@
       "cells": [
         {
           "cell_ref": "利息费用_客户TOP1_借方",
-          "formula": "=AUX('6603','客户','TOP1','借方发生额')",
+          "formula": "=AUX('6603','客户','XX单位1','借方发生额')",
           "formula_type": "AUX",
           "description": "财务费用按客户辅助核算 TOP1 借方发生额（利息支出）"
         },
         {
           "cell_ref": "利息费用_客户TOP2_借方",
-          "formula": "=AUX('6603','客户','TOP2','借方发生额')",
+          "formula": "=AUX('6603','客户','XX单位2','借方发生额')",
           "formula_type": "AUX",
           "description": "财务费用按客户辅助核算 TOP2 借方发生额"
         },
         {
           "cell_ref": "利息费用_客户TOP3_借方",
-          "formula": "=AUX('6603','客户','TOP3','借方发生额')",
+          "formula": "=AUX('6603','客户','XX单位3','借方发生额')",
           "formula_type": "AUX",
           "description": "财务费用按客户辅助核算 TOP3 借方发生额"
         },
