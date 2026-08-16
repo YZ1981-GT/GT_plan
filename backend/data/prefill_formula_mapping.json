@@ -3212,27 +3212,27 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('2501','期初余额')",
+          "formula": "=TB('2231','期初余额')",
           "formula_type": "TB",
-          "description": "从试算表取长期借款审定表期初余额"
+          "description": "从试算表取应付利息期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('2501','期末余额')",
+          "formula": "=TB('2231','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取长期借款审定表期末余额（未审）"
+          "description": "从试算表取应付利息期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('2501','aje_net')",
+          "formula": "=ADJ('2231','aje_net')",
           "formula_type": "ADJ",
-          "description": "长期借款审定表审计调整分录净额"
+          "description": "应付利息审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('2501','rje_net')",
+          "formula": "=ADJ('2231','rje_net')",
           "formula_type": "ADJ",
-          "description": "长期借款审定表重分类调整分录净额"
+          "description": "应付利息重分类调整分录净额"
         },
         {
           "cell_ref": "上年审定数",
@@ -3292,27 +3292,27 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('2601','期初余额')",
+          "formula": "=TB('2502','期初余额')",
           "formula_type": "TB",
-          "description": "从试算表取租赁负债审定表期初余额"
+          "description": "从试算表取应付债券期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('2601','期末余额')",
+          "formula": "=TB('2502','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取租赁负债审定表期末余额（未审）"
+          "description": "从试算表取应付债券期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('2601','aje_net')",
+          "formula": "=ADJ('2502','aje_net')",
           "formula_type": "ADJ",
-          "description": "租赁负债审定表审计调整分录净额"
+          "description": "应付债券审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('2601','rje_net')",
+          "formula": "=ADJ('2502','rje_net')",
           "formula_type": "ADJ",
-          "description": "租赁负债审定表重分类调整分录净额"
+          "description": "应付债券重分类调整分录净额"
         },
         {
           "cell_ref": "上年审定数",
@@ -3332,27 +3332,27 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('2502','期初余额')",
+          "formula": "=TB('2701','期初余额')",
           "formula_type": "TB",
-          "description": "从试算表取应付债券审定表期初余额"
+          "description": "从试算表取长期应付款期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('2502','期末余额')",
+          "formula": "=TB('2701','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取应付债券审定表期末余额（未审）"
+          "description": "从试算表取长期应付款期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('2502','aje_net')",
+          "formula": "=ADJ('2701','aje_net')",
           "formula_type": "ADJ",
-          "description": "应付债券审定表审计调整分录净额"
+          "description": "长期应付款审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('2502','rje_net')",
+          "formula": "=ADJ('2701','rje_net')",
           "formula_type": "ADJ",
-          "description": "应付债券审定表重分类调整分录净额"
+          "description": "长期应付款重分类调整分录净额"
         },
         {
           "cell_ref": "上年审定数",
@@ -3372,27 +3372,27 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('2701','期初余额')",
+          "formula": "=TB('2711','期初余额')",
           "formula_type": "TB",
-          "description": "从试算表取长期应付款审定表期初余额"
+          "description": "从试算表取专项应付款期初余额"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('2701','期末余额')",
+          "formula": "=TB('2711','期末余额')",
           "formula_type": "TB",
-          "description": "从试算表取长期应付款审定表期末余额（未审）"
+          "description": "从试算表取专项应付款期末余额（未审）"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('2701','aje_net')",
+          "formula": "=ADJ('2711','aje_net')",
           "formula_type": "ADJ",
-          "description": "长期应付款审定表审计调整分录净额"
+          "description": "专项应付款审计调整分录净额"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('2701','rje_net')",
+          "formula": "=ADJ('2711','rje_net')",
           "formula_type": "ADJ",
-          "description": "长期应付款审定表重分类调整分录净额"
+          "description": "专项应付款重分类调整分录净额"
         },
         {
           "cell_ref": "上年审定数",
@@ -3410,27 +3410,27 @@
       "cells": [
         {
           "cell_ref": "期初余额",
-          "formula": "=TB('2801','期初余额')",
-          "formula_type": "TB",
-          "description": "从试算表取预计负债审定表期初余额"
+          "formula": "=PLACEHOLDER('其他非流动负债期初余额')",
+          "formula_type": "PLACEHOLDER",
+          "description": "其他非流动负债期初余额需手工填列。其他非流动负债在 CAS 会计科目表中无专属科目，本项目需按实际情况手工填列。不得采用 2801（预计负债，归 K5 循环）或 2901（递延所得税负债，归 N 循环）—— report_config 的 BS-071/BS-097 引用的 2901 与 BS-070/BS-096 撞码，故 L7 的 fallback_codes 为空元组、报表公式解析成功也不采用（宁缺勿造）。"
         },
         {
           "cell_ref": "未审数",
-          "formula": "=TB('2801','期末余额')",
-          "formula_type": "TB",
-          "description": "从试算表取预计负债审定表期末余额（未审）"
+          "formula": "=PLACEHOLDER('其他非流动负债期末余额（未审）')",
+          "formula_type": "PLACEHOLDER",
+          "description": "其他非流动负债期末余额（未审）需手工填列。其他非流动负债在 CAS 会计科目表中无专属科目，本项目需按实际情况手工填列。不得采用 2801（预计负债，归 K5 循环）或 2901（递延所得税负债，归 N 循环）—— report_config 的 BS-071/BS-097 引用的 2901 与 BS-070/BS-096 撞码，故 L7 的 fallback_codes 为空元组、报表公式解析成功也不采用（宁缺勿造）。"
         },
         {
           "cell_ref": "AJE调整",
-          "formula": "=ADJ('2801','aje_net')",
-          "formula_type": "ADJ",
-          "description": "预计负债审定表审计调整分录净额"
+          "formula": "=PLACEHOLDER('其他非流动负债审计调整分录净额')",
+          "formula_type": "PLACEHOLDER",
+          "description": "其他非流动负债审计调整分录净额需手工填列。其他非流动负债在 CAS 会计科目表中无专属科目，本项目需按实际情况手工填列。不得采用 2801（预计负债，归 K5 循环）或 2901（递延所得税负债，归 N 循环）—— report_config 的 BS-071/BS-097 引用的 2901 与 BS-070/BS-096 撞码，故 L7 的 fallback_codes 为空元组、报表公式解析成功也不采用（宁缺勿造）。"
         },
         {
           "cell_ref": "RJE调整",
-          "formula": "=ADJ('2801','rje_net')",
-          "formula_type": "ADJ",
-          "description": "预计负债审定表重分类调整分录净额"
+          "formula": "=PLACEHOLDER('其他非流动负债重分类调整分录净额')",
+          "formula_type": "PLACEHOLDER",
+          "description": "其他非流动负债重分类调整分录净额需手工填列。其他非流动负债在 CAS 会计科目表中无专属科目，本项目需按实际情况手工填列。不得采用 2801（预计负债，归 K5 循环）或 2901（递延所得税负债，归 N 循环）—— report_config 的 BS-071/BS-097 引用的 2901 与 BS-070/BS-096 撞码，故 L7 的 fallback_codes 为空元组、报表公式解析成功也不采用（宁缺勿造）。"
         },
         {
           "cell_ref": "上年审定数",
@@ -4426,30 +4426,6 @@
           "formula": "=WP('K8','明细表K8-2','本期发生额合计')",
           "label": "审定表与 K8-2 明细表本期发生额合计勾稽",
           "description": ""
-        }
-      ]
-    },
-    {
-      "wp_code": "L1",
-      "wp_name": "债务分析程序",
-      "sheet": "分析程序L1-3",
-      "account_codes": [
-        "2001",
-        "2201",
-        "2501"
-      ],
-      "cells": [
-        {
-          "cell_ref": "上年审定数",
-          "formula": "=PREV('L1','分析程序L1-3','审定数')",
-          "formula_type": "PREV",
-          "description": "上年同底稿分析程序审定数"
-        },
-        {
-          "cell_ref": "本年未审数",
-          "formula": "=TB_SUM('2001~2501','期末余额')",
-          "formula_type": "TB_SUM",
-          "description": "从试算表取债务期末余额合计（未审）"
         }
       ]
     },
@@ -7941,9 +7917,9 @@
       ]
     },
     {
-      "wp_code": "L5",
+      "wp_code": "L4",
       "wp_name": "应付债券明细表",
-      "sheet": "明细表L5-2",
+      "sheet": "应付债券明细表L4-2",
       "account_codes": [
         "2502"
       ],
@@ -7981,9 +7957,9 @@
       ]
     },
     {
-      "wp_code": "L6",
+      "wp_code": "L5",
       "wp_name": "长期应付款明细表",
-      "sheet": "明细表L6-2",
+      "sheet": "明细表L5-2",
       "account_codes": [
         "2701"
       ],

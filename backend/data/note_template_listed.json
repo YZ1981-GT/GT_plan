@@ -24821,10 +24821,14 @@
           "name": "期末发行在外的优先股、永续债等其他金融工具变动情况",
           "headers": [
             "发行在外的金融工具",
-            "期初",
-            "本期增加",
-            "本期减少",
-            "期末"
+            "数量",
+            "账面价值",
+            "数量",
+            "账面价值",
+            "数量",
+            "账面价值",
+            "数量",
+            "账面价值"
           ],
           "rows": [
             {
@@ -24841,31 +24845,80 @@
             {
               "key": "label",
               "label": "发行在外的金融工具",
-              "is_label": true,
-              "flat": true
+              "is_label": true
             },
             {
               "key": "begin_count",
-              "label": "期初",
-              "format": "amount"
+              "label": "数量",
+              "format": "amount",
+              "group": "期初余额"
+            },
+            {
+              "key": "begin_value",
+              "label": "账面价值",
+              "format": "amount",
+              "group": "期初余额"
             },
             {
               "key": "increase_count",
-              "label": "本期增加",
-              "format": "amount"
+              "label": "数量",
+              "format": "amount",
+              "group": "本期增加"
+            },
+            {
+              "key": "increase_value",
+              "label": "账面价值",
+              "format": "amount",
+              "group": "本期增加"
             },
             {
               "key": "decrease_count",
-              "label": "本期减少",
-              "format": "amount"
+              "label": "数量",
+              "format": "amount",
+              "group": "本期减少"
+            },
+            {
+              "key": "decrease_value",
+              "label": "账面价值",
+              "format": "amount",
+              "group": "本期减少"
             },
             {
               "key": "end_count",
-              "label": "期末",
-              "format": "amount"
+              "label": "数量",
+              "format": "amount",
+              "group": "期末余额"
+            },
+            {
+              "key": "end_value",
+              "label": "账面价值",
+              "format": "amount",
+              "group": "期末余额"
             }
           ],
-          "guidance": "期末发行在外的优先股、永续债等其他金融工具数量变动情况。如无发行在外的优先股/永续债，本表可删除。"
+          "guidance": "期末发行在外的优先股、永续债等其他金融工具数量及账面价值变动情况。如无发行在外的优先股/永续债，本表可删除。源模板 r063/r064 为两级表头（4 组各含数量+账面价值）。",
+          "_column_groups": [
+            {
+              "group": "期初余额",
+              "start": 1,
+              "span": 2
+            },
+            {
+              "group": "本期增加",
+              "start": 3,
+              "span": 2
+            },
+            {
+              "group": "本期减少",
+              "start": 5,
+              "span": 2
+            },
+            {
+              "group": "期末余额",
+              "start": 7,
+              "span": 2
+            }
+          ]
         }
       ],
       "text_sections": [
@@ -24910,8 +24963,8 @@
       "sort_index": 45,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:08:41"
+      "_aligned_by": "fix_note_l_cycle_structure_v2",
+      "_aligned_at": "2026-08-16 17:06:20"
     },
     {
       "section_number": "五、47",
@@ -25168,7 +25221,7 @@
               "format": "text"
             }
           ],
-          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 L6 专项应付款底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。"
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 **L6 专项应付款**底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。"
         }
       ],
       "text_sections": [
@@ -25196,7 +25249,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure",
-      "_aligned_at": "2026-07-31 10:36:27"
+      "_aligned_at": "2026-08-16 17:06:20"
     },
     {
       "section_number": "五、49",

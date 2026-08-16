@@ -15105,22 +15105,23 @@
           ],
           "columns": [
             {
-              "key": "项目",
+              "key": "label",
               "label": "项目",
-              "flat": true,
-              "is_label": true
+              "is_label": true,
+              "flat": true
             },
             {
-              "key": "期末余额",
+              "key": "end_amount",
               "label": "期末余额",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "期初余额",
+              "key": "prior_amount",
               "label": "期初余额",
-              "flat": true
+              "format": "amount"
             }
-          ]
+          ],
+          "guidance": "勾稽：合计 = 各项之和。数据来源 L3-1 审定表。一年内到期部分从长期借款中拆出，应与 八、53 主表的「减：一年内到期的长期借款」行一致。"
         }
       ],
       "text_sections": [],
@@ -15138,8 +15139,8 @@
       "sort_index": 44,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_by": "fix_note_l_cycle_structure_v2",
+      "_aligned_at": "2026-08-16 17:06:20"
     },
     {
       "section_number": "八、46",
@@ -15165,32 +15166,33 @@
           ],
           "columns": [
             {
-              "key": "债券名称",
+              "key": "label",
               "label": "债券名称",
-              "flat": true,
-              "is_label": true
+              "is_label": true,
+              "flat": true
             },
             {
-              "key": "面值",
+              "key": "face_value",
               "label": "面值",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "发行日期",
+              "key": "issue_date",
               "label": "发行日期",
-              "flat": true
+              "format": "text"
             },
             {
-              "key": "债券期限",
+              "key": "bond_term",
               "label": "债券期限",
-              "flat": true
+              "format": "text"
             },
             {
-              "key": "发行金额",
+              "key": "issue_amount",
               "label": "发行金额",
-              "flat": true
+              "format": "amount"
             }
-          ]
+          ],
+          "guidance": "一年内到期的应付债券基本信息表（面值/发行日期/期限/发行金额）。数据来源 L4 应付债券底稿。"
         },
         {
           "name": "一年内到期的应付债券",
@@ -15212,42 +15214,43 @@
           ],
           "columns": [
             {
-              "key": "债券名称",
+              "key": "label",
               "label": "债券名称",
-              "flat": true,
-              "is_label": true
+              "is_label": true,
+              "flat": true
             },
             {
-              "key": "期初余额",
+              "key": "begin_amount",
               "label": "期初余额",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "本期发行",
+              "key": "issued",
               "label": "本期发行",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "按面值计提利息",
+              "key": "interest_accrued",
               "label": "按面值计提利息",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "溢折价摊销",
+              "key": "premium_discount",
               "label": "溢折价摊销",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "本期偿还",
+              "key": "repaid",
               "label": "本期偿还",
-              "flat": true
+              "format": "amount"
             },
             {
-              "key": "期末余额",
+              "key": "end_amount",
               "label": "期末余额",
-              "flat": true
+              "format": "amount"
             }
-          ]
+          ],
+          "guidance": "一年内到期的应付债券增减变动表。勾稽：期末余额 = 期初余额 + 本期发行 + 按面值计提利息 + 溢折价摊销 - 本期偿还。数据来源 L4 应付债券底稿。"
         }
       ],
       "text_sections": [
@@ -15270,8 +15273,8 @@
       "sort_index": 45,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-07 17:32:07"
+      "_aligned_by": "fix_note_l_cycle_structure_v2",
+      "_aligned_at": "2026-08-16 17:06:20"
     },
     {
       "section_number": "八、47",
@@ -16043,7 +16046,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 L6 专项应付款底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 **L6 专项应付款**底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
         }
       ],
       "text_sections": [
@@ -16072,7 +16075,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure",
-      "_aligned_at": "2026-07-31 10:36:27"
+      "_aligned_at": "2026-08-16 17:06:20"
     },
     {
       "section_number": "八、54",
@@ -16822,8 +16825,8 @@
           "name": "其他非流动负债",
           "headers": [
             "项目",
-            "期末余额",
-            "期初余额"
+            "年初余额",
+            "期末余额"
           ],
           "rows": [
             {
@@ -16848,17 +16851,17 @@
               "flat": true
             },
             {
-              "key": "end_amount",
-              "label": "期末余额",
+              "key": "prior_amount",
+              "label": "年初余额",
               "format": "amount"
             },
             {
-              "key": "prior_amount",
-              "label": "期初余额",
+              "key": "end_amount",
+              "label": "期末余额",
               "format": "amount"
             }
           ],
-          "guidance": "勾稽：合计 = 各项目之和。数据来源 L7-1 审定表 / L7-2 明细表。注：本表列序为「期末余额 / 期初余额」（附注交付物口径），源模板底稿录入界面为「年初余额 / 期末余额」。"
+          "guidance": "勾稽：合计 = 各项目之和。数据来源 L7-1 审定表 / L7-2 明细表。列序按源模板（项目/年初余额/期末余额），与上市侧（期末数/上年年末数）相反是源模板事实。"
         }
       ],
       "text_sections": [],
@@ -16875,8 +16878,8 @@
       "sort_index": 56,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "fix_note_l_cycle_structure",
-      "_aligned_at": "2026-07-31 09:54:24"
+      "_aligned_by": "fix_note_l_cycle_structure_v2",
+      "_aligned_at": "2026-08-16 17:06:20"
     },
     {
       "section_number": "八、58",
