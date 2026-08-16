@@ -46,6 +46,7 @@ from ._l_preset_criteria import (  # noqa: F401
     CROSS_CYCLE_ALLOWLIST,
     MIN_L_BLOCK_COUNT,
     MIN_REASON_CHARS,
+    OUT_OF_SCOPE_WP_CODES,
     PREFILL_PATH,
     TEMPLATE_DIR,
     WP_CODES_WITHOUT_SPEC,
@@ -245,6 +246,58 @@ class TestClassAInfrastructure:
             )
             assert allow.codes or allow.labels, (
                 f"{_CLASS_A} 白名单条目 {_fmt_key(key)} 既不放行科目码也不放行科目名，是空条目"
+            )
+
+    def test_out_of_scope_registry_entries_have_reason(self):
+        """范围外登记必须带理由与归属方 —— 否则退化成永久逃逸阀。"""
+        assert OUT_OF_SCOPE_WP_CODES, (
+            f"{_CLASS_A} 范围外登记表为空；若确已无范围外循环，请连同"
+            "evaluate_block_sheet_existence / evaluate_block_range_health 里的"
+            "registry 分支一并删除，不要留空表"
+        )
+        for wp, reason in sorted(OUT_OF_SCOPE_WP_CODES.items()):
+            assert len(reason.strip()) >= MIN_REASON_CHARS, (
+                f"{_CLASS_A} 范围外条目 {wp} 的理由过短"
+                f"（{len(reason.strip())} 字，下限 {MIN_REASON_CHARS}）"
+            )
+            assert "owner" in reason, (
+                f"{_CLASS_A} 范围外条目 {wp} 未写明 owner，无人认领的豁免等于永久欠账"
+            )
+
+    def test_out_of_scope_does_not_mask_in_scope_cycles(self):
+        """🔴 反向自检：只许放行 L0，L1~L8 的缺陷必须修而不是豁免。
+
+        这条是本登记表的唯一防滥用闸门 —— 按 wp_code 粒度豁免比按块豁免宽，
+        故必须钉死「宽到什么程度」：恰好是 spec R11.1 声明的那一个循环。
+        """
+        assert set(OUT_OF_SCOPE_WP_CODES) == {"L0"}, (
+            f"{_CLASS_A} 范围外登记应恰为 {{'L0'}}（spec R11.1 唯一声明的范围外循环），"
+            f"实际 {sorted(OUT_OF_SCOPE_WP_CODES)}；"
+            "L1~L8 出现在此表即为拿豁免绕过本 spec 该修的缺陷"
+        )
+
+    def test_out_of_scope_exemption_actually_narrows_nothing_in_scope(
+        self, l_blocks, l_specs, visible_sheets
+    ):
+        """反向自检：撤掉豁免后，红的只能是 L0 —— 证明豁免没顺手盖住 L1~L8。
+
+        判据形态是「传空登记表重算」，而不是信注释 —— 若某天豁免被误扩到 L3，
+        本条会因为 L3 出现在 offenders 里而打红。
+        """
+        for evaluate, arg in (
+            (evaluate_block_sheet_existence, visible_sheets),
+            (evaluate_block_range_health, l_specs),
+        ):
+            offenders = {
+                _block_key(b)
+                for b in l_blocks
+                if evaluate(b, arg, out_of_scope={})
+            }
+            in_scope = sorted(k for k in offenders if k[0] != "L0")
+            assert not in_scope, (
+                f"{_CLASS_A} 撤掉豁免后 L1~L8 仍有块被 {evaluate.__name__} 打红: "
+                f"{[_fmt_key(k) for k in in_scope]}；"
+                "这些是本 spec 该修的缺陷，不得靠豁免掩盖"
             )
 
     def test_cross_cycle_allowlist_is_not_stale(self, l_blocks):

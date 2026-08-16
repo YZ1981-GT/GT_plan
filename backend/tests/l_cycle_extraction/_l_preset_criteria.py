@@ -32,6 +32,7 @@ __all__ = [
     "CrossCycleAllowance",
     "CROSS_CYCLE_ALLOWLIST",
     "WP_CODES_WITHOUT_SPEC",
+    "OUT_OF_SCOPE_WP_CODES",
     "CLEAN_BLOCK_BASELINE",
     "PLACEHOLDER_MIN_DESC_CHARS",
     "extract_formula_codes",
@@ -104,6 +105,32 @@ CROSS_CYCLE_ALLOWLIST = {
             "与长期借款本金一起反算实际利率并核对资本化与费用化的划分；"
             "源模板 利息测算表L3-5 即按此编制，故 L3 块引用 6603 是合法的审计口径。"
         ),
+    ),
+}
+
+#: 本 spec 范围外的缺陷登记（**按 wp_code 粒度**，非按块）。
+#:
+#: 🔴 粒度选择的实测依据（2026-08-16）：先按「块」登记过 `("L0","审定表L0-1")`，
+#: 结果配上「不得过期」自检后无法同时对两个状态成立 —— 共享工作树里另一条并发流
+#: 已把该块迁为 `函证结果汇总表L0-1`（未提交）⇒ 登记表在工作树里是过期的、
+#: 在 HEAD 里是必需的，同一份判据两处结论相反。改按 wp_code 粒度后无此脆性：
+#: 块在则豁免、块被修好后也无需清理条目。
+#:
+#: 语义上 wp_code 粒度也更贴 spec：Requirement 11.1 是「涉及 L0 函证循环则不改任何
+#: L0 组件与配置」——整个循环范围外，不是某一块范围外。
+#:
+#: 具体已知缺陷（供 owner 方接手时定位，本 spec 不处置）：
+#:   L0/审定表L0-1  ①sheet 不在 L0 源 xlsx 的 9 张 visible tab 内（真实 tab 是
+#:                    '函证结果汇总表L0-1'）⇒ 预设永远匹配不到底稿 sheet；
+#:                  ②TB_SUM('2001~2501') 病态区间横跨 L1(2001)/L2(2231)/L3(2501)，
+#:                    与本 spec 已删的幽灵块 'L1/分析程序L1-3' 是同一错误形态。
+#: owner: l0-confirmation-source-alignment（已归档，需另立任务重开）
+OUT_OF_SCOPE_WP_CODES = {
+    "L0": (
+        "L0 债务循环函证枢纽，spec Requirement 11.1 明确范围外（已由归档 spec "
+        "l0-confirmation-source-alignment 收口）。其预设块存在 sheet 名不实与病态区间"
+        "两处真实缺陷（详见上方注释），本 spec 只登记不处置 —— 改它属越权，"
+        "且实测另一条并发流正在修。owner: l0-confirmation-source-alignment。"
     ),
 }
 
@@ -457,9 +484,14 @@ def evaluate_block_description_coherence(
     return tuple(problems)
 
 
-def evaluate_block_sheet_existence(block: dict, visible_sheets: dict) -> tuple:
+def evaluate_block_sheet_existence(
+    block: dict, visible_sheets: dict, out_of_scope=None
+) -> tuple:
     """Property 4：块的 sheet 必须是该 wp_code 源 xlsx 的真实 visible tab。"""
     wp, sheet = _block_key(block)
+    registry = OUT_OF_SCOPE_WP_CODES if out_of_scope is None else out_of_scope
+    if wp in registry:
+        return ()
     names = visible_sheets.get(wp)
     if names is None:
         return (f"源模板目录里找不到 wp_code={wp} 对应的 xlsx，无法校验 sheet {sheet!r}",)
@@ -499,9 +531,12 @@ def evaluate_block_prev_targets(block: dict, visible_sheets: dict) -> tuple:
     return tuple(problems)
 
 
-def evaluate_block_range_health(block: dict, specs: dict) -> tuple:
+def evaluate_block_range_health(block: dict, specs: dict, out_of_scope=None) -> tuple:
     """Property 5：区间函数不得跨循环。"""
     wp, _sheet = _block_key(block)
+    registry = OUT_OF_SCOPE_WP_CODES if out_of_scope is None else out_of_scope
+    if wp in registry:
+        return ()
     code_owner = build_code_owner_index(specs)
     problems = []
     for cell in block.get("cells") or []:
