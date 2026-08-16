@@ -175,21 +175,28 @@ L4_L_T4_GUIDANCE = (
 )
 
 L4_L_T5_NAME = "期末发行在外的优先股、永续债等其他金融工具变动情况"
-L4_L_T5_COLS = flat_columns([
-    ("label", "发行在外的金融工具", None),
-    ("begin_count", "期初", AMOUNT),
-    ("increase_count", "本期增加", AMOUNT),
-    ("decrease_count", "本期减少", AMOUNT),
-    ("end_count", "期末", AMOUNT),
-])
+L4_L_T5_COLS = grouped_columns(
+    ("label", "发行在外的金融工具"),
+    [
+        ("begin_count", "数量", AMOUNT, "期初余额"),
+        ("begin_value", "账面价值", AMOUNT, "期初余额"),
+        ("increase_count", "数量", AMOUNT, "本期增加"),
+        ("increase_value", "账面价值", AMOUNT, "本期增加"),
+        ("decrease_count", "数量", AMOUNT, "本期减少"),
+        ("decrease_value", "账面价值", AMOUNT, "本期减少"),
+        ("end_count", "数量", AMOUNT, "期末余额"),
+        ("end_value", "账面价值", AMOUNT, "期末余额"),
+    ],
+)
 # 删除 header_label 假行（压扁的第二行表头残留），保留真实数据行 + 合计行
 L4_L_T5_ROWS: list[dict[str, Any]] = [
     {"label": "工具1", "row_type": "data"},
     {"label": "合计", "is_total": True, "row_type": "total"},
 ]
 L4_L_T5_GUIDANCE = (
-    "期末发行在外的优先股、永续债等其他金融工具数量变动情况。"
+    "期末发行在外的优先股、永续债等其他金融工具数量及账面价值变动情况。"
     "如无发行在外的优先股/永续债，本表可删除。"
+    "源模板 r063/r064 为两级表头（4 组各含数量+账面价值）。"
 )
 
 # ─── 国企 八、50 应付债券 ─── 2 表

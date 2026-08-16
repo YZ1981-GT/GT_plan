@@ -324,10 +324,13 @@ def plan_l7_listed() -> tuple[list[dict[str, Any]], list[str], list[str], list[s
 
 def plan_l7_soe() -> tuple[list[dict[str, Any]], list[str], list[str], list[str]]:
     """八、57 其他非流动负债（国企）。"""
+    # 🔴 2026-08-15 更新：本 spec 裁决 C 推翻原「有意不改」决策，
+    # 列序改为与源模板一致（项目/年初余额/期末余额）。
+    # key 保持不变（prior_amount 仍是期初、end_amount 仍是期末），只改 label 与数组顺序。
     cols = kit.flat_columns([
         ("label", "项目", None),
+        ("prior_amount", "年初余额", AMOUNT),
         ("end_amount", "期末余额", AMOUNT),
-        ("prior_amount", "期初余额", AMOUNT),
     ])
     plan = [
         kit.rule(
@@ -335,8 +338,7 @@ def plan_l7_soe() -> tuple[list[dict[str, Any]], list[str], list[str], list[str]
             cols,
             kit.labels_then_total(["待转销项税额", "合同负债"]),
             "勾稽：合计 = 各项目之和。数据来源 L7-1 审定表 / L7-2 明细表。"
-            "注：本表列序为「期末余额 / 期初余额」（附注交付物口径），"
-            "源模板底稿录入界面为「年初余额 / 期末余额」。",
+            "列序按源模板（项目/年初余额/期末余额），与上市侧（期末数/上年年末数）相反是源模板事实。",
         ),
     ]
     return plan, ["其他非流动负债"], [], []

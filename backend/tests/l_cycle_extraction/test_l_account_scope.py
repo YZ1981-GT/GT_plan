@@ -252,16 +252,62 @@ def test_split_current_portion_cycles_expose_the_bucket():
 @pytest.mark.parametrize(
     ("standards", "expected_first"),
     [
-        (["listed_standalone", "listed", "standalone"], "BS-044"),
+        (["listed_standalone", "listed", "standalone"], "BS-041"),
         (["soe_standalone", "soe", "standalone"], "BS-055"),
         ([], "BS-055"),
     ],
 )
 def test_pick_row_codes_follows_standard(standards, expected_first):
-    """报表行编码按准则挑选（同科目两准则编码不同）。"""
+    """报表行编码按准则挑选（同科目两准则编码不同）。
+
+    🔴 2026-08-05：listed 侧期望值由 `BS-044` 改为 `BS-041` —— 原值是 `report_config`
+    实证的**应付票据**（`TB('2201')`，四准则一致），短期借款正解是
+    `BS-041 = TB('2001','期末余额')`。本断言此前**镜像了该缺陷**。
+    """
     codes = pick_row_codes("L1", standards)
     assert codes[0] == expected_first
-    assert set(codes) == {"BS-044", "BS-055"}
+    assert set(codes) == {"BS-041", "BS-055"}
+
+
+def test_l1_listed_row_code_is_not_notes_payable():
+    """反向自检：L1 listed 行号不得再指向应付票据行 `BS-044`（F3 的科目）。"""
+    spec = L_CYCLE_SPECS["L1"]
+    assert spec.row_code_listed == "BS-041", (
+        f"L1 listed 行号应为 BS-041 短期借款（实为 {spec.row_code_listed}）；"
+        "BS-044 是应付票据 TB('2201')，取到的是 F3 的钱"
+    )
+    assert "BS-044" not in (spec.row_code_listed, spec.row_code_soe)
+
+
+@pytest.mark.parametrize(
+    ("wp", "expected_row", "banned_row", "banned_desc"),
+    [
+        # 🔴 L3/L4 的 soe 行号原本指向权益段，是 **V138 造成的活跃回归**：
+        #    V138 前 BS-085 写 TB('4102')（零命中，错误被掩盖）、BS-086 写 TB('4103')
+        #    （本年利润）；V138 改对成 4003/4301 后，长期借款/应付债券开始取到权益科目。
+        ("L3", "BS-061", "BS-085", "其他综合收益 TB('4003')，M9 的行"),
+        ("L4", "BS-062", "BS-086", "专项储备 TB('4301')，M7 的行"),
+    ],
+)
+def test_l_soe_row_codes_are_not_equity_rows(wp, expected_row, banned_row, banned_desc):
+    """L3/L4 的 soe 报表行必须与 listed 同为负债段行，不得落在权益段。"""
+    spec = L_CYCLE_SPECS[wp]
+    assert spec.row_code_soe == expected_row, (
+        f"{wp} soe 行号应为 {expected_row}（实为 {spec.row_code_soe}）"
+    )
+    assert banned_row not in pick_row_codes(wp, ["soe_standalone"]), (
+        f"{wp} 不得再尝试 {banned_row} —— 它是{banned_desc}"
+    )
+
+
+def test_l5_listed_row_code_is_not_deferred_income():
+    """L5 长期应付款 listed 行号不得指向递延收益行 `BS-066`（K7 的科目）。"""
+    spec = L_CYCLE_SPECS["L5"]
+    assert spec.row_code_listed == "BS-064", (
+        f"L5 listed 行号应为 BS-064 长期应付款（实为 {spec.row_code_listed}）；"
+        "BS-066 是递延收益 TB('2811')，且 2811 全库科目表零命中 → 表现为恒空"
+    )
+    assert "BS-066" not in pick_row_codes("L5", ["listed_standalone"])
 
 
 def test_pick_row_codes_skips_missing_variant():
@@ -274,6 +320,54 @@ def test_pick_row_codes_skips_missing_variant():
 def test_pick_row_codes_empty_for_cycle_without_report_line():
     """L6 无报表行 → 返回空（走纯兜底路径）。"""
     assert pick_row_codes("L6", ["soe_standalone"]) == []
+
+
+# ---------------------------------------------------------------------------
+# L7 宁缺勿造 + row_code 双真源冻结（spec l-cycle-…completion R8.5, R9.1~R9.5）
+# ---------------------------------------------------------------------------
+
+
+def test_l7_fallback_codes_empty_and_row_code_frozen():
+    """L7 宁缺勿造：兜底码为空 + 报表行号冻结。
+
+    BS-071/BS-097 的公式是 TB('2901') = 递延所得税负债（撞码），
+    但 L7 保留这两个 row_code 是为了在溯源面板展示「report_config 引用了什么」。
+    因 fallback_codes 为空，row_code 只影响展示不影响取数。
+    """
+    spec = L_CYCLE_SPECS["L7"]
+    assert spec.fallback_codes == (), (
+        f"L7 兜底码应为空元组（宁缺勿造），实际 {spec.fallback_codes!r}"
+    )
+    assert spec.row_code_listed == "BS-071", (
+        f"L7 listed row_code 应为 BS-071，实际 {spec.row_code_listed!r}"
+    )
+    assert spec.row_code_soe == "BS-097", (
+        f"L7 soe row_code 应为 BS-097，实际 {spec.row_code_soe!r}"
+    )
+
+
+def test_l7_dual_source_row_code_divergence_is_intentional():
+    """双真源收敛断言：两份 L_CYCLE_SPECS 的 L7 row_code 故意不同（有理由）。
+
+    - l_cycle_extraction/account_scope.py: BS-071/BS-097（render 消费，展示 report_config 事实）
+    - four_table/l_cycle_specs.py: BS-068（semantic_account_resolver 消费，语义正确的行）
+    两者都对各自的消费者有意义，不是分叉。
+    """
+    from app.services.four_table.l_cycle_specs import L7_SPEC as l7_semantic
+
+    # 生产真源
+    l7_render = L_CYCLE_SPECS["L7"]
+
+    # 两份 row_code 确实不同
+    assert l7_render.row_code_listed != l7_semantic.row_code, (
+        "两份 L7 row_code 变成一样了 → 必须确认这个改动是否有意"
+    )
+    # 语义侧是 BS-068（其他非流动负债）
+    assert l7_semantic.row_code == "BS-068"
+    # render 侧是 BS-071（冻结）
+    assert l7_render.row_code_listed == "BS-071"
+    # 因为兜底码为空，两侧取数结果逐字节相同（都是 0）
+    assert l7_render.fallback_codes == ()
 
 
 # ---------------------------------------------------------------------------

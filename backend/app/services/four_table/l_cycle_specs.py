@@ -97,6 +97,20 @@ L6_SPEC = SemanticAccountSpec(
 
 L7_SPEC = SemanticAccountSpec(
     row_code="BS-068",  # 其他非流动负债 = TB('2911')（原写 BS-066 实为递延收益/K7）
+    #
+    # 🔴 双真源标注（spec l-cycle-…completion R9.4）：
+    #    另一份 = `l_cycle_extraction/account_scope.py` 的 L_CYCLE_SPECS["L7"]
+    #    （row_code_listed="BS-071", row_code_soe="BS-097"）。
+    #    那份被 render 真实消费：下发 tb_source_codes 给审定表溯源面板，
+    #    保留 BS-071/BS-097 是为了展示「report_config 公式引用了 TB('2901')」
+    #    这个审计追溯事实（即使该公式不被采纳）。
+    #    本文件用 BS-068 是因为 semantic_account_resolver 的定位链路需要
+    #    一个公式**语义正确**的报表行来做层③反解——BS-068 的 TB('2911')
+    #    才能让"本项目有 2911 科目时"正确定位。
+    #    两者不同是有意设计，因 L7 兜底码为空，无论走哪个 row_code 最终取数都是 0。
+    #
+    #    消费关系：`l0_book_amounts.py` 用 `L4_SPEC` / `L5_SPEC` 做函证金额（含 `is` 断言），
+    #    L7_SPEC 无类似消费。
     slots=(
         # 🔴 2801 已被 K5 预计负债认领（DB 实证：account_chart 5 条 / tb_balance 39 行）
         #    其他非流动负债在实务中是**报表行**、由多个明细科目归集 → 宁缺勿造不给兜底码。

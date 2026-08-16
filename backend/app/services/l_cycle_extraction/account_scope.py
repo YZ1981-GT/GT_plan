@@ -269,14 +269,35 @@ _L8_BUCKETS: tuple[LBucket, ...] = (
     ),
 )
 
+# 🔴 2026-08-05 修正：本文件的 `row_code` 与 `four_table/l_cycle_specs.py`（2026-08-03 已按
+# `report_config` 对账改正）**长期分叉** —— 本文件才是 render 消费的那一份，却一直没跟上。
+# 逐行 DB 实证（`report_config`，四准则 listed_standalone / listed_consolidated /
+# soe_standalone / soe_consolidated 全查，`is_deleted=false`）::
+#     BS-041 短期借款      TB('2001','期末余额')   四准则一致   ← L1 正解
+#     BS-044 应付票据      TB('2201','期末余额')   四准则一致   ← L1 原值，取的是 F3 的科目
+#     BS-055 短期借款      formula NULL（仅 soe）               ← L1 soe，名对但无公式→走兜底
+#     BS-061 长期借款      TB('2501','期末余额')   四准则一致   ← L3 正解
+#     BS-062 应付债券      TB('2502','期末余额')   四准则一致   ← L4 正解
+#     BS-064 长期应付款    TB('2701','期末余额')   四准则一致   ← L5 正解
+#     BS-066 递延收益      TB('2811','期末余额')   四准则一致   ← L5 原值（K7 的行）
+#     BS-085 其他综合收益  TB('4003','期末余额')   四准则一致   ← L3 原值（M9 的行）
+#     BS-086 专项储备      TB('4301','期末余额')   四准则一致   ← L4 原值（M7 的行）
+# `account_chart` 双向对账：2001 短期借款（standard 9 / client 6）· 2501 长期借款（8/5）·
+# 2502 应付债券（8/5）· 2701 长期应付款（8/5）· 2201 应付票据（10/7）·
+# 4003 其他综合收益（5/8）· 4301 专项储备（8/4）；**2811 全库两张科目表零命中**。
 L_CYCLE_SPECS: dict[str, LCycleSpec] = {
     "L1": LCycleSpec(
         wp_code="L1",
         account_label="短期借款",
-        row_code_listed="BS-044",
+        # 🔴 原写 `BS-044` = **应付票据** `TB('2201')`（四准则一致）→ listed 项目的短期借款
+        #    审定表取到应付票据余额（`resolve_report_line_accounts` 解析成功即 break，
+        #    兜底 2001 永远用不上）。正解 `BS-041 短期借款 = TB('2001','期末余额')`。
+        row_code_listed="BS-041",
         row_code_soe="BS-055",
         fallback_codes=("2001",),
-        source_ref="report_config BS-044/BS-055 = TB('2001','期末余额')；tb_balance 2001 无子科目",
+        source_ref="report_config BS-041 = TB('2001','期末余额')（四准则一致）；"
+        "BS-055（仅 soe）row_name 亦为短期借款但 formula NULL → 该分支回退兜底；"
+        "tb_balance 2001 无子科目",
     ),
     "L2": LCycleSpec(
         wp_code="L2",
@@ -292,31 +313,48 @@ L_CYCLE_SPECS: dict[str, LCycleSpec] = {
         wp_code="L3",
         account_label="长期借款",
         row_code_listed="BS-061",
-        row_code_soe="BS-085",
+        # 🔴 原写 `BS-085` = **其他综合收益** `TB('4003')`（M9 的行）。这是 **V138 造成的
+        #    活跃回归**：V138 之前 BS-085 的公式是 `TB('4102')`（该码全库零命中）→ 虽解析
+        #    成功但取不到数，错误被掩盖；V138 把它改对成 `TB('4003')`（4003 确实存在）后，
+        #    soe 项目的长期借款审定表开始取到**其他综合收益**的余额。
+        #    正解 = 与 listed 同一行 `BS-061 长期借款 = TB('2501','期末余额')`（四准则一致，
+        #    长期借款在 soe 侧没有独立行号）。
+        row_code_soe="BS-061",
         fallback_codes=("2501",),
         buckets=_L3_BUCKETS,
         split_current_portion=True,
-        source_ref="report_config BS-061/BS-085 = TB('2501','期末余额')；tb_balance 2501.01/.02",
+        source_ref="report_config BS-061 = TB('2501','期末余额')（四准则一致）；"
+        "tb_balance 2501.01/.02",
     ),
     "L4": LCycleSpec(
         wp_code="L4",
         account_label="应付债券",
         row_code_listed="BS-062",
-        row_code_soe="BS-086",
+        # 🔴 原写 `BS-086` = **专项储备** `TB('4301')`（M7 的行）。同 L3，属 **V138 造成的
+        #    活跃回归**：V138 前 BS-086 写 `TB('4103')`（实为「本年利润」，确实存在）→ 早已
+        #    取错；V138 改对成 `TB('4301')` 后改为取到**专项储备**。两种情形都不是应付债券。
+        #    正解 = 与 listed 同一行 `BS-062 应付债券 = TB('2502','期末余额')`（四准则一致）。
+        row_code_soe="BS-062",
         fallback_codes=("2502",),
         buckets=_L4_BUCKETS,
         split_current_portion=True,
-        source_ref="report_config BS-062/BS-086 = TB('2502','期末余额')；tb_balance 2502.01~.03",
+        source_ref="report_config BS-062 = TB('2502','期末余额')（四准则一致）；"
+        "tb_balance 2502.01~.03",
     ),
     "L5": LCycleSpec(
         wp_code="L5",
         account_label="长期应付款",
-        row_code_listed="BS-066",
+        # 🔴 原写 `BS-066` = **递延收益** `TB('2811')`（K7 的行）→ listed 项目的长期应付款
+        #    取到递延收益的报表口径；2811 全库两张科目表零命中，故表现为「恒空」而非错数
+        #    （比 L3/L4 隐蔽）。正解 `BS-064 长期应付款 = TB('2701','期末余额')`（四准则一致）。
+        row_code_listed="BS-064",
         row_code_soe="BS-092",
         fallback_codes=("2701",),
         buckets=_L5_BUCKETS,
         split_current_portion=True,
-        source_ref="report_config BS-066/BS-092 = TB('2701','期末余额')；tb_balance 2701.01~.03/.99",
+        source_ref="report_config BS-064 = TB('2701','期末余额')（四准则一致）；"
+        "BS-092（仅 soe）row_name 亦为长期应付款但 formula NULL → 该分支回退兜底；"
+        "tb_balance 2701.01~.03/.99",
     ),
     "L6": LCycleSpec(
         wp_code="L6",
@@ -337,6 +375,14 @@ L_CYCLE_SPECS: dict[str, LCycleSpec] = {
         row_code_soe="BS-097",
         # 🔴 故意留空 = 宁缺勿造：BS-071/BS-097 的 TB('2901') 与 BS-070/BS-096
         #    递延所得税负债撞码；2801 是预计负债；客户科目表无「其他非流动负债」科目。
+        #
+        # 🔴 双真源标注（spec l-cycle-…completion R9.4）：
+        #    另一份 = `four_table/l_cycle_specs.py` 的 `L7_SPEC`（row_code="BS-068"）。
+        #    那份是 `semantic_account_resolver` 的定位链路消费——走 BS-068 的 TB('2911')
+        #    可让语义解析在本项目科目表有 2911 时正常工作。
+        #    本文件保留 BS-071/BS-097 是因为 render 下发 `tb_source_codes` 需要展示
+        #    「report_config 引用了什么公式」这个审计追溯信息（哪怕该公式不被采纳）。
+        #    两者不同是有意设计、不是分叉 —— 因 fallback_codes 为空，改 row_code 不影响取数。
         fallback_codes=(),
         source_ref=(
             "account_chart 实证 2901=递延所得税负债、2801=预计负债；"
@@ -468,8 +514,12 @@ def bucket_defs_payload(wp_code: str) -> list[dict]:
 def pick_row_codes(wp_code: str, applicable_standards) -> list[str]:
     """按适用准则挑报表行编码，返回**尝试顺序**（首选在前）。
 
-    同一科目在两套准则下报表行编码不同（短期借款 listed ``BS-044`` / soe ``BS-055``），
+    同一科目在两套准则下报表行编码可能不同（短期借款 listed ``BS-041`` / soe ``BS-055``），
     故不能只传一个。准则未知时两个都试（顺序 soe 优先 —— 平台在册项目以国企为主）。
+
+    🔴 长期借款 / 应付债券**两套准则共用同一行号**（``BS-061`` / ``BS-062``，
+    见 :data:`L_CYCLE_SPECS` 上方的 2026-08-05 修正说明）—— soe 侧没有独立行号，
+    别因为「listed 与 soe 取值相同」就以为是漏填。
     """
     spec = L_CYCLE_SPECS.get(wp_code)
     if spec is None:

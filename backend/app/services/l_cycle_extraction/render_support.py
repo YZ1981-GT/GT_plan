@@ -191,9 +191,14 @@ async def build_l_tb_payload(ctx, wp_code: str) -> dict[str, Any]:
 
     source = scope.as_dict()
     source["account_label"] = spec.account_label
+    # 前端 WpFourTableSourcePanel 期望 `row_code`（不是 `report_row_code`）
+    source["row_code"] = scope.report_row_code
+    source["row_name"] = spec.account_label
 
     # 宁缺勿造（L7）：不取数、不预填，但仍下发溯源说明供 UI 解释「为什么没有数据」
     if not scope.prefill_supported or not scope.gross_query:
+        # 🔴 前端 isTbSourceAbsent 检查 `empty_reason` 非空即判 absent
+        source["empty_reason"] = scope.note or None
         source.update(
             {
                 "leaf_total": 0,
@@ -230,6 +235,7 @@ async def build_l_tb_payload(ctx, wp_code: str) -> dict[str, Any]:
     source["parent_check"] = build_parent_check(scope, leaves, parents)
     source["current_portion"] = build_current_portion(wp_code, prefill)
     source["tb_source"] = tb.get("source")
+    source["empty_reason"] = None
 
     return {
         "trial_balance": tb,
