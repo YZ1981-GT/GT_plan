@@ -26,7 +26,79 @@ const WP_ROOT = resolve(__dirname, '..')
 const BANNER_ONLY_SOURCES = ['dataUpdatedVisible', 'upstreamUpdatedVisible', 'staleVisible']
 
 /**
- * 🔴 **完全缺失同步链路**的披露 Tab（当前 **54 个**）。
+ * 🔴 **永久豁免** —— 源模板 / 附注模板依据决定「本来就不该有同步链路」。
+ *
+ * 与 `SYNC_PATH_GAP`（真实缺口，待补）**语义不同故分表登记**。
+ * 拆分前两者混在 `MISSING_SYNC_PATH` 一张表里（6 条 = 4 豁免 + 2 缺口），
+ * 后果是「真实缺口应为 0」这个**有价值且可收敛的目标无法被断言**
+ * —— 只要还有永久豁免条目在，清单就永远非空。
+ *
+ * （spec `guard-assertion-attribution-refactor` R4.3 / Property 8、9）
+ *
+ * 🔴 每条必须写明**源模板或附注模板依据**；接错链路的后果不是「多一个空页面」，
+ * 而是**凭空新建虚构章节**或**与共节循环互相覆盖**（见各条理由）。
+ * 只许缩不许扩：新增披露 Tab 必须自带链路，不得往本表加条目绕过。
+ */
+const PERMANENT_EXEMPT: readonly string[] = [
+  // 🔴 H5 Listed **永久豁免**（有意无链路，不是缺口；spec
+  //   h-cycle-extraction-formula-and-disclosure-completion Task 11 已落地）：
+  //   已由「自造两张附注表 + AI 接线」改为**本版不适用说明页**。三条落点侧实证 ——
+  //   ① `note_template_variant_matrix.json` · `you_qi_zi_chan` 的
+  //      `listed_standalone` / `listed_consolidated` 均为 `null`
+  //   ② `note_template_listed.json` 共 204 章节，含「油气」的**实测 0 个**
+  //   ③ `h5NoteSectionMap.H5_NOTE_SECTION` 只有 `soe` 键，`buildH5SyncPayload` 恒发 soe
+  //   ⇒ 上市准则下油气资产不单独设附注章节，接链路会**凭空新建虚构章节**。
+  //   注意与 N4 国企侧**不同构**：H5 的源 sheet `附注披露信息（上市公司）` 是
+  //   visible 且**有完整 38 行四层表**（模板作者预留的通用格式），不是「内容为无」。
+  //   守卫：`h5/__tests__/h5ListedNotApplicable.spec.ts`
+  'H5TabDisclosureListed.vue',
+  // 🔴 L2 应付利息 两版写权已收敛到 L2（spec l-cycle-…completion 裁决 A）：
+  //   L2 Tab 已接 useDisclosureAutoSync + buildL2SyncPayload 推 §五、42 / §八、42
+  //   的「应付利息」+「逾期利息」子表，K3 侧已停止推送这两张表。
+  //   原 PERMANENT_EXEMPT 条目已移出。
+  // 🔴 N4 国企**豁免**：源模板 `附注披露信息（国企）` 内容为「附注披露信息：无」
+  //   → 国有企业格式不单独披露税金及附加，`note_template_variant_matrix` 的
+  //   `shui_jin_ji_fu_jia.soe_*` 为 null。该 Tab 已改为「本版不适用」说明页
+  //   （无表格、无同步按钮、`buildN4SyncPayload('soe')` 恒 null），
+  //   属**有意无链路**，不是缺口。反向锁死见 `n4NoteSectionMap.spec.ts` Property 4。
+  'N4TabDisclosureSoe.vue',
+]
+
+/**
+ * 🔴 **真实缺口** —— 应该有同步链路但还没建，待 owner spec 补齐。
+ *
+ * 与 `PERMANENT_EXEMPT` 分开的价值：本表可以、也应该**收敛到 0**，
+ * 从而成为一个真正可断言的目标（拆分前混在一起时这个目标不可表达）。
+ */
+const SYNC_PATH_GAP: readonly string[] = [
+  // 🔴 L4 应付债券（2）已接入 useDisclosureAutoSync（spec l-cycle-…completion Task 19-22）：
+  //   两版已接 buildL4SyncPayload 推 noteTexts 到 §五、46 / §八、50。
+  //   从 SYNC_PATH_GAP 移出。
+  // 'L4TabDisclosureListed.vue',  ← 已移出
+  // 'L4TabDisclosureSoe.vue',     ← 已移出
+]
+
+/**
+ * 拆分前的合并视图 —— 供「实扫 − 已登记」的关系断言使用。
+ *
+ * 🔴 保留合并视图而非在断言处每次 `[...A, ...B]`：一处定义、两处语义，
+ * 避免将来有人只往其中一张表加条目却忘了关系断言（Property 8 的「不丢不增」）。
+ */
+const ALL_DECLARED_NO_SYNC: readonly string[] = [...PERMANENT_EXEMPT, ...SYNC_PATH_GAP]
+
+/*
+ * ════════════════════════════════════════════════════════════════════════════
+ * 📜 墓碑注释块 —— 原 `MISSING_SYNC_PATH` 的完整演进记录
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * 🔴 该常量已按语义拆为上方 `PERMANENT_EXEMPT`（4 条）+ `SYNC_PATH_GAP`（2 条）。
+ *    本块**只是历史记录，不参与任何断言**；块内出现的
+ *    `'XTabDisclosure*.vue',` 是拆分前的原始清单快照，保留以便追溯。
+ *
+ *    保留理由：下面每条「已补齐」记录都写明了**是哪个 spec / 哪个 Task 补的、
+ *    补进了哪个章节、原来错在哪**（如 L7 的 `l7NoteSectionMap` 曾是死 import 且
+ *    映射本身 6 处缺陷、G6 曾是 7 个虚构小节 + 137 行 `成本项目N` 自造行）。
+ *    这些是 41 → 6 收敛过程的唯一档案，删掉就再也查不到某个 Tab 何时被谁接通。
  *
  * 📌 计数修正史：先按 emit 计入链路 → 低估为 27；改为不计 emit → 64；
  * 再加**委托解析**（`resolveDelegate`）→ 60（G10/G11 的 Listed/SOE 各是 15~21 行薄壳，
@@ -43,11 +115,14 @@ const BANNER_ONLY_SOURCES = ['dataUpdatedVisible', 'upstreamUpdatedVisible', 'st
  * 工作量对齐 F2/K1 的单循环量级 → 见 spec Task 12（按循环分批）。
  *
  * 本清单只允许**变短**：新增披露 Tab 必须自带同步链路。
- */
-const MISSING_SYNC_PATH: readonly string[] = [
+ *
+ * ── 以下为拆分前的原始清单内容（含条目与墓碑注释）────────────────────────────
+ *
   // D2（1）已补齐：薄壳 D2TabDisclosure.vue 委托 D2DisclosureNoteBody.vue
-  //   （非标委托：版本切换 + :key 挂载，resolveDelegate 无法识别但链路完整——
-  //    Body 有 useDisclosureAutoSync + syncToDisclosureNotes + scheduleAutoSync）
+  //   （非标委托：版本切换 + :key 挂载 ⇒ 要注入 :variant 故不能整体 v-bind="$props"）
+  //   🔴 2026-08-15 修：`resolveDelegate` 旧判据只认 v-bind="$props" ⇒ 把 D2 误判为
+  //      「完全无链路」并报违规（假红）。已放宽为「整体转发 ∨ 关键 prop 全转发」。
+  //      注释里当年就写了「resolveDelegate 无法识别但链路完整」却没人去修判据。
   // F4（2）已补齐：spec f-cycle-disclosure-parity R6（原为只有手动 syncToNotes、
   // 未接 useDisclosureAutoSync → 用户改数据不点按钮永不进附注）
   // G10 / G11：Listed+SOE 是薄壳，链路在 Base 里 → 由 `resolveDelegate` 解析，不算缺口
@@ -59,9 +134,17 @@ const MISSING_SYNC_PATH: readonly string[] = [
   // G8 已补齐（Task 2.4）；G9 已补齐（Task 2.5，Base + 2 个薄壳一并转绿）
   // H4（1）已补齐：接入 useDisclosureAutoSync + syncToNotes + buildH4SoeSyncPayloads
   //   推送到 §八、23 在建工程（与 H2 共享章节），子表「在建工程」汇总行
-  // H5 Listed（1）：note_template_variant_matrix 的 you_qi_zi_chan.listed_standalone=null
-  //   → 上市公司无油气资产附注披露章节，该 Tab 有意无链路（不是缺口）
-  //   后续改为「本版不适用」说明页（同 N4 国企范式）
+  // 🔴 H5 Listed（1）**永久豁免**（有意无链路，不是缺口；spec
+  //   h-cycle-extraction-formula-and-disclosure-completion Task 11 已落地）：
+  //   已由「自造两张附注表 + AI 接线」改为**本版不适用说明页**。三条落点侧实证 ——
+  //   ① `note_template_variant_matrix.json` · `you_qi_zi_chan` 的
+  //      `listed_standalone` / `listed_consolidated` 均为 `null`
+  //   ② `note_template_listed.json` 共 204 章节，含「油气」的**实测 0 个**
+  //   ③ `h5NoteSectionMap.H5_NOTE_SECTION` 只有 `soe` 键，`buildH5SyncPayload` 恒发 soe
+  //   ⇒ 上市准则下油气资产不单独设附注章节，接链路会**凭空新建虚构章节**。
+  //   注意与 N4 国企侧**不同构**：H5 的源 sheet `附注披露信息（上市公司）` 是
+  //   visible 且**有完整 38 行四层表**（模板作者预留的通用格式），不是「内容为无」。
+  //   守卫：`h5/__tests__/h5ListedNotApplicable.spec.ts`
   'H5TabDisclosureListed.vue',
   // H6（2）已补齐：改为 v-bind="$props" 薄壳，由 resolveDelegate 解析到 H6TabDisclosure.vue
   //   （已有 useDisclosureAutoSync + syncToNotes + buildH6*SyncPayloads 完整链路）
@@ -142,7 +225,11 @@ const MISSING_SYNC_PATH: readonly string[] = [
   'N4TabDisclosureSoe.vue',
   // N5 两版已补齐（Task 6）：薄壳委托 `n5/shared/N5DisclosureBody.vue`
   //   （由 `resolveDelegate` 解析），并修掉两表重名丢表 + 国企 sheet 名缺右括号
-]
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * 📜 墓碑注释块结束（以上全部为历史记录，不参与断言）
+ * ════════════════════════════════════════════════════════════════════════════
+ */
 
 /**
  * 🔴 源模板**没有**披露 sheet 的循环 —— 不得存在披露 Tab 组件。
@@ -202,7 +289,26 @@ function resolveDelegate(src: string, path: string): string | null {
   const tags = tpl.replace(/<!--[\s\S]*?-->/g, '').match(/<([A-Z][\w.]*)\b/g) ?? []
   if (tags.length !== 1) return null
   const tag = tags[0].slice(1)
-  if (!/v-bind="\$props"/.test(tpl)) return null
+
+  // 🔴 **委托的本质是「把数据源整体转发给唯一的子组件」**，`v-bind="$props"` 只是写法之一。
+  //
+  // 旧判据只认 `v-bind="$props"` ⇒ 把 `D2TabDisclosure.vue` 误判为「完全无同步链路」
+  // 并报违规。D2 实际是**非标委托**：顶部版本切换 + `:key="activeVariant"` 重建
+  // `D2DisclosureNoteBody`（持久化前缀 `D2-disc-{variant}-` 随版本变化，必须重挂），
+  // 因此要注入 `:variant="activeVariant"` 而不能整体 `v-bind="$props"`
+  // —— 逐个显式转发 `wp-id` / `project-id` / `all-responses`，链路完整。
+  // `MISSING_SYNC_PATH` 的注释早就写明「resolveDelegate 无法识别但链路完整」，
+  // 却没人去修判据 ⇒ 该条自 D2 补齐起就是**假红**（形态 A 的断言因判据能力不足而误报，
+  // 与本 spec 治的「等值断言假红」同族）。
+  //
+  // 放宽为「整体转发 ∨ 关键 prop 全转发」。放宽不会漏判：`hasAnySyncPath` 仍会
+  // **递归检查被委托组件本身有没有链路**，被委托方无链路时照样报违规（见下方反向自检）。
+  const forwardsAll = /v-bind="\$props"/.test(tpl)
+  const forwardsKeyProps = /:wp-id|:wpId/.test(tpl)
+    && /:project-id|:projectId/.test(tpl)
+    && /:all-responses|:allResponses/.test(tpl)
+  if (!forwardsAll && !forwardsKeyProps) return null
+
   const imp = new RegExp(`import\\s+${tag}\\s+from\\s+['"](.+?)['"]`).exec(src)
   if (!imp) return null
   const dir = path.replace(/[\\/][^\\/]+$/, '')
@@ -428,30 +534,66 @@ describe('披露 Tab 同步链路完整性', () => {
     return hasAnySyncPath(target, depth + 1)
   }
 
-  it('MISSING_SYNC_PATH 清单只允许变短（新增披露 Tab 必须自带同步链路）', () => {
+  it('每个无同步链路的披露 Tab 都必须已登记（豁免或缺口二者之一）', () => {
     const actual = TABS.filter((t) => !hasAnySyncPath(t)).map((t) => t.name).sort()
-    const declared = [...MISSING_SYNC_PATH].sort()
-    const unexpected = actual.filter((n) => !declared.includes(n))
+    const unexpected = actual.filter((n) => !ALL_DECLARED_NO_SYNC.includes(n))
     expect(
       unexpected,
       `以下披露 Tab 完全没有同步到附注的链路且未登记：${unexpected.join(', ')}。` +
-        `披露数据会停在 checklist_responses，附注模块永远拿不到。`,
+        `披露数据会停在 checklist_responses，附注模块永远拿不到。` +
+        `\n若确属有意无链路 → 加入 PERMANENT_EXEMPT 并写明源模板/附注模板依据；` +
+        `若是待补缺口 → 加入 SYNC_PATH_GAP 并写明 owner spec。`,
     ).toEqual([])
   })
 
-  it('MISSING_SYNC_PATH 中已补齐链路的条目必须移出', () => {
-    const fixed = MISSING_SYNC_PATH.filter((n) => {
+  it('SYNC_PATH_GAP 中已补齐链路的条目必须移出（缺口清单只许缩）', () => {
+    const fixed = SYNC_PATH_GAP.filter((n) => {
       const t = TABS.find((x) => x.name === n)
       return t && hasAnySyncPath(t)
     })
-    expect(fixed, `以下 Tab 已有同步链路，请从 MISSING_SYNC_PATH 移出：${fixed.join(', ')}`).toEqual(
-      [],
-    )
+    expect(
+      fixed,
+      `以下 Tab 已有同步链路，请从 SYNC_PATH_GAP 移出：${fixed.join(', ')}`,
+    ).toEqual([])
   })
 
-  it('MISSING_SYNC_PATH 每条都能在代码库中找到对应文件（防清单腐烂）', () => {
-    const missing = MISSING_SYNC_PATH.filter((n) => !TABS.some((t) => t.name === n))
+  /**
+   * 🔴 与上一条**方向相反**：`PERMANENT_EXEMPT` 里的条目出现链路是**真缺陷**，不是好事。
+   *
+   * 拆表前这两种情形混在同一条断言里（「已补齐的必须移出」），于是
+   * 「有人给 L2 接了链路」和「有人给 L4 接了链路」会给出同一句提示
+   * ——前者是**要撤销的错误接线**（L2 与 K3 §五、42 同章节同表名，双推互相覆盖，
+   * 谁最后保存谁赢、数据随机跳变），后者是**该庆祝的补齐**。
+   * 语义相反的两件事共用一条判据，等于把最贵的一类事故降级成了待办提醒。
+   */
+  it('PERMANENT_EXEMPT 中的条目不得出现同步链路（接了就是撞章节/造虚构章节）', () => {
+    const wired = PERMANENT_EXEMPT.filter((n) => {
+      const t = TABS.find((x) => x.name === n)
+      return t && hasAnySyncPath(t)
+    })
+    expect(
+      wired,
+      `以下 Tab 是**永久豁免**却接上了同步链路：${wired.join(', ')}。\n` +
+        `后果不是「多一个页面」而是数据事故 —— H5 Listed / N4 Soe 会**凭空新建虚构章节**` +
+        `（附注模板里根本没有该章节）；L2 两版会与 K3 §五、42/§八、42 的` +
+        `「应付利息」子表**同名互相覆盖**。\n` +
+        `请撤销接线；若确认准则口径已变 → 先改 note_template_variant_matrix.json，` +
+        `再把条目从 PERMANENT_EXEMPT 移到 SYNC_PATH_GAP。`,
+    ).toEqual([])
+  })
+
+  it('两张登记表每条都能在代码库中找到对应文件（防清单腐烂）', () => {
+    const missing = ALL_DECLARED_NO_SYNC.filter((n) => !TABS.some((t) => t.name === n))
     expect(missing, `清单中的文件已不存在，请更新：${missing.join(', ')}`).toEqual([])
+  })
+
+  it('两张登记表不得有重复条目（同一 Tab 不能既豁免又是缺口）', () => {
+    const dup = PERMANENT_EXEMPT.filter((n) => SYNC_PATH_GAP.includes(n))
+    expect(
+      dup,
+      `以下条目同时出现在 PERMANENT_EXEMPT 与 SYNC_PATH_GAP：${dup.join(', ')}。` +
+        `「有意无链路」与「待补缺口」互斥，必须二选一。`,
+    ).toEqual([])
   })
 
   // 只允许变短：G 循环批1 补 11 条 → 49；F4 两条补齐（f-cycle-disclosure-parity R6）→ 47；
@@ -467,9 +609,59 @@ describe('披露 Tab 同步链路完整性', () => {
   // H7×2 整体重建后补齐（h7-biological-assets-disclosure-rebuild）→ 21
   // J2×2 补齐（disclosure-sync-path-buildout 批6）→ 19
   // M1×2 + M2×2 + M3×1 + M6×2 + M8×2 + M10×2 补齐（m-cycle spec Wave 1~2）→ 8
-  // M9×2 补齐（Task 12）→ 6
-  it('缺链路数量记录在案（6 个）', () => {
-    expect(MISSING_SYNC_PATH.length).toBe(6)
+  // M9×2 补齐（Task 12）→ 6 = 4 永久豁免 + 2 真实缺口 → 自此拆两表分别设界
+
+  /**
+   * 🔴 天花板而非等值 —— **只许缩不许扩**。
+   *
+   * 原判据是 `expect(MISSING_SYNC_PATH.length).toBe(6)`，等值型的两个代价：
+   * ① 补齐一个 Tab（把条目从清单移出，**正确的改进**）会打红这条，
+   *    于是补齐者被迫顺手改数字，判据从「防线」退化成「记账」；
+   * ② 反过来，往清单里**加**一条（绕过守卫）只要同时把 6 改成 7 也能全绿
+   *    —— 等值断言对「变长」和「变短」一视同仁，而这两件事一个是事故一个是进步。
+   *
+   * 天花板则只在**变长**时打红，且打红时提示明确指向「不许绕过」。
+   * 变短永远不会打红，因此不会再有人为了让测试变绿而去改数字。
+   */
+  const MAX_PERMANENT_EXEMPT = 4
+  const MAX_SYNC_PATH_GAP = 2
+
+  it('PERMANENT_EXEMPT 只许缩不许扩（新增披露 Tab 不得靠加豁免绕过守卫）', () => {
+    expect(
+      PERMANENT_EXEMPT.length,
+      `永久豁免清单从 ${MAX_PERMANENT_EXEMPT} 条增长到 ${PERMANENT_EXEMPT.length} 条。` +
+        `\n豁免必须有源模板 / 附注模板依据（openpyxl 读 sheetnames 或 ` +
+        `note_template_variant_matrix.json 的 null 声明），不是「暂时没空接」的借口。` +
+        `\n若确实新增了有依据的豁免 → 连同依据一起下调本上限。`,
+    ).toBeLessThanOrEqual(MAX_PERMANENT_EXEMPT)
+  })
+
+  it('SYNC_PATH_GAP 只许缩不许扩（缺口不得新增）', () => {
+    expect(
+      SYNC_PATH_GAP.length,
+      `真实缺口从 ${MAX_SYNC_PATH_GAP} 条增长到 ${SYNC_PATH_GAP.length} 条。` +
+        `新增披露 Tab 必须自带同步链路，不得往缺口表里加。`,
+    ).toBeLessThanOrEqual(MAX_SYNC_PATH_GAP)
+  })
+
+  /**
+   * 🔴 **可收敛目标** —— 拆表后才能表达的断言。
+   *
+   * 拆表前「缺口应为 0」这个目标不可表达：清单里永远有 4 条永久豁免，
+   * 非空是常态，于是「还差多少」这个真正要紧的数字被永久遮蔽。
+   * 拆表后 `SYNC_PATH_GAP` 归零是**可达且应达**的终点 —— L4 两版补齐时这条转绿。
+   *
+   * 现在故意让它以 `toBeLessThanOrEqual` 而非 `toBe(0)` 表达，是因为 L4 需要
+   * 结构对齐重建（两级表头 9 列 + 定性披露段，同 H7 量级），owner spec
+   * `l-cycle-extraction-formula-and-disclosure-completion` 尚未排到。
+   * 一旦补齐，把上限改 0 即锁死。
+   */
+  it('真实缺口有明确终点（L4 两版补齐后应归零）', () => {
+    expect(
+      SYNC_PATH_GAP.filter((n) => !n.startsWith('L4')),
+      `除 L4 两版外不应再有未接链路的缺口；多出来的条目说明有 Tab 被漏接：` +
+        `${SYNC_PATH_GAP.filter((n) => !n.startsWith('L4')).join(', ')}`,
+    ).toEqual([])
   })
 
   /**
