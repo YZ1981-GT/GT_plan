@@ -48,7 +48,11 @@ TEXT = "text"
 
 # 八、45「（1）一年内到期的长期借款」—— 单级 3 列
 E1_845_COLUMNS = [
-    {"key": "label", "label": "项目", "is_label": True, "flat": True},
+    # 🔴 首列 label 是「借款类别」不是「项目」—— 源 xlsx
+    # L3!附注披露（国企）信息核对!A21 直读为 借款类别（守卫 Class A 的
+    # test_source_header_row_landmarks 对该格直接断言）。初版沿用了平台通用的
+    # 「项目」措辞，属自造列名，会让三向比对的第三条边（源 xlsx）恒红。
+    {"key": "label", "label": "借款类别", "is_label": True, "flat": True},
     {"key": "end_amount", "label": "期末余额", "format": AMOUNT},
     {"key": "prior_amount", "label": "期初余额", "format": AMOUNT},
 ]
