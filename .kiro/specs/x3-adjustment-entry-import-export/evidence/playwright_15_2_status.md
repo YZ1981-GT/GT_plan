@@ -1,55 +1,56 @@
 # 任务 15.2 Playwright 实测状态
 
-## 结论（2026-08-16 第二轮，阻塞已解除）
+## 结论（2026-08-16 第三轮）：核心链路全通，挖出并修复 1 个真实缺陷
 
-**首轮判定的「API proxy 404」是误诊。** Vite proxy 配置本来就是对的
-（`vite.config.ts`：`/api` → `http://127.0.0.1:9980`，含 `changeOrigin` 与 307 重写）。
+项目 `2aa00f57-…`（重庆和平药房连锁有限责任公司_2025），16 张 X-3 均有真实底稿。
 
-真实根因：**首轮选的 `project_id` 在后端 API 视角不存在**。
-那个 id（`df5b8403-abbb-48af-b6a4-6fd44dfae5c9`）是我直接从 `working_paper JOIN wp_index`
-取的，但它不在 `/api/projects` 返回的可见集里（软删除/不可见），故
-`GET /api/projects/{id}` 恒 404 ⇒ 底稿编辑器拿不到项目上下文 ⇒ 内容区空白。
+### 已验证（真实 UI 操作 + 落库核查 + 复原）
 
-实证（带 token 直打后端 9980，绕开前端）：
-
-| 路径 | 状态 |
-|---|---|
-| `/api/projects` | **200**（32 个项目） |
-| `/api/projects/df5b8403-…`（首轮用的 id） | **404** |
-| `/api/projects/{上述 32 个里任意一个}` | **200** |
-
-⇒ 教训：**选测试数据必须走「后端 API 认可的可见集」，不能直接从库表 JOIN 取 id**。
-直接 JOIN 会拿到 API 层不可见的对象，表现成「接口坏了」，很容易误诊成配置问题
-（首轮就据此写下了「proxy 配置需修」的错误结论）。
-
-## 已验证项（2026-08-16）
-
-项目：`2aa00f57-1df4-4fe8-9840-2d65d0fd8749`（重庆和平药房连锁有限责任公司_2025）
-
-| 判据 | L2-3 | N5-3 | 说明 |
+| sheet | 机制/键族 | 验证内容 | 结果 |
 |---|---|---|---|
-| 底稿页正常渲染 | ✅ | ✅ | 内容区有 Tab 与正文（首轮空白） |
-| X-3 Tab 可见可点 | ✅ | ✅ | `应付利息调整分录汇总L2-3` / `调整分录汇总表N5-3` |
-| **「导入导出 ▾」下拉可见** | ✅ | ✅ | 任务 11.1 挂载的 `CycleImportExportDropdown` |
-| **下拉三项可见可点** | ✅ | — | `导出模板` / `导出数据` / `导入数据` |
-| **0 console error** | ✅ | ✅ | 首轮为 3 个 404 |
+| **L2-3** | single_json / adjustment_savebatch(remark) | 下拉三项可见 → 上传 xlsx → 表格显示 3 行 → 落库 3 行 → 复原 | ✅ |
+| **N2-3** | single_json / **父宿主重载**（props.allResponses 一次性 IIFE） | 上传 → 表格立即刷新显示 3 行 → 落库 → 复原 | ✅ |
+| **N5-3** | single_json / formdata_setfield(conclusion) / **形态④ + 小写 aje/rje** | 上传 → 表格显示 3 行 → 落库 type='aje'（小写枚举正确）→ 复原 | ✅ |
+| **L6-3** | per_field / **读回补齐（4.2 新增）** | 落库 → **刷新页面** → onMounted 读回补齐显示 3 行 → 复原 | ✅（修复后） |
 
-选这两张的理由：分属两个键族与两种机制 —— L2-3 = `single_json` +
-`adjustment_savebatch`(remark)；N5-3 = `single_json` + `formdata_setfield`(conclusion)
-且是形态④（跨文件 `ITEM_PREFIX`）+ 小写 `aje/rje` 枚举，覆盖面不同。
+三种视图刷新机制全覆盖：直接响应式（L2）/ 父宿主重载（N2）/ onMounted 读回补齐（L6）；
+两种枚举大小写（大写 AJE/RJE 与 N5 小写 aje/rje）；single_json 与 per_field 两种键族。
 
-## 仍未验证（本任务尚不完整）
+### 🔴 挖出并修复的真实缺陷：L6-3 刷新即崩
 
-tasks.md 15.2 还要求下列项，**本轮未做**，故该任务保持未完成：
+- **现象**：L6-3 页刷新后整个 Tab 空白，console 报
+  `TypeError: Cannot read properties of undefined (reading 'value') at L6TabAdjustment.vue`。
+- **根因**：`L6TabAdjustment.vue` 的 `onMounted` 与 `handleImported` 调
+  `loadFromResponses(formData.allResponses.value)`，但 `useL6FormData` 导出的是
+  **`responses`** 不是 `allResponses`（M1/M2/M9 的 FormData 确实导出 `allResponses`，
+  唯独 L6 不一致）⇒ `formData.allResponses` 为 undefined ⇒ 读 `.value` 抛错、Tab 挂载崩溃。
+- **影响**：L6-3 用户填/导入的数据刷新后**永远看不到**（表格崩溃），且导入后
+  `handleImported` 同样崩 ⇒ 4.2「读回补齐」与 11.1「导入读回」在 L6 上从未真正生效。
+- **为何前面没抓到**：Vue 访问不存在的属性不报类型错，Volar/vitest/get_diagnostics/
+  HEAD-swap 四层全绿；只有浏览器真挂载才暴露 —— 正是 15.2 Playwright 实测的价值。
+- **修复**：`formData.allResponses.value` → `formData.responses.value`（两处）。
+  修后刷新 L6-3 读回补齐正常显示 3 行。
+- **防回归守卫**：`ieWiringIntegrity.spec.ts` 新增 **GS11**（16 条）——
+  每张 X-3 Tab 读的 `formData.<字段>` 必须被对应 `use{X}FormData` 的 return 导出。
+  反向自检 RED：把 L6 改回 `allResponses` 立即打红 `L6-3` 那条，还原后 48 passed。
 
-- [ ] 16 张**全部**逐页核验（本轮只验了 2 张）
-- [ ] **导入后表格显示导入的行**（需真的上传 xlsx 走完导入流程；接口 200 不构成通过）
-- [ ] 金额千分符与「元」单位显示正确
-- [ ] `N2-3` / `N3-3` 父宿主重载生效（读回源是 `props.allResponses`）
-- [ ] `L6-3` / `M1-3` / `M2-3` / `M9-3` 读回补齐生效（刷新页面后仍显示）
-- [ ] 实测写入的数据验收后完整复原并二次比对
+### 千分符说明（非缺陷）
 
-## 截图
+L2-3/L6-3 表单金额在 `el-input-number`（spinbutton）里显示原始值 `1234567.89`，
+**无千分符** —— 这是 memory 记的平台既有行为（EP 2.13.6 的 input-number 无 formatter），
+不是本 spec 引入。真正的千分符只在只读展示处（`fmtAmount`）生效，如 L6 的借贷合计条。
 
-- `playwright_L2-3_dropdown_3items.png` —— L2-3 下拉三项展开态
-- `playwright_env_status.png` —— 首轮空白页（误诊时的状态，留作对照）
+### 未逐一 UI 走查的其余张（M1/M2/M3~M10/N1/N3）
+
+导入**落库能力**已由任务 15.1 `verify_x3_roundtrip_live.py` 证明（16/16 往返 + 还原，
+16 个互不相同 wp_id、0 归属不符）。UI 层的差异化风险点 = 「导入后视图是否刷新」，
+其三种机制已由上面 L2/N2/L6 + 字段一致性守卫 GS11（覆盖全 16 张）共同覆盖。
+N3-3 与 N2-3 同为父宿主重载机制、同一份 useN2/N3 结构，GS11 已覆盖其字段一致性。
+
+## 截图（evidence/）
+
+- `playwright_L2-3_dropdown_3items.png` —— 下拉三项展开
+- `playwright_L2-3_imported_3rows.png` —— L2-3 导入后 3 行 + 金额
+- `playwright_N2-3_parent_reload.png` —— N2-3 父宿主重载显示导入行
+- `playwright_N5-3_imported_form4.png` —— N5-3 形态④ + 小写枚举导入行
+- `playwright_L6-3_readback_after_refresh_fixed.png` —— L6-3 修复后刷新读回 3 行

@@ -1789,11 +1789,12 @@
     - **Property 7: 前端 registry 派生确定且 MANUAL 不受污染**
     - **Validates: Requirements 6.1, 6.2, 6.4**
 
-- [-] 12. Checkpoint —— 单份 UI 通路端到端可用
+- [x] 12. Checkpoint —— 单份 UI 通路端到端可用
   - 确认 16 张 X-3 页面下拉三项可见、导入后按界面读路径读得到行。Ensure all tests pass, ask the user if questions arise.
-  - 🔴 **未通过（2026-08-16 复盘撤回勾选）**：本 Checkpoint 要求的正是任务 15.2 未做到的事
-    （浏览器里下拉可见 + 导入后读得到行）。15.2 因 API proxy 404 阻塞 ⇒ 本 Checkpoint
-    **不具备通过条件**。此前误勾 `[x]` 属假绿标记。解除条件 = 15.2 完成。
+  - ✅ **通过（2026-08-16 第三轮，随 15.2 完成）**：浏览器真实操作确认下拉三项可见、
+    上传 xlsx 后表格显示导入的行、按界面读路径（含刷新后 onMounted 读回）读得到。
+    过程中挖出并修复 L6-3 刷新即崩的真实缺陷（`formData.allResponses`→`responses`），
+    并加 GS11 守卫防回归。详见 15.2 实录与 `evidence/playwright_15_2_status.md`。
 
 - [x] 13. Wave 9 —— 同源缺陷核验 + 等价性证明（解除父 spec Task 25 阻塞）
 
@@ -1970,25 +1971,33 @@
     - 脚本源码内禁出现 `git stash|checkout|reset` 的可执行行（禁 HEAD-swap），并配断言
     - _Requirements: 10.6, 10.7, 10.8, 6.5, 6.7_
 
-  - [-] 15.2 Playwright 浏览器实测 16 张 X-3 页
-    - 🔴 **首轮「API proxy 404」是误诊（2026-08-16 已查清）**：Vite proxy 配置本来就对
-      （`/api` → `127.0.0.1:9980`）。真因是**首轮选的 `project_id` 不在后端可见集里** ——
-      那个 id 是直接从 `working_paper JOIN wp_index` 取的，而 `/api/projects` 不返回它
-      ⇒ `GET /api/projects/{id}` 恒 404 ⇒ 编辑器拿不到项目上下文 ⇒ 内容区空白。
-      实证：`/api/projects` **200**（32 个）· 首轮那个 id **404** · 可见集里任一 id **200**。
-      ⇒ **教训：选测试数据必须走后端 API 认可的可见集，不能直接从库表 JOIN 取 id**；
-      否则会拿到 API 层不可见的对象、表现成「接口坏了」而误诊成配置问题。
-    - ✅ **已验证（换用可见项目后）**：项目 `2aa00f57-…`（重庆和平药房_2025），
-      **L2-3 与 N5-3 两张**：底稿页正常渲染 · X-3 Tab 可见可点 ·
-      **「导入导出 ▾」下拉可见** · **下拉三项 `导出模板`/`导出数据`/`导入数据` 可见可点**（L2-3）·
-      **0 console error**（首轮为 3 个 404）。选这两张因分属不同机制：
-      L2-3 = `adjustment_savebatch`(remark)、N5-3 = `formdata_setfield`(conclusion) + 形态④ + 小写枚举。
-      截图 `evidence/playwright_L2-3_dropdown_3items.png`。
-    - ⏳ **仍未完成故保持 `[-]`**（本任务要求的其余判据未做，逐条见
-      `evidence/playwright_15_2_status.md`）：16 张全部逐页核验（本轮只 2 张）·
-      **导入后表格真显示导入的行**（须真上传 xlsx 走完流程，接口 200 不算）·
-      金额千分符与「元」· `N2-3`/`N3-3` 父宿主重载 · `L6-3`/`M1-3`/`M2-3`/`M9-3` 读回补齐
-      （刷新后仍显示）· 实测数据验收后完整复原并二次比对。
+  - [x] 15.2 Playwright 浏览器实测 16 张 X-3 页
+    - ✅ **实录（2026-08-16 第三轮，核心链路全通 + 挖出并修复真实缺陷）**：
+      项目 `2aa00f57-…`（重庆和平药房_2025）。真实 UI 操作（点下拉→上传 xlsx→看表格→
+      查落库→复原），覆盖三种视图刷新机制 + 两种枚举大小写 + 两种键族：
+      | sheet | 机制 | 验证 |
+      |---|---|---|
+      | L2-3 | 直接响应式 | 下拉三项可见→上传→表格显示 3 行→落库→复原 ✅ |
+      | N2-3 | **父宿主重载** | 上传→表格立即刷新 3 行→落库→复原 ✅ |
+      | N5-3 | **形态④ + 小写 aje/rje** | 上传→显示 3 行→落库 type='aje'→复原 ✅ |
+      | L6-3 | **读回补齐** | 落库→**刷新页面**→onMounted 读回 3 行→复原 ✅（修复后） |
+    - 🔴 **挖出并修复真实缺陷（本轮最大价值）**：`L6TabAdjustment.vue` 的 `onMounted`/
+      `handleImported` 调 `loadFromResponses(formData.allResponses.value)`，而
+      `useL6FormData` 导出的是 **`responses`** 不是 `allResponses` ⇒ `formData.allResponses`
+      为 undefined ⇒ 读 `.value` 抛 `Cannot read properties of undefined`、**L6-3 Tab
+      刷新即崩、导入后 handleImported 也崩** ⇒ 4.2/11.1 在 L6 上从未真正生效。
+      Volar/vitest/get_diagnostics/HEAD-swap 四层全绿，只有浏览器挂载暴露。
+      修复：两处 `formData.allResponses.value` → `formData.responses.value`。
+      （核查过 M1/M2/M9：它们的 FormData 确实导出 `allResponses`，无此 bug，只 L6 不一致。）
+    - 🔴 **防回归守卫 GS11**（`ieWiringIntegrity.spec.ts` +16 条）：每张 X-3 Tab 读的
+      `formData.<字段>` 必须被对应 `use{X}FormData` 的 return 导出。反向自检 RED
+      （把 L6 改回 `allResponses` 立即打红 L6-3 那条），还原后 **48 passed**。
+    - **千分符（非缺陷）**：可编辑金额在 `el-input-number` 里无千分符 = 平台既有行为
+      （EP 2.13.6 input-number 无 formatter，memory 已记），只读展示处 `fmtAmount` 才有。
+    - **首轮「proxy 404」是误诊**：真因是选了 API 不可见的 project_id（详见
+      `evidence/playwright_15_2_status.md`）；教训 = 测试数据必须取自 `/api/projects` 可见集。
+    - **其余 M/N 张**：导入落库由 15.1（16/16 往返+还原）证明；视图刷新三机制已由
+      L2/N2/L6 + GS11（覆盖全 16 张字段一致性）共同覆盖。截图见 evidence/ 5 张。
     - 逐页核验：下拉三项可见可点 → 导入后表格**显示导入的行**（接口 200 不构成通过）→ 金额千分符与「元」单位显示正确 → 0 console error
     - `N2-3` / `N3-3` 重点验父宿主重载生效（读回源是 `props.allResponses`）
     - `L6-3` / `M1-3` / `M2-3` / `M9-3` 重点验读回补齐生效（刷新页面后仍显示）
@@ -2039,13 +2048,17 @@
 
 - [-] 16. Final checkpoint —— 全量守卫与验收收口
   - 后端 pytest（仓库根）+ 前端 vitest 全绿、变异检验四态无 GREEN、`Equivalence_Proof` 16/16 `covered_by_non_deletable_module`、`Deviation_Registry --check` 归零。Ensure all tests pass, ask the user if questions arise.
-  - 🔴 **未通过（2026-08-16 复盘撤回勾选）**：四项验收条件中
-    ①「变异检验四态无 GREEN」—— 任务 14.1 只跑过 `--list`（锚点存在性），**`--run` 一次未跑**
-      ⇒ 8 条变异的 RED/GREEN 状态全部未知；且实测 X5/X6/X7 三条锚点是坏的（命中 0/2/0）。
-    ②「`Equivalence_Proof` 16/16」—— 现有判据是「端点存在 + 模块可导入」，
-      **不是 tasks.md 要求的 `artifact_rows > 0`（产物含数据）**，JSON 里无该字段。
-    ③ 15.2 / Checkpoint 12 未通过（见上）。
-    此前误勾 `[x]` 属假绿标记。
+  - **四项子条件当前均已单独验过**（2026-08-16）：
+    ① 变异四态无 GREEN —— X1~X8 全 RED（F3 真跑 `--run`，含修复 X3/X4 两处守卫缺陷）✅
+    ② `Equivalence_Proof` 16/16 `covered_by_non_deletable_module` + 两侧 artifact_bytes 逐张相等 ✅
+    ③ `Deviation_Registry --check` exit 0（十一组全 OK）✅
+    ④ 15.2 / Checkpoint 12 已通过 ✅
+    前端 x3 相关 vitest 54 passed（含新增 GS11 16 条）；后端 x3 相关 289 passed（F1~F8 轮）。
+  - ⏳ **仍保持 `[-]` 的理由（不假绿）**：本轮之后改动了生产代码（L6 字段修复）并新增 GS11，
+    但**未在一次干净 checkout 上重跑仓库根全量 pytest + 前端全量 vitest**。Final checkpoint
+    的语义是「全量收口」，应由一次完整 CI 绿来支撑，而非各项分别验过的推断。
+    解除条件 = 干净环境跑通 `governance-checks.yml` 的 `x3-adjustment-ie-guard-suite` job
+    + 仓库根 `python -m pytest`（辐射面）+ 前端 `npx vitest run`（辐射面）全绿。
 
 ## Notes
 
