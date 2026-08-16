@@ -15,3 +15,5 @@
 #     spec: workpaper-import-export-lifecycle-closure Task 21 + x3 任务 14.1
 backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
+
+audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue  1700

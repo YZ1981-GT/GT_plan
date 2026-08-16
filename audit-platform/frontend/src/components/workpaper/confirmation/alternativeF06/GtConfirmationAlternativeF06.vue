@@ -92,7 +92,7 @@ import {
 } from '../../composables/useWorkpaperScaffold'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
-import { F0_ALTERNATIVE_MASTER_LABELS } from '../composables/f0MasterLabels'
+import { F0_ALTERNATIVE_MASTER_LABELS } from '../../composables/f0MasterLabels'
 import { BLOCK_COLUMN_CONFIGS_F06 } from './blockColumnConfigsF06'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件

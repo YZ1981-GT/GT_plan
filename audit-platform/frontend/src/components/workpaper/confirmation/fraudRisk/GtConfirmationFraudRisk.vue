@@ -78,7 +78,7 @@ import { eventBus } from '@/utils/eventBus'
 import {
   buildB50RiskFactorPayload,
   hasPresentFraudIndicators,
-} from '../composables/confirmationRiskPush'
+} from '../../composables/confirmationRiskPush'
 import type { FraudSignal } from '../coordination/useFraudSignalCollector'
 import FraudRiskDashboard from './FraudRiskDashboard.vue'
 import FraudRiskChecklist from './FraudRiskChecklist.vue'

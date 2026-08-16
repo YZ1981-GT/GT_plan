@@ -154,6 +154,7 @@ import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useG7ConsolLinkageEntry } from './composables/g7ConsolLinkageEntry'
+import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 
 // 🔴 科目码单一真源：运行态取 render 下发的 tb_source_codes（报表映射解析结果），
 //    常量只作兜底。禁在本文件写字面量科目码（R11.1 / Property 15）。
@@ -216,15 +217,26 @@ const wpIdRef = computed(() => props.wpId)
 const projectIdRef = computed(() => props.projectId)
 const isReadonly = computed(() => !!props.readonly)
 
+// 适用准则门控：阻止在国企项目渲染上市 Tab（反之亦然），防止同步时传错 current_standard
+const applicableStandards = useHostApplicableStandards({
+  htmlData: () => props.htmlData,
+})
+
 /** 提取当前sheetName对应的组件标识 */
 const currentSheet = computed(() => {
   const name = props.sheetName || ''
 
   // 优先匹配中文sheet名
   if (name.includes('附注披露信息（上市公司）') || name.includes('附注披露(上市)') || name.includes('附注-上市')) {
+    // 门控：项目标准不含 listed → 不渲染 Listed Tab（回退 OnlyOffice）
+    const stds = applicableStandards.value
+    if (stds.length > 0 && !stds.some(s => s.includes('listed'))) return ''
     return 'disclosureListed'
   }
   if (name.includes('附注披露信息（国企）') || name.includes('附注披露(国企)') || name.includes('附注-国企')) {
+    // 门控：项目标准不含 soe → 不渲染 SOE Tab（回退 OnlyOffice）
+    const stds = applicableStandards.value
+    if (stds.length > 0 && !stds.some(s => s.includes('soe'))) return ''
     return 'disclosureSOE'
   }
   if (name.includes('底稿目录')) {

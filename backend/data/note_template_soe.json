@@ -5996,7 +5996,7 @@
               "row_type": "total"
             }
           ],
-          "guidance": "源模板国企版账龄表为**单级 3 列**（账龄 / 期末数 / 期初数），行含小  计、减：坏账准备、合  计。勾稽：小  计 = K1-1 其他应收款审定期末数；小  计 − 减：坏账准备 = 合  计；减：坏账准备 = 三阶段变动表期末余额。账龄档随项目账龄配置（3年段 / 5年段 / 自定义），此处 seed 取源模板 5 年段口径。",
+          "guidance": "源模板国企版账龄表为单级 3 列（账龄 / 期末数 / 期初数），行含小  计、减：坏账准备、合  计。勾稽：小  计 = K1-1 其他应收款审定期末数；小  计 − 减：坏账准备 = 合  计；减：坏账准备 = 三阶段变动表期末余额。账龄档随项目账龄配置（3年段 / 5年段 / 自定义），此处 seed 取源模板 5 年段口径。",
           "columns": [
             {
               "key": "label",
@@ -9187,8 +9187,8 @@
       "sort_index": 16,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:07:15"
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-08-16 20:13:19"
     },
     {
       "section_number": "八、18",
@@ -10215,8 +10215,8 @@
       "sort_index": 18,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:07:15"
+      "_aligned_by": "disclosure-sync-path-buildout",
+      "_aligned_at": "2026-08-16 20:13:19"
     },
     {
       "section_number": "八、20",
@@ -13060,7 +13060,7 @@
       "sort_index": 30,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_aligned_by": "n1-deferred-tax-disclosure-template-alignment",
       "_tables": [
         {
           "name": "未经抵销的递延所得税资产和递延所得税负债",
@@ -14241,15 +14241,11 @@
               "row_type": "data"
             },
             {
-              "label": "其中：医疗保险费",
+              "label": "其中：医疗保险费及生育保险费",
               "row_type": "data"
             },
             {
               "label": "工伤保险费",
-              "row_type": "data"
-            },
-            {
-              "label": "生育保险费",
               "row_type": "data"
             },
             {
@@ -14417,8 +14413,8 @@
       "sort_index": 39,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "j-cycle-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-02 14:11:32"
+      "_aligned_by": "j1-disclosure-template-alignment",
+      "_aligned_at": "2026-08-16 20:13:20"
     },
     {
       "section_number": "八、41",
@@ -14466,10 +14462,6 @@
           "guidance": "🔴 国企版按变动口径列示（期初余额 / 本期应交 / 本期已交 / 期末余额），与上市版的双期余额表结构本质不同，不可互相套用。【提示：增值税，根据“应交税费-未交增值税、简易计税、转让金融商品应交增值税、代扣代缴增值税”科目贷方余额计算填列。】勾稽：每行 期末余额 = 期初余额 + 本期应交 − 本期已交（源模板 =B8+C8-D8）；合计 = 各列之和（源模板 =SUM(B8:B22) 等）。",
           "rows": [
             {
-              "label": "企业所得税",
-              "row_type": "data"
-            },
-            {
               "label": "增值税",
               "row_type": "data"
             },
@@ -14482,15 +14474,11 @@
               "row_type": "data"
             },
             {
-              "label": "土地增值税",
+              "label": "企业所得税",
               "row_type": "data"
             },
             {
               "label": "城市维护建设税",
-              "row_type": "data"
-            },
-            {
-              "label": "车船牌照税",
               "row_type": "data"
             },
             {
@@ -14502,19 +14490,15 @@
               "row_type": "data"
             },
             {
-              "label": "教育费附加",
+              "label": "个人所得税",
               "row_type": "data"
             },
             {
-              "label": "矿产资源补偿费",
+              "label": "教育费附加（含地方教育费附加）",
               "row_type": "data"
             },
             {
-              "label": "代扣代缴外国企业所得税",
-              "row_type": "data"
-            },
-            {
-              "label": "代扣代缴个人所得税",
+              "label": "其他税费",
               "row_type": "data"
             },
             {
@@ -14544,7 +14528,7 @@
       "sort_index": 40,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_aligned_by": "n-cycle-tax-disclosure-alignment",
       "_tables": [
         {
           "name": "应交税费",
@@ -15108,7 +15092,7 @@
         {
           "name": "（1）一年内到期的长期借款",
           "headers": [
-            "项目",
+            "借款类别",
             "期末余额",
             "期初余额"
           ],
@@ -15138,7 +15122,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "项目",
+              "label": "借款类别",
               "is_label": true,
               "flat": true
             },
@@ -15172,7 +15156,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure_v2",
-      "_aligned_at": "2026-08-16 00:17:38"
+      "_aligned_at": "2026-08-16 20:13:19"
     },
     {
       "section_number": "八、46",
@@ -16107,7 +16091,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure",
-      "_aligned_at": "2026-07-31 10:36:27"
+      "_aligned_at": "2026-08-16 20:13:19"
     },
     {
       "section_number": "八、54",
@@ -17832,53 +17816,52 @@
             {
               "key": "label",
               "label": "合同分类/报告分部",
-              "is_label": true,
-              "flat": true
+              "is_label": true
             },
             {
-              "key": "cat_1_revenue",
+              "key": "cat0_revenue",
               "label": "收入",
               "group": "消费品",
               "format": "amount"
             },
             {
-              "key": "cat_1_cost",
+              "key": "cat0_cost",
               "label": "成本",
               "group": "消费品",
               "format": "amount"
             },
             {
-              "key": "cat_2_revenue",
+              "key": "cat1_revenue",
               "label": "收入",
               "group": "汽车",
               "format": "amount"
             },
             {
-              "key": "cat_2_cost",
+              "key": "cat1_cost",
               "label": "成本",
               "group": "汽车",
               "format": "amount"
             },
             {
-              "key": "cat_3_revenue",
+              "key": "cat2_revenue",
               "label": "收入",
               "group": "能源",
               "format": "amount"
             },
             {
-              "key": "cat_3_cost",
+              "key": "cat2_cost",
               "label": "成本",
               "group": "能源",
               "format": "amount"
             },
             {
-              "key": "cat_4_revenue",
+              "key": "cat3_revenue",
               "label": "收入",
               "group": "其他",
               "format": "amount"
             },
             {
-              "key": "cat_4_cost",
+              "key": "cat3_cost",
               "label": "成本",
               "group": "其他",
               "format": "amount"
@@ -17906,7 +17889,7 @@
               "span": 2
             }
           ],
-          "guidance": "源模板：上市 R44~R56 / 国企 R37~R49。列 = 4 个分解类别（可增删改名），各辖「收入 / 成本」；无横向合计列，合计是最后一行。「主营业务」「其他业务」为派生小计（源模板 SUM 公式），其下第 3 行为空可扩行且计入小计；「合  计」= 两个小计之和。分解类别应与内部管理报告一致；租赁收入需单独披露。"
+          "guidance": "在确定对收入、成本进行分解的类别时，企业应当考虑其在下列情况下是如何列报和披露与收入有关的信息：①在财务报表之外披露的信息，例如，在企业的业绩公告、年报或向投资者报送的相关资料中披露的收入信息；②管理层为评价经营分部的财务业绩所定期复核的信息；以及③企业或企业的财务报表使用者在评价企业的财务业绩或作出资源分配决策时，所使用的类似于上述①和②的信息类型的其他信息。企业在对收入信息进行分解时，可以采用的类别包括但不限于：商品类型、经营地区、市场或客户类型、合同类型（例如，固定造价合同、成本加成合同等）、商品转让的时间（例如，在某一时点转让或在某一时段内转让）、合同期限（例如，长期合同、短期合同等）、销售渠道（例如，直接销售或通过经销商销售等）等。④租赁收入需单独披露。"
         },
         {
           "name": "与剩余履约义务有关的信息",
@@ -17970,7 +17953,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "d4-four-table-extraction-and-disclosure-alignment",
-      "_aligned_at": "2026-08-03 12:45:17"
+      "_aligned_at": "2026-08-16 20:13:19"
     },
     {
       "section_number": "八、65",
@@ -19306,7 +19289,7 @@
       "sort_index": 77,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "n-cycle-note-template-and-disclosure-completion",
+      "_aligned_by": "n-cycle-tax-disclosure-alignment",
       "_tables": [
         {
           "name": "所得税费用",
@@ -22446,7 +22429,7 @@
         "chapter-12-gu-fen-zhi-fu"
       ],
       "_aligned_by": "fix_note_parent_company_chapter.py",
-      "_aligned_at": "2026-08-07 17:18:33"
+      "_aligned_at": "2026-08-16 20:14:57"
     },
     {
       "section_number": "十二、应收账款",
@@ -23337,11 +23320,13 @@
             },
             {
               "label": "应收股利",
-              "row_type": "data"
+              "row_type": "data",
+              "report_row_code": "BS-016"
             },
             {
               "label": "其他应收款项",
-              "row_type": "data"
+              "row_type": "data",
+              "report_row_code": "BS-009"
             },
             {
               "label": "合计",
@@ -23755,6 +23740,10 @@
               "row_type": "data"
             },
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -23833,6 +23822,10 @@
             {
               "label": "",
               "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -25268,53 +25261,52 @@
             {
               "key": "label",
               "label": "合同分类/报告分部",
-              "is_label": true,
-              "flat": true
+              "is_label": true
             },
             {
-              "key": "cat_1_revenue",
+              "key": "cat0_revenue",
               "label": "收入",
               "group": "消费品",
               "format": "amount"
             },
             {
-              "key": "cat_1_cost",
+              "key": "cat0_cost",
               "label": "成本",
               "group": "消费品",
               "format": "amount"
             },
             {
-              "key": "cat_2_revenue",
+              "key": "cat1_revenue",
               "label": "收入",
               "group": "汽车",
               "format": "amount"
             },
             {
-              "key": "cat_2_cost",
+              "key": "cat1_cost",
               "label": "成本",
               "group": "汽车",
               "format": "amount"
             },
             {
-              "key": "cat_3_revenue",
+              "key": "cat2_revenue",
               "label": "收入",
               "group": "能源",
               "format": "amount"
             },
             {
-              "key": "cat_3_cost",
+              "key": "cat2_cost",
               "label": "成本",
               "group": "能源",
               "format": "amount"
             },
             {
-              "key": "cat_4_revenue",
+              "key": "cat3_revenue",
               "label": "收入",
               "group": "其他",
               "format": "amount"
             },
             {
-              "key": "cat_4_cost",
+              "key": "cat3_cost",
               "label": "成本",
               "group": "其他",
               "format": "amount"
@@ -25342,7 +25334,7 @@
               "span": 2
             }
           ],
-          "guidance": "源模板：上市 R44~R56 / 国企 R37~R49。列 = 4 个分解类别（可增删改名），各辖「收入 / 成本」；无横向合计列，合计是最后一行。「主营业务」「其他业务」为派生小计（源模板 SUM 公式），其下第 3 行为空可扩行且计入小计；「合  计」= 两个小计之和。分解类别应与内部管理报告一致；租赁收入需单独披露。"
+          "guidance": "在确定对收入、成本进行分解的类别时，企业应当考虑其在下列情况下是如何列报和披露与收入有关的信息：①在财务报表之外披露的信息，例如，在企业的业绩公告、年报或向投资者报送的相关资料中披露的收入信息；②管理层为评价经营分部的财务业绩所定期复核的信息；以及③企业或企业的财务报表使用者在评价企业的财务业绩或作出资源分配决策时，所使用的类似于上述①和②的信息类型的其他信息。企业在对收入信息进行分解时，可以采用的类别包括但不限于：商品类型、经营地区、市场或客户类型、合同类型（例如，固定造价合同、成本加成合同等）、商品转让的时间（例如，在某一时点转让或在某一时段内转让）、合同期限（例如，长期合同、短期合同等）、销售渠道（例如，直接销售或通过经销商销售等）等。④租赁收入需单独披露。"
         },
         {
           "name": "与剩余履约义务有关的信息",

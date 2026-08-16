@@ -91,7 +91,7 @@ import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/
 import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
 import { BLOCK_COLUMN_CONFIGS_F05 } from './blockColumnConfigsF05'
 // 主表文案按 F0 循环覆盖（共享 master 的默认值是 D0-5 销售循环语义）
-import { F0_ALTERNATIVE_MASTER_LABELS } from '../composables/f0MasterLabels'
+import { F0_ALTERNATIVE_MASTER_LABELS } from '../../composables/f0MasterLabels'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件
 import AlternativeD05Dashboard from '../alternativeD05/AlternativeD05Dashboard.vue'

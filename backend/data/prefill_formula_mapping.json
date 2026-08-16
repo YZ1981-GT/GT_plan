@@ -11714,6 +11714,52 @@
           "description": "与审定表K1-1的审定数勾稽（不参与披露取数）"
         }
       ]
+    },
+    {
+      "wp_code": "F3",
+      "wp_name": "应付票据附注披露信息（国企）",
+      "sheet": "附注披露信息(国企)",
+      "account_codes": [
+        "2201"
+      ],
+      "items": [
+        {
+          "cell_ref": "披露soe期末合计",
+          "formula": "=TB('2201','期末余额')",
+          "formula_type": "TB",
+          "description": "国企附注披露表期末合计核对数"
+        },
+        {
+          "cell_ref": "披露soe审定期末",
+          "formula": "=WP('F3','审定表F3-1','期末审定数')",
+          "formula_type": "WP",
+          "description": "国企附注披露表期末数来源 = 审定表期末审定数"
+        }
+      ],
+      "cells": []
+    },
+    {
+      "wp_code": "F4",
+      "wp_name": "应付账款附注披露信息（国企）",
+      "sheet": "附注披露信息(国企)",
+      "account_codes": [
+        "2202"
+      ],
+      "items": [
+        {
+          "cell_ref": "披露soe期末合计",
+          "formula": "=TB('2202','期末余额')",
+          "formula_type": "TB",
+          "description": "国企披露按账龄主表合计核对数（= 报表行 BS-045）"
+        },
+        {
+          "cell_ref": "披露soe长期挂账合计",
+          "formula": "=WP('F4','长期挂账检查表F4-5','审定余额合计')",
+          "formula_type": "WP",
+          "description": "国企披露「账龄超过1年的重要应付账款」合计来源"
+        }
+      ],
+      "cells": []
     }
   ]
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { G12WorkflowReadiness } from '../composables/g12CoreWorkflowReadiness'
+import type { G12WorkflowReadiness } from '../../composables/g12CoreWorkflowReadiness'
 
 withDefaults(defineProps<{
   readiness: G12WorkflowReadiness

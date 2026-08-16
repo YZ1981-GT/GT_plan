@@ -817,7 +817,7 @@ import {
   calcLossRateVariance,
   calcSumColumn,
   parseNum,
-} from '../../../../composables/useG4EclFormulaEngine'
+} from '../../composables/useG4EclFormulaEngine'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null

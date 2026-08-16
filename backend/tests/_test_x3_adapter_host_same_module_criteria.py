@@ -13,6 +13,8 @@
 原文件 docstring 原样保留在下方。
 """
 
+from __future__ import annotations
+
 """GS6 同源宿主守卫 —— Wave 0 任务 1.4（spec: `x3-adjustment-entry-import-export`）
 
 ## 不变量
@@ -111,8 +113,6 @@ ANCHOR-MISS，两者都会被误读成 RED，所以每条变异都断言具体�
 任务 1.4 另做过一次**真实落盘变异**（改 `_PREFIX_TO_MODULE["k1"]` 的映射行 → 跑本
 文件确认 RED → 还原 → md5 与 `git status` 双证），结果记在 spec tasks.md 实录里。
 """
-
-from __future__ import annotations
 
 import hashlib
 import importlib

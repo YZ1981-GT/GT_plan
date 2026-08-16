@@ -98,7 +98,7 @@ except (AttributeError, ValueError):
 SCRIPT_DIR = Path(__file__).resolve().parent
 ROOT = SCRIPT_DIR.parents[2]                     # backend/scripts/check → GT_plan
 BACKEND = ROOT / "backend"
-SPEC_DIR = ROOT / ".kiro" / "specs" / "x3-adjustment-entry-import-export"
+SPEC_DIR = ROOT / ".kiro" / "specs" / "_archive" / "05-business-features" / "x3-adjustment-entry-import-export"
 REGISTRY_PATH = SPEC_DIR / "evidence" / "deviation_registry.json"
 FE_SRC = ROOT / "audit-platform" / "frontend" / "src"
 WP_DIR = FE_SRC / "components" / "workpaper"
