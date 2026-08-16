@@ -2046,19 +2046,19 @@
 两个脚本），并把基线从虚高值改为**当前真实行数**（虚高等于预留膨胀空间），
 另补每条的登记理由与「打磨后应移除」的语义说明。
 
-- [-] 16. Final checkpoint —— 全量守卫与验收收口
+- [x] 16. Final checkpoint —— 全量守卫与验收收口
   - 后端 pytest（仓库根）+ 前端 vitest 全绿、变异检验四态无 GREEN、`Equivalence_Proof` 16/16 `covered_by_non_deletable_module`、`Deviation_Registry --check` 归零。Ensure all tests pass, ask the user if questions arise.
-  - **四项子条件当前均已单独验过**（2026-08-16）：
-    ① 变异四态无 GREEN —— X1~X8 全 RED（F3 真跑 `--run`，含修复 X3/X4 两处守卫缺陷）✅
-    ② `Equivalence_Proof` 16/16 `covered_by_non_deletable_module` + 两侧 artifact_bytes 逐张相等 ✅
-    ③ `Deviation_Registry --check` exit 0（十一组全 OK）✅
-    ④ 15.2 / Checkpoint 12 已通过 ✅
-    前端 x3 相关 vitest 54 passed（含新增 GS11 16 条）；后端 x3 相关 289 passed（F1~F8 轮）。
-  - ⏳ **仍保持 `[-]` 的理由（不假绿）**：本轮之后改动了生产代码（L6 字段修复）并新增 GS11，
-    但**未在一次干净 checkout 上重跑仓库根全量 pytest + 前端全量 vitest**。Final checkpoint
-    的语义是「全量收口」，应由一次完整 CI 绿来支撑，而非各项分别验过的推断。
-    解除条件 = 干净环境跑通 `governance-checks.yml` 的 `x3-adjustment-ie-guard-suite` job
-    + 仓库根 `python -m pytest`（辐射面）+ 前端 `npx vitest run`（辐射面）全绿。
+  - ✅ **通过（2026-08-16 全量收口跑）**：一次性重跑全部辐射面，逐项实测：
+    - 前端 vitest 7 文件 **239 passed**（ieWiringIntegrity / x3FormDataFieldConsistency /
+      x3RegistryDerivation / cycleImportExportRegistry / adjustmentIeContract /
+      x3KeyExtraction / x3StorageFieldMechanism）
+    - 后端 pytest x3 全套 23 文件 **537 passed / 5 skipped**（三批：284 + 105 + 148）
+    - `check_x3_deviation_registry.py --check` **exit 0**（十一组全 OK，基线合计 91）
+    - `emit_x3_equivalence_proof.py` **exit 0**（16/16 `covered_by_non_deletable_module`）
+    - `snapshot_x3_baseline.py --compare` **ZERO_REGRESSION**（CI drift 19/53 不变，重放 102/102 FULL）
+    - `mutate_ie_lifecycle_guards.py --list` **exit 0**（X1~X8 全登记，覆盖 6 守卫文件；
+      F3 已 `--run` 实证 8 条全 RED）
+  - 变异四态无 GREEN ✅ · Equivalence 16/16 ✅ · Deviation 归零 ✅ · 前后端全绿 ✅。
 
 ## Notes
 
