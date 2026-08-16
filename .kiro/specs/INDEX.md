@@ -10,7 +10,7 @@
 > `guard-assertion-attribution-refactor` **2/8** ·
 > `l-cycle-extraction-formula-and-disclosure-completion` **3/26** ·
 > `workpaper-import-export-lifecycle-closure` **24/25** ·
-> `x3-adjustment-entry-import-export` **38/53**；
+> ~~`x3-adjustment-entry-import-export` 38/53~~（**2026-08-16 全交付 63/63 并归档** → `_archive/05-business-features/`）；
 > 空壳 2 个 = `procedure-delegation-visibility-isolation` / `visibility-isolation-go-live-hardening`（又一次出现在 Active 区且 git 未跟踪）。
 > **上一版表头的 Active 写 6 而同句括注写「带 tasks.md 的 7 个」，本身自相矛盾** —— 那串 8→7→6→7→6 是按当日归档/新建增量推算的，没与目录实扫对账。**Active 数一律以目录实扫为准，禁按增量推算**（本文件 §四「凭印象禁令」的又一次兑现）。
 
@@ -20,7 +20,7 @@
 > `k-cycle-…closure` **19/25**（`[ ]`6） · `l-cycle-…completion` 3/26 ·
 > ~~`procedure-trim-report-line-account-resolution` 16/16~~（**本日第三个归档** → `_archive/05-business-features/`） ·
 > `workpaper-import-export-lifecycle-closure` 24/25（`[-]`1） ·
-> `x3-adjustment-entry-import-export` **33/53** ·
+> ~~`x3-adjustment-entry-import-export` 33/53~~（**2026-08-16 归档，见上**） ·
 > ~~`g7-column-alignment-and-extraction-closure` 24/24~~（**本轮已归档** → `_archive/08-disclosure-notes/`）
 >
 > 🔴 **2026-08-15 实扫又打翻两处旧记载**：①上一轮表头写「8 个目录全部带 tasks.md、无空壳」
@@ -77,7 +77,10 @@
 | `e1-variant-recalc-and-mutation-denominator-closure` | 0/19 | **2026-08-15 新建**（承接 `e-cycle-…completion` 归档时登记未修的两项）。**A 组**修 E1-3 `multi` 口径抹零：`recalcRow` 的 multi 分支无条件由原币列派生（`useE1BankDetail.ts` L105~L119），而 `loadFromResponses` 对 `fxRate` 缺失回落 **1**、对 `openingFc` 等回落 **0**（L176~L179 不对称）⇒ 只有本位币列的行切到 multi 版后真实金额被 0 覆盖。<br>**立项新查三项超出原登记**：①影响面含**审计师手工录入的行**（不止种子行）②`USER_FIELDS`（L92~L98）同含本位币四列与原币五列 ⇒ `serializeRows` 把 0 落库、原值**不可恢复**，触发条件仅「切一次 variant + 改任一格 + 2 秒」；`syncCrossSheetTotals` 的 watch 带 `immediate:true` ⇒ E1-1 审定表 TB 核对基准同步归零（实测横幅「审定合计 0.00 ≠ TB 4467536.12」）③叶子口径 `buildBankSeedRows` 无条件给 `fxRate:1` + fc 全 0 ⇒ **aux 侧无银行账户数据的项目在 multi 版金额恒零，连 variant 都不用切**（改造前的存量缺陷，账户级取数只是把它改善为「先开 multi 即正确」）。<br>修复落在**消费侧**（三形态判定 `base-identity`/`foreign-pending`/`fc-authoritative`，判据用 `fxCurrency` 而非 `fxRate` —— 用 fxRate 会把「外币待录入」误判成「本位币恒等」从而臆造汇率 1，违反 Property 34），种子侧一行不动（AC 1.9 的 variant 字段集差异已被守卫锁死）。<br>**B 组**推广 `mutate_e_cycle_guards.py` 的**覆盖面分母**范式：平台 17 个变异脚本 / 9657 行，分母 **3/17** · 静态锚点自检 **1/17** · 冻结基线 **1/17**，仅 e-cycle 那个 11/11。收敛成 `backend/scripts/_mutation_kit/`（8 模块），`run_cli` 的 `guard_files` 设**必填**让「没有分母」在签名层面不可能。<br>🔴 **顺带修一个已归档 spec 的产物欠账**：7 个 `mutate_task*.py` 属已归档 `procedure-trimming-and-delegation-intelligence`(26/26)，归档 commit 只带了 `mutate_trim_decision_guards.py`，这 7 个至今 `??` 未入库。<br>在办 spec 的 3 个脚本（`k_cycle`/`i_cycle`/`ie_lifecycle`）**不迁只登记豁免**，豁免表带失效检测（spec 一归档即提示撤销）。 |
 
 > 🔴 g7 与 e-cycle 双双归档后，上表**剩下的 5 个活行全部由并发会话推进**（tasks.md mtime
-> 秒/分钟级刷新），另 `x3-adjustment-entry-import-export`（实扫 33/53，并发新建）**本表尚无行**。
+> 秒/分钟级刷新）。`x3-adjustment-entry-import-export` 已于 2026-08-16 全交付 **63/63** 归档
+> → `_archive/05-business-features/`（复盘撕掉 5 处假绿后重做：15.2 挖出并修复 L6-3 刷新即崩、
+> 8 条变异 `--run` 全 RED、全量收口跑前端 239 + 后端 537 passed；4 个 commit 落
+> `work/2026-08-16-amount-input-migration-typing`）。
 > 跨会话协作时不要并行推进同一 spec（memory 已实证并发会话会互相回退同一文件）。
 > **`g7-column-alignment-and-extraction-closure`(24/24)** 与
 > **`e-cycle-extraction-formula-and-disclosure-completion`(24/24)** 均已于 2026-08-15 归档（见下）。
