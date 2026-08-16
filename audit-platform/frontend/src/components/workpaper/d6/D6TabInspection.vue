@@ -139,7 +139,7 @@
       </el-table-column>
       <el-table-column label="合同金额" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateSampleCell(1, row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateSampleCell(1, row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
@@ -250,7 +250,7 @@
       </el-table-column>
       <el-table-column label="贷方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateSampleCell(2, row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateSampleCell(2, row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
@@ -391,6 +391,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D6TabInspection.vue — 合同资产检查表 D6-6
  *

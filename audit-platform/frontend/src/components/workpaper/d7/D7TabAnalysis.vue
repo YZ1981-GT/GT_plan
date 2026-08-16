@@ -104,7 +104,7 @@
         </el-table-column>
         <el-table-column label="金额" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDebitCell(row.rowId, 'amount', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateDebitCell(row.rowId, 'amount', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -142,7 +142,7 @@
         </el-table-column>
         <el-table-column label="金额" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCreditCell(row.rowId, 'amount', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateCreditCell(row.rowId, 'amount', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -261,6 +261,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D7TabAnalysis.vue — 分析表 D7-4 (~350行)
  * 4区块卡片：借方+贷方+Top10+审计说明

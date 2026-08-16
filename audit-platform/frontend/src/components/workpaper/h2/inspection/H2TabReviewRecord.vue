@@ -332,10 +332,9 @@
               </el-table-column>
               <el-table-column label="期初数" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="!isReadonly && row.yearLabel !== '合计'"
                     v-model="row.begin"
-                    :controls="false"
                     size="small"
                     style="width:100%"
                   />
@@ -344,10 +343,9 @@
               </el-table-column>
               <el-table-column label="本期借方" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="!isReadonly && row.yearLabel !== '合计'"
                     v-model="row.debit"
-                    :controls="false"
                     size="small"
                     style="width:100%"
                   />
@@ -356,10 +354,9 @@
               </el-table-column>
               <el-table-column label="本期贷方" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="!isReadonly && row.yearLabel !== '合计'"
                     v-model="row.credit"
-                    :controls="false"
                     size="small"
                     style="width:100%"
                   />
@@ -368,10 +365,9 @@
               </el-table-column>
               <el-table-column label="期末数" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="!isReadonly && row.yearLabel !== '合计'"
                     v-model="row.end"
-                    :controls="false"
                     size="small"
                     style="width:100%"
                   />
@@ -662,6 +658,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabReviewRecord.vue — H2-6 按项目审核记录
  * 多工程汇总表 + 弹窗填充（对齐致同 Excel 1–9 节）+ 风险联动

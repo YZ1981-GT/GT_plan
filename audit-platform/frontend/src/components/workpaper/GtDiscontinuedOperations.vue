@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 /**
  * GtDiscontinuedOperations — 终止经营利润计算组件 (A5-4)
  *
@@ -94,13 +95,12 @@ onBeforeUnmount(() => { if (saveTimer) { clearTimeout(saveTimer); doSave() } })
       <el-table-column label="项目" prop="label" width="180" />
       <el-table-column label="金额（万元）" min-width="180">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row.editable"
             :model-value="row.value"
             @update:model-value="(v: number) => onInput(row.code, v)"
             :disabled="readonly"
             size="small"
-            :controls="false"
             style="width: 100%"
           />
           <strong v-else class="gt-do-computed">{{ row.value.toLocaleString() }}</strong>

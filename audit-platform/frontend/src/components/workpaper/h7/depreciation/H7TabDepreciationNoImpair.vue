@@ -24,13 +24,13 @@
       </el-table-column>
       <el-table-column label="原值" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.cost" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.cost" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="残值率(%)" min-width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.salvageRatePct" :controls="false" :min="0" :max="100" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.salvageRatePct" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ row.isSubtotal ? '' : row.salvageRatePct + '%' }}</span>
         </template>
       </el-table-column>
@@ -103,6 +103,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabDepreciationNoImpair.vue — H7-11 折旧测算表（不含减值·直线法）
  *

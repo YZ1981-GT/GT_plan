@@ -87,7 +87,7 @@
       </el-table-column>
       <el-table-column prop="originalCost" label="原值" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.originalCost" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.originalCost"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'originalCost', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.originalCost) }}</span>
@@ -95,7 +95,7 @@
       </el-table-column>
       <el-table-column prop="accumulatedDepreciation" label="累计折旧" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.accumulatedDepreciation" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.accumulatedDepreciation"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'accumulatedDepreciation', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.accumulatedDepreciation) }}</span>
@@ -103,7 +103,7 @@
       </el-table-column>
       <el-table-column prop="impairmentProvision" label="减值准备" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.impairmentProvision" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.impairmentProvision"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'impairmentProvision', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.impairmentProvision) }}</span>
@@ -169,10 +169,9 @@
       <el-table-column label="未审数" align="center">
         <el-table-column label="期初数" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!props.isReadonly"
               v-model="row.beginUnadjusted"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="updateCell(row.rowId, 'beginUnadjusted', $event)"
@@ -182,10 +181,9 @@
         </el-table-column>
         <el-table-column label="本期增加" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!props.isReadonly"
               v-model="row.periodIncrease"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="updateCell(row.rowId, 'periodIncrease', $event)"
@@ -195,10 +193,9 @@
         </el-table-column>
         <el-table-column label="本期减少" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!props.isReadonly"
               v-model="row.periodDecrease"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="updateCell(row.rowId, 'periodDecrease', $event)"
@@ -228,10 +225,9 @@
       <el-table-column label="账项调整" align="center">
         <el-table-column label="本期增加" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!props.isReadonly"
               v-model="row.ajeIncrease"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="updateCell(row.rowId, 'ajeIncrease', $event)"
@@ -241,10 +237,9 @@
         </el-table-column>
         <el-table-column label="本期减少" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!props.isReadonly"
               v-model="row.ajeDecrease"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="updateCell(row.rowId, 'ajeDecrease', $event)"
@@ -302,7 +297,7 @@
       <el-table-column prop="assetName" label="资产名称" min-width="120" fixed />
       <el-table-column prop="disposalIncome" label="处置收入" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.disposalIncome" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.disposalIncome"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'disposalIncome', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.disposalIncome) }}</span>
@@ -310,7 +305,7 @@
       </el-table-column>
       <el-table-column prop="disposalExpenses" label="清理费用" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.disposalExpenses" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.disposalExpenses"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'disposalExpenses', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.disposalExpenses) }}</span>
@@ -589,6 +584,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H6TabDetail.vue — H6-2 明细表
  *

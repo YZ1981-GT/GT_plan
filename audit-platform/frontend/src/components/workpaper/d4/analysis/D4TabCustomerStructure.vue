@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabCustomerStructure — D4-9 重要客户结构分析表
  *
@@ -285,7 +286,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
           <template #default="{ row, $index }"><el-input v-model="currentPeriod.rows[$index].name" size="small" :disabled="isReadonly" placeholder="客户" @input="updateData" /></template>
         </el-table-column>
         <el-table-column label="销售金额" width="120" align="right">
-          <template #default="{ row, $index }"><el-input-number v-model="currentPeriod.rows[$index].amount" :controls="false" size="small" :disabled="isReadonly" :precision="2" class="num-cell" @change="updateData" /></template>
+          <template #default="{ row, $index }"><WpAmountInput v-model="currentPeriod.rows[$index].amount" size="small" :disabled="isReadonly" class="num-cell" @change="updateData" /></template>
         </el-table-column>
         <el-table-column label="销售金额占比" width="110" align="right">
           <template #default="{ row }"><el-tooltip content="公式: IF(金额=0,0,金额/本期销售总额)" placement="top" :show-after="200"><span class="has-formula">{{ fmtPercent(row.amountRatio) }}</span></el-tooltip></template>
@@ -327,7 +328,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <el-table :data="computedPrior" border class="customer-table" :header-cell-style="{ fontSize: '13px', fontWeight: '600', background: '#f5f7fa', textAlign: 'center' }">
         <el-table-column label="序号" width="55" align="center"><template #default="{ $index }">{{ $index + 1 }}</template></el-table-column>
         <el-table-column label="客户名称" min-width="160"><template #default="{ row, $index }"><el-input v-model="priorPeriod.rows[$index].name" size="small" :disabled="isReadonly" placeholder="客户" @input="updateData" /></template></el-table-column>
-        <el-table-column label="销售金额" width="120" align="right"><template #default="{ row, $index }"><el-input-number v-model="priorPeriod.rows[$index].amount" :controls="false" size="small" :disabled="isReadonly" :precision="2" class="num-cell" @change="updateData" /></template></el-table-column>
+        <el-table-column label="销售金额" width="120" align="right"><template #default="{ row, $index }"><WpAmountInput v-model="priorPeriod.rows[$index].amount" size="small" :disabled="isReadonly" class="num-cell" @change="updateData" /></template></el-table-column>
         <el-table-column label="销售金额占比" width="110" align="right"><template #default="{ row }"><span class="has-formula">{{ fmtPercent(row.amountRatio) }}</span></template></el-table-column>
         <el-table-column label="销售数量" width="100" align="right"><template #default="{ row, $index }"><el-input-number v-model="priorPeriod.rows[$index].quantity" :controls="false" size="small" :disabled="isReadonly" class="num-cell" @change="updateData" /></template></el-table-column>
         <el-table-column label="销售数量占比" width="110" align="right"><template #default="{ row }"><span class="has-formula">{{ fmtPercent(row.quantityRatio) }}</span></template></el-table-column>

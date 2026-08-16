@@ -218,11 +218,9 @@
             </el-table-column>
             <el-table-column label="借方" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   v-model="row.debitAmount"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   style="width: 100%"
                   @change="persistRows"
@@ -232,11 +230,9 @@
             </el-table-column>
             <el-table-column label="贷方" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   v-model="row.creditAmount"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   style="width: 100%"
                   @change="persistRows"
@@ -426,6 +422,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G7TabVoucherCheck — G7-18 凭证检查表
  * 持久化 G7-18-rows / G7-18-criteria；字段对齐后端 IE；抽凭引擎科目 1511。

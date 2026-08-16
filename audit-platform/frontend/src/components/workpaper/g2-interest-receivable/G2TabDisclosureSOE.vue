@@ -106,11 +106,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.endAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateClassAmount(row.rowKey, 'endAmount', v)"
             />
@@ -119,11 +118,10 @@
         </el-table-column>
         <el-table-column label="期初余额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateClassAmount(row.rowKey, 'priorAmount', v)"
             />
@@ -162,11 +160,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.endAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateOverdueField(row.id, 'endAmount', v ?? 0)"
             />
@@ -344,6 +341,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, inject, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter, useRoute } from 'vue-router'

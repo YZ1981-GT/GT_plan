@@ -65,11 +65,9 @@
         </el-table-column>
         <el-table-column label="期末余额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="(row.kind === 'category' || row.kind === 'within') && !isReadonly"
               :model-value="row.endBalance ?? undefined"
-              :controls="false"
-              :precision="2"
               size="small"
               class="num-input"
               @update:model-value="(v: number | undefined) => onEndChange(row, v)"
@@ -79,11 +77,9 @@
         </el-table-column>
         <el-table-column label="上年年末余额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="(row.kind === 'category' || row.kind === 'within') && !isReadonly"
               :model-value="row.lastYearEnd ?? undefined"
-              :controls="false"
-              :precision="2"
               size="small"
               class="num-input"
               @update:model-value="(v: number | undefined) => onLastChange(row, v)"
@@ -120,19 +116,15 @@
           />
         </el-form-item>
         <el-form-item label="计提利息(元)">
-          <el-input-number
+          <WpAmountInput
             v-model="state.interest.total"
-            :controls="false"
-            :precision="2"
             :disabled="isReadonly"
             @change="onInterestChange"
           />
         </el-form-item>
         <el-form-item label="计入财务费用(元)">
-          <el-input-number
+          <WpAmountInput
             v-model="state.interest.financeExpense"
-            :controls="false"
-            :precision="2"
             :disabled="isReadonly"
             @change="onInterestChange"
           />
@@ -218,6 +210,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabDisclosureListed — 租赁负债附注披露（上市公司）
  * 对齐源模板 A1:F18 + note_template 五、47；同步附注模块

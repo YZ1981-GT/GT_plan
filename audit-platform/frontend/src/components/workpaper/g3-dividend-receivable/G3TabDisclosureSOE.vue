@@ -85,10 +85,9 @@
       </el-table-column>
       <el-table-column label="期初余额" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.openingBalance"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => updateTableRow(row.id, 'openingBalance', v ?? 0)"
@@ -159,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

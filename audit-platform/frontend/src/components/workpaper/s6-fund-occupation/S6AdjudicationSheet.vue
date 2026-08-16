@@ -53,12 +53,10 @@
         </el-table-column>
         <el-table-column prop="occupationAmount" label="资金占用金额(元)" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.occupationAmount"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width: 140px"
             />
             <span v-else>{{ fmt(row.occupationAmount) }}</span>
@@ -66,12 +64,10 @@
         </el-table-column>
         <el-table-column prop="guaranteeAmount" label="违规担保金额(元)" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.guaranteeAmount"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width: 140px"
             />
             <span v-else>{{ fmt(row.guaranteeAmount) }}</span>
@@ -79,12 +75,10 @@
         </el-table-column>
         <el-table-column prop="auditedAmount" label="审定金额(元)" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.auditedAmount"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width: 140px"
             />
             <span v-else>{{ fmt(row.auditedAmount) }}</span>
@@ -146,6 +140,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * S6AdjudicationSheet.vue — 审定表S6-1 大股东及关联方资金占用/违规担保汇总
  *

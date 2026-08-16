@@ -248,10 +248,9 @@
         <el-table-column label="期初数" align="center">
           <el-table-column label="未审数" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isSubtotal && !isReadonly"
                 :model-value="row.beginUnadjusted"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(blk.key, row.rowId, 'beginUnadjusted', v ?? 0)"
@@ -261,10 +260,9 @@
           </el-table-column>
           <el-table-column label="账项调整" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isSubtotal && !isReadonly"
                 :model-value="row.beginAdjustment"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(blk.key, row.rowId, 'beginAdjustment', v ?? 0)"
@@ -282,10 +280,9 @@
         <el-table-column label="期末数" align="center">
           <el-table-column label="未审数" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isSubtotal && !isReadonly"
                 :model-value="row.endUnadjusted"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(blk.key, row.rowId, 'endUnadjusted', v ?? 0)"
@@ -295,10 +292,9 @@
           </el-table-column>
           <el-table-column label="账项调整" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isSubtotal && !isReadonly"
                 :model-value="row.endAdjustment"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(blk.key, row.rowId, 'endAdjustment', v ?? 0)"
@@ -471,6 +467,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabAdjudication.vue — H8-1 审定表
  * 四区块 Excel 列结构 + H8-3 账项回写 + H9/TB 勾稽

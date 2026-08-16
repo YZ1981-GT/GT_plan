@@ -98,7 +98,7 @@
             </el-table-column>
             <el-table-column label="总额" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.curTotal" :controls="false" size="small" style="width:98px" @change="(v: number) => updateDeptCell(row.id, 'curTotal', v ?? 0)" />
+                <WpAmountInput v-if="!isReadonly && row.id !== 'total'" :model-value="row.curTotal" size="small" style="width:98px" @change="(v: number) => updateDeptCell(row.id, 'curTotal', v ?? 0)" />
                 <span v-else>{{ fmtAmt(row.curTotal) }}</span>
               </template>
             </el-table-column>
@@ -115,7 +115,7 @@
             </el-table-column>
             <el-table-column label="总额" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && row.id !== 'total'" :model-value="row.priorTotal" :controls="false" size="small" style="width:98px" @change="(v: number) => updateDeptCell(row.id, 'priorTotal', v ?? 0)" />
+                <WpAmountInput v-if="!isReadonly && row.id !== 'total'" :model-value="row.priorTotal" size="small" style="width:98px" @change="(v: number) => updateDeptCell(row.id, 'priorTotal', v ?? 0)" />
                 <span v-else>{{ fmtAmt(row.priorTotal) }}</span>
               </template>
             </el-table-column>
@@ -215,31 +215,31 @@
           </el-table-column>
           <el-table-column label="人工成本（生产人员）" width="120" align="right" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.laborCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'laborCost', v ?? 0)" />
+              <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.laborCost" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'laborCost', v ?? 0)" />
               <span v-else>{{ fmtAmt(row.laborCost) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="主营业务成本中人工成本" width="130" align="right" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mainLaborCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'mainLaborCost', v ?? 0)" />
+              <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mainLaborCost" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'mainLaborCost', v ?? 0)" />
               <span v-else>{{ fmtAmt(row.mainLaborCost) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="收入" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.revenue" :controls="false" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'revenue', v ?? 0)" />
+              <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.revenue" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'revenue', v ?? 0)" />
               <span v-else>{{ fmtAmt(row.revenue) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="总成本" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.totalCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'totalCost', v ?? 0)" />
+              <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.totalCost" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'totalCost', v ?? 0)" />
               <span v-else>{{ fmtAmt(row.totalCost) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="主营业务成本" width="110" align="right" show-overflow-tooltip>
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mainCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'mainCost', v ?? 0)" />
+              <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mainCost" size="small" style="width:98px" @change="(v: number) => updateProdCell(row.id, 'mainCost', v ?? 0)" />
               <span v-else>{{ fmtAmt(row.mainCost) }}</span>
             </template>
           </el-table-column>
@@ -285,7 +285,7 @@
             </el-table-column>
             <el-table-column label="人工成本（销售人员）" width="120" align="right" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.salesCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateSMRCell(row.id, 'salesCost', v ?? 0)" />
+                <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.salesCost" size="small" style="width:98px" @change="(v: number) => updateSMRCell(row.id, 'salesCost', v ?? 0)" />
                 <span v-else>{{ fmtAmt(row.salesCost) }}</span>
               </template>
             </el-table-column>
@@ -306,7 +306,7 @@
             </el-table-column>
             <el-table-column label="人工成本（管理人员）" width="120" align="right" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mgmtCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateSMRCell(row.id, 'mgmtCost', v ?? 0)" />
+                <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.mgmtCost" size="small" style="width:98px" @change="(v: number) => updateSMRCell(row.id, 'mgmtCost', v ?? 0)" />
                 <span v-else>{{ fmtAmt(row.mgmtCost) }}</span>
               </template>
             </el-table-column>
@@ -327,7 +327,7 @@
             </el-table-column>
             <el-table-column label="人工成本（研发人员）" width="120" align="right" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-input-number v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.rdCost" :controls="false" size="small" style="width:98px" @change="(v: number) => updateSMRCell(row.id, 'rdCost', v ?? 0)" />
+                <WpAmountInput v-if="!isReadonly && !['同行业平均','被审计单位','差异'].includes(row.company)" :model-value="row.rdCost" size="small" style="width:98px" @change="(v: number) => updateSMRCell(row.id, 'rdCost', v ?? 0)" />
                 <span v-else>{{ fmtAmt(row.rdCost) }}</span>
               </template>
             </el-table-column>
@@ -381,6 +381,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useJ1IndustryCompare } from '@/composables/workpaper/j1/useJ1IndustryCompare'

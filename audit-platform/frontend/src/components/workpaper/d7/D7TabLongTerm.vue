@@ -82,7 +82,7 @@
       </el-table-column>
       <el-table-column label="期末余额" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.endBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endBalance', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.endBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endBalance', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endBalance) }}</span>
         </template>
       </el-table-column>
@@ -119,7 +119,7 @@
       </el-table-column>
       <el-table-column label="至审计日结转金额" width="140" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.auditDateTransfer" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditDateTransfer', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.auditDateTransfer" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditDateTransfer', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.auditDateTransfer) }}</span>
         </template>
       </el-table-column>
@@ -224,6 +224,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D7TabLongTerm.vue — 账龄1年以上 D7-5 (~250行)
  * Task: 20.1

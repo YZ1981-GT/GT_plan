@@ -237,14 +237,14 @@
       </el-table-column>
       <el-table-column label="借方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.debitAmount" size="small" :controls="false" style="width:100%"
+          <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small" style="width:100%"
             @change="(v: number) => adj.updateCell(row.rowId, 'debitAmount', v)" />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.creditAmount" size="small" :controls="false" style="width:100%"
+          <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small" style="width:100%"
             @change="(v: number) => adj.updateCell(row.rowId, 'creditAmount', v)" />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
@@ -297,6 +297,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG12Adjustment } from '../../composables/useG12Adjustment'

@@ -139,8 +139,8 @@
 
       <el-table-column label="套期调整摊销" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKind === 'amortization' && !isReadonly" v-model="row.hedgeAdjAmortization"
-            size="small" :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKind === 'amortization' && !isReadonly" v-model="row.hedgeAdjAmortization"
+            size="small" style="width:100%"
             @change="(v: number) => hd.updateCell(row.rowId, 'hedgeAdjAmortization', v)" />
           <span v-else-if="row.rowKind === 'amortization'">{{ fmt(row.hedgeAdjAmortization) }}</span>
           <span v-else class="muted">—</span>
@@ -195,6 +195,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, inject, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG12HedgeDetail, mapG12HedgeDetailForFvCross } from '../../composables/useG12HedgeDetail'

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * J2TabDetail — J2-2 长期应付职工薪酬/设定受益计划净资产明细表
  *
@@ -278,19 +279,19 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column label="未审数" align="center">
           <el-table-column label="期初数" min-width="105" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.kind === 'leaf'" v-model="row.beginUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && row.kind === 'leaf'" v-model="row.beginUnadj" size="small" @change="scheduleSave" />
               <span v-else>{{ fmt(baseOf(t.rows, row, 'beginUnadj')) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期增加" min-width="105" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.kind === 'leaf'" v-model="row.incUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && row.kind === 'leaf'" v-model="row.incUnadj" size="small" @change="scheduleSave" />
               <span v-else>{{ fmt(baseOf(t.rows, row, 'incUnadj')) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期减少" min-width="105" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.kind === 'leaf'" v-model="row.decUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && row.kind === 'leaf'" v-model="row.decUnadj" size="small" @change="scheduleSave" />
               <span v-else>{{ fmt(baseOf(t.rows, row, 'decUnadj')) }}</span>
             </template>
           </el-table-column>
@@ -301,7 +302,7 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column label="期初调整" align="center">
           <el-table-column label="账项调整" min-width="105" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.kind === 'leaf'" v-model="row.openAdjust" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && row.kind === 'leaf'" v-model="row.openAdjust" size="small" @change="scheduleSave" />
               <span v-else>{{ fmt(baseOf(t.rows, row, 'openAdjust')) }}</span>
             </template>
           </el-table-column>
@@ -309,13 +310,13 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column label="账项调整" align="center">
           <el-table-column label="本期增加" min-width="105" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.kind === 'leaf'" v-model="row.incAdjust" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && row.kind === 'leaf'" v-model="row.incAdjust" size="small" @change="scheduleSave" />
               <span v-else>{{ fmt(baseOf(t.rows, row, 'incAdjust')) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期减少" min-width="105" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && row.kind === 'leaf'" v-model="row.decAdjust" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+              <WpAmountInput v-if="!isReadonly && row.kind === 'leaf'" v-model="row.decAdjust" size="small" @change="scheduleSave" />
               <span v-else>{{ fmt(baseOf(t.rows, row, 'decAdjust')) }}</span>
             </template>
           </el-table-column>
@@ -354,13 +355,13 @@ watch(() => props.allResponses, load, { deep: false })
       <el-table-column label="设定受益计划义务现值" align="center">
         <el-table-column label="本期未审金额" min-width="115" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="sEditable(row, 'dboUnadj')" v-model="row.dboUnadj" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="sEditable(row, 'dboUnadj')" v-model="row.dboUnadj" size="small" @change="scheduleSave" />
             <span v-else>{{ fmt(sBaseOf(row, 'dboUnadj')) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="账项调整" min-width="105" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="sEditable(row, 'dboAdjust')" v-model="row.dboAdjust" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="sEditable(row, 'dboAdjust')" v-model="row.dboAdjust" size="small" @change="scheduleSave" />
             <span v-else>{{ fmt(sBaseOf(row, 'dboAdjust')) }}</span>
           </template>
         </el-table-column>
@@ -369,7 +370,7 @@ watch(() => props.allResponses, load, { deep: false })
         </el-table-column>
         <el-table-column label="上期金额" min-width="105" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="sEditable(row, 'dboPrior')" v-model="row.dboPrior" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="sEditable(row, 'dboPrior')" v-model="row.dboPrior" size="small" @change="scheduleSave" />
             <span v-else>{{ fmt(sBaseOf(row, 'dboPrior')) }}</span>
           </template>
         </el-table-column>
@@ -377,13 +378,13 @@ watch(() => props.allResponses, load, { deep: false })
       <el-table-column label="计划资产的公允价值" align="center">
         <el-table-column label="本期金额" min-width="105" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="sEditable(row, 'assetCur')" v-model="row.assetCur" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="sEditable(row, 'assetCur')" v-model="row.assetCur" size="small" @change="scheduleSave" />
             <span v-else class="na-cell">{{ row.assetNa ? '—' : fmt(sBaseOf(row, 'assetCur')) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="上期金额" min-width="105" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="sEditable(row, 'assetPrior')" v-model="row.assetPrior" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="sEditable(row, 'assetPrior')" v-model="row.assetPrior" size="small" @change="scheduleSave" />
             <span v-else class="na-cell">{{ row.assetNa ? '—' : fmt(sBaseOf(row, 'assetPrior')) }}</span>
           </template>
         </el-table-column>
@@ -406,13 +407,13 @@ watch(() => props.allResponses, load, { deep: false })
       <el-table-column prop="label" label="项 目" min-width="180" />
       <el-table-column label="期末数" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.end" :controls="false" :precision="4" :step="0.001" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.end" :step="0.001" size="small" @change="scheduleSave" />
           <span v-else>{{ fmt(row.end) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="期初数" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" :precision="4" :step="0.001" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.begin" :step="0.001" size="small" @change="scheduleSave" />
           <span v-else>{{ fmt(row.begin) }}</span>
         </template>
       </el-table-column>

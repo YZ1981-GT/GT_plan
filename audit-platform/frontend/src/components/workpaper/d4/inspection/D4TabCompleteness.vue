@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabCompleteness — D4-15 营业收入完整性检查表
  *
@@ -277,7 +278,7 @@ function rowClassName({ row }: { row: any }) {
           </el-table-column>
           <el-table-column label="金额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.delivery.amount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateField(row.id, 'delivery', 'amount', row.delivery.amount)" />
+              <WpAmountInput v-model="row.delivery.amount" size="small" :disabled="isReadonly" style="width:100%" @change="updateField(row.id, 'delivery', 'amount', row.delivery.amount)" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -306,7 +307,7 @@ function rowClassName({ row }: { row: any }) {
           </el-table-column>
           <el-table-column label="金额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.invoice.amount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateField(row.id, 'invoice', 'amount', row.invoice.amount)" />
+              <WpAmountInput v-model="row.invoice.amount" size="small" :disabled="isReadonly" style="width:100%" @change="updateField(row.id, 'invoice', 'amount', row.invoice.amount)" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -335,7 +336,7 @@ function rowClassName({ row }: { row: any }) {
           </el-table-column>
           <el-table-column label="金额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.voucher.amount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateField(row.id, 'voucher', 'amount', row.voucher.amount)" />
+              <WpAmountInput v-model="row.voucher.amount" size="small" :disabled="isReadonly" style="width:100%" @change="updateField(row.id, 'voucher', 'amount', row.voucher.amount)" />
             </template>
           </el-table-column>
         </el-table-column>

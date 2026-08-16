@@ -42,10 +42,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.origBook"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="recalcCreditor"
@@ -60,10 +59,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.origFair"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="recalcCreditor"
@@ -78,10 +76,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.recvFair"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="recalcCreditor"
@@ -130,10 +127,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.debtBook"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="recalcDebtor"
@@ -148,10 +144,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.assetBook"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="recalcDebtor"
@@ -166,10 +161,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.equityFair"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="recalcDebtor"
@@ -270,6 +264,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * S5AdjudicationSheet.vue — 审定表 S5-1 + 非经常性损益标注
  *

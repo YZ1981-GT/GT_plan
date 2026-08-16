@@ -61,21 +61,21 @@
         <el-table-column label="本期数" align="center">
           <el-table-column label="未审" width="88" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.currentUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.currentUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'currentUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.currentUnadjusted) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="AJE" width="80" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.currentAje" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.currentAje" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'currentAje', v ?? 0)" />
               <span v-else>{{ fmt(row.currentAje) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="RJE" width="80" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.currentRje" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.currentRje" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'currentRje', v ?? 0)" />
               <span v-else>{{ fmt(row.currentRje) }}</span>
             </template>
@@ -183,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { inject, toRef, ref, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'

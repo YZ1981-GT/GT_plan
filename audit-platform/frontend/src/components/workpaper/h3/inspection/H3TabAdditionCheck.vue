@@ -226,21 +226,21 @@
         <el-table-column label="增减情况" align="center">
           <el-table-column prop="originalCost" label="原值" width="100" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.originalCost" size="small"
                 class="amt-input" @change="state.updateCell($index, 'originalCost', row.originalCost)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="accDep" label="累计折旧" width="100" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-if="!isReadonly" v-model="row.accDep" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.accDep" size="small"
                 class="amt-input" @change="state.updateCell($index, 'accDep', row.accDep)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="impairment" label="减值准备" width="100" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small"
                 class="amt-input" @change="state.updateCell($index, 'impairment', row.impairment)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
             </template>
@@ -374,14 +374,14 @@
         <el-table-column label="增减情况" align="center">
           <el-table-column prop="fairValue" label="公允价值" width="110" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-if="!isReadonly" v-model="row.fairValue" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.fairValue" size="small"
                 class="amt-input" @change="state.updateCell($index, 'fairValue', row.fairValue)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.fairValue) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="fairValueChange" label="公允价值变动" width="110" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-if="!isReadonly" v-model="row.fairValueChange" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.fairValueChange" size="small"
                 class="amt-input" @change="state.updateCell($index, 'fairValueChange', row.fairValueChange)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.fairValueChange) }}</span>
             </template>
@@ -546,7 +546,7 @@
         </el-table-column>
         <el-table-column prop="sourceAmount" label="源文件金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.sourceAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.sourceAmount" size="small"
               class="amt-input" @change="state.updateTraceCell(row.rowId, 'sourceAmount', row.sourceAmount)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.sourceAmount) }}</span>
           </template>
@@ -579,7 +579,7 @@
         </el-table-column>
         <el-table-column prop="bookAmount" label="账面金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookAmount" size="small"
               class="amt-input" @change="state.updateTraceCell(row.rowId, 'bookAmount', row.bookAmount)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookAmount) }}</span>
           </template>
@@ -711,6 +711,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H3TabAdditionCheck.vue — H3-5 增减检查表（成本/公允统一组件）
  * 对齐致同模板：目标→样本选取→测试→说明→结论

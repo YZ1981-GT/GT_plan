@@ -72,11 +72,10 @@
         </el-table-column>
         <el-table-column label="期末公允价值" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.endAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateTradingAmount(row.rowKey, 'endAmount', v)"
             />
@@ -85,11 +84,10 @@
         </el-table-column>
         <el-table-column label="期初公允价值" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateTradingAmount(row.rowKey, 'priorAmount', v)"
             />
@@ -155,11 +153,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.endAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateDerivativeField(row.rowId, 'endAmount', v)"
             />
@@ -168,11 +165,10 @@
         </el-table-column>
         <el-table-column label="期初余额" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.priorAmount"
               size="small"
-              :controls="false"
               style="width: 100%"
               @change="(v: number) => dis.updateDerivativeField(row.rowId, 'priorAmount', v)"
             />
@@ -247,6 +243,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, onBeforeUnmount, ref, toRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'

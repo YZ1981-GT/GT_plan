@@ -132,14 +132,14 @@
         </el-table-column>
         <el-table-column label="购买价款" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.transAmount" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.transAmount" size="small" class="amt-input"
               @change="onCell(row, 'transAmount')" />
             <span v-else class="amt-cell">{{ fmtAmt(row.transAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="工程物资入账价值" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookValue" size="small" class="amt-input"
               @change="onCell(row, 'bookValue')" />
             <span v-else class="amt-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
@@ -154,7 +154,7 @@
         </el-table-column>
         <el-table-column label="公允/评估价值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.appraisedValue" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.appraisedValue" size="small" class="amt-input"
               @change="onCell(row, 'appraisedValue')" />
             <span v-else class="amt-cell">{{ fmtAmt(row.appraisedValue) }}</span>
           </template>
@@ -168,7 +168,7 @@
         </el-table-column>
         <el-table-column label="同类总额" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.categoryTotal" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.categoryTotal" size="small" class="amt-input"
               @change="onCell(row, 'categoryTotal')" />
             <span v-else>{{ row.categoryTotal != null ? fmtAmt(row.categoryTotal) : '-' }}</span>
           </template>
@@ -279,14 +279,14 @@
         </el-table-column>
         <el-table-column label="出售时原值" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.originalCost" size="small" class="amt-input"
               @change="onCell(row, 'originalCost')" />
             <span v-else class="amt-cell">{{ fmtAmt(row.originalCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small" class="amt-input"
               @change="onCell(row, 'impairment')" />
             <span v-else class="amt-cell">{{ fmtAmt(row.impairment) }}</span>
           </template>
@@ -310,7 +310,7 @@
         </el-table-column>
         <el-table-column label="公允/评估价值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.appraisedValue" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.appraisedValue" size="small" class="amt-input"
               @change="onCell(row, 'appraisedValue')" />
             <span v-else class="amt-cell">{{ fmtAmt(row.appraisedValue) }}</span>
           </template>
@@ -420,6 +420,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabRelatedParty.vue — H4-9 关联交易检查表
  * 对齐致同 Excel：购入/出售双表 + 审计目标/说明/结论

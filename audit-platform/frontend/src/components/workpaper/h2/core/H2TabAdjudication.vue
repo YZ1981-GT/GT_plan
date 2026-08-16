@@ -214,9 +214,8 @@
         <el-table-column label="审定数" align="right" min-width="130">
           <template #default="{ row }">
             <template v-if="row.label.includes('1605') && !isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="state.materialsAudited.value"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number) => state.updateMaterials('audited', v ?? 0)"
@@ -405,6 +404,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabAdjudication.vue — H2-1 审定表
  * 对齐致同：原值 / 减值 / 净值 + 试算核对 + 结构化说明 + 结论 A/B/C

@@ -245,6 +245,11 @@ def main() -> int:
         "--files", default="",
         help="批2：逗号分隔的相对 workpaper 路径，处理这些文件的所有金额列（含无 :formatter）",
     )
+    ap.add_argument(
+        "--cycle", default="",
+        help="批3：逗号分隔的循环目录前缀（如 'f2,f3-notes-payable'），迁移这些目录下所有 .vue "
+             "的金额列（含无 :formatter）。git 已修改文件自动 SKIP。",
+    )
     args = ap.parse_args()
 
     sem = probe.load_semantics(probe.SEMANTICS_TS.read_text(encoding="utf-8"))
@@ -256,6 +261,17 @@ def main() -> int:
                 return 2
         require_formatter = False
         print(f"[INFO] 批2 指定 {len(files)} 文件（处理所有金额列，含无 formatter）")
+    elif args.cycle:
+        # 批3：按循环目录前缀（相对 workpaper 的首段目录名）选文件。前缀精确匹配首段，
+        # 不用首字母（否则顶层 Gt*.vue 首字母 g 会混入 G 循环）。
+        prefixes = tuple(c.strip() for c in args.cycle.split(",") if c.strip())
+        files = sorted(
+            p for p in WP_DIR.rglob("*.vue")
+            if "__tests__" not in p.parts
+            and p.relative_to(WP_DIR).as_posix().split("/")[0] in prefixes
+        )
+        require_formatter = False
+        print(f"[INFO] 批3 循环迁移 {len(files)} 文件（目录前缀 {prefixes}）")
     else:
         files = target_files()
         require_formatter = True

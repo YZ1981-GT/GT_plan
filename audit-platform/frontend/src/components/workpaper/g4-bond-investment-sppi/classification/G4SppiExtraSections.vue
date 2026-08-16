@@ -17,7 +17,7 @@
       </el-table-column>
       <el-table-column label="投资总额" min-width="100">
         <template #default="{ row }">
-          <el-input-number v-model="row.totalAmount" size="small" :controls="false" :disabled="isReadonly" @change="logic.updatePreferredItem(row.id, { totalAmount: row.totalAmount })" />
+          <WpAmountInput v-model="row.totalAmount" size="small" :disabled="isReadonly" @change="logic.updatePreferredItem(row.id, { totalAmount: row.totalAmount })" />
         </template>
       </el-table-column>
       <el-table-column label="期限" min-width="90">
@@ -89,7 +89,7 @@
       </el-table-column>
       <el-table-column label="投资总额" min-width="100">
         <template #default="{ row }">
-          <el-input-number v-model="row.totalAmount" size="small" :controls="false" :disabled="isReadonly" @change="logic.updateConvertibleItem(row.id, { totalAmount: row.totalAmount })" />
+          <WpAmountInput v-model="row.totalAmount" size="small" :disabled="isReadonly" @change="logic.updateConvertibleItem(row.id, { totalAmount: row.totalAmount })" />
         </template>
       </el-table-column>
       <el-table-column label="期限" min-width="80">
@@ -146,7 +146,7 @@
       </el-table-column>
       <el-table-column label="投资总额" min-width="100">
         <template #default="{ row }">
-          <el-input-number v-model="row.totalAmount" size="small" :controls="false" :disabled="isReadonly" @change="logic.updateProjectTrustItem(row.id, { totalAmount: row.totalAmount })" />
+          <WpAmountInput v-model="row.totalAmount" size="small" :disabled="isReadonly" @change="logic.updateProjectTrustItem(row.id, { totalAmount: row.totalAmount })" />
         </template>
       </el-table-column>
       <el-table-column label="期限" min-width="80">
@@ -260,6 +260,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4-6 部分(三)～(六)：优先股永续债 / 可转债 / 项目信托 / ABS
  */

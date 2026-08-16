@@ -189,11 +189,10 @@
       <el-table-column label="本期数" align="center">
         <el-table-column label="未审" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.currentUnadjusted"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { currentUnadjusted: v ?? 0 })"
             />
@@ -223,11 +222,10 @@
       <el-table-column label="上期数" align="center">
         <el-table-column label="未审" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorUnadjusted"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { priorUnadjusted: v ?? 0 })"
             />
@@ -330,6 +328,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, onMounted, computed, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG11DetailAnalysis } from '../../composables/useG11DetailAnalysis'

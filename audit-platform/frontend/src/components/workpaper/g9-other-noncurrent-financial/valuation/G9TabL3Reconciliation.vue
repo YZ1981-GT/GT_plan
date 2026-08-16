@@ -93,11 +93,10 @@
       </el-table-column>
       <el-table-column label="期初公允价值" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.openingFairValue"
             size="small"
-            :controls="false"
             style="width:100%"
             @update:model-value="(v: number) => l3.updateRow(row.rowId, 'openingFairValue', v ?? 0)"
           />
@@ -205,11 +204,10 @@
         </el-table-column>
         <el-table-column label="减值" width="80" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.impairmentLoss"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => l3.updateRow(row.rowId, 'impairmentLoss', v ?? 0)"
             />
@@ -345,6 +343,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, ref, watch } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'

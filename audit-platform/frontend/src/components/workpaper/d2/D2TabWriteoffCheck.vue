@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabWriteoffCheck — 坏账准备转回（收回）、核销检查 D2-11
  *
@@ -141,7 +142,7 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <el-table-column label="金额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -208,7 +209,7 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <el-table-column label="金额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.amount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.amount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'amount', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>
           </template>
         </el-table-column>

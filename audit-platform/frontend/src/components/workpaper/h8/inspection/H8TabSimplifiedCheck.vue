@@ -122,7 +122,7 @@
         </el-table-column>
         <el-table-column prop="newAssetValue" label="全新价值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.newAssetValue" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.newAssetValue" size="small"
               @change="(v: number | undefined) => updateCell(row.rowId, 'newAssetValue', v)" />
             <span v-else>{{ fmtAmt(row.newAssetValue) }}</span>
           </template>
@@ -168,7 +168,7 @@
         </el-table-column>
         <el-table-column prop="bookExpense" label="账面本期租金" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookExpense" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookExpense" size="small"
               @change="(v: number | undefined) => updateCell(row.rowId, 'bookExpense', v)" />
             <span v-else>{{ fmtAmt(row.bookExpense) }}</span>
           </template>
@@ -292,6 +292,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabSimplifiedCheck.vue — H8-13 简化处理的租赁检查表
  * 资格判断（短期/低价值）+ 费用重算（应计 vs 账面），不合规/差异高亮

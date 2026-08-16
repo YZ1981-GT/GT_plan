@@ -268,11 +268,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.endingBalance"
               size="small"
-              :controls="false"
               @change="onScopeChange(row)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.endingBalance) }}</span>
@@ -280,11 +279,10 @@
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairment"
               size="small"
-              :controls="false"
               @change="onScopeChange(row)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
@@ -327,12 +325,10 @@
         </el-table-column>
         <el-table-column label="计划监盘金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.planAmount"
               size="small"
-              :controls="false"
-              :min="0"
               @change="onScopeChange(row)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.planAmount) }}</span>
@@ -448,9 +444,8 @@
             @change="persist"
           />
           <span class="muted">预计数量</span>
-          <el-input-number
+          <WpAmountInput
             v-model="form.sampleBookToFloorQty"
-            :min="0"
             :disabled="isReadonly"
             class="ml-8"
             @change="persist"
@@ -464,9 +459,8 @@
             @change="persist"
           />
           <span class="muted">预计数量</span>
-          <el-input-number
+          <WpAmountInput
             v-model="form.sampleFloorToBookQty"
-            :min="0"
             :disabled="isReadonly"
             class="ml-8"
             @change="persist"
@@ -567,8 +561,8 @@
     <el-dialog v-model="majDialog.visible" title="编辑主要工程项目" width="560px" destroy-on-close>
       <el-form label-width="100px" size="small">
         <el-form-item label="工程项目"><el-input v-model="majDialog.draft.name" /></el-form-item>
-        <el-form-item label="原值/余额"><el-input-number v-model="majDialog.draft.originalCost" :controls="false" style="width:100%" /></el-form-item>
-        <el-form-item label="减值准备"><el-input-number v-model="majDialog.draft.impairment" :controls="false" style="width:100%" /></el-form-item>
+        <el-form-item label="原值/余额"><WpAmountInput v-model="majDialog.draft.originalCost" style="width:100%" /></el-form-item>
+        <el-form-item label="减值准备"><WpAmountInput v-model="majDialog.draft.impairment" style="width:100%" /></el-form-item>
         <el-form-item label="所处地点"><el-input v-model="majDialog.draft.location" /></el-form-item>
         <el-form-item label="说明"><el-input v-model="majDialog.draft.note" type="textarea" :autosize="{ minRows: 2 }" /></el-form-item>
       </el-form>
@@ -593,6 +587,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabStocktakePlan — H2-12 在建工程监盘计划
  * 对齐致同模板；参照 H1-9 固定资产监盘计划处理范式

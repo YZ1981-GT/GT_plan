@@ -80,10 +80,9 @@
         <el-table-column prop="label" label="目标行" min-width="220" />
         <el-table-column label="分摊金额" width="160">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-model="row.amount"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               class="alloc-input"
             />
@@ -134,11 +133,10 @@
       <el-table-column label="期初数" align="center">
         <el-table-column label="未审数" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.openingUnadjusted"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => updateField(row.rowKey, 'openingUnadjusted', v ?? 0)"
             />
@@ -147,11 +145,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.openingAdjustment"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => updateField(row.rowKey, 'openingAdjustment', v ?? 0)"
             />
@@ -168,11 +165,10 @@
       <el-table-column label="期末数" align="center">
         <el-table-column label="未审数" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.closingUnadjusted"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => updateField(row.rowKey, 'closingUnadjusted', v ?? 0)"
             />
@@ -181,11 +177,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.closingAdjustment"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => updateField(row.rowKey, 'closingAdjustment', v ?? 0)"
             />
@@ -273,6 +268,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, inject, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'

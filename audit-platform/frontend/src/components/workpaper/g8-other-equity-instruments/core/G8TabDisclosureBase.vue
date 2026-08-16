@@ -130,11 +130,10 @@
       <el-table-column label="期末余额" width="140" align="right">
         <template #default="{ row }">
           <span v-if="row.isTotal" class="formula-cell">{{ fmt(row.closing) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.closing"
             size="small"
-            :controls="false"
             style="width:100%"
             @update:model-value="(v: number) => disc.updateBalance(row.rowKey, 'closing', v ?? 0)"
           />
@@ -217,7 +216,7 @@
         </el-table-column>
         <el-table-column label="本期确认的股利收入" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.dividend" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.dividend" size="small" style="width:100%"
               @update:model-value="(v: number) => disc.updateOci(row.rowKey, 'dividend', v ?? 0)" />
             <span v-else>{{ fmt(row.dividend) }}</span>
           </template>
@@ -270,7 +269,7 @@
         <el-table-column label="本期确认的股利收入" width="120" align="right">
           <template #default="{ row }">
             <span v-if="row.isTotal" class="formula-cell">{{ fmt(row.dividend) }}</span>
-            <el-input-number v-else-if="!isReadonly" :model-value="row.dividend" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-else-if="!isReadonly" :model-value="row.dividend" size="small" style="width:100%"
               @update:model-value="(v: number) => disc.updateDetail(row.rowKey, 'dividend', v ?? 0)" />
             <span v-else>{{ fmt(row.dividend) }}</span>
           </template>
@@ -294,7 +293,7 @@
         <el-table-column label="其他综合收益转入留存收益的金额" width="140" align="right">
           <template #default="{ row }">
             <span v-if="row.isTotal" class="formula-cell">{{ fmt(row.transferAmt) }}</span>
-            <el-input-number v-else-if="!isReadonly" :model-value="row.transferAmt" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-else-if="!isReadonly" :model-value="row.transferAmt" size="small" style="width:100%"
               @update:model-value="(v: number) => disc.updateDetail(row.rowKey, 'transferAmt', v ?? 0)" />
             <span v-else>{{ fmt(row.transferAmt) }}</span>
           </template>
@@ -317,6 +316,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, ref, toRef, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'

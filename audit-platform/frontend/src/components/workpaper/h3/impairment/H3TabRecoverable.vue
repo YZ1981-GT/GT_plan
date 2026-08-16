@@ -81,7 +81,7 @@
           />
         </el-form-item>
         <el-form-item label="账面价值">
-          <el-input-number v-model="bookValue" :controls="false" :disabled="isReadonly" />
+          <WpAmountInput v-model="bookValue" :disabled="isReadonly" />
         </el-form-item>
         <el-form-item v-if="activeGroup.sourceH38RowId" label="H3-8">
           <el-tag size="small" type="success">已关联</el-tag>
@@ -125,10 +125,9 @@
         <el-table-column prop="label" label="确定方法" width="160" />
         <el-table-column label="金额" width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.amount"
-              :controls="false"
               size="small"
               @change="row.onAmount"
             />
@@ -464,6 +463,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H3TabRecoverable.vue — H3-11 可收回金额测试表
  * 对齐 Excel：公允净额 + DCF/WACC + MAX + 敏感性 + 回写 H3-10

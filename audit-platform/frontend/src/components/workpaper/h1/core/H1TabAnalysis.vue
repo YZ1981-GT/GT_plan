@@ -288,12 +288,10 @@
         </el-table-column>
         <el-table-column label="综合年折旧率%" align="right" width="150">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="depRecalcRate"
-              :controls="false"
               size="small"
-              :precision="2"
               :placeholder="row.compositeRate != null ? row.compositeRate.toFixed(2) : '待填/取上期'"
               style="width:100%"
               @change="setDepRecalcRate"
@@ -498,6 +496,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, reactive, watch, inject, toRef, onMounted } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

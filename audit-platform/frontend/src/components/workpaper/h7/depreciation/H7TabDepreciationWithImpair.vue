@@ -24,19 +24,19 @@
       </el-table-column>
       <el-table-column label="原值" min-width="115" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.cost" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.cost" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="已提累计折旧" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.accDep" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.accDep" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="减值准备" min-width="115" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.impairment" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.impairment" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
         </template>
       </el-table-column>
@@ -47,7 +47,7 @@
       </el-table-column>
       <el-table-column label="残值率(%)" min-width="95" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.salvageRatePct" :controls="false" :min="0" :max="100" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.salvageRatePct" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ row.isSubtotal ? '' : row.salvageRatePct + '%' }}</span>
         </template>
       </el-table-column>
@@ -104,6 +104,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabDepreciationWithImpair.vue — H7-11 折旧测算表（含减值）
  *

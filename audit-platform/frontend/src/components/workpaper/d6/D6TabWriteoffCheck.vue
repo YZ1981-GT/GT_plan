@@ -139,7 +139,7 @@
       </el-table-column>
       <el-table-column label="转回金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.reversalAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateReversalCell(row.rowId, 'reversalAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.reversalAmount" size="small" style="width:100%" @change="(v: number) => updateReversalCell(row.rowId, 'reversalAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.reversalAmount) }}</span>
         </template>
       </el-table-column>
@@ -185,7 +185,7 @@
       </el-table-column>
       <el-table-column label="核销金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.writeoffAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateWriteoffCell(row.rowId, 'writeoffAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.writeoffAmount" size="small" style="width:100%" @change="(v: number) => updateWriteoffCell(row.rowId, 'writeoffAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.writeoffAmount) }}</span>
         </template>
       </el-table-column>
@@ -284,6 +284,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D6TabWriteoffCheck.vue — 减值准备转回核销检查 D6-9
  */

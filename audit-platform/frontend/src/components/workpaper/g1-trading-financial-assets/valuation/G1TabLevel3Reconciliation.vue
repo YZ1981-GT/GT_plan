@@ -89,10 +89,9 @@
       </el-table-column>
       <el-table-column label="期初余额" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.openingBalance"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @change="l3.updateRow(row.id, { openingBalance: row.openingBalance })"
@@ -130,10 +129,9 @@
       <el-table-column label="当期利得或损失总额" align="center">
         <el-table-column label="公允价值变动损益" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-model="row.gainPl"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @change="l3.updateRow(row.id, { gainPl: row.gainPl })"
@@ -308,6 +306,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, inject, watch, computed } from 'vue'
 import {
   useG1Level3,

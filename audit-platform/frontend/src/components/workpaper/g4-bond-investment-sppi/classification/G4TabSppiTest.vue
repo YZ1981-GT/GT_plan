@@ -88,7 +88,7 @@
           </el-table-column>
           <el-table-column label="票面价值总额" min-width="110">
             <template #default="{ row }">
-              <el-input-number v-model="row.faceValue" size="small" :controls="false" :disabled="isReadonly" @change="handleBondUpdate(row.id, { faceValue: row.faceValue })" />
+              <WpAmountInput v-model="row.faceValue" size="small" :disabled="isReadonly" @change="handleBondUpdate(row.id, { faceValue: row.faceValue })" />
             </template>
           </el-table-column>
           <el-table-column label="票面利率(%)" min-width="100">
@@ -197,7 +197,7 @@
       </el-table-column>
       <el-table-column label="投资总额" min-width="100">
         <template #default="{ row }">
-          <el-input-number v-model="row.totalAmount" size="small" :controls="false" :disabled="isReadonly" @change="sppiTestLogic.updateStep1Item(row.id, { totalAmount: row.totalAmount })" />
+          <WpAmountInput v-model="row.totalAmount" size="small" :disabled="isReadonly" @change="sppiTestLogic.updateStep1Item(row.id, { totalAmount: row.totalAmount })" />
         </template>
       </el-table-column>
       <el-table-column label="保证本金" width="80" align="center">
@@ -359,6 +359,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { inject, toRef, computed, ref, defineAsyncComponent } from 'vue'
 import { ChatDotRound, MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'

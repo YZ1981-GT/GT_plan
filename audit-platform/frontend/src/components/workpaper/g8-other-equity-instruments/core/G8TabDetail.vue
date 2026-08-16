@@ -180,7 +180,7 @@
         </el-table-column>
         <el-table-column label="期初余额" :render-header="th('期初余额')" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingBalance" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.openingBalance" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingBalance: v ?? 0 })" />
             <span v-else>{{ fmt(row.openingBalance) }}</span>
           </template>
@@ -351,18 +351,17 @@
         </el-table-column>
         <el-table-column label="每股公允价值" :render-header="th('每股公允价值')" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.pricePerShare" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.pricePerShare" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { pricePerShare: v ?? 0 })" />
             <span v-else>{{ fmt(row.pricePerShare) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="公允价值合计" :render-header="th('公允价值合计')" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.fairValueTotal"
               size="small"
-              :controls="false"
               style="width:100%"
               :class="{ 'field-warn': fvClosingMismatch(row) }"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { fairValueTotal: v ?? 0 })"
@@ -439,6 +438,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, ref, watch, h } from 'vue'
 import { ElMessage, ElTooltip } from 'element-plus'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'

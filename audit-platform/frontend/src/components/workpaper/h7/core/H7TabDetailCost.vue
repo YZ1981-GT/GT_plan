@@ -71,19 +71,19 @@
       <el-table-column prop="assetName" label="资产名称" min-width="150" fixed />
       <el-table-column label="期初原值" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.costBegin" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.costBegin" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.costBegin) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期增加" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.costIncrease" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.costIncrease" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.costIncrease) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期减少" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.costDecrease" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.costDecrease" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.costDecrease) }}</span>
         </template>
       </el-table-column>
@@ -104,13 +104,13 @@
       </el-table-column>
       <el-table-column label="累计折旧" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.accDep" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.accDep" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="减值准备" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.impairment" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.impairment" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
         </template>
       </el-table-column>
@@ -160,6 +160,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabDetailCost.vue — H7-2 明细表（成本模式）
  *

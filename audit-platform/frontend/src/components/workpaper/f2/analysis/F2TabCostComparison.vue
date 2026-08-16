@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * F2TabCostComparison — F2-20 产成品单位成本年度比较分析表
  * 功能参照 F2-18：期间标签、阈值、表+说明/异常原因、总体结论、AI
@@ -208,10 +209,9 @@ function setThresholdPct(v: number) {
             </el-table-column>
             <el-table-column label="制造费用" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="row.currentOverhead"
-                  :controls="false"
                   size="small"
                   style="width: 100%"
                   @change="(v: number | undefined) => updateCell(row.rowId, 'currentOverhead', v ?? 0)"
@@ -253,10 +253,9 @@ function setThresholdPct(v: number) {
             </el-table-column>
             <el-table-column label="制造费用" width="100" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="row.priorOverhead"
-                  :controls="false"
                   size="small"
                   style="width: 100%"
                   @change="(v: number | undefined) => updateCell(row.rowId, 'priorOverhead', v ?? 0)"

@@ -225,10 +225,9 @@
         </el-table-column>
         <el-table-column label="增加·面值总额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-model="row.increaseFaceTotal"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="reconciliationLogic.updateItem(row.id, { increaseFaceTotal: row.increaseFaceTotal })"
             />
@@ -247,10 +246,9 @@
         </el-table-column>
         <el-table-column label="减少·面值总额" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-model="row.decreaseFaceTotal"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="reconciliationLogic.updateItem(row.id, { decreaseFaceTotal: row.decreaseFaceTotal })"
             />
@@ -324,10 +322,9 @@
         </el-table-column>
         <el-table-column label="账面·面值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-model="row.bookFaceValue"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="reconciliationLogic.updateItem(row.id, { bookFaceValue: row.bookFaceValue })"
             />
@@ -342,10 +339,9 @@
         </el-table-column>
         <el-table-column label="账面摊余成本" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-model="row.bookCarryingAmount"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="reconciliationLogic.updateItem(row.id, { bookCarryingAmount: row.bookCarryingAmount })"
             />
@@ -460,6 +456,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabInventoryReconciliation.vue — G4-8 有价证券盘点倒轧表（重构）
  *

@@ -183,14 +183,14 @@
         </el-table-column>
         <el-table-column label="借方金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small"
               class="amount-input" @change="persist" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="贷方金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small"
               class="amount-input" @change="persist" />
             <span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span>
           </template>
@@ -287,14 +287,14 @@
         </el-table-column>
         <el-table-column label="借方金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small"
               class="amount-input" @change="persist" />
             <span v-else class="amount-cell">{{ fmtAmt(row.debitAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="贷方金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small"
               class="amount-input" @change="persist" />
             <span v-else class="amount-cell">{{ fmtAmt(row.creditAmount) }}</span>
           </template>
@@ -460,6 +460,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, onMounted, defineAsyncComponent } from 'vue'
 import {
   useG5VoucherCheck,

@@ -110,11 +110,10 @@
           <template v-if="row.isTotal">
             <b>{{ fmt(row.closingBookValue) }}</b>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else
             :model-value="row.closingBookValue"
             size="small"
-            :controls="false"
             style="width: 100%"
             :disabled="isReadonly"
             @change="(v: number) => cls.updateRow(row.id, { closingBookValue: v ?? 0 })"
@@ -302,6 +301,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, ref, toRef, watch } from 'vue'
 import { useG1Classification } from '../../composables/useG1Classification'
 import type { ChecklistResponse } from '../../composables/useF1FormData'

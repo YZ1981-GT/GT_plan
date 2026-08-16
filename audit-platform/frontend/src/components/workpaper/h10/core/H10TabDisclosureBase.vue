@@ -86,9 +86,9 @@
       </el-table-column>
       <el-table-column label="本期发生额" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row.rowKey !== 'total' && !(variant === 'listed' && row.rowKey === 'trial_operation_sales') && !isReadonly"
-            :model-value="row.currentAmount" size="small" :controls="false" style="width:100%"
+            :model-value="row.currentAmount" size="small" style="width:100%"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'currentAmount', v ?? 0)"
           />
           <span v-else :class="{ 'formula-cell': (variant === 'listed' && row.rowKey === 'trial_operation_sales') || row.rowKey === 'total' }">
@@ -98,9 +98,9 @@
       </el-table-column>
       <el-table-column label="上期发生额" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row.rowKey !== 'total' && !(variant === 'listed' && row.rowKey === 'trial_operation_sales') && !isReadonly"
-            :model-value="row.priorAmount" size="small" :controls="false" style="width:100%"
+            :model-value="row.priorAmount" size="small" style="width:100%"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'priorAmount', v ?? 0)"
           />
           <span v-else :class="{ 'formula-cell': (variant === 'listed' && row.rowKey === 'trial_operation_sales') || row.rowKey === 'total' }">
@@ -110,7 +110,7 @@
       </el-table-column>
       <el-table-column v-if="variant === 'soe'" label="计入当期非经常性损益的金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.nonRecurringAmount" size="small" :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.nonRecurringAmount" size="small" style="width:100%"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'nonRecurringAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.nonRecurringAmount ?? 0) }}</span>
         </template>
@@ -144,14 +144,14 @@
         <el-table-column label="本期发生额" align="center">
           <el-table-column label="收入" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentIncome" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentIncome" size="small" style="width:100%"
                 @update:model-value="(v: number) => dis.updateTrialField(row.rowKey, 'currentIncome', v ?? 0)" />
               <span v-else>{{ fmt(row.currentIncome) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="成本" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentCost" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentCost" size="small" style="width:100%"
                 @update:model-value="(v: number) => dis.updateTrialField(row.rowKey, 'currentCost', v ?? 0)" />
               <span v-else>{{ fmt(row.currentCost) }}</span>
             </template>
@@ -160,14 +160,14 @@
         <el-table-column label="上期发生额" align="center">
           <el-table-column label="收入" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorIncome" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorIncome" size="small" style="width:100%"
                 @update:model-value="(v: number) => dis.updateTrialField(row.rowKey, 'priorIncome', v ?? 0)" />
               <span v-else>{{ fmt(row.priorIncome) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="成本" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorCost" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorCost" size="small" style="width:100%"
                 @update:model-value="(v: number) => dis.updateTrialField(row.rowKey, 'priorCost', v ?? 0)" />
               <span v-else>{{ fmt(row.priorCost) }}</span>
             </template>
@@ -199,6 +199,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'

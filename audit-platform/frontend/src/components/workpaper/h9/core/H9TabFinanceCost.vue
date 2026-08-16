@@ -66,14 +66,14 @@
       </el-table-column>
       <el-table-column prop="beginBalance" label="B:期初余额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'beginBalance', v)" />
           <span v-else>{{ fmtAmt(row.beginBalance) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="debitIncrease" label="C:本期增加(借)" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.debitIncrease" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.debitIncrease" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'debitIncrease', v)" />
           <span v-else>{{ fmtAmt(row.debitIncrease) }}</span>
         </template>
@@ -118,28 +118,28 @@
       <el-table-column prop="contractNo" label="合同号" width="110" />
       <el-table-column prop="beginAje" label="F:期初AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.beginAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.beginAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'beginAje', v)" />
           <span v-else>{{ fmtAmt(row.beginAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="confirmAje" label="G:确认AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.confirmAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.confirmAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'confirmAje', v)" />
           <span v-else>{{ fmtAmt(row.confirmAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="increaseAje" label="H:增加AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.increaseAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.increaseAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'increaseAje', v)" />
           <span v-else>{{ fmtAmt(row.increaseAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="otherAje" label="I:其他AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.otherAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.otherAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'otherAje', v)" />
           <span v-else>{{ fmtAmt(row.otherAje) }}</span>
         </template>
@@ -303,6 +303,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabFinanceCost.vue — H9-3 未确认融资费用明细表（21列 3区段Tab）
  *

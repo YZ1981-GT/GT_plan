@@ -82,11 +82,10 @@
         </el-table-column>
         <el-table-column label="减值准备" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairment"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="persistStructured"
             />
@@ -149,11 +148,10 @@
             </el-table-column>
             <el-table-column label="账面余额" width="125" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="row.kind === 'detail' && !isReadonly"
                   :model-value="row.bookBalance"
                   size="small"
-                  :controls="false"
                   class="amt-input"
                   @change="(v: number) => patchStageRow(block.id, method, row.id, { bookBalance: v || 0 })"
                 />
@@ -165,11 +163,10 @@
             </el-table-column>
             <el-table-column label="减值准备" width="125" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="row.kind === 'detail' && !isReadonly"
                   :model-value="row.impairment"
                   size="small"
-                  :controls="false"
                   class="amt-input"
                   @change="(v: number) => patchStageRow(block.id, method, row.id, { impairment: v || 0 })"
                 />
@@ -280,6 +277,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'

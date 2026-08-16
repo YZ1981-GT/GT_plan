@@ -170,7 +170,7 @@
         </el-table-column>
         <el-table-column label="②账面价值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false"
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookValue"
               size="small" class="amt-input" @change="onCalcChange(row.rowId, 'bookValue', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
@@ -178,10 +178,9 @@
         <el-table-column label="可收回金额" align="center">
           <el-table-column label="③公允净额" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.fairValueNet"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 :disabled="row.hasSign === '否'"
@@ -222,7 +221,7 @@
         </el-table-column>
         <el-table-column label="⑦账面已提" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookedProvision" :controls="false"
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookedProvision"
               size="small" class="amt-input" @change="onCalcChange(row.rowId, 'bookedProvision', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.bookedProvision) }}</span>
           </template>
@@ -338,6 +337,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabImpairment.vue — H2-15 减值测算
  * 双区域(迹象判断6项+测算表对齐Excel) + GtIndexChip→H2-16/H2-13

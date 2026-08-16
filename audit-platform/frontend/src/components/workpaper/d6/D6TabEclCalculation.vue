@@ -92,7 +92,7 @@
       </el-table-column>
       <el-table-column label="审定余额①" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateSingleCell(row.rowId, 'auditedBalance', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.auditedBalance" size="small" style="width:100%" @change="(v: number) => updateSingleCell(row.rowId, 'auditedBalance', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.auditedBalance) }}</span>
         </template>
       </el-table-column>
@@ -107,7 +107,7 @@
       </el-table-column>
       <el-table-column label="账面余额④" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.bookBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateSingleCell(row.rowId, 'bookBalance', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.bookBalance" size="small" style="width:100%" @change="(v: number) => updateSingleCell(row.rowId, 'bookBalance', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.bookBalance) }}</span>
         </template>
       </el-table-column>
@@ -167,7 +167,7 @@
         </el-table-column>
         <el-table-column label="审定余额①" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.auditedBalance" size="small" style="width:100%" @change="(v: number) => updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.auditedBalance) }}</span>
           </template>
         </el-table-column>
@@ -182,7 +182,7 @@
         </el-table-column>
         <el-table-column label="账面余额④" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.bookBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateAgingCell(group.groupId, row.rowId, 'bookBalance', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.bookBalance" size="small" style="width:100%" @change="(v: number) => updateAgingCell(group.groupId, row.rowId, 'bookBalance', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.bookBalance) }}</span>
           </template>
         </el-table-column>
@@ -269,6 +269,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D6TabEclCalculation.vue — 减值准备测算 D6-8
  */

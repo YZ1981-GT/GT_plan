@@ -166,8 +166,7 @@
       <template v-if="activeTab === 'tab1'">
         <el-table-column label="投资账面" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.investmentBookValue" size="small"
-              :controls="false" :precision="2" class="compact-num"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.investmentBookValue" size="small" class="compact-num"
               @change="(v: number) => updateFieldWithRecalc(row.id, 'investmentBookValue', v)" />
             <span v-else>{{ fmtNum(row.investmentBookValue) }}</span>
           </template>
@@ -411,6 +410,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { extractG7AiText } from '../../composables/g7AiText'
 /**
  * G7TabUnrecognizedLoss — G7-16 未确认投资损失测试表

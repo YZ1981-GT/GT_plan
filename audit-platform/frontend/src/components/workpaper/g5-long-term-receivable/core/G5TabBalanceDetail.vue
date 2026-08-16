@@ -116,12 +116,12 @@
       </el-table-column>
       <el-table-column prop="contractAmount" label="合同总额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.contractAmount" size="small" :controls="false" :disabled="props.readonly" @change="onRowEdit(row)" />
+          <WpAmountInput v-model="row.contractAmount" size="small" :disabled="props.readonly" @change="onRowEdit(row)" />
         </template>
       </el-table-column>
       <el-table-column prop="recoveredAmount" label="已收回金额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.recoveredAmount" size="small" :controls="false" :disabled="props.readonly" @change="onRowEdit(row)" />
+          <WpAmountInput v-model="row.recoveredAmount" size="small" :disabled="props.readonly" @change="onRowEdit(row)" />
         </template>
       </el-table-column>
       <el-table-column label="期末余额" min-width="100" align="right">
@@ -131,12 +131,12 @@
       </el-table-column>
       <el-table-column prop="debitOccurrence" label="借方发生" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.debitOccurrence" size="small" :controls="false" :disabled="props.readonly" @change="persistRows" />
+          <WpAmountInput v-model="row.debitOccurrence" size="small" :disabled="props.readonly" @change="persistRows" />
         </template>
       </el-table-column>
       <el-table-column prop="creditOccurrence" label="贷方发生" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.creditOccurrence" size="small" :controls="false" :disabled="props.readonly" @change="persistRows" />
+          <WpAmountInput v-model="row.creditOccurrence" size="small" :disabled="props.readonly" @change="persistRows" />
         </template>
       </el-table-column>
       <el-table-column prop="isRelatedParty" label="关联方" width="70" align="center">
@@ -235,6 +235,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, onMounted, watch } from 'vue'
 import { useG5BalanceDetail } from '../../composables/useG5BalanceDetail'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'

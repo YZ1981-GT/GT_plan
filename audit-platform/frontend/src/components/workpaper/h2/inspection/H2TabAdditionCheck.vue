@@ -122,7 +122,7 @@
         </el-table-column>
         <el-table-column prop="amount" label="金额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false"
+            <WpAmountInput v-if="!isReadonly" v-model="row.amount"
               size="small" class="amt-input" @change="onCellChange(row.rowId, 'amount', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.amount) }}</span>
           </template>
@@ -359,6 +359,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabAdditionCheck.vue — H2-8 增加检查
  * 双区域(抽样参数+明细) + 固定列+滚动列 + OCR📎 + 抽凭

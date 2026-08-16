@@ -277,9 +277,8 @@
         <el-table-column label="期末审定" align="right" min-width="130">
           <template #default="{ row }">
             <template v-if="row.editable && !props.isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.label.startsWith('在建') ? state.fsReconcile.value.cipEndAudited : state.fsReconcile.value.fsEndAmount"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number) => onFsChange(row.label, 'end', v ?? 0)"
@@ -293,9 +292,8 @@
         <el-table-column label="期初审定" align="right" min-width="130">
           <template #default="{ row }">
             <template v-if="row.editable && !props.isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.label.startsWith('在建') ? state.fsReconcile.value.cipBeginAudited : state.fsReconcile.value.fsBeginAmount"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number) => onFsChange(row.label, 'begin', v ?? 0)"
@@ -412,6 +410,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabAdjudication.vue — H4-1 工程物资及减值准备审定表
  * 对齐致同 Excel：期初/期末×未审·账项调整·审定 + 变动额/率；三段+报表核对+结构化说明

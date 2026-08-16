@@ -192,19 +192,19 @@
           </el-table-column>
           <el-table-column prop="bookValue" label="原值" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" @change="onCell(row, 'bookValue')" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.bookValue" size="small" @change="onCell(row, 'bookValue')" />
               <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="accumDep" label="累计折旧" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.accumDep" :controls="false" size="small" @change="onCell(row, 'accumDep')" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.accumDep" size="small" @change="onCell(row, 'accumDep')" />
               <span v-else class="amount-cell">{{ fmtAmt(row.accumDep) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="impairment" label="减值准备" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small" @change="onCell(row, 'impairment')" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small" @change="onCell(row, 'impairment')" />
               <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
             </template>
           </el-table-column>
@@ -330,10 +330,9 @@
           </el-table-column>
           <el-table-column prop="mortgageAmount" label="抵押价值" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.isMortgaged === 'Y'"
                 v-model="row.mortgageAmount"
-                :controls="false"
                 size="small"
                 @change="onCell(row, 'mortgageAmount')"
               />
@@ -496,6 +495,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

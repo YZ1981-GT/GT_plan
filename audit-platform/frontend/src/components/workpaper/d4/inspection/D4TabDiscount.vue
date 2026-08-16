@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabDiscount — D4-19 销售折扣与折让检查
  *
@@ -270,10 +271,10 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
             <template #default="{ row }"><el-input v-model="row.discountType" size="small" :disabled="isReadonly" placeholder="价格折扣/现金折扣/销售折让" @change="persistAll()" /></template>
           </el-table-column>
           <el-table-column label="收入金额" min-width="110" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.revenueAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.revenueAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" /></template>
           </el-table-column>
           <el-table-column label="折扣金额" min-width="110" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.discountAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.discountAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" /></template>
           </el-table-column>
           <el-table-column label="折扣比例" min-width="80" align="right">
             <template #default="{ row }"><span class="auto-calc">{{ row.discountRate > 0 ? fmtRate(row.discountRate) : '—' }}</span></template>
@@ -298,10 +299,10 @@ function fmtRate(v: number): string { return (v * 100).toFixed(2) + '%' }
             <template #default="{ row }"><el-input v-model="row.detailSubject" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
           </el-table-column>
           <el-table-column label="借方金额" min-width="110" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.debitAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.debitAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
           </el-table-column>
           <el-table-column label="贷方金额" min-width="110" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.creditAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.creditAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
           </el-table-column>
         </el-table-column>
 

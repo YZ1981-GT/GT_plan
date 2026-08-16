@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabAdjustment — 调整分录 D1-5（对齐 D4-4）
  */
@@ -320,12 +321,10 @@ function saveAuditMeta() {
 
       <el-table-column label="借方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             class="cell-amount-input"
             @change="(v: number) => updateCell(row.rowId, 'debitAmount', v || 0)"
           />
@@ -335,12 +334,10 @@ function saveAuditMeta() {
 
       <el-table-column label="贷方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             class="cell-amount-input"
             @change="(v: number) => updateCell(row.rowId, 'creditAmount', v || 0)"
           />

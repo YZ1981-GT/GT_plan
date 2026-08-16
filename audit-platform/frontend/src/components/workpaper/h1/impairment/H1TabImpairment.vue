@@ -178,7 +178,7 @@
         </el-table-column>
         <el-table-column label="②账面价值" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" @change="onCalcChange(row, 'bookValue')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookValue" size="small" @change="onCalcChange(row, 'bookValue')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
         </el-table-column>
@@ -213,7 +213,7 @@
         </el-table-column>
         <el-table-column label="⑦已计提" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.alreadyProvided" :controls="false" size="small" @change="onCalcChange(row, 'alreadyProvided')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.alreadyProvided" size="small" @change="onCalcChange(row, 'alreadyProvided')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.alreadyProvided) }}</span>
           </template>
         </el-table-column>
@@ -355,6 +355,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'

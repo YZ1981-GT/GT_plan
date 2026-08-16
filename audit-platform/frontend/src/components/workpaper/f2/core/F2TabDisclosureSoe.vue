@@ -365,11 +365,9 @@ async function syncToDisclosureNotes(): Promise<void> {
             <el-table-column label="计提" min-width="100" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="subtotal-label">{{ fmtAmount(row.incProvision) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.incProvision"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"

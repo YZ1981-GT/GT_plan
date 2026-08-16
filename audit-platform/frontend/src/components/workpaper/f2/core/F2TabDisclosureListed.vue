@@ -337,11 +337,9 @@ async function syncToDisclosureNotes(): Promise<void> {
             <el-table-column label="计提" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="subtotal-label">{{ fmtAmount(row.incProvision) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.incProvision"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -499,11 +497,9 @@ async function syncToDisclosureNotes(): Promise<void> {
             <el-table-column label="金额" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.balance) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.balance"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -524,11 +520,9 @@ async function syncToDisclosureNotes(): Promise<void> {
             <el-table-column label="金额" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.impairment) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.impairment"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -589,11 +583,9 @@ async function syncToDisclosureNotes(): Promise<void> {
             <el-table-column label="金额" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.balance) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.balance"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -614,11 +606,9 @@ async function syncToDisclosureNotes(): Promise<void> {
             <el-table-column label="金额" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.impairment) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.impairment"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -732,7 +722,7 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期末数" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.endBalance) }}</span>
-              <el-input-number v-else :model-value="row.endBalance" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'endBalance', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.endBalance" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS5(row.rowId, 'endBalance', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="上年年末数" min-width="110" align="right">
@@ -777,19 +767,19 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期初余额" min-width="100" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.opening) }}</span>
-              <el-input-number v-else :model-value="row.opening" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'opening', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.opening" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'opening', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期增加" min-width="100" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.increase) }}</span>
-              <el-input-number v-else :model-value="row.increase" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'increase', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.increase" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'increase', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期减少" min-width="100" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.decrease) }}</span>
-              <el-input-number v-else :model-value="row.decrease" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'decrease', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.decrease" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS6(row.rowId, 'decrease', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末余额" min-width="100" align="right">
@@ -827,19 +817,19 @@ async function syncToDisclosureNotes(): Promise<void> {
           <el-table-column label="期初余额" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.opening) }}</span>
-              <el-input-number v-else :model-value="row.opening" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'opening', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.opening" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'opening', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期增加" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.increase) }}</span>
-              <el-input-number v-else :model-value="row.increase" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'increase', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.increase" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'increase', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="本期减少" min-width="110" align="right">
             <template #default="{ row }">
               <span v-if="row.rowId === '__total__'" class="subtotal-label">{{ fmtAmount(row.decrease) }}</span>
-              <el-input-number v-else :model-value="row.decrease" :controls="false" :precision="2" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'decrease', v ?? 0)" />
+              <WpAmountInput v-else :model-value="row.decrease" size="small" :disabled="isReadonly" style="width:100%" @change="(v: number | undefined) => updateS7(row.rowId, 'decrease', v ?? 0)" />
             </template>
           </el-table-column>
           <el-table-column label="期末余额" min-width="110" align="right">

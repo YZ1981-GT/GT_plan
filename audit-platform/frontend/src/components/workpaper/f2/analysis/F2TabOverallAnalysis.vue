@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * F2TabOverallAnalysis — F2-18 存货总体分析表
  * A 构成 / B 指标三期 / C 同行业 / D 产品大类周转 + 分段说明 + 结论
@@ -187,10 +188,9 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
         <el-table-column :label="yearLabels[0]" align="center">
           <el-table-column label="金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.amt0"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="(v: number | undefined) => updateComposition(row.key, 'amt0', v ?? 0)"
@@ -205,10 +205,9 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
         <el-table-column :label="yearLabels[1]" align="center">
           <el-table-column label="金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.amt1"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="(v: number | undefined) => updateComposition(row.key, 'amt1', v ?? 0)"
@@ -223,10 +222,9 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
         <el-table-column :label="yearLabels[2]" align="center">
           <el-table-column label="金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.amt2"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="(v: number | undefined) => updateComposition(row.key, 'amt2', v ?? 0)"
@@ -498,7 +496,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
           </el-table-column>
           <el-table-column label="营业成本" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.cogs0" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.cogs0" size="small" style="width:100%"
                 @change="(v: number | undefined) => updateProduct(row.rowId, 'cogs0', v ?? 0)" />
               <span v-else>{{ fmt(row.cogs0) }}</span>
             </template>
@@ -520,7 +518,7 @@ function setInput(yearIdx: number, field: 'cogs' | 'invAvg' | 'invBal' | 'impair
           </el-table-column>
           <el-table-column label="营业成本" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.cogs1" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.cogs1" size="small" style="width:100%"
                 @change="(v: number | undefined) => updateProduct(row.rowId, 'cogs1', v ?? 0)" />
               <span v-else>{{ fmt(row.cogs1) }}</span>
             </template>

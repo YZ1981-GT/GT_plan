@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabAdjustment — 调整分录D2-4
  * 10列, 新增/删除, 借贷平衡检查, 推送至A13
@@ -190,12 +191,10 @@ function handlePushToA13() {
       </el-table-column>
       <el-table-column label="借方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             @change="(v: number) => updateEntry(row.rowId, 'debitAmount', v)"
           />
           <span v-else>{{ displayPrefs.fmtAmount(row.debitAmount) }}</span>
@@ -203,12 +202,10 @@ function handlePushToA13() {
       </el-table-column>
       <el-table-column label="贷方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             @change="(v: number) => updateEntry(row.rowId, 'creditAmount', v)"
           />
           <span v-else>{{ displayPrefs.fmtAmount(row.creditAmount) }}</span>

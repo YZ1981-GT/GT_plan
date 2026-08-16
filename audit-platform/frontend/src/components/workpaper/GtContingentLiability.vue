@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 /**
  * GtContingentLiability — 或有事项审计底稿组件 (A5-3)
  *
@@ -134,7 +135,7 @@ onBeforeUnmount(() => { if (saveTimer) { clearTimeout(saveTimer); doSave() } })
       </el-table-column>
       <el-table-column label="金额(万元)" width="120">
         <template #default="{ $index }">
-          <el-input-number v-model="items[$index].amount" :disabled="readonly" size="small" :controls="false" @change="scheduleSave" />
+          <WpAmountInput v-model="items[$index].amount" :disabled="readonly" size="small" @change="scheduleSave" />
         </template>
       </el-table-column>
       <el-table-column label="附注章节" width="100">

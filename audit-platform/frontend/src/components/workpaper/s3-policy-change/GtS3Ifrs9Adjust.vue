@@ -46,11 +46,9 @@
         <el-table-column prop="accountItem" label="科目/项目" min-width="220" />
         <el-table-column prop="oldStandard" label="原准则账面价值" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.oldStandard"
-              :precision="2"
-              :controls="false"
               style="width: 130px"
             />
             <span v-else>{{ fmt(row.oldStandard) }}</span>
@@ -58,11 +56,9 @@
         </el-table-column>
         <el-table-column prop="newStandard" label="新准则账面价值" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.newStandard"
-              :precision="2"
-              :controls="false"
               style="width: 130px"
             />
             <span v-else>{{ fmt(row.newStandard) }}</span>
@@ -102,6 +98,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS3Ifrs9Adjust.vue — S3-4 首次执行新金融工具准则的调整
  *

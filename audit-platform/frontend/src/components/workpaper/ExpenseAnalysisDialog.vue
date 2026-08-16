@@ -29,11 +29,9 @@
       </el-form-item>
 
       <el-form-item label="本年营业收入">
-        <el-input-number
+        <WpAmountInput
           v-model="form.revenue"
-          :min="0"
           :step="100000"
-          :precision="2"
           controls-position="right"
           style="width: 220px"
         />
@@ -51,11 +49,9 @@
       </el-table-column>
       <el-table-column label="本年金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.current"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -63,11 +59,9 @@
       </el-table-column>
       <el-table-column label="上年金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.prior"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -75,11 +69,9 @@
       </el-table-column>
       <el-table-column label="预算金额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.budget"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -216,6 +208,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'

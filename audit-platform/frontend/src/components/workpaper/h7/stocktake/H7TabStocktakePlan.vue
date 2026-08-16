@@ -103,7 +103,7 @@
         </el-table-column>
         <el-table-column prop="coverageAmount" label="金额覆盖" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.coverageAmount" :controls="false" size="small" @change="persistSamples" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.coverageAmount" size="small" @change="persistSamples" />
             <span v-else class="amount-cell">{{ fmtAmt(row.coverageAmount) }}</span>
           </template>
         </el-table-column>
@@ -147,6 +147,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, reactive, computed, inject, onMounted, toRef } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { useH7Stocktake } from '../../composables/useH7Stocktake'

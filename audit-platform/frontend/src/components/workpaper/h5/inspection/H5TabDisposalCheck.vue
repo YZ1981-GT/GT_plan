@@ -42,7 +42,7 @@
         </el-table-column>
         <el-table-column prop="originalCost" label="原值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" @change="state.updateCell(row.rowId, 'originalCost', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.originalCost" size="small" @change="state.updateCell(row.rowId, 'originalCost', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
           </template>
         </el-table-column>
@@ -54,13 +54,13 @@
         </el-table-column>
         <el-table-column prop="netValue" label="净值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.netValue" :controls="false" size="small" @change="state.updateCell(row.rowId, 'netValue', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.netValue" size="small" @change="state.updateCell(row.rowId, 'netValue', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.netValue) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="disposalIncome" label="处置收入" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.disposalIncome" :controls="false" size="small" @change="state.updateCell(row.rowId, 'disposalIncome', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.disposalIncome" size="small" @change="state.updateCell(row.rowId, 'disposalIncome', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.disposalIncome) }}</span>
           </template>
         </el-table-column>
@@ -127,6 +127,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, defineAsyncComponent, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'

@@ -58,7 +58,7 @@
         </el-table-column>
         <el-table-column prop="amount" label="入账原值" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.amount" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
           </template>
         </el-table-column>
@@ -132,6 +132,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

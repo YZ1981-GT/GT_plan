@@ -117,17 +117,17 @@
           </el-table-column>
           <el-table-column label="期初余额" width="110">
             <template #default="{ row }">
-              <el-input-number :model-value="row.opening" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { opening: v ?? 0 })" />
+              <WpAmountInput :model-value="row.opening" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { opening: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="本期增加" width="110">
             <template #default="{ row }">
-              <el-input-number :model-value="row.increase" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { increase: v ?? 0 })" />
+              <WpAmountInput :model-value="row.increase" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { increase: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="本期减少" width="110">
             <template #default="{ row }">
-              <el-input-number :model-value="row.decrease" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { decrease: v ?? 0 })" />
+              <WpAmountInput :model-value="row.decrease" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateBasic(row.id, { decrease: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="期末余额" width="110">
@@ -181,12 +181,12 @@
           </el-table-column>
           <el-table-column label="入库金额" width="100">
             <template #default="{ row }">
-              <el-input-number :model-value="row.inboundAmount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { inboundAmount: v ?? 0 })" />
+              <WpAmountInput :model-value="row.inboundAmount" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { inboundAmount: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="加工费金额" width="100">
             <template #default="{ row }">
-              <el-input-number :model-value="row.feeAmount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { feeAmount: v ?? 0 })" />
+              <WpAmountInput :model-value="row.feeAmount" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier1(row.id, { feeAmount: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="加工费结算单据" min-width="110">
@@ -243,7 +243,7 @@
           </el-table-column>
           <el-table-column label="发出材料成本" width="110">
             <template #default="{ row }">
-              <el-input-number :model-value="row.issueCost" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { issueCost: v ?? 0 })" />
+              <WpAmountInput :model-value="row.issueCost" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { issueCost: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="加工费" width="96">
@@ -253,7 +253,7 @@
           </el-table-column>
           <el-table-column label="收回材料成本" width="110">
             <template #default="{ row }">
-              <el-input-number :model-value="row.recoverCost" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { recoverCost: v ?? 0 })" />
+              <WpAmountInput :model-value="row.recoverCost" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => sc.updateSupplier2(row.id, { recoverCost: v ?? 0 })" />
             </template>
           </el-table-column>
           <el-table-column label="应收回(发出+加工费)" width="120">
@@ -340,6 +340,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, onMounted, toRef, type Ref } from 'vue'
 import { useF2SubcontractSheet } from '../../composables/useF2SubcontractCheck'
 import { useF2ValuationAiGenerate } from '../../composables/useF2ValuationAiGenerate'

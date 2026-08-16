@@ -209,10 +209,9 @@
         </el-table-column>
         <el-table-column label="合同总金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.rowKind === 'data' && row.dataIndex != null"
               v-model="contractRows[row.dataIndex].contractAmount"
-              :controls="false"
               size="small"
               :disabled="isReadonly"
               @change="onContractChange(row.dataIndex!, contractRows[row.dataIndex])"
@@ -529,6 +528,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H3TabRentalIncome.vue — H3-14 租金收入测算
  * 核心区对齐 Excel（应计/已计/差异/日后收款）+ 月度/到期增强

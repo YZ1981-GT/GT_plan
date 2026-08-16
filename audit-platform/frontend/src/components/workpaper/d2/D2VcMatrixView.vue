@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2VcMatrixView — 凭证检查表矩阵视图（固定列 + 列设置器）
  *
@@ -184,14 +185,14 @@ function onCellChange(rowId: string, field: keyof VoucherCheckRow, value: any) {
 
       <el-table-column label="借方" width="100" align="right" fixed="left">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" :min="0" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'debitAmount', val ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'debitAmount', val ?? 0)" />
           <span v-else class="amount-cell">{{ row.debitAmount ? row.debitAmount.toFixed(2) : '-' }}</span>
         </template>
       </el-table-column>
 
       <el-table-column label="贷方" width="100" align="right" fixed="left">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" :min="0" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'creditAmount', val ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width: 100%" @change="(val: number | undefined) => onCellChange(row.rowId, 'creditAmount', val ?? 0)" />
           <span v-else class="amount-cell">{{ row.creditAmount ? row.creditAmount.toFixed(2) : '-' }}</span>
         </template>
       </el-table-column>

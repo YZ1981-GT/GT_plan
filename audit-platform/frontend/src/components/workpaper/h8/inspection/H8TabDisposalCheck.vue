@@ -301,7 +301,7 @@
         <el-table-column label="减少情况" align="center">
           <el-table-column label="原值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.rouCost" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.rouCost"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'rouCost', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.rouCost) }}</span>
@@ -309,7 +309,7 @@
           </el-table-column>
           <el-table-column label="累计折旧" width="95" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.accDepreciation" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.accDepreciation"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'accDepreciation', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.accDepreciation) }}</span>
@@ -317,7 +317,7 @@
           </el-table-column>
           <el-table-column label="减值准备" width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairmentProvision" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairmentProvision"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'impairmentProvision', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.impairmentProvision) }}</span>
@@ -332,7 +332,7 @@
 
         <el-table-column label="租赁负债余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.liabilityBalance" :controls="false"
+            <WpAmountInput v-if="!isReadonly" v-model="row.liabilityBalance"
               size="small" class="amt-input"
               @change="updateCell(row.rowId, 'liabilityBalance', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.liabilityBalance) }}</span>
@@ -585,6 +585,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabDisposalCheck.vue — H8-12 使用权资产/租赁负债减少检查表
  * 对齐致同五段式：目标 → 样本选取 → 测试（原值/折旧/减值/净值 + 终止损益 + 核对1–5）

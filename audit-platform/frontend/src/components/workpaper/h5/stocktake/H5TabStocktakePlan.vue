@@ -43,7 +43,7 @@
         </el-table-column>
         <el-table-column prop="bookCost" label="账面原值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookCost" :controls="false" size="small" @change="state.updatePlanCell(row.rowId, 'bookCost', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookCost" size="small" @change="state.updatePlanCell(row.rowId, 'bookCost', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookCost) }}</span>
           </template>
         </el-table-column>
@@ -110,6 +110,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'

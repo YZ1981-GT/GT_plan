@@ -303,10 +303,9 @@
       </el-table-column>
       <el-table-column label="借方" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
             style="width: 100%"
             :disabled="isReadonly"
             @update:model-value="(v: number) => dc.updateVoucher(row.id, { debitAmount: v ?? 0 })"
@@ -315,10 +314,9 @@
       </el-table-column>
       <el-table-column label="贷方" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
             style="width: 100%"
             :disabled="isReadonly"
             @update:model-value="(v: number) => dc.updateVoucher(row.id, { creditAmount: v ?? 0 })"
@@ -415,6 +413,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, inject, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'

@@ -194,12 +194,10 @@
       </el-table-column>
       <el-table-column label="借方" width="108" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width:100%"
             @update:model-value="(v: number | undefined) => adj.updateRow(row.rowId, { debitAmount: v ?? 0 })"
           />
@@ -208,12 +206,10 @@
       </el-table-column>
       <el-table-column label="贷方" width="108" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width:100%"
             @update:model-value="(v: number | undefined) => adj.updateRow(row.rowId, { creditAmount: v ?? 0 })"
           />
@@ -292,6 +288,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G8TabAdjustment.vue — G8-3 调整分录汇总
  * 对齐 Excel 10 列：序号|类型|日期|摘要|科目代码|科目名称|借方|贷方|编制人|备注

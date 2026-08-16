@@ -183,7 +183,7 @@
             </el-table-column>
             <el-table-column label="贷方金额" width="110">
               <template #default="{ row }">
-                <el-input-number :model-value="row.amount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateRow(row.id, { amount: v ?? 0 })" />
+                <WpAmountInput :model-value="row.amount" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateRow(row.id, { amount: v ?? 0 })" />
               </template>
             </el-table-column>
             <el-table-column label="对方科目" width="110">
@@ -284,7 +284,7 @@
         <el-table-column prop="category" label="项目" min-width="140" />
         <el-table-column label="账面金额" width="150">
           <template #default>
-            <el-input-number :model-value="ic.bookTotal.value" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateBookTotal(v ?? 0)" />
+            <WpAmountInput :model-value="ic.bookTotal.value" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateBookTotal(v ?? 0)" />
           </template>
         </el-table-column>
         <el-table-column label="检查金额" width="130">
@@ -373,6 +373,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, onMounted, inject, toRef, type Ref } from 'vue'
 import { useF2MaterialUsageCheck } from '../../composables/useF2InspectionCheck'
 import { useF2ValuationAiGenerate, type F2ValAiSection } from '../../composables/useF2ValuationAiGenerate'

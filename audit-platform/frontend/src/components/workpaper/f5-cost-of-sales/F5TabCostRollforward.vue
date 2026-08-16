@@ -105,10 +105,9 @@
 
       <el-table-column label="未审数" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row.rowType !== 'formula' && !isReadonly"
             :model-value="row.unadjusted"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(v: number | undefined) => roll.updateAmount(row.rowKey, 'unadjusted', v ?? 0)"
@@ -252,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F5TabCostRollforward — F5-7 主营业务成本倒轧表（灵魂表）
  * 21 行源表网格 + 公式悬停 + 交叉索引 + F5-1 校验 + AI

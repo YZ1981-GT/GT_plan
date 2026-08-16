@@ -264,10 +264,10 @@
           </el-table-column>
           <el-table-column label="期初摊余成本" width="130" align="right">
             <template #default="{ row, $index }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && $index === 0"
                 :model-value="row.openingAmortized"
-                size="small" :controls="false" :precision="2"
+                size="small"
                 style="width: 110px"
                 @update:model-value="(v: number | undefined) => interest.updatePeriod(group.id, row.id, 'openingAmortized', v ?? 0)"
               />
@@ -294,10 +294,10 @@
           </el-table-column>
           <el-table-column label="期初减值" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.openingImpairment"
-                size="small" :controls="false" :precision="2"
+                size="small"
                 style="width: 95px"
                 :disabled="row.stage !== 'Stage3'"
                 @update:model-value="(v: number | undefined) => interest.updatePeriod(group.id, row.id, 'openingImpairment', v ?? 0)"
@@ -636,6 +636,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabInterestCalculation.vue — G6-6 利息测算表（实际利率法分组结构）
  *

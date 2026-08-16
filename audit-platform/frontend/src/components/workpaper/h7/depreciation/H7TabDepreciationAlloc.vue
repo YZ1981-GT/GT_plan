@@ -39,7 +39,7 @@
       </el-table-column>
       <el-table-column label="分配金额" min-width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.amount" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.amount" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.amount) }}</span>
         </template>
       </el-table-column>
@@ -100,6 +100,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabDepreciationAlloc.vue — H7-12 折旧分配分析表
  *

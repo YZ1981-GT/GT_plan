@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F4TabRelatedParty — F4-6 应付账款关联方及交易检查表 */
 import { inject, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -222,10 +223,9 @@ async function generateAuditConclusion(): Promise<void> {
         <el-table-column label="期初余额" width="130" align="right">
           <template #default="{ row }">
             <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.openingBalance) }}</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.openingBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'openingBalance', value ?? 0)"
@@ -236,10 +236,9 @@ async function generateAuditConclusion(): Promise<void> {
         <el-table-column label="本期借方" width="130" align="right">
           <template #default="{ row }">
             <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.currentDebit) }}</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.currentDebit"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'currentDebit', value ?? 0)"
@@ -250,10 +249,9 @@ async function generateAuditConclusion(): Promise<void> {
         <el-table-column label="本期贷方" width="130" align="right">
           <template #default="{ row }">
             <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.currentCredit) }}</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.currentCredit"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'currentCredit', value ?? 0)"
@@ -321,10 +319,9 @@ async function generateAuditConclusion(): Promise<void> {
         <el-table-column label="期后付款金额" width="140" align="right">
           <template #default="{ row }">
             <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.postPaymentAmount) }}</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.postPaymentAmount"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'postPaymentAmount', value ?? 0)"

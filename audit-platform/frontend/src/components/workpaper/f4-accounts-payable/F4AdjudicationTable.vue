@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F4AdjudicationTable — F4-1 双分类审定表通用宽表。 */
 import type {
   F4AdjudicationRow,
@@ -50,10 +51,9 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
       <el-table-column label="期初数" align="center">
         <el-table-column prop="openingUnadjusted" label="未审数" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !readonly"
               :model-value="row.openingUnadjusted"
-              :controls="false"
               size="small"
               @change="(value: number | undefined) => update(row.rowKey, 'openingUnadjusted', value ?? 0)"
             />
@@ -62,10 +62,9 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
         </el-table-column>
         <el-table-column prop="openingAje" label="账项调整" width="112" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !readonly"
               :model-value="row.openingAje"
-              :controls="false"
               size="small"
               @change="(value: number | undefined) => update(row.rowKey, 'openingAje', value ?? 0)"
             />
@@ -74,10 +73,9 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
         </el-table-column>
         <el-table-column prop="openingRje" label="重分类调整" width="112" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !readonly"
               :model-value="row.openingRje"
-              :controls="false"
               size="small"
               @change="(value: number | undefined) => update(row.rowKey, 'openingRje', value ?? 0)"
             />
@@ -96,10 +94,9 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
       <el-table-column label="期末数" align="center">
         <el-table-column prop="closingUnadjusted" label="未审数" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !readonly && !row.closingFromDetail"
               :model-value="row.closingUnadjusted"
-              :controls="false"
               size="small"
               @change="(value: number | undefined) => update(row.rowKey, 'closingUnadjusted', value ?? 0)"
             />
@@ -111,10 +108,9 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
         </el-table-column>
         <el-table-column prop="closingAje" label="账项调整" width="112" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !readonly && !row.closingFromDetail"
               :model-value="row.closingAje"
-              :controls="false"
               size="small"
               @change="(value: number | undefined) => update(row.rowKey, 'closingAje', value ?? 0)"
             />
@@ -123,10 +119,9 @@ function update(rowKey: string, field: keyof StoredF4AdjRow, value: unknown): vo
         </el-table-column>
         <el-table-column prop="closingRje" label="重分类调整" width="112" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !readonly && !row.closingFromDetail"
               :model-value="row.closingRje"
-              :controls="false"
               size="small"
               @change="(value: number | undefined) => update(row.rowKey, 'closingRje', value ?? 0)"
             />

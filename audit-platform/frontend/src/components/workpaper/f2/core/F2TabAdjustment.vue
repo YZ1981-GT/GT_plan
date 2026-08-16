@@ -1,4 +1,5 @@
 ﻿<script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /** F2TabAdjustment — F2-14 调整分录 | Task 15.4 */
 import { ref, toRef, inject, onMounted, computed, type Ref } from 'vue'
 import { useF2Adjustment } from '../../composables/useF2Adjustment'
@@ -213,14 +214,14 @@ function fmt(v: number): string {
       </el-table-column>
       <el-table-column label="借方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%"
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%"
             @change="(v: number | undefined) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%"
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%"
             @change="(v: number | undefined) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>

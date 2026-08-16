@@ -58,25 +58,25 @@
         </el-table-column>
         <el-table-column label="生产成本" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.productionCost" :controls="false" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'productionCost', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isSection" :model-value="row.productionCost" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'productionCost', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.productionCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="制造费用" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.manufacturing" :controls="false" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'manufacturing', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isSection" :model-value="row.manufacturing" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'manufacturing', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.manufacturing) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="管理费用" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.adminExpense" :controls="false" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'adminExpense', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isSection" :model-value="row.adminExpense" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'adminExpense', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.adminExpense) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="销售费用" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.sellingExpense" :controls="false" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'sellingExpense', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isSection" :model-value="row.sellingExpense" size="small" style="width:88px" @change="(v: number) => updateCell(row.id, 'sellingExpense', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.sellingExpense) }}</span>
           </template>
         </el-table-column>
@@ -95,7 +95,7 @@
         </el-table-column>
         <el-table-column label="本期实际计提数" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly && !row.isSection" :model-value="row.actualAccrual" :controls="false" size="small" style="width:98px" @change="(v: number) => updateCell(row.id, 'actualAccrual', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly && !row.isSection" :model-value="row.actualAccrual" size="small" style="width:98px" @change="(v: number) => updateCell(row.id, 'actualAccrual', v ?? 0)" />
             <span v-else>{{ fmtAmt(row.actualAccrual) }}</span>
           </template>
         </el-table-column>
@@ -169,6 +169,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

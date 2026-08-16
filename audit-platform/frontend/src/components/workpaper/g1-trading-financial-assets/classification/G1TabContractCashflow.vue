@@ -72,7 +72,7 @@
         </el-table-column>
         <el-table-column label="账面/面值" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.bookOrFaceValue" size="small" :controls="false" style="width:100%"
+            <WpAmountInput :model-value="row.bookOrFaceValue" size="small" style="width:100%"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updateBond(row.id, { bookOrFaceValue: v ?? 0 })" />
           </template>
@@ -162,7 +162,7 @@
         </el-table-column>
         <el-table-column label="投资总额" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.totalAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput :model-value="row.totalAmount" size="small" style="width:100%"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updateWealth1(row.id, { totalAmount: v ?? 0 })" />
           </template>
@@ -305,7 +305,7 @@
         </el-table-column>
         <el-table-column label="账面价值" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.bookValue" size="small" :controls="false" style="width:100%"
+            <WpAmountInput :model-value="row.bookValue" size="small" style="width:100%"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updatePerpetual(row.id, { bookValue: v ?? 0 })" />
           </template>
@@ -385,7 +385,7 @@
         </el-table-column>
         <el-table-column label="投资总额" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.totalAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput :model-value="row.totalAmount" size="small" style="width:100%"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updateConvertible(row.id, { totalAmount: v ?? 0 })" />
           </template>
@@ -460,7 +460,7 @@
         </el-table-column>
         <el-table-column label="投资总额" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.totalAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput :model-value="row.totalAmount" size="small" style="width:100%"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updateProject(row.id, { totalAmount: v ?? 0 })" />
           </template>
@@ -540,7 +540,7 @@
         </el-table-column>
         <el-table-column label="投资总额" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number :model-value="row.totalAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput :model-value="row.totalAmount" size="small" style="width:100%"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updateAbs(row.id, { totalAmount: v ?? 0 })" />
           </template>
@@ -643,6 +643,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, inject, watch, computed } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G1AuditTextCards from '../G1AuditTextCards.vue'

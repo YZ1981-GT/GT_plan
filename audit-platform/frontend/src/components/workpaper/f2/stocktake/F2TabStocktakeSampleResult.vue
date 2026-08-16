@@ -222,7 +222,7 @@
           </el-table-column>
           <el-table-column label="账面金额" width="88">
             <template #default="{ row }">
-              <el-input-number :model-value="row.bookAmount" size="small" :controls="false" :disabled="isReadonly"
+              <WpAmountInput :model-value="row.bookAmount" size="small" :disabled="isReadonly"
                 @update:model-value="(v: number | undefined) => existSheet.updateRow(row.id, { bookAmount: v ?? 0 })" />
             </template>
           </el-table-column>
@@ -369,7 +369,7 @@
           </el-table-column>
           <el-table-column label="账面金额" width="88">
             <template #default="{ row }">
-              <el-input-number :model-value="row.bookAmount" size="small" :controls="false" :disabled="isReadonly"
+              <WpAmountInput :model-value="row.bookAmount" size="small" :disabled="isReadonly"
                 @update:model-value="(v: number | undefined) => floorSheet.updateRow(row.id, { bookAmount: v ?? 0 })" />
             </template>
           </el-table-column>
@@ -511,6 +511,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, onMounted, ref, toRef, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useF2StocktakeFields, useF2StocktakeRows } from '../../composables/useF2StocktakeSheet'

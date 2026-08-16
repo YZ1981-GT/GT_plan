@@ -1,5 +1,5 @@
 {
-  "confirmed_total": 1898,
+  "confirmed_total": 1137,
   "ambiguous_total": 179,
   "batches_by_cycle": [
     {
@@ -16,8 +16,8 @@
     },
     {
       "cycle": "D",
-      "files": 57,
-      "columns": 196,
+      "files": 5,
+      "columns": 20,
       "active_spec_conflict": false
     },
     {
@@ -27,15 +27,9 @@
       "active_spec_conflict": true
     },
     {
-      "cycle": "F",
-      "files": 37,
-      "columns": 150,
-      "active_spec_conflict": false
-    },
-    {
       "cycle": "G",
-      "files": 111,
-      "columns": 356,
+      "files": 2,
+      "columns": 5,
       "active_spec_conflict": false
     },
     {
@@ -52,8 +46,8 @@
     },
     {
       "cycle": "J",
-      "files": 13,
-      "columns": 52,
+      "files": 2,
+      "columns": 4,
       "active_spec_conflict": false
     },
     {
@@ -82,8 +76,8 @@
     },
     {
       "cycle": "S",
-      "files": 17,
-      "columns": 39,
+      "files": 1,
+      "columns": 3,
       "active_spec_conflict": false
     }
   ],

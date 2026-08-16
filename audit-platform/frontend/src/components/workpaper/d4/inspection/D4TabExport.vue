@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabExport — D4-16 出口收入电子口岸系统核对
  *
@@ -264,7 +265,7 @@ function fmtAmount(v: number): string {
         <el-table-column label="账面出口收入金额" align="center" class-name="col-book">
           <el-table-column label="金额" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.bookAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
+              <WpAmountInput v-model="row.bookAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -278,7 +279,7 @@ function fmtAmount(v: number): string {
           </el-table-column>
           <el-table-column label="结关金额" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.portsAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
+              <WpAmountInput v-model="row.portsAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
             </template>
           </el-table-column>
           <el-table-column label="差异" min-width="110" align="right">
@@ -297,7 +298,7 @@ function fmtAmount(v: number): string {
         <el-table-column label="免抵退税申报数据" align="center" class-name="col-tax">
           <el-table-column label="申报外营收入" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.taxReportAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
+              <WpAmountInput v-model="row.taxReportAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" />
             </template>
           </el-table-column>
           <el-table-column label="差异" min-width="110" align="right">

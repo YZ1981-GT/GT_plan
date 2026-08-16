@@ -180,10 +180,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorUnadjusted) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.priorUnadjusted"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'priorUnadjusted', val ?? 0)"
@@ -198,10 +197,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorAje) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.priorAje"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'priorAje', val ?? 0)"
@@ -216,10 +214,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.priorRje) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.priorRje"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'priorRje', val ?? 0)"
@@ -241,10 +238,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.ociImpairment) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.ociImpairment"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'ociImpairment', val ?? 0)"
@@ -259,10 +255,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.periodIncrease) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.periodIncrease"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'periodIncrease', val ?? 0)"
@@ -277,10 +272,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.periodDecrease) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.periodDecrease"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'periodDecrease', val ?? 0)"
@@ -327,10 +321,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endAje) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.endAje"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'endAje', val ?? 0)"
@@ -345,10 +338,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endRje) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.endRje"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'endRje', val ?? 0)"
@@ -370,10 +362,9 @@
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.endOciImpairment) }}</span>
           </template>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.endOciImpairment"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'endOciImpairment', val ?? 0)"
@@ -469,6 +460,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D5TabDetail.vue — D5-2 明细表
  *

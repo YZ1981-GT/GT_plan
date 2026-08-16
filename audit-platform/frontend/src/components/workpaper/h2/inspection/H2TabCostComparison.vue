@@ -114,16 +114,14 @@
 
         <el-table-column label="本期增加额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.periodIncrease"
-              :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!row.isTotal && !isReadonly" v-model="row.periodIncrease" size="small" class="amt-input"
               @change="onCellChange(row.rowId, 'periodIncrease', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.periodIncrease) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期计入现金流量金额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!row.isTotal && !isReadonly" v-model="row.cashFlowAmount"
-              :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!row.isTotal && !isReadonly" v-model="row.cashFlowAmount" size="small" class="amt-input"
               @change="onCellChange(row.rowId, 'cashFlowAmount', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.cashFlowAmount) }}</span>
           </template>
@@ -225,6 +223,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabCostComparison.vue — H2-7 工程造价比较分析表
  * 对齐致同：单方造价vs可比价 + 本期增加vs现金流量勾稽

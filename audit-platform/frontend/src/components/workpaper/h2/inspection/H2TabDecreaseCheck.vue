@@ -268,7 +268,7 @@
         <el-table-column label="转入固定资产" align="center">
           <el-table-column prop="transferToFaAmount" label="金额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.transferToFaAmount" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.transferToFaAmount"
                 size="small" class="amt-input" @change="onCellChange(row.rowId, 'transferToFaAmount', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.transferToFaAmount) }}</span>
             </template>
@@ -285,7 +285,7 @@
         <el-table-column label="其他减少" align="center">
           <el-table-column prop="otherDecreaseAmount" label="金额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.otherDecreaseAmount" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.otherDecreaseAmount"
                 size="small" class="amt-input" @change="onCellChange(row.rowId, 'otherDecreaseAmount', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.otherDecreaseAmount) }}</span>
             </template>
@@ -331,7 +331,7 @@
           </el-table-column>
           <el-table-column prop="acceptanceAmount" label="金额" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.acceptanceAmount" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.acceptanceAmount"
                 size="small" class="amt-input" @change="onCellChange(row.rowId, 'acceptanceAmount', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.acceptanceAmount) }}</span>
             </template>
@@ -429,9 +429,9 @@
         </el-table-column>
         <el-table-column prop="disposalIncome" label="处置收入" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && (row.decreaseType === '出售' || row.decreaseType === '报废' || row.otherDecreaseAmount > 0)"
-              v-model="row.disposalIncome" :controls="false"
+              v-model="row.disposalIncome"
               size="small" class="amt-input"
               @change="onCellChange(row.rowId, 'disposalIncome', $event)"
             />
@@ -599,6 +599,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabDecreaseCheck.vue — H2-9 在建工程减少检查
  * 对齐致同：目标 → 抽样 → 转入固定资产/其他减少 + 审批验收证据 → 检查比例 → 说明/结论 → 提示

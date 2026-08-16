@@ -203,10 +203,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.openingAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => detail.updateRow(row.id, { openingAmt: v ?? 0 })"
               />
@@ -231,10 +230,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.increaseAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => detail.updateRow(row.id, { increaseAmt: v ?? 0 })"
               />
@@ -259,10 +257,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.decreaseAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => detail.updateRow(row.id, { decreaseAmt: v ?? 0 })"
               />
@@ -299,10 +296,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.postPeriodAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => detail.updateRow(row.id, { postPeriodAmt: v ?? 0 })"
               />
@@ -528,6 +524,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, toRef, ref, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

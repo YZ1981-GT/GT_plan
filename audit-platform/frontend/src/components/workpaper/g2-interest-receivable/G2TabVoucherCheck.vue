@@ -272,7 +272,7 @@
           </el-table-column>
           <el-table-column label="借方金额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.amount" size="small" :controls="false" :disabled="isReadonly"
+              <WpAmountInput :model-value="row.amount" size="small" :disabled="isReadonly"
                 style="width:100%"
                 @update:model-value="(v: number) => vc.updateDebitCell(row.id, 'amount', v ?? 0)" />
             </template>
@@ -460,7 +460,7 @@
           </el-table-column>
           <el-table-column label="贷方金额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number :model-value="row.amount" size="small" :controls="false" :disabled="isReadonly"
+              <WpAmountInput :model-value="row.amount" size="small" :disabled="isReadonly"
                 style="width:100%"
                 @update:model-value="(v: number) => vc.updateCreditCell(row.id, 'amount', v ?? 0)" />
             </template>
@@ -644,6 +644,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, watch, inject, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'

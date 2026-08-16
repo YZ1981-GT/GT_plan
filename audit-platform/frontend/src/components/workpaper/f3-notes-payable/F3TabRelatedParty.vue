@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F3TabRelatedParty — F3-6 应付票据关联方及交易检查表 */
 import { inject, toRef, type Ref } from 'vue'
 import {
@@ -187,8 +188,8 @@ function summaryMethod({ columns }: { columns: any[] }) {
         </el-table-column>
         <el-table-column prop="openingBalance" label="期初余额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly" :model-value="row.openingBalance" :controls="false"
+            <WpAmountInput
+              v-if="!isReadonly" :model-value="row.openingBalance"
               size="small" style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'openingBalance', value ?? 0)"
             />
@@ -197,8 +198,8 @@ function summaryMethod({ columns }: { columns: any[] }) {
         </el-table-column>
         <el-table-column prop="debitMovement" label="借方发生" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly" :model-value="row.debitMovement" :controls="false"
+            <WpAmountInput
+              v-if="!isReadonly" :model-value="row.debitMovement"
               size="small" style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'debitMovement', value ?? 0)"
             />
@@ -207,8 +208,8 @@ function summaryMethod({ columns }: { columns: any[] }) {
         </el-table-column>
         <el-table-column prop="creditMovement" label="贷方发生" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly" :model-value="row.creditMovement" :controls="false"
+            <WpAmountInput
+              v-if="!isReadonly" :model-value="row.creditMovement"
               size="small" style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'creditMovement', value ?? 0)"
             />
@@ -271,9 +272,8 @@ function summaryMethod({ columns }: { columns: any[] }) {
           prop="subsequentPaymentAmount" label="期后付款金额" width="135" align="right"
         >
           <template #default="{ row }">
-            <el-input-number
-              v-if="!isReadonly" :model-value="row.subsequentPaymentAmount"
-              :controls="false" size="small" style="width:100%"
+            <WpAmountInput
+              v-if="!isReadonly" :model-value="row.subsequentPaymentAmount" size="small" style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'subsequentPaymentAmount', value ?? 0)"
             />
             <span v-else>{{ fmt(row.subsequentPaymentAmount) }}</span>

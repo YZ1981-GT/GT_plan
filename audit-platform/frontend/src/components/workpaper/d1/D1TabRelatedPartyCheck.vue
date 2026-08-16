@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabRelatedPartyCheck.vue — D1-11 关联方关系及交易检查表 HTML渲染
  *
@@ -267,11 +268,9 @@ async function generateAuditConclusionWithAI() {
         <!-- C: 期初余额 -->
         <el-table-column label="期初余额" width="120" align="right">
           <template #default="{ row }: { row: RelatedPartyRow }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.openingBalance"
               size="small"
-              :controls="false"
-              :precision="2"
               :disabled="isReadonly"
               style="width: 100%"
               @change="(v: number) => updateRow(row.id, 'openingBalance', v || 0)"
@@ -282,11 +281,9 @@ async function generateAuditConclusionWithAI() {
         <!-- D: 借方发生 -->
         <el-table-column label="借方发生" width="120" align="right">
           <template #default="{ row }: { row: RelatedPartyRow }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.debitOccurrence"
               size="small"
-              :controls="false"
-              :precision="2"
               :disabled="isReadonly"
               style="width: 100%"
               @change="(v: number) => updateRow(row.id, 'debitOccurrence', v || 0)"
@@ -297,11 +294,9 @@ async function generateAuditConclusionWithAI() {
         <!-- E: 贷方发生 -->
         <el-table-column label="贷方发生" width="120" align="right">
           <template #default="{ row }: { row: RelatedPartyRow }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.creditOccurrence"
               size="small"
-              :controls="false"
-              :precision="2"
               :disabled="isReadonly"
               style="width: 100%"
               @change="(v: number) => updateRow(row.id, 'creditOccurrence', v || 0)"
@@ -319,11 +314,9 @@ async function generateAuditConclusionWithAI() {
         <!-- G: 减坏账准备 -->
         <el-table-column label="减：坏账准备" width="120" align="right">
           <template #default="{ row }: { row: RelatedPartyRow }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.badDebtProvision"
               size="small"
-              :controls="false"
-              :precision="2"
               :disabled="isReadonly"
               style="width: 100%"
               @change="(v: number) => updateRow(row.id, 'badDebtProvision', v || 0)"

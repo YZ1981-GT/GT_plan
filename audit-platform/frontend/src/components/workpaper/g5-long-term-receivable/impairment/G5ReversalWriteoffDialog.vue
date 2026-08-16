@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G5ReversalWriteoffDialog — G5-11 转回/核销逐笔录入与合理性分析弹窗
  */
@@ -164,12 +165,12 @@ function resultTag(r: ReasonablenessItem['result']): string {
             </el-col>
             <el-col :span="12">
               <el-form-item label="收回/转回金额">
-                <el-input-number v-model="rev.reversalAmount" :controls="false" :disabled="readonly" style="width:100%" />
+                <WpAmountInput v-model="rev.reversalAmount" :disabled="readonly" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
               <el-form-item label="转回前累计计提">
-                <el-input-number v-model="rev.accumulatedProvision" :controls="false" :disabled="readonly" style="width:100%" />
+                <WpAmountInput v-model="rev.accumulatedProvision" :disabled="readonly" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -206,7 +207,7 @@ function resultTag(r: ReasonablenessItem['result']): string {
             </el-col>
             <el-col :span="12">
               <el-form-item label="核销金额">
-                <el-input-number v-model="wo.writeoffAmount" :controls="false" :disabled="readonly" style="width:100%" />
+                <WpAmountInput v-model="wo.writeoffAmount" :disabled="readonly" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="12">

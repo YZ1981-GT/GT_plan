@@ -92,10 +92,9 @@
         </el-table-column>
         <el-table-column label="平均单位成本" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.currentUnitCost"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => cmp.updateCell(row.id, 'currentUnitCost', v ?? 0)"
@@ -126,10 +125,9 @@
         </el-table-column>
         <el-table-column label="平均单位成本" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.priorUnitCost"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => cmp.updateCell(row.id, 'priorUnitCost', v ?? 0)"
@@ -286,6 +284,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F5TabComparison — F5-5 主营业务成本与上年度比较分析表
  * 源表：数量×单价→总成本 + 变动额/率 + 变动原因/索引 + AI说明结论

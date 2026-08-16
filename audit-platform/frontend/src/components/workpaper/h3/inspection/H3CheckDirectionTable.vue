@@ -78,10 +78,9 @@
       </el-table-column>
       <el-table-column label="账面金额" width="100">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.bookAmount"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             @update:model-value="(v: number | undefined) => emit('update', row.rowId, { bookAmount: v ?? 0 })"
           />
@@ -228,6 +227,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H3CheckDirectionTable — H3-9 单向抽盘明细表（账面→实物 或 实物→账面）
  */

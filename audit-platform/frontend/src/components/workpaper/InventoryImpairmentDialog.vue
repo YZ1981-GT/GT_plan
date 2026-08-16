@@ -51,12 +51,12 @@
       </el-table-column>
       <el-table-column label="账面成本" width="140">
         <template #default="{ row }">
-          <el-input-number v-model="row.cost" :min="0" :step="100" controls-position="right" size="small" />
+          <WpAmountInput v-model="row.cost" :step="100" controls-position="right" size="small" />
         </template>
       </el-table-column>
       <el-table-column label="可变现净值" width="140">
         <template #default="{ row }">
-          <el-input-number v-model="row.nrv" :min="0" :step="100" controls-position="right" size="small" />
+          <WpAmountInput v-model="row.nrv" :step="100" controls-position="right" size="small" />
         </template>
       </el-table-column>
       <el-table-column label="库龄(月)" width="110">
@@ -130,6 +130,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'

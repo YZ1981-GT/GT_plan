@@ -156,10 +156,9 @@
         </el-table-column>
         <el-table-column prop="costEnding" label="原值期末审定" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.costEnding"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateRouCell(row.rowId, 'costEnding', v)"
             />
@@ -168,10 +167,9 @@
         </el-table-column>
         <el-table-column prop="accumDepEnding" label="累计折旧期末" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.accumDepEnding"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateRouCell(row.rowId, 'accumDepEnding', v)"
             />
@@ -180,10 +178,9 @@
         </el-table-column>
         <el-table-column prop="impairmentEnding" label="减值准备期末" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairmentEnding"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateRouCell(row.rowId, 'impairmentEnding', v)"
             />
@@ -197,10 +194,9 @@
         </el-table-column>
         <el-table-column prop="additionsCost" label="本期新增(原值)" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.additionsCost"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateRouCell(row.rowId, 'additionsCost', v)"
             />
@@ -209,10 +205,9 @@
         </el-table-column>
         <el-table-column prop="periodDep" label="本期折旧" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.periodDep"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateRouCell(row.rowId, 'periodDep', v)"
             />
@@ -400,10 +395,9 @@
         </el-table-column>
         <el-table-column prop="liabilityEnding" label="负债期末审定" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.liabilityEnding"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateLiabCell(row.rowId, 'liabilityEnding', v)"
             />
@@ -424,10 +418,9 @@
         </el-table-column>
         <el-table-column prop="periodInterest" label="本期利息支出" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.periodInterest"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => updateLiabCell(row.rowId, 'periodInterest', v)"
             />
@@ -563,6 +556,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabRelatedParty.vue — H8-14 关联交易检查表
  * 对齐 Excel 双表（使用权资产 + 租赁负债）+ 价差率数字化增强

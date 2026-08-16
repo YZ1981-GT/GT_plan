@@ -50,13 +50,13 @@
         </el-table-column>
         <el-table-column prop="transferOut" label="转出账面价值" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.transferOut" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.transferOut" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.transferOut) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="transferIn" label="转入账面价值" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.transferIn" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.transferIn" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.transferIn) }}</span>
           </template>
         </el-table-column>
@@ -133,6 +133,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

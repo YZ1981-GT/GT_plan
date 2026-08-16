@@ -59,11 +59,10 @@
           </el-table-column>
           <el-table-column label="期末余额" min-width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.kind === 'leaf' && !isReadonly"
                 :model-value="row.endAmount"
                 size="small"
-                :controls="false"
                 style="width:100%"
                 @update:model-value="(v: number) => updateClassField(row.rowKey, 'endAmount', v ?? 0)"
               />
@@ -72,11 +71,10 @@
           </el-table-column>
           <el-table-column label="上年年末余额" min-width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.kind === 'leaf' && !isReadonly"
                 :model-value="row.priorAmount"
                 size="small"
-                :controls="false"
                 style="width:100%"
                 @update:model-value="(v: number) => updateClassField(row.rowKey, 'priorAmount', v ?? 0)"
               />
@@ -134,11 +132,10 @@
             <el-table-column label="项目" min-width="200" prop="label" />
             <el-table-column label="期末余额" min-width="150" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="row.kind === 'leaf' && !isReadonly"
                   :model-value="row.endAmount"
                   size="small"
-                  :controls="false"
                   style="width:100%"
                   @update:model-value="(v: number) => updateDerivField(row.rowKey, 'endAmount', v ?? 0)"
                 />
@@ -147,11 +144,10 @@
             </el-table-column>
             <el-table-column label="上年年末余额" min-width="150" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="row.kind === 'leaf' && !isReadonly"
                   :model-value="row.priorAmount"
                   size="small"
-                  :controls="false"
                   style="width:100%"
                   @update:model-value="(v: number) => updateDerivField(row.rowKey, 'priorAmount', v ?? 0)"
                 />
@@ -255,11 +251,10 @@
           </el-table-column>
           <el-table-column label="期末公允价值" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.endFv"
                 size="small"
-                :controls="false"
                 style="width:100%"
                 @update:model-value="(v: number) => updateInputField(row.rowKey, 'endFv', v ?? 0)"
               />
@@ -410,7 +405,7 @@
           <el-table-column label="项目" min-width="200" prop="label" />
           <el-table-column label="账面价值" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.bookValue" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.bookValue" size="small" style="width:100%"
                 @update:model-value="(v:number)=>updateAmortField(row.rowKey,'bookValue',v??0)" />
               <span v-else>{{ fmt(row.bookValue) }}</span>
             </template>
@@ -463,6 +458,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, ref, inject, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { buildNoteJumpRoute, type DisclosureVariant } from '@/views/composables/noteDisclosureReverseJump'

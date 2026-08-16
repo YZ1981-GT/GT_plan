@@ -137,19 +137,19 @@
       <!-- 期初 -->
       <el-table-column v-if="isColVisible('priorUnadjusted')" label="期初未审" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorUnadjusted" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.priorUnadjusted" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorUnadjusted) }}</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isColVisible('priorAje')" label="期初AJE" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAje', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.priorAje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isColVisible('priorRje')" label="期初RJE" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.priorRje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorRje', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.priorRje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorRje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.priorRje) }}</span>
         </template>
       </el-table-column>
@@ -174,13 +174,13 @@
       <!-- 借贷发生 -->
       <el-table-column v-if="isColVisible('debitAmount')" label="借方发生" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isColVisible('creditAmount')" label="贷方发生" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
@@ -200,13 +200,13 @@
       </el-table-column>
       <el-table-column v-if="isColVisible('endAje')" label="期末AJE" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endAje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAje', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.endAje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endAje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isColVisible('endRje')" label="期末RJE" width="100" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="isDataRow(row) && !isReadonly" :model-value="row.endRje" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endRje', v ?? 0)" />
+          <WpAmountInput v-if="isDataRow(row) && !isReadonly" :model-value="row.endRje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'endRje', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.endRje) }}</span>
         </template>
       </el-table-column>
@@ -329,6 +329,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D7TabDetail.vue — 明细表 D7-2 (~400行), 27列横向滚动
  * Task: 17.1

@@ -106,11 +106,10 @@
         <el-table-column label="期末余额" align="center">
           <el-table-column label="账面余额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.end.balance"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchNature(row.id, { end: { balance: v ?? 0 } })"
               />
@@ -119,11 +118,10 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.end.provision"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchNature(row.id, { end: { provision: v ?? 0 } })"
               />
@@ -140,11 +138,10 @@
         <el-table-column label="期初余额" align="center">
           <el-table-column label="账面余额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.prior.balance"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchNature(row.id, { prior: { balance: v ?? 0 } })"
               />
@@ -153,11 +150,10 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.prior.provision"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchNature(row.id, { prior: { provision: v ?? 0 } })"
               />
@@ -243,10 +239,9 @@
         </el-table-column>
         <el-table-column label="终止确认金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.amount"
               size="small"
-              :controls="false"
               class="amt-input"
               :disabled="isReadonly"
               @change="(v: number) => dis.patchDerecog(row.id, { amount: v ?? 0 })"
@@ -282,11 +277,10 @@
         <el-table-column prop="label" label="项目" min-width="160" />
         <el-table-column label="期末余额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.amount"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => onContinuingChange(row.key, v ?? 0)"
             />
@@ -329,11 +323,10 @@
         <el-table-column label="期末数" align="center">
           <el-table-column label="账面余额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.end.balance"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchMethod(row.id, { end: { balance: v ?? 0 } })"
               />
@@ -347,11 +340,10 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.end.provision"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchMethod(row.id, { end: { provision: v ?? 0 } })"
               />
@@ -372,11 +364,10 @@
         <el-table-column label="期初数" align="center">
           <el-table-column label="账面余额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.prior.balance"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchMethod(row.id, { prior: { balance: v ?? 0 } })"
               />
@@ -390,11 +381,10 @@
           </el-table-column>
           <el-table-column label="坏账准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.prior.provision"
                 size="small"
-                :controls="false"
                 class="amt-input"
                 @change="(v: number) => dis.patchMethod(row.id, { prior: { provision: v ?? 0 } })"
               />
@@ -439,11 +429,10 @@
         </el-table-column>
         <el-table-column label="期末账面余额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.endBalance"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => dis.patchIndividualDetail(row.id, { endBalance: v ?? 0 })"
             />
@@ -452,11 +441,10 @@
         </el-table-column>
         <el-table-column label="期末坏账准备" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.endProvision"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => dis.patchIndividualDetail(row.id, { endProvision: v ?? 0 })"
             />
@@ -465,11 +453,10 @@
         </el-table-column>
         <el-table-column label="期初账面余额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.priorBalance"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => dis.patchIndividualDetail(row.id, { priorBalance: v ?? 0 })"
             />
@@ -478,11 +465,10 @@
         </el-table-column>
         <el-table-column label="期初坏账准备" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.priorProvision"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => dis.patchIndividualDetail(row.id, { priorProvision: v ?? 0 })"
             />
@@ -612,11 +598,10 @@
             </el-table-column>
             <el-table-column label="坏账准备" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="row.kind === 'band' && !isReadonly"
                   :model-value="row.endProvision"
                   size="small"
-                  :controls="false"
                   class="amt-input"
                   @change="(v: number) => dis.patchAgingCell(pf.id, row.id, 'endProvision', v ?? 0)"
                 />
@@ -645,11 +630,10 @@
             </el-table-column>
             <el-table-column label="坏账准备" width="120" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="row.kind === 'band' && !isReadonly"
                   :model-value="row.priorProvision"
                   size="small"
-                  :controls="false"
                   class="amt-input"
                   @change="(v: number) => dis.patchAgingCell(pf.id, row.id, 'priorProvision', v ?? 0)"
                 />
@@ -721,6 +705,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G5TabDisclosureSOE — 附注披露信息（国企）
  * 对齐致同 Excel；共享上市取数/勾稽/组合同步，补国企专有段。

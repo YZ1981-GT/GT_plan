@@ -162,11 +162,9 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="成本合计">
-              <el-input-number
+              <WpAmountInput
                 :model-value="meta.totalBookCost ?? undefined"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
                 style="width:100%"
                 placeholder="覆盖率分母，避免除零"
                 @update:model-value="(v: number | undefined) => updateMeta('totalBookCost', v ?? null)"
@@ -363,6 +361,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabStocktakeCheck.vue — H2-13 盘点检查
  * 对齐致同模板结构，参照 H1-10 双向抽盘 + CIP 专用列

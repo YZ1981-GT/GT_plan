@@ -85,7 +85,7 @@
     </el-table-column>
     <el-table-column label="截止日账面(E)" width="110">
       <template #default="{ row }">
-        <el-input-number :model-value="row.bookQty" size="small" :controls="false" :disabled="isReadonly"
+        <WpAmountInput :model-value="row.bookQty" size="small" :disabled="isReadonly"
           @update:model-value="(v: number | undefined) => emit('update', row.id, { bookQty: v ?? 0 })" />
       </template>
     </el-table-column>
@@ -147,6 +147,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed } from 'vue'
 import type { StocktakeRollMode, StocktakeRollforwardRow } from './f2StocktakeConfigs'
 

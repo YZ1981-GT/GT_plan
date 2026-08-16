@@ -80,7 +80,7 @@
         </el-table-column>
         <el-table-column prop="contractAmount" label="合同总金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.contractAmount" :controls="false" size="small" @change="onCell(row, 'contractAmount')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.contractAmount" size="small" @change="onCell(row, 'contractAmount')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.contractAmount) }}</span>
           </template>
         </el-table-column>
@@ -92,13 +92,13 @@
         </el-table-column>
         <el-table-column prop="originalCost" label="固定资产原值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small" @change="onCell(row, 'originalCost')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.originalCost" size="small" @change="onCell(row, 'originalCost')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="accumDep" label="累计折旧" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.accumDep" :controls="false" size="small" @change="onCell(row, 'accumDep')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.accumDep" size="small" @change="onCell(row, 'accumDep')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.accumDep) }}</span>
           </template>
         </el-table-column>
@@ -110,7 +110,7 @@
         </el-table-column>
         <el-table-column prop="residualRate" label="残值率%" width="80" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.residualRate" :controls="false" :min="0" :max="100" size="small" @change="onCell(row, 'residualRate')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.residualRate" size="small" @change="onCell(row, 'residualRate')" />
             <span v-else>{{ row.residualRate }}%</span>
           </template>
         </el-table-column>
@@ -129,7 +129,7 @@
           </el-table-column>
           <el-table-column prop="bookedDep" label="账面折旧" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.bookedDep" :controls="false" size="small" @change="onCell(row, 'bookedDep')" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.bookedDep" size="small" @change="onCell(row, 'bookedDep')" />
               <span v-else class="amount-cell">{{ fmtAmt(row.bookedDep) }}</span>
             </template>
           </el-table-column>
@@ -159,7 +159,7 @@
           </el-table-column>
           <el-table-column prop="bookedRent" label="账面租金" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.bookedRent" :controls="false" size="small" @change="onCell(row, 'bookedRent')" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.bookedRent" size="small" @change="onCell(row, 'bookedRent')" />
               <span v-else class="amount-cell">{{ fmtAmt(row.bookedRent) }}</span>
             </template>
           </el-table-column>
@@ -286,6 +286,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

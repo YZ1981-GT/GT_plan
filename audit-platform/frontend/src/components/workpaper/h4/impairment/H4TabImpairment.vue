@@ -191,10 +191,9 @@
           </el-table-column>
           <el-table-column label="②账面" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookValue"
-                :controls="false"
                 size="small"
                 @change="(v: number | undefined) => state.updateCalcCell(row.rowId, 'bookValue', v ?? 0)"
               />
@@ -325,6 +324,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabImpairment.vue — H4-7 减值测算表
  * CAS8 迹象 + ①~⑧测算 + H4-2/H4-1 带入 + H4-8 回写接收 + 推送 AJE

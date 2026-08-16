@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F3TabAdjustment — F3-3 调整分录 | Task 6 (比照 D4TabAdjustment) */
 import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { useF3Adjustment } from '../composables/useF3Adjustment'
@@ -177,13 +178,13 @@ async function runAdjAi(section: 'adjustment-note' | 'adjustment-conclusion'): P
       <el-table-column label="科目" width="100"><template #default="{ row }">{{ row.accountCode }}</template></el-table-column>
       <el-table-column label="借方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>

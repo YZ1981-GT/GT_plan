@@ -614,13 +614,13 @@
               <el-input-number v-model="form.recountTotalAmount" :disabled="isReadonly" :min="0" :precision="2" @change="onRecountChange('recountTotalAmount')" />
             </el-form-item>
             <el-form-item label="复盘账面值(元)">
-              <el-input-number v-model="form.recountSampleAmount" :disabled="isReadonly" :min="0" :precision="2" @change="onRecountChange('recountSampleAmount')" />
+              <WpAmountInput v-model="form.recountSampleAmount" :disabled="isReadonly" @change="onRecountChange('recountSampleAmount')" />
             </el-form-item>
             <el-form-item label="金额覆盖率">
               <el-tag type="info">{{ fmtPct(rates.amountCoverage) }}</el-tag>
             </el-form-item>
             <el-form-item label="复盘正确金额">
-              <el-input-number v-model="form.recountCorrectAmount" :disabled="isReadonly" :min="0" :precision="2" @change="onRecountChange('recountCorrectAmount')" />
+              <WpAmountInput v-model="form.recountCorrectAmount" :disabled="isReadonly" @change="onRecountChange('recountCorrectAmount')" />
             </el-form-item>
             <el-form-item label="金额正确率">
               <el-tag :type="(rates.amountAccuracy ?? 0) >= 95 ? 'success' : 'warning'">{{ fmtPct(rates.amountAccuracy) }}</el-tag>
@@ -892,6 +892,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H1TabStocktakeSummary — H1-11 固定资产监盘小结
  * 对齐致同模板结构；支持分区导航、索引弹窗联动、附件+OCR确认回写+二次编辑

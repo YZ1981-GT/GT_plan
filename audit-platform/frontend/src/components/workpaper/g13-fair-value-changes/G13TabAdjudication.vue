@@ -110,10 +110,10 @@
       <el-table-column label="本期数" align="center">
         <el-table-column label="未审数" width="108" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.rowKey !== 'total' && !row.autoCurrent && !isReadonly"
               :model-value="row.currentUnadjusted"
-              size="small" :controls="false" style="width:100%"
+              size="small" style="width:100%"
               @update:model-value="(v: number) => adj.updatePriorField(row.rowKey, 'currentUnadjusted', v ?? 0)"
             />
             <span v-else class="formula-cell" :title="row.autoCurrent ? '自 G13-2 明细按科目汇总' : ''">
@@ -144,8 +144,8 @@
       <el-table-column label="上期数" align="center">
         <el-table-column label="未审数" width="108" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorUnadjusted"
-              size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorUnadjusted"
+              size="small" style="width:100%"
               @update:model-value="(v: number) => adj.updatePriorField(row.rowKey, 'priorUnadjusted', v ?? 0)" />
             <span v-else>{{ fmt(row.priorUnadjusted) }}</span>
           </template>
@@ -238,6 +238,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, inject, toRef } from 'vue'
 import { useG13Adjudication } from '../composables/useG13Adjudication'
 import { resolveG13SheetLabel } from '../composables/g13SheetLabels'

@@ -101,8 +101,8 @@
         <el-table-column label="本期数" align="center">
           <el-table-column label="未审数" width="96" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentUnadjusted"
-                size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentUnadjusted"
+                size="small" style="width:100%"
                 @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'currentUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.currentUnadjusted) }}</span>
             </template>
@@ -134,16 +134,16 @@
         <el-table-column label="对应科目-减值准备" align="center">
           <el-table-column label="期初余额" width="92" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.openingProvision"
-                size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.openingProvision"
+                size="small" style="width:100%"
                 @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'openingProvision', v ?? 0)" />
               <span v-else>{{ fmt(row.openingProvision) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期计提" width="88" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentProvision"
-                size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentProvision"
+                size="small" style="width:100%"
                 @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'currentProvision', v ?? 0)" />
               <span v-else>{{ fmt(row.currentProvision) }}</span>
             </template>
@@ -175,8 +175,8 @@
           </el-table-column>
           <el-table-column label="期末余额" width="96" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.closingProvision"
-                size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.closingProvision"
+                size="small" style="width:100%"
                 :class="{ 'cell-error': !row.rollForwardBalanced || (row.tbClosing != null && !row.tbClosingMatched) }"
                 :title="closingTitle(row)"
                 @update:model-value="(v: number) => detail.updateCell(row.rowKey, 'closingProvision', v ?? 0)" />
@@ -258,6 +258,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, ref, toRef, onMounted } from 'vue'
 import { useG14Detail, type G14DetailRow } from '../composables/useG14Detail'
 import { useG14ExternalCross } from '../composables/useG14ExternalCross'

@@ -315,10 +315,9 @@
         <el-table-column label="账面金额" align="center">
           <el-table-column prop="originalCost" label="原值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.originalCost"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 :class="{ 'warn-input': state.needsAmountMismatchWarning(row) }"
@@ -332,7 +331,7 @@
           </el-table-column>
           <el-table-column prop="accDep" label="累计折旧" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.accDep" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.accDep" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'accDep', row.accDep)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
@@ -340,7 +339,7 @@
           </el-table-column>
           <el-table-column prop="impairment" label="减值准备" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'impairment', row.impairment)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
@@ -400,7 +399,7 @@
           </el-table-column>
           <el-table-column prop="contractAmount" label="合同金额" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.contractAmount" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.contractAmount" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'contractAmount', row.contractAmount)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.contractAmount) }}</span>
@@ -422,10 +421,9 @@
           </el-table-column>
           <el-table-column prop="invoiceAmount" label="发票金额" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.invoiceAmount"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 :class="{ 'warn-input': state.needsAmountMismatchWarning(row) }"
@@ -695,7 +693,7 @@
         </el-table-column>
         <el-table-column prop="sourceAmount" label="源文件金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.sourceAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.sourceAmount" size="small"
               class="amt-input"
               @change="state.updateTraceCell(row.rowId, 'sourceAmount', row.sourceAmount)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.sourceAmount) }}</span>
@@ -729,7 +727,7 @@
         </el-table-column>
         <el-table-column prop="bookAmount" label="账面金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookAmount" :controls="false" size="small"
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookAmount" size="small"
               class="amt-input"
               @change="state.updateTraceCell(row.rowId, 'bookAmount', row.bookAmount)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookAmount) }}</span>
@@ -883,6 +881,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist } from '../../composables/shared/useSamplingMethodologyPersist'

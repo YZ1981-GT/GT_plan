@@ -64,11 +64,9 @@
         </el-table-column>
         <el-table-column prop="originalCost" label="原始成本(元)" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.originalCost"
-              :controls="false"
-              :precision="2"
               size="small"
               placeholder="0.00"
               style="width: 100%"
@@ -104,13 +102,9 @@
         </el-table-column>
         <el-table-column prop="residualRate" label="残值率(%)" width="100" align="center">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.residualRate"
-              :controls="false"
-              :precision="2"
-              :min="0"
-              :max="100"
               size="small"
               placeholder="0"
               style="width: 100%"
@@ -172,6 +166,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS21BasicInfo.vue — 数据资产的基本情况 S21-1
  *

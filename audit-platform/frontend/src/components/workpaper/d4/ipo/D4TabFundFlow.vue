@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabFundFlow — D4-32 客户、供应商等资金流水检查
  *
@@ -119,7 +120,7 @@ function rowClassName({ row }: { row: FlowRow }) { return row.hasAnomaly === '�
       <el-table v-if="groups[gIdx].rows.length" :data="groups[gIdx].rows" border stripe size="small" class="flow-table" :row-class-name="rowClassName">
         <el-table-column label="#" width="40" align="center"><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
         <el-table-column label="单位名称/姓名" min-width="110"><template #default="{ row }"><el-input v-model="row.name" size="small" :disabled="isReadonly" @change="updateCell(group.key,row.id,'name',row.name)" /></template></el-table-column>
-        <el-table-column label="本期交易金额" min-width="110" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(group.key,row.id,'amount',row.amount)" /></template></el-table-column>
+        <el-table-column label="本期交易金额" min-width="110" align="right"><template #default="{ row }"><WpAmountInput v-model="row.amount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(group.key,row.id,'amount',row.amount)" /></template></el-table-column>
         <el-table-column label="占比" width="70"><template #default="{ row }"><el-input v-model="row.ratio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(group.key,row.id,'ratio',row.ratio)" /></template></el-table-column>
         <el-table-column label="开户银行" min-width="100"><template #default="{ row }"><el-input v-model="row.bank" size="small" :disabled="isReadonly" @change="updateCell(group.key,row.id,'bank',row.bank)" /></template></el-table-column>
         <el-table-column label="账号" min-width="120"><template #default="{ row }"><el-input v-model="row.account" size="small" :disabled="isReadonly" @change="updateCell(group.key,row.id,'account',row.account)" /></template></el-table-column>

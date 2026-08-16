@@ -71,7 +71,7 @@
 
       <el-table-column label="期初余额" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number :model-value="row.openingUnadjusted" size="small" :controls="false" :disabled="isReadonly"
+          <WpAmountInput :model-value="row.openingUnadjusted" size="small" :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => detail.updateCell(row.id, 'openingUnadjusted', v ?? 0)" />
         </template>
@@ -112,14 +112,14 @@
 
       <el-table-column label="借方发生" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number :model-value="row.debit" size="small" :controls="false" :disabled="isReadonly"
+          <WpAmountInput :model-value="row.debit" size="small" :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => detail.updateCell(row.id, 'debit', v ?? 0)" />
         </template>
       </el-table-column>
       <el-table-column label="贷方发生" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number :model-value="row.credit" size="small" :controls="false" :disabled="isReadonly"
+          <WpAmountInput :model-value="row.credit" size="small" :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => detail.updateCell(row.id, 'credit', v ?? 0)" />
         </template>
@@ -131,7 +131,7 @@
       </el-table-column>
       <el-table-column label="账项调整" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number :model-value="row.closingAdjustment" size="small" :controls="false" :disabled="isReadonly"
+          <WpAmountInput :model-value="row.closingAdjustment" size="small" :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => detail.updateCell(row.id, 'closingAdjustment', v ?? 0)" />
         </template>
@@ -345,6 +345,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, watch, inject } from 'vue'
 import { useG2Detail } from '../composables/useG2Detail'
 import GtIndexChip from '../GtIndexChip.vue'

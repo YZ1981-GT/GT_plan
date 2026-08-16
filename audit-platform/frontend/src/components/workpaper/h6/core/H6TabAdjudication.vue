@@ -154,10 +154,9 @@
         <el-table-column label="期初数" align="center">
           <el-table-column label="未审数" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !props.isReadonly"
                 v-model="row.beginUnadjusted"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'beginUnadjusted', $event)"
@@ -167,10 +166,9 @@
           </el-table-column>
           <el-table-column label="账项调整" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !props.isReadonly"
                 v-model="row.beginAdjustment"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'beginAdjustment', $event)"
@@ -188,10 +186,9 @@
         <el-table-column label="期末数" align="center">
           <el-table-column label="未审数" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !props.isReadonly"
                 v-model="row.endUnadjusted"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'endUnadjusted', $event)"
@@ -201,10 +198,9 @@
           </el-table-column>
           <el-table-column label="账项调整" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !props.isReadonly"
                 v-model="row.endAdjustment"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'endAdjustment', $event)"
@@ -311,9 +307,8 @@
         <el-table-column label="期末数" align="right" min-width="140">
           <template #default="{ row }">
             <template v-if="row.editable && !props.isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.kind === 'fa' ? state.fsReconcile.value.faNetEndAudited : state.fsReconcile.value.fsEndAmount"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number) => onFsChange(row.kind, 'end', v ?? 0)"
@@ -328,9 +323,8 @@
         <el-table-column label="期初数" align="right" min-width="140">
           <template #default="{ row }">
             <template v-if="row.editable && !props.isReadonly">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.kind === 'fa' ? state.fsReconcile.value.faNetBeginAudited : state.fsReconcile.value.fsBeginAmount"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number) => onFsChange(row.kind, 'begin', v ?? 0)"
@@ -432,6 +426,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H6TabAdjudication.vue — H6-1 审定表
  * 对齐致同 Excel：期初/期末×未审·账项调整·审定 + 变动额/率；

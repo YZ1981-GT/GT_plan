@@ -112,7 +112,7 @@
         </el-table-column>
         <el-table-column label="残值率%" width="80" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.salvageRate" :min="0" :max="99" :controls="false"
+            <WpAmountInput v-if="!isReadonly" v-model="row.salvageRate"
               size="small" @change="onFieldChange(row, 'salvageRate')" />
             <span v-else>{{ row.salvageRate }}%</span>
           </template>
@@ -532,6 +532,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H1TabDetail — H1-2 固定资产、累计折旧及减值准备明细表
  * 对齐源模板 54 列：4 区段 Tab + 未审/期初调整/账项调整/审定 + 净值 + 核对标志 + 结论 A/B/C

@@ -170,11 +170,9 @@
         </el-table-column>
         <el-table-column label="宣告分派的股利金额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.declaredAmount"
-              :controls="false"
-              :precision="2"
               size="small"
               class="cell-number"
               @change="(v: number | undefined) => updateDividendNumber(row, 'declaredAmount', v)"
@@ -516,6 +514,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, defineComponent, h, inject, onMounted, reactive, ref, toRef } from 'vue'
 import { ElInputNumber, ElMessage, ElMessageBox, ElOption, ElSelect } from 'element-plus'
 import {

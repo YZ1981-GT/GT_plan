@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabSamplingVouching.vue — D1-13 应收票据抽样凭证核对 HTML渲染
  *
@@ -801,11 +802,9 @@ const SAMPLING_METHOD_TEXTS = [
         <!-- 金额 -->
         <el-table-column label="金额" width="110" align="right">
           <template #default="{ row }: { row: VouchingRow }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.amount"
               size="small"
-              :controls="false"
-              :precision="2"
               :disabled="isReadonly"
               style="width: 100%"
               @change="(v: number) => updateVouchingRow(row.id, 'amount', v || 0)"

@@ -78,11 +78,10 @@
       <el-table-column label="期初数" align="center">
         <el-table-column label="未审数" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly"
               :model-value="row.openingUnadjusted"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => onUpdate(row.id, 'openingUnadjusted', v ?? 0)"
             />
@@ -91,11 +90,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly"
               :model-value="row.openingAdjustment"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => onUpdate(row.id, 'openingAdjustment', v ?? 0)"
             />
@@ -112,11 +110,10 @@
       <el-table-column label="本期增加" align="center">
         <el-table-column label="计提" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly"
               :model-value="row.provisionIncrease"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => onUpdate(row.id, 'provisionIncrease', v ?? 0)"
             />
@@ -188,11 +185,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly"
               :model-value="row.closingAdjustment"
               size="small"
-              :controls="false"
               class="amt-input"
               @change="(v: number) => onUpdate(row.id, 'closingAdjustment', v ?? 0)"
             />
@@ -267,6 +263,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG5BadDebtDetail } from '../../composables/useG5BadDebtDetail'

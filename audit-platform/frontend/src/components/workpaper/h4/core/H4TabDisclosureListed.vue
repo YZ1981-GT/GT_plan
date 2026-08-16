@@ -69,10 +69,9 @@
         </el-table-column>
         <el-table-column label="期末余额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.endBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number | undefined) => updateMaterial(row.key, 'endBalance', v ?? 0)"
@@ -84,10 +83,9 @@
         </el-table-column>
         <el-table-column label="上年年末余额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.priorBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number | undefined) => updateMaterial(row.key, 'priorBalance', v ?? 0)"
@@ -130,6 +128,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabDisclosureListed — 附注披露信息（上市公司）
  * 对齐源 xlsx：（2）工程物资分类表

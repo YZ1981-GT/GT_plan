@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F3TabAdjudication — F3-1 审定表（贷方科目 2201）
  * Spec: .kiro/specs/f3-notes-payable/ Task 6.1
@@ -265,10 +266,9 @@ function confirmAdjudication() {
       <el-table-column label="期初" align="center">
         <el-table-column label="未审" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly && !row.isFromCrossSheet"
               :model-value="row.openingUnadjusted"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number) => updateCell(row.rowKey, 'openingUnadjusted', v ?? 0)"
@@ -278,10 +278,9 @@ function confirmAdjudication() {
         </el-table-column>
         <el-table-column label="账项调整" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               :model-value="row.openingAje"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number) => updateCell(row.rowKey, 'openingAje', v ?? 0)"
@@ -317,10 +316,9 @@ function confirmAdjudication() {
         </el-table-column>
         <el-table-column label="账项调整" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.isEditable && !isReadonly"
               :model-value="row.closingAje"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number) => updateCell(row.rowKey, 'closingAje', v ?? 0)"

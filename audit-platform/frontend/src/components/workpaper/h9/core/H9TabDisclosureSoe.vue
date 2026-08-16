@@ -56,11 +56,9 @@
         <el-table-column prop="item" label="项  目" min-width="240" />
         <el-table-column label="期末余额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.kind === 'line' && !isReadonly"
               :model-value="row.endBalance ?? undefined"
-              :controls="false"
-              :precision="2"
               size="small"
               class="num-input"
               @update:model-value="(v: number | undefined) => updateLine(row.rowIndex!, 'endBalance', v ?? null)"
@@ -70,11 +68,9 @@
         </el-table-column>
         <el-table-column label="期初余额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.kind === 'line' && !isReadonly"
               :model-value="row.beginBalance ?? undefined"
-              :controls="false"
-              :precision="2"
               size="small"
               class="num-input"
               @update:model-value="(v: number | undefined) => updateLine(row.rowIndex!, 'beginBalance', v ?? null)"
@@ -172,6 +168,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabDisclosureSoe — 租赁负债附注披露（国企）
  * 对齐源模板 A1:F16 + note_template 八、52；同步附注模块

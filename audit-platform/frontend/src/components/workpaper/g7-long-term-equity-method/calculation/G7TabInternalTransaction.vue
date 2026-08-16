@@ -149,10 +149,9 @@
       <!-- 4. 交易金额 -->
       <el-table-column label="交易金额" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.transactionAmount"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @change="(v: number | undefined) => handleAmountChange(row.id, v ?? 0)"
@@ -414,6 +413,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { extractG7AiText } from '../../composables/g7AiText'
 /**
  * G7TabInternalTransaction — G7-15 内部交易抵销测算表

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabOverseas — D4-26 境外销售收入检查
  *
@@ -78,14 +79,14 @@ async function handleImportFile(f: any) { await importData('D4-26', f.raw || f) 
       <el-table-column label="所在国家/地区" min-width="100"><template #default="{ row }"><el-input v-model="row.country" size="small" :disabled="isReadonly" @change="updateCell(row.id,'country',row.country)" /></template></el-table-column>
       <el-table-column label="产品种类" min-width="90"><template #default="{ row }"><el-input v-model="row.product" size="small" :disabled="isReadonly" @change="updateCell(row.id,'product',row.product)" /></template></el-table-column>
       <el-table-column label="业务模式" min-width="90"><template #default="{ row }"><el-input v-model="row.bizModel" size="small" :disabled="isReadonly" placeholder="直销/经销" @change="updateCell(row.id,'bizModel',row.bizModel)" /></template></el-table-column>
-      <el-table-column label="本期销售金额" min-width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.salesAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'salesAmount',row.salesAmount)" /></template></el-table-column>
+      <el-table-column label="本期销售金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.salesAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'salesAmount',row.salesAmount)" /></template></el-table-column>
       <el-table-column label="占比" min-width="70"><template #default="{ row }"><el-input v-model="row.proportion" size="small" :disabled="isReadonly" @change="updateCell(row.id,'proportion',row.proportion)" /></template></el-table-column>
       <el-table-column label="贸易模式" min-width="80"><template #default="{ row }"><el-input v-model="row.tradeMode" size="small" :disabled="isReadonly" placeholder="EXW/FOB/CIF" @change="updateCell(row.id,'tradeMode',row.tradeMode)" /></template></el-table-column>
       <el-table-column label="贸易条款" min-width="110"><template #default="{ row }"><el-input v-model="row.tradeTerms" size="small" :disabled="isReadonly" @change="updateCell(row.id,'tradeTerms',row.tradeTerms)" /></template></el-table-column>
       <el-table-column label="结算模式" min-width="90"><template #default="{ row }"><el-input v-model="row.settlementMode" size="small" :disabled="isReadonly" placeholder="汇款/信用证" @change="updateCell(row.id,'settlementMode',row.settlementMode)" /></template></el-table-column>
       <el-table-column label="第三方回款" width="75" align="center"><template #default="{ row }"><el-select v-model="row.hasThirdParty" size="small" :disabled="isReadonly" placeholder="—" @change="updateCell(row.id,'hasThirdParty',row.hasThirdParty)"><el-option label="是" value="是" /><el-option label="否" value="否" /></el-select></template></el-table-column>
       <el-table-column label="第三方回款原因" min-width="110"><template #default="{ row }"><el-input v-model="row.thirdPartyReason" size="small" :disabled="isReadonly" @change="updateCell(row.id,'thirdPartyReason',row.thirdPartyReason)" /></template></el-table-column>
-      <el-table-column label="核查确认金额" min-width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.verifiedAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'verifiedAmount',row.verifiedAmount)" /></template></el-table-column>
+      <el-table-column label="核查确认金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.verifiedAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'verifiedAmount',row.verifiedAmount)" /></template></el-table-column>
       <el-table-column label="差异" min-width="100" align="right"><template #default="{ row }"><el-input v-model="row.diff" size="small" :disabled="isReadonly" @change="updateCell(row.id,'diff',row.diff)" /></template></el-table-column>
       <el-table-column label="差异原因" min-width="110"><template #default="{ row }"><el-input v-model="row.diffReason" size="small" :disabled="isReadonly" @change="updateCell(row.id,'diffReason',row.diffReason)" /></template></el-table-column>
       <!-- 相关程序索引（5子列） -->

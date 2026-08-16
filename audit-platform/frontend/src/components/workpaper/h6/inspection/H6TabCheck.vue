@@ -338,10 +338,9 @@
         <el-table-column label="被清理固定资产情况" align="center">
           <el-table-column v-if="isColVisible('originalCost')" label="原值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.originalCost"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(row.rowId, 'originalCost', v)"
@@ -351,10 +350,9 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('accumulatedDepreciation')" label="累计折旧" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.accumulatedDepreciation"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(row.rowId, 'accumulatedDepreciation', v)"
@@ -364,10 +362,9 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('impairment')" label="减值准备" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.impairment"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(row.rowId, 'impairment', v)"
@@ -387,10 +384,9 @@
         <el-table-column label="清理损益" align="center">
           <el-table-column v-if="isColVisible('clearingExpense')" label="清理费用" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.clearingExpense"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(row.rowId, 'clearingExpense', v)"
@@ -400,10 +396,9 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('clearingIncome')" label="清理收入" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.clearingIncome"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(row.rowId, 'clearingIncome', v)"
@@ -426,10 +421,9 @@
         <el-table-column label="结转" align="center">
           <el-table-column v-if="isColVisible('toNonOperating')" label="转营业外收入/支出" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.toNonOperating"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 @change="(v: number | undefined) => updateCell(row.rowId, 'toNonOperating', v)"
@@ -452,10 +446,9 @@
           </el-table-column>
           <el-table-column v-if="isColVisible('endingBalance')" label="期末余额" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!props.isReadonly"
                 :model-value="row.endingBalance"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 :class="{ 'warn-input': Math.abs(row.endingBalance) > 0.005 }"
@@ -782,6 +775,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H6TabCheck.vue — H6-4 固定资产清理检查表（对齐致同源模板凭证级测试）
  */

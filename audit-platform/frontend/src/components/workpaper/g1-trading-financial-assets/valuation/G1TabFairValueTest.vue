@@ -179,11 +179,10 @@
           </el-table-column>
           <el-table-column label="公允价值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookValue"
                 size="small"
-                :controls="false"
                 style="width: 100%"
                 @update:model-value="(v: number | undefined) => updateCell(row.id, 'bookValue', v ?? 0)"
               />
@@ -286,11 +285,10 @@
           </el-table-column>
           <el-table-column label="报价值" width="88" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.fvLevel === 1"
                 :model-value="row.quoteValue"
                 size="small"
-                :controls="false"
                 style="width: 100%"
                 @update:model-value="(v: number | undefined) => updateCell(row.id, 'quoteValue', v ?? 0)"
               />
@@ -440,6 +438,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, inject, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG1FairValueTest } from '../../composables/useG1FairValueTest'

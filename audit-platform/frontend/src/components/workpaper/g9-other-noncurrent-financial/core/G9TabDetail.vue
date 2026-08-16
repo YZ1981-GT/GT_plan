@@ -171,7 +171,7 @@
         </el-table-column>
         <el-table-column label="面值/成本" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.faceValueOrCost" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.faceValueOrCost" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { faceValueOrCost: v ?? 0 })" />
             <span v-else>{{ fmt(row.faceValueOrCost) }}</span>
           </template>
@@ -208,7 +208,7 @@
         <el-table-column label="资产名称" prop="assetName" min-width="100" fixed />
         <el-table-column label="期初余额" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.openingBalance" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.openingBalance" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { openingBalance: v ?? 0 })" />
             <span v-else>{{ fmt(row.openingBalance) }}</span>
           </template>
@@ -225,14 +225,14 @@
         </el-table-column>
         <el-table-column label="本期增加" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.increaseAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.increaseAmount" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { increaseAmount: v ?? 0 })" />
             <span v-else>{{ fmt(row.increaseAmount) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期减少" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.decreaseAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.decreaseAmount" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { decreaseAmount: v ?? 0 })" />
             <span v-else>{{ fmt(row.decreaseAmount) }}</span>
           </template>
@@ -253,7 +253,7 @@
         </el-table-column>
         <el-table-column label="减值" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.impairmentLoss" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.impairmentLoss" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { impairmentLoss: v ?? 0 })" />
             <span v-else>{{ fmt(row.impairmentLoss) }}</span>
           </template>
@@ -318,7 +318,7 @@
         </el-table-column>
         <el-table-column label="减值准备" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.impairmentProvision" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.impairmentProvision" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { impairmentProvision: v ?? 0 })" />
             <span v-else>{{ fmt(row.impairmentProvision) }}</span>
           </template>
@@ -382,6 +382,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

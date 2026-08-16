@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 /**
  * GtB30GroupAudit — B30 集团审计范围确定底稿
  * Spec: .kiro/specs/b30-group-audit/ | Tasks: 3.1~3.15, 4.1
@@ -575,7 +576,7 @@ watch(allScopeDetermined, (val) => { if (val) publishScopeDetermined() })
           </el-table-column>
           <el-table-column prop="revenue" label="营业收入" width="120">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.revenue" size="small" :controls="false" @change="(v: number|null) => { updateComponent(row.id, 'revenue', v); emit('save') }" />
+              <WpAmountInput v-if="!isReadonly" :model-value="row.revenue" size="small" @change="(v: number|null) => { updateComponent(row.id, 'revenue', v); emit('save') }" />
               <span v-else>{{ formatAmount(row.revenue) }}</span>
             </template>
           </el-table-column>

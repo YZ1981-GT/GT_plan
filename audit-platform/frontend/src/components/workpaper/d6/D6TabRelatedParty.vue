@@ -101,10 +101,9 @@
 
     <el-table-column label="期初余额" width="120" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!isReadonly"
           :model-value="row.priorBalance"
-          :controls="false"
           size="small"
           style="width:100%"
           @change="(v: number) => updateCell(row.rowId, 'priorBalance', v ?? 0)"
@@ -115,10 +114,9 @@
 
     <el-table-column label="借方发生" width="120" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!isReadonly"
           :model-value="row.debitAmount"
-          :controls="false"
           size="small"
           style="width:100%"
           @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)"
@@ -129,10 +127,9 @@
 
     <el-table-column label="贷方发生" width="120" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!isReadonly"
           :model-value="row.creditAmount"
-          :controls="false"
           size="small"
           style="width:100%"
           @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)"
@@ -149,10 +146,9 @@
 
     <el-table-column label="坏账准备" width="110" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!isReadonly"
           :model-value="row.impairment"
-          :controls="false"
           size="small"
           style="width:100%"
           @change="(v: number) => updateCell(row.rowId, 'impairment', v ?? 0)"
@@ -193,10 +189,9 @@
 
     <el-table-column label="至审计日结转金额" width="140" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!isReadonly"
           :model-value="row.postSettlement"
-          :controls="false"
           size="small"
           style="width:100%"
           @change="(v: number) => updateCell(row.rowId, 'postSettlement', v ?? 0)"
@@ -363,6 +358,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D6TabRelatedParty.vue — 关联关系及交易检查 D6-5
  */

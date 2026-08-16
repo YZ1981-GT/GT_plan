@@ -137,10 +137,9 @@
         </el-table-column>
         <el-table-column label="估计金额" width="110">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.estimatedAmount"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @update:model-value="(v: number | undefined) => updateLocation(row.rowId, { estimatedAmount: v ?? 0 })"
             />
@@ -285,6 +284,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useH4StocktakePlan } from '../../composables/useH4StocktakePlan'

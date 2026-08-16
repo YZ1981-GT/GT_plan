@@ -212,11 +212,10 @@
         </el-table-column>
         <el-table-column label="未审单价" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.closingUnadjustedPrice"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => fv.updateRow(row.rowId, { closingUnadjustedPrice: v ?? 0 })"
             />
@@ -243,11 +242,10 @@
         </el-table-column>
         <el-table-column label="审定单价" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.closingAuditedPrice"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => fv.updateRow(row.rowId, { closingAuditedPrice: v ?? 0 })"
             />
@@ -448,6 +446,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, ref, watch, toRef, inject } from 'vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import G8ImportExportDropdown from '../G8ImportExportDropdown.vue'

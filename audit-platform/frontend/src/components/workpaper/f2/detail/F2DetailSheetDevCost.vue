@@ -116,10 +116,9 @@
         <el-table-column label="未审数" align="center">
           <el-table-column label="期初余额" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.unaudOpen"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { unaudOpen: v ?? 0 })"
               />
@@ -127,10 +126,9 @@
           </el-table-column>
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.unaudInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { unaudInc: v ?? 0 })"
               />
@@ -138,10 +136,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.unaudDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { unaudDec: v ?? 0 })"
               />
@@ -154,10 +151,9 @@
         <el-table-column label="账项调整" align="center">
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.adjAcctInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { adjAcctInc: v ?? 0 })"
               />
@@ -165,10 +161,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.adjAcctDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { adjAcctDec: v ?? 0 })"
               />
@@ -178,10 +173,9 @@
         <el-table-column label="重分类调整" align="center">
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.adjReclassInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { adjReclassInc: v ?? 0 })"
               />
@@ -189,10 +183,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.adjReclassDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { adjReclassDec: v ?? 0 })"
               />
@@ -243,10 +236,9 @@
         <el-table-column label="未审数" align="center">
           <el-table-column label="期初余额" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impUnaudOpen"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impUnaudOpen: v ?? 0 })"
               />
@@ -254,10 +246,9 @@
           </el-table-column>
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impUnaudInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impUnaudInc: v ?? 0 })"
               />
@@ -265,10 +256,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impUnaudDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impUnaudDec: v ?? 0 })"
               />
@@ -281,10 +271,9 @@
         <el-table-column label="账项调整" align="center">
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impAdjAcctInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impAdjAcctInc: v ?? 0 })"
               />
@@ -292,10 +281,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impAdjAcctDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impAdjAcctDec: v ?? 0 })"
               />
@@ -305,10 +293,9 @@
         <el-table-column label="重分类调整" align="center">
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impAdjReclassInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impAdjReclassInc: v ?? 0 })"
               />
@@ -316,10 +303,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impAdjReclassDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => sheet.updateRow(row.id, { impAdjReclassDec: v ?? 0 })"
               />
@@ -456,6 +442,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { inject, ref, toRef, type Ref } from 'vue'
 import { useF2DevCostSheet, DEV_COST_QUALITY } from '../../composables/useF2DevCostSheet'
 import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'

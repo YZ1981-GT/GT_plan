@@ -57,10 +57,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.openingAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => emit('update', { id: row.id, patch: { openingAmt: v ?? 0 } })"
               />
@@ -85,10 +84,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.increaseAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => emit('update', { id: row.id, patch: { increaseAmt: v ?? 0 } })"
               />
@@ -113,10 +111,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.decreaseAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => emit('update', { id: row.id, patch: { decreaseAmt: v ?? 0 } })"
               />
@@ -193,6 +190,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed } from 'vue'
 import type { AgingSegment } from '@/composables/useAgingConfig'
 import type { F2TurnoverRow, F2TurnoverView } from '../../composables/useF2DetailTurnover'

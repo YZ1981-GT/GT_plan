@@ -159,10 +159,9 @@
         </el-table-column>
         <el-table-column prop="originalCost" label="原值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.originalCost"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="(v: number | undefined) => onCell(row, 'originalCost', v ?? 0)"
@@ -172,10 +171,9 @@
         </el-table-column>
         <el-table-column prop="accDep" label="累计折旧" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.accDep"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="(v: number | undefined) => onCell(row, 'accDep', v ?? 0)"
@@ -185,10 +183,9 @@
         </el-table-column>
         <el-table-column prop="impairmentProvision" label="减值准备" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairmentProvision"
-              :controls="false"
               size="small"
               class="amt-input"
               @change="(v: number | undefined) => onCell(row, 'impairmentProvision', v ?? 0)"
@@ -430,6 +427,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

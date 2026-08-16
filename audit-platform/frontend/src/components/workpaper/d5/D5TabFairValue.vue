@@ -200,10 +200,9 @@
       <!-- D: 票面金额 -->
       <el-table-column label="票面金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.faceValue"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'faceValue', val ?? 0)"
@@ -499,6 +498,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D5TabFairValue.vue — D5-4 公允价值测算
  *

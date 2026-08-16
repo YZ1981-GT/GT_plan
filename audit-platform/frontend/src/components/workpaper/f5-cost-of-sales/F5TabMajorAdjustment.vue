@@ -114,10 +114,9 @@
       <el-table-column label="调整金额" align="center">
         <el-table-column label="借方" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.debitAmount"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => adj.updateCell(row.id, 'debitAmount', v ?? 0)"
@@ -127,10 +126,9 @@
         </el-table-column>
         <el-table-column label="贷方" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.creditAmount"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => adj.updateCell(row.id, 'creditAmount', v ?? 0)"
@@ -246,6 +244,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F5TabMajorAdjustment — F5-8 主营业务成本账户中重大调整事项核查表
  * 源表：日期/凭证号/事项/借贷方/理由/是否充分 + 抽凭 + AI + F5-1/4/7 交叉引用

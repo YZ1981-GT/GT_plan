@@ -88,11 +88,10 @@
       <el-table-column label="期初数" align="center">
         <el-table-column label="未审数" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.openingUnadjusted"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => bd.updateCell(row.id, 'openingUnadjusted', v ?? 0)"
             />
@@ -101,11 +100,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.openingAdjustment"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => bd.updateCell(row.id, 'openingAdjustment', v ?? 0)"
             />
@@ -122,11 +120,10 @@
       <el-table-column label="本期增加" align="center">
         <el-table-column label="计提" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.provisionIncrease"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => bd.updateCell(row.id, 'provisionIncrease', v ?? 0)"
             />
@@ -201,11 +198,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.closingAdjustment"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => bd.updateCell(row.id, 'closingAdjustment', v ?? 0)"
             />
@@ -278,6 +274,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, watch, inject } from 'vue'
 import { useG2BadDebtDetail } from '../composables/useG2BadDebtDetail'
 import GtIndexChip from '../GtIndexChip.vue'

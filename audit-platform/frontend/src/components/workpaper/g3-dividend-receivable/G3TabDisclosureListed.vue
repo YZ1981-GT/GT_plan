@@ -86,10 +86,9 @@
       </el-table-column>
       <el-table-column label="上年年末余额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.openingBalance"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => updateTableRow(row.id, 'openingBalance', v ?? 0)"
@@ -98,10 +97,9 @@
       </el-table-column>
       <el-table-column label="本期增加" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.currentIncrease"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => updateTableRow(row.id, 'currentIncrease', v ?? 0)"
@@ -110,10 +108,9 @@
       </el-table-column>
       <el-table-column label="本期减少" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.currentDecrease"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => updateTableRow(row.id, 'currentDecrease', v ?? 0)"
@@ -182,6 +179,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount, inject } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

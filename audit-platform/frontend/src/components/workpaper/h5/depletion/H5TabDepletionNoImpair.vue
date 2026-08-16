@@ -40,13 +40,13 @@
         </el-table-column>
         <el-table-column prop="cost" label="原值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.cost" :controls="false" size="small" @change="state.updateCalcCell(row.rowId, 'cost', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.cost" size="small" @change="state.updateCalcCell(row.rowId, 'cost', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="salvage" label="残值" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.salvage" :controls="false" size="small" @change="state.updateCalcCell(row.rowId, 'salvage', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.salvage" size="small" @change="state.updateCalcCell(row.rowId, 'salvage', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.salvage) }}</span>
           </template>
         </el-table-column>
@@ -107,6 +107,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'

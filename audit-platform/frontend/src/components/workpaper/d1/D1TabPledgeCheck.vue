@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabPledgeCheck.vue — D1-12 应收票据质押检查表 HTML渲染
  *
@@ -366,11 +367,9 @@ const GUIDANCE_TEXTS = [
           <!-- H: 票据金额 -->
           <el-table-column label="票据金额" width="120" align="right">
             <template #default="{ row }: { row: PledgeRow }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.noteAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => updateRow(row.id, 'noteAmount', v || 0)"
@@ -401,11 +400,9 @@ const GUIDANCE_TEXTS = [
           <!-- J: 质押金额 -->
           <el-table-column label="质押金额" width="120" align="right">
             <template #default="{ row }: { row: PledgeRow }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.pledgeAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => updateRow(row.id, 'pledgeAmount', v || 0)"

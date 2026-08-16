@@ -128,7 +128,7 @@
       </el-table-column>
       <el-table-column prop="liabilityBalance" label="负债余额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.liabilityBalance" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.liabilityBalance"
             size="small"
             @change="(v: number | undefined) => updateCell(row.rowId, 'liabilityBalance', v)" />
           <span v-else>{{ fmtAmt(row.liabilityBalance) }}</span>
@@ -208,6 +208,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabRelatedParty.vue — H9-6 关联方筛选视图
  *

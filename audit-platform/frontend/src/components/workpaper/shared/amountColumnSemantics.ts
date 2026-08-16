@@ -77,7 +77,12 @@ export const NON_AMOUNT_LABEL_PATTERNS: readonly NonAmountCategory[] = [
   { category: '数量', pattern: /数量/, sample: '数量' },
   { category: '股数', pattern: /股数/, sample: '股数' },
   { category: '份数', pattern: /份数/, sample: '份数' },
-  { category: '年度', pattern: /年度/, sample: '年度' },
+  // 🔴「年度」用 lookbehind 排除「本/上年度」前缀 —— 那是**时间修饰**而非计量语义，
+  // 由核心词定性（「本年度审定数」是金额、「上年度审定数」是金额）。收窄前它们同时命中
+  // 「年度」与「审定数」被判假歧义、需逐条 override；收窄后直接判 amount，无需 override。
+  // 独立「年度」/「会计年度」（前缀非本/上）仍命中非金额（R1.2 覆盖不变）。
+  // 本模块运行时不进浏览器 bundle（只服务 vitest + Python 探针），lookbehind 无兼容性顾虑。
+  { category: '年度', pattern: /(?<![本上])年度/, sample: '年度' },
 ] as const
 
 /**
@@ -162,6 +167,13 @@ export const EXPLICIT_OVERRIDES: Readonly<Record<string, OverrideEntry>> = Objec
       'I1-11 含减值版摊销测算表，结构对齐 I1-10，「摊销期限(月)」同为剩余月数只读列。' +
       '同 I1-10 裁决为非金额（月数）。',
   },
+  'InventoryStocktakeDialog.vue::账面数': {
+    classification: 'non_amount',
+    evidence:
+      '存货盘点差异表「账面数」绑定 row.bookQty（账面**数量**），与「实盘数」row.actualQty ' +
+      '配对算数量差异 diffOf = bookQty − actualQty，实测（2026-08-15）为数量列。因含金额词' +
+      '「账面」被 raw 判 amount，此处裁决为非金额（数量），保留 el-input-number。',
+  },
 })
 
 /**
@@ -183,12 +195,9 @@ export const GLOBAL_LABEL_OVERRIDES: Readonly<Record<string, OverrideEntry>> = O
   '计提比例(%)': { classification: 'non_amount', evidence: '带 % 的计提比例列，非金额。' },
   '折旧年限': { classification: 'non_amount', evidence: '「折旧」+「年限」；实为年限（年数），非金额。' },
   '剩余摊销期限(月)': { classification: 'non_amount', evidence: '「摊销」+「期限」；实为剩余月数，非金额。' },
-  // —— 「年/年度」为时间修饰，核心是审定数/金额 → 金额 ——
-  '本年度审定数': { classification: 'amount', evidence: '「年度」为时间修饰，核心「审定数」为审定金额。' },
-  '上年度审定数': { classification: 'amount', evidence: '同「本年度审定数」，审定金额。' },
-  '本年度审定数（C列）': { classification: 'amount', evidence: '审定金额（源表 C 列），「年度」为时间修饰。' },
-  '上年度追溯调整后审定数（D列）': { classification: 'amount', evidence: '追溯调整后审定金额（源表 D 列）。' },
-  '本年度销售金额': { classification: 'amount', evidence: '「年度」为时间修饰，核心「销售金额」为金额。' },
+  // 注：「本年度审定数 / 上年度审定数 / 本年度销售金额」等原需在此裁决，
+  // 建议3 收窄「年度」pattern（排除本/上前缀）后，它们的 raw 判定直接为 amount，
+  // 不再是假歧义，故从 override 移除（真源更精确、维护量更小）。
 })
 
 /** override 键构造（守卫与迁移脚本共用，避免两侧各拼一份）。 */

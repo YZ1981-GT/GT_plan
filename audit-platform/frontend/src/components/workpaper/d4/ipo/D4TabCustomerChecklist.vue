@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabCustomerChecklist — D4-28 客户信息核查清单
  *
@@ -99,9 +100,9 @@ const checkedCount = computed(() => rows.value.filter(r => r.checkBiz || r.check
       <el-table-column label="序号" width="50" align="center" fixed><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
       <el-table-column label="客户名称" min-width="110"><template #default="{ row }"><el-input v-model="row.customerName" size="small" :disabled="isReadonly" @change="updateCell(row.id,'customerName',row.customerName)" /></template></el-table-column>
       <el-table-column label="选取原因" min-width="110"><template #default="{ row }"><el-input v-model="row.reason" size="small" :disabled="isReadonly" placeholder="如：新增主要客户" @change="updateCell(row.id,'reason',row.reason)" /></template></el-table-column>
-      <el-table-column label="销售金额" min-width="100" align="right"><template #default="{ row }"><el-input-number v-model="row.salesAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'salesAmount',row.salesAmount)" /></template></el-table-column>
+      <el-table-column label="销售金额" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.salesAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'salesAmount',row.salesAmount)" /></template></el-table-column>
       <el-table-column min-width="60"><template #header><el-tooltip content="占总交易比重" placement="top"><span>占比</span></el-tooltip></template><template #default="{ row }"><el-input v-model="row.salesRatio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(row.id,'salesRatio',row.salesRatio)" /></template></el-table-column>
-      <el-table-column label="应收余额" min-width="100" align="right"><template #default="{ row }"><el-input-number v-model="row.arBalance" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'arBalance',row.arBalance)" /></template></el-table-column>
+      <el-table-column label="应收余额" min-width="100" align="right"><template #default="{ row }"><WpAmountInput v-model="row.arBalance" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'arBalance',row.arBalance)" /></template></el-table-column>
       <el-table-column min-width="60"><template #header><el-tooltip content="占期末余额比重" placement="top"><span>占比</span></el-tooltip></template><template #default="{ row }"><el-input v-model="row.arRatio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(row.id,'arRatio',row.arRatio)" /></template></el-table-column>
       <el-table-column label="合同负债" min-width="100" align="right"><template #default="{ row }"><el-input-number v-model="row.contractLiability" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id,'contractLiability',row.contractLiability)" /></template></el-table-column>
       <el-table-column min-width="60"><template #header><el-tooltip content="占期末余额比重" placement="top"><span>占比</span></el-tooltip></template><template #default="{ row }"><el-input v-model="row.clRatio" size="small" :disabled="isReadonly" placeholder="%" @change="updateCell(row.id,'clRatio',row.clRatio)" /></template></el-table-column>

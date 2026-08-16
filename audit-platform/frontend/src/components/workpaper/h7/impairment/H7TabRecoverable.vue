@@ -39,7 +39,7 @@
         </el-table-column>
         <el-table-column prop="fairValueLessCost" label="公允价值减处置费用" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.fairValueLessCost" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.fairValueLessCost" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.fairValueLessCost) }}</span>
           </template>
         </el-table-column>
@@ -111,6 +111,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

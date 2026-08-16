@@ -93,19 +93,19 @@
       </el-table-column>
       <el-table-column label="期初余额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.openingBalance" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'openingBalance', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.openingBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'openingBalance', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.openingBalance) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="借方发生" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方发生" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
@@ -128,7 +128,7 @@
       </el-table-column>
       <el-table-column label="至审计日结转金额" width="140" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.auditDateTransfer" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditDateTransfer', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.auditDateTransfer" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditDateTransfer', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.auditDateTransfer) }}</span>
         </template>
       </el-table-column>
@@ -256,6 +256,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D7TabRelatedParty.vue — 关联方 D7-6 (~300行)
  * Task: 21.1

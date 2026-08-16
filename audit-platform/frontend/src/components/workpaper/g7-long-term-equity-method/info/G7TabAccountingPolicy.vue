@@ -172,11 +172,10 @@
 
           <el-table-column label="调整金额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.adjustmentAmount"
                 size="small"
-                :controls="false"
                 :disabled="row.isConsistent !== '不一致'"
                 style="width: 100%"
                 @change="persistAll()"
@@ -267,6 +266,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G7TabAccountingPolicy — G7-6 被投资公司会计政策一致性检查
  * 按被投资单位分组；调整合计可同步至 G7-14 accountingPolicyAdj

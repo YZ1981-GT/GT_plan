@@ -144,8 +144,7 @@
               <span class="total-num">{{ fmtNum(rw.reversalSummary.value.totalReversalAmount) }}</span>
             </template>
             <template v-else>
-              <el-input-number v-if="!isReadonly" v-model="row.reversalAmount" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.reversalAmount" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.reversalAmount) }}</span>
               <div v-if="rw.getReversalError(row)" class="validation-error">
                 {{ rw.getReversalError(row) }}
@@ -160,8 +159,7 @@
               <span class="total-num">{{ fmtNum(rw.reversalSummary.value.totalAccumulatedProvision) }}</span>
             </template>
             <template v-else>
-              <el-input-number v-if="!isReadonly" v-model="row.accumulatedProvision" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.accumulatedProvision" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.accumulatedProvision) }}</span>
             </template>
           </template>
@@ -221,8 +219,7 @@
               <span class="total-num">{{ fmtNum(rw.writeOffSummary.value.totalWriteOffAmount) }}</span>
             </template>
             <template v-else>
-              <el-input-number v-if="!isReadonly" v-model="row.writeOffAmount" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.writeOffAmount" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.writeOffAmount) }}</span>
             </template>
           </template>
@@ -377,6 +374,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabReversalWriteOff.vue — G4-12 减值准备转回核销检查表（2区段Tab）
  *

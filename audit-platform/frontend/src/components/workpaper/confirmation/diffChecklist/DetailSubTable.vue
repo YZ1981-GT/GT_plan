@@ -93,12 +93,10 @@
 
       <el-table-column label="金额" min-width="90" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!readonly"
             :model-value="row.amount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width: 100%"
             @change="(val: number) => $emit('update-row', row._row_id, 'amount', val)"
           />
@@ -150,6 +148,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed } from 'vue'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import type { SubTableRow } from './diffChecklistTypes'

@@ -284,15 +284,13 @@
 
           <template #default="{ row }">
 
-            <el-input-number
+            <WpAmountInput
 
               v-if="row.kind === 'detail' && !isReadonly"
 
               :model-value="row.bookBalance"
 
               size="small"
-
-              :controls="false"
 
               class="amt-input"
 
@@ -320,15 +318,13 @@
 
           <template #default="{ row }">
 
-            <el-input-number
+            <WpAmountInput
 
               v-if="row.kind === 'detail' && !isReadonly"
 
               :model-value="row.impairment"
 
               size="small"
-
-              :controls="false"
 
               class="amt-input"
 
@@ -462,15 +458,13 @@
 
           <template #default="{ row }">
 
-            <el-input-number
+            <WpAmountInput
 
               v-if="row.kind === 'detail' && !isReadonly"
 
               :model-value="row.bookBalance"
 
               size="small"
-
-              :controls="false"
 
               class="amt-input"
 
@@ -498,15 +492,13 @@
 
           <template #default="{ row }">
 
-            <el-input-number
+            <WpAmountInput
 
               v-if="row.kind === 'detail' && !isReadonly"
 
               :model-value="row.impairment"
 
               size="small"
-
-              :controls="false"
 
               class="amt-input"
 
@@ -643,6 +635,7 @@
 
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 /**
 

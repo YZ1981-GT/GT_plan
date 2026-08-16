@@ -157,10 +157,9 @@
       <el-table-column label="账面价值" min-width="140" align="right">
         <template #default="{ row }">
           <div class="book-cell">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.bookValue"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @change="(v: number | undefined) => handleBookValueChange(row.id, v ?? 0)"
@@ -219,11 +218,10 @@
             >
               手工
             </el-checkbox>
-            <el-input-number
+            <WpAmountInput
               v-if="row.recoverableManual"
               :model-value="row.recoverableAmount"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @change="(v: number | undefined) => handleManualRecoverable(row.id, v ?? 0)"
@@ -287,10 +285,9 @@
 
       <el-table-column label="公允-处置费用" min-width="130" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.fvLessDisposalCost"
             size="small"
-            :controls="false"
             :disabled="isReadonly || !row.hasImpairmentSign"
             :class="{
               'highlight-required': row.hasImpairmentSign && !row.recoverableManual,
@@ -305,10 +302,9 @@
 
       <el-table-column label="使用价值" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.valueInUse"
             size="small"
-            :controls="false"
             :disabled="isReadonly || !row.hasImpairmentSign"
             :class="{
               'highlight-required': row.hasImpairmentSign && !row.recoverableManual,
@@ -462,6 +458,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { extractG7AiText } from '../../composables/g7AiText'
 /**
  * G7TabImpairmentTest — G7-17 减值测试表

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabWriteoffCheck.vue — D1-16 坏账准备转回/核销检查表
  *
@@ -456,23 +457,19 @@ const GUIDANCE_TEXTS = [
                 content="转回金额超过原计提金额，请核实"
                 placement="top"
               >
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.reversalAmount"
                   size="small"
-                  :controls="false"
-                  :precision="2"
                   :disabled="isReadonly"
                   class="exceeds-provision"
                   style="width: 100%"
                   @change="(v: number) => updateReversalRow(row.id, 'reversalAmount', v || 0)"
                 />
               </el-tooltip>
-              <el-input-number
+              <WpAmountInput
                 v-else
                 :model-value="row.reversalAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => updateReversalRow(row.id, 'reversalAmount', v || 0)"
@@ -483,11 +480,9 @@ const GUIDANCE_TEXTS = [
           <!-- F: 原计提 -->
           <el-table-column label="收回或转回前累计已计提坏账准备金额" width="210" align="right">
             <template #default="{ row }: { row: ReversalRow }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.priorProvisionAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => updateReversalRow(row.id, 'priorProvisionAmount', v || 0)"
@@ -666,11 +661,9 @@ const GUIDANCE_TEXTS = [
           <!-- C: 核销金额 -->
           <el-table-column label="核销金额" width="120" align="right">
             <template #default="{ row }: { row: WriteoffRow }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.writeoffAmount"
                 size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => updateWriteoffRow(row.id, 'writeoffAmount', v || 0)"

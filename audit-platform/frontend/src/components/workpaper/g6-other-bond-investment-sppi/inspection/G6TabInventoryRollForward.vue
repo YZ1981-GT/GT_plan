@@ -417,10 +417,10 @@
         <!-- 金额 -->
         <el-table-column label="金额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!props.isReadonly"
               v-model="row.amount"
-              size="small" :controls="false" :precision="2"
+              size="small"
               style="width: 105px"
             />
             <span v-else>{{ fmtNum(row.amount) }}</span>
@@ -558,6 +558,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabInventoryRollForward.vue — G6-10 盘点倒轧表（2区段Tab + 行同步）
  *

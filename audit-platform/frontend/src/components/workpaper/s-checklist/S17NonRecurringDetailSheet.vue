@@ -84,10 +84,9 @@
           <el-table-column prop="itemName" label="非经常性损益项目" min-width="220" />
           <el-table-column prop="currentAmount" label="本期金额" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.currentAmount"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="markDirty"
@@ -138,10 +137,9 @@
           <el-table-column prop="itemName" label="非经常性损益项目" min-width="250" />
           <el-table-column prop="amount" label="金额" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.amount"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="markDirty"
@@ -210,10 +208,9 @@
           <el-table-column prop="itemName" label="非经常性损益项目" min-width="250" />
           <el-table-column prop="amount" label="金额" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.amount"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="markDirty"
@@ -288,6 +285,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * S17NonRecurringDetailSheet.vue — S17-1/S17-2/S17-3 非经常性损益明细
  *

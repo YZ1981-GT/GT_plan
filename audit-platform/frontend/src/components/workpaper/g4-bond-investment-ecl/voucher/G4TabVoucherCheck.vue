@@ -233,15 +233,13 @@
           </el-table-column>
           <el-table-column label="借方金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.debitAmount" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.debitAmount) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="贷方金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.creditAmount" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.creditAmount) }}</span>
             </template>
           </el-table-column>
@@ -421,15 +419,13 @@
           </el-table-column>
           <el-table-column label="借方金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.debitAmount" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.debitAmount) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="贷方金额" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.creditAmount" size="small"
-                :controls="false" class="compact-num" />
+              <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small" class="compact-num" />
               <span v-else>{{ fmtNum(row.creditAmount) }}</span>
             </template>
           </el-table-column>
@@ -617,6 +613,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabVoucherCheck.vue — G4-13 凭证检查表（97行×19列→3区段Tab）
  *

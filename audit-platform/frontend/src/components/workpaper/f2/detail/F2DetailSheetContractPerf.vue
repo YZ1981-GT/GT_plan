@@ -109,10 +109,9 @@
       </el-table-column>
       <el-table-column label="期初余额" width="110">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.openingAmt"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             @change="(v: number | undefined) => sheet.updateRow(row.id, { openingAmt: v ?? 0 })"
           />
@@ -262,6 +261,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { inject, ref, toRef, type Ref } from 'vue'
 import { useF2ContractPerfSheet, CONTRACT_PERF_QUALITY } from '../../composables/useF2ContractPerfSheet'
 import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'

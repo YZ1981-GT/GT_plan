@@ -93,10 +93,10 @@
           <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.offsetAccount" size="small" @change="persist" /><span v-else>{{ row.offsetAccount || '-' }}</span></template>
         </el-table-column>
         <el-table-column label="借方" width="110" align="right">
-          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" size="small" class="amt-in" @change="persist" /><span v-else class="amt">{{ fmtAmt(row.debit) }}</span></template>
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.debit" size="small" class="amt-in" @change="persist" /><span v-else class="amt">{{ fmtAmt(row.debit) }}</span></template>
         </el-table-column>
         <el-table-column label="贷方" width="110" align="right">
-          <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" size="small" class="amt-in" @change="persist" /><span v-else class="amt">{{ fmtAmt(row.credit) }}</span></template>
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.credit" size="small" class="amt-in" @change="persist" /><span v-else class="amt">{{ fmtAmt(row.credit) }}</span></template>
         </el-table-column>
         <el-table-column label="附件" width="80" align="center">
           <template #default="{ row }">
@@ -177,6 +177,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'

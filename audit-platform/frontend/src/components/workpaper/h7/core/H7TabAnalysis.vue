@@ -36,13 +36,13 @@
       </el-table-column>
       <el-table-column label="上期原值" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.priorCost" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.priorCost" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.priorCost) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期原值" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.currentCost" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.currentCost" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.currentCost) }}</span>
         </template>
       </el-table-column>
@@ -53,7 +53,7 @@
       </el-table-column>
       <el-table-column label="累计折旧" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.accDep" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.accDep" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
         </template>
       </el-table-column>
@@ -114,6 +114,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabAnalysis.vue — H7-5 分析表
  *

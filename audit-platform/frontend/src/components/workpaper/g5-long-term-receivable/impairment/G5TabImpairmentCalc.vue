@@ -114,10 +114,9 @@
         </el-table-column>
         <el-table-column label="审定余额①" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.auditedBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number) => calc.updateSingleCell(row.rowId, 'auditedBalance', v ?? 0)"
@@ -149,10 +148,9 @@
         </el-table-column>
         <el-table-column label="账面准备④" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.bookProvision"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number) => calc.updateSingleCell(row.rowId, 'bookProvision', v ?? 0)"
@@ -210,10 +208,9 @@
           <el-table-column prop="label" label="信用期/逾期" width="160" />
           <el-table-column label="审定余额①" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.auditedBalance"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number) => calc.updateCreditCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)"
@@ -241,10 +238,9 @@
           </el-table-column>
           <el-table-column label="账面准备④" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookProvision"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number) => calc.updateCreditCell(group.groupId, row.rowId, 'bookProvision', v ?? 0)"
@@ -311,10 +307,9 @@
           <el-table-column prop="label" label="账龄" width="180" />
           <el-table-column label="审定余额①" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.auditedBalance"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number) => calc.updateAgingCell(group.groupId, row.rowId, 'auditedBalance', v ?? 0)"
@@ -342,10 +337,9 @@
           </el-table-column>
           <el-table-column label="账面准备④" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookProvision"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number) => calc.updateAgingCell(group.groupId, row.rowId, 'bookProvision', v ?? 0)"
@@ -428,6 +422,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG5ImpairmentCalc, type G5EclGroup, type G5AgingPreset, type G5CreditPreset } from '../../composables/useG5ImpairmentCalc'

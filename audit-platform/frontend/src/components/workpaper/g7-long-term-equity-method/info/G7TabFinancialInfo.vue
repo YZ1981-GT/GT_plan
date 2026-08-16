@@ -119,11 +119,10 @@
                 </el-table-column>
                 <el-table-column label="上年金额" width="130" align="right">
                   <template #default="{ row }">
-                    <el-input-number
+                    <WpAmountInput
                       v-if="!isReadonly"
                       :model-value="row.priorAmount"
                       size="small"
-                      :controls="false"
                       style="width: 100%"
                       @update:model-value="(v: number) => updateAmount(row, 'priorAmount', v)"
                     />
@@ -132,11 +131,10 @@
                 </el-table-column>
                 <el-table-column label="本年金额" width="130" align="right">
                   <template #default="{ row }">
-                    <el-input-number
+                    <WpAmountInput
                       v-if="!isReadonly"
                       :model-value="row.currentAmount"
                       size="small"
-                      :controls="false"
                       style="width: 100%"
                       @update:model-value="(v: number) => updateAmount(row, 'currentAmount', v)"
                     />
@@ -273,6 +271,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G7TabFinancialInfo — G7-5 被投资单位财务信息（合营、联营）
  * 分组录入 + 变动额/率公式 + 校验 + IE + 版本链。

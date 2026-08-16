@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabEcl — ECL测算D2-9+D2-10
  * el-tabs: 单项ECL(D2-9) | 计量测试(D2-10)
@@ -212,7 +213,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
           <el-table-column label="审定余额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.auditedBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditedBalance', v || 0)" />
+              <WpAmountInput v-if="!isReadonly" :model-value="row.auditedBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'auditedBalance', v || 0)" />
               <span v-else>{{ displayPrefs.fmtAmount(row.auditedBalance) }}</span>
             </template>
           </el-table-column>
@@ -231,7 +232,7 @@ const GUIDANCE_TEXTS = [
           </el-table-column>
           <el-table-column label="实际余额" width="130" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.actualBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'actualBalance', v || 0)" />
+              <WpAmountInput v-if="!isReadonly" :model-value="row.actualBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'actualBalance', v || 0)" />
               <span v-else>{{ displayPrefs.fmtAmount(row.actualBalance) }}</span>
             </template>
           </el-table-column>

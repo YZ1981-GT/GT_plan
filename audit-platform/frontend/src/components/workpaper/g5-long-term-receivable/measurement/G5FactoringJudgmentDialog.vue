@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G5FactoringJudgmentDialog — G5-7 保理终止确认：录入基本信息 + CAS23 九步判断弹窗
  */
@@ -147,7 +148,7 @@ function onSave(): void {
             </el-col>
             <el-col :span="12">
               <el-form-item label="账面金额">
-                <el-input-number v-model="draft.amount" :controls="false" :disabled="readonly" style="width:100%" />
+                <WpAmountInput v-model="draft.amount" :disabled="readonly" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="12">
@@ -173,7 +174,7 @@ function onSave(): void {
           <el-row :gutter="12">
             <el-col :span="8">
               <el-form-item label="终止确认金额">
-                <el-input-number v-model="draft.derecognizedAmount" :controls="false" :disabled="readonly" style="width:100%" />
+                <WpAmountInput v-model="draft.derecognizedAmount" :disabled="readonly" style="width:100%" />
               </el-form-item>
             </el-col>
             <el-col :span="8">

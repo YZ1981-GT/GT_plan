@@ -129,12 +129,10 @@
       <!-- 金额列 -->
       <el-table-column label="发函金额" prop="sent_amount" min-width="95" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!readonly"
             :model-value="row.sent_amount"
             size="small"
-            :controls="false"
-            :precision="2"
             class="diff-reconcile-master__amount-input"
             @change="(val: number) => $emit('update', row._row_id, 'sent_amount', val)"
           />
@@ -144,12 +142,10 @@
 
       <el-table-column label="回函金额" prop="reply_amount" min-width="95" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!readonly"
             :model-value="row.reply_amount"
             size="small"
-            :controls="false"
-            :precision="2"
             class="diff-reconcile-master__amount-input"
             @change="(val: number) => $emit('update', row._row_id, 'reply_amount', val)"
           />
@@ -294,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed } from 'vue'
 import { Plus, Delete, Download, InfoFilled, WarningFilled, Link } from '@element-plus/icons-vue'
 import type { DiffReconcileRow, DiffSummaryBySubject } from './diffReconcileTypes'

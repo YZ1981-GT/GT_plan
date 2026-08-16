@@ -337,7 +337,7 @@
         </el-table-column>
         <el-table-column label="贷方金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%"
               @update:model-value="(v: number) => vc.updateRow(row.id, { creditAmount: v ?? 0 })" />
             <span v-else>{{ fmt(row.creditAmount) }}</span>
           </template>
@@ -484,6 +484,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, onMounted, onBeforeUnmount, inject, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'

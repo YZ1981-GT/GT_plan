@@ -247,13 +247,10 @@
         </el-table-column>
         <el-table-column prop="salvageRate" label="残值率%" width="80" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.salvageRate"
-              :controls="false"
               size="small"
-              :min="0"
-              :max="99"
               @change="persistParams"
             />
             <span v-else>{{ row.salvageRate }}%</span>
@@ -400,13 +397,10 @@
           </el-table-column>
           <el-table-column label="残值%" width="72" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="cellOf(row, peer.peerId).salvageRate ?? undefined"
-                :controls="false"
                 size="small"
-                :min="0"
-                :max="99"
                 @change="(v: number | undefined) => state.updatePeerCell(row.category, peer.peerId, 'salvageRate', v ?? null)"
               />
               <span v-else>{{ formatSalvage(cellOf(row, peer.peerId).salvageRate) }}</span>
@@ -447,13 +441,10 @@
         </el-table-column>
         <el-table-column label="原残值率%" width="90" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.salvageRate"
-              :controls="false"
               size="small"
-              :min="0"
-              :max="99"
               @change="state.persistPriors()"
             />
             <span v-else>{{ formatSalvage(row.salvageRate) }}</span>
@@ -466,10 +457,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impactAmount"
-              :controls="false"
               size="small"
               @change="state.persistPriors()"
             />
@@ -567,6 +557,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, watch, defineComponent, h } from 'vue'
 import { MagicStick, InfoFilled } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, ElSelect, ElOption, ElTag } from 'element-plus'

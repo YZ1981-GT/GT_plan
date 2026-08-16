@@ -145,14 +145,14 @@
         </el-table-column>
         <el-table-column label="②工程费用" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEditMonth(row)" v-model="row.engCost" :controls="false"
+            <WpAmountInput v-if="canEditMonth(row)" v-model="row.engCost"
               size="small" class="amt-input" @change="onMonthChange(row.rowId, 'engCost', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.engCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="③借款费用" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEditMonth(row)" v-model="row.borrowCost" :controls="false"
+            <WpAmountInput v-if="canEditMonth(row)" v-model="row.borrowCost"
               size="small" class="amt-input" @change="onMonthChange(row.rowId, 'borrowCost', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.borrowCost) }}</span>
           </template>
@@ -289,6 +289,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabInterestCapWithBorrow.vue — H2-11 有专门借款利息资本化
  * 对齐 xlsx：专门借款区 + 一般借款利率 + 月度扣SP资本化 + 差异

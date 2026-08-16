@@ -155,11 +155,9 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="原值合计">
-              <el-input-number
+              <WpAmountInput
                 :model-value="meta.totalBookCost ?? undefined"
                 :disabled="isReadonly"
-                :controls="false"
-                :precision="2"
                 style="width:100%"
                 placeholder="覆盖率分母，避免除零"
                 @update:model-value="(v: number | undefined) => updateMeta('totalBookCost', v ?? null)"
@@ -349,6 +347,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useH1Stocktake, type StocktakeCheckRow, type StocktakeDirection } from '../../composables/useH1Stocktake'

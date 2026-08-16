@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F4TabAdjustment — F4-3 调整分录
  * Spec: .kiro/specs/f4-accounts-payable/ Task 6.6
@@ -292,13 +293,13 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="借方金额" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmount(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方金额" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmount(row.creditAmount) }}</span>
         </template>
       </el-table-column>

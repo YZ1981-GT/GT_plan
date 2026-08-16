@@ -86,11 +86,10 @@
       <el-table-column label="本期数" align="center">
         <el-table-column label="发生额①" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.currentIncome"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number | undefined) => rr.updateRow(row.id, { currentIncome: v ?? 0 })"
             />
@@ -99,11 +98,10 @@
         </el-table-column>
         <el-table-column label="期初余额" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.currentOpening"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number | undefined) => rr.updateBalance(row.id, 'currentOpening', v ?? 0)"
             />
@@ -112,11 +110,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.currentClosing"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number | undefined) => rr.updateBalance(row.id, 'currentClosing', v ?? 0)"
             />
@@ -140,11 +137,10 @@
       <el-table-column label="上期数" align="center">
         <el-table-column label="审定数④" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorAudited"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number | undefined) => rr.updateRow(row.id, { priorAudited: v ?? 0 })"
             />
@@ -153,11 +149,10 @@
         </el-table-column>
         <el-table-column label="期初余额" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorOpening"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number | undefined) => rr.updateBalance(row.id, 'priorOpening', v ?? 0)"
             />
@@ -166,11 +161,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.priorClosing"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number | undefined) => rr.updateBalance(row.id, 'priorClosing', v ?? 0)"
             />
@@ -316,6 +310,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { toRef, computed } from 'vue'
 import type { TableColumnCtx } from 'element-plus'
 import { useG11ReturnRateAnalysis, type G11ReturnRateRow } from '../../composables/useG11ReturnRateAnalysis'

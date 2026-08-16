@@ -166,11 +166,10 @@
       <el-table-column label="收回或转回金额" min-width="120" align="right">
         <template #default="{ row }">
           <span v-if="row._isTotal" class="total-num">{{ fmtNum(rw.reversalSummary.value.totalReversalAmount) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.reversalAmount"
             size="small"
-            :controls="false"
             class="amt"
             :class="{ 'amt-invalid': !rw.isRowValid(row) }"
             @change="(v: number | undefined) => { row.reversalAmount = v ?? 0; persist() }"
@@ -181,11 +180,10 @@
       <el-table-column label="转回前累计已计提" min-width="130" align="right">
         <template #default="{ row }">
           <span v-if="row._isTotal" class="total-num">{{ fmtNum(rw.reversalSummary.value.totalAccumulatedProvision) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.accumulatedProvision"
             size="small"
-            :controls="false"
             class="amt"
             @change="(v: number | undefined) => { row.accumulatedProvision = v ?? 0; persist() }"
           />
@@ -294,11 +292,10 @@
       <el-table-column label="核销金额" min-width="120" align="right">
         <template #default="{ row }">
           <span v-if="row._isTotal" class="total-num">{{ fmtNum(rw.writeOffSummary.value.totalWriteOffAmount) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else-if="!isReadonly"
             :model-value="row.writeOffAmount"
             size="small"
-            :controls="false"
             class="amt"
             @change="(v: number | undefined) => { row.writeOffAmount = v ?? 0; persist() }"
           />
@@ -453,6 +450,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabReversalWriteOff.vue — 对齐 Excel《减值准备转回（收回）、核销检查表G6-14》
  */

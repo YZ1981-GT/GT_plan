@@ -25,14 +25,24 @@ export function amountParser(value: string): string {
 }
 
 /**
- * 判断通用列渲染器里的某数值列是否为「金额」列（应套千分符+两位小数）。
- * 用于 COLUMN_CONFIG 驱动的动态表格（如 E1-23/E1-26~32）：金额列格式化，
- * 月份/年度/笔数/数量/率/比例/天数等非金额数值列不格式化。
+ * 判断通用列渲染器里的某数值列是否为「金额」列（金额列在运行时渲染 WpAmountInput，
+ * 非金额数值列保留 el-input-number）。用于 COLUMN_CONFIG 驱动的动态表格
+ * （E1-23/E1-26~32 等，label 是运行时值、静态探针判不了 → 运行时兜底）。
+ *
+ * 🔴 非金额黑名单**与迁移探针真源 `amountColumnSemantics.NON_AMOUNT_LABEL_PATTERNS`
+ * 对齐**（利率/汇率/比例/年限/期限/月份/笔数/数量/股数/份数… 一致），两套判定由
+ * `amountColumnRuntimeParity.spec.ts` 跨真源守卫锁住不漂移。此前 `率$` 锚定词尾漏掉
+ * 「日利率(/360)」这类带后缀的利率列（被误当金额、precision=2 截断利率精度），已修。
  */
 export function isAmountColumn(col: { key?: string; label?: string }): boolean {
   const label = String(col?.label ?? '')
   const key = String(col?.key ?? '')
-  if (/月份|月度|年度|年份|笔数|数量|次数|个数|天数|比例|率$|占比/.test(label)) return false
+  if (
+    /月份|月度|年度|年份|笔数|数量|次数|个数|天数|比例|占比|利率|汇率|折现率|增长率|毛利率|税率|比率|率$|年限|期限|月数|股数|份数|张数|面值|面额/.test(
+      label,
+    )
+  )
+    return false
   if (/^(month|year|count|qty|quantity|days|rate|ratio|pct|percent|times)$/i.test(key)) return false
   return true
 }

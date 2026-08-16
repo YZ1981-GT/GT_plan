@@ -173,14 +173,20 @@ describe('GLOBAL_LABEL_OVERRIDES 全局歧义裁决（Task9 收敛 label_hit_bot
     }
   })
 
-  it('「年度」时间修饰的审定数/金额裁决为 amount', () => {
-    for (const l of ['本年度审定数', '上年度审定数', '本年度销售金额', '本年度审定数（C列）']) {
-      expect(classifyColumnLabel(l), `「${l}」应裁决为金额`).toBe('amount')
+  it('建议3：「年度」收窄后本/上年度前缀直接判 amount（raw，无需 override）', () => {
+    // 收窄「年度」pattern（lookbehind 排除本/上前缀）后，这些不再是假歧义，
+    // raw 判定直接为 amount，故已从 GLOBAL_LABEL_OVERRIDES 移除。
+    for (const l of ['本年度审定数', '上年度审定数', '本年度销售金额', '本年度审定数（C列）', '上年度追溯调整后审定数（D列）']) {
+      expect(classifyColumnLabelRaw(l), `「${l}」raw 应直接为金额`).toBe('amount')
     }
+    // 独立「年度」/「会计年度」/「决算年度」（前缀非本/上）仍命中非金额（R1.2 不变）
+    expect(matchesNonAmount('年度')).toBe(true)
+    expect(matchesNonAmount('会计年度')).toBe(true)
+    expect(matchesNonAmount('决算年度')).toBe(true)
   })
 
   it('这些 label 的 raw 判定确是 ambiguous（证明全局 override 针对的是真歧义）', () => {
-    for (const l of ['账面数量', '本年度审定数', '折旧年限', '计提比例']) {
+    for (const l of ['账面数量', '减值比例', '折旧年限', '计提比例']) {
       expect(classifyColumnLabelRaw(l), `「${l}」raw 应为 ambiguous`).toBe('ambiguous')
     }
   })

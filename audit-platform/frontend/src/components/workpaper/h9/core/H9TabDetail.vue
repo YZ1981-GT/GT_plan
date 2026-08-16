@@ -96,7 +96,7 @@
       </el-table-column>
       <el-table-column prop="beginBalance" label="B:期初余额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.beginBalance" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.beginBalance" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'beginBalance', v)" />
           <span v-else>{{ fmtAmt(row.beginBalance) }}</span>
         </template>
@@ -141,21 +141,21 @@
       <el-table-column prop="contractNo" label="合同号" width="110" />
       <el-table-column prop="beginAje" label="F:期初AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.beginAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.beginAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'beginAje', v)" />
           <span v-else>{{ fmtAmt(row.beginAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="repayAje" label="G:偿还AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.repayAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.repayAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'repayAje', v)" />
           <span v-else>{{ fmtAmt(row.repayAje) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="interestAje" label="H:利息AJE" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.interestAje" :controls="false" size="small"
+          <WpAmountInput v-if="!isReadonly" v-model="row.interestAje" size="small"
             @change="(v: number | undefined) => onCell(row.rowId, 'interestAje', v)" />
           <span v-else>{{ fmtAmt(row.interestAje) }}</span>
         </template>
@@ -335,6 +335,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabDetail.vue — H9-2 租赁负债明细表（22列 3区段Tab）
  *

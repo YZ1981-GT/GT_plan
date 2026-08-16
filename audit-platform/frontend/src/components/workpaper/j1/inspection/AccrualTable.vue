@@ -25,7 +25,7 @@
       </el-table-column>
       <el-table-column label="金额" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.baseAmount" :controls="false" size="small" style="width:98px" @change="(v: number) => $emit('update', row.id, 'baseAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.baseAmount" size="small" style="width:98px" @change="(v: number) => $emit('update', row.id, 'baseAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.baseAmount) }}</span>
         </template>
       </el-table-column>
@@ -56,7 +56,7 @@
     <!-- 实际计提数 -->
     <el-table-column label="实际计提数" width="110" align="right">
       <template #default="{ row }">
-        <el-input-number v-if="!isReadonly" :model-value="row.actual" :controls="false" size="small" style="width:98px" @change="(v: number) => $emit('update', row.id, 'actual', v ?? 0)" />
+        <WpAmountInput v-if="!isReadonly" :model-value="row.actual" size="small" style="width:98px" @change="(v: number) => $emit('update', row.id, 'actual', v ?? 0)" />
         <span v-else>{{ fmtAmt(row.actual) }}</span>
       </template>
     </el-table-column>
@@ -90,6 +90,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 defineProps<{
   rows: Array<any>
   isReadonly: boolean

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F4TabLongOutstanding — F4-5 账龄1年以上应付账款检查表
  * 支持F4-2同步、逐行附件、OCR识别确认回填、导入导出及AI说明/结论。
@@ -312,10 +313,9 @@ async function uploadAndRecognize(file: File): Promise<void> {
         <el-table-column label="期末余额" width="135" align="right">
           <template #default="{ row }">
             <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.closingBalance) }}</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.closingBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'closingBalance', value ?? 0)"
@@ -408,10 +408,9 @@ async function uploadAndRecognize(file: File): Promise<void> {
         <el-table-column label="审定金额" width="135" align="right">
           <template #default="{ row }">
             <span v-if="row.linked" class="linked-value">{{ fmtAmount(row.auditedAmount) }}</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.auditedAmount"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(value: number | undefined) => updateCell(row.rowId, 'auditedAmount', value ?? 0)"

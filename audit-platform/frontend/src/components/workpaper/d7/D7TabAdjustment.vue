@@ -114,13 +114,13 @@
       </el-table-column>
       <el-table-column label="借方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>
@@ -158,6 +158,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D7TabAdjustment.vue — 调整分录 D7-3 (~250行)
  * Task: 18.1

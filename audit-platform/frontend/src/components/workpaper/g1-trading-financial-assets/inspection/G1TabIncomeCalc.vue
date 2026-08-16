@@ -249,10 +249,9 @@
       </el-table-column>
       <el-table-column label="合同金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.contractAmount"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width: 100%"
             @change="calc.updateInterestRow(row.id, { contractAmount: row.contractAmount })"
@@ -529,6 +528,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, inject, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG1IncomeCalc } from '../../composables/useG1IncomeCalc'

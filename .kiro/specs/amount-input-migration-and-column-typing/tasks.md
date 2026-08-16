@@ -256,3 +256,88 @@ memory 记「平台现存 40+ 处 `el-input-number :formatter`」—— **实测
 2. **目标文件为 `M` 时跳过**：并发多会话常态，覆盖他人在途改动的代价远高于晚一轮迁移
 3. **不动只读展示金额**：那部分归 `displayPrefs.fmtAmount()` 口径，
    I 循环 Task 18 已收口 16 个 SFC 的 7 种本地 `fmtAmount`
+
+### 改进建议交付与批 3 扩展（2026-08-16 会话）
+
+主体 10 任务交付后，按用户 4 条改进建议逐一修复，并把批 3 从「规划」推进到「执行」。
+
+**4 条改进建议**（全部交付并重验判据链）：
+
+1. **收窄「年度」假歧义**：`amountColumnSemantics.ts` 的年度 pattern 从 `/年度/` 改为
+   `/(?<![本上])年度/`（lookbehind 排除本/上前缀，因「本年度审定数」本就是金额），移除
+   `GLOBAL_LABEL_OVERRIDES` 5 条年度 override（raw 直接判 amount）。本模块运行时不进
+   浏览器 bundle（只服务 vitest + Python 探针），lookbehind 无兼容性顾虑。
+2. **通用渲染器运行时兜底 + 收敛双真源**：改造 `E1TabLargeCheck`(E1-23) /
+   `E1TabIpoSpecial`(E1-26~32) 两个 COLUMN_CONFIG 驱动的动态列渲染器，
+   `col.type==='number'` 分支拆为「`isAmountColumn(col)`→`WpAmountInput`」+
+   「else→`el-input-number`」。过程中修复实锤 bug：`isAmountColumn` 黑名单 `率$`
+   锚定词尾，漏判 E1-30「日利率(/360)」→被误当金额 `precision=2` 截断利率精度；
+   已把黑名单与真源 `NON_AMOUNT_LABEL_PATTERNS` 对齐（补 利率/汇率/年限/股数/份数/张数…）。
+   新建 `composables/__tests__/amountColumnRuntimeParity.spec.ts`（29 tests：渲染器锁定 +
+   跨真源一致性 + 定向回归），变异检验 2 次精确变红。
+3. **批 3 — 6 个非 active 循环批量迁移**：给 `fix_amount_input_batch.py` 加 `--cycle`
+   参数（逗号分隔循环目录前缀，git-M 自动 SKIP），迁移 S/J/F/D/G/H 共 **1118 处**
+   `el-input-number`→`WpAmountInput`。319 文件 `get_diagnostics` 全 clean，23 个并发 M
+   文件自动跳过。`hCycleAmountControl.spec` 37 passed 交叉验证 H 循环 337 处未误伤非金额边界。
+4. **CI 升级**：`governance-checks.yml` 的 `amount-input-migration-typing` job 加
+   `amountColumnRuntimeParity` 守卫 + 6 循环代表文件防回退 `--check-files`，更新注释。
+
+**C / ? 循环补做**（33 处）：
+- **C 循环（confirmation 共享）**：2 文件 3 列（金额/发函金额/回函金额）已迁移。
+- **? 循环（散落顶层 A/B 类 + 通用弹窗）**：12 文件已迁移，`GtB50RiskAssessment`（并发 M）跳过。
+- 🔴 **修复一处数量误判**：`InventoryStocktakeDialog.vue`「账面数」绑定 `row.bookQty`
+  （账面**数量**，与「实盘数」`actualQty` 配对算数量差），因含金额词「账面」被 raw 判 amount，
+  加文件级 `EXPLICIT_OVERRIDES` 裁决为非金额，保留 `el-input-number`（否则数量列会被错误加千分符）。
+
+**累计成果**：迁移 **1151 处**（6 循环 1118 + C/? 补做 33），探针实测
+`el-input-number` 4190→3039、`WpAmountInput` 754→1905、`confirmed_violation` 1898→813，
+`reverse_violation`=0。判据链全绿：`amountColumnSemantics`(25) + `amountInputColumnTyping`(12)
++ `amountColumnRuntimeParity`(29) + `WpAmountInput`(7) + `mutate --all` M1-M4 全 RED。
+
+**剩余 confirmed 813 的构成**（均为有意保留，非遗漏）：
+- **active 循环 E/I/K/L/M/N**（约 774 处）：正被各自 active spec 开发的并发热区，
+  留其 spec 收口时用同一 `--cycle` 迁移（避免并行编辑冲突）。
+- **真源盲区漏迁移**：金额列但 label 无金额词（如 GtA38 应分配商誉 / GtB30 总资产·利润 /
+  WpPopupMixedForm 留存收益·其他综合收益），兜底 skip 保留 `el-input-number`（**安全但无千分符**）。
+  要补需谨慎扩 `AMOUNT_LABEL_PATTERNS` 并重验全库判据链，登记为后续。
+- **23 个并发 M 文件** + 各处 **not_self_closing**（带 slot 的金额列，本批不处理）。
+
+**批 1 / 批 2 浏览器实测状态（Task 6 与 Task 8 保持未勾选 —— 不假绿）**
+
+Task 6（批 1 K1/E1 千分符实测）与 Task 8（批 2 I1-10 定点复验）的**端到端浏览器判据**
+（千分符显示 / 聚焦编辑 / 持久化 number / 只读派生一致 / 数据复原无漂移）受**后端全 API 500
+故障阻塞**（postgres 直连正常，证明是后端服务层故障，非 DB、非本迁移；不重启后端以免影响并发会话）。
+
+已用可执行的判据充分覆盖控件层与结构层：`WpAmountInput.spec`（7 passed：千分符
+`1234567.5`→`1,234,567.50` / 防 NaN / 持久化 number / 粘贴解析）+ 全部迁移文件
+`get_diagnostics` clean + 探针精确增量。**端到端浏览器复验待后端恢复后补做**，故此两任务
+保持未勾选，不以「组件层已验证」冒充「端到端已验证」。
+
+**3 个历史大文件被行数门禁阻塞（已回滚迁移，登记待拆分后重做）**
+
+批 3 的 G 循环迁移中，以下 3 个文件触发 `pre-commit` 的文件行数门禁
+（`check_file_size.py`：`.vue` 上限 1500 行，触碰即检查）：
+
+| 文件 | 当前行数 | 本次迁移对行数的影响 |
+|---|---|---|
+| `g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue` | 1627 | −1 |
+| `g7-long-term-equity-main/core/G7TabAdjudication.vue` | 1648 | +1 |
+| `g7-long-term-equity-method/calculation/G7TabEquityMethodCalc.vue` | 2472 | −6 |
+
+三者都是**先于本 spec 存在的历史大文件**（迁移只让其更短或持平，不是本 spec 写大的）。
+门禁给的两条处置路径中：
+
+- **拆分文件**：1600~2500 行的 G 循环组件重构，远超本 spec 范围（且 G7 刚归档）
+- **加入 `file_size_whitelist.txt`**：🔴 该共享文件当时正被并发会话修改（`git status` 为 `M`），
+  纳入本次提交会把并发的未提交改动一起带进去 —— 违反「只提交自身 spec」，故**不采用**
+
+因此这 3 个文件的迁移已 `git restore` 回滚（保持工作树与提交内容一致），探针产物同步重生成
+（`confirmed` 813→837，即这 3 文件的 24 列回到违规态）。**待其拆分或 whitelist 空档期后**，
+用现成脚本秒级重做即可：
+
+```
+python backend/scripts/fix/fix_amount_input_batch.py --apply --files "g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue,g7-long-term-equity-main/core/G7TabAdjudication.vue,g7-long-term-equity-method/calculation/G7TabEquityMethodCalc.vue"
+```
+
+**批 3 最终入库量**：迁移 **1127 处**（原 1151 减去这 3 文件的 24 处），
+`el-input-number` 4260→3063、`WpAmountInput` 682→1881、`confirmed` 1898→837、`reverse`=0。

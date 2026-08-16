@@ -146,10 +146,9 @@
       </el-table-column>
       <el-table-column label="账面金额①" width="118" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             :model-value="row.faceValue"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => calc.updateCell(row.id, 'faceValue', v ?? 0)"
@@ -318,6 +317,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, watch, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useG2InterestCalc } from '../composables/useG2InterestCalc'

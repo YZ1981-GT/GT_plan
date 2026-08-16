@@ -42,11 +42,10 @@
     </el-table-column>
     <el-table-column label="期初数" min-width="110" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!readonly && row.rowKey !== 'subtotal'"
           :model-value="row.opening"
           size="small"
-          :controls="false"
           @change="(v: number | undefined) => onUpdate(row.rowKey, 'opening', v ?? 0)"
         />
         <span v-else>{{ fmt(row.opening) }}</span>
@@ -54,11 +53,10 @@
     </el-table-column>
     <el-table-column label="本期增加" min-width="110" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!readonly && row.rowKey !== 'subtotal'"
           :model-value="row.increase"
           size="small"
-          :controls="false"
           @change="(v: number | undefined) => onUpdate(row.rowKey, 'increase', v ?? 0)"
         />
         <span v-else>{{ fmt(row.increase) }}</span>
@@ -66,11 +64,10 @@
     </el-table-column>
     <el-table-column label="本期减少" min-width="110" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!readonly && row.rowKey !== 'subtotal'"
           :model-value="row.decrease"
           size="small"
-          :controls="false"
           @change="(v: number | undefined) => onUpdate(row.rowKey, 'decrease', v ?? 0)"
         />
         <span v-else>{{ fmt(row.decrease) }}</span>
@@ -85,11 +82,10 @@
     </el-table-column>
     <el-table-column label="账项调整" min-width="110" align="right">
       <template #default="{ row }">
-        <el-input-number
+        <WpAmountInput
           v-if="!readonly && row.rowKey !== 'subtotal'"
           :model-value="row.adjustment"
           size="small"
-          :controls="false"
           @change="(v: number | undefined) => onUpdate(row.rowKey, 'adjustment', v ?? 0)"
         />
         <span v-else>{{ fmt(row.adjustment) }}</span>
@@ -133,6 +129,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, ref, onMounted } from 'vue'
 import type { F2AdjudicationRow, F2BlockKey } from '../../composables/useF2Adjudication'
 import type { ChecklistResponse } from '../../composables/useF2FormData'

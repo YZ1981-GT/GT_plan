@@ -78,10 +78,9 @@
 
         <el-table-column prop="grossAmount" label="税前金额" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.editable"
               v-model="row.grossAmount"
-              :controls="false"
               size="small"
               style="width: 100%"
               @change="() => recalcRow(row)"
@@ -154,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * S17TaxImpactSheet.vue — S17-21 非经常性损益项目的所得税影响
  *

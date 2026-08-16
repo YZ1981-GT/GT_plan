@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabRelatedParty — 关联方及交易检查 D2-6
  *
@@ -225,19 +226,19 @@ const GUIDANCE_TEXTS = [
       </el-table-column>
       <el-table-column label="期初余额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.priorBalance" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorBalance', v || 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.priorBalance" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorBalance', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.priorBalance) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期借方" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v || 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'debitAmount', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="本期贷方" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v || 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'creditAmount', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.creditAmount) }}</span>
         </template>
       </el-table-column>
@@ -250,7 +251,7 @@ const GUIDANCE_TEXTS = [
       </el-table-column>
       <el-table-column label="坏账准备" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.badDebtProvision" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'badDebtProvision', v || 0)" />
+          <WpAmountInput v-if="!isReadonly" :model-value="row.badDebtProvision" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'badDebtProvision', v || 0)" />
           <span v-else>{{ displayPrefs.fmtAmount(row.badDebtProvision) }}</span>
         </template>
       </el-table-column>

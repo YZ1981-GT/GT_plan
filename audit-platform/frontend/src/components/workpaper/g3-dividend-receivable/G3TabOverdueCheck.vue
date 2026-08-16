@@ -93,11 +93,10 @@
       <el-table-column label="期初余额" width="110" align="right">
         <template #default="{ row }">
           <span v-if="overdue.isMetaRow(row)" class="subtotal-val">{{ fmtNum(row.openingBalance) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else
             :model-value="row.openingBalance"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => overdue.updateRow(row.id, { openingBalance: v ?? 0 })"
@@ -108,11 +107,10 @@
       <el-table-column label="本期借方发生额" width="120" align="right">
         <template #default="{ row }">
           <span v-if="overdue.isMetaRow(row)" class="subtotal-val">{{ fmtNum(row.periodDebit) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else
             :model-value="row.periodDebit"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => overdue.updateRow(row.id, { periodDebit: v ?? 0 })"
@@ -123,11 +121,10 @@
       <el-table-column label="本期贷方发生额" width="120" align="right">
         <template #default="{ row }">
           <span v-if="overdue.isMetaRow(row)" class="subtotal-val">{{ fmtNum(row.periodCredit) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else
             :model-value="row.periodCredit"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => overdue.updateRow(row.id, { periodCredit: v ?? 0 })"
@@ -219,10 +216,9 @@
         <template #default="{ row }">
           <span v-if="overdue.isMetaRow(row)" class="subtotal-val">{{ fmtNum(row.auditedBalance) }}</span>
           <div v-else class="audited-cell">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.auditedBalance"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @update:model-value="(v: number) => overdue.updateRow(row.id, { auditedBalance: v ?? 0 })"
@@ -242,11 +238,10 @@
       <el-table-column label="期后收款金额" width="120" align="right">
         <template #default="{ row }">
           <span v-if="overdue.isMetaRow(row)" class="subtotal-val">{{ fmtNum(row.postPeriodCollection) }}</span>
-          <el-input-number
+          <WpAmountInput
             v-else
             :model-value="row.postPeriodCollection"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => overdue.updateRow(row.id, { postPeriodCollection: v ?? 0 })"
@@ -355,6 +350,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, watch, toRef, computed, inject, onMounted } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

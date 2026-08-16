@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabCustomerPrice — D4-10 重要客户销售价格分析
  *
@@ -253,7 +254,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
         <!-- 销售情况 -->
         <el-table-column label="销售情况" align="center">
           <el-table-column label="销售金额" width="100" align="right">
-            <template #default="{ $index }"><el-input-number v-model="rows[$index].amount" :controls="false" size="small" :disabled="isReadonly" :precision="2" class="num-cell" @change="updateData" /></template>
+            <template #default="{ $index }"><WpAmountInput v-model="rows[$index].amount" size="small" :disabled="isReadonly" class="num-cell" @change="updateData" /></template>
           </el-table-column>
           <el-table-column label="占比" width="75" align="right">
             <template #default="{ row }"><el-tooltip content="公式: IF(金额=0,0,金额/本期销售总额)" placement="top" :show-after="200"><span class="has-formula">{{ fmtPercent(row.amountRatio) }}</span></el-tooltip></template>

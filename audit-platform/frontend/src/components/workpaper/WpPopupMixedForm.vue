@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 /**
  * WpPopupMixedForm — A1-18 采用新金融工具准则衔接影响数核对
  *
@@ -380,10 +381,9 @@ onBeforeUnmount(() => {
           </el-table-column>
           <el-table-column label="金额" width="140" align="center">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.amount"
                 size="small"
-                :controls="false"
                 placeholder="金额"
                 style="width: 110px"
                 @change="onReclassChange"
@@ -447,10 +447,9 @@ onBeforeUnmount(() => {
           </el-table-column>
           <el-table-column label="账面价值" width="130" align="center">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.bookValue"
                 size="small"
-                :controls="false"
                 placeholder="金额"
                 style="width: 100px"
                 @change="onInvestmentChange"
@@ -459,10 +458,9 @@ onBeforeUnmount(() => {
           </el-table-column>
           <el-table-column label="公允价值" width="130" align="center">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.fairValue"
                 size="small"
-                :controls="false"
                 placeholder="金额"
                 style="width: 100px"
                 @change="onInvestmentChange"

@@ -154,7 +154,7 @@
       </el-table-column>
       <el-table-column label="利息费用" width="88" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.interestExpense" size="small" :controls="false" :disabled="isReadonly"
+          <WpAmountInput v-model="row.interestExpense" size="small" :disabled="isReadonly"
             style="width:100%" @change="(v: number) => l3.updateCell(row.rowId, 'interestExpense', v)" />
         </template>
       </el-table-column>
@@ -228,6 +228,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, watch, inject, computed } from 'vue'
 import { useG10L3Reconciliation } from '../../composables/useG10L3Reconciliation'
 import type { ChecklistResponse } from '../../composables/useF1FormData'

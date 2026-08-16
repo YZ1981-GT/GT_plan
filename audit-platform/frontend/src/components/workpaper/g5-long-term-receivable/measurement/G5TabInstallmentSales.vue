@@ -81,10 +81,9 @@
           </el-table-column>
           <el-table-column label="应收总额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.contractTotal"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 @change="onRecalcInitial(group)"
               />
@@ -92,10 +91,9 @@
           </el-table-column>
           <el-table-column label="公允价值" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.fairValue"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 @change="onRecalcInitial(group)"
               />
@@ -190,10 +188,9 @@
           </el-table-column>
           <el-table-column label="账面收益" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.companyBookIncome"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 @change="onRecalc(group, row)"
               />
@@ -261,12 +258,12 @@
         <el-table :data="[group.initial]" border size="small" class="basic-table">
           <el-table-column label="账面未实现期末" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.bookClosingUnrealized" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.bookClosingUnrealized" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="账面摊余期末" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.bookClosingAmortizedCost" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.bookClosingAmortizedCost" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="预计可收回(6)" min-width="120" align="right">
@@ -276,10 +273,9 @@
           </el-table-column>
           <el-table-column label="账面已收回(7)" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.totalCollectedBook"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 placeholder="默认取摊销收款合计"
               />
@@ -287,7 +283,7 @@
           </el-table-column>
           <el-table-column label="减值准备期末" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.impairmentEnding" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.impairmentEnding" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="已核销" min-width="90" align="right">
@@ -438,6 +434,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, watch, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG5InstallmentSales } from '../../composables/useG5InstallmentSales'

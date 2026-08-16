@@ -84,7 +84,7 @@
       </el-table-column>
       <el-table-column label="借方金额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.debitAmount" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.debitAmount"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'debitAmount', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.debitAmount) }}</span>
@@ -92,7 +92,7 @@
       </el-table-column>
       <el-table-column label="贷方金额" min-width="110" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!props.isReadonly" v-model="row.creditAmount" :controls="false"
+          <WpAmountInput v-if="!props.isReadonly" v-model="row.creditAmount"
             size="small" class="amt-input"
             @change="updateCell(row.rowId, 'creditAmount', $event)" />
           <span v-else class="amt-cell">{{ fmtAmt(row.creditAmount) }}</span>
@@ -208,6 +208,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H9TabAdjustment.vue — H9-4 调整分录汇总
  *

@@ -734,10 +734,8 @@
             </div>
             <div class="inline-fields mb-6">
               <el-form-item label="全新价值(元)" class="compact-item">
-                <el-input-number
+                <WpAmountInput
                   :model-value="record.newAssetValue"
-                  :controls="false"
-                  :min="0"
                   :disabled="isReadonly"
                   size="small"
                   @change="(v: number | undefined) => onField(record.recordId, 'newAssetValue', v)"
@@ -885,6 +883,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabLeaseIdentification.vue — H8-4 租赁的识别
  * 对齐 Excel：§1~§5 决策树 + 公式结论 + 提示抽屉 + 跨表跳转

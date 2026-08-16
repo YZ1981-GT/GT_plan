@@ -38,10 +38,9 @@
         <el-table-column label="换出资产" align="center">
           <el-table-column prop="outBookValue" label="账面价值" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.outBookValue"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="recalculate"
@@ -51,10 +50,9 @@
           </el-table-column>
           <el-table-column prop="outFairValue" label="公允价值" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.outFairValue"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="recalculate"
@@ -66,10 +64,9 @@
         <el-table-column label="换入资产" align="center">
           <el-table-column prop="inFairValue" label="公允价值" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.inFairValue"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="recalculate"
@@ -193,6 +190,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * S4AdjudicationSheet.vue — 审定表 S4-1 + 非经常性损益标注
  *

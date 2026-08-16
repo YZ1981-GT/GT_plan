@@ -115,7 +115,7 @@
         </el-table-column>
         <el-table-column prop="bookValue" label="账面原值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" @change="onCell(row, 'bookValue')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookValue" size="small" @change="onCell(row, 'bookValue')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
         </el-table-column>
@@ -172,10 +172,9 @@
         </el-table-column>
         <el-table-column prop="mortgageAmount" label="抵押价值" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly && row.isMortgaged === 'Y'"
               v-model="row.mortgageAmount"
-              :controls="false"
               size="small"
               @change="onCell(row, 'mortgageAmount')"
             />
@@ -298,6 +297,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {

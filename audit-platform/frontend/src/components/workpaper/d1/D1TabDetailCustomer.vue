@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabDetailCustomer.vue — 原值明细按客户 D1-3 HTML渲染
  *
@@ -457,13 +458,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="期初未审" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'priorUnadjusted')"
               class="cell-amount-input"
               :model-value="row.priorUnadjusted"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.priorUnadjusted)" />
@@ -472,13 +471,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="期初AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'priorAje')"
               class="cell-amount-input"
               :model-value="row.priorAje"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'priorAje', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.priorAje)" />
@@ -487,13 +484,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="期初RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'priorRje')"
               class="cell-amount-input"
               :model-value="row.priorRje"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'priorRje', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.priorRje)" />
@@ -508,13 +503,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="本期增加" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'currentIncrease')"
               class="cell-amount-input"
               :model-value="row.currentIncrease"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'currentIncrease', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.currentIncrease)" />
@@ -523,13 +516,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="本期减少" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'currentDecrease')"
               class="cell-amount-input"
               :model-value="row.currentDecrease"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'currentDecrease', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.currentDecrease)" />
@@ -570,13 +561,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="期末AJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'currentAje')"
               class="cell-amount-input"
               :model-value="row.currentAje"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'currentAje', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.currentAje)" />
@@ -585,13 +574,11 @@ function onReview(sectionId: string) {
 
         <el-table-column label="期末RJE" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isCellEditable(row, 'currentRje')"
               class="cell-amount-input"
               :model-value="row.currentRje"
               size="small"
-              :controls="false"
-              :precision="2"
               @change="(v: number) => updateCell(row.rowId, 'currentRje', v || 0)"
             />
             <span v-else v-html="fmtAmount(row.currentRje)" />

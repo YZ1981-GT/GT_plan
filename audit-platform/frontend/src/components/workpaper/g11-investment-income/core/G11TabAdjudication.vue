@@ -122,7 +122,7 @@
         <el-table-column label="本期数" align="center">
           <el-table-column label="未审数" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.currentUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.currentUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'currentUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.currentUnadjusted) }}</span>
             </template>
@@ -143,7 +143,7 @@
         <el-table-column label="上期数" align="center">
           <el-table-column label="未审数" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.priorUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.priorUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'priorUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.priorUnadjusted) }}</span>
             </template>
@@ -251,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, toRef, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'

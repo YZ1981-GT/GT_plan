@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabInvoiceCompare — D4-23 收入与开具发票金额比较分析
  *
@@ -204,12 +205,12 @@ async function handleImportFile(uploadFile: any) { await importData('D4-23', upl
         <el-table-column label="本期账面确认收入" align="center" class-name="col-revenue">
           <el-table-column label="主营业务收入" min-width="120" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row.mainRevenue" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'mainRevenue', row.mainRevenue)" />
+              <WpAmountInput v-model="row.mainRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'mainRevenue', row.mainRevenue)" />
             </template>
           </el-table-column>
           <el-table-column label="其他业务收入" min-width="120" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row.otherRevenue" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'otherRevenue', row.otherRevenue)" />
+              <WpAmountInput v-model="row.otherRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'otherRevenue', row.otherRevenue)" />
             </template>
           </el-table-column>
           <el-table-column label="营业收入合计" min-width="120" align="right">
@@ -223,7 +224,7 @@ async function handleImportFile(uploadFile: any) { await importData('D4-23', upl
         <el-table-column label="本期开具发票的金额" align="center" class-name="col-invoice">
           <el-table-column label="增值税发票金额" min-width="120" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row.vatAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'vatAmount', row.vatAmount)" />
+              <WpAmountInput v-model="row.vatAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'vatAmount', row.vatAmount)" />
             </template>
           </el-table-column>
           <el-table-column label="增值税发票份数" min-width="110" align="right">
@@ -233,7 +234,7 @@ async function handleImportFile(uploadFile: any) { await importData('D4-23', upl
           </el-table-column>
           <el-table-column label="普通发票金额" min-width="120" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row.normalAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'normalAmount', row.normalAmount)" />
+              <WpAmountInput v-model="row.normalAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'normalAmount', row.normalAmount)" />
             </template>
           </el-table-column>
           <el-table-column label="普通发票份数" min-width="100" align="right">

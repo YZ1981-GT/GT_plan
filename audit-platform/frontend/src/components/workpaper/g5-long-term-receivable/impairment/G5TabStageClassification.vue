@@ -184,11 +184,10 @@
 
       <el-table-column label="期末余额" width="110" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.closingBalance"
             size="small"
-            :controls="false"
             @change="(v: number | undefined) => stageLogic.updateClosingBalance(row.id, Number(v) || 0)"
           />
           <span v-else>{{ fmt(row.closingBalance) }}</span>
@@ -369,6 +368,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, watch, onMounted } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import {

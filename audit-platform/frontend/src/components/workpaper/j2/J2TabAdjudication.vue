@@ -571,13 +571,13 @@ watch(() => props.allResponses, load, { deep: false })
         <el-table-column prop="label" label="假设项目" min-width="180" />
         <el-table-column label="期末数(%)" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.end" :controls="false" :precision="4" :step="0.001" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.end" :step="0.001" size="small" @change="scheduleSave" />
             <span v-else>{{ fmtPct(row.end) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期初数(%)" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.begin" :controls="false" :precision="4" :step="0.001" size="small" @change="scheduleSave" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.begin" :step="0.001" size="small" @change="scheduleSave" />
             <span v-else>{{ fmtPct(row.begin) }}</span>
           </template>
         </el-table-column>

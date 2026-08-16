@@ -64,10 +64,9 @@
         <el-table-column label="期末余额" align="center">
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.endBook"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number | undefined) => updateSummary(row.key, 'endBook', v ?? 0)"
@@ -77,10 +76,9 @@
           </el-table-column>
           <el-table-column label="减值准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.endImpairment"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number | undefined) => updateSummary(row.key, 'endImpairment', v ?? 0)"
@@ -97,10 +95,9 @@
         <el-table-column label="期初余额" align="center">
           <el-table-column label="账面余额" width="120" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.beginBook"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number | undefined) => updateSummary(row.key, 'beginBook', v ?? 0)"
@@ -110,10 +107,9 @@
           </el-table-column>
           <el-table-column label="减值准备" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.editable && !isReadonly"
                 :model-value="row.beginImpairment"
-                :controls="false"
                 size="small"
                 style="width:100%"
                 @update:model-value="(v: number | undefined) => updateSummary(row.key, 'beginImpairment', v ?? 0)"
@@ -160,6 +156,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabDisclosureSoe — 附注披露信息（国有企业）
  * CIP 行：H2 EventBus substantive:adjudicated + sessionStorage 回放

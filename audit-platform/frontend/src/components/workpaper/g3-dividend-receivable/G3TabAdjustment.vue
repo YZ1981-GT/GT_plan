@@ -184,11 +184,10 @@
       </el-table-column>
       <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
             style="width: 100%"
             @update:model-value="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)"
           />
@@ -197,11 +196,10 @@
       </el-table-column>
       <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
             style="width: 100%"
             @update:model-value="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)"
           />
@@ -267,6 +265,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, computed, watch, inject, toRef, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG3Adjustment, type G3AdjustmentRow } from '../composables/useG3Adjustment'

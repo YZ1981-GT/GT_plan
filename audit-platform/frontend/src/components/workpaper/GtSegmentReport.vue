@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 /**
  * GtSegmentReport — 经营分部审定表组件
  *
@@ -264,7 +265,7 @@ onBeforeUnmount(() => { if (saveTimer) { clearTimeout(saveTimer); doSave() } })
         <el-table-column label="地区" prop="region" width="120" />
         <el-table-column label="来自外部客户的收入（万元）" min-width="180">
           <template #default="{ $index }">
-            <el-input-number v-model="geoData[$index].revenue" :disabled="readonly" size="small" :controls="false" @change="scheduleSave" />
+            <WpAmountInput v-model="geoData[$index].revenue" :disabled="readonly" size="small" @change="scheduleSave" />
           </template>
         </el-table-column>
         <el-table-column label="非流动资产（万元）" min-width="180">
@@ -289,7 +290,7 @@ onBeforeUnmount(() => { if (saveTimer) { clearTimeout(saveTimer); doSave() } })
         </el-table-column>
         <el-table-column label="收入金额（万元）" width="150">
           <template #default="{ $index }">
-            <el-input-number v-model="customers[$index].revenue" :disabled="readonly" size="small" :controls="false" @change="scheduleSave" />
+            <WpAmountInput v-model="customers[$index].revenue" :disabled="readonly" size="small" @change="scheduleSave" />
           </template>
         </el-table-column>
         <el-table-column label="占比 %" width="100">

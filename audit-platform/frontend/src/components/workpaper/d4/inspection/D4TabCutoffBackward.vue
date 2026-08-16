@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabCutoffBackward — D4-18 营业收入截止测试（单据到账）
  *
@@ -352,7 +353,7 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
             <template #default="{ row }"><el-input v-model="row.deliveryQty" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
           </el-table-column>
           <el-table-column label="金额" min-width="110" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.deliveryAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.deliveryAmount" size="small" :disabled="isReadonly" style="width:100%" @change="onCellChange(row)" /></template>
           </el-table-column>
         </el-table-column>
 
@@ -371,7 +372,7 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
             <template #default="{ row }"><el-input v-model="row.voucherQty" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
           </el-table-column>
           <el-table-column label="金额" min-width="110" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.voucherAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.voucherAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
           </el-table-column>
         </el-table-column>
 

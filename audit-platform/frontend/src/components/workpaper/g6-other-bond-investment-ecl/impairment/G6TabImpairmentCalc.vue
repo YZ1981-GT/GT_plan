@@ -103,11 +103,10 @@
           <el-table-column label="①账面余额" min-width="120" align="right">
             <template #default="{ row }">
               <span v-if="row._isSubtotal || row._isTotal" class="subtotal-num">{{ fmtNum(row.amortizedCost) }}</span>
-              <el-input-number
+              <WpAmountInput
                 v-else-if="!isReadonly"
                 :model-value="row.amortizedCost"
                 size="small"
-                :controls="false"
                 class="compact-num"
                 @change="(v: number | undefined) => updateField(row.id, 'amortizedCost', v ?? 0)"
               />
@@ -185,11 +184,10 @@
           <el-table-column label="⑤账面余额调整" min-width="120" align="right">
             <template #default="{ row }">
               <span v-if="row._isSubtotal || row._isTotal" class="subtotal-num">{{ fmtNum(row.balanceAdjustment) }}</span>
-              <el-input-number
+              <WpAmountInput
                 v-else-if="!isReadonly"
                 :model-value="row.balanceAdjustment"
                 size="small"
-                :controls="false"
                 class="compact-num"
                 @change="(v: number | undefined) => updateField(row.id, 'balanceAdjustment', v ?? 0)"
               />
@@ -201,11 +199,10 @@
             <template #default="{ row }">
               <template v-if="row._isSubtotal || row._isTotal" />
               <template v-else-if="row.stage === 'Stage3'">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="calc.effectiveAdjPv(row)"
                   size="small"
-                  :controls="false"
                   class="compact-num"
                   placeholder="审定现值"
                   @change="(v: number | undefined) => updateField(row.id, 'adjustedPvFutureCashFlow', v ?? 0)"
@@ -213,12 +210,10 @@
                 <span v-else>{{ fmtNum(calc.effectiveAdjPv(row)) }}</span>
               </template>
               <template v-else>
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="calc.effectiveAdjRate(row)"
                   size="small"
-                  :controls="false"
-                  :precision="4"
                   :step="0.01"
                   class="compact-num"
                   @change="(v: number | undefined) => updateField(row.id, 'adjustedCreditLossRate', v ?? 0)"
@@ -358,11 +353,10 @@
         <el-table-column label="上年减值" min-width="110" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.priorImpairment"
               size="small"
-              :controls="false"
               class="compact-num"
               @change="(v: number | undefined) => updateField(row.id, 'priorImpairment', v ?? 0)"
             />
@@ -391,11 +385,10 @@
         <el-table-column label="公允价值(参考)" min-width="120" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
-            <el-input-number
+            <WpAmountInput
               v-else-if="!isReadonly"
               :model-value="row.adjFairValue || row.fairValue"
               size="small"
-              :controls="false"
               class="compact-num"
               @change="(v: number | undefined) => updateField(row.id, 'adjFairValue', v ?? 0)"
             />
@@ -503,6 +496,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabImpairmentCalc.vue — 对齐 Excel《减值准备测算表G6-12》
  */

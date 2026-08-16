@@ -245,7 +245,7 @@
           </el-table-column>
           <el-table-column label="借方金额" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.amount" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.amount"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'amount', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.amount) }}</span>
@@ -282,7 +282,7 @@
           </el-table-column>
           <el-table-column label="发票金额" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.invoiceAmount" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.invoiceAmount"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'invoiceAmount', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.invoiceAmount) }}</span>
@@ -489,6 +489,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabAdditionCheck.vue — H4-4 增加检查表
  * 对齐致同：目标 → 样本选取 → 测试（记账凭证 + 核对1–5）

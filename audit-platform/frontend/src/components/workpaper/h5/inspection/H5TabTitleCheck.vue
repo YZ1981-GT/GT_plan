@@ -75,7 +75,7 @@
         </el-table-column>
         <el-table-column prop="pledgeAmount" label="抵押金额" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.pledgeAmount" :controls="false" size="small" @change="state.updateCell(row.rowId, 'pledgeAmount', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.pledgeAmount" size="small" @change="state.updateCell(row.rowId, 'pledgeAmount', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.pledgeAmount) }}</span>
           </template>
         </el-table-column>
@@ -101,6 +101,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'

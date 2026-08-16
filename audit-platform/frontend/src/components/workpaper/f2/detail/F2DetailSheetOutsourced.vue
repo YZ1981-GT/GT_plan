@@ -140,10 +140,9 @@
         </el-table-column>
         <el-table-column label="加工费用" width="110">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.processingFee"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="(v: number | undefined) => sheet.updateRow(row.id, { processingFee: v ?? 0 })"
             />
@@ -162,10 +161,9 @@
         </el-table-column>
         <el-table-column label="计入加工物资成本的税金" width="150">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.taxInCost"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="(v: number | undefined) => sheet.updateRow(row.id, { taxInCost: v ?? 0 })"
             />
@@ -302,6 +300,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, toRef, ref, type Ref } from 'vue'
 import {
   useF2DetailOutsourced,

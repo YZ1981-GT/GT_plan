@@ -197,12 +197,10 @@
       </el-table-column>
       <el-table-column label="借方" width="108" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width:100%"
             @update:model-value="(v: number | undefined) => adj.updateRow(row.rowId, { debitAmount: v ?? 0 })"
           />
@@ -211,12 +209,10 @@
       </el-table-column>
       <el-table-column label="贷方" width="108" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width:100%"
             @update:model-value="(v: number | undefined) => adj.updateRow(row.rowId, { creditAmount: v ?? 0 })"
           />
@@ -291,6 +287,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

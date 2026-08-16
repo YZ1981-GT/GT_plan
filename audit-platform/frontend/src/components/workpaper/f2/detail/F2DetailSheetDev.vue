@@ -119,10 +119,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.openAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { openAmt: v ?? 0 })"
               />
@@ -132,10 +131,9 @@
         <el-table-column label="期初调整" align="center">
           <el-table-column label="账项调整" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.openAdjAcct"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { openAdjAcct: v ?? 0 })"
               />
@@ -143,10 +141,9 @@
           </el-table-column>
           <el-table-column label="重分类调整" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.openAdjReclass"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { openAdjReclass: v ?? 0 })"
               />
@@ -178,10 +175,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.incAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { incAmt: v ?? 0 })"
               />
@@ -205,10 +201,9 @@
           </el-table-column>
           <el-table-column label="金额" width="110">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.decAmt"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { decAmt: v ?? 0 })"
               />
@@ -229,10 +224,9 @@
         <el-table-column label="期末调整" align="center">
           <el-table-column label="账项调整" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.closeAdjAcct"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { closeAdjAcct: v ?? 0 })"
               />
@@ -240,10 +234,9 @@
           </el-table-column>
           <el-table-column label="重分类调整" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.closeAdjReclass"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { closeAdjReclass: v ?? 0 })"
               />
@@ -277,10 +270,9 @@
         <el-table-column label="未审数" align="center">
           <el-table-column label="期初余额" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impOpen"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { impOpen: v ?? 0 })"
               />
@@ -288,10 +280,9 @@
           </el-table-column>
           <el-table-column label="本期增加" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impInc"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { impInc: v ?? 0 })"
               />
@@ -299,10 +290,9 @@
           </el-table-column>
           <el-table-column label="本期减少" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impDec"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { impDec: v ?? 0 })"
               />
@@ -315,10 +305,9 @@
         <el-table-column label="期初调整" align="center">
           <el-table-column label="账项调整" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impOpenAdjAcct"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { impOpenAdjAcct: v ?? 0 })"
               />
@@ -326,10 +315,9 @@
           </el-table-column>
           <el-table-column label="重分类调整" width="100">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.impOpenAdjReclass"
                 size="small"
-                :controls="false"
                 :disabled="isReadonly"
                 @change="(v: number | undefined) => dev.updateRow(row.id, { impOpenAdjReclass: v ?? 0 })"
               />
@@ -483,6 +471,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { inject, ref, toRef, type Ref } from 'vue'
 import { useF2DevProductSheet, DEV_PRODUCT_QUALITY } from '../../composables/useF2DevProductSheet'
 import { useF2AiGenerate, type F2AiSection } from '../../composables/useF2AiGenerate'

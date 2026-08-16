@@ -152,10 +152,8 @@
                   </span>
                 </template>
                 <template v-else-if="row.isInput && !isReadonly">
-                  <el-input-number
+                  <WpAmountInput
                     v-model="row.currentYear"
-                    :controls="false"
-                    :precision="2"
                     size="small"
                     class="amount-input"
                     @change="onInputChange"
@@ -174,10 +172,8 @@
                   </span>
                 </template>
                 <template v-else-if="row.isInput && !isReadonly">
-                  <el-input-number
+                  <WpAmountInput
                     v-model="row.priorYear"
-                    :controls="false"
-                    :precision="2"
                     size="small"
                     class="amount-input"
                     @change="onInputChange"
@@ -232,11 +228,9 @@
             </el-table-column>
             <el-table-column label="本年度审定数" min-width="140" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   v-model="row.currentYear"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   class="amount-input"
                   @change="onInputChange"
@@ -246,11 +240,9 @@
             </el-table-column>
             <el-table-column label="上年度审定数" min-width="140" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   v-model="row.priorYear"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   class="amount-input"
                   @change="onInputChange"
@@ -330,11 +322,9 @@
             </el-table-column>
             <el-table-column label="本年度审定数" min-width="140" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   v-model="row.currentYear"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   class="amount-input"
                   @change="onInputChange"
@@ -344,11 +334,9 @@
             </el-table-column>
             <el-table-column label="上年度审定数" min-width="140" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   v-model="row.priorYear"
-                  :controls="false"
-                  :precision="2"
                   size="small"
                   class="amount-input"
                   @change="onInputChange"
@@ -457,6 +445,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS20RevenueDeduction.vue — S20 营业收入扣除情况核查底稿主入口
  *

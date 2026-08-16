@@ -28,7 +28,7 @@
               </template>
             </el-table-column>
             <el-table-column label="资产组账面价值(A)" width="130">
-              <template #default="{ row }"><el-input-number v-model="row.carrying_a" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.carrying_a" :disabled="readonly" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="应分配商誉(B1)" width="120">
               <template #default="{ row }"><el-input-number v-model="row.goodwill_b1" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
@@ -40,7 +40,7 @@
               <template #default="{ row }"><span class="gt-a38__calc">{{ fmt(calcTotal(row)) }}</span></template>
             </el-table-column>
             <el-table-column label="可收回金额" width="120">
-              <template #default="{ row }"><el-input-number v-model="row.recoverable" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.recoverable" :disabled="readonly" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="差额=(1)-(2)" width="110" align="right">
               <template #default="{ row }"><span class="gt-a38__calc">{{ fmt(calcDiff(row)) }}</span></template>
@@ -83,7 +83,7 @@
           </div>
           <el-form :inline="true" class="gt-a38__alloc-loss">
             <el-form-item label="待分摊减值损失">
-              <el-input-number v-model="allocLoss" :disabled="readonly" :controls="false" size="small" style="width:160px" />
+              <WpAmountInput v-model="allocLoss" :disabled="readonly" size="small" style="width:160px" />
             </el-form-item>
           </el-form>
           <el-table :data="allocationRows" border size="small" class="gt-a38__table">
@@ -94,13 +94,13 @@
               </template>
             </el-table-column>
             <el-table-column label="账面价值" width="120">
-              <template #default="{ row }"><el-input-number v-model="row.carrying" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.carrying" :disabled="readonly" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="未确认少数股东权益" width="140">
               <template #default="{ row }"><el-input-number v-model="row.minority" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="可收回金额" width="120">
-              <template #default="{ row }"><el-input-number v-model="row.recoverable" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.recoverable" :disabled="readonly" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="减值损失第一分配(冲商誉)" width="150" align="right">
               <template #default="{ row }"><span class="gt-a38__calc">{{ fmt(allocOf(row.id).alloc_first) }}</span></template>
@@ -132,10 +132,10 @@
               </template>
             </el-table-column>
             <el-table-column label="公允价值" width="140">
-              <template #default="{ row }"><el-input-number v-model="row.fair_value" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.fair_value" :disabled="readonly" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="处置费用" width="140">
-              <template #default="{ row }"><el-input-number v-model="row.disposal_cost" :disabled="readonly" :controls="false" size="small" style="width:100%" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.disposal_cost" :disabled="readonly" size="small" style="width:100%" /></template>
             </el-table-column>
             <el-table-column label="公允价值-处置费用" width="150" align="right">
               <template #default="{ row }"><span class="gt-a38__calc">{{ fmt(num(row.fair_value) - num(row.disposal_cost)) }}</span></template>
@@ -187,9 +187,9 @@
           <div class="gt-a38__hint" style="margin-bottom:12px">税后 WACC = E/(D+E)·Ke + D/(D+E)·Kd·(1-税率)；Ke = Rf + β·(Rm-Rf)。折现率口径应与现金流口径一致。</div>
           <el-form label-width="160px" class="gt-a38__wacc-form">
             <el-form-item label="所得税率"><el-input-number v-model="recoverable.wacc.tax_rate" :disabled="readonly" :controls="false" size="small" :step="0.01" style="width:160px" /></el-form-item>
-            <el-form-item label="债务总额 (D)"><el-input-number v-model="recoverable.wacc.debt_d" :disabled="readonly" :controls="false" size="small" style="width:160px" /></el-form-item>
-            <el-form-item label="资本总额 (E)"><el-input-number v-model="recoverable.wacc.equity_e" :disabled="readonly" :controls="false" size="small" style="width:160px" /></el-form-item>
-            <el-form-item label="税前债务成本 (Kd)"><el-input-number v-model="recoverable.wacc.cost_debt_kd" :disabled="readonly" :controls="false" size="small" :step="0.01" style="width:160px" /></el-form-item>
+            <el-form-item label="债务总额 (D)"><WpAmountInput v-model="recoverable.wacc.debt_d" :disabled="readonly" size="small" style="width:160px" /></el-form-item>
+            <el-form-item label="资本总额 (E)"><WpAmountInput v-model="recoverable.wacc.equity_e" :disabled="readonly" size="small" style="width:160px" /></el-form-item>
+            <el-form-item label="税前债务成本 (Kd)"><WpAmountInput v-model="recoverable.wacc.cost_debt_kd" :disabled="readonly" size="small" :step="0.01" style="width:160px" /></el-form-item>
             <el-form-item label="无风险报酬率 (Rf)"><el-input-number v-model="recoverable.wacc.rf" :disabled="readonly" :controls="false" size="small" :step="0.01" style="width:160px" /></el-form-item>
             <el-form-item label="β 系数"><el-input-number v-model="recoverable.wacc.beta" :disabled="readonly" :controls="false" size="small" :step="0.01" style="width:160px" /></el-form-item>
             <el-form-item label="市场平均收益率 (Rm)"><el-input-number v-model="recoverable.wacc.rm" :disabled="readonly" :controls="false" size="small" :step="0.01" style="width:160px" /></el-form-item>
@@ -233,6 +233,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Plus, Delete } from '@element-plus/icons-vue'

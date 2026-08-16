@@ -193,11 +193,10 @@
               <span class="subtotal-num">{{ fmtNum(row.bookBalance) }}</span>
             </template>
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookBalance"
                 size="small"
-                :controls="false"
                 class="compact-num"
                 @change="(v: number) => updateField(row.id, 'bookBalance', v)"
               />
@@ -283,11 +282,10 @@
               <span class="subtotal-num">{{ fmtNum(row.balanceAdjustment) }}</span>
             </template>
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.balanceAdjustment"
                 size="small"
-                :controls="false"
                 class="compact-num"
                 @change="(v: number) => updateField(row.id, 'balanceAdjustment', v)"
               />
@@ -388,11 +386,10 @@
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal" />
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.priorImpairment"
                 size="small"
-                :controls="false"
                 class="compact-num"
                 @change="(v: number) => updateField(row.id, 'priorImpairment', v)"
               />
@@ -493,6 +490,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabImpairmentCalc.vue — G4-10 减值准备测算表
  */

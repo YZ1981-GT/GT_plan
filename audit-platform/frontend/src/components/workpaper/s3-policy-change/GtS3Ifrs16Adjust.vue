@@ -51,11 +51,9 @@
               </span>
             </template>
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.amount"
-                :precision="2"
-                :controls="false"
                 style="width: 130px"
               />
               <span v-else>{{ fmt(row.amount) }}</span>
@@ -81,11 +79,9 @@
               </span>
             </template>
             <template v-else>
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.amount"
-                :precision="2"
-                :controls="false"
                 style="width: 130px"
               />
               <span v-else>{{ fmt(row.amount) }}</span>
@@ -122,6 +118,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS3Ifrs16Adjust.vue — S3-8 首次执行新租赁准则的调整
  *

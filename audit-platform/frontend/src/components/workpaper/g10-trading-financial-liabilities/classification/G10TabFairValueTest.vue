@@ -185,7 +185,7 @@
         </el-table-column>
         <el-table-column label="未审单价" width="92" align="right">
           <template #default="{ row }">
-            <el-input-number v-model="row.closingUnadjustedPrice" size="small" :controls="false" :disabled="isReadonly"
+            <WpAmountInput v-model="row.closingUnadjustedPrice" size="small" :disabled="isReadonly"
               style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'closingUnadjustedPrice', v)" />
           </template>
         </el-table-column>
@@ -200,7 +200,7 @@
         </el-table-column>
         <el-table-column label="审定单价" width="92" align="right">
           <template #default="{ row }">
-            <el-input-number v-model="row.closingAuditedPrice" size="small" :controls="false" :disabled="isReadonly"
+            <WpAmountInput v-model="row.closingAuditedPrice" size="small" :disabled="isReadonly"
               style="width:100%" @change="(v: number) => fv.updateCell(row.rowId, 'closingAuditedPrice', v)" />
           </template>
         </el-table-column>
@@ -325,6 +325,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, watch, inject } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG10FairValueTest } from '../../composables/useG10FairValueTest'

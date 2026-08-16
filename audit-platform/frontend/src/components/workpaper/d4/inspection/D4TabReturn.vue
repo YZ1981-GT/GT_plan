@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabReturn — D4-20 销售退货检查表
  *
@@ -404,13 +405,13 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
           <el-table-column label="本年度" align="center" class-name="col-current">
             <el-table-column label="退货金额" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="$index < 2" v-model="row.currentReturn" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
+                <WpAmountInput v-if="$index < 2" v-model="row.currentReturn" size="small" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
                 <span v-else class="auto-calc" title="自动合计">{{ fmtAmount(row.currentReturn) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="收入金额" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="$index < 2" v-model="row.currentRevenue" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
+                <WpAmountInput v-if="$index < 2" v-model="row.currentRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
                 <span v-else class="auto-calc" title="自动合计">{{ fmtAmount(row.currentRevenue) }}</span>
               </template>
             </el-table-column>
@@ -421,13 +422,13 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
           <el-table-column label="上年度" align="center" class-name="col-prior">
             <el-table-column label="退货金额" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="$index < 2" v-model="row.priorReturn" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
+                <WpAmountInput v-if="$index < 2" v-model="row.priorReturn" size="small" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
                 <span v-else class="auto-calc" title="自动合计">{{ fmtAmount(row.priorReturn) }}</span>
               </template>
             </el-table-column>
             <el-table-column label="收入金额" min-width="120" align="right">
               <template #default="{ row, $index }">
-                <el-input-number v-if="$index < 2" v-model="row.priorRevenue" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
+                <WpAmountInput v-if="$index < 2" v-model="row.priorRevenue" size="small" :disabled="isReadonly" style="width:100%" @change="onSummaryChange" />
                 <span v-else class="auto-calc" title="自动合计">{{ fmtAmount(row.priorRevenue) }}</span>
               </template>
             </el-table-column>
@@ -472,7 +473,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
             <template #default="{ row }"><el-input v-model="row.productName" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
           </el-table-column>
           <el-table-column label="计提基数" min-width="120" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.base" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onProvisionCellChange(row)" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.base" size="small" :disabled="isReadonly" style="width:100%" @change="onProvisionCellChange(row)" /></template>
           </el-table-column>
           <el-table-column label="计提比例" min-width="90" align="right">
             <template #default="{ row }"><el-input-number v-model="row.rate" size="small" :controls="false" :disabled="isReadonly" :precision="4" :step="0.01" style="width:100%" @change="onProvisionCellChange(row)" /></template>
@@ -481,7 +482,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
             <template #default="{ row }"><span class="auto-calc" title="计提基数 × 计提比例">{{ fmtAmount(row.shouldProvide) }}</span></template>
           </el-table-column>
           <el-table-column label="账面已计提金额" min-width="130" align="right">
-            <template #default="{ row }"><el-input-number v-model="row.alreadyProvided" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="onProvisionCellChange(row)" /></template>
+            <template #default="{ row }"><WpAmountInput v-model="row.alreadyProvided" size="small" :disabled="isReadonly" style="width:100%" @change="onProvisionCellChange(row)" /></template>
           </el-table-column>
           <el-table-column label="差异金额" min-width="110" align="right">
             <template #default="{ row }"><span class="auto-calc" :class="{ 'diff-warn': row.diff !== 0 }" title="应计提 - 已计提">{{ fmtAmount(row.diff) }}</span></template>
@@ -527,10 +528,10 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
               <template #default="{ row }"><el-input v-model="row.detailSubject" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="借方金额" min-width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.debitAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.debitAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="贷方金额" min-width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.creditAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.creditAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
             </el-table-column>
           </el-table-column>
           <!-- 退货单 -->
@@ -545,7 +546,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
               <template #default="{ row }"><el-input v-model="row.returnQty" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="退货金额" min-width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.returnAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.returnAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="退货原因" min-width="110">
               <template #default="{ row }"><el-input v-model="row.returnReason" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
@@ -604,10 +605,10 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
               <template #default="{ row }"><el-input v-model="row.detailSubject" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="借方金额" min-width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.debitAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.debitAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="贷方金额" min-width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.creditAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.creditAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
             </el-table-column>
           </el-table-column>
           <!-- 退货单 -->
@@ -622,7 +623,7 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
               <template #default="{ row }"><el-input v-model="row.returnQty" size="small" :disabled="isReadonly" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="退货金额" min-width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.returnAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.returnAmount" size="small" :disabled="isReadonly" style="width:100%" @change="persistAll()" /></template>
             </el-table-column>
             <el-table-column label="退货原因" min-width="110">
               <template #default="{ row }"><el-input v-model="row.returnReason" size="small" :disabled="isReadonly" @change="persistAll()" /></template>

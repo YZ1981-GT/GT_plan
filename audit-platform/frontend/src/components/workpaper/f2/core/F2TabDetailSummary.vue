@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * F2TabDetailSummary — F2-2 明细汇总表
  * 对齐源模板：(一)原值 (二)跌价 (三)账面价值 + 审计目标/过程/说明/结论（含 AI）
@@ -169,10 +170,9 @@ function bvRowClass({ row }: { row: F2SummaryBvRow }): string {
             <el-table-column label="期初余额" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="total-label">{{ fmtAmt(row.unaudOpen) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else-if="!row.crossSheet"
                   :model-value="row.unaudOpen"
-                  :controls="false"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -184,10 +184,9 @@ function bvRowClass({ row }: { row: F2SummaryBvRow }): string {
             <el-table-column label="本期增加" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="total-label">{{ fmtAmt(row.unaudInc) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else-if="!row.crossSheet"
                   :model-value="row.unaudInc"
-                  :controls="false"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -199,10 +198,9 @@ function bvRowClass({ row }: { row: F2SummaryBvRow }): string {
             <el-table-column label="本期减少" min-width="110" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="total-label">{{ fmtAmt(row.unaudDec) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else-if="!row.crossSheet"
                   :model-value="row.unaudDec"
-                  :controls="false"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -237,10 +235,9 @@ function bvRowClass({ row }: { row: F2SummaryBvRow }): string {
             <el-table-column label="本期增加" min-width="100" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="total-label">{{ fmtAmt(row.closeAdjInc) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.closeAdjInc"
-                  :controls="false"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"
@@ -251,10 +248,9 @@ function bvRowClass({ row }: { row: F2SummaryBvRow }): string {
             <el-table-column label="本期减少" min-width="100" align="right">
               <template #default="{ row }">
                 <span v-if="row.rowKey === '__total__'" class="total-label">{{ fmtAmt(row.closeAdjDec) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else
                   :model-value="row.closeAdjDec"
-                  :controls="false"
                   size="small"
                   :disabled="isReadonly"
                   style="width:100%"

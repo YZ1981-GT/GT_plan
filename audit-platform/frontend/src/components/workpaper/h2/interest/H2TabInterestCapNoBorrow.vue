@@ -94,7 +94,7 @@
         </el-table-column>
         <el-table-column label="⑤实际利息费用" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.actualInterest" :controls="false"
+            <WpAmountInput v-if="!isReadonly" v-model="row.actualInterest"
               size="small" class="amt-input" @change="onLoanChange(row.rowId, 'actualInterest', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.actualInterest) }}</span>
           </template>
@@ -155,14 +155,14 @@
         </el-table-column>
         <el-table-column label="②工程费用" min-width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEditMonth(row)" v-model="row.engCost" :controls="false"
+            <WpAmountInput v-if="canEditMonth(row)" v-model="row.engCost"
               size="small" class="amt-input" @change="onMonthChange(row.rowId, 'engCost', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.engCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="③借款费用" min-width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="canEditMonth(row)" v-model="row.borrowCost" :controls="false"
+            <WpAmountInput v-if="canEditMonth(row)" v-model="row.borrowCost"
               size="small" class="amt-input" @change="onMonthChange(row.rowId, 'borrowCost', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.borrowCost) }}</span>
           </template>
@@ -290,6 +290,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabInterestCapNoBorrow.vue — H2-10 利息资本化(无专门借款)
  * 对齐 xlsx：①年加权利率表 ②月度支出资本化表 ③差异与建议分录

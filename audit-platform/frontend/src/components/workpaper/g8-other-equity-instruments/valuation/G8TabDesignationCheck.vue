@@ -139,11 +139,10 @@
       <el-table-column label="期末账面价值" width="120" align="right">
         <template #default="{ row }">
           <b v-if="row.isTotal">{{ fmt(row.closingBookValue) }}</b>
-          <el-input-number
+          <WpAmountInput
             v-else
             :model-value="row.closingBookValue"
             size="small"
-            :controls="false"
             style="width: 100%"
             :disabled="isReadonly"
             @change="(v: number) => dc.updateRow(row.rowId, { closingBookValue: v ?? 0 })"
@@ -367,6 +366,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, watch, toRef, inject } from 'vue'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 import GtIndexChip from '../../GtIndexChip.vue'

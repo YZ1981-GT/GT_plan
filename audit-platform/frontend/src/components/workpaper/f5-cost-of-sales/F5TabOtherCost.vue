@@ -77,10 +77,9 @@
       <el-table-column label="本期数" align="center">
         <el-table-column label="本期未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.currentUnaudited"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => other.updateCell(row.id, 'currentUnaudited', v ?? 0)"
@@ -90,10 +89,9 @@
         </el-table-column>
         <el-table-column label="账项调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.currentAje"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => other.updateCell(row.id, 'currentAje', v ?? 0)"
@@ -103,10 +101,9 @@
         </el-table-column>
         <el-table-column label="重分类调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.currentRje"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => other.updateCell(row.id, 'currentRje', v ?? 0)"
@@ -129,10 +126,9 @@
       <el-table-column label="上期数" align="center">
         <el-table-column label="上期未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.priorUnaudited"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => other.updateCell(row.id, 'priorUnaudited', v ?? 0)"
@@ -142,10 +138,9 @@
         </el-table-column>
         <el-table-column label="账项调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.priorAje"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => other.updateCell(row.id, 'priorAje', v ?? 0)"
@@ -155,10 +150,9 @@
         </el-table-column>
         <el-table-column label="重分类调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.__type === 'data' && !isReadonly"
               :model-value="row.priorRje"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => other.updateCell(row.id, 'priorRje', v ?? 0)"
@@ -278,6 +272,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F5TabOtherCost — F5-3 其他业务成本明细表
  * 源表：本期/上期未审·调整·审定·结构比 + 变动额/率 + 固定项目 + AI说明结论

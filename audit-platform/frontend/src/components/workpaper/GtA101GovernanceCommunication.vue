@@ -120,11 +120,8 @@
                 <el-table-column label="服务项目" prop="name" min-width="180" />
                 <el-table-column label="金额（元）" min-width="160">
                   <template #default="{ row, $index }">
-                    <el-input-number
+                    <WpAmountInput
                       :model-value="row.amount"
-                      :precision="2"
-                      :min="0"
-                      :controls="false"
                       size="small"
                       placeholder="请输入金额"
                       @change="(v: number | undefined) => updateFee($index, v ?? null)"
@@ -195,6 +192,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { ref, toRef, watch, onMounted, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { useA101GovernanceCommunication } from './composables/useA101GovernanceCommunication'

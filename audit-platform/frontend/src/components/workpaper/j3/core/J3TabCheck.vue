@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * J3TabCheck — J3-2 应付职工薪酬/股份支付检查表
  *
@@ -293,10 +294,10 @@ watch(() => props.allResponses, load, { deep: false })
         <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.counterAccount" size="small" @change="scheduleSave" /><span v-else>{{ row.counterAccount }}</span></template>
       </el-table-column>
       <el-table-column label="借方金额" width="120" align="right">
-        <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debit" :controls="false" :precision="2" size="small" @change="scheduleSave" /><span v-else>{{ fmt(row.debit) }}</span></template>
+        <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.debit" size="small" @change="scheduleSave" /><span v-else>{{ fmt(row.debit) }}</span></template>
       </el-table-column>
       <el-table-column label="贷方金额" width="120" align="right">
-        <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.credit" :controls="false" :precision="2" size="small" @change="scheduleSave" /><span v-else>{{ fmt(row.credit) }}</span></template>
+        <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.credit" size="small" @change="scheduleSave" /><span v-else>{{ fmt(row.credit) }}</span></template>
       </el-table-column>
       <el-table-column label="附件" width="120">
         <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.attachment" size="small" placeholder="附件索引/说明" @change="scheduleSave" /><span v-else>{{ row.attachment }}</span></template>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabPolicyCheck — 政策检查D2-8
  * 段落卡片式布局(非table), 6个政策段落, Y/N/NA radio, 结论=N红色边框
@@ -189,19 +190,19 @@ function fmtPct(v: number): string {
         <el-table-column prop="agingBand" label="账龄段" width="90" fixed />
         <el-table-column label="余额Y1" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.balanceY1" :controls="false" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'balanceY1', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.balanceY1" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'balanceY1', v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.balanceY1) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="余额Y2" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.balanceY2" :controls="false" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'balanceY2', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.balanceY2" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'balanceY2', v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.balanceY2) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="余额Y3" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.balanceY3" :controls="false" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'balanceY3', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.balanceY3" size="small" @change="(v: number) => updateHistoricalCell(row.rowId, 'balanceY3', v ?? 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.balanceY3) }}</span>
           </template>
         </el-table-column>

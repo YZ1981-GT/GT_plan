@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F4TabSupplierFinancing — F4-9 供应商融资检查表
  * 按供应商动态分组：插行/删行/从F4-2引用；附件+OCR确认回填；AI说明结论；导入导出。
@@ -384,10 +385,9 @@ function confirmRemoveGroup(groupId: string, name: string): void {
 
         <el-table-column label="融资金额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isDetail(row) && !isReadonly"
               :model-value="row.detail.financingAmount"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => updateCell(row.detail.rowId, 'financingAmount', v ?? 0)"
@@ -465,10 +465,9 @@ function confirmRemoveGroup(groupId: string, name: string): void {
 
         <el-table-column label="本期采购金额" width="120" align="right" class-name="col-formula">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isDetail(row) && !isReadonly"
               :model-value="row.detail.purchaseAmount"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => updateCell(row.detail.rowId, 'purchaseAmount', v ?? 0)"
@@ -485,10 +484,9 @@ function confirmRemoveGroup(groupId: string, name: string): void {
 
         <el-table-column label="借款余额" width="120" align="right" class-name="col-formula">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="isDetail(row) && !isReadonly"
               :model-value="row.detail.loanBalance"
-              :controls="false"
               size="small"
               style="width:100%"
               @change="(v: number | undefined) => updateCell(row.detail.rowId, 'loanBalance', v ?? 0)"

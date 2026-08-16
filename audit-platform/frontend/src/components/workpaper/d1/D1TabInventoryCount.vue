@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1TabInventoryCount.vue — D1-10 应收票据监盘表 HTML渲染
  *
@@ -403,11 +404,9 @@ const GUIDANCE_TEXTS = [
           <!-- F: 金额 -->
           <el-table-column label="金额" width="110" align="right">
             <template #default="{ row }: { row: InventoryCountRow }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.amount"
                 size="small"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => updateRow(row.id, 'amount', v || 0)"

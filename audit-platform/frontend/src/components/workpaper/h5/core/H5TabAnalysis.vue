@@ -42,13 +42,13 @@
         </el-table-column>
         <el-table-column prop="priorCost" label="上期原值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.priorCost" :controls="false" size="small" @change="state.updateCell(row.rowId, 'priorCost', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.priorCost" size="small" @change="state.updateCell(row.rowId, 'priorCost', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.priorCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="currentCost" label="本期原值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.currentCost" :controls="false" size="small" @change="state.updateCell(row.rowId, 'currentCost', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.currentCost" size="small" @change="state.updateCell(row.rowId, 'currentCost', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.currentCost) }}</span>
           </template>
         </el-table-column>
@@ -72,7 +72,7 @@
         </el-table-column>
         <el-table-column prop="currentNetValue" label="本期净值" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.currentNetValue" :controls="false" size="small" @change="state.updateCell(row.rowId, 'currentNetValue', $event ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.currentNetValue" size="small" @change="state.updateCell(row.rowId, 'currentNetValue', $event ?? 0)" />
             <span v-else class="amount-cell">{{ fmtAmt(row.currentNetValue) }}</span>
           </template>
         </el-table-column>
@@ -109,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, toRef } from 'vue'
 import { MagicStick } from '@element-plus/icons-vue'
 import GtIndexChip from '../../GtIndexChip.vue'

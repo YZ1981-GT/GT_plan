@@ -266,11 +266,10 @@
         </el-table-column>
         <el-table-column label="期末余额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.endingBalance"
               size="small"
-              :controls="false"
               @change="onScopeChange(row)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.endingBalance) }}</span>
@@ -278,11 +277,10 @@
         </el-table-column>
         <el-table-column label="减值准备" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.impairment"
               size="small"
-              :controls="false"
               @change="onScopeChange(row)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
@@ -325,12 +323,10 @@
         </el-table-column>
         <el-table-column label="计划监盘金额" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.planAmount"
               size="small"
-              :controls="false"
-              :min="0"
               @change="onScopeChange(row)"
             />
             <span v-else class="amount-cell">{{ fmtAmt(row.planAmount) }}</span>
@@ -410,9 +406,8 @@
             @change="persist"
           />
           <span class="muted">预计数量</span>
-          <el-input-number
+          <WpAmountInput
             v-model="form.sampleBookToFloorQty"
-            :min="0"
             :disabled="isReadonly"
             class="ml-8"
             @change="persist"
@@ -426,9 +421,8 @@
             @change="persist"
           />
           <span class="muted">预计数量</span>
-          <el-input-number
+          <WpAmountInput
             v-model="form.sampleFloorToBookQty"
-            :min="0"
             :disabled="isReadonly"
             class="ml-8"
             @change="persist"
@@ -576,6 +570,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H1TabStocktakePlan — H1-9 固定资产监盘计划
  * 对齐致同模板；H1-2/H1-4 带入、风险建议、门禁、OCR、上年、Word 导出、字段映射

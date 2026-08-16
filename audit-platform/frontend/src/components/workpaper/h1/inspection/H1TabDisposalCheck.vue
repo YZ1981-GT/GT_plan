@@ -233,7 +233,7 @@
         <el-table-column label="转入清理的固定资产" align="center">
           <el-table-column prop="originalCost" label="原值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.originalCost" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'originalCost', row.originalCost)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.originalCost) }}</span>
@@ -241,7 +241,7 @@
           </el-table-column>
           <el-table-column prop="accDep" label="累计折旧" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.accDep" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.accDep" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'accDep', row.accDep)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
@@ -249,7 +249,7 @@
           </el-table-column>
           <el-table-column prop="impairment" label="减值准备" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'impairment', row.impairment)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
@@ -266,7 +266,7 @@
         <el-table-column label="清理净收入与损益" align="center">
           <el-table-column prop="disposalCost" label="清理费用" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.disposalCost" :controls="false" size="small"
+              <WpAmountInput v-if="!isReadonly" v-model="row.disposalCost" size="small"
                 class="amt-input"
                 @change="state.updateCell(row.rowId, 'disposalCost', row.disposalCost)" />
               <span v-else class="amount-cell">{{ fmtAmt(row.disposalCost) }}</span>
@@ -274,10 +274,9 @@
           </el-table-column>
           <el-table-column prop="disposalIncome" label="清理收入" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 v-model="row.disposalIncome"
-                :controls="false"
                 size="small"
                 class="amt-input"
                 :class="{ 'warn-input': state.needsScrapResidualWarning(row) }"
@@ -552,6 +551,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { MagicStick } from '@element-plus/icons-vue'

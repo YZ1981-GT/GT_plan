@@ -205,7 +205,7 @@
             </el-table-column>
             <el-table-column label="借方金额" width="110">
               <template #default="{ row }">
-                <el-input-number :model-value="row.amount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateRow(row.id, { amount: v ?? 0 })" />
+                <WpAmountInput :model-value="row.amount" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateRow(row.id, { amount: v ?? 0 })" />
               </template>
             </el-table-column>
             <el-table-column label="对方科目" width="110">
@@ -268,7 +268,7 @@
             </el-table-column>
             <el-table-column label="金额" width="110">
               <template #default="{ row }">
-                <el-input-number :model-value="row.invoiceAmount" size="small" :controls="false" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateRow(row.id, { invoiceAmount: v ?? 0 })" />
+                <WpAmountInput :model-value="row.invoiceAmount" size="small" :disabled="isReadonly" class="compact-num" @change="(v?: number) => ic.updateRow(row.id, { invoiceAmount: v ?? 0 })" />
               </template>
             </el-table-column>
           </el-table-column>
@@ -348,10 +348,9 @@
         <el-table-column prop="category" label="存货类别" min-width="120" />
         <el-table-column label="账面金额" width="150">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="ic.bookByCategory.value[row.category] ?? row.bookAmount"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               class="compact-num"
               @change="(v?: number) => ic.updateBookByCategory(row.category, v ?? 0)"
@@ -453,6 +452,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, onMounted, inject, toRef, type Ref } from 'vue'
 import { useF2PurchaseInboundCheck } from '../../composables/useF2InspectionCheck'
 import { useF2PurchaseOcr } from '../../composables/useF2PurchaseOcr'

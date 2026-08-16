@@ -127,7 +127,7 @@
         <el-table-column label="在建工程期末余额" align="center">
           <el-table-column prop="cipOriginal" label="原值" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.cipOriginal" :controls="false" size="small" class="amt-input"
+              <WpAmountInput v-if="!isReadonly" v-model="row.cipOriginal" size="small" class="amt-input"
                 @change="onCipChange(row.rowId, 'cipOriginal', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.cipOriginal) }}</span>
             </template>
@@ -141,7 +141,7 @@
           </el-table-column>
           <el-table-column prop="impairment" label="减值准备" min-width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small" class="amt-input"
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small" class="amt-input"
                 @change="onCipChange(row.rowId, 'impairment', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.impairment) }}</span>
             </template>
@@ -242,7 +242,7 @@
         </el-table-column>
         <el-table-column prop="salvageRatePct" label="残值%" width="64" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.salvageRatePct" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.salvageRatePct" size="small" class="amt-input"
               @change="onCipChange(row.rowId, 'salvageRatePct', $event)" />
             <span v-else>{{ row.salvageRatePct ?? '-' }}</span>
           </template>
@@ -309,21 +309,21 @@
         <el-table-column label="固定资产相关金额" align="center">
           <el-table-column prop="faOriginal" label="原值" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.faOriginal" :controls="false" size="small" class="amt-input"
+              <WpAmountInput v-if="!isReadonly" v-model="row.faOriginal" size="small" class="amt-input"
                 @change="onCellChange(row.rowId, 'faOriginal', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.faOriginal) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="faAccumDep" label="累计折旧" min-width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.faAccumDep" :controls="false" size="small" class="amt-input"
+              <WpAmountInput v-if="!isReadonly" v-model="row.faAccumDep" size="small" class="amt-input"
                 @change="onCellChange(row.rowId, 'faAccumDep', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.faAccumDep) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="faImpairment" label="减值" min-width="80" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.faImpairment" :controls="false" size="small" class="amt-input"
+              <WpAmountInput v-if="!isReadonly" v-model="row.faImpairment" size="small" class="amt-input"
                 @change="onCellChange(row.rowId, 'faImpairment', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.faImpairment) }}</span>
             </template>
@@ -345,7 +345,7 @@
         </el-table-column>
         <el-table-column prop="transferAmount" label="转固金额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.transferAmount" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.transferAmount" size="small" class="amt-input"
               @change="onCellChange(row.rowId, 'transferAmount', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.transferAmount) }}</span>
           </template>
@@ -369,7 +369,7 @@
           </el-table-column>
           <el-table-column prop="acceptanceAmount" label="决算金额" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.acceptanceAmount" :controls="false" size="small" class="amt-input"
+              <WpAmountInput v-if="!isReadonly" v-model="row.acceptanceAmount" size="small" class="amt-input"
                 @change="onCellChange(row.rowId, 'acceptanceAmount', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.acceptanceAmount) }}</span>
             </template>
@@ -418,7 +418,7 @@
         </el-table-column>
         <el-table-column prop="salvageRatePct" label="残值%" width="64" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.salvageRatePct" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.salvageRatePct" size="small" class="amt-input"
               @change="onCellChange(row.rowId, 'salvageRatePct', $event)" />
             <span v-else>{{ row.salvageRatePct ?? '-' }}</span>
           </template>
@@ -476,7 +476,7 @@
 
         <el-table-column prop="h1Amount" label="H1入账金额" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.h1Amount" :controls="false" size="small" class="amt-input"
+            <WpAmountInput v-if="!isReadonly" v-model="row.h1Amount" size="small" class="amt-input"
               @change="onCellChange(row.rowId, 'h1Amount', $event)" />
             <span v-else class="amt-cell">{{ fmtAmt(row.h1Amount) }}</span>
           </template>
@@ -582,6 +582,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H2TabTransferCheck.vue — H2-5 转固时点检查
  * 对齐致同：双表（CIP挂账 + 已转固时点）+ CAS4 + 延迟高亮 + H1联动

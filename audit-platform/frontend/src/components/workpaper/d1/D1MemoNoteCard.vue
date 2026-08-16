@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D1MemoNoteCard — 单张票据备查簿卡片（纵向分组，便于宽表字段填写）
  */
@@ -194,10 +195,8 @@ function handleUpload(file: any): boolean {
           </el-col>
           <el-col :span="8">
             <el-form-item label="金额">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.amount"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => emit('update', 'amount', v || 0)"
@@ -297,10 +296,8 @@ function handleUpload(file: any): boolean {
           </el-col>
           <el-col :span="8">
             <el-form-item label="年末余额（自动）">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.endingBalance"
-                :controls="false"
-                :precision="2"
                 disabled
                 style="width: 100%"
               />
@@ -393,10 +390,8 @@ function handleUpload(file: any): boolean {
           </el-col>
           <el-col :span="8">
             <el-form-item label="审定应收款项融资">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.auditedFinancing"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => emit('update', 'auditedFinancing', v || 0)"
@@ -405,10 +400,8 @@ function handleUpload(file: any): boolean {
           </el-col>
           <el-col :span="8">
             <el-form-item label="审定应收票据">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.auditedNotes"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => emit('update', 'auditedNotes', v || 0)"
@@ -430,10 +423,8 @@ function handleUpload(file: any): boolean {
           </el-col>
           <el-col :span="8">
             <el-form-item label="逾期转应收金额">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.overdueTransferAmount"
-                :controls="false"
-                :precision="2"
                 :disabled="isReadonly"
                 style="width: 100%"
                 @change="(v: number) => emit('update', 'overdueTransferAmount', v || 0)"

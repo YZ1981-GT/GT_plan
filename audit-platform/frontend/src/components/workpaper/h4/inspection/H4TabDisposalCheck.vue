@@ -257,7 +257,7 @@
         <el-table-column label="减少情况" align="center">
           <el-table-column label="原值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.originalCost" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.originalCost"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'originalCost', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.originalCost) }}</span>
@@ -265,7 +265,7 @@
           </el-table-column>
           <el-table-column label="减值准备" width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.impairment"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'impairment', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.impairment) }}</span>
@@ -278,7 +278,7 @@
           </el-table-column>
           <el-table-column label="清理费用" width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.disposalCost" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.disposalCost"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'disposalCost', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.disposalCost) }}</span>
@@ -286,7 +286,7 @@
           </el-table-column>
           <el-table-column label="清理收入" width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" v-model="row.disposalIncome" :controls="false"
+              <WpAmountInput v-if="!isReadonly" v-model="row.disposalIncome"
                 size="small" class="amt-input"
                 @change="updateCell(row.rowId, 'disposalIncome', $event)" />
               <span v-else class="amt-cell">{{ fmtAmt(row.disposalIncome) }}</span>
@@ -526,6 +526,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H4TabDisposalCheck.vue — H4-5 减少检查表
  * 对齐致同：目标 → 样本选取 → 测试（原值/减值/净值/清理损益 + 核对1–5）

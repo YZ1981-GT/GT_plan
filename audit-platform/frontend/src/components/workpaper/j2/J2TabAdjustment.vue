@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * J2TabAdjustment — J2-3 长期应付职工薪酬调整分录汇总表
  *
@@ -242,13 +243,13 @@ watch(() => props.allResponses, load, { deep: false })
       </el-table-column>
       <el-table-column label="借方调整金额" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small" @change="scheduleSave" />
           <span v-else>{{ fmt(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方调整金额" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" :precision="2" size="small" @change="scheduleSave" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small" @change="scheduleSave" />
           <span v-else>{{ fmt(row.creditAmount) }}</span>
         </template>
       </el-table-column>

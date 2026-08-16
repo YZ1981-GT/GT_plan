@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabAnalysis — 分析程序D2-5
  * 完整5区段分析：
@@ -605,12 +606,10 @@ onBeforeUnmount(() => {
             {{ displayPrefs.fmtAmount(debitReconComputed.diff) }}
           </span>
           <!-- 可编辑行 -->
-          <el-input-number
+          <WpAmountInput
             v-else
             v-model="row.amount"
             :disabled="isReadonly"
-            :controls="false"
-            :precision="2"
             size="small"
             style="width: 100%"
             @change="onDebitReconChange"
@@ -669,11 +668,9 @@ onBeforeUnmount(() => {
       </el-table-column>
       <el-table-column label="金额" align="right" min-width="140">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.amount"
             :disabled="isReadonly"
-            :controls="false"
-            :precision="2"
             size="small"
             style="width: 100%"
             @change="onCreditAnalysisChange"
@@ -737,12 +734,12 @@ onBeforeUnmount(() => {
       </el-table-column>
       <el-table-column label="期末账面余额" align="right" min-width="120">
         <template #default="{ row }">
-          <el-input-number v-model="row.endBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%" @change="() => { calcTop10Row(row); onTop10Change() }" />
+          <WpAmountInput v-model="row.endBalance" :disabled="isReadonly" size="small" style="width: 100%" @change="() => { calcTop10Row(row); onTop10Change() }" />
         </template>
       </el-table-column>
       <el-table-column label="期初账面余额" align="right" min-width="120">
         <template #default="{ row }">
-          <el-input-number v-model="row.beginBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%" @change="() => { calcTop10Row(row); onTop10Change() }" />
+          <WpAmountInput v-model="row.beginBalance" :disabled="isReadonly" size="small" style="width: 100%" @change="() => { calcTop10Row(row); onTop10Change() }" />
         </template>
       </el-table-column>
       <el-table-column label="变动金额" align="right" min-width="110" class-name="auto-calc-col">
@@ -767,7 +764,7 @@ onBeforeUnmount(() => {
       </el-table-column>
       <el-table-column label="逾期金额" align="right" min-width="110">
         <template #default="{ row }">
-          <el-input-number v-model="row.overdueAmount" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%" @change="onTop10Change" />
+          <WpAmountInput v-model="row.overdueAmount" :disabled="isReadonly" size="small" style="width: 100%" @change="onTop10Change" />
         </template>
       </el-table-column>
       <el-table-column v-if="!isReadonly" label="" width="50" align="center">
@@ -798,7 +795,7 @@ onBeforeUnmount(() => {
       <el-table-column prop="aging" label="账龄" width="100" />
       <el-table-column label="期末账面余额" align="right" min-width="120">
         <template #default="{ row }">
-          <el-input-number v-model="row.endBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%" @change="onAgingCompareChange" />
+          <WpAmountInput v-model="row.endBalance" :disabled="isReadonly" size="small" style="width: 100%" @change="onAgingCompareChange" />
         </template>
       </el-table-column>
       <el-table-column label="各账龄占比" align="right" width="100" class-name="auto-calc-col">
@@ -808,7 +805,7 @@ onBeforeUnmount(() => {
       </el-table-column>
       <el-table-column label="期初账面余额" align="right" min-width="120">
         <template #default="{ row }">
-          <el-input-number v-model="row.beginBalance" :disabled="isReadonly" :controls="false" :precision="2" size="small" style="width: 100%" @change="onAgingCompareChange" />
+          <WpAmountInput v-model="row.beginBalance" :disabled="isReadonly" size="small" style="width: 100%" @change="onAgingCompareChange" />
         </template>
       </el-table-column>
       <el-table-column label="各账龄占比" align="right" width="100" class-name="auto-calc-col">

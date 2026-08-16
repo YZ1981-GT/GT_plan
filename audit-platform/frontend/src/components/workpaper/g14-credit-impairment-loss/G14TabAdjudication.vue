@@ -148,11 +148,10 @@
         <el-table-column label="上期数" align="center">
           <el-table-column label="未审数" width="108" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="row.rowKey !== 'total' && !isReadonly"
                 :model-value="row.priorUnadjusted"
                 size="small"
-                :controls="false"
                 class="cell-input"
                 @update:model-value="(v: number) => adj.updatePriorField(row.rowKey, 'priorUnadjusted', v ?? 0)"
               />
@@ -334,6 +333,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, inject, toRef } from 'vue'
 import { useG14Adjudication } from '../composables/useG14Adjudication'
 import { resolveG14SheetLabel } from '../composables/g14SheetLabels'

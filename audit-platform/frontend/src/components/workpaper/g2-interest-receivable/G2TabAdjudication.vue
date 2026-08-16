@@ -121,11 +121,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.openingAdjustment"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => updateField(row.rowKey, 'openingAdjustment', v ?? 0)"
             />
@@ -155,11 +154,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.closingAdjustment"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => updateField(row.rowKey, 'closingAdjustment', v ?? 0)"
             />
@@ -253,6 +251,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, toRef, computed, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'

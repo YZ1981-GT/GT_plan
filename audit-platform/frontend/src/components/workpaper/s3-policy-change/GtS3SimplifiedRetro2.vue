@@ -76,11 +76,9 @@
         </el-table-column>
         <el-table-column prop="amount" label="原始金额" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.amount"
-              :precision="2"
-              :controls="false"
               style="width: 110px"
             />
             <span v-else>{{ fmt(row.amount) }}</span>
@@ -166,6 +164,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS3SimplifiedRetro2.vue — S3-10 简化的追溯调整法（2）
  *

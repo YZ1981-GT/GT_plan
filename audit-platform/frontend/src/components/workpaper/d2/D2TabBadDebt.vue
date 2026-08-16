@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabBadDebt — 坏账准备明细表 D2-3
  *
@@ -159,19 +160,19 @@ const GUIDANCE_TEXTS = [
         <!-- 期初 -->
         <el-table-column label="期初未审" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.priorUnadjusted" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v || 0)" />
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.priorUnadjusted" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorUnadjusted', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.priorUnadjusted) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期初AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.priorAje" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAje', v || 0)" />
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.priorAje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorAje', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.priorAje) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期初RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.priorRje" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorRje', v || 0)" />
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.priorRje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'priorRje', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.priorRje) }}</span>
           </template>
         </el-table-column>
@@ -186,7 +187,7 @@ const GUIDANCE_TEXTS = [
         <!-- 本期增加 -->
         <el-table-column label="计提" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentProvision" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentProvision', v || 0)" />
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentProvision" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentProvision', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.currentProvision) }}</span>
           </template>
         </el-table-column>
@@ -227,13 +228,13 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <el-table-column label="期末AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentAje" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentAje', v || 0)" />
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentAje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentAje', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.currentAje) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="期末RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentRje" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentRje', v || 0)" />
+            <WpAmountInput v-if="isRowEditable(section.rows.value, row)" :model-value="row.currentRje" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'currentRje', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.currentRje) }}</span>
           </template>
         </el-table-column>

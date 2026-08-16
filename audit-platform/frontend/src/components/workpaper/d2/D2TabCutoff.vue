@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabCutoff — 截止测试
  * 8列: 序号|发票号|收入日期|入账日期|金额|跨期判定|结论|备注
@@ -262,12 +263,10 @@ function handleReviewApplied(text: string): void {
       </el-table-column>
       <el-table-column label="金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.amount"
             size="small"
-            :controls="false"
-            :precision="2"
             @change="(v: number) => updateCell(row.rowId, 'amount', v)"
           />
           <span v-else>{{ displayPrefs.fmtAmount(row.amount) }}</span>

@@ -276,8 +276,8 @@
         </el-table-column>
         <el-table-column label="本期未审" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.currentUnadjusted"
-              size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.currentUnadjusted"
+              size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateCell(row.rowId, 'currentUnadjusted', v ?? 0)" />
             <span v-else>{{ fmt(row.currentUnadjusted) }}</span>
           </template>
@@ -316,8 +316,8 @@
         <el-table-column label="对应科目 — 公允价值变动" align="center">
           <el-table-column label="成本" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.cost"
-                size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.cost"
+                size="small" style="width:100%"
                 @update:model-value="(v: number) => detail.updateCell(row.rowId, 'cost', v ?? 0)" />
               <span v-else>{{ fmt(row.cost) }}</span>
             </template>
@@ -340,8 +340,8 @@
           </el-table-column>
           <el-table-column label="公允价值" width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.fairValue"
-                size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="row.rowId !== 'total' && !isReadonly" :model-value="row.fairValue"
+                size="small" style="width:100%"
                 @update:model-value="(v: number) => detail.updateCell(row.rowId, 'fairValue', v ?? 0)" />
               <span v-else :class="{ 'cell-error': !row.bsReconciled }">{{ fmt(row.fairValue) }}</span>
             </template>
@@ -444,6 +444,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, ref, toRef, onMounted } from 'vue'
 import { useG13Detail } from '../composables/useG13Detail'
 import { useG13ExternalCross } from '../composables/useG13ExternalCross'

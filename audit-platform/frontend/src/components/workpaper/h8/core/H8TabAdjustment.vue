@@ -240,12 +240,10 @@
 
       <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
-            :min="0"
             style="width:100%"
             @update:model-value="(v: number | undefined) => state.updateCell(row.rowId, 'debitAmount', v ?? 0)"
           />
@@ -255,12 +253,10 @@
 
       <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
-            :min="0"
             style="width:100%"
             @update:model-value="(v: number | undefined) => state.updateCell(row.rowId, 'creditAmount', v ?? 0)"
           />
@@ -352,6 +348,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabAdjustment.vue — H8-3 使用权资产调整分录汇总表
  * 对齐 Excel 列结构 + 调整分录模块双向联动 + A13 / H8-1

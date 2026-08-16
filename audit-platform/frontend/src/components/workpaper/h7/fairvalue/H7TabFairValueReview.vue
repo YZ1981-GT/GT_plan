@@ -36,7 +36,7 @@
       </el-table-column>
       <el-table-column label="单位公允价值" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.unitFv" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.unitFv" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ row.isSubtotal ? '' : fmtAmt(row.unitFv) }}</span>
         </template>
       </el-table-column>
@@ -47,7 +47,7 @@
       </el-table-column>
       <el-table-column label="账面价值" min-width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!row.isSubtotal && !isReadonly" v-model="row.bookValue" :controls="false" size="small" class="amt-input" @change="onUpdate()" />
+          <WpAmountInput v-if="!row.isSubtotal && !isReadonly" v-model="row.bookValue" size="small" class="amt-input" @change="onUpdate()" />
           <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
         </template>
       </el-table-column>
@@ -112,6 +112,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H7TabFairValueReview.vue — H7-13 公允价值复核表
  *

@@ -103,12 +103,10 @@
 
         <el-table-column label="面值总额" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.faceValueTotal"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width:100%"
               @change="(v: number | undefined) => calc.updateInitialField(group.id, 'faceValueTotal', v ?? 0)"
             />
@@ -163,12 +161,10 @@
 
         <el-table-column label="交易费用" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.transactionCost"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width:100%"
               @change="(v: number | undefined) => calc.updateInitialField(group.id, 'transactionCost', v ?? 0)"
             />
@@ -249,12 +245,10 @@
 
         <el-table-column label="期初账面总额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.openingBalance"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width:100%"
               @change="(v: number | undefined) => calc.updatePeriodField(group.id, row.id, 'openingBalance', v ?? 0)"
             />
@@ -264,12 +258,10 @@
 
         <el-table-column label="期初减值准备" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.openingImpairment"
               size="small"
-              :controls="false"
-              :precision="2"
               style="width:100%"
               @change="(v: number | undefined) => calc.updatePeriodField(group.id, row.id, 'openingImpairment', v ?? 0)"
             />
@@ -417,6 +409,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabInterestCalc.vue — G4-4 利息测算表（实际利率法双section分组）
  *

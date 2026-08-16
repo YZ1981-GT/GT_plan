@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F3TabInterestCalc — F3-4 应付票据（带息）利息测算表（对齐源表结构） */
 import { ref, watch, toRef, inject, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -238,7 +239,7 @@ function summaryMethod({ columns }: { columns: any[]; data: F3InterestCalcRow[] 
         <template #default="{ row }"><span class="formula-cell" title="期限 = 到期日 − 出票日">{{ row.termDays || '-' }}</span></template>
       </el-table-column>
       <el-table-column prop="faceValue" label="票面金额" width="120" align="right">
-        <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.faceValue" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'faceValue', v ?? 0)" /><span v-else>{{ fmt(row.faceValue) }}</span></template>
+        <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.faceValue" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'faceValue', v ?? 0)" /><span v-else>{{ fmt(row.faceValue) }}</span></template>
       </el-table-column>
       <el-table-column prop="interestRate" label="票面利率%" width="90" align="right">
         <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.interestRate" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'interestRate', v ?? 0)" /><span v-else>{{ row.interestRate }}</span></template>
@@ -247,7 +248,7 @@ function summaryMethod({ columns }: { columns: any[]; data: F3InterestCalcRow[] 
         <template #default="{ row }"><span class="formula-cell" title="应计利息 = 票面金额 × 票面利率% × 期限 / 360">{{ fmt(row.payableInterest) }}</span></template>
       </el-table-column>
       <el-table-column prop="bookInterest" label="账面已计利息" width="120" align="right">
-        <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.bookInterest" :controls="false" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'bookInterest', v ?? 0)" /><span v-else>{{ fmt(row.bookInterest) }}</span></template>
+        <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.bookInterest" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'bookInterest', v ?? 0)" /><span v-else>{{ fmt(row.bookInterest) }}</span></template>
       </el-table-column>
       <el-table-column prop="variance" label="差异" width="100" align="right" class-name="auto-calc-col">
         <template #default="{ row }"><span class="formula-cell" title="差异 = 应计利息 − 账面已计利息">{{ fmt(row.variance) }}</span></template>

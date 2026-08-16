@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabOtherCheck — D4-35 其他业务收入检查表（抽凭）
  *
@@ -151,7 +152,7 @@ function rowClassName({ row }: { row: CheckRow }) { return row.isAnomalous === '
       <el-table-column label="业务内容" min-width="100"><template #default="{ row }"><el-input v-model="row.content" size="small" :disabled="isReadonly" @change="updateRow(row.id,'content',row.content)" /></template></el-table-column>
       <el-table-column label="对方科目" min-width="80"><template #default="{ row }"><el-input v-model="row.counterAccount" size="small" :disabled="isReadonly" @change="updateRow(row.id,'counterAccount',row.counterAccount)" /></template></el-table-column>
       <el-table-column label="明细科目" min-width="80"><template #default="{ row }"><el-input v-model="row.detailAccount" size="small" :disabled="isReadonly" @change="updateRow(row.id,'detailAccount',row.detailAccount)" /></template></el-table-column>
-      <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><el-input-number v-model="row.amount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateRow(row.id,'amount',row.amount)" /></template></el-table-column>
+      <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><WpAmountInput v-model="row.amount" size="small" :disabled="isReadonly" style="width:100%" @change="updateRow(row.id,'amount',row.amount)" /></template></el-table-column>
       <el-table-column label="支持性文件" min-width="90"><template #default="{ row }"><el-input v-model="row.supportDoc" size="small" :disabled="isReadonly" @change="updateRow(row.id,'supportDoc',row.supportDoc)" /></template></el-table-column>
       <!-- 核对内容6子列 -->
       <el-table-column label="核对内容" align="center" class-name="col-check">

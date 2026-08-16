@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D2TabPledgeCheck — 应收账款质押及保理检查 D2-12
  *
@@ -183,7 +184,7 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <el-table-column label="质押金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.pledgeAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'pledgeAmount', v || 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.pledgeAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'pledgeAmount', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.pledgeAmount) }}</span>
           </template>
         </el-table-column>
@@ -299,7 +300,7 @@ const GUIDANCE_TEXTS = [
         </el-table-column>
         <el-table-column label="保理金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.factoringAmount" size="small" :controls="false" :precision="2" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'factoringAmount', v || 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.factoringAmount" size="small" style="width:100%" @change="(v: number) => updateCell(row.rowId, 'factoringAmount', v || 0)" />
             <span v-else>{{ displayPrefs.fmtAmount(row.factoringAmount) }}</span>
           </template>
         </el-table-column>

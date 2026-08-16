@@ -69,11 +69,9 @@
         </el-table-column>
         <el-table-column prop="currentImpact" label="对本期的影响金额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.currentImpact"
-              :precision="2"
-              :controls="false"
               style="width: 120px"
             />
             <span v-else>{{ fmt(row.currentImpact) }}</span>
@@ -143,6 +141,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS3EstimateChange.vue — S3-2 会计估计变更审计程序
  *

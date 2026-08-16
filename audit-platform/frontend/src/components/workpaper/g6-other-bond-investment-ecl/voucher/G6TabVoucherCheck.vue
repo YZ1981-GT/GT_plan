@@ -194,10 +194,10 @@
             <template #default="{ row }"><el-input v-if="!isReadonly" v-model="row.detailAccount" size="small" /><span v-else>{{ row.detailAccount }}</span></template>
           </el-table-column>
           <el-table-column label="借方金额" width="125" align="right">
-            <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" /><span v-else>{{ fmtAmount(row.debitAmount) }}</span></template>
+            <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small" /><span v-else>{{ fmtAmount(row.debitAmount) }}</span></template>
           </el-table-column>
           <el-table-column label="贷方金额" width="125" align="right">
-            <template #default="{ row }"><el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small" /><span v-else>{{ fmtAmount(row.creditAmount) }}</span></template>
+            <template #default="{ row }"><WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small" /><span v-else>{{ fmtAmount(row.creditAmount) }}</span></template>
           </el-table-column>
           <el-table-column label="选样类别" width="110">
             <template #default="{ row }">
@@ -391,6 +391,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, inject, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import WpSamplingMethodologyBar from '../../shared/WpSamplingMethodologyBar.vue'
 import { useSamplingMethodologyPersist, buildChecklistDirectPersist, snapshotToResponseMap } from '../../composables/shared/useSamplingMethodologyPersist'

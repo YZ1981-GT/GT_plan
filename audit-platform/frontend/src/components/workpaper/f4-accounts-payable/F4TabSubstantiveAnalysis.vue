@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * F4TabSubstantiveAnalysis — F4-4 应付账款实质性分析
  * 源表结构：付款期分析 + 期末前十名债权人动态分析 + 分区审计说明 + 审计结论。
@@ -191,10 +192,9 @@ async function generateConclusion(): Promise<void> {
       </el-table-column>
       <el-table-column label="本期金额" min-width="155" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row.currentInput && !isReadonly"
             :model-value="row.currentAmount"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(value: number | undefined) => updateTurnoverInput(row.currentInput as F4TurnoverInputKey, value ?? 0)"
@@ -210,10 +210,9 @@ async function generateConclusion(): Promise<void> {
       </el-table-column>
       <el-table-column label="上期金额" min-width="155" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row.priorInput && !isReadonly"
             :model-value="row.priorAmount"
-            :controls="false"
             size="small"
             style="width:100%"
             @change="(value: number | undefined) => updateTurnoverInput(row.priorInput as F4TurnoverInputKey, value ?? 0)"

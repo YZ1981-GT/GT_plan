@@ -61,16 +61,14 @@
       <el-table-column label="项目" prop="label" min-width="220" fixed />
       <el-table-column label="本期发生额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAmount" size="small"
-            :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.currentAmount" size="small" style="width:100%"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'currentAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.currentAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="上期发生额" width="160" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAmount" size="small"
-            :controls="false" style="width:100%"
+          <WpAmountInput v-if="row.rowKey !== 'total' && !isReadonly" :model-value="row.priorAmount" size="small" style="width:100%"
             @update:model-value="(v: number) => dis.updateField(row.rowKey, 'priorAmount', v ?? 0)" />
           <span v-else>{{ fmt(row.priorAmount) }}</span>
         </template>
@@ -104,6 +102,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG12Disclosure } from '../../composables/useG12Disclosure'

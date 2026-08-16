@@ -108,7 +108,7 @@
         <el-table-column label="期初" align="center">
           <el-table-column label="未审" width="92" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.openingUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.openingUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.openingUnadjusted) }}</span>
             </template>
@@ -127,7 +127,7 @@
         <el-table-column label="期末" align="center">
           <el-table-column label="未审" width="92" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.closingUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.closingUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.closingUnadjusted) }}</span>
             </template>
@@ -278,6 +278,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G8TabAdjudication.vue — G8-1 审定表
  * 勾稽：TB / G8-2 明细 / G8-3 调整回写 / G8-4 公允合计

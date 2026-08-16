@@ -192,11 +192,10 @@
         </el-table-column>
         <el-table-column label="未审单价" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.closingUnadjustedPrice"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => fv.updateRow(row.rowId, { closingUnadjustedPrice: v ?? 0 })"
             />
@@ -223,11 +222,10 @@
         </el-table-column>
         <el-table-column label="审定单价" width="88" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.closingAuditedPrice"
               size="small"
-              :controls="false"
               style="width:100%"
               @update:model-value="(v: number) => fv.updateRow(row.rowId, { closingAuditedPrice: v ?? 0 })"
             />
@@ -441,6 +439,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, ref, watch } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

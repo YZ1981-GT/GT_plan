@@ -49,19 +49,19 @@
         </el-table-column>
         <el-table-column prop="cost" label="账面原值" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.cost" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.cost" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.cost) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="accDep" label="累计折旧" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.accDep" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.accDep" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.accDep) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="impairment" label="减值准备" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.impairment" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.impairment" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.impairment) }}</span>
           </template>
         </el-table-column>
@@ -72,13 +72,13 @@
         </el-table-column>
         <el-table-column prop="proceeds" label="处置收入" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.proceeds" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.proceeds" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.proceeds) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="disposalCost" label="处置费用" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.disposalCost" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.disposalCost" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.disposalCost) }}</span>
           </template>
         </el-table-column>
@@ -136,6 +136,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabOtherCutoff — D4-36 其他业务收入截止性测试
  *
@@ -151,14 +152,14 @@ function rowClass({ row }: { row: CutoffRow }) { return row.isCrossing === '×' 
           <el-table-column label="编号" min-width="80"><template #default="{ row }"><el-input v-model="row.voucherNo" size="small" :disabled="isReadonly" @change="updateForward(row.id,'voucherNo',row.voucherNo)" /></template></el-table-column>
           <el-table-column label="品名" min-width="80"><template #default="{ row }"><el-input v-model="row.voucherProduct" size="small" :disabled="isReadonly" @change="updateForward(row.id,'voucherProduct',row.voucherProduct)" /></template></el-table-column>
           <el-table-column label="数量" width="60"><template #default="{ row }"><el-input v-model="row.voucherQty" size="small" :disabled="isReadonly" @change="updateForward(row.id,'voucherQty',row.voucherQty)" /></template></el-table-column>
-          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><el-input-number v-model="row.voucherAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateForward(row.id,'voucherAmount',row.voucherAmount)" /></template></el-table-column>
+          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><WpAmountInput v-model="row.voucherAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateForward(row.id,'voucherAmount',row.voucherAmount)" /></template></el-table-column>
         </el-table-column>
         <el-table-column label="发货单（或验收单、出库单等）" align="center" class-name="col-doc">
           <el-table-column label="日期" min-width="90"><template #default="{ row }"><el-input v-model="row.docDate" size="small" :disabled="isReadonly" placeholder="YYYY-MM-DD" @change="updateForward(row.id,'docDate',row.docDate)" /></template></el-table-column>
           <el-table-column label="编号" min-width="80"><template #default="{ row }"><el-input v-model="row.docNo" size="small" :disabled="isReadonly" @change="updateForward(row.id,'docNo',row.docNo)" /></template></el-table-column>
           <el-table-column label="品名" min-width="80"><template #default="{ row }"><el-input v-model="row.docProduct" size="small" :disabled="isReadonly" @change="updateForward(row.id,'docProduct',row.docProduct)" /></template></el-table-column>
           <el-table-column label="数量" width="60"><template #default="{ row }"><el-input v-model="row.docQty" size="small" :disabled="isReadonly" @change="updateForward(row.id,'docQty',row.docQty)" /></template></el-table-column>
-          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><el-input-number v-model="row.docAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateForward(row.id,'docAmount',row.docAmount)" /></template></el-table-column>
+          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><WpAmountInput v-model="row.docAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateForward(row.id,'docAmount',row.docAmount)" /></template></el-table-column>
         </el-table-column>
         <el-table-column label="是否跨期" width="65" align="center"><template #default="{ row }"><span :class="['crossing-badge', row.isCrossing==='×'?'crossing-bad':'crossing-ok']">{{ row.isCrossing || '—' }}</span></template></el-table-column>
         <el-table-column width="35" align="center"><template #default="{ row }"><el-popconfirm title="删除？" @confirm="removeForward(row.id)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">×</el-button></template></el-popconfirm></template></el-table-column>
@@ -175,14 +176,14 @@ function rowClass({ row }: { row: CutoffRow }) { return row.isCrossing === '×' 
           <el-table-column label="编号" min-width="80"><template #default="{ row }"><el-input v-model="row.docNo" size="small" :disabled="isReadonly" @change="updateBackward(row.id,'docNo',row.docNo)" /></template></el-table-column>
           <el-table-column label="品名" min-width="80"><template #default="{ row }"><el-input v-model="row.docProduct" size="small" :disabled="isReadonly" @change="updateBackward(row.id,'docProduct',row.docProduct)" /></template></el-table-column>
           <el-table-column label="数量" width="60"><template #default="{ row }"><el-input v-model="row.docQty" size="small" :disabled="isReadonly" @change="updateBackward(row.id,'docQty',row.docQty)" /></template></el-table-column>
-          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><el-input-number v-model="row.docAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateBackward(row.id,'docAmount',row.docAmount)" /></template></el-table-column>
+          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><WpAmountInput v-model="row.docAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateBackward(row.id,'docAmount',row.docAmount)" /></template></el-table-column>
         </el-table-column>
         <el-table-column label="记账凭证" align="center" class-name="col-voucher">
           <el-table-column label="日期" min-width="90"><template #default="{ row }"><el-input v-model="row.voucherDate" size="small" :disabled="isReadonly" placeholder="YYYY-MM-DD" @change="updateBackward(row.id,'voucherDate',row.voucherDate)" /></template></el-table-column>
           <el-table-column label="编号" min-width="80"><template #default="{ row }"><el-input v-model="row.voucherNo" size="small" :disabled="isReadonly" @change="updateBackward(row.id,'voucherNo',row.voucherNo)" /></template></el-table-column>
           <el-table-column label="品名" min-width="80"><template #default="{ row }"><el-input v-model="row.voucherProduct" size="small" :disabled="isReadonly" @change="updateBackward(row.id,'voucherProduct',row.voucherProduct)" /></template></el-table-column>
           <el-table-column label="数量" width="60"><template #default="{ row }"><el-input v-model="row.voucherQty" size="small" :disabled="isReadonly" @change="updateBackward(row.id,'voucherQty',row.voucherQty)" /></template></el-table-column>
-          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><el-input-number v-model="row.voucherAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateBackward(row.id,'voucherAmount',row.voucherAmount)" /></template></el-table-column>
+          <el-table-column label="金额" min-width="90" align="right"><template #default="{ row }"><WpAmountInput v-model="row.voucherAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateBackward(row.id,'voucherAmount',row.voucherAmount)" /></template></el-table-column>
         </el-table-column>
         <el-table-column label="是否跨期" width="65" align="center"><template #default="{ row }"><span :class="['crossing-badge', row.isCrossing==='×'?'crossing-bad':'crossing-ok']">{{ row.isCrossing || '—' }}</span></template></el-table-column>
         <el-table-column width="35" align="center"><template #default="{ row }"><el-popconfirm title="删除？" @confirm="removeBackward(row.id)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">×</el-button></template></el-popconfirm></template></el-table-column>

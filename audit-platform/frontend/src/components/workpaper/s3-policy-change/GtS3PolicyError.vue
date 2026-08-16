@@ -79,11 +79,9 @@
         </el-table-column>
         <el-table-column prop="retroAdjustment" label="追溯调整金额" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.retroAdjustment"
-              :precision="2"
-              :controls="false"
               style="width: 120px"
             />
             <span v-else>{{ fmt(row.retroAdjustment) }}</span>
@@ -151,6 +149,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS3PolicyError.vue — S3-1 会计政策变更和前期差错更正
  *

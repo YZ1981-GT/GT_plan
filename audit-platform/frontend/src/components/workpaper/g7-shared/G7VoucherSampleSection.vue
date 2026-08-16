@@ -59,13 +59,13 @@
       </el-table-column>
       <el-table-column label="借方" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.debitAmount" :controls="false" size="small" style="width:100%" @change="persistRows" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.debitAmount" size="small" style="width:100%" @change="persistRows" />
           <span v-else>{{ Number(row.debitAmount || 0).toFixed(2) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" v-model="row.creditAmount" :controls="false" size="small" style="width:100%" @change="persistRows" />
+          <WpAmountInput v-if="!isReadonly" v-model="row.creditAmount" size="small" style="width:100%" @change="persistRows" />
           <span v-else>{{ Number(row.creditAmount || 0).toFixed(2) }}</span>
         </template>
       </el-table-column>
@@ -92,6 +92,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine.vue'

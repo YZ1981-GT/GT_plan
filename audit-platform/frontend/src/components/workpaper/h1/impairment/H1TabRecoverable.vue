@@ -91,9 +91,8 @@
           />
         </el-form-item>
         <el-form-item label="账面价值">
-          <el-input-number
+          <WpAmountInput
             :model-value="state.bookValue.value"
-            :controls="false"
             :disabled="isReadonly"
             @change="(v: number | undefined) => state.updateBookValue(v ?? 0)"
           />
@@ -117,10 +116,9 @@
         <el-table-column prop="label" label="确定方法" width="160" />
         <el-table-column label="金额" width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.amount"
-              :controls="false"
               size="small"
               @change="row.onAmount"
             />
@@ -152,7 +150,7 @@
         <el-row :gutter="12">
           <el-col :span="8">
             <el-form-item label="法律费用">
-              <el-input-number v-model="state.fvDisposal.value.legalFees" :controls="false" :disabled="isReadonly" @change="persistFv" />
+              <WpAmountInput v-model="state.fvDisposal.value.legalFees" :disabled="isReadonly" @change="persistFv" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -167,7 +165,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="直接费用">
-              <el-input-number v-model="state.fvDisposal.value.directCosts" :controls="false" :disabled="isReadonly" @change="persistFv" />
+              <WpAmountInput v-model="state.fvDisposal.value.directCosts" :disabled="isReadonly" @change="persistFv" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -240,10 +238,9 @@
         <el-table-column prop="yearLabel" label="年份" width="80" align="center" />
         <el-table-column label="现金流入/收入" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.revenue"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => state.updateCashFlowYear(row.year - 1, 'revenue', v ?? 0)"
             />
@@ -252,10 +249,9 @@
         </el-table-column>
         <el-table-column label="现金流出/成本" width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.cost"
-              :controls="false"
               size="small"
               @change="(v: number | undefined) => state.updateCashFlowYear(row.year - 1, 'cost', v ?? 0)"
             />
@@ -343,7 +339,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="债务成本 Kd%">
-              <el-input-number v-model="state.waccParams.value.costOfDebt" :controls="false" :precision="2" :disabled="isReadonly" @change="persistWacc" />
+              <WpAmountInput v-model="state.waccParams.value.costOfDebt" :disabled="isReadonly" @change="persistWacc" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -591,6 +587,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H1TabRecoverable.vue — H1-15 可收回金额测试表
  *

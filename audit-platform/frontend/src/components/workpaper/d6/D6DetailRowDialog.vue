@@ -49,13 +49,13 @@
     </el-alert>
     <el-form label-width="110px" label-position="right">
       <el-form-item label="期初未审">
-        <el-input-number v-model="form.priorUnadjusted" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.priorUnadjusted" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="期初AJE">
-        <el-input-number v-model="form.priorAje" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.priorAje" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="期初RJE">
-        <el-input-number v-model="form.priorRje" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.priorRje" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="期初审定">
         <div class="computed-value">{{ fmtAmt(computedPriorAudited) }}</div>
@@ -89,10 +89,10 @@
     </el-alert>
     <el-form label-width="110px" label-position="right">
       <el-form-item label="借方发生">
-        <el-input-number v-model="form.debitAmount" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.debitAmount" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="贷方发生">
-        <el-input-number v-model="form.creditAmount" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.creditAmount" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="期末未审">
         <div class="computed-value">{{ fmtAmt(computedEndUnadjusted) }}</div>
@@ -108,10 +108,10 @@
     </el-alert>
     <el-form label-width="120px" label-position="right">
       <el-form-item label="期末AJE">
-        <el-input-number v-model="form.endAje" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.endAje" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="期末RJE">
-        <el-input-number v-model="form.endRje" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.endRje" style="width:100%" placeholder="0" />
       </el-form-item>
       <el-form-item label="期末审定">
         <div class="computed-value highlight">{{ fmtAmt(computedEndAudited) }}</div>
@@ -159,7 +159,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="期后结转金额">
-        <el-input-number v-model="form.postPeriodSettlement" :controls="false" style="width:100%" placeholder="0" />
+        <WpAmountInput v-model="form.postPeriodSettlement" style="width:100%" placeholder="0" />
       </el-form-item>
     </el-form>
   </div>
@@ -178,6 +178,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ref, computed, watch, reactive } from 'vue'
 import {
   CONTRACT_TYPES,

@@ -23,6 +23,7 @@ import GtVoucherSamplingEngine from '../voucher-sampling/GtVoucherSamplingEngine
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import { isAmountColumn } from '../composables/wpAmountInput'
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { ElMessage } from 'element-plus'
 import {
   pullSamplesForWorkpaper,
@@ -374,13 +375,20 @@ async function generateAuditConclusion(): Promise<void> {
               <span v-if="col.type === 'computed'" class="auto-calc-value">
                 {{ formatCellValue(row, col) }}
               </span>
-              <!-- Number -->
+              <!-- Number: 金额列用 WpAmountInput（千分符生效），非金额数值列（月份/利率等）保留 el-input-number -->
+              <WpAmountInput
+                v-else-if="col.type === 'number' && isAmountColumn(col)"
+                :model-value="row[col.key]"
+                :disabled="isReadonly"
+                size="small"
+                :aria-label="col.label"
+                @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
+              />
               <el-input-number
                 v-else-if="col.type === 'number'"
                 :model-value="row[col.key]"
                 :disabled="isReadonly"
                 :controls="false"
-                :precision="isAmountColumn(col) ? 2 : undefined"
                 size="small"
                 @change="(val: number) => updateCell(row.id, col.key, val ?? 0)"
               />

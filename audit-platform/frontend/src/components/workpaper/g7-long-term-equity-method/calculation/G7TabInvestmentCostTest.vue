@@ -163,8 +163,7 @@
 
         <el-table-column label="直接相关费用" min-width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.directCosts" size="small"
-              :controls="false" :precision="2" class="compact-num"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.directCosts" size="small" class="compact-num"
               @change="(v: number) => updateFieldWithRecalc(row.id, 'directCosts', v)" />
             <span v-else>{{ fmtNum(row.directCosts) }}</span>
           </template>
@@ -180,8 +179,7 @@
 
         <el-table-column label="净资产公允价值" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.netAssetFairValue" size="small"
-              :controls="false" :precision="2" class="compact-num"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.netAssetFairValue" size="small" class="compact-num"
               @change="(v: number) => updateFieldWithRecalc(row.id, 'netAssetFairValue', v)" />
             <span v-else>{{ fmtNum(row.netAssetFairValue) }}</span>
           </template>
@@ -355,6 +353,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { extractG7AiText } from '../../composables/g7AiText'
 /**
  * G7TabInvestmentCostTest — G7-13 投资成本测试

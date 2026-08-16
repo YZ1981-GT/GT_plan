@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /** F3TabOverdueCheck — F3-5 逾期未付票据检查表 */
 import { computed, inject, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -291,11 +292,11 @@ function summaryMethod({ columns }: { columns: any[] }) {
           <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.interestRate" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'interestRate', v ?? 0)" /><span v-else>{{ row.interestRate || '-' }}</span></template>
         </el-table-column>
         <el-table-column prop="faceValue" label="票面金额" width="120" align="right">
-          <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.faceValue" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'faceValue', v ?? 0)" /><span v-else>{{ fmt(row.faceValue) }}</span></template>
+          <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.faceValue" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'faceValue', v ?? 0)" /><span v-else>{{ fmt(row.faceValue) }}</span></template>
         </el-table-column>
         <el-table-column prop="postPaymentAmount" label="期后支付金额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.postPaymentAmount" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'postPaymentAmount', v ?? 0)" />
+            <WpAmountInput v-if="!isReadonly" :model-value="row.postPaymentAmount" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'postPaymentAmount', v ?? 0)" />
             <span v-else>{{ fmt(row.postPaymentAmount) }}</span>
             <div v-if="row.unpaidAmount" class="cell-hint">尚未支付 {{ fmt(row.unpaidAmount) }}</div>
           </template>
@@ -316,7 +317,7 @@ function summaryMethod({ columns }: { columns: any[] }) {
             <template #default="{ row }"><el-input v-if="!isReadonly" :model-value="row.collateralName" size="small" @change="(v: string) => updateCell(row.rowId, 'collateralName', v)" /><span v-else>{{ row.collateralName }}</span></template>
           </el-table-column>
           <el-table-column prop="collateralAmount" label="金额" width="120" align="right">
-            <template #default="{ row }"><el-input-number v-if="!isReadonly" :model-value="row.collateralAmount" :controls="false" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'collateralAmount', v ?? 0)" /><span v-else>{{ fmt(row.collateralAmount) }}</span></template>
+            <template #default="{ row }"><WpAmountInput v-if="!isReadonly" :model-value="row.collateralAmount" size="small" style="width:100%" @change="(v: number | undefined) => updateCell(row.rowId, 'collateralAmount', v ?? 0)" /><span v-else>{{ fmt(row.collateralAmount) }}</span></template>
           </el-table-column>
         </el-table-column>
         <el-table-column label="风险提示" width="170">

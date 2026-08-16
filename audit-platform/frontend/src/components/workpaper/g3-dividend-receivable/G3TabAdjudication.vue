@@ -117,11 +117,10 @@
       <el-table-column label="期初">
         <el-table-column label="未审" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row._type === 'data'"
               :model-value="row.openingUnadjusted"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @update:model-value="(v: number) => adj.updateCell(row.id, 'openingUnadjusted', v ?? 0)"
@@ -139,11 +138,10 @@
             <span title="仅用于前期差错更正/重述；常规项目期初应等于上期审定期末">AJE（前期差错）</span>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row._type === 'data'"
               :model-value="row.openingAJE"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @update:model-value="(v: number) => adj.updateCell(row.id, 'openingAJE', v ?? 0)"
@@ -161,11 +159,10 @@
             <span title="仅用于前期重分类重述">RJE（重述）</span>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row._type === 'data'"
               :model-value="row.openingRJE"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @update:model-value="(v: number) => adj.updateCell(row.id, 'openingRJE', v ?? 0)"
@@ -188,11 +185,10 @@
       <!-- 本期宣告(借方) -->
       <el-table-column label="本期宣告(借方)" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row._type === 'data'"
             :model-value="row.currentDeclared"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => adj.updateCell(row.id, 'currentDeclared', v ?? 0)"
@@ -204,11 +200,10 @@
       <!-- 本期收回(贷方) -->
       <el-table-column label="本期收回(贷方)" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="row._type === 'data'"
             :model-value="row.currentReceived"
             size="small"
-            :controls="false"
             :disabled="isReadonly"
             style="width:100%"
             @update:model-value="(v: number) => adj.updateCell(row.id, 'currentReceived', v ?? 0)"
@@ -231,11 +226,10 @@
         </el-table-column>
         <el-table-column label="AJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row._type === 'data'"
               :model-value="row.closingAJE"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @update:model-value="(v: number) => adj.updateCell(row.id, 'closingAJE', v ?? 0)"
@@ -245,11 +239,10 @@
         </el-table-column>
         <el-table-column label="RJE" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row._type === 'data'"
               :model-value="row.closingRJE"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               style="width:100%"
               @update:model-value="(v: number) => adj.updateCell(row.id, 'closingRJE', v ?? 0)"
@@ -448,6 +441,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 import { computed, ref, toRef, inject } from 'vue'
 import { Delete, Download } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'

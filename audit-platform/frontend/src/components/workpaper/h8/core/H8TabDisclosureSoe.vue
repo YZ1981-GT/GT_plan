@@ -62,10 +62,9 @@
         </el-table-column>
         <el-table-column label="期初余额" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && row.editable && !isReadonly"
               :model-value="row.begin"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number | undefined) => updateCell(block.layer, row.key, 'begin', v ?? 0)"
@@ -76,10 +75,9 @@
         <el-table-column label="本期增加" width="130" align="right">
           <template #default="{ row }">
             <span v-if="movementNa(block.layer)">——</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!row.isTotal && row.editable && !isReadonly"
               :model-value="row.increase"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number | undefined) => updateCell(block.layer, row.key, 'increase', v ?? 0)"
@@ -90,10 +88,9 @@
         <el-table-column label="本期减少" width="130" align="right">
           <template #default="{ row }">
             <span v-if="movementNa(block.layer)">——</span>
-            <el-input-number
+            <WpAmountInput
               v-else-if="!row.isTotal && row.editable && !isReadonly"
               :model-value="row.decrease"
-              :controls="false"
               size="small"
               style="width:100%"
               @update:model-value="(v: number | undefined) => updateCell(block.layer, row.key, 'decrease', v ?? 0)"
@@ -173,6 +170,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabDisclosureSoe — 使用权资产附注披露（国企）
  */

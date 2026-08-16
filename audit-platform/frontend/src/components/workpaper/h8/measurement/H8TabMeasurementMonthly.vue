@@ -54,9 +54,8 @@
           />
         </el-form-item>
         <el-form-item label="初始直接费用">
-          <el-input-number
+          <WpAmountInput
             :model-value="measurementParams.directCost"
-            :controls="false"
             @change="(v: number | undefined) => handleParamChange('directCost', v)"
           />
         </el-form-item>
@@ -174,6 +173,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabMeasurementMonthly.vue — H8-6(B) 按月计量（OO渲染+CAS21公式说明）
  * 361行16列，按月逐期

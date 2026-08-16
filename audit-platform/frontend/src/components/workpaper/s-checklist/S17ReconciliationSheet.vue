@@ -70,10 +70,9 @@
 
           <el-table-column prop="nrAmount" label="非经常性损益金额" min-width="140" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly && row.editable"
                 v-model="row.nrAmount"
-                :controls="false"
                 size="small"
                 style="width: 100%"
                 @change="() => { recalcDiff(row); markDirty() }"
@@ -188,6 +187,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * S17ReconciliationSheet.vue — S17-11 与营业外收支等核对表
  *

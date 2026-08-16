@@ -158,12 +158,10 @@
 
       <el-table-column label="借方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!props.readonly"
             :model-value="row.debitAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width: 100%"
             @change="(v: number | undefined) => adj.updateCell(row.id, 'debitAmount', v ?? 0)"
           />
@@ -173,12 +171,10 @@
 
       <el-table-column label="贷方调整金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!props.readonly"
             :model-value="row.creditAmount"
             size="small"
-            :controls="false"
-            :precision="2"
             style="width: 100%"
             @change="(v: number | undefined) => adj.updateCell(row.id, 'creditAmount', v ?? 0)"
           />
@@ -244,6 +240,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, computed, onMounted } from 'vue'
 import { useG5Adjustment } from '../../composables/useG5Adjustment'
 import { useInjectedG5FormData } from '../../composables/useG5LonRecFormData'

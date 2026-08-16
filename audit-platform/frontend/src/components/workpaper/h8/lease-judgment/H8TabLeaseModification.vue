@@ -221,11 +221,11 @@
                   @change="(v: string) => onCell(row.rowId, 'originalTerms', v)" />
               </el-form-item>
               <el-form-item label="账面负债">
-                <el-input-number :model-value="row.carryingLiability" :controls="false" :disabled="isReadonly" :precision="2"
+                <WpAmountInput :model-value="row.carryingLiability" :disabled="isReadonly"
                   @change="(v: number | undefined) => onCell(row.rowId, 'carryingLiability', v)" />
               </el-form-item>
               <el-form-item label="账面 ROU">
-                <el-input-number :model-value="row.carryingROU" :controls="false" :disabled="isReadonly" :precision="2"
+                <WpAmountInput :model-value="row.carryingROU" :disabled="isReadonly"
                   @change="(v: number | undefined) => onCell(row.rowId, 'carryingROU', v)" />
               </el-form-item>
               <el-form-item v-if="row.sourceTag" label="来源">
@@ -290,7 +290,7 @@
                     @change="(v: number | undefined) => onCell(row.rowId, 'remainingPeriods', v)" />
                 </el-form-item>
                 <el-form-item label="ROU摊销期(年)">
-                  <el-input-number :model-value="row.rouAmortYears" :controls="false" :disabled="isReadonly" :min="0" :precision="0"
+                  <WpAmountInput :model-value="row.rouAmortYears" :disabled="isReadonly"
                     @change="(v: number | undefined) => onCell(row.rowId, 'rouAmortYears', v)" />
                 </el-form-item>
                 <el-form-item label="新负债现值">
@@ -415,6 +415,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, watch, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useH8LeaseModification, type H8LeaseModificationRow } from '../../composables/useH8LeaseModification'

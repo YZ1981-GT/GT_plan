@@ -122,7 +122,7 @@
           <el-table-column label="未审数" width="88" align="right">
             <template #default="{ row }">
               <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.openingUnadjusted) }}</span></template>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.openingUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.openingUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.openingUnadjusted) }}</span>
             </template>
@@ -130,7 +130,7 @@
           <el-table-column label="账项调整" width="80" align="right">
             <template #default="{ row }">
               <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.openingAJE) }}</span></template>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.openingAJE" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.openingAJE" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'openingAJE', v ?? 0)" />
               <span v-else>{{ fmt(row.openingAJE) }}</span>
             </template>
@@ -152,7 +152,7 @@
           <el-table-column label="未审数" width="88" align="right">
             <template #default="{ row }">
               <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.closingUnadjusted) }}</span></template>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.closingUnadjusted" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.closingUnadjusted" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingUnadjusted', v ?? 0)" />
               <span v-else>{{ fmt(row.closingUnadjusted) }}</span>
             </template>
@@ -160,7 +160,7 @@
           <el-table-column label="账项调整" width="80" align="right">
             <template #default="{ row }">
               <template v-if="row.rowKey?.endsWith('_subtotal')"><span class="formula-cell">{{ fmt(row.closingAJE) }}</span></template>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.closingAJE" size="small" :controls="false" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.closingAJE" size="small" style="width:100%"
                 @update:model-value="(v: number) => adj.updateField(row.rowKey, 'closingAJE', v ?? 0)" />
               <span v-else>{{ fmt(row.closingAJE) }}</span>
             </template>
@@ -268,6 +268,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { computed, toRef, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'

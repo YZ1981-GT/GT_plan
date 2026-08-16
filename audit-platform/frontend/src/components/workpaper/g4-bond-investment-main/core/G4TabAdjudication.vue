@@ -86,11 +86,10 @@
       <el-table-column label="期初数" align="center">
         <el-table-column label="未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly && row.kind !== 'footer'"
               :model-value="row.openingUnadjusted"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'openingUnadjusted', v ?? 0)"
             />
@@ -99,11 +98,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly && row.kind !== 'footer'"
               :model-value="row.openingAdjustment"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'openingAdjustment', v ?? 0)"
             />
@@ -120,11 +118,10 @@
       <el-table-column label="期末数" align="center">
         <el-table-column label="未审数" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.closingUnadjusted"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'closingUnadjusted', v ?? 0)"
             />
@@ -133,11 +130,10 @@
         </el-table-column>
         <el-table-column label="账项调整" width="110" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly && row.kind !== 'footer'"
               :model-value="row.closingAdjustment"
               size="small"
-              :controls="false"
               style="width: 100%"
               @update:model-value="(v: number) => adj.updateCell(row.rowKey, 'closingAdjustment', v ?? 0)"
             />
@@ -216,6 +212,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G4TabAdjudication.vue — 对齐 Excel《审定表G4-1》列/行结构（参照 G1-1）
  */

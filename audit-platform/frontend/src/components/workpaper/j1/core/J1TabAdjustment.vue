@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * J1TabAdjustment — J1-3 调整分录汇总表
  *
@@ -430,14 +431,14 @@ function fmtAmount(v: number): string {
       </el-table-column>
       <el-table-column label="借方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" :controls="false" size="small" style="width:105px"
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:105px"
             @change="(v: number) => updateCell(row.rowId, 'debitAmount', v ?? 0)" />
           <span v-else>{{ fmtAmount(row.debitAmount) }}</span>
         </template>
       </el-table-column>
       <el-table-column label="贷方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" :controls="false" size="small" style="width:105px"
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:105px"
             @change="(v: number) => updateCell(row.rowId, 'creditAmount', v ?? 0)" />
           <span v-else>{{ fmtAmount(row.creditAmount) }}</span>
         </template>

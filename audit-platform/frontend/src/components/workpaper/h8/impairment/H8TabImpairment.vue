@@ -137,10 +137,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.bookValue"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="(v: number | undefined) => state.updateRow(row.rowId, { bookValue: v ?? 0 })"
             />
@@ -153,10 +152,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.fairValueLessDisposal"
               size="small"
-              :controls="false"
               :disabled="isReadonly || row.hasIndication !== 'Y'"
               @change="(v: number | undefined) => state.updateRow(row.rowId, { fairValueLessDisposal: v ?? 0 })"
             />
@@ -205,10 +203,9 @@
             </el-tooltip>
           </template>
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.alreadyProvided"
               size="small"
-              :controls="false"
               :disabled="isReadonly"
               @change="(v: number | undefined) => state.updateRow(row.rowId, { alreadyProvided: v ?? 0 })"
             />
@@ -362,6 +359,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H8TabImpairment.vue — H8-10 减值测算表
  * 行级测算 + H8-2/H8-8/H8-11/K11 联动（useH8Impairment）

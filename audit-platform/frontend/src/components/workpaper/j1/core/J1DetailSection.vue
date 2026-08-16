@@ -46,10 +46,9 @@
       <el-table-column label="未审数" align="center">
         <el-table-column label="期初数" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.unadjBegin"
-              :controls="false"
               size="small"
               style="width:90px"
               @change="(v: number) => $emit('update-cell', row.id, 'unadjBegin', v ?? 0)"
@@ -59,10 +58,9 @@
         </el-table-column>
         <el-table-column label="本期增加" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.unadjIncrease"
-              :controls="false"
               size="small"
               style="width:90px"
               @change="(v: number) => $emit('update-cell', row.id, 'unadjIncrease', v ?? 0)"
@@ -72,10 +70,9 @@
         </el-table-column>
         <el-table-column label="本期减少" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.unadjDecrease"
-              :controls="false"
               size="small"
               style="width:90px"
               @change="(v: number) => $emit('update-cell', row.id, 'unadjDecrease', v ?? 0)"
@@ -94,10 +91,9 @@
       <el-table-column label="期初调整" align="center">
         <el-table-column label="账项调整" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.openingAdj"
-              :controls="false"
               size="small"
               style="width:90px"
               @change="(v: number) => $emit('update-cell', row.id, 'openingAdj', v ?? 0)"
@@ -111,10 +107,9 @@
       <el-table-column label="账项调整" align="center">
         <el-table-column label="本期增加" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.ajeIncrease"
-              :controls="false"
               size="small"
               style="width:90px"
               @change="(v: number) => $emit('update-cell', row.id, 'ajeIncrease', v ?? 0)"
@@ -124,10 +119,9 @@
         </el-table-column>
         <el-table-column label="本期减少" width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.ajeDecrease"
-              :controls="false"
               size="small"
               style="width:90px"
               @change="(v: number) => $emit('update-cell', row.id, 'ajeDecrease', v ?? 0)"
@@ -195,6 +189,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import type { J1DetailRow } from '@/composables/workpaper/j1/useJ1Detail'
 
 defineProps<{

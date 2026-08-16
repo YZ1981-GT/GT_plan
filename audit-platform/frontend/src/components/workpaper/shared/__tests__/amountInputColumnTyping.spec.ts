@@ -78,8 +78,10 @@ describe('Property 7: 三分类无遗漏桶', () => {
   })
 
   it('totals 与判据基线一致（探针扫描准确性）', () => {
-    // el-input-number 总量是稳定基线（存量实测 4260）；若大幅偏离说明扫描漏读
-    expect(report.totals.el_input_number).toBeGreaterThan(4000)
+    // el-input-number 总量是扫描健康度基线：批3 迁移 6 个非 active 循环
+    // （S/J/F/D/G/H 约 1118 处 el-input-number→WpAmountInput）后从存量 4260 降到
+    // ~3072；下限 2500 仍能拦「探针漏读骤降到 0」的扫描故障（保留原判据意图）。
+    expect(report.totals.el_input_number).toBeGreaterThan(2500)
     expect(report.scanned_files).toBeGreaterThan(1500)
   })
 })

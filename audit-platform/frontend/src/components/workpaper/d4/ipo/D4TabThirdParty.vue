@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabThirdParty — D4-24 第三方回款检查
  *
@@ -205,9 +206,9 @@ function fmtAmount(v: number): string { return v ? v.toLocaleString('zh-CN', { m
       <el-table :data="rows" border stripe class="tp-table">
         <el-table-column label="序号" width="55" align="center" fixed><template #default="{ $index }">{{ $index + 1 }}</template></el-table-column>
         <el-table-column label="客户名称" min-width="120"><template #default="{ row }"><el-input v-model="row.customerName" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'customerName', row.customerName)" /></template></el-table-column>
-        <el-table-column label="本年度销售金额" min-width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.salesAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'salesAmount', row.salesAmount)" /></template></el-table-column>
-        <el-table-column label="期末应收余额" min-width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.arBalance" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'arBalance', row.arBalance)" /></template></el-table-column>
-        <el-table-column label="第三方回款金额" min-width="120" align="right"><template #default="{ row }"><el-input-number v-model="row.thirdPartyAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'thirdPartyAmount', row.thirdPartyAmount)" /></template></el-table-column>
+        <el-table-column label="本年度销售金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.salesAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'salesAmount', row.salesAmount)" /></template></el-table-column>
+        <el-table-column label="期末应收余额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.arBalance" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'arBalance', row.arBalance)" /></template></el-table-column>
+        <el-table-column label="第三方回款金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.thirdPartyAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'thirdPartyAmount', row.thirdPartyAmount)" /></template></el-table-column>
         <el-table-column label="回款方名称" min-width="120"><template #default="{ row }"><el-input v-model="row.thirdPartyName" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'thirdPartyName', row.thirdPartyName)" /></template></el-table-column>
         <el-table-column label="回款原因" min-width="110"><template #default="{ row }"><el-input v-model="row.reason" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'reason', row.reason)" /></template></el-table-column>
         <el-table-column label="与客户关系" min-width="100"><template #default="{ row }"><el-input v-model="row.relationToCustomer" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'relationToCustomer', row.relationToCustomer)" /></template></el-table-column>

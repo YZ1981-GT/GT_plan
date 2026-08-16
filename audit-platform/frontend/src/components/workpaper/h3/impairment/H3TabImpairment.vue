@@ -144,7 +144,7 @@
         </el-table-column>
         <el-table-column label="②账面价值" width="115" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" @change="onCalcChange($index, 'bookValue')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookValue" size="small" @change="onCalcChange($index, 'bookValue')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
         </el-table-column>
@@ -179,7 +179,7 @@
         </el-table-column>
         <el-table-column label="⑦已计提" width="100" align="right">
           <template #default="{ row, $index }">
-            <el-input-number v-if="!isReadonly" v-model="row.alreadyProvided" :controls="false" size="small" @change="onCalcChange($index, 'alreadyProvided')" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.alreadyProvided" size="small" @change="onCalcChange($index, 'alreadyProvided')" />
             <span v-else class="amount-cell">{{ fmtAmt(row.alreadyProvided) }}</span>
           </template>
         </el-table-column>
@@ -326,6 +326,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * H3TabImpairment.vue — H3-10 减值测算（仅成本模式）
  * 对齐致同源模板：CAS8六项 + ①~⑧测算表 + H3-11回写校验

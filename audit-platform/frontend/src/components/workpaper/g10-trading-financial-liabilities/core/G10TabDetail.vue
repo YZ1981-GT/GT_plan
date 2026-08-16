@@ -285,14 +285,14 @@
         </el-table-column>
         <el-table-column label="计入财务费用利息" width="120" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.interestExpense" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.interestExpense" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { interestExpense: v ?? 0 })" />
             <span v-else>{{ fmt(row.interestExpense) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="本期减少" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.currentDecrease" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.currentDecrease" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.rowId, { currentDecrease: v ?? 0 })" />
             <span v-else>{{ fmt(row.currentDecrease) }}</span>
           </template>
@@ -469,6 +469,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, watch, inject } from 'vue'
 import { useG10Detail, type G10DetailRow } from '../../composables/useG10Detail'
 import {

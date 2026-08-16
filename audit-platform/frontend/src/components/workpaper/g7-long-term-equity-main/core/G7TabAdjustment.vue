@@ -207,13 +207,10 @@
 
       <el-table-column label="借方调整金额" width="125" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly && !isSuggestedDraft(row)"
             v-model="row.debitAmount"
             size="small"
-            :controls="false"
-            :precision="2"
-            :min="0"
             style="width:100%"
             @change="handleRowChanged(row)"
           />
@@ -223,13 +220,10 @@
 
       <el-table-column label="贷方调整金额" width="125" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly && !isSuggestedDraft(row)"
             v-model="row.creditAmount"
             size="small"
-            :controls="false"
-            :precision="2"
-            :min="0"
             style="width:100%"
             @change="handleRowChanged(row)"
           />
@@ -321,6 +315,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G7TabAdjustment.vue — G7-3 调整分录汇总（源模板22行×10列，HTML动态行）
  *

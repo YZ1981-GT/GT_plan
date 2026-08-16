@@ -40,11 +40,9 @@
         </el-table-column>
         <el-table-column prop="amount" label="金额(元)" width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               v-model="row.amount"
-              :controls="false"
-              :precision="2"
               size="small"
               style="width: 100%"
             />
@@ -155,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * GtS21CostAllocation.vue — 成本归集与分摊检查表 S21-3
  *

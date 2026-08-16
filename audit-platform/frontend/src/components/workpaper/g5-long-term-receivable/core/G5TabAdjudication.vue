@@ -96,11 +96,10 @@
       <el-table-column label="期初数" align="center">
         <el-table-column label="未审数" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly && row.kind !== 'tb_amount'"
               :model-value="row.openingUnadjusted"
               size="small"
-              :controls="false"
               @update:model-value="(v: number) => adjudication.updateField(row.rowKey, 'openingUnadjusted', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmtAmount(row.openingUnadjusted) }}</span>
@@ -108,11 +107,10 @@
         </el-table-column>
         <el-table-column label="账项调整" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly && row.kind !== 'tb_amount'"
               :model-value="row.openingAJE"
               size="small"
-              :controls="false"
               @update:model-value="(v: number) => adjudication.updateField(row.rowKey, 'openingAJE', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmtAmount(row.openingAJE) }}</span>
@@ -120,11 +118,10 @@
         </el-table-column>
         <el-table-column label="重分类调整" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly && row.kind !== 'tb_amount'"
               :model-value="row.openingRJE"
               size="small"
-              :controls="false"
               @update:model-value="(v: number) => adjudication.updateField(row.rowKey, 'openingRJE', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmtAmount(row.openingRJE) }}</span>
@@ -140,11 +137,10 @@
       <el-table-column label="期末数" align="center">
         <el-table-column label="未审数" min-width="100" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly"
               :model-value="row.closingUnadjusted"
               size="small"
-              :controls="false"
               @update:model-value="(v: number) => adjudication.updateField(row.rowKey, 'closingUnadjusted', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmtAmount(row.closingUnadjusted) }}</span>
@@ -152,11 +148,10 @@
         </el-table-column>
         <el-table-column label="账项调整" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly && row.kind !== 'tb_amount'"
               :model-value="row.closingAJE"
               size="small"
-              :controls="false"
               @update:model-value="(v: number) => adjudication.updateField(row.rowKey, 'closingAJE', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmtAmount(row.closingAJE) }}</span>
@@ -164,11 +159,10 @@
         </el-table-column>
         <el-table-column label="重分类调整" min-width="90" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !props.readonly && row.kind !== 'tb_amount'"
               :model-value="row.closingRJE"
               size="small"
-              :controls="false"
               @update:model-value="(v: number) => adjudication.updateField(row.rowKey, 'closingRJE', v ?? 0)"
             />
             <span v-else :class="{ 'formula-cell': !row.editable }">{{ fmtAmount(row.closingRJE) }}</span>
@@ -245,6 +239,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, toRef, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Download } from '@element-plus/icons-vue'

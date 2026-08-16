@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * D4TabMarginMonthly — D4-7 主营业务收入毛利率分析表
  *
@@ -540,7 +541,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
               <template #default="{ row }"><el-tooltip content="公式: 收入/数量" placement="top" :show-after="200"><span class="has-formula">{{ fmtAmt(row.curAvgPrice) }}</span></el-tooltip></template>
             </el-table-column>
             <el-table-column label="主营业务收入" width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.curRevenue" :controls="false" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.curRevenue" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
             </el-table-column>
             <el-table-column label="结构比" width="75" align="right">
               <template #default="{ row }"><el-tooltip content="公式: 收入/合计收入" placement="top" :show-after="200"><span class="has-formula">{{ fmtPercent(row.curStructure) }}</span></el-tooltip></template>
@@ -549,7 +550,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
               <template #default="{ row }"><el-tooltip content="公式: 成本/数量" placement="top" :show-after="200"><span class="has-formula">{{ fmtAmt(row.curUnitCost) }}</span></el-tooltip></template>
             </el-table-column>
             <el-table-column label="主营业务成本" width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.curCost" :controls="false" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.curCost" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
             </el-table-column>
             <el-table-column label="毛利" width="90" align="right">
               <template #default="{ row }"><el-tooltip content="公式: 收入-成本" placement="top" :show-after="200"><span class="has-formula">{{ fmtAmt(row.curProfit) }}</span></el-tooltip></template>
@@ -567,7 +568,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
               <template #default="{ row }"><span class="has-formula">{{ fmtAmt(row.priorAvgPrice) }}</span></template>
             </el-table-column>
             <el-table-column label="主营业务收入" width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.priorRevenue" :controls="false" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.priorRevenue" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
             </el-table-column>
             <el-table-column label="结构比" width="75" align="right">
               <template #default="{ row }"><span class="has-formula">{{ fmtPercent(row.priorStructure) }}</span></template>
@@ -576,7 +577,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
               <template #default="{ row }"><span class="has-formula">{{ fmtAmt(row.priorUnitCost) }}</span></template>
             </el-table-column>
             <el-table-column label="主营业务成本" width="110" align="right">
-              <template #default="{ row }"><el-input-number v-model="row.priorCost" :controls="false" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
+              <template #default="{ row }"><WpAmountInput v-model="row.priorCost" size="small" :disabled="isReadonly" class="num-cell" @change="updateProduct" /></template>
             </el-table-column>
             <el-table-column label="毛利" width="90" align="right">
               <template #default="{ row }"><span class="has-formula">{{ fmtAmt(row.priorProfit) }}</span></template>

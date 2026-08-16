@@ -48,13 +48,13 @@
         </el-table-column>
         <el-table-column prop="bookValue" label="账面价值" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.bookValue" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.bookValue" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.bookValue) }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="recoverableAmount" label="可收回金额" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.recoverableAmount" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.recoverableAmount" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.recoverableAmount) }}</span>
           </template>
         </el-table-column>
@@ -65,7 +65,7 @@
         </el-table-column>
         <el-table-column prop="priorImpairment" label="已确认减值" min-width="110" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" v-model="row.priorImpairment" :controls="false" size="small" @change="persistRows" />
+            <WpAmountInput v-if="!isReadonly" v-model="row.priorImpairment" size="small" @change="persistRows" />
             <span v-else class="amount-cell">{{ fmtAmt(row.priorImpairment) }}</span>
           </template>
         </el-table-column>
@@ -117,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, onMounted, toRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import GtIndexChip from '../../GtIndexChip.vue'

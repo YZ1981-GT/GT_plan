@@ -140,11 +140,9 @@
       <!-- 借方金额 -->
       <el-table-column label="借方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.debitAmount"
-            :controls="false"
-            :min="0"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'debitAmount', val ?? 0)"
@@ -156,11 +154,9 @@
       <!-- 贷方金额 -->
       <el-table-column label="贷方金额" width="120" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="!isReadonly"
             :model-value="row.creditAmount"
-            :controls="false"
-            :min="0"
             size="small"
             style="width:100%"
             @change="(val: number) => updateCell(row.rowId, 'creditAmount', val ?? 0)"
@@ -222,6 +218,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../shared/WpAmountInput.vue'
 /**
  * D5TabAdjustment.vue — D5-3 调整分录
  *

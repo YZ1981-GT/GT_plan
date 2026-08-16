@@ -118,7 +118,7 @@
           </el-table-column>
           <el-table-column label="初始直接费用" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.initialDirectCosts" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.initialDirectCosts" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="未担保余值期末" min-width="110" align="right">
@@ -134,7 +134,7 @@
           </el-table-column>
           <el-table-column label="公允价值" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.fairValue" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.fairValue" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="内含利率" width="100" align="right">
@@ -206,10 +206,9 @@
           </el-table-column>
           <el-table-column label="账面融资收益" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.companyBookIncome"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 @change="onRecalc(group, row)"
               />
@@ -289,10 +288,9 @@
           </el-table-column>
           <el-table-column label="本期增加" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.unguaranteedIncrease"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 @change="lease.syncUnguaranteedEnding(row)"
               />
@@ -300,10 +298,9 @@
           </el-table-column>
           <el-table-column label="本期减少" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-model="row.unguaranteedDecrease"
                 size="small"
-                :controls="false"
                 :disabled="!!props.readonly"
                 @change="lease.syncUnguaranteedEnding(row)"
               />
@@ -316,12 +313,12 @@
           </el-table-column>
           <el-table-column label="账面未实现期末" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.bookClosingUnrealized" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.bookClosingUnrealized" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="账面净投资期末" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.bookClosingNetInvestment" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.bookClosingNetInvestment" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="预计可收回" min-width="100" align="right">
@@ -331,7 +328,7 @@
           </el-table-column>
           <el-table-column label="减值准备期末" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.impairmentEnding" size="small" :controls="false" :disabled="!!props.readonly" />
+              <WpAmountInput v-model="row.impairmentEnding" size="small" :disabled="!!props.readonly" />
             </template>
           </el-table-column>
           <el-table-column label="已核销" min-width="90" align="right">
@@ -486,6 +483,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, watch, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useG5LeaseAmortization } from '../../composables/useG5LeaseAmortization'

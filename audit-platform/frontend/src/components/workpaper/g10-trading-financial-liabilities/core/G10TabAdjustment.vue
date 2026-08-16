@@ -392,7 +392,7 @@
 
         <template #default="{ row }">
 
-          <el-input-number v-if="!isReadonly" :model-value="row.debitAmount" size="small" :controls="false" :precision="2" style="width:100%"
+          <WpAmountInput v-if="!isReadonly" :model-value="row.debitAmount" size="small" style="width:100%"
 
             @update:model-value="(v: number | undefined) => adj.updateRow(row.rowId, { debitAmount: v ?? 0 })" />
 
@@ -406,7 +406,7 @@
 
         <template #default="{ row }">
 
-          <el-input-number v-if="!isReadonly" :model-value="row.creditAmount" size="small" :controls="false" :precision="2" style="width:100%"
+          <WpAmountInput v-if="!isReadonly" :model-value="row.creditAmount" size="small" style="width:100%"
 
             @update:model-value="(v: number | undefined) => adj.updateRow(row.rowId, { creditAmount: v ?? 0 })" />
 
@@ -552,6 +552,7 @@
 
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 
 import { computed, ref, toRef, watch, onMounted, onBeforeUnmount, nextTick, inject } from 'vue'
 import { ElMessage } from 'element-plus'

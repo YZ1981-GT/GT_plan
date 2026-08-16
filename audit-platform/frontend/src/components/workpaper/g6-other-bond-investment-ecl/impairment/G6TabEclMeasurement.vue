@@ -223,11 +223,10 @@
           </el-table-column>
           <el-table-column label="账面余额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookBalance"
                 size="small"
-                :controls="false"
                 class="amt"
                 @change="(v: number | undefined) => { row.bookBalance = v ?? 0; recomputePdLgd(row); saveAll() }"
               />
@@ -386,11 +385,10 @@
           </el-table-column>
           <el-table-column label="账面余额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!isReadonly"
                 :model-value="row.bookBalance"
                 size="small"
-                :controls="false"
                 class="amt"
                 @change="(v: number | undefined) => { row.bookBalance = v ?? 0; recomputeLossRate(row); saveAll() }"
               />
@@ -607,6 +605,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabEclMeasurement.vue — 对齐 Excel《预期信用损失的计量测试G6-13》
  */

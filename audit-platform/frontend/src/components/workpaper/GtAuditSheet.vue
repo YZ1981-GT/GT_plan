@@ -193,12 +193,10 @@
       <!-- 账项调整（可编辑；合计行汇总只读） -->
       <el-table-column v-if="!isDynamicColumns" label="账项调整" width="130" align="right">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-if="isEditableRow(row)"
             v-model="row.adj_amount"
             size="small"
-            :precision="2"
-            :controls="false"
             :disabled="readonly"
             :placeholder="adjPlaceholder(row)"
             style="width: 100%"
@@ -458,6 +456,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'

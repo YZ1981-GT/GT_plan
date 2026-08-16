@@ -110,12 +110,10 @@
           </el-table-column>
           <el-table-column label="单位公允价值" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row._isTotal && !isReadonly"
                 :model-value="row.unadjPrice"
                 size="small"
-                :controls="false"
-                :precision="4"
                 class="amt"
                 @update:model-value="(v: number | undefined) => fairValue.updateRow(row.id, 'unadjPrice', v ?? 0)"
               />
@@ -165,12 +163,10 @@
           </el-table-column>
           <el-table-column label="单位公允价值" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row._isTotal && !isReadonly"
                 :model-value="row.auditedPrice"
                 size="small"
-                :controls="false"
-                :precision="4"
                 class="amt"
                 @update:model-value="(v: number | undefined) => fairValue.updateRow(row.id, 'auditedPrice', v ?? 0)"
               />
@@ -477,6 +473,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 /**
  * G6TabFairValueTest.vue — 对齐 Excel《公允价值测试表G6-5》
  */

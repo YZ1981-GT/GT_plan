@@ -82,21 +82,21 @@
         </el-table-column>
         <el-table-column label="原值" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.originalCost" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.originalCost" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { originalCost: v ?? 0 })" />
             <span v-else>{{ fmt(row.originalCost) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="累计折旧" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.accumulatedDepreciation" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.accumulatedDepreciation" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { accumulatedDepreciation: v ?? 0 })" />
             <span v-else>{{ fmt(row.accumulatedDepreciation) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="减值准备" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.impairmentProvision" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.impairmentProvision" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { impairmentProvision: v ?? 0 })" />
             <span v-else>{{ fmt(row.impairmentProvision) }}</span>
           </template>
@@ -109,14 +109,14 @@
       <template v-else-if="activeTab === 'disposal'">
         <el-table-column label="处置收入" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.disposalIncome" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.disposalIncome" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { disposalIncome: v ?? 0 })" />
             <span v-else>{{ fmt(row.disposalIncome) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="处置费用" width="96" align="right">
           <template #default="{ row }">
-            <el-input-number v-if="!isReadonly" :model-value="row.disposalExpenses" size="small" :controls="false" style="width:100%"
+            <WpAmountInput v-if="!isReadonly" :model-value="row.disposalExpenses" size="small" style="width:100%"
               @update:model-value="(v: number) => detail.updateRow(row.id, { disposalExpenses: v ?? 0 })" />
             <span v-else>{{ fmt(row.disposalExpenses) }}</span>
           </template>
@@ -196,6 +196,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, toRef, onMounted } from 'vue'
 import { useH10Detail } from '../../composables/useH10Detail'
 import type { ChecklistResponse } from '../../composables/useF1FormData'

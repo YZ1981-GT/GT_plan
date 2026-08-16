@@ -32,12 +32,9 @@
       </el-form-item>
 
       <el-form-item label="商誉账面价值" required>
-        <el-input-number
+        <WpAmountInput
           v-model="form.goodwill_book_value"
-          :min="0.01"
-          :max="999999999999"
           :step="10000"
-          :precision="2"
           controls-position="right"
           style="width: 220px"
         />
@@ -45,12 +42,9 @@
       </el-form-item>
 
       <el-form-item label="CGU 其他资产账面价值">
-        <el-input-number
+        <WpAmountInput
           v-model="form.other_assets_book_value"
-          :min="0"
-          :max="999999999999"
           :step="10000"
-          :precision="2"
           controls-position="right"
           style="width: 220px"
         />
@@ -145,11 +139,9 @@
       </el-table-column>
       <el-table-column label="账面价值（元）" min-width="180">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.book_value"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             style="width: 100%"
           />
@@ -157,11 +149,9 @@
       </el-table-column>
       <el-table-column label="可收回金额（元，可选）" min-width="200">
         <template #default="{ row }">
-          <el-input-number
+          <WpAmountInput
             v-model="row.recoverable_amount"
-            :min="0"
             :step="10000"
-            :precision="2"
             controls-position="right"
             placeholder="留空 = 无下限"
             style="width: 100%"
@@ -297,6 +287,7 @@
 </template>
 
 <script setup lang="ts">
+import WpAmountInput from './shared/WpAmountInput.vue'
 import { reactive, ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
