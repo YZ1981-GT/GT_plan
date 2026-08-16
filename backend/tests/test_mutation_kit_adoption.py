@@ -68,14 +68,21 @@ KIT_PACKAGE = "_mutation_kit"
 _LEGACY_NOT_REQUIRED: dict[str, str] = {
     # ── 已归档 spec 的产物，迁移需逐条等价性验证（Property 26），成本不由本 spec 支付 ──
     "backend/scripts/diagnose/mutate_h_cycle_guards.py":
-        "Task 12 待迁（钦定 5 个之一）。用 groups「变异 → 测试组」模型，与共享件的 want "
-        "模型不同构，声明需重写 —— 迁移完成后从本表移出",
+        "Task 12 原定待迁，2026-08-16 实测阻塞放弃：M1/M2 用 `groups` 模型同时跑 be"
+        "(BE_DUAL) + fe(FE_SCOPE) 两个侧并合并判定（`new_fails = fails_be ∪ fails_fe`），"
+        "而共享件的 `Mutation.side` 是单值（每条变异只跑一个侧）。等价迁移需改共享件加 "
+        "`sides` 多侧并行+合并判定能力，或非等价拆条（1条→2条，判定矩阵结构改变 ⇒ "
+        "违反 Property 26）。须单独立项扩展共享件后再迁",
     "backend/scripts/diagnose/mutate_g7_column_alignment_guards.py":
-        "Task 12 待迁（钦定 5 个之一）。缺 md5 还原核验，迁移后由共享件补齐 —— "
-        "迁移完成后从本表移出",
+        "Task 12 原定待迁，2026-08-16 实测阻塞放弃：M14/M15 两条变异含跨行锚点"
+        "（`\\n`），在 CRLF 工作树下 text.count() 恒 0 命中 = 已失效的 ANCHOR-MISS。"
+        "迁移到共享件声明期会直接拒绝（`anchor 含换行`），而改写锚点 = 改判据 ≠ "
+        "行为等价重构（违反 Property 26/28）。须单独立项先修锚点再迁",
     "backend/scripts/check/mutate_trim_decision_guards.py":
-        "Task 12 待迁（钦定 5 个之一，736 行）。用 scope+offset 相对定位与 expect_red "
-        "多目标，共享件已吸收这两项能力 —— 迁移完成后从本表移出",
+        "Task 12 原定待迁，2026-08-16 实测阻塞放弃：全部 12 条变异声明 `sides=(py,ts)`"
+        "——每条同时跑 Python 和 TypeScript 测试并合并判定。共享件的 `Mutation.side` 是"
+        "单值，不支持跨侧合并。与 h_cycle 同为「共享件架构限制：一条 Mutation 只有一个"
+        " side」的同族阻塞。须扩展共享件后再迁",
     # ── Task 13 决策为「不迁」的 7 个（procedure-trimming 已归档，Task 3 已入库）──
     "backend/scripts/check/mutate_task13_wiring_guards.py":
         "Task 13 决策不迁：R5 的目标是入库（防工作树一丢即蒸发），Task 3 已达成；"

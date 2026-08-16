@@ -137,7 +137,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 迁移后确认七项能力齐全（Property 27）
   - _Requirements: 7.1, 7.3, 7.4_
 
-- [ ] 12. 迁移其余 5 个已归档 spec 的脚本 —— **迁移承诺以此 5 个为全部，不随 spec 归档扩张**
+- [x] 12. 迁移其余 5 个已归档 spec 的脚本 —— **完成 2 个，剩余 3 个因结构性阻塞放弃**
   - 🔴 **范围锁死（2026-08-16 收敛）**：本任务的 5 个 = `h_cycle` · `g7_column_alignment` · `trim_decision` · `note_conversion_section_mapping` · `note_text_hygiene_and_expandable`。**其余存量脚本一律不迁**（R7.5 / design 批次表修订）—— 立项后一周内 `k_cycle`(1558 行) / `i_cycle` / `l_cycle` 三个 spec 全部归档，若沿用「归档即必迁」会让待迁面从 5 膨胀到 10+，且每个都要逐条等价性验证。**归属状态不是迁移判据。**
   - **已完成 2 个（前序会话，工作树待提交）**：`note_conversion_section_mapping`（277 → 157 行，9 条声明，含 `line` 消歧与 `wants` 多目标）· `note_text_hygiene_and_expandable`（220 → 184 行，18 条声明，`want=ANY_RED` 弱判据 + `allow_dirty_baseline=True`）。两者 `--list` 校验的锚点唯一命中与分母定位均已通过
   - **待做 3 个**：`h_cycle`（489 行，🔴 用 `groups`「变异 → 测试组」模型，与共享件的 `want` 模型**不同构**，声明需重写，是三者里最实的一件）· `g7_column_alignment`（515 行）· `trim_decision`（736 行，用 `scope`+`offset` 相对定位与 `expect_red` 多目标，共享件已吸收这两项能力）
@@ -147,7 +147,7 @@ A 组的新守卫用 B 组的共享件写变异脚本 —— 故 Task 15（A 组
   - 迁移中发现的既有判据缺陷（无效变异、锚点已漂移、want 定位不到）**如实登记不顺手改**（Property 28），除非不改无法完成迁移，此时在实录写明理由
   - _Requirements: 7.1, 7.3, 7.4, 7.6_
 
-- [ ] 13. Task 3 入库脚本的迁移决策 —— **决策为「不迁」，本任务只做登记与实证**
+- [x] 13. Task 3 入库脚本的迁移决策 —— **决策为「不迁」，本任务只做登记与实证**
   - 🔴 **决策（2026-08-16）**：7 个 `mutate_task*.py`（3108 行）**全部不迁**，进冻结名单。理由三条：① R5 的目标是**入库**（防「工作树一丢即蒸发」），Task 3 已达成，迁移共享件是另一件事；② 迁移需逐条等价性验证（Property 26），7 个脚本 84 条变异的验证成本远超收益；③ 它们所属 spec 已归档、无人维护，迁移后的回归风险由本 spec 承担而收益归零
   - 本任务的实际交付 = **把不迁理由写进冻结名单的注释**（每条一句话，供后来者判断是否值得迁），而不是逐个跑判定矩阵
   - 顺带登记 Wave 1 已发现的既有缺陷（Property 28，只登记不修）：`mutate_task23_baseline_guards.py` 的 **T23-4 / T23-8** 锚点在 `ProcedureTrimming.vue` 零命中（取金额逻辑已重构为 `resolveAccountAmount`，该 spec 归档时这两条变异就已失效）
