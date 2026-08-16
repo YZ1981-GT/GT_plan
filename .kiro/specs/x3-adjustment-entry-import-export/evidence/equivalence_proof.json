@@ -4,7 +4,7 @@
     "task": "13.3",
     "artifact": "Equivalence_Proof",
     "purpose": "证明 16 张 X-3 的两条通路（UI 形态 A + Bulk adapter）均可达且不经由工厂模块",
-    "generated_at": "2026-08-15T16:20:39.538236+00:00",
+    "generated_at": "2026-08-16T00:34:21.940596+00:00",
     "requirements": [
       "9.1",
       "9.2",
@@ -19,7 +19,13 @@
     "verdict_distribution": {
       "covered_by_non_deletable_module": 16
     },
-    "all_covered": true
+    "all_covered": true,
+    "criterion": "产物含数据（artifact_bytes > 0 且无 error）+ 两侧接线齐 + 不经工厂模块",
+    "ui_artifact_ok": 16,
+    "bulk_artifact_ok": 16,
+    "bytes_agree_count": 16,
+    "rows_nonzero": 0,
+    "rows_zero_note": "rows=0 表示该底稿当前无分录（本脚本只读不写库）。通路可用性已由 artifact_bytes>0 + 两侧字节一致证明；非空往返见 evidence/roundtrip_live.json"
   },
   "records": [
     {
@@ -34,7 +40,12 @@
           "export-template": "/api/workpapers/{wp_id}/l2/export-template",
           "export-data": "/api/workpapers/{wp_id}/l2/export-data",
           "import-data": "/api/workpapers/{wp_id}/l2/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6447,
+        "probe_wp_id": "55834e10-7ead-4216-b5f0-a6b1a75ad5ac",
+        "probe_wp_code": "L2",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "l2",
@@ -42,7 +53,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6447,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -59,7 +73,12 @@
           "export-template": "/api/workpapers/{wp_id}/l6/export-template",
           "export-data": "/api/workpapers/{wp_id}/l6/export-data",
           "import-data": "/api/workpapers/{wp_id}/l6/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6425,
+        "probe_wp_id": "ccac5f0f-b57e-4cba-a536-40adfb6e0d99",
+        "probe_wp_code": "L6",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "l6",
@@ -67,7 +86,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6425,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -84,7 +106,12 @@
           "export-template": "/api/workpapers/{wp_id}/m1/export-template",
           "export-data": "/api/workpapers/{wp_id}/m1/export-data",
           "import-data": "/api/workpapers/{wp_id}/m1/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6425,
+        "probe_wp_id": "1844d2e3-8116-4e4b-8821-3d879d6fb715",
+        "probe_wp_code": "M1",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m1",
@@ -92,7 +119,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6425,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -109,7 +139,12 @@
           "export-template": "/api/workpapers/{wp_id}/m10/export-template",
           "export-data": "/api/workpapers/{wp_id}/m10/export-data",
           "import-data": "/api/workpapers/{wp_id}/m10/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6426,
+        "probe_wp_id": "85c20b6f-e364-4924-9c8d-931699939773",
+        "probe_wp_code": "M10",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m10",
@@ -117,7 +152,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6426,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -134,7 +172,12 @@
           "export-template": "/api/workpapers/{wp_id}/m2/export-template",
           "export-data": "/api/workpapers/{wp_id}/m2/export-data",
           "import-data": "/api/workpapers/{wp_id}/m2/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6425,
+        "probe_wp_id": "f0ce78c9-2b6a-4acb-bee7-ddc602a6fdac",
+        "probe_wp_code": "M2",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m2",
@@ -142,7 +185,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6425,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -159,7 +205,12 @@
           "export-template": "/api/workpapers/{wp_id}/m3/export-template",
           "export-data": "/api/workpapers/{wp_id}/m3/export-data",
           "import-data": "/api/workpapers/{wp_id}/m3/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6426,
+        "probe_wp_id": "653708e4-cbc7-4e48-821a-6f94f06219de",
+        "probe_wp_code": "M3",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m3",
@@ -167,7 +218,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6426,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -184,7 +238,12 @@
           "export-template": "/api/workpapers/{wp_id}/m4/export-template",
           "export-data": "/api/workpapers/{wp_id}/m4/export-data",
           "import-data": "/api/workpapers/{wp_id}/m4/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6426,
+        "probe_wp_id": "4e05c127-e933-4d99-804e-0c19bf1cb420",
+        "probe_wp_code": "M4",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m4",
@@ -192,7 +251,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6426,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -209,7 +271,12 @@
           "export-template": "/api/workpapers/{wp_id}/m5/export-template",
           "export-data": "/api/workpapers/{wp_id}/m5/export-data",
           "import-data": "/api/workpapers/{wp_id}/m5/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6426,
+        "probe_wp_id": "9db23672-94db-483b-84b7-813837777460",
+        "probe_wp_code": "M5",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m5",
@@ -217,7 +284,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6426,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -234,7 +304,12 @@
           "export-template": "/api/workpapers/{wp_id}/m6/export-template",
           "export-data": "/api/workpapers/{wp_id}/m6/export-data",
           "import-data": "/api/workpapers/{wp_id}/m6/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6425,
+        "probe_wp_id": "e13fd5b8-a5d9-45df-b7b0-9ccbb7fb3ac9",
+        "probe_wp_code": "M6",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m6",
@@ -242,7 +317,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6425,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -259,7 +337,12 @@
           "export-template": "/api/workpapers/{wp_id}/m7/export-template",
           "export-data": "/api/workpapers/{wp_id}/m7/export-data",
           "import-data": "/api/workpapers/{wp_id}/m7/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6426,
+        "probe_wp_id": "30e1fef9-8689-49ea-8949-949520d80005",
+        "probe_wp_code": "M7",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m7",
@@ -267,7 +350,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6426,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -284,7 +370,12 @@
           "export-template": "/api/workpapers/{wp_id}/m8/export-template",
           "export-data": "/api/workpapers/{wp_id}/m8/export-data",
           "import-data": "/api/workpapers/{wp_id}/m8/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6426,
+        "probe_wp_id": "936f6474-2053-4fe1-85be-ae4fe5bcd341",
+        "probe_wp_code": "M8",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m8",
@@ -292,7 +383,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6426,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -309,7 +403,12 @@
           "export-template": "/api/workpapers/{wp_id}/m9/export-template",
           "export-data": "/api/workpapers/{wp_id}/m9/export-data",
           "import-data": "/api/workpapers/{wp_id}/m9/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6425,
+        "probe_wp_id": "cba04e24-1eb2-484c-a373-58d052a5f549",
+        "probe_wp_code": "M9",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "m9",
@@ -317,7 +416,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6425,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -334,7 +436,12 @@
           "export-template": "/api/workpapers/{wp_id}/n1/export-template",
           "export-data": "/api/workpapers/{wp_id}/n1/export-data",
           "import-data": "/api/workpapers/{wp_id}/n1/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6425,
+        "probe_wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
+        "probe_wp_code": "N1",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "n1",
@@ -342,7 +449,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6425,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -359,7 +469,12 @@
           "export-template": "/api/workpapers/{wp_id}/n2/export-template",
           "export-data": "/api/workpapers/{wp_id}/n2/export-data",
           "import-data": "/api/workpapers/{wp_id}/n2/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6430,
+        "probe_wp_id": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
+        "probe_wp_code": "N2",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "n2",
@@ -367,7 +482,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6430,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -384,7 +502,12 @@
           "export-template": "/api/workpapers/{wp_id}/n3/export-template",
           "export-data": "/api/workpapers/{wp_id}/n3/export-data",
           "import-data": "/api/workpapers/{wp_id}/n3/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6430,
+        "probe_wp_id": "898bae6a-48a5-4871-bff4-0e9382558ef2",
+        "probe_wp_code": "N3",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "n3",
@@ -392,7 +515,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6430,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -409,7 +535,12 @@
           "export-template": "/api/workpapers/{wp_id}/n5/export-template",
           "export-data": "/api/workpapers/{wp_id}/n5/export-data",
           "import-data": "/api/workpapers/{wp_id}/n5/import-data"
-        }
+        },
+        "artifact_rows": 0,
+        "artifact_bytes": 6439,
+        "probe_wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
+        "probe_wp_code": "N5",
+        "error": null
       },
       "bulk_path": {
         "adapter_prefix": "n5",
@@ -417,7 +548,10 @@
         "module_importable": true,
         "module_has_IE_SHEETS": true,
         "sheet_in_IE_SHEETS": true,
-        "skip_reason": null
+        "skip_reason": null,
+        "artifact_rows": 1,
+        "artifact_bytes": 6439,
+        "error": null
       },
       "factory_module_referenced": false,
       "verdict": "covered_by_non_deletable_module"
@@ -447,47 +581,75 @@
       {
         "module": "_h5_import_export",
         "file_exists": true,
-        "production_refs": 3,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:188 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       },
       {
         "module": "_h7_import_export",
         "file_exists": true,
-        "production_refs": 2,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:189 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       },
       {
         "module": "_l1_import_export",
         "file_exists": true,
-        "production_refs": 2,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:162 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       },
       {
         "module": "_l3_import_export",
         "file_exists": true,
-        "production_refs": 2,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:164 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       },
       {
         "module": "_l4_import_export",
         "file_exists": true,
-        "production_refs": 2,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:165 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       },
       {
         "module": "_l5_import_export",
         "file_exists": true,
-        "production_refs": 2,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:166 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       },
       {
         "module": "_n4_import_export",
         "file_exists": true,
-        "production_refs": 3,
+        "import_sites": [
+          "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py:185 module-path-string"
+        ],
+        "import_ref_count": 1,
+        "string_only_sites": [],
         "alive": true
       }
     ],
-    "method": "文件存在 + 生产代码（非测试）有引用 ⇒ alive"
+    "method": "AST 级：文件存在 + 生产代码里存在 `import`/`from … import` 该模块，或 adapter 映射值指向它。注释/docstring 里的字符串提及单列 string_only_sites，不计入 alive。"
   },
   "task25_guidance": {
     "non_deletable_modules": [

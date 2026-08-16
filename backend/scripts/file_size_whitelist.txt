@@ -1,6 +1,17 @@
 # 文件行数门禁白名单 — 历史大文件或设计上必须单文件的脚本
-# 格式：path  baseline_lines（空格分隔）
-backend/scripts/check/check_x3_deviation_registry.py  2436
-backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1243
-backend/scripts/fix/fix_note_i_cycle_structure.py  1247
-backend/tests/test_note_i_cycle_structure.py  806
+# 格式：path  baseline_lines（空格分隔，# 注释）
+#
+# 语义（见 backend/scripts/check/check_file_size.py）：
+#   - 在册文件豁免「超上限」，但**仍检查膨胀**：行数 > baseline × 1.05 即报错
+#   - 打磨完成后应把该文件从本表移除（强制回到 ≤800/1500）
+#   - 🔴 baseline 必须填**当前真实行数**，不得虚高 —— 虚高等于预留膨胀空间
+#
+# 登记理由：
+#   check_x3_deviation_registry.py —— Deviation_Registry 十一组活探针 + 自我失效机制，
+#     每组探针含「判据 + 反空转对照组 + 可复算 method」三段，拆分会让「一组的判据
+#     与它的对照组」跨文件，反空转关系不可见。spec: x3-adjustment-entry-import-export 任务 1.7
+#   mutate_ie_lifecycle_guards.py —— 变异检验清单（54 条 Mutation 声明式常量 + 四态判读引擎），
+#     条目本身是数据不是逻辑；拆分后「守卫清单 ↔ 变异覆盖率」的分母核对会跨文件。
+#     spec: workpaper-import-export-lifecycle-closure Task 21 + x3 任务 14.1
+backend/scripts/check/check_x3_deviation_registry.py  2474
+backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290

@@ -30,6 +30,7 @@ BACKEND = ROOT / "backend"
 FE_SRC = ROOT / "audit-platform" / "frontend" / "src"
 WP_DIR = FE_SRC / "components" / "workpaper"
 CATALOG_PATH = BACKEND / "data" / "acnr" / "global_catalog.json"
+CONTRACT_PATH = BACKEND / "data" / "adjustment_ie_contract.json"
 REGISTRY_PATH = ROOT / ".kiro" / "specs" / "x3-adjustment-entry-import-export" / "evidence" / "deviation_registry.json"
 
 _ADJ_CLASS = "F-调整分录"
@@ -89,12 +90,40 @@ def _has_consumer_form4(code: str, item_id: str) -> bool:
             # 直接匹配：item_id 以 ITEM_PREFIX 开头
             if item_id.startswith(prefix_val):
                 return True
-            # 间接匹配：同 cycle 前缀的派生键在前端存在
+            # 间接匹配：同 cycle 前缀 + **契约清单登记的任一后缀**在前端存在
+            # 🔴 后缀表必须与 `check_x3_deviation_registry._contract_key_suffixes()`
+            #    同源（都读 key_families），否则两处判据分叉：2026-08-16 首轮就因本处
+            #    写死 `-entries` 而在 K8-3 上与 probe_g1 判定相反。
             if prefix_val.startswith(f"{cycle}-"):
-                derived_key = prefix_val + "-entries"
-                if _has_consumer_literal(derived_key):
-                    return True
+                for suffix in _contract_suffixes():
+                    if _has_consumer_literal(f"{prefix_val}-{suffix}"):
+                        return True
     return False
+
+
+def _contract_suffixes() -> tuple[str, ...]:
+    """契约清单登记的全部后缀（单一真源 = `key_families`，禁硬编码）。"""
+    global _SUFFIX_CACHE
+    if _SUFFIX_CACHE is None:
+        doc = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        out: set[str] = set()
+        for entry in (doc.get("sheets") or {}).values():
+            fams = entry.get("key_families") or {}
+            for s in (fams.get("per_field") or {}).get("suffixes") or []:
+                if isinstance(s, str) and s:
+                    out.add(s.lstrip("-"))
+            ds = (fams.get("data") or {}).get("suffix")
+            if isinstance(ds, str) and ds:
+                out.add(ds.lstrip("-"))
+            sj_id = (fams.get("single_json") or {}).get("item_id")
+            if isinstance(sj_id, str) and "-" in sj_id:
+                out.add(sj_id.rsplit("-", 1)[-1])
+        assert out, "契约清单未登记任何后缀 ⇒ 判据退化为恒假（禁空转）"
+        _SUFFIX_CACHE = tuple(sorted(out))
+    return _SUFFIX_CACHE
+
+
+_SUFFIX_CACHE: tuple[str, ...] | None = None
 
 
 # ─── 预加载数据（避免每次 hypothesis 迭代重复 IO）────────────────────────────────

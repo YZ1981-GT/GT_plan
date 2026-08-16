@@ -93,26 +93,36 @@ def _fingerprint(data: Any) -> str:
 
 
 async def _find_wp_ids() -> dict[str, str]:
-    """为每张 X-3 找一个真实 wp_id（从 checklist_responses 按 item_id 前缀匹配）。"""
+    """为每张 X-3 找**它自己的**真实底稿对象。
+
+    🔴 判据 = `wp_index.wp_code` 必须等于该 sheet 的循环码（`L2-3` → `L2`）。
+    绝不允许用别的底稿的 wp_id 顶替 —— 那样 `write_rows`/`load_rows` 只按 item_id
+    前缀读写、在任何 wp_id 上都会"成功"，得到的通过率毫无意义
+    （2026-08-16 复盘实证：初版 16 张共用一个 `G8` 底稿的 wp_id ⇒ 虚假验收）。
+
+    找不到的 sheet **不返回**，由调用方落「无法验收」。
+    """
     import sqlalchemy as sa
     from app.core.database import async_session
-    from app.routers.wp_render_strategies._x3_adjustment_import_export import X3_SHEET_SPECS
 
     found: dict[str, str] = {}
 
     async with async_session() as db:
-        # 尝试从 checklist_responses 找任何有 X-3 相关数据的 wp_id
-        result = await db.execute(
-            sa.text("SELECT DISTINCT wp_id FROM checklist_responses LIMIT 10")
-        )
-        candidates = [str(row[0]) for row in result.fetchall()]
-
-        if not candidates:
-            return found
-
-        # 对每张 sheet 用第一个可用的 wp_id
         for sheet in X3_SHEETS:
-            found[sheet] = candidates[0]
+            cycle = sheet.split("-")[0]           # 'L2-3' → 'L2'
+            result = await db.execute(
+                sa.text(
+                    "SELECT wp.id::text FROM working_paper wp "
+                    "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                    "WHERE wi.wp_code = :code "
+                    "ORDER BY wp.updated_at DESC NULLS LAST "
+                    "LIMIT 1"
+                ),
+                {"code": cycle},
+            )
+            row = result.fetchone()
+            if row is not None:
+                found[sheet] = str(row[0])
 
     return found
 
@@ -129,6 +139,29 @@ async def _roundtrip_one(sheet: str, wp_id: str) -> dict[str, Any]:
         "error": None,
         "restored": False,
     }
+
+    # 归属证据：该 wp_id 的 wp_code 必须等于本 sheet 的循环码（防「拿别人底稿顶替」复发）
+    import sqlalchemy as _sa
+    from app.core.database import async_session as _sess
+    expected_cycle = sheet.split("-")[0]
+    async with _sess() as _db:
+        _r = await _db.execute(
+            _sa.text(
+                "SELECT wi.wp_code FROM working_paper wp "
+                "JOIN wp_index wi ON wi.id = wp.wp_index_id WHERE wp.id = :wid"
+            ),
+            {"wid": wp_id},
+        )
+        _row = _r.fetchone()
+    actual_code = str(_row[0]) if _row else None
+    result["wp_code_observed"] = actual_code
+    result["wp_code_expected"] = expected_cycle
+    if actual_code != expected_cycle:
+        result["error"] = (
+            f"底稿归属不符：wp_id 的 wp_code={actual_code!r} != 本 sheet 循环码 {expected_cycle!r}"
+            "（禁止用其他底稿顶替，见 R10.7）"
+        )
+        return result
 
     async with async_session() as db:
         # 1. 快照原始数据

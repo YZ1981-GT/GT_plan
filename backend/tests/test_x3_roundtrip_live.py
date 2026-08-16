@@ -66,6 +66,21 @@ def _all_sheets() -> list[str]:
     return sorted(mod.X3_SHEET_SPECS.keys())
 
 
+def _sample_rows() -> list[dict[str, str]]:
+    """GS7 往返用的 3 行样本（每次返回新列表，避免被就地修改）。"""
+    return [
+        {"type": "AJE", "subject": "测试科目A", "debit": "1000.00", "credit": "",
+         "summary": "GS7测试行1", "preparer": "test", "date": "2026-01-01",
+         "voucher_no": "T001", "voucher_word": "记", "index_no": ""},
+        {"type": "RJE", "subject": "测试科目B", "debit": "", "credit": "2000.50",
+         "summary": "GS7测试行2", "preparer": "test", "date": "2026-01-02",
+         "voucher_no": "T002", "voucher_word": "记", "index_no": ""},
+        {"type": "AJE", "subject": "测试科目C", "debit": "500.00", "credit": "",
+         "summary": "GS7测试行3", "preparer": "test", "date": "2026-01-03",
+         "voucher_no": "T003", "voucher_word": "记", "index_no": ""},
+    ]
+
+
 async def _find_any_wp_id() -> str | None:
     """在 checklist_responses 中找一个有数据的 wp_id。"""
     import sqlalchemy as sa
@@ -184,39 +199,91 @@ class TestGS7RoundtripLive:
         if re.search(r"except\s+Exception.*?logger\.warn", source, re.DOTALL):
             pytest.fail("write_rows 内有 `except Exception: logger.warning` —— 违反 GS7")
 
-    def test_roundtrip_first_sheet(self):
-        """至少一张 X-3 能完成 write→load 往返。"""
+    def test_roundtrip_all_16_sheets(self):
+        """🔴 **16 张全部**完成 write→load 往返（单次 asyncio.run 防连接池污染）。
+
+        2026-08-16 复盘修：初版只测 `sheets[0]`（L2-3）一张，却命名 `first_sheet`
+        并被当成 GS7 的往返覆盖 —— 其余 15 张的取值层从未被真执行过。
+        """
         async def _run():
-            wp_id = await _find_any_wp_id()
-            if wp_id is None:
-                pytest.skip("数据库中无 checklist_responses 记录")
-            sheets = _all_sheets()
-            # 取第一张尝试
-            result = await _roundtrip_one_sheet(sheets[0], wp_id)
-            return result
+            import sqlalchemy as sa
 
-        result = asyncio.run(_run())
-        if result.get("error"):
-            pytest.fail(f"往返失败 ({result['sheet']}): {result['error']}")
-        assert result["success"], f"往返未成功: {result}"
-
-    def test_wrong_column_name_must_fail(self):
-        """反向自检：故意把列名写错必须失败。"""
-        import sqlalchemy as sa
-
-        async def _run():
+            failures: list[str] = []
+            checked: list[str] = []
             async with _get_db_session() as db:
-                # 用一个不存在的列名查询
-                with pytest.raises(Exception):
-                    await db.execute(
+                for sheet in _all_sheets():
+                    cycle = sheet.split("-")[0]
+                    # 归属判据同 15.1：必须用该 sheet **自己的**底稿，禁别家顶替
+                    r = await db.execute(
                         sa.text(
-                            "SELECT item_id, nonexistent_column FROM checklist_responses "
-                            "WHERE wp_id = :wp_id LIMIT 1"
+                            "SELECT wp.id::text FROM working_paper wp "
+                            "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                            "WHERE wi.wp_code = :code "
+                            "ORDER BY wp.updated_at DESC NULLS LAST LIMIT 1"
                         ),
-                        {"wp_id": "fake-wp-id-for-gs7-selfcheck"},
+                        {"code": cycle},
                     )
+                    row = r.fetchone()
+                    if row is None:
+                        failures.append(f"{sheet}: 库中无 wp_code={cycle} 的底稿（无法验收）")
+                        continue
+                    wp_id = str(row[0])
+                    mod = _x3_module()
+                    try:
+                        original, _ = await mod.load_rows(db, wp_id, sheet)
+                        await mod.write_rows(db, wp_id, sheet, _sample_rows())
+                        readback, _ = await mod.load_rows(db, wp_id, sheet)
+                        if len(readback) != len(_sample_rows()):
+                            failures.append(
+                                f"{sheet}: 写入 {len(_sample_rows())} 行 读回 {len(readback)} 行"
+                            )
+                        await mod.write_rows(db, wp_id, sheet, original)
+                        checked.append(sheet)
+                    except Exception as exc:  # noqa: BLE001 — 记失败态，禁吞（GS7）
+                        failures.append(f"{sheet}: {type(exc).__name__}: {exc}")
+            return checked, failures
 
-        asyncio.run(_run())
+        checked, failures = asyncio.run(_run())
+        assert not failures, f"往返失败 {len(failures)} 项: {failures}"
+        # 反空转：必须是 16 个**互不相同**的 sheet，且与 X3_SHEET_SPECS 键集逐一相等
+        assert len(set(checked)) == 16, f"应覆盖 16 张互不相同，实测 {len(set(checked))}: {sorted(checked)}"
+        assert set(checked) == set(_all_sheets()), (
+            f"覆盖面与 X3_SHEET_SPECS 不符，缺 {sorted(set(_all_sheets()) - set(checked))}"
+        )
+
+    def test_reverse_selfcheck_wrong_column_name_is_detected(self):
+        """🔴 反向自检：把 SQL 里的 `wp_id` 换成 `workpaper_id`，列名守卫**必须**检出。
+
+        2026-08-16 复盘修：初版反向自检是「查一个不存在的列，断言 SQLAlchemy 抛错」——
+        那验证的是**第三方库的既有行为**，与本文件的列名守卫有没有效毫无关系
+        （守卫被删掉它照样绿）。
+
+        正确形态 = 对**守卫本身**做变异：把被扫的源码替换成写错列名的版本，
+        喂给与 `test_sql_column_name_is_wp_id` 同一套判据，必须判出违规。
+        """
+        mod = _x3_module()
+        source = inspect.getsource(mod)
+
+        # 与 test_sql_column_name_is_wp_id 完全同一套提取 + 判定逻辑
+        def _violations(src: str) -> list[str]:
+            stmts = re.findall(
+                r'(?:sa\.text|text)\(\s*(?:f?""".*?"""|f?".*?")', src, re.DOTALL
+            )
+            return [s[:80] for s in stmts if "workpaper_id" in s]
+
+        # CONTROL：真实源码必须零违规
+        assert _violations(source) == [], (
+            f"真实源码里出现 workpaper_id: {_violations(source)}"
+        )
+
+        # MUTANT：把 wp_id 换成 workpaper_id ⇒ 判据必须检出（否则守卫空转）
+        mutated = source.replace("wp_id = :wp_id", "workpaper_id = :wp_id")
+        assert mutated != source, "变异未生效（源码里找不到 `wp_id = :wp_id`）⇒ 判据锚点已漂移"
+        found = _violations(mutated)
+        assert found, (
+            "把 SQL 列名改成 workpaper_id 后判据仍未检出 ⇒ "
+            "`test_sql_column_name_is_wp_id` 是空转守卫"
+        )
 
 
 class TestGS7SourceIntegrity:
@@ -245,3 +312,38 @@ class TestGS7SourceIntegrity:
             assert col in ("remark", "conclusion"), (
                 f"{code} storage_field={col!r} 不在白名单"
             )
+
+    def test_storage_column_guard_really_executes(self):
+        """🔴 `_storage_column()` 的运行期白名单校验必须**真的执行**（GS9 运行期侧）。
+
+        为什么需要这条（2026-08-16 变异 X3 判 GREEN 后补）：
+        GS9 后端侧（`test_x3_key_ledger.py`）全是**清单内数据断言**
+        （读 `adjustment_ie_contract.json` 比 `mechanism` ↔ `storage_field`），
+        没有任何一条会**执行** `_storage_column()`。故把该函数的校验短路成
+        `if False and spec.storage_field not in allowed:` 后，GS1~GS9 照旧全绿
+        ⇒ 「列名先被白名单校验、再拼进 SQL」这条运行期保证**结构性不可见**。
+
+        判据形态 = 行为：造一个 `storage_field` 非法的替身 spec 喂给 `_storage_column()`，
+        它**必须抛错**。校验被短路 ⇒ 返回非法列名而不抛 ⇒ 本条打红。
+        （若不抛，那个非法列名会被 f-string 拼进 `SELECT {column}` / `UPDATE SET {column}`。）
+        """
+        mod = _x3_module()
+        import dataclasses
+
+        # 取一张真 spec，替换 storage_field 为非法值（不改生产数据，只造替身对象）
+        real_spec = next(iter(mod.X3_SHEET_SPECS.values()))
+        try:
+            bad_spec = dataclasses.replace(real_spec, storage_field="evil_column")
+        except Exception:
+            # 非 dataclass（如 NamedTuple）时用 _replace
+            bad_spec = real_spec._replace(storage_field="evil_column")  # type: ignore[attr-defined]
+
+        with pytest.raises(Exception) as ei:
+            mod._storage_column(bad_spec)
+        msg = str(ei.value)
+        assert "evil_column" in msg or "落库列" in msg, (
+            f"_storage_column 抛错了但消息不含被拒的列名/理由: {msg!r}"
+        )
+
+        # 对照组：合法 spec 必须正常返回（防上面那条靠「函数恒抛」蒙对）
+        assert mod._storage_column(real_spec) == real_spec.storage_field

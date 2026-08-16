@@ -522,12 +522,55 @@ def _g1_has_consumer_literal(item_id: str) -> bool:
     return False
 
 
+def _contract_key_suffixes() -> tuple[str, ...]:
+    """契约清单登记的**全部后缀**（`key_families` 的单一真源，禁硬编码）。
+
+    2026-08-16 复盘修：初版在 `_g1_has_consumer_form4` 里写死 `derived_key = prefix + "-entries"`
+    —— 既违反「禁硬编码」铁律，又因只试一个后缀而判据过宽/过窄不可控。
+    真源三处：`key_families.single_json.item_id`（完整键的尾段）、
+    `key_families.per_field.suffixes[]`、`key_families.data.suffix`。
+    """
+    def _load() -> tuple[str, ...]:
+        doc = json.loads(_read(CONTRACT_PATH))
+        out: set[str] = set()
+        for entry in (doc.get("sheets") or {}).values():
+            fams = entry.get("key_families") or {}
+            pf = fams.get("per_field") or {}
+            for s in pf.get("suffixes") or []:
+                if isinstance(s, str) and s:
+                    out.add(s.lstrip("-"))
+            data = fams.get("data") or {}
+            ds = data.get("suffix")
+            if isinstance(ds, str) and ds:
+                out.add(ds.lstrip("-"))
+            sj = fams.get("single_json") or {}
+            sj_id = sj.get("item_id")
+            if isinstance(sj_id, str) and "-" in sj_id:
+                out.add(sj_id.rsplit("-", 1)[-1])
+        if not out:
+            raise AssertionError(
+                "契约清单未登记任何后缀（key_families.per_field.suffixes / data.suffix / "
+                "single_json.item_id 三处全空）⇒ 形态④判据会退化为恒假。"
+                "异常向上抛而不 fail-open 成空表（R10.11）"
+            )
+        return tuple(sorted(out))
+
+    return _cached("contract_key_suffixes", _load)
+
+
 def _g1_has_consumer_form4(code: str, item_id: str) -> bool:
-    """形态④：通过 ITEM_PREFIX 跨文件拼装判断是否有消费方。"""
+    """形态④：通过 `ITEM_PREFIX` 跨文件拼装判断是否有消费方。
+
+    两级判据：
+      ① `item_id` 以某处 `ITEM_PREFIX` 值开头 ⇒ 该前缀能拼出此键
+      ② 该 sheet 存在同 cycle 的 `ITEM_PREFIX`，且 **`prefix + 清单登记的任一后缀`**
+         在前端生产代码真出现 ⇒ 前端用的是同义真键（catalog 记错键名）
+
+    后缀表来自 `_contract_key_suffixes()`（契约清单单一真源），**不写任何字面量**。
+    """
     if not item_id:
         return False
     cycle = code.split("-")[0]
-    # 搜索 use{X}FormData.ts / {X}TabAdjust*.vue 中的 ITEM_PREFIX
     search_patterns = [
         f"use{cycle}FormData.ts",
         f"{cycle}TabAdjust*.vue",
@@ -536,26 +579,21 @@ def _g1_has_consumer_form4(code: str, item_id: str) -> bool:
     import fnmatch
 
     for p in _g1_prod_files():
-        name = p.name
-        matched = any(fnmatch.fnmatch(name, pat) for pat in search_patterns)
-        if not matched:
+        if not any(fnmatch.fnmatch(p.name, pat) for pat in search_patterns):
             continue
-        src = _read(p)
-        m = re.search(r"ITEM_PREFIX\s*=\s*['\"]([^'\"]+)['\"]", src)
-        if m:
-            prefix_val = m.group(1)
-            # item_id 以 ITEM_PREFIX 值开头 → 该前缀组装出此键
-            if item_id.startswith(prefix_val):
-                return True
-            # 或者 item_id 含 code（如 'K3-3-rows'）而 ITEM_PREFIX 含同 cycle-sheet
-            # 片段（如 'K3-3-adj'）→ 有同义消费
-            if prefix_val.startswith(f"{cycle}-"):
-                # 同一 sheet 的另一个前缀 → 有消费方（只是 catalog 记错键名）
-                # 但只有当**该前缀的真键**在前端生产代码有使用时才算
-                derived_key = prefix_val + "-entries"  # 最常见后缀
-                for p2 in _g1_prod_files():
-                    if derived_key in _read(p2):
-                        return True
+        m = re.search(r"ITEM_PREFIX\s*=\s*['\"]([^'\"]+)['\"]", _read(p))
+        if not m:
+            continue
+        prefix_val = m.group(1)
+        # ① 直接匹配
+        if item_id.startswith(prefix_val):
+            return True
+        # ② 同义真键：按清单登记的后缀逐个试（真源 = key_families，非硬编码）
+        if prefix_val.startswith(f"{cycle}-"):
+            for suffix in _contract_key_suffixes():
+                derived = f"{prefix_val}-{suffix}"
+                if _g1_has_consumer_literal(derived):
+                    return True
     return False
 
 

@@ -644,55 +644,77 @@ MUTATIONS: tuple[Mutation, ...] = (
         "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py",
         "X3_SHEET_SPECS, COLUMN_ORDER = _load()",
         "X3_SHEET_SPECS, COLUMN_ORDER = _load(); COLUMN_ORDER = COLUMN_ORDER[:-1]  # MUTATION: drop last col",
-        "column_order",
+        "test_class_b_three_way_column_alignment",
     ),
+    # 🔴 X3 的 guard 原登记为 `x3_key_ledger`，2026-08-16 首轮 --run 判 GREEN：
+    #    GS9 后端侧全是「清单内数据断言」，无一条**执行** `_storage_column()`
+    #    ⇒ 运行期白名单校验结构性不可见。按规矩重写守卫（不改变异）：
+    #    在 GS7（取值层真执行）补 `test_storage_column_guard_really_executes`，
+    #    并把本条 guard 改指到真正承载该行为判据的守卫文件。
     Mutation(
-        "X3", "x3_key_ledger",
-        "storage_field 判据改回常量（GS9：机制↔列守卫不再动态取值）",
+        "X3", "x3_roundtrip_live",
+        "storage_field 运行期白名单校验短路（GS9 运行期侧：列名未经校验即拼进 SQL）",
         "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py",
         'if spec.storage_field not in allowed:',
         'if False and spec.storage_field not in allowed:  # MUTATION: always pass',
-        "storage_field",
+        "test_storage_column_guard_really_executes",
     ),
+    # 🔴 X4 初版打在 `K8TabAdjustment.vue` 上，2026-08-16 首轮 --run 判 GREEN。
+    #    根因不是守卫缺陷而是**靶子选错**：`ieWiringIntegrity` 的形态④键链只覆盖
+    #    `X3_PROBES`（本 spec 的 16 张作业面），而 K8-3 属 K 循环、不在作业面内
+    #    ⇒ 改它的 ITEM_PREFIX 本就不该让本 spec 的守卫打红。
+    #    改打 `useN5FormData.ts`（N5-3 是本 spec 作业面内走形态④的一张）。
     Mutation(
         "X4", "x3_ie_wiring",
-        "K8TabAdjustment 的 ITEM_PREFIX 改名（形态④：键族断链）",
-        "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue",
-        "const ITEM_PREFIX = 'K8-3-adj'",
-        "const ITEM_PREFIX = 'K8-3-MUTATED'",
+        "useN5FormData 的 ITEM_PREFIX 改值（形态④：三步链键族断链）",
+        "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts",
+        "const ITEM_PREFIX = 'N5-'",
+        "const ITEM_PREFIX = 'N5-MUTATED-'",
         "ITEM_PREFIX",
     ),
+    # 🔴 X5/X6 初版曾把锚点指向**测试文件自己**（改测试看测试红 = 零判据力），
+    #    且实测锚点命中 0 / 2 ⇒ ANCHOR-MISS。2026-08-16 复盘改为改**生产代码**。
     Mutation(
         "X5", "x3_catalog_registration",
-        "Preflight 改成键存在即通过（GS4：双向断言变单向空过）",
-        "backend/tests/test_x3_catalog_registration.py",
-        "assert sheet_code in ie_sheets, (",
-        "assert True or sheet_code in ie_sheets, (  # MUTATION: always pass",
-        "preflight",
+        "16 张 X-3 之一从 IE_SHEETS 摘掉（GS4 第②条 Preflight：sheet ∈ module.IE_SHEETS）",
+        "backend/app/routers/l6_special_payables.py",
+        "IE_SHEETS: frozenset[str] = frozenset(_SHEET_CONFIGS) | _X3_CODES",
+        "IE_SHEETS: frozenset[str] = frozenset(_SHEET_CONFIGS)  # MUTATION: drop X-3 sheet",
+        "test_enabled_targets_pass_preflight",
     ),
     Mutation(
         "X6", "x3_roundtrip_live",
-        "write_rows 异常吞成 WARNING（GS7：取值层异常禁吞）",
-        "backend/tests/test_x3_roundtrip_live.py",
-        'if re.search(r"except\\s+Exception.*?logger\\.warn", source, re.DOTALL):',
-        'if False and re.search(r"except\\s+Exception.*?logger\\.warn", source, re.DOTALL):  # MUTATION',
-        "swallow",
+        "取值层异常吞成 WARNING（GS7：load_rows 异常禁吞成 logger.warning）",
+        "backend/app/routers/wp_render_strategies/_x3_adjustment_import_export.py",
+        "    spec = sheet_spec(sheet)\n    column = _storage_column(spec)\n    warnings: list[str] = []\n\n    family = _effective_read_family(spec)",
+        "    try:\n        spec = sheet_spec(sheet)\n        column = _storage_column(spec)\n    except Exception:  # MUTATION: swallow\n        logger.warning('x3 load_rows failed')\n        return [], []\n    warnings: list[str] = []\n\n    family = _effective_read_family(spec)",
+        "test_load_rows_does_not_swallow_exceptions",
     ),
     Mutation(
         "X7", "x3_ie_wiring",
-        "L6TabAdjustment 删除 @imported 读回（GS5b/GS10：读回可追溯）",
+        "L6TabAdjustment 摘掉 @imported 读回绑定（GS5b/GS10：读回可追溯）",
         "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjustment.vue",
-        '@imported="onImported"',
+        '@imported="handleImported"',
         '@imported=""',
         "imported",
     ),
+    # 🔴 X8 初版把 l6 指向 `_l6_import_export`，2026-08-16 首轮 --run 判 WRONG-TEST：
+    #    那个工厂模块**不存在**（本 spec 16 张从无工厂模块）⇒ 红的是「目标模块不可导入」
+    #    4 条，而非 split-brain 违规集变大。改指一个**真实存在但不同源**的工厂模块
+    #    （`_l1_import_export`，G4 里 l1 的工厂），才构成真正的 split-brain 变异。
     Mutation(
         "X8", "x3_adapter_host",
-        "l6 前缀的 adapter 目标模块改回工厂（GS6：split-brain 基线只许下调）",
+        "l6 前缀的 adapter 改指别家工厂模块（GS6：split-brain 违规集只许下调）",
         "backend/app/services/bulk_tab/_kfgh_cycle_adapters.py",
+        # 🔴 替换文本**不得**在行尾追加 `# MUTATION` 注释：本行锚点不含尾逗号，
+        #    加注释会把原行的 `,` 推到注释里被吞掉 ⇒ 该字典项与下一项粘连成一个键
+        #    ⇒ 红的是 4 条结构断言（键数/可导入性）而非 split-brain 违规集 = WRONG-TEST。
         '"l6": "app.routers.l6_special_payables"',
-        '"l6": "app.routers.wp_render_strategies._l6_import_export"  # MUTATION: factory',
-        "test_violation_set_matches_baseline",
+        '"l6": "app.routers.wp_render_strategies._l1_import_export"',
+        # 该变异让 l6 由「同源」变「不同源」；因目标工厂模块内无 l6 端点，
+        # `_endpoint_for` 返 None ⇒ 走「无法在 adapter 侧解析」分支，
+        # 故承载判据的是下面这条（而非 violation_set 基线那条）。
+        "test_non_violating_prefixes_share_the_same_endpoint",
     ),
 )
 
