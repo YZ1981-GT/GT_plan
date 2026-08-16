@@ -19,6 +19,8 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+// spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
+import { formulaPresets } from '@/services/apiPaths/formula'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -129,7 +131,6 @@ export interface CustomPresetSaveResult {
   total: number
 }
 
-const BASE = '/api/formula-management/import-export'
 const XLSX_MIME =
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
@@ -161,7 +162,7 @@ export function useFormulaImportExport() {
     loading.value = true
     try {
       const response = await http.post(
-        `${BASE}/export-template`,
+        formulaPresets.exportTemplate,
         {},
         { responseType: 'blob' },
       )
@@ -183,7 +184,7 @@ export function useFormulaImportExport() {
     loading.value = true
     try {
       const response = await http.post(
-        `${BASE}/export-data`,
+        formulaPresets.exportData,
         {},
         {
           params: pageKey ? { page_key: pageKey } : {},
@@ -219,7 +220,7 @@ export function useFormulaImportExport() {
       if (opts.projectId) params.project_id = opts.projectId
       if (opts.persist !== undefined) params.persist = opts.persist
 
-      const response = await http.post(`${BASE}/import-data`, formData, {
+      const response = await http.post(formulaPresets.importData, formData, {
         params,
         headers: { 'Content-Type': 'multipart/form-data' },
       })
@@ -247,7 +248,7 @@ export function useFormulaImportExport() {
     fmt: 'json' | 'markdown' = 'json',
   ): Promise<FormulaReportingDoc | null> {
     try {
-      const response = await http.get('/api/formula-management/reporting-instructions', {
+      const response = await http.get(formulaPresets.reportingInstructions, {
         params: { fmt },
       })
       return (response.data?.data ?? response.data) as FormulaReportingDoc
@@ -265,7 +266,7 @@ export function useFormulaImportExport() {
     scope?: string,
   ): Promise<FormulaPresetInventory | null> {
     try {
-      const response = await http.get('/api/formula-management/presets/inventory', {
+      const response = await http.get(formulaPresets.inventory, {
         params: scope ? { scope } : {},
       })
       return (response.data?.data ?? response.data) as FormulaPresetInventory
@@ -283,7 +284,7 @@ export function useFormulaImportExport() {
     pageKey: string,
   ): Promise<FormulaPresetPageDetail | null> {
     try {
-      const response = await http.get('/api/formula-management/presets/page', {
+      const response = await http.get(formulaPresets.page, {
         params: { page_key: pageKey },
       })
       return (response.data?.data ?? response.data) as FormulaPresetPageDetail
@@ -306,7 +307,7 @@ export function useFormulaImportExport() {
     loading.value = true
     try {
       const response = await http.post(
-        '/api/formula-management/presets/custom',
+        formulaPresets.custom,
         payload,
         { params: projectId ? { project_id: projectId } : {} },
       )

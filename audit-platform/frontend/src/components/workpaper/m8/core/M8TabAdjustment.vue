@@ -8,6 +8,13 @@
         <el-tag type="warning" effect="dark" size="small">借贷平衡</el-tag>
       </div>
       <div class="section-header-right">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="m8"
+          sheet="M8-3"
+          :disabled="isReadonly"
+          @imported="handleImported"
+        />
         <el-button size="small" :loading="aiLoading === 'adjustment'" @click="handleAI('adjustment')">
           <el-icon><MagicStick /></el-icon> AI辅助
         </el-button>
@@ -312,6 +319,7 @@ import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaf
 import { eventBus } from '@/utils/eventBus'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 const emit = defineEmits<{ (e: 'navigate', sheetName: string): void; (e: 'save'): void }>()
@@ -509,6 +517,19 @@ function _restoreEntries(): void {
     restored.sort((a, b) => a.index - b.index)
     adjustment.entries.value = restored
   }
+}
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：M8-3 读回 = 本 Tab _restoreEntries（-data 族，整体替换）。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  await formData.loadData()
+  _restoreEntries()
 }
 </script>
 

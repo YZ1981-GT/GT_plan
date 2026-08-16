@@ -99,7 +99,12 @@ describe('H 循环披露 AI / 复核接线', () => {
 
   it('接入 useHCycleDisclosureAi 的 Tab 必须绑 :ai-loading 与 :disabled', () => {
     const wired = hDisclosureTabs.filter((f) => read(f).includes('useHCycleDisclosureAi'))
-    expect(wired.length, '应有 13 个 Tab 接入统一 helper').toBeGreaterThanOrEqual(13)
+    // 🔴 12 而非 13：H5 上市披露 Tab 已于 spec
+    // `h-cycle-extraction-formula-and-disclosure-completion` Task 11 改为
+    // 「本版不适用」说明页（无文本域、无 AI）—— 见本文件末尾 H5 上市专项断言。
+    // 原实现的 `noteSectionId: H5_NOTE_SECTION.listed ?? '五、油气资产'` 向 AI 链路
+    // 下发**凭空编造的章节号**（`H5_NOTE_SECTION` 连 `listed` 键都没有），是活缺陷。
+    expect(wired.length, '应有 12 个 Tab 接入统一 helper').toBeGreaterThanOrEqual(12)
     const missing: string[] = []
     for (const file of wired) {
       const src = read(file)
@@ -171,14 +176,32 @@ describe('H 循环披露 AI / 复核接线', () => {
     }
   })
 
-  it('H5 两版补上文本持久化（原本录入刷新即丢）', () => {
-    for (const [name, item] of [
-      ['h5/core/H5TabDisclosureListed.vue', 'H5-disc-listed-text'],
-      ['h5/core/H5TabDisclosureSoe.vue', 'H5-disc-soe-text'],
-    ] as const) {
-      const src = read(resolve(WP_ROOT, name))
-      expect(src, `${name} 缺持久化 item id`).toContain(item)
-      expect(src, `${name} 缺 saveResponse`).toContain('saveResponse')
+  it('H5 国企版补上文本持久化（原本录入刷新即丢）', () => {
+    // 🔴 只对 soe 断言：上市版已改「本版不适用」说明页，无录入位置故无持久化键
+    // （`H5-disc-listed-text` 全库 checklist_responses 实测 0 行，删除零数据丢失）
+    const name = 'h5/core/H5TabDisclosureSoe.vue'
+    const src = read(resolve(WP_ROOT, name))
+    expect(src, `${name} 缺持久化 item id`).toContain('H5-disc-soe-text')
+    expect(src, `${name} 缺 saveResponse`).toContain('saveResponse')
+  })
+
+  it('H5 上市版是「本版不适用」说明页：无 AI、无持久化、无自造附注表', () => {
+    // Task 11 / R12.1~R12.6。反向锁死，防下个会话「补回 AI 辅助」。
+    const src = read(resolve(WP_ROOT, 'h5/core/H5TabDisclosureListed.vue'))
+    for (const forbidden of [
+      'useHCycleDisclosureAi',
+      'WpNoteTextArea',
+      'H5-disc-listed-text',
+      'costNoteRows',
+      'depletionNoteRows',
+      'useDisclosureAutoSync',
+      'scheduleAutoSync',
+      'sync-from-workpaper',
+    ]) {
+      expect(src, `上市版不适用页不应含 ${forbidden}`).not.toContain(forbidden)
     }
+    // 🔴 最核心一条：禁章节号兜底字面量（原 `H5_NOTE_SECTION.listed ?? '五、油气资产'`
+    // 恒取右值 ⇒ 向 AI/复核下发 listed 模板里不存在的虚构章节号）
+    expect(src, '禁 `?? \'五、…\'` 形态的章节号兜底').not.toMatch(/\?\?\s*['"][一二三四五六七八九十]+、/)
   })
 })

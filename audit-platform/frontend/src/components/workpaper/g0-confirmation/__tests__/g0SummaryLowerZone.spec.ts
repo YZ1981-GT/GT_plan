@@ -514,14 +514,30 @@ describe('Property 31: 样本选择 6 项由 isG0 门控且六枢纽渲染不变
     expect(clean).toMatch(/const\s+isG0\s*=\s*computed\(\(\)\s*=>\s*props\.cycle\s*===\s*'G0'\)/)
   })
 
-  it('源码级：6 项渲染块在 isG0 内，4 项在 v-else 分支（互斥）', () => {
+  /**
+   * 🔴 改写记录（k0-confirmation-source-alignment Task 10，2026-08-07）
+   *
+   * 原断言按**门控表达式字面** `<el-form v-if="isG0"` 定位 6 项块。K0 收口后该门控
+   * 归一为 `v-if="useSourceSix"`（G0 与 K0 共用同一表单块，各自 import 自己的文字真源），
+   * 原字面必然找不到 ⇒ 这是「守卫锁了实现细节而非行为」，不是回归。
+   *
+   * 改为：门控存在性 + 与 `v-else` 互斥 + **`useSourceSix` 由 `isG0` 参与计算**
+   * （后者才是 R3.6.2 的实质要求：G0 走 6 项、未声明的枢纽走 4 项）。
+   * 挂载渲染那两条（`cycle="G0"` → 6 项 / `cycle="D0"` → 4 项）是行为级判据，未受影响。
+   */
+  it('源码级：6 项渲染块由门控守住、4 项在 v-else 分支（互斥），且门控由 isG0 参与计算', () => {
     const clean = stripComments(SAMPLING_VUE)
-    const gateIdx = clean.indexOf('<el-form v-if="isG0"')
+    const gateIdx = clean.indexOf('<el-form v-if="useSourceSix"')
     const elseIdx = clean.indexOf('<el-form v-else')
-    expect(gateIdx, '未找到 v-if="isG0" 的 el-form').toBeGreaterThan(-1)
+    expect(gateIdx, '未找到 6 项块的门控 el-form（v-if="useSourceSix"）').toBeGreaterThan(-1)
     expect(elseIdx, '未找到 v-else 的既有 4 项 el-form').toBeGreaterThan(gateIdx)
-    const g0Block = clean.slice(gateIdx, elseIdx)
-    expect(g0Block).toContain('G0_SAMPLE_DEFS')
+    const gateBlock = clean.slice(gateIdx, elseIdx)
+    // 6 项块遍历归一后的 defs（G0/K0 各自的文字真源在 script 里归一）
+    expect(gateBlock).toContain('sourceSixDefs')
+    // 🔴 门控必须真的由 isG0 决定（否则 G0 走不进 6 项分支）
+    expect(clean).toMatch(/useSourceSix\s*=\s*computed\(\(\)\s*=>\s*sourceSixDefs\.value\.length\s*>\s*0\)/)
+    expect(clean).toMatch(/if\s*\(isG0\.value\)/)
+    expect(clean).toContain('G0_SAMPLE_DEFS')
     // 4 项分支不得出现 6 项字段
     const legacyBlock = clean.slice(elseIdx)
     for (const f of ['test_population', 'sampling_population', 'sampling_process']) {
@@ -617,19 +633,27 @@ describe('Property 31: 样本选择 6 项由 isG0 门控且六枢纽渲染不变
     wrapper.unmount()
   })
 
-  it('反向自检：门控是两分支唯一区别 —— 去掉 v-if="isG0" 则 D0 必渲染 6 项', () => {
+  /**
+   * 🔴 改写记录（同上，2026-08-07）：门控字面由 `v-if="isG0"` 归一为
+   * `v-if="useSourceSix"`（G0/K0 共用表单块）。反向自检的**实质**不变：
+   * 「删掉门控 → 未声明 6 项的枢纽（D0）也会渲染 6 项」，故仍断言
+   * 门控只有一个条件、无 `v-show`、块内不含第二层枢纽条件。
+   */
+  it('反向自检：门控是两分支唯一区别 —— 去掉门控则 D0 必渲染 6 项', () => {
     const clean = stripComments(SAMPLING_VUE)
-    // 若把 `v-if="isG0"` 删掉，两个 el-form 都会渲染 → D0 出现 6 项。
-    // 用「6 项块只被 isG0 守住、无其它条件」证明这一点。
-    const gateIdx = clean.indexOf('<el-form v-if="isG0"')
+    const gateIdx = clean.indexOf('<el-form v-if="useSourceSix"')
+    expect(gateIdx).toBeGreaterThan(-1)
     const formTag = clean.slice(gateIdx, clean.indexOf('>', gateIdx))
-    expect(formTag).toContain('v-if="isG0"')
+    expect(formTag).toContain('v-if="useSourceSix"')
     expect(formTag).not.toContain('v-show')
     // 该块内不存在第二层枢纽条件（否则删门控也未必出现 6 项，反向自检会失效）
     const elseIdx = clean.indexOf('<el-form v-else')
-    const g0Block = clean.slice(gateIdx, elseIdx)
-    expect(g0Block).not.toContain('isG0 &&')
-    expect(g0Block.match(/isG0/g)!.length).toBe(1)
+    const gateBlock = clean.slice(gateIdx, elseIdx)
+    expect(gateBlock).not.toContain('isG0')
+    expect(gateBlock).not.toContain('isK0')
+    expect(gateBlock.match(/useSourceSix/g)!.length).toBe(1)
+    // 🔴 门控本身必须是纯长度判定（不含枢纽白名单以外的旁路条件）
+    expect(clean).not.toMatch(/useSourceSix\s*=\s*computed\(\(\)\s*=>\s*true\)/)
   })
 
   it('R3.6.3：cycle="D0" 下 6 项字段数据不被组件丢弃', () => {

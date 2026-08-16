@@ -605,6 +605,75 @@ SECOND_SEND_LEAF_COLUMNS = [
     ("AK", "信息是否核查一致"),
 ]
 
+#: K0-2 编制说明五条（源 `A28:A41`，标题在 `A28/A34/A36/A38/A40`，正文在其下）。
+#: 说明 1 有四条子要点（`A30:A33`），其余各一条。
+#: 🔴 说明 3 的「记录工号（若有）」与 K0-3 的工号要求交叉呼应（R8.4）。
+ENTITY_VERIFY_GUIDANCE = [
+    (
+        "说明1：",
+        "A28",
+        [
+            ("A29", "进行核实的信息应该包括单位名称，地址，以及联系人和电话。"),
+            (
+                "A30",
+                "1.项目组可利用函证中心对接的企查查获取被函证单位地址，如果不一致的应使用多种"
+                "方法来核实被函证单位的信息，如查找相关发票/合同，网站搜索，电话确认，邮件确认等，"
+                "请详细记录核实的方式",
+            ),
+            ("A31", "2.若检查了相关支持性文件或其他公开信息，请记录所检查的详细内容。"),
+            (
+                "A32",
+                "3.请记录确认联系人身份的过程。注意：在银行函证中，也应注意核实联系人的身份并"
+                "记录工号（若有）",
+            ),
+            (
+                "A33",
+                "4.在核实结果中，应注明所检查的信息（包括单位名称、地址、联系人及电话等）"
+                "是否与被函证单位信息相符。",
+            ),
+        ],
+    ),
+    (
+        "说明2：",
+        "A34",
+        [("A35", "请详细记录核实函证被退回原因所进行的程序， 例如：询问，检查等程序的具体内容")],
+    ),
+    (
+        "说明3：",
+        "A36",
+        [
+            (
+                "A37",
+                "若退回的原因不合理或存在舞弊可能，审计项目组人员应及时告知项目负责人，"
+                "并咨询有关针对舞弊的审计应对措施",
+            )
+        ],
+    ),
+    (
+        "说明4：",
+        "A38",
+        [
+            (
+                "A39",
+                "请跟进第二次发函的结果，记录是否送抵被函证方，对于仍被退回的函证，"
+                "应进行进一步调查并考虑舞弊的可能，同时在相应底稿中记录与之相关的审计风险与"
+                "对审计的影响。",
+            )
+        ],
+    ),
+    (
+        "说明5：",
+        "A40",
+        [
+            (
+                "A41",
+                "如果被询证者以传真、电子邮件方式回函，审计项目组应当直接接收，并验证传真、"
+                "电子邮件回函的可靠性，要求被询证者在审计报告日之前寄回询证函原件",
+            )
+        ],
+    ),
+]
+
 #: K0-2 DV 覆盖行区**非对称**：提供信息段到 24 行，回函段与二次发函段到 26 行
 DV_TO_ROW24 = ["C", "J", "L", "N"]
 DV_TO_ROW26 = ["P", "Q", "R", "V", "W", "X", "AB", "AD", "AE", "AK", "AL"]
@@ -621,6 +690,28 @@ class TestEntityVerify:
         # 列宽度校验：AL = 第 38 列
         assert get_column_letter(38) == "AL"
         assert not norm(ws["AM5"].value) and not norm(ws["AM6"].value)
+
+    def test_preparation_guidance_five_notes(self, wb):
+        """K0-2 编制说明五条逐字（R8.4）。
+
+        🔴 `A27` 是「编制说明：」总标题，五条说明各自的标题在 `A28/A34/A36/A38/A40`。
+        本常量是前端 `entityVerifyGuidance.ts` 的裁决真源，前端守卫读它交叉锁死。
+        """
+        ws = wb["核实被函证单位信息K0-2"]
+        assert norm(ws["A27"].value) == "编制说明："
+        for title, title_coord, items in ENTITY_VERIFY_GUIDANCE:
+            assert norm(ws[title_coord].value) == title, (
+                f"{title_coord} 应为 {title}，实际 {norm(ws[title_coord].value)!r}"
+            )
+            for coord, text in items:
+                assert norm(ws[coord].value) == text, (
+                    f"{coord} 与源模板不符：\n期望 {text!r}\n实际 {norm(ws[coord].value)!r}"
+                )
+
+    def test_guidance_note3_mentions_staff_no(self, wb):
+        """说明 3 逐字含「记录工号（若有）」—— 与 K0-3 的工号要求交叉呼应（R8.4）。"""
+        ws = wb["核实被函证单位信息K0-2"]
+        assert "记录工号（若有）" in norm(ws["A32"].value)
 
     @pytest.mark.parametrize("col,label", SECOND_SEND_LEAF_COLUMNS)
     def test_second_send_leaf_columns(self, wb, col: str, label: str):
@@ -1112,6 +1203,23 @@ class TestReverseSelfChecks:
         # 反向自检：R6 里没有任何一列叫「发函询证纪要」
         leaves = {norm(ws.cell(6, c).value) for c in range(1, 29)}
         assert "发函询证纪要" not in leaves, "它出现在叶子行 ⇒ 不是段头，本判据失效"
+
+    def test_entity_verify_guidance_anchors_are_in_column_a(self, wb):
+        """K0-2 五条编制说明确实在 **A 列**（防把 `C26` 那类别列文字当成说明抄进来）。
+
+        反向自检：`C26` 有内容但**不属于**编制说明段（它是回函核对块的列内提示），
+        若把它算进 `ENTITY_VERIFY_GUIDANCE` 则本断言打红。
+        """
+        ws = wb["核实被函证单位信息K0-2"]
+        assert norm(ws["C26"].value).startswith("2.采用电子函证方式的")
+        c26 = norm(ws["C26"].value)
+        for _, _, items in ENTITY_VERIFY_GUIDANCE:
+            for _, text in items:
+                assert text != c26, "C26 是列内提示、不是编制说明，不得混入"
+        # 五条说明的锚点必须落在 A 列且连续覆盖 A28..A41
+        anchors = [anchor for _, anchor, _ in ENTITY_VERIFY_GUIDANCE]
+        assert anchors == ["A28", "A34", "A36", "A38", "A40"]
+        assert all(a.startswith("A") for a in anchors)
 
     def test_dv_helper_rejects_mirror_sqref(self, wb):
         """`dv_formulas_at` 的逐格判定确实排除了镜像 sqref（helper 自检）。"""

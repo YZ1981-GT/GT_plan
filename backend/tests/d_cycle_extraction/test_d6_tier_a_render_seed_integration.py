@@ -117,7 +117,11 @@ def _session(*, checklist_rows=None, tb_amount=98765.43):
             business_category="general",
             applicable_standards="listed",
         ),
-        tb_row=SimpleNamespace(amount=tb_amount),
+        tb_row=SimpleNamespace(
+            amount=tb_amount,
+            unadjusted=tb_amount,
+            audited=tb_amount,
+        ),
         rp_rows=[],
     )
 

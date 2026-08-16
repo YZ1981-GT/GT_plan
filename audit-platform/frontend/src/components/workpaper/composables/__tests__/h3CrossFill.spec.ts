@@ -90,9 +90,9 @@ describe('applyAdjToRows / buildCategoryBuckets', () => {
         accountCode: '1505', accountName: '减值准备', summary: '', debitAmount: 8, creditAmount: 0, indexRef: '', remark: '',
       },
     ])
-    expect(b.aje1503['房屋及建筑物']).toBe(100)
-    expect(b.aje1504['房屋及建筑物']).toBe(-20)
-    expect(b.rje1505['土地使用权']).toBe(8)
+    expect(b.ajeGross['房屋及建筑物']).toBe(100)
+    expect(b.ajeAccumDep['房屋及建筑物']).toBe(-20)
+    expect(b.rjeImpairment['土地使用权']).toBe(8)
   })
 })
 

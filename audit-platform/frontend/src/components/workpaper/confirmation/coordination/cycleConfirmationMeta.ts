@@ -5,6 +5,14 @@
  * 须按 wpCode 前缀解析 sheet 名，避免文案写死 D0-*。
  */
 
+// 🔴 L0 的 sheet 定位/展示真源在 L0 专属目录（源模板 9 张可见 tab 名逐字固化 +
+//    程序表 tab 名 `函证程序表F0A` 的索引号笔误说明；hidden 的差异检查表不登记）。
+//    spec: l0-confirmation-source-alignment R6.1~R6.4
+import { L0_CONFIRMATION_SHEETS } from '../l0-confirmation/l0SheetRegistry'
+// 🔴 K0 的 sheet 定位/展示真源在 K0 专属目录（源模板 10 张 tab 名逐字固化 + 三条
+//    「跨表引用索引号笔误」说明，文案由 `k0LowerZoneSpec.K0_INDEX_TYPO_MAP` 派生）。
+//    spec: k0-confirmation-source-alignment R2.2 / R6.1 / R6.2
+import { K0_CONFIRMATION_SHEETS } from '../k0-confirmation/k0SheetRegistry'
 // 🔴 G0 的 sheet 定位/展示真源在 G0 专属目录（源模板 10 张 tab 名逐字固化 + 三处索引号笔误说明）。
 //    反向只有 `import type`（被编译期擦除）→ 无运行时循环依赖。
 import { G0_CONFIRMATION_SHEETS } from '../../g0-confirmation/g0SheetRegistry'
@@ -31,7 +39,15 @@ export interface ConfirmationSheetRef {
   sheetName: string | null
   /** 展示真源：底稿目录索引号（tab 名笔误已按目录裁决修正）。一切 UI 展示只许用它。 */
   indexLabel: string
-  /** tab 名索引号与底稿目录不一致时的说明（tooltip 用；SHALL NOT 静默改写，见 R6.3） */
+  /**
+   * 索引号笔误说明（tooltip 用；SHALL NOT 静默改写，见 G0 R6.3）。
+   *
+   * 两种成因都落这里 —— 对用户而言要回答的是同一个问题「我在源模板上看到的索引号
+   * 为什么和这里显示的不一样」：
+   *   - **tab 名笔误**（G0 / L0）：本表 tab 名尾码与底稿目录不一致，如 L0 的 `函证程序表F0A`；
+   *   - **跨表引用笔误**（K0）：本表命名正确，但源模板**别处**引用它时写错了索引号，
+   *     如 `K0-1!V6` 写「调节索引（K1-12）」而差异调节表实为 `K0-4`。
+   */
   indexTypoNote?: string
 }
 
@@ -237,8 +253,21 @@ function resolveCycleSheets(
   cycle: ConfirmationCycle,
   codes: CycleConfirmationCodes,
 ): Record<ConfirmationSheetSlot, ConfirmationSheetRef | null> {
-  // G0 有源模板 tab 名真源（10 张 sheet 逐字固化）→ 用注册表；其余六循环派生。
+  // G0 / K0 / L0 有源模板 tab 名真源（逐字固化）→ 用注册表；其余四循环派生。
+  //
+  // 🔴 L0 接注册表会把它的跨表跳转从「按 wp_code」切到「同工作簿 `?sheet=` 深链」，
+  //    这是 spec l0-confirmation-source-alignment R6.1 的裁决，且有库侧实证支撑：
+  //    `wp_index` 里 L0 只有整册 `L0` 与遗留单 sheet `L0-1`~`L0-5`，**没有 L0-6/L0-7**
+  //    → 按 wp_code 跳这两张表本来就落空；遗留单 sheet wp_code 的 render 又返
+  //    `html_data=null`（同 G0/H0）⇒ `?sheet=` 是唯一可达路径。
+  //
+  // 🔴 K0 同款（2026-08-07 `wp_index` 实测）：只有整册 `K0` 与遗留 `K0-1`~`K0-5`，
+  //    **没有 K0-6/K0-7/K0-8**（= altSecondary / reliability / fraud 三槽）
+  //    ⇒ 接注册表既让这三张表可达，又给三条「跨表引用索引号笔误」提供 tooltip 落点。
+  //    详见 `k0-confirmation/k0SheetRegistry.ts` 文件头。
   if (cycle === 'G0') return G0_CONFIRMATION_SHEETS
+  if (cycle === 'K0') return K0_CONFIRMATION_SHEETS
+  if (cycle === 'L0') return L0_CONFIRMATION_SHEETS
   return deriveSheetsFromCodes(cycle, codes)
 }
 
@@ -297,10 +326,17 @@ export interface CrossWorkpaperNavDef {
 /**
  * 判「该导航目标是否在同一工作簿内」。
  *
- * 判据 = 该槽有**真实 tab 名真源**且与展示编码不同。G0 是单 `wp_code` 多 sheet 工作簿，
- * 其 10 个 sheetName 都是中文 tab 名 → 恒为 true → 走 `?sheet=` 深链；
- * D0/E0/F0/H0/K0/L0 的 sheetName 由 code 派生（与 wpCode 相同）→ 恒为 false → 走既有
- * `navigate`（按 wp_code 解析），**行为逐字不变**（R11.1）。
+ * 判据 = 该槽有**真实 tab 名真源**且与展示编码不同。
+ *
+ * 🔴 已接注册表（sheetName 是中文 tab 名 ⇒ 恒 true ⇒ 走 `?sheet=` 深链）：
+ *    **G0 / L0 / K0** —— 三者都是单 `wp_code` 多 sheet 工作簿，且 `wp_index` 里缺后几张
+ *    单 sheet 记录，按 wp_code 跳本就落空（各自 registry 文件头有库侧实证）。
+ * 🔴 仍走派生（sheetName === wpCode ⇒ 恒 false ⇒ 既有 `navigate` 按 wp_code 解析）：
+ *    **D0 / E0 / F0 / H0** —— 行为逐字不变（G0 spec R11.1 的零回归支点）。
+ *
+ * 改写记录：本注释原写「D0/E0/F0/H0/K0/L0 … 恒为 false」，该表述在
+ * `l0-confirmation-source-alignment`（L0 接注册表）与
+ * `k0-confirmation-source-alignment` Task 12（K0 接注册表）后失效，已按实际收敛。
  */
 export function isSameWorkbookNavTarget(def: CrossWorkpaperNavDef): boolean {
   return !!def.sheetName && def.sheetName !== def.wpCode

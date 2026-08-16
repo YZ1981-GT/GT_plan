@@ -28,6 +28,7 @@ import pytest
 import sqlalchemy as sa
 
 from app.services.four_table.report_config_account_names import (  # noqa: E402
+    ADJUDICATED_2026_08_05,
     CODE_CORRECTIONS,
     DETAIL_ROW_PREFIXES,
     DERIVED_ROWS_WITHOUT_ACCOUNT,
@@ -666,4 +667,84 @@ class TestSuspectedNewIssuesReported:
         assert not overlap, (
             f"{sorted(overlap)} 既登记为疑似错码又在零命中白名单 —— 判据自相矛盾"
         )
+
+
+class TestAdjudicationLanded:
+    """已裁决条目必须**真的落地**且**从待办登记表里移除**（Task 10 交叉锁死）。
+
+    🔴 为什么需要这一组：`ADJUDICATED_2026_08_05` 的 docstring 声称
+    「守卫断言每条都必须已落地到 CODE_CORRECTIONS 或 DERIVED_ROWS_WITHOUT_ACCOUNT 之一，
+    且不得再挂在 SUSPECTED_NEW_ISSUES / PENDING_ADJUDICATION 里」——
+    但 2026-08-05 实测该断言**并不存在**（本文件当时压根没 import 这个常量）。
+    「声称有守卫但没写」与「注释结论错、取值恰好对」同族：下个会话会照注释信任它。
+
+    两个方向都要锁：
+      · 裁决了但没落地 → 数据仍是错码 / 仍挂着旧公式，而登记表看起来已收口；
+      · 落地了但登记表没清 → `SUSPECTED_NEW_ISSUES` / `PENDING_ADJUDICATION` 变成
+        **陈旧断言**（守卫的跳过集里还留着已修好的行 ⇒ 那两行永久豁免正向断言 = 假绿）。
+    """
+
+    def test_registry_not_empty(self) -> None:
+        """哨兵：登记表空 = 本组全部断言空转（假绿）。"""
+        assert ADJUDICATED_2026_08_05, (
+            "ADJUDICATED_2026_08_05 为空 —— 本组断言会全部空转。"
+            "若确已无裁决记录需保留，应连同本测试类一起删除而不是留空表"
+        )
+
+    def test_each_adjudication_landed_in_exactly_one_enforcing_set(self) -> None:
+        """每条裁决必须落到「改码」或「置 NULL」**其中之一**（互斥且必居其一）。
+
+        这两个集合各自都有 DB 级强制断言（`TestCodeCorrectionsApplied` /
+        `TestDerivedRowsHaveNoAccount`）⇒ 落进任一集合即等于被真实数据盯住；
+        两边都不在 = 裁决只写在注释里，没有任何断言保证它已落地。
+        """
+        bad: list[str] = []
+        for row_code in ADJUDICATED_2026_08_05:
+            in_corr = row_code in CODE_CORRECTIONS
+            in_null = row_code in DERIVED_ROWS_WITHOUT_ACCOUNT
+            if in_corr and in_null:
+                bad.append(f"{row_code}: 同时登记为改码与置 NULL —— 处置自相矛盾")
+            elif not in_corr and not in_null:
+                bad.append(
+                    f"{row_code}: 已裁决但未落地 —— 既不在 CODE_CORRECTIONS 也不在 "
+                    "DERIVED_ROWS_WITHOUT_ACCOUNT ⇒ 无任何 DB 级断言保证它已生效"
+                )
+        assert not bad, "裁决未落地：\n" + "\n".join(bad)
+
+    def test_adjudicated_rows_removed_from_pending_registries(self) -> None:
+        """🔴 已裁决的行必须从「待办」登记表移除，否则守卫的跳过集会永久豁免它们。
+
+        `TestNoMismatchedCodes` / `TestNoCrossRowDoubleClaim` 都把
+        `SUSPECTED_NEW_ISSUES` 与 `PENDING_ADJUDICATION` 当跳过集 ——
+        修好后不清，那两行就再也不会被正向断言检查（陈旧断言 = 假绿）。
+        """
+        stale_suspected = set(ADJUDICATED_2026_08_05) & set(SUSPECTED_NEW_ISSUES)
+        stale_pending = set(ADJUDICATED_2026_08_05) & set(PENDING_ADJUDICATION)
+        assert not stale_suspected, (
+            f"{sorted(stale_suspected)} 已裁决落地却仍挂在 SUSPECTED_NEW_ISSUES —— "
+            "守卫会继续跳过它们的名称/双算断言"
+        )
+        assert not stale_pending, (
+            f"{sorted(stale_pending)} 已裁决落地却仍挂在 PENDING_ADJUDICATION —— "
+            "同上，且 test_pending_adjudication_excluded_from_corrections 会与落地结果冲突"
+        )
+
+    def test_adjudicated_rows_not_in_zero_hit_whitelist(self) -> None:
+        """裁决为「错码」或「置 NULL」的行不得同时享受零命中白名单豁免。
+
+        `BS-066` 就是这么被漏过的：立项时只查了码（`2811` 零命中）没查名
+        （「递延收益」实挂 `2401`）→ 误列白名单当业务事实。
+        """
+        overlap = set(ADJUDICATED_2026_08_05) & set(ZERO_HIT_WHITELIST)
+        assert not overlap, (
+            f"{sorted(overlap)} 既已裁决为需修正又在零命中白名单 —— 判据自相矛盾"
+        )
+
+    def test_adjudication_reasons_carry_evidence(self) -> None:
+        """裁决理由必须写明实证与日期（同 SUSPECTED_NEW_ISSUES 的纪律）。"""
+        for row_code, reason in ADJUDICATED_2026_08_05.items():
+            assert reason and len(reason.strip()) >= 30, f"{row_code} 的裁决说明过短"
+            assert "2026-" in reason or "V144" in reason, (
+                f"{row_code} 未写裁决日期或落地迁移号"
+            )
 

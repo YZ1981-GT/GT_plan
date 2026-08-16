@@ -41,6 +41,11 @@ from app.models.core import User
 from app.services.llm_client import chat_completion
 from app.services.unified_ocr_service import UnifiedOCRService
 
+from app.routers.wp_render_strategies._x3_adjustment_import_export import (
+    X3_SHEET_SPECS,
+    attach_shape_a_routes,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -48,8 +53,29 @@ router = APIRouter(
     tags=["N2 应交税费"],
 )
 
-# 支持的多税种sheet编码
-SUPPORTED_SHEETS = {"N2-2", "N2-6", "N2-8", "N2-9", "N2-10"}
+#: 本模块的短前缀 = catalog `import_export.api_prefix`，单份 UI 与批量两条通路共用它。
+_IE_API_PREFIX = "n2"
+
+#: 本前缀的 X-3 sheet 码 —— 从 `X3_SHEET_SPECS`（Key_Ledger 单一真源）按短前缀**反查**。
+#: 🔴 本模块内不写 X-3 字面量：写死一份即成后端第二真源，前端改键时不会打红。
+#: 反查为空 ⇒ 下面 `attach_shape_a_routes` 立即抛 `X3ContractError`（fail-loud，不静默少端点）。
+_X3_CODES: frozenset[str] = frozenset(
+    code for code, spec in X3_SHEET_SPECS.items() if spec.api_prefix == _IE_API_PREFIX
+)
+
+#: 本前缀 sheet 白名单的**唯一真源**（R4.4）= 形态 B（长前缀）五个税种 sheet + 形态 A 的 X-3。
+#: 🔴 派生方向刻意是 `IE_SHEETS → SUPPORTED_SHEETS`，不是反过来：sheet 码只在这里写一次，
+#:    三个既有 handler 的 `sheet not in SUPPORTED_SHEETS` 校验由它派生 ⇒ 改 `IE_SHEETS` 会真的
+#:    改到既有端点的校验结果，它因此是**活的**真源，而不是只喂守卫的影子常量。
+IE_SHEETS: frozenset[str] = frozenset({"N2-2", "N2-6", "N2-8", "N2-9", "N2-10"}) | _X3_CODES
+
+# 支持的多税种sheet编码 = `IE_SHEETS` 去掉 X-3。取值与施加前逐字相同。
+#: 🔴 X-3 刻意不进这里：形态 B 的三个 handler 会把 sheet 透传给
+#:    `n2_taxes_payable_service`，该 service 只认这五个税种 sheet；放进来会让 `sheet=N2-3`
+#:    越过 400 进到取不到配置的旧代码路径。X-3 只由形态 A 短前缀端点服务（走共享实现）。
+SUPPORTED_SHEETS = set(IE_SHEETS - _X3_CODES)
+
+attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 # AI超时（秒）
 _AI_TIMEOUT = 30.0

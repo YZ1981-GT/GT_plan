@@ -30,6 +30,9 @@ import { ElMessage } from 'element-plus'
 import { eventBus } from '@/utils/eventBus'
 import http from '@/utils/http'
 
+// fail closed 提示文案单一真源（含**为什么**，不只是哪张表）
+import { rowScopeFailureMessage } from './shared/rowScopeFailure'
+
 import {
   buildRestrictedAssetsPayloads,
   RESTRICTED_ASSETS_NOTE_SECTION,
@@ -99,9 +102,13 @@ export function useRestrictedAssetsSync(
           year ? { ...payload, year } : payload,
         )
         const data = resp?.data ?? resp
-        const unresolved: string[] = data?.row_scope_unresolved || []
-        if (unresolved.length) {
-          ElMessage.warning(`受限资产未能同步（段边界解析失败）：${unresolved.join('、')}`)
+        const failure = rowScopeFailureMessage(
+          '受限资产',
+          data?.row_scope_unresolved,
+          data?.row_scope_unresolved_reasons,
+        )
+        if (failure) {
+          ElMessage.warning(failure)
           continue
         }
         if (data && (data.success || data.section_id)) {

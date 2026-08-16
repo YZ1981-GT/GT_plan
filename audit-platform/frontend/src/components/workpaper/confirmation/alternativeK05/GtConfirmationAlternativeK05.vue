@@ -40,10 +40,15 @@
         </div>
       </div>
 
-      <!-- 编制提示 -->
-      <details class="gt-confirmation-alternative-k05__tips">
+      <!-- 编制提示（内嵌源模板 B68:B70 三条替代程序要点，R7.4） -->
+      <details class="gt-confirmation-alternative-k05__tips" data-testid="k05-preparation-notes">
         <summary>编制提示</summary>
         <p>对回函可能性不高的、余额重大的被询证单位，发函同时执行替代程序：期后收款+余额支持性证据+本期发生额+往来对账。</p>
+        <p class="gt-confirmation-alternative-k05__tips-src">源模板编制说明（替代程序要点）：</p>
+        <p v-for="item in K0_ALT_PREPARATION_ITEMS" :key="item.anchor">
+          {{ item.text }}
+          <span class="gt-confirmation-alternative-k05__anchor">源模板 {{ item.anchor }}</span>
+        </p>
       </details>
 
       <!-- 余额汇总区 -->
@@ -129,25 +134,37 @@
           <!-- 4区块检查表 -->
           <div class="detail-section">
             <div class="detail-section__header">二、检查过程记录</div>
-            <!-- 非 block3 区块：统一渲染 -->
-            <CheckBlock
-              v-for="bt in blockTypes.filter(b => b !== 'block3')"
-              :key="bt"
-              :config="blockConfigs[bt]"
-              :rows="getBlockRows(selectedCompany, bt)"
-              :totals="data.getBlockTotal(selectedCompany, bt)"
-              :readonly="readonly"
-              :enable-ocr="true"
-              :ocr-loading-row-id="ocrLoadingRowId"
-              :formula-fn="bt === 'block4' ? reconcileDiffFn : undefined"
-              @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
-              @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
-              @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
-              @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
-            />
+            <!-- 非 block3 区块：统一渲染（每块上方就地展示源模板红字，R7.3） -->
+            <template v-for="bt in blockTypes.filter(b => b !== 'block3')" :key="bt">
+              <div
+                v-if="redHintAnchorOf(bt)"
+                class="src-hint"
+                :data-testid="`k05-red-hint-${bt}`"
+              >
+                <div class="src-hint__badge">源模板要求（{{ redHintAnchorOf(bt) }}）</div>
+                <div class="src-hint__body">{{ K0_ALT_RED_HINT }}</div>
+              </div>
+              <CheckBlock
+                :config="blockConfigs[bt]"
+                :rows="getBlockRows(selectedCompany, bt)"
+                :totals="data.getBlockTotal(selectedCompany, bt)"
+                :readonly="readonly"
+                :enable-ocr="true"
+                :ocr-loading-row-id="ocrLoadingRowId"
+                :formula-fn="bt === 'block4' ? reconcileDiffFn : undefined"
+                @add-row="data.addBlockRow(selectedCompany._company_id!, bt)"
+                @delete-row="(rowId: string) => data.deleteBlockRow(selectedCompany!._company_id!, bt, rowId)"
+                @update-field="(rowId: string, field: string, val: any) => data.updateBlockField(selectedCompany!._company_id!, bt, rowId, field, val)"
+                @ocr-upload="(rowId: string, file: File) => handleRowOcr(bt, rowId, file)"
+              />
+            </template>
             <!-- block3 本期发生额：借方/贷方两张表（confirmation-alternative-structure-alignment 决策 1） -->
             <div class="split-direction-block">
               <div class="split-direction-block__title">{{ blockConfigs.block3.title }}</div>
+              <div class="src-hint" data-testid="k05-red-hint-block3">
+                <div class="src-hint__badge">源模板要求（{{ redHintAnchorOf('block3') }}）</div>
+                <div class="src-hint__body">{{ K0_ALT_RED_HINT }}</div>
+              </div>
               <!-- 待归位提示：既有行无 direction -->
               <el-alert
                 v-if="getBlockRows(selectedCompany, 'block3').some(r => !r.direction)"
@@ -243,6 +260,14 @@ import {
 } from '../../composables/useWorkpaperScaffold'
 import GtReviewTrigger from '../../GtReviewTrigger.vue'
 
+// 源模板字面真源（红字提示 / 编制说明 3 条）—— 与后端 openpyxl 守卫双向锁死，
+// 组件内不抄第二份中文（spec k0-confirmation-source-alignment R7.3 / R7.4）
+import {
+  K0_ALT_PREPARATION_ITEMS,
+  K0_ALT_RED_HINT,
+  K0_ALT_RED_HINT_BLOCKS,
+} from './k0AlternativeSourceFidelity'
+
 // Shared D0-5 components
 import CheckBlock from '../alternativeD05/CheckBlock.vue'
 
@@ -298,6 +323,16 @@ const data = useAlternativeK05Data({
 // ─── Block configs ────────────────────────────────────────────────────────
 const blockTypes: BlockType[] = ['block1', 'block2', 'block3', 'block4']
 const blockConfigs = BLOCK_COLUMN_CONFIGS_K05
+
+/**
+ * 该区块在源模板里的红字锚点（无则返 undefined ⇒ 不渲染琥珀块）。
+ *
+ * 🔴 源模板只有 `O15`/`O26`/`O38` 三处（段①②③），**`O48` 没有** —— 段④（往来对账）
+ *    是源外增强区块（已在 `SOURCE_EXTRA_MANIFEST` 登记），不得凭空补第 4 处红字。
+ */
+function redHintAnchorOf(blockType: string): string | undefined {
+  return K0_ALT_RED_HINT_BLOCKS[blockType]
+}
 
 function getBlockRows(company: AlternativeCompany, blockType: BlockType): CheckRow[] {
   const key = `${blockType}_rows` as keyof AlternativeCompany
@@ -376,7 +411,9 @@ onUnmounted(() => { eventBus.off('confirmation:updated', onConfirmationUpdated) 
 const ocrLoadingRowId = ref<string | null>(null)
 
 const OCR_FIELD_MAP: Record<BlockType, Record<string, string>> = {
-  block1: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 金额: 'receipt_amount', 收款方: 'receipt_payer', 银行回单: 'receipt_date_no' },
+  // 🔴 `付款方` 是源模板 `K0-5!G16` 的正确用词（R7.1）；`收款方` 作 OCR 结果兼容保留 ——
+  //    银行回单实物上印的字样不可控，两个键都映到同一字段，识别到哪个都能落格。
+  block1: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 金额: 'receipt_amount', 付款方: 'receipt_payer', 收款方: 'receipt_payer', 银行回单: 'receipt_date_no' },
   block2: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 协议编号: 'agreement_no', 对方单位: 'agreement_party', 协议金额: 'agreement_amount' },
   block3: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 单据编号: 'doc_date_no', 事由: 'doc_reason', 审批人: 'approval_person', 审批金额: 'approval_amount' },
   block4: { date: 'voucher_date', voucher_no: 'voucher_no', amount: 'voucher_amount', 对方余额: 'other_balance', 本方余额: 'self_balance', 协议编号: 'agreement_no', 签订日期: 'agreement_date' },
@@ -544,6 +581,19 @@ defineExpose({ handleSave, handleExportTemplate, handleExportData, handleImport:
 .gt-confirmation-alternative-k05__legacy-notice { margin-bottom: 12px; }
 .gt-confirmation-alternative-k05__tips { margin-bottom: 12px; font-size: 12px; color: #606266; border: 1px solid var(--el-border-color-lighter); border-radius: 4px; padding: 8px 12px; }
 .gt-confirmation-alternative-k05__tips summary { cursor: pointer; font-weight: 500; }
+.gt-confirmation-alternative-k05__tips-src { margin-top: 6px; font-weight: 500; color: #7A5C22; }
+.gt-confirmation-alternative-k05__anchor { color: #C0C4CC; font-weight: 400; margin-left: 6px; font-size: 11px; }
+
+/* 源模板方法论上下文（琥珀色左边线 + 浅黄背景），与 H0-5 同款 */
+.src-hint {
+  margin: 8px 0;
+  border-left: 3px solid #e6a23c;
+  background: #fdf6ec;
+  padding: 6px 10px;
+  border-radius: 3px;
+}
+.src-hint__badge { font-size: 12px; font-weight: 600; color: #b88230; margin-bottom: 2px; }
+.src-hint__body { font-size: 12px; color: var(--el-text-color-regular); }
 .gt-confirmation-alternative-k05__summary-card { margin-bottom: 16px; }
 .gt-confirmation-alternative-k05__detail { margin-top: 12px; }
 .detail-section { margin-bottom: 16px; }

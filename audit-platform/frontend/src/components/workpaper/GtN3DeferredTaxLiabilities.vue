@@ -76,6 +76,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        @imported="selfLoad"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />

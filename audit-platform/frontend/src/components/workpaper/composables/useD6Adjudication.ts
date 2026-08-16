@@ -21,6 +21,7 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { eventBus } from '@/utils/eventBus'
+import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import {
   parseNum,
   calcAuditedAmount,
@@ -93,6 +94,12 @@ export interface UseD6AdjudicationOptions {
    * spec: d-cycle-four-table-extraction-formulas (R2.1/2.2/2.3, Property 2/9/11)
    */
   adjudicationPrefill?: Ref<AdjudicationPrefillRow[] | undefined>
+  /**
+   * 试算平衡表数种子（render `project_context.tb_amount`，BS-011 叶子口径）。
+   * 仅在用户未手工保存 `D6-1-tb-amount` 时回退使用（手工优先）。
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16
+   */
+  tbSeedAmount?: Ref<number | null | undefined>
 }
 
 // ─── Block Configuration ─────────────────────────────────────────────────────
@@ -231,12 +238,21 @@ export function useD6Adjudication(options: UseD6AdjudicationOptions) {
 
   // ─── Trial Balance ─────────────────────────────────────────────────────────
 
-  const trialBalanceAmount = ref<number>(0)
-
-  // Load TB amount from allResponses (auto_data or manual)
-  watch(allResponses, (map) => {
-    trialBalanceAmount.value = getNumFromResponse(map, 'D6-1-tb-amount')
-  }, { immediate: true })
+  /**
+   * 试算平衡表数（手工优先，其次 render 下发的四表口径）。
+   *
+   * 🔴 改造前只读 `D6-1-tb-amount`，而 render 的 `project_context.tb_amount`
+   * （`seed_tb_amount_scalars` 按 BS-011 解析后的叶子口径）**零消费方** = dead
+   * output。现按平台既有范式（D1/D7 的 `tbSeedAmount`）加只读回退。
+   *
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16
+   */
+  const trialBalanceAmount: ComputedRef<number> = computed(() =>
+    resolveTbAmountWithSeed(
+      allResponses.value.get('D6-1-tb-amount')?.remark,
+      options.tbSeedAmount?.value,
+    ),
+  )
 
   // ─── Dynamic Row Keys Tracking ─────────────────────────────────────────────
 

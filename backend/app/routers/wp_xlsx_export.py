@@ -75,6 +75,44 @@ async def export_xlsx(
 
     wp_code = wp_index.wp_code
 
+    # ─── Step 2.5: custom 底稿走独立导出路径 ─────────────────────────────
+    # 🔴 必须在 Step 3 `load_schema` **之前** —— 自定义 wp_code 在
+    #    `wp_render_schema/` 下没有 yaml，走到那里必 FileNotFoundError → 500。
+    # 🔴 自定义底稿口径 = xlsx 本体即权威，导出就是原样交付该文件；
+    #    不需要 schema，也不能套 `dynamic_table`（它读 `rows`，custom 是 `cells`）。
+    # 🔴 加法式分流：非 custom 底稿完全走原路径，逐字节不变。
+    from app.services.custom_workpaper_context import resolve_is_custom
+
+    if await resolve_is_custom(db, working_paper, wp_code):
+        from app.services.custom_workpaper_export import (
+            CustomExportError,
+            export_custom_workpaper,
+        )
+
+        try:
+            custom_buf = export_custom_workpaper(working_paper)
+        except CustomExportError as e:
+            # 🔴 明确报错而非回退空白 workbook —— 导出是交付件动作，
+            #    静默给空文件比报错坏得多
+            raise HTTPException(status_code=422, detail=str(e))
+
+        # 文件名沿用 Step 8 的 RFC 5987 形态（ASCII fallback + filename*）
+        from urllib.parse import quote as _quote
+
+        _custom_name = f"{wp_code}_{wp_index.wp_name or wp_code}.xlsx"
+        return StreamingResponse(
+            content=custom_buf,
+            media_type=(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            ),
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{wp_code}.xlsx"; '
+                    f"filename*=UTF-8''{_quote(_custom_name)}"
+                )
+            },
+        )
+
     # ─── Step 3: 加载 render schema ──────────────────────────────────────
     try:
         schema = _schema_service.load_schema(wp_code=wp_code)

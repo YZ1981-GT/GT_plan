@@ -551,6 +551,13 @@ import { handleApiError } from '@/utils/errorHandler'
 import { confirmDelete, confirmDangerous } from '@/utils/confirm'
 import { api } from '@/services/apiProxy'
 import { reportConfig as P_rc, noteTemplates as P_nt, linkageBus, formulaAuditLog } from '@/services/apiPaths'
+// spec: formula-management-runtime-closure Task 14 — 公式端点收敛进 apiPaths（纯搬迁，URL 逐字不变）
+import {
+  projectFormula,
+  reportConfigFormula,
+  wpFormula,
+  wpUserFormula,
+} from '@/services/apiPaths/formula'
 import { fmtAmount } from '@/utils/formatters'
 import FormulaEditDialog from './FormulaEditDialog.vue'
 import FormulaHistoryTab from './FormulaHistoryTab.vue'
@@ -654,7 +661,7 @@ async function onAutoGenerateReportFormulas() {
       '自动生成报表公式',
       { confirmButtonText: '确认生成', cancelButtonText: '取消', type: 'info' },
     )
-    const data = await api.post(`/api/projects/${props.projectId}/formula/auto-generate`, {}, {
+    const data = await api.post(projectFormula.autoGenerate(props.projectId), {}, {
       _silent: true,
     } as any)
     const result = data?.data ?? data
@@ -1204,7 +1211,7 @@ const crossCheckLoaded = ref(false)
 async function loadCrossCheckItems() {
   if (crossCheckLoaded.value || !props.projectId) return
   try {
-    const data = await api.get(`/api/projects/${props.projectId}/formula/report-cross-check`, {
+    const data = await api.get(projectFormula.reportCrossCheck(props.projectId), {
       _silent: true,  // 404 不弹全局错误 toast
     } as any)
     const rules: any[] = Array.isArray(data) ? data : (data?.data?.rules ?? data?.data?.items ?? data?.rules ?? data?.items ?? [])
@@ -1280,7 +1287,7 @@ const tbDetailFallbackAccounts = ref<Array<{ code: string; name: string }>>([])
 async function loadTbDetailFormulas() {
   if (!props.projectId) return
   try {
-    const data: any = await api.get(`/api/report-config/tb-detail-formulas/${props.projectId}`, {
+    const data: any = await api.get(reportConfigFormula.tbDetail(props.projectId), {
       _silent: true, validateStatus: (s: number) => s < 600,
     } as any)
     tbDetailOverrides.value = data?.overrides || {}
@@ -1307,7 +1314,7 @@ async function loadTbDetailFormulas() {
 async function persistTbDetailFormulas() {
   if (!props.projectId) return
   try {
-    await api.put(`/api/report-config/tb-detail-formulas/${props.projectId}`, {
+    await api.put(reportConfigFormula.tbDetail(props.projectId), {
       overrides: tbDetailOverrides.value,
       added: tbDetailAdded.value,
     }, { validateStatus: (s: number) => s < 600 })
@@ -1330,7 +1337,7 @@ async function loadWpFormulas(wpCode: string, sheetCode: string) {
     const wpId = idResp?.wp_id || idResp?.data?.wp_id
     if (!wpId) return
     // 2) 加载该底稿全部公式
-    const data: any = await api.get(`/api/workpapers/${wpId}/formulas`, {
+    const data: any = await api.get(wpFormula.list(wpId), {
       _silent: true, validateStatus: (s: number) => s < 600,
     } as any)
     const rows: any[] = []
@@ -2515,7 +2522,7 @@ async function loadUserFormulas(wpId: string) {
   if (!wpId) return
   wpIdForUserFormulas.value = wpId
   try {
-    const data: any = await api.get(`/api/workpapers/${wpId}/user-formulas`)
+    const data: any = await api.get(wpUserFormula.list(wpId))
     const list = data?.user_formulas || data?.items || data || {}
     const arr: UserFormulaItem[] = []
     if (Array.isArray(list)) {
@@ -2549,7 +2556,9 @@ async function onRestorePresetFormula(row: UserFormulaItem) {
     return
   }
   try {
-    await api.delete(`/api/workpapers/${wpIdForUserFormulas.value}/user-formulas/${encodeURIComponent(row.cell_key)}`)
+    await api.delete(
+      wpUserFormula.restorePreset(wpIdForUserFormulas.value, encodeURIComponent(row.cell_key)),
+    )
     userFormulasList.value = userFormulasList.value.filter((u) => u.cell_key !== row.cell_key)
     ElMessage.success(`已恢复 ${row.cell_key} 的预设公式`)
   } catch (err) {
@@ -2565,7 +2574,9 @@ async function onDeleteUserFormula(row: UserFormulaItem) {
     return
   }
   try {
-    await api.delete(`/api/workpapers/${wpIdForUserFormulas.value}/user-formulas/${encodeURIComponent(row.cell_key)}`)
+    await api.delete(
+      wpUserFormula.restorePreset(wpIdForUserFormulas.value, encodeURIComponent(row.cell_key)),
+    )
     userFormulasList.value = userFormulasList.value.filter((u) => u.cell_key !== row.cell_key)
     ElMessage.success('已删除用户自定义公式')
   } catch (err) {

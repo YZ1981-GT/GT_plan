@@ -15,6 +15,7 @@
 //     正是这种不对称掩盖了错配 —— 与 `f0MatrixDataSources` 同款。）
 import { api } from '@/services/apiProxy'
 import type { ConfirmationRow } from '../confirmationTypes'
+import { isNotReplied, isRepliedTrue } from '../replyStatus'
 
 export type SummaryRow = ConfirmationRow
 
@@ -23,14 +24,33 @@ export interface FetchSummaryResult {
   rows: SummaryRow[]
 }
 
-/** 默认：未回函（含 is_replied=false 且非相符） */
+/**
+ * 默认：未回函（含**显式**未回函且非相符）
+ *
+ * 🔴 判据走 `isNotReplied` 归一谓词，**不写 `r.is_replied === false`**：
+ * 完整表格视图（`kind: 'bool'` → el-checkbox）写入布尔 `false`，而明细面板与
+ * Excel 导入写入字符串 `'否'` —— 裸 `=== false` 对后者恒不成立
+ * ⇒ 改造前「明细面板录入的未回函行」永远进不了 F0-5/F0-6「从 X0-1 带入」
+ * （2026-08-05 浏览器实测）。
+ *
+ * 未填（`undefined`）**不算**未回函 —— 空行不得被带进替代程序底稿（宁缺勿造）。
+ */
 export function defaultUnrepliedFilter(r: SummaryRow): boolean {
-  return r.match_status === '未回函' || (r.is_replied === false && r.match_status !== '相符')
+  return r.match_status === '未回函' || (isNotReplied(r) && r.match_status !== '相符')
 }
 
 /** 已回函且差异 ≠ 0（供差异调节表） */
 export function defaultDiffFilter(r: SummaryRow): boolean {
-  if (!r.is_replied && r.match_status !== '不符') return false
+  // 🔴 走 `isRepliedTrue` 归一谓词而非 `!r.is_replied` —— 字符串 `'否'` 是 truthy，
+  // 裸真值判断会把「明确未回函」的行当成已回函放进差异调节表。
+  //
+  // 🔴 2026-08-07 修：此处原写 `isReplied(r) !== true`，而 import 清单里只有
+  // `isNotReplied` / `isRepliedTrue` ⇒ 运行时 `ReferenceError: isReplied is not defined`，
+  // 整条「差异行带入 X0-4 调节表」链路崩溃（5 个既有测试同时红）。
+  // `get_diagnostics` **查不出漏 import**（平台已记同款教训，Python/TS 各踩过一次）。
+  // `isReplied(r) !== true` 与 `!isRepliedTrue(r)` 语义逐字等价（后者定义即 `isReplied(row) === true`），
+  // 故改用已导入的谓词，行为不变。
+  if (!isRepliedTrue(r) && r.match_status !== '不符') return false
   if (r.match_status === '相符') return false
   const sent = Number(r.amount) || 0
   const reply = Number(r.reply_amount) || 0

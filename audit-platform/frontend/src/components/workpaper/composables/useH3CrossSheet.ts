@@ -112,16 +112,25 @@ export interface TransferSummary {
   fromH2: number   // 从 H2 在建工程转入金额
 }
 
-/** H3-3 调整分录 → H3-1 AJE/RJE */
+/**
+ * H3-3 调整分录 → H3-1 AJE/RJE。
+ *
+ * 🔴 字段名原为 `aje1503`/`aje1504`/`aje1505`，那三个码分别是
+ * **可供出售金融资产(G6 域) / 债权投资(G4 域) / 债权投资减值准备** ——
+ * 投资性房地产真实科目族是 `1521`/`1525`/`1526`/`1527`。改为语义命名。
+ */
 export interface AdjustmentSync {
   totalAje: number
   totalRje: number
-  aje1503: number
-  rje1503: number
-  aje1504: number
-  rje1504: number
-  aje1505: number
-  rje1505: number
+  /** 原值 / 公允价值（1521 族） */
+  ajeGross: number
+  rjeGross: number
+  /** 累计折旧 + 累计摊销（1525/1526 族） */
+  ajeAccumDep: number
+  rjeAccumDep: number
+  /** 减值准备（1527 族） */
+  ajeImpairment: number
+  rjeImpairment: number
 }
 
 /** H3-14 租金收入 → 附注 */
@@ -535,36 +544,48 @@ export function useH3CrossSheet(
   const adjustmentSync: ComputedRef<AdjustmentSync> = computed(() => {
     let totalAje = 0
     let totalRje = 0
-    let aje1503 = 0
-    let rje1503 = 0
-    let aje1504 = 0
-    let rje1504 = 0
-    let aje1505 = 0
-    let rje1505 = 0
+    let ajeGross = 0
+    let rjeGross = 0
+    let ajeAccumDep = 0
+    let rjeAccumDep = 0
+    let ajeImpairment = 0
+    let rjeImpairment = 0
 
     for (const row of adjustmentRows.value) {
       const net = _getNum(row.debitAmount) - _getNum(row.creditAmount)
       const code = String(row.accountCode || '')
       const name = String(row.accountName || '')
-      const is1505 = code.startsWith('1505') || /减值准备/.test(name)
-      const is1504 = code.startsWith('1504') || /累计折旧|累计摊销/.test(name)
-      const is1503 = code.startsWith('1503') || /投资性房地产/.test(name)
+      // 🔴 判定委托 `useH3Adjustment` 的单一真源 —— 本处改造前是同一套逻辑的**第二份副本**
+      //    （且两份都按错误的 1503/1504/1505 前缀判定）。改一处漏一处正是平台已实证的
+      //    「抄 N 份必分叉」代价（G4/G6 的 main 与子策略即如此）。
+      const isImpairment = isH3ImpairmentSubject(code, name)
+      const isAccumDep = !isImpairment && isH3AccumDepSubject(code, name)
+      const isGross = !isImpairment && !isAccumDep && (isH3GrossSubject(code, name) || !!code)
       const isRje = row.entryType === 'RJE'
 
       if (isRje) {
         totalRje += net
-        if (is1505) rje1505 += net
-        else if (is1504) rje1504 += net
-        else if (is1503 || (!is1504 && !is1505 && code)) rje1503 += net
+        if (isImpairment) rjeImpairment += net
+        else if (isAccumDep) rjeAccumDep += net
+        else if (isGross) rjeGross += net
       } else {
         totalAje += net
-        if (is1505) aje1505 += net
-        else if (is1504) aje1504 += net
-        else if (is1503 || (!is1504 && !is1505 && code)) aje1503 += net
+        if (isImpairment) ajeImpairment += net
+        else if (isAccumDep) ajeAccumDep += net
+        else if (isGross) ajeGross += net
       }
     }
 
-    return { totalAje, totalRje, aje1503, rje1503, aje1504, rje1504, aje1505, rje1505 }
+    return {
+      totalAje,
+      totalRje,
+      ajeGross,
+      rjeGross,
+      ajeAccumDep,
+      rjeAccumDep,
+      ajeImpairment,
+      rjeImpairment,
+    }
   })
 
   // ═══════════════════════════════════════════════════════════════════════════

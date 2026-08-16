@@ -19,6 +19,9 @@ import sqlalchemy as sa
 from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table.h2_account_scope import H2_ACCOUNT_SPEC, H2_SLOT_KEY_PREFIX
+from app.services.four_table.h_cycle_adjudication_prefill import (
+    attach_h_segment_prefill,
+)
 from app.services.four_table.semantic_account_resolver import (
     SemanticAccountResult,
     resolve_semantic_accounts,
@@ -279,7 +282,7 @@ async def render(ctx: RenderContext) -> dict | None:
 
     resolved_codes = sorted({c for slot in accounts.slots.values() if slot.found for c in slot.codes})
 
-    return {
+    payload: dict = {
         "component_type": "h2-construction-in-progress",
         "account_codes": resolved_codes or ["1604", "1605"],
         "responses_snapshot": responses_snapshot,
@@ -290,3 +293,14 @@ async def render(ctx: RenderContext) -> dict | None:
         "prefix": "H2",
         "sheets": H2_SHEETS,
     }
+
+    # ─── 审定表四表预填（spec h-cycle Task 5；H5~H10 已有，H1~H4 原缺）──
+    await attach_h_segment_prefill(
+        ctx,
+        payload,
+        cycle="H2",
+        accounts=accounts,
+        slot_key_prefix=H2_SLOT_KEY_PREFIX,
+    )
+
+    return payload

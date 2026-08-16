@@ -243,11 +243,15 @@ describe('H0 分段表头顺序', () => {
     expect(byKey.row_conclusion).toBe('row_summary')
   })
 
-  it('H0 的 row_conclusion 不落在 send_memo 段（那是 K0/L0 的发函询证纪要段）', () => {
+  it('H0 的 row_conclusion 不落在 send_memo 段（那是发函询证纪要段）', () => {
     const h0 = resolveConfirmationColumns('H0').find((c) => c.key === 'row_conclusion')!
-    const k0 = resolveConfirmationColumns('K0').find((c) => c.key === 'row_conclusion')!
     expect(h0.group).toBe('row_summary')
-    expect(k0.group).toBe('send_memo')
+    // 🔴 改写记录（k0-confirmation-source-alignment R2.4，2026-08-07）：
+    //    原断言 `k0.group === 'send_memo'` 锁定 K0 改造前的缺陷状态；K0 现已收口，
+    //    四个循环（G0/H0/K0/L0）的行级结论列统一归 row_summary。
+    const k0 = resolveConfirmationColumns('K0').find((c) => c.key === 'row_conclusion')!
+    expect(k0.group).toBe('row_summary')
+    expect(k0.source).toContain('K0-1')
   })
 })
 

@@ -191,6 +191,8 @@ import { ref, computed } from 'vue'
 import { ElMessage, type ElTree } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import http from '@/utils/http'
+// spec: formula-management-runtime-closure Task 14/16 - 端点收敛进 apiPaths（纯搬迁）
+import { draftRefresh } from '@/services/apiPaths/formula'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import {
   parseDraftRefreshResponse,
@@ -262,7 +264,7 @@ async function openDialog() {
 async function loadScopes() {
   scopesLoading.value = true
   try {
-    const response = await http.get('/api/workpapers/refresh-scopes', {
+    const response = await http.get(draftRefresh.scopes, {
       params: { project_id: props.projectId, year: props.year },
     })
     const payload = (response.data?.data ?? response.data) as { items?: RefreshScopeItem[] }
@@ -316,7 +318,7 @@ async function onConfirm() {
   }
   submitting.value = true
   try {
-    const response = await http.post('/api/workpapers/draft-refresh', {
+    const response = await http.post(draftRefresh.execute, {
       project_id: props.projectId,
       year: props.year,
       scopes: checkedScopes.value,
@@ -349,7 +351,7 @@ async function onRollback() {
   rollingBack.value = true
   try {
     const response = await http.post(
-      `/api/workpapers/draft-refresh/${parsedResult.value.run_id}/rollback`,
+      draftRefresh.rollback(parsedResult.value.run_id),
     )
     const data = response.data?.data ?? response.data
     if (data?.status === 'rolled_back') {

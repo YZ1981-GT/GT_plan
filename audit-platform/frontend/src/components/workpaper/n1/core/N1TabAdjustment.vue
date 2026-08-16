@@ -14,6 +14,13 @@
           <el-tag type="success" size="small" class="asset-tag">资产类·借方·1811</el-tag>
         </div>
         <div class="section-actions">
+          <CycleImportExportDropdown
+            :wp-id="props.wpId"
+            api-prefix="n1"
+            sheet="N1-3"
+            :disabled="isReadonly"
+            @imported="handleImported"
+          />
           <el-button
             size="small"
             type="primary"
@@ -306,6 +313,7 @@ import { generateN1Text } from '../../composables/useN1AiText'
 import { eventBus } from '@/utils/eventBus'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -604,6 +612,19 @@ function fmtAmt(val: number | null | undefined): string {
     return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   }
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：N1-3 读回 = 本 Tab _restoreEntries（N1-3-entries 单键 JSON）。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  await formData.loadData()
+  _restoreEntries()
 }
 </script>
 

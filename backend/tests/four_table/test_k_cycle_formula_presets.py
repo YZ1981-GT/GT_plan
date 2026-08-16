@@ -30,6 +30,22 @@ _CORRECT_ACCOUNTS: dict[str, str | None] = {
     code: spec.fallback_standard or None for code, spec in K_CYCLE_SPECS.items()
 }
 
+#: 各循环公式里**合法出现的非原值科目码**（备抵 / 附加单列科目）。
+#:
+#: 🔴 这些码由报表行公式本身引用（如 `BS-009` soe_standalone 的
+#: `TB('1221','期末余额') − TB('1231-03','期末余额') + TB('1131','期末余额')`），
+#: 不属于原值族但完全正当 —— 与 `k_cycle_specs` 的
+#: `provision_name_filter` / `extra_standard_codes` 声明对应。
+_ALLOWED_NON_GROSS_CODES: dict[str, tuple[str, ...]] = {
+    # K1 其他应收款：备抵 1231-03 + 附加单列 1131 应收股利 / 1132 应收利息
+    "K1": ("1231-03", "1131", "1132"),
+    # K3 其他应付款：BS-050 standalone 变体是 TB('2241') + TB('2231')
+    "K3": ("2231",),
+    # K6 持有待售：备抵 1482（IMP-007）+ 负债侧 2245（BS-051）
+    "K6": ("1482", "2245"),
+}
+
+
 _DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "prefill_formula_mapping.json"
 _ACCOUNT_CHART_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "standard_account_chart.json"
 
@@ -37,7 +53,18 @@ _ACCOUNT_CHART_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "
 _ORPHAN_CODES = {"K14", "K15", "K16", "K17", "K18"}
 
 # Prefill engine vocabulary — functions allowed in formulas that are NOT in formula_engine._REGISTRY
-_PREFILL_ONLY_FUNCS = {"ADJ", "TB_SUM", "LEDGER", "LEDGER_DETAIL", "AUX", "PREV", "WP"}
+#
+# 🔴 `PLACEHOLDER` 是**一等 formula_type**（不是占位垃圾）：语义 = 「该格值无法用单一
+#    科目码公式表达，取数真源在别处」，**有意永久 pending**。K0 的两个矩阵账面金额格
+#    （`K0-1-matrix-{品种}-book_amount`）由 k0-confirmation-source-alignment 改成它 ——
+#    因为 cell_ref 同时是手工覆盖键，写 TB() 会让「按码取到的 0」伪装成审计师手填值，
+#    压住语义定位拿到的 undefined，使「本项目无此科目」与「余额为 0」不可区分。
+#    本白名单当时漏补（memory 已登记「PLACEHOLDER 三处白名单都可能漏它」，此为第 4 处），
+#    致 `test_formula_syntax_valid` 长期红。2026-08-05 由 l0-confirmation-source-alignment
+#    回归时发现并补录（L0 侧同款改动亦依赖它，见该 spec Task 4）。
+_PREFILL_ONLY_FUNCS = {
+    "ADJ", "TB_SUM", "LEDGER", "LEDGER_DETAIL", "AUX", "PREV", "WP", "PLACEHOLDER",
+}
 
 
 @pytest.fixture(scope="module")
@@ -129,6 +156,12 @@ def test_formulas_reference_correct_account(k_presets, wp_code):
             for code in codes:
                 if "~" in code:
                     continue  # Range handled by Property 14
+                # 🔴 备抵科目**本就不属原值族** —— K1 的 1231-03（坏账准备-其他应收款）
+                #    由 BS-009 的 soe_standalone 公式 `TB('1221') − TB('1231-03') + TB('1131')`
+                #    直接解析出，是该报表行的正当组成部分；按「必须以原值码开头」判会误伤。
+                #    同理 extra_standard_codes（K1 的 1131 应收股利 / 1132 应收利息）。
+                if code in _ALLOWED_NON_GROSS_CODES.get(wp_code, ()):
+                    continue
                 # Code should start with expected or be the expected itself
                 assert code == expected or code.startswith(expected), (
                     f"{wp_code} 公式引用 {code}，应属于 {expected} 科目族"
@@ -188,17 +221,28 @@ def test_no_empty_tb_sum_formulas(k_presets):
 
 
 def test_detail_blocks_no_wp_back_reference(k_presets):
-    """明细表块（非主审定表）不得含 WP() 反引审定表。"""
+    """**明细表块**不得含 WP() 反引审定表（防 审定表 ⇄ 明细表 双向成环）。
+
+    🔴 2026-08-14 收窄判据（spec `k-cycle-…-closure` Task 12）。
+    原判据是「非主审定表块（无 `ADJ()`）一律禁 WP 反引」—— 太宽：**披露块**引审定表
+    做勾稽是平台既有范式（实测 G14 / G11 / D2 / D1 / N2 的披露块都有
+    `WP('Gx','审定表Gx-1', …)`），它不成环，因为审定表**不反过来引披露块**。
+
+    环的真实条件是**双向**：审定表 → 明细表 且 明细表 → 审定表。
+    披露块是单向叶子（审定表 → 明细表 + 披露 → 审定表 构不成回路）。
+
+    故判据改为按 **sheet 名**识别明细表块，与
+    `fix_k_cycle_prefill_presets.py` 的 `is_main` 判据同源（都用 sheet 名，
+    不用公式形态 —— 后者两头摇：披露块含 `PREV()` 就会被误认成审定表块）。
+    """
     for block in k_presets:
         wc = block.get("wp_code", "")
         if wc not in _CORRECT_ACCOUNTS:
             continue
+        sheet = str(block.get("sheet", ""))
+        if "明细表" not in sheet:
+            continue  # 只管明细表块；审定表块可引明细表，披露块可引审定表
         cells = block.get("cells") or block.get("entries") or []
-        # Is this a detail/sub block? (no ADJ() = not the main adjudication block)
-        is_main = any("ADJ(" in (c.get("formula") or "") for c in cells)
-        if is_main:
-            continue
-        # Detail block should not WP() back to the adjudication table
         for c in cells:
             f = c.get("formula") or ""
             wp_refs = re.findall(r"WP\('([^']+)','([^']*)'", f)
@@ -206,8 +250,29 @@ def test_detail_blocks_no_wp_back_reference(k_presets):
                 if ref_wc == wc and "审定表" in ref_sheet:
                     pytest.fail(
                         f"{wc} 明细块 WP() 反引审定表: {c.get('cell_ref','')} → "
-                        f"WP('{ref_wc}','{ref_sheet}') — 会成环"
+                        f"WP('{ref_wc}','{ref_sheet}') — 与「审定表→明细表」合成双向环"
                     )
+
+
+def test_disclosure_blocks_may_reference_adjudication(k_presets):
+    """反向自检：披露块引审定表**必须被允许**（否则上一条又收窄成空转）。
+
+    这条同时钉死「披露块确实建了勾稽引用」——若哪天披露块被清空或勾稽被删，
+    它会打红而不是静默通过。
+    """
+    disc_with_ref = [
+        (b.get("wp_code"), b.get("sheet"))
+        for b in k_presets
+        if str(b.get("sheet", "")).startswith("附注披露信息")
+        and any(
+            re.search(r"WP\('[^']+','审定表", str(c.get("formula") or ""))
+            for c in (b.get("cells") or b.get("entries") or [])
+        )
+    ]
+    assert len(disc_with_ref) >= 20, (
+        f"披露块引审定表的数量过少（{len(disc_with_ref)}）—— "
+        "26 张披露 sheet 应各有一条审定表勾稽；若已改设计请同步本断言"
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -216,8 +281,13 @@ def test_detail_blocks_no_wp_back_reference(k_presets):
 
 
 def test_formula_syntax_valid(k_presets):
-    """所有公式只使用已知函数名。"""
-    known_funcs = {"TB", "ADJ", "PREV", "WP", "TB_SUM", "LEDGER", "LEDGER_DETAIL", "AUX"}
+    """所有公式只使用已知函数名。
+
+    🔴 白名单**引用模块级 `_PREFILL_ONLY_FUNCS`**，不在函数内再硬编码一份 ——
+    改造前这里有一份局部 `known_funcs`，与模块级常量构成**双真源**：给模块级常量
+    补 `PLACEHOLDER` 不生效，必须两处都改，正是漂移的温床。
+    """
+    known_funcs = {"TB"} | _PREFILL_ONLY_FUNCS
     issues = []
     for block in k_presets:
         cells = block.get("cells") or block.get("entries") or []

@@ -121,29 +121,21 @@
           @change="(val: string) => onCellChange(row.rowId, 'companyCode', val)" />
       </template>
     </el-table-column>
-    <!-- C: 款项性质 -->
+    <!-- C: 款项性质（候选来自 d3NatureCategories 单一真源，与 D3-1 性质行标签同源） -->
     <el-table-column v-if="isColumnVisible('nature')" label="款项性质" width="160">
       <template #default="{ row }">
         <el-select v-if="isDataRow(row)" v-model="row.nature" size="small" :disabled="isReadonly"
           @change="(val: string) => onCellChange(row.rowId, 'nature', val)">
-          <el-option value="预收销售固定资产款" />
-          <el-option value="预收销售土地使用权款" />
-          <el-option value="合同不成立时已收取的对价" />
-          <el-option value="其他" />
+          <el-option v-for="opt in d3NatureOptions(row.nature)" :key="opt" :value="opt" />
         </el-select>
       </template>
     </el-table-column>
-    <!-- D: 关联方类型 -->
+    <!-- D: 关联方类型（候选来自源模板 D3-2!D12:D23 数据验证） -->
     <el-table-column v-if="isColumnVisible('relationType')" label="关联方类型" width="120">
       <template #default="{ row }">
         <el-select v-if="isDataRow(row)" v-model="row.relationType" size="small" :disabled="isReadonly"
           @change="(val: string) => onCellChange(row.rowId, 'relationType', val)">
-          <el-option value="非关联方" />
-          <el-option value="母公司" />
-          <el-option value="子公司" />
-          <el-option value="联营企业" />
-          <el-option value="合营企业" />
-          <el-option value="其他关联方" />
+          <el-option v-for="opt in d3RelationTypeOptions(row.relationType)" :key="opt" :value="opt" />
         </el-select>
       </template>
     </el-table-column>
@@ -402,6 +394,7 @@ import { virtualTextCol, virtualNumCol } from '../composables/virtualColumnHelpe
 import type { VirtualColumn } from '@/composables/useVirtualTable'
 import type { ChecklistResponse } from '../composables/useD3FormData'
 import { D3_DETAIL_FORMULA_CELLS } from '../composables/useD3FormulaEngine'
+import { d3NatureOptions, d3RelationTypeOptions } from '../composables/d3NatureCategories'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import GtFormulaSourceTooltip from '@/components/formula/GtFormulaSourceTooltip.vue'
 

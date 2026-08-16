@@ -52,6 +52,7 @@ from app.routers.wp_render_config_helpers import (  # noqa: F401
     _confirmation_initial_data,
     _inject_confirmation_population,
     _inject_h0_book_amounts,
+    _inject_l0_book_amounts,
     _extract_field_sources,
     _has_custom_procedure,
     _infer_sheet_type_by_heuristic,
@@ -222,6 +223,13 @@ _ONLYOFFICE_HTML_WHITELIST: set[str] = {
     # S32/S33 纯前端聚合组件（无后端 renderer）：保留 componentType，禁止改写为 onlyoffice-sheet
     "s32-fraud-bundle",
     "s33-ann14-bundle",
+    # 🔴 自定义底稿（componentType=custom）：当前恒单 sheet 故 E 分支不触发，
+    # 但一旦将来出现多 sheet，E 分支（要求 `_is_multi_sheet`）会把它静默改写成
+    # "onlyoffice-sheet"，使前端专属组件 GtCustomWpEditor **永不渲染**。
+    # 自定义底稿自带 HTML/OnlyOffice 双模式切换（用户可主动进在线编辑），
+    # 不需要也不允许后端替它决定渲染方式。
+    # spec: custom-workpaper-dual-mode-formula-and-batch R4.8
+    "custom",
     # K12/K13 营业外收入/支出（K13 render 策略待后续 Task，暂保留白名单）
     "k12-non-operating-income",
     "k13-non-operating-expense",
@@ -728,6 +736,17 @@ async def _get_render_config_impl(
                 _skip_m2 = re.match(r"([A-Z]\d+(?:-\d+)*)", cls.sheet_name)
                 if _skip_m2 and _WP_CODE_OVERRIDE.get(_skip_m2.group(1)) == "skip":
                     continue
+            # 复合键 skip override（`{wp_code}-{sheet_name}`）——**接在上面三条之后**：
+            # 同一 sheet 名在不同循环可见性不同时用它精确门控。
+            # 🔴 例：`函证差异检查表（示例）` 在 L0 源模板是 **hidden**（不该渲染），
+            #    而在 **D0 / F0 是 visible**（真实页签，openpyxl 三处模板实证）
+            #    → 绝不能按裸 sheet 名标 skip（那会连 D0/F0 的真实页签一起杀掉），
+            #    只能按 `L0-函证差异检查表（示例）` 复合键。
+            # 🔴 裸键 `函证差异检查表（示例）` → `confirmation-diff-checklist` **保留不动**
+            #    （它是 D0/F0 的 componentType 来源，见下方 `_sheet_ovr` 的 fallback 分支）。
+            # spec: l0-confirmation-source-alignment R5.1 ~ R5.5
+            if wp_code and _WP_CODE_OVERRIDE.get(f"{wp_code}-{cls.sheet_name}") == "skip":
+                continue
             # 向导式专属组件隐藏辅助sheet（选项清单/示例/不打印，无标准编码）。
             # 「底稿目录」策略分两类：
             #  - D~N/S 科目专属组件（J1/H1/K3 等）有 TabIndex 子组件渲染目录页 → 必须保留，
@@ -876,6 +895,28 @@ async def _get_render_config_impl(
                     sheet_html_data = strip_standard_header(_grid)
             except Exception:  # noqa: BLE001
                 pass
+        # 自定义底稿（componentType=custom）存量补齐：xlsx → 恒等坐标投影。
+        # 🔴 加法式 + custom 门控 ⇒ 其余 37 种 componentType 的输出逐字节不变。
+        # 🔴 为什么必需：建时投影（create_custom_workpaper）只覆盖**新建**底稿，
+        #    库里既有自定义底稿的 parsed_data 已经是空的 ⇒ 不补齐永远显示
+        #    「此表格底稿模板暂无内容」，也就永远选不了公式目标格。
+        # 🔴 不落库（render-config 是 GET，不在读端点写库）；`project_if_empty` 在
+        #    已有内容时直接短路，故天然幂等、无额外 IO。
+        # 🔴 fail-open：xlsx 缺失/损坏返回空网格 + `source_unavailable` 标记，
+        #    前端据此区分「文件异常」与「空底稿」（都显示「暂无内容」会掩盖文件损坏）。
+        # spec: custom-workpaper-dual-mode-formula-and-batch R2.6 / Task 27
+        if component_type == "custom":
+            try:
+                from app.services.custom_workpaper_projection import project_if_empty
+                sheet_html_data = project_if_empty(
+                    working_paper, cls.sheet_name, sheet_html_data
+                )
+            except Exception as _cproj_err:  # noqa: BLE001 — 补齐失败不阻断渲染
+                logger.warning(
+                    "custom 投影补齐失败 wp_id=%s sheet=%s: %s",
+                    wp_id, cls.sheet_name, _cproj_err,
+                )
+
         # skip 类 sheet 不加入输出（隐藏的辅助说明 sheet）
         if component_type == "skip":
             continue
@@ -894,6 +935,16 @@ async def _get_render_config_impl(
             # spec: h0-confirmation-source-fidelity-and-linkage R3.5/R3.6
             try:
                 await _inject_h0_book_amounts(
+                    db, project_id, _prog_year, wp_code, sheet_html_data
+                )
+            except Exception:  # noqa: BLE001 — 注入失败不阻断渲染（键不存在=未取数）
+                pass
+            # L0-1 下区矩阵账面金额（2 品种：长期应付款 / 应付债券）。
+            # 🔴 同上：内部按 wp_code 前缀门控，仅 L0 生效 → 其余六枢纽载荷逐字节不变；
+            #    走加法式注入而非 RENDERER_DISPATCH，否则会劫持全部七枢纽。
+            # spec: l0-confirmation-source-alignment R3.3/R3.4/R10.1/R10.2
+            try:
+                await _inject_l0_book_amounts(
                     db, project_id, _prog_year, wp_code, sheet_html_data
                 )
             except Exception:  # noqa: BLE001 — 注入失败不阻断渲染（键不存在=未取数）

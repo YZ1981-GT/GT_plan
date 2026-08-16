@@ -447,7 +447,9 @@ interface BlockConfig {
 const BLOCKS_L05_BASE: BlockConfig[] = [
   {
     key: 'block1',
-    title: '①期后付款/还款检查',
+    // 🔴 title 逐字取源模板 `长期应付款替代程序L0-5!A13`「1、检查期后付款」（圈码是平台区块前缀）。
+    //    spec l0-confirmation-source-alignment R7.1；改前为「①期后付款/还款检查」（自拟用词）。
+    title: '①检查期后付款',
     evidenceCols: [
       { key: 'repay_approval_date_no', label: '还款审批单日期编号', width: 150 },
       { key: 'repay_approved', label: '是否恰当审批', width: 110, type: 'select' },
@@ -459,7 +461,11 @@ const BLOCKS_L05_BASE: BlockConfig[] = [
   },
   {
     key: 'block2',
-    title: '②期末余额支持性证据(借款合同/银行对账单)',
+    // 🔴 逐字取源模板 `A20`「2、检查构成期末长期应付款余额的支持性文件（如合同等）」。
+    //    改前为「②期末余额支持性证据(借款合同/银行对账单)」—— 「银行对账单」「借款合同」与
+    //    L0A 程序 1 的批注「不含银行借款（银行借款函证见 E0 货币资金循环）」自相矛盾（R7.2）。
+    //    列 key 一个不改（`contract_no`/`statement_date` 等已持久化），只改区块标题。
+    title: '②检查构成期末长期应付款余额的支持性文件（如合同等）',
     evidenceCols: [
       { key: 'contract_no', label: '借款合同编号', width: 130 },
       { key: 'creditor', label: '债权人', width: 100 },
@@ -472,8 +478,11 @@ const BLOCKS_L05_BASE: BlockConfig[] = [
   },
   {
     key: 'block3',
-    title: '③本期借款检查',
-    splitByDirection: true, // 源模板 L0-5 第③区块为借方(归还)/贷方(借入)两张表
+    // 🔴 逐字取源模板 `A28`「4、测试本期发生额」。源模板编号为 **4** 而平台是第 3 个区块 ——
+    //    源模板第 3 项 `A27`「3、检查期初余额是否与上期期末余额一致：」**没有凭证明细表**
+    //    （由本组件的期初余额一致性核对承载），故平台无对应区块，不是漏做（R7.3）。
+    title: '③测试本期发生额',
+    splitByDirection: true, // 源模板 `A29`（1）本期借方发生额 / `A37`（2）本期贷方发生额 两张表
     evidenceCols: [
       { key: 'loan_approval_date_no', label: '借款审批单日期编号', width: 150 },
       { key: 'loan_approved', label: '是否恰当审批', width: 110, type: 'select' },
@@ -505,8 +514,9 @@ const BLOCKS_L05 = computed<BlockConfig[]>(() => {
   const out: BlockConfig[] = []
   for (const b of BLOCKS_L05_BASE) {
     if (b.splitByDirection) {
-      out.push({ ...b, title: `${b.title}（借方发生额）`, direction: 'debit' })
-      out.push({ ...b, title: `${b.title}（贷方发生额）`, direction: 'credit' })
+      // 🔴 副标题逐字取源模板 `A29`/`A37`（R7.3）；改前为「（借方发生额）」「（贷方发生额）」。
+      out.push({ ...b, title: `${b.title}（1）本期借方发生额`, direction: 'debit' })
+      out.push({ ...b, title: `${b.title}（2）本期贷方发生额`, direction: 'credit' })
     } else {
       out.push(b)
     }

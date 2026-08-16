@@ -10,6 +10,13 @@
         </el-tag>
       </div>
       <div class="section-header-right">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="m6"
+          sheet="M6-3"
+          :disabled="isReadonly"
+          @imported="handleImported"
+        />
         <el-segmented
           v-model="adjustment.activeType.value"
           :options="typeOptions"
@@ -273,6 +280,7 @@ import { useM6Adjustment } from '../../composables/useM6Adjustment'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { GenerateWorkpaperAiText } from '@/components/workpaper/composables/useWorkpaperScaffold'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -418,6 +426,19 @@ onMounted(async () => {
   restoreEntries()
   refreshStatus()
 })
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：M6-3 读回 = useM6Adjustment.loadFromResponses（整体替换，幂等）。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  await formData.loadData()
+  restoreEntries()
+}
 </script>
 
 <style scoped>

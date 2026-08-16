@@ -414,8 +414,8 @@ import {
   parseSoeDisclosurePack,
 } from '../../composables/h1DisclosurePack'
 import { pullH6ClearingForH1Soe, type H6ClearingPullResult } from '../../composables/h1SoeClearingH6Pull'
-import {
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import {
   H1_SOE_KEYS,
   readSoeRemark,
   CLEARING_NOTE_PLACEHOLDER,

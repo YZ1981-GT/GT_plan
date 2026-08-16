@@ -21,13 +21,33 @@ const VOUCHER_COLS: BlockColumnDef[] = [
   { field: 'voucher_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '记账凭证', align: 'right' },
 ]
 
-/** ① 期后收款检查 */
+/**
+ * ① 期后收款检查
+ *
+ * 🔴 源模板 `K0-5!A15:K16` 三段：记账凭证 / 银行回单{日期,**付款方**,金额} /
+ *    支持性文件1{识别特征,信息1,信息2}。真源 `k0AlternativeSourceFidelity.K05_BLOCK1_SOURCE`。
+ *
+ * 两处对齐（spec k0-confirmation-source-alignment R7.1 / R7.2，2026-08-07）：
+ *   - `receipt_payer` 的 label 由「收款方」改为「**付款方**」—— 其他应收款是期后**收回**
+ *     款项，银行回单上的对方是付款方。K0-6（其他应付款、期后付出）那侧才是「收款方」，
+ *     **两者不得统一**（统一即业务方向搞反，守卫有反向自检）。
+ *   - 补齐源模板 `I15:K16` 的 `支持性文件1` 三列（改造前完全缺失 ⇒ 源模板要求的识别特征
+ *     与两项信息无处录入）。
+ *   - `receipt_date_no` 的**字段名保留**（既有项目已按此持久化），label 回归源模板「日期」；
+ *     源模板银行回单只有「日期」单列，「/编号」是平台合成用词。
+ *
+ * 源外增强列 `post_receipt_ratio`（期后收回比例）保留 —— 它是平台对「期后收回比例」这一
+ * 审计判断的量化位置，源模板无此列但红字 `O15` 授权「根据被审计单位具体情况修改」。
+ */
 const BLOCK1_COLUMNS: BlockColumnDef[] = [
   { field: 'seq', label: '序号', width: 50, type: 'number', editable: false, fixed: true, align: 'center' },
   ...VOUCHER_COLS,
-  { field: 'receipt_date_no', label: '银行回单日期/编号', width: 130, type: 'text', group: '银行回单' },
-  { field: 'receipt_payer', label: '收款方', width: 120, type: 'text', group: '银行回单' },
+  { field: 'receipt_date_no', label: '日期', width: 110, type: 'text', group: '银行回单' },
+  { field: 'receipt_payer', label: '付款方', width: 120, type: 'text', group: '银行回单' },
   { field: 'receipt_amount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '银行回单', align: 'right' },
+  { field: 'support1_feature', label: '识别特征', width: 120, type: 'text', group: '支持性文件1' },
+  { field: 'support1_info1', label: '信息1', width: 110, type: 'text', group: '支持性文件1' },
+  { field: 'support1_info2', label: '信息2', width: 110, type: 'text', group: '支持性文件1' },
   { field: 'post_receipt_ratio', label: '期后收回比例', width: 100, type: 'text', group: '汇总' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },

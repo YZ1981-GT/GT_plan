@@ -192,12 +192,30 @@ function applyPreset(preset: 'all' | 'core' | 'nonEmpty') {
 
 interface GridGroup { group: ColumnGroup; label: string; cols: ColumnDef[] }
 
+/**
+ * 分段表头 —— 🔴 **按列序推导，禁在此另抄一份段顺序**。
+ *
+ * 本组件是原生 `<table>`：列头行按 `visibleColumns` 顺序渲染，分段表头行用 `colspan`
+ * 覆盖同一批列 ⇒ 两者顺序与总数必须严格对齐，否则段标题与列**错位**。
+ *
+ * 改造前这里写死 `['send_info','reply_info','reply_amount','alternative','send_memo']`
+ * **漏了 `row_summary`** ⇒ E0 的 4 列（抵押质押说明/其他事项相符/不符说明/审计结论）
+ * 与 G0/H0/L0 的审计结论列上方没有段标题、`colspan` 之和小于列数（表头缺一块）。
+ * 且各枢纽段顺序可按源模板不同（K0 的 `send_memo` 段排在 `reply_info` 之前，见
+ * `CYCLE_COLUMN_GROUP_ORDER_OVERRIDES`），照抄固定 order 必然与列序打架。
+ *
+ * 改为「连续同 group 的列合成一段」：与列序**恒等**对齐，新增段/改段序都零改动。
+ * spec: k0-confirmation-source-alignment R2.3/R2.4（顺带修 E0/G0/H0/L0 的段标题缺失）
+ */
 function buildGroups(cols: ColumnDef[]): GridGroup[] {
-  const order: ColumnGroup[] = ['send_info', 'reply_info', 'reply_amount', 'alternative', 'send_memo']
   const groups: GridGroup[] = []
-  for (const g of order) {
-    const gc = cols.filter((c) => c.group === g)
-    if (gc.length) groups.push({ group: g, label: COLUMN_GROUP_LABELS[g], cols: gc })
+  for (const col of cols) {
+    const last = groups[groups.length - 1]
+    if (last && last.group === col.group) {
+      last.cols.push(col)
+    } else {
+      groups.push({ group: col.group, label: COLUMN_GROUP_LABELS[col.group], cols: [col] })
+    }
   }
   return groups
 }

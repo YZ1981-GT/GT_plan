@@ -120,9 +120,16 @@
  * - 附注上市公司模板
  * - subscribe 'substantive:adjudicated' 刷新
  */
-import { inject, onMounted, onUnmounted, ref, computed } from 'vue'
+import { inject, onMounted, onUnmounted, onBeforeUnmount, ref, computed, watch } from 'vue'
 import { MagicStick, Check } from '@element-plus/icons-vue'
 import { useL4FormData } from '../../composables/useL4FormData'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import {
+  buildL4SyncPayload,
+  L4_NOTE_SECTION,
+  L4_DISCLOSURE_SHEET_NAME,
+} from '../../composables/l4NoteSectionMap'
+import { api } from '@/services/apiProxy'
 import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
@@ -182,6 +189,45 @@ function saveNoteText() {
 function saveConclusion() {
   formData.debouncedSave('L4-disc-listed-conclusion', { remark: conclusion.value || null })
 }
+
+// ─── 附注同步链路（spec l-cycle-…completion R5.7）────────────────────────────
+
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (props.isReadonly || !props.projectId) return
+  try {
+    const noteTextsPayload: Array<{ section: string; title: string; text: string }> = []
+    const text = (noteText.value || '').trim()
+    if (text) {
+      noteTextsPayload.push({ section: 'l4-convertible-bond', title: '可转换公司债券', text })
+    }
+    const payload = buildL4SyncPayload({
+      variant: 'listed',
+      wpId: props.wpId,
+      projectId: props.projectId,
+      noteTexts: noteTextsPayload.length ? noteTextsPayload : undefined,
+    })
+    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
+      wp_id: props.wpId,
+      sheet_name: L4_DISCLOSURE_SHEET_NAME.listed,
+      section_id: L4_NOTE_SECTION.listed,
+      current_standard: 'listed_standalone',
+      sub_table_data: payload.sub_table_data,
+      columns: payload._sub_table_columns,
+    })
+  } catch {
+    // 自动同步失败静默（不打断录入流程）
+  }
+}
+
+watch(
+  [noteText, disclosureItems],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
+
+onBeforeUnmount(() => autoSync.cancelPending())
 
 // subscribe EventBus
 function onAdjudicated() {

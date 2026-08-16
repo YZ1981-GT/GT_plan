@@ -39,6 +39,21 @@
 
 6. **描述贴错标签**：随科目码一并纠正 ``description`` 里的科目名与码。
 
+7. **点号子科目公式恒返 0 且不报错**（2026-08-08 新增，G7 ``明细表G7-2`` 7 条）
+   ``TB('1511.01','期末余额')`` 这类**带点号的多级码**在求值时恒返 0：
+   ``formula_engine._handle_tb`` 从 ``ctx.tb_data.get(code, {})`` 取值，而 ``tb_data``
+   按**标准码**构造（余额来自 ``trial_balance``）。DB 实证 ``trial_balance`` 的 151x 段
+   **只有 1511 / 1512 / 1519**，点号子科目 ``1511.01``~``1511.04.02`` 只存在于
+   ``tb_balance``（客户原始码体系）⇒ 键查不到 → ``account_data = {}`` →
+   ``_resolve_tb_column`` 返 0。而 ``期末余额`` 是**已注册列**（``COLUMN_ALIASES`` 里有）
+   ⇒ ``is_unregistered_column`` 为 False ⇒ **不进 errors**，走「诚实的 0」路径 ⇒
+   与「该科目余额确实为 0」**在界面上不可区分**（公式管理页看着有配置、实则恒 0）。
+   → 改 ``PLACEHOLDER``（沿用 E1 数字货币 / D5 应收款项融资 / G0 / H0 / K0 / L0 已落地
+   的范式），description 写明真源 = render 的 ``tb_leaf_categories``（按科目名归类 6 桶，
+   见 `four_table/g7_investment_buckets`）与 ``adjudication_prefill``；
+   ``account_codes`` 由 ``['1511','1511.01'..'1511.04']`` 收敛为 ``['1511','1512']``
+   （标准码体系里只有这两个真实存在）。
+
 Usage::
 
     python backend/scripts/fix/fix_g_cycle_prefill_presets.py --dry-run
@@ -93,6 +108,57 @@ DROP_CELLS: set[tuple[str, str, str]] = {
     ("G8", "明细表G8-2", "FVOCI_1525_期末"),
     ("G8", "明细表G8-2", "FVOCI_1526_期末"),
     ("G8", "明细表G8-2", "FVOCI_1527_期末"),
+}
+
+#: ── 缺陷 7：G7 明细表点号子科目公式恒返 0 ────────────────────────────────────
+G7_DETAIL_SHEET = "明细表G7-2"
+
+#: 标准码体系（``trial_balance.standard_account_code``）里真实存在的 G7 科目。
+#: DB 实证 151x 段只有 1511 / 1512 / 1519；``1511.0x`` 只在 ``tb_balance``。
+G7_DETAIL_ACCOUNTS = ["1511", "1512"]
+
+#: 点号子科目恒返 0 的共用实证说明（≥20 字且含实证依据，防 PLACEHOLDER 变逃逸阀）
+G7_DOT_SUBACCOUNT_REASON = (
+    "🔴 原公式 {old} 恒返 0 且不报错：formula_engine._handle_tb 从 ctx.tb_data 按"
+    "**标准码**取值（余额来自 trial_balance），而 DB 实证 trial_balance 的 151x 段"
+    "只有 1511/1512/1519 —— 点号子科目 1511.01~1511.04.02 只存在于 tb_balance"
+    "（客户原始码体系）⇒ 键查不到返 0；且「期末余额」是已注册列故不进 errors，"
+    "使「取不到」与「余额确实为 0」不可区分。"
+    "真源 = render 下发的 `tb_leaf_categories`（按科目名归类 6 桶，"
+    "见 four_table/g7_investment_buckets 的 G7_INVESTMENT_BUCKETS）与 "
+    "`adjudication_prefill`，两者都基于 tb_balance 叶子聚合 + parent_check 勾稽自校验。"
+)
+
+#: cell_ref → (PLACEHOLDER 标签, 该格业务含义)
+G7_DETAIL_PLACEHOLDER_CELLS: dict[str, tuple[str, str]] = {
+    "子科目_1511_01_期初": (
+        "对子公司投资期初余额（按科目名归类）",
+        "1511.01 对应桶「对子公司投资」的期初余额",
+    ),
+    "子科目_1511_01_期末": (
+        "对子公司投资期末余额（按科目名归类）",
+        "1511.01 对应桶「对子公司投资」的期末余额",
+    ),
+    "子科目_1511_02_期末": (
+        "对联营企业投资成本期末余额（按科目名归类）",
+        "1511.02 对应桶「对联营企业投资」的期末余额",
+    ),
+    "子科目_1511_03_期末": (
+        "权益法下确认的投资损益期末余额（按科目名归类）",
+        "1511.03 对应桶「权益法下确认的投资损益」的期末余额",
+    ),
+    "子科目_1511_04_期末": (
+        "其他权益变动期末余额（按科目名归类）",
+        "1511.04 对应「其他权益变动」父级（其下 .01/.02 再分 OCI / 非 OCI 两桶）",
+    ),
+    "子科目_1511_04_01_期末": (
+        "其他综合收益调整期末余额（按科目名归类）",
+        "1511.04.01 对应桶「其他综合收益调整」的期末余额",
+    ),
+    "子科目_1511_04_02_期末": (
+        "其他权益变动（非其他综合收益）期末余额（按科目名归类）",
+        "1511.04.02 对应桶「其他权益变动」的期末余额（否决词排除 OCI）",
+    ),
 }
 
 #: G4 审定表：区间口径 → 单科目
@@ -230,6 +296,39 @@ def apply_fixes(data: dict) -> list[str]:
                         f"{wp}/{blk.get('sheet')}/{cell.get('cell_ref')}.description 纠正贴错标签"
                     )
                     cell["description"] = new
+
+    # ── 7. G7 明细表点号子科目 → PLACEHOLDER ────────────────────────────────
+    for blk in _blocks_of(data, "G7"):
+        if blk.get("sheet") != G7_DETAIL_SHEET:
+            continue
+
+        before_acc = list(blk.get("account_codes") or [])
+        if before_acc != G7_DETAIL_ACCOUNTS:
+            changes.append(
+                f"G7/{G7_DETAIL_SHEET} account_codes {before_acc} → {G7_DETAIL_ACCOUNTS}"
+                f"（标准码体系里 151x 段只有 1511/1512/1519；点号子科目只在 tb_balance）"
+            )
+            blk["account_codes"] = list(G7_DETAIL_ACCOUNTS)
+
+        for cell in blk.get("cells") or []:
+            ref = cell.get("cell_ref")
+            target = G7_DETAIL_PLACEHOLDER_CELLS.get(ref or "")
+            if target is None:
+                continue
+            label, meaning = target
+            want_formula = f"=PLACEHOLDER('{label}')"
+            old_formula = cell.get("formula") or ""
+            if cell.get("formula") == want_formula and cell.get("formula_type") == "PLACEHOLDER":
+                continue  # 幂等：已修订
+            changes.append(
+                f"G7/{G7_DETAIL_SHEET}/{ref}: {old_formula} → {want_formula}"
+                f"（点号子科目恒返 0 且不报错）"
+            )
+            cell["formula"] = want_formula
+            cell["formula_type"] = "PLACEHOLDER"
+            cell["description"] = (
+                f"{meaning}。" + G7_DOT_SUBACCOUNT_REASON.format(old=old_formula or "（原公式已丢失）")
+            )
 
     return changes
 

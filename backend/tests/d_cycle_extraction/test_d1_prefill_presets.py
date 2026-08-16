@@ -49,6 +49,16 @@ _KNOWN_AUX_TYPES = {
 _PHANTOM_AUX_TYPES = {"票据类型", "票据种类"}
 
 
+def _is_disclosure_sheet(sheet: str) -> bool:
+    """是否为附注披露 sheet。
+
+    🔴 判据用「以『附注披露信息』开头」而不是穷举括号写法 —— D 类披露 tab 名的
+    括号有**六种写法并存**（D1/D5 全角全角、D2/D3/D7 半角半角、D6 前半后全），
+    穷举必漏；而「附注披露信息」这个前缀在源模板里是稳定的。
+    """
+    return sheet.startswith("附注披露信息")
+
+
 @pytest.fixture(scope="module")
 def d1_mappings() -> list[dict]:
     data = json.loads(_MAPPING_PATH.read_text(encoding="utf-8"))
@@ -108,15 +118,140 @@ def test_tb_aux_dimensions_are_real(d1_mappings):
 
 
 def test_detail_sheets_have_no_wp_formula(d1_mappings):
-    """明细表禁 WP()（防审定表 ↔ 明细表循环引用）；审定表允许。"""
+    """明细表禁 WP()（防审定表 ↔ 明细表循环引用）；审定表与披露 sheet 允许。
+
+    🔴 判据从「非审定表一律禁」收窄为「**明细表**禁」（2026-08-06 修）：
+
+    原判据把披露 sheet 也算成明细表，而 D1 的两个披露块各有一条
+    ``WP('D1','原值明细表（按类别）D1-2','期末合计')`` 是**勾稽核对**用
+    （spec Task 20 交付，`description` 明写「勾稽用，不参与披露取数」）。
+    它不构成环 —— 环的成因是**双向**引用（审定表取明细合计、明细表又回取审定数），
+    而明细表**不反向引用披露 sheet**，披露 sheet 也不被审定表引用。
+
+    同族已登记：「明细表不得引用审定表」写宽会误伤跨循环引用
+    （`D0 → WP('D2','审定表D2-1')` 是函证覆盖率的合法分母）。
+
+    ⚠️ 豁免只给「披露 sheet」这一类，且必须配反向自检证明真正的明细表 WP()
+    仍会被抓住（否则本条退化成空转）。
+    """
     offenders = []
     for m in d1_mappings:
-        if m.get("sheet") == _ADJUDICATION_SHEET:
+        sheet = str(m.get("sheet") or "")
+        if sheet == _ADJUDICATION_SHEET or _is_disclosure_sheet(sheet):
             continue
         for cell in m.get("cells", []):
             if "WP(" in (cell.get("formula") or ""):
-                offenders.append(f"{m['sheet']}.{cell['cell_ref']}")
+                offenders.append(f"{sheet}.{cell['cell_ref']}")
     assert not offenders, f"明细表出现 WP() 循环引用风险: {offenders}"
+
+
+def test_detail_sheet_wp_guard_reverse_selfcheck(d1_mappings):
+    """反向自检：真正的明细表 WP() 必须被上一条抓住（防豁免退化成空转）。
+
+    两条：
+      1. 扫描面非空 —— D1 确实存在既非审定表也非披露 sheet 的明细块；
+      2. 往明细块注入一条 WP() 时，上一条的判据必须命中。
+    """
+    detail_sheets = [
+        str(m.get("sheet"))
+        for m in d1_mappings
+        if str(m.get("sheet")) != _ADJUDICATION_SHEET
+        and not _is_disclosure_sheet(str(m.get("sheet")))
+    ]
+    assert detail_sheets, (
+        "D1 段没有任何明细块（既非审定表也非披露 sheet）⇒ 上一条守卫是空转"
+    )
+
+    # 复现上一条的判据，施加于「注入了 WP() 的明细块」替身
+    fake = [{"sheet": detail_sheets[0], "cells": [{"cell_ref": "X1", "formula": "=WP('D1','审定表D1-1','x')"}]}]
+    caught = [
+        f"{m['sheet']}.{c['cell_ref']}"
+        for m in fake
+        if m["sheet"] != _ADJUDICATION_SHEET and not _is_disclosure_sheet(m["sheet"])
+        for c in m["cells"]
+        if "WP(" in c["formula"]
+    ]
+    assert caught, "判据无法抓住明细块里的 WP() ⇒ 豁免写得太宽"
+
+
+def test_disclosure_wp_is_reconcile_only(d1_mappings):
+    """披露 sheet 的 WP() 只许作勾稽核对，且必须指向明细表而非审定表。
+
+    若哪天披露块用 WP() 去**取审定表的数**，就形成「审定表 ← 明细表」与
+    「披露 ← 审定表」两跳链路，一旦明细表回取披露值即成环 ⇒ 提前钉死。
+    """
+    for m in d1_mappings:
+        sheet = str(m.get("sheet") or "")
+        if not _is_disclosure_sheet(sheet):
+            continue
+        for cell in m.get("cells", []):
+            formula = cell.get("formula") or ""
+            if "WP(" not in formula:
+                continue
+            assert _ADJUDICATION_SHEET not in formula, (
+                f"{sheet}.{cell['cell_ref']} 的 WP() 指向审定表 {_ADJUDICATION_SHEET}，"
+                "披露侧只许与明细表勾稽"
+            )
+            desc = cell.get("description") or ""
+            assert "勾稽" in desc, (
+                f"{sheet}.{cell['cell_ref']} 有 WP() 但 description 未写明「勾稽」用途 —— "
+                "披露侧 WP() 必须显式声明不参与披露取数"
+            )
+
+
+def test_disclosure_wp_targets_are_detail_sheets_not_adjudication(d1_mappings):
+    """披露 sheet 的 WP() 只许指向**明细表**做勾稽，不许指向审定表。
+
+    反向锁死：披露 ← 审定表 会与「审定表 ← 明细表」叠成两跳依赖，且披露数字
+    应当独立于审定表口径（源模板披露表的数据来自明细表逐行汇总）。
+    """
+    import re
+
+    pattern = re.compile(r"WP\('D1'\s*,\s*'([^']*)'")
+    seen = 0
+    for m in d1_mappings:
+        sheet = m.get("sheet") or ""
+        if not _is_disclosure_sheet(sheet):
+            continue
+        for cell in m.get("cells", []):
+            for target in pattern.findall(cell.get("formula") or ""):
+                seen += 1
+                assert target != _ADJUDICATION_SHEET, (
+                    f"{sheet}.{cell['cell_ref']} 的 WP() 指向审定表 {target!r}，"
+                    "披露数字应直接取明细表汇总"
+                )
+    assert seen > 0, (
+        "披露 sheet 没有任何 WP() 勾稽公式 —— 本守卫会空转；"
+        "若确实撤销了披露侧勾稽，请同步删除本用例"
+    )
+
+
+def test_detail_sheets_never_reference_disclosure_sheets(d1_mappings):
+    """明细表不得反引披露 sheet —— 这是「披露 ← 明细」不成环的结构性前提。"""
+    import re
+
+    pattern = re.compile(r"WP\('D1'\s*,\s*'([^']*)'")
+    offenders = []
+    for m in d1_mappings:
+        sheet = m.get("sheet") or ""
+        if _is_disclosure_sheet(sheet) or sheet == _ADJUDICATION_SHEET:
+            continue
+        for cell in m.get("cells", []):
+            for target in pattern.findall(cell.get("formula") or ""):
+                if _is_disclosure_sheet(target):
+                    offenders.append(f"{sheet}.{cell['cell_ref']} -> {target}")
+    assert not offenders, f"明细表反引披露 sheet（会成环）: {offenders}"
+
+
+def test_disclosure_sheet_predicate_self_check(d1_mappings):
+    """反向自检：谓词必须真的命中 D1 的两个披露 sheet，且不误判审定/明细表。"""
+    sheets = {m.get("sheet") or "" for m in d1_mappings}
+    disclosure = {s for s in sheets if _is_disclosure_sheet(s)}
+    assert len(disclosure) == 2, (
+        f"D1 应有 2 个披露 sheet 条目（上市 + 国企），实测 {sorted(disclosure)}"
+    )
+    assert not _is_disclosure_sheet(_ADJUDICATION_SHEET)
+    assert not _is_disclosure_sheet("原值明细表（按类别）D1-2")
 
 
 def test_adjudication_sheet_links_to_both_detail_sheets(d1_mappings):

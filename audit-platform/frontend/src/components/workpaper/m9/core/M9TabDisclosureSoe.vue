@@ -303,6 +303,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM9SoeSyncPayload, type M9SoeRow } from '../../composables/m9NoteSectionMap'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -349,8 +350,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildM9SoeSyncPayload(props.wpId, rows)
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 

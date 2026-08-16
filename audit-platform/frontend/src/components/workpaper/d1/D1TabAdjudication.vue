@@ -33,6 +33,12 @@ import {
   D1_ADJ_REVIEW_SECTION,
   d1AdjReviewSectionId,
 } from '../composables/d1AdjudicationModel'
+import WpFourTableSourcePanel from '@/components/workpaper/shared/WpFourTableSourcePanel.vue'
+import {
+  pickDTbSourceCodes,
+  normalizeDSlots,
+  dCycleBasisLabel,
+} from '../composables/dCycleAccountScope'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +51,14 @@ const props = defineProps<{
   tbSeedAmount?: number
   /** TB 核对行取数溯源（原值 / 坏账准备 / 净额），由宿主从 render 的 project_context 派生 */
   tbSeedProvenance?: { gross: number; provision: number; net: number; hasProvision: boolean }
+  /**
+   * render 下发的本 sheet `html_data`（含 `tb_source_codes` / `parent_check`）。
+   *
+   * 🔴 必须由宿主显式传入 —— 漏传不会报错、只会让四表取数溯源恒 `undefined`
+   * （Vue 对未声明的属性会静默落到根元素当 HTML 属性，`get_diagnostics`/vitest/
+   * Vite transform 四层全绿），平台已登记该范式为「漏传 prop = 静默锁死」。
+   */
+  htmlData?: Record<string, any> | null
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -210,10 +224,31 @@ async function handleAiConclusion() {
   finally { aiConclusionLoading.value = false }
 }
 
+
+// ─── 四表库取数溯源（Task 16）────────────────────────────────────────
+// 🔴 落点两套并存：D1/D2/D3/D5/D6/D7 写 `html_data` 顶层、D4 写
+// `project_context` —— `pickDTbSourceCodes` 两层都读，只读一层会恒 undefined。
+const dTbSourceCodes = computed(() =>
+  normalizeDSlots(pickDTbSourceCodes(props.htmlData)),
+)
+const dSourceHints = [
+  '取数口径：<code>期末余额</code>；标准码查试算平衡表、客户原始码查余额表。',
+  '「本项目无此科目」与「余额为 0」是两回事 —— 前者金额显示为空，后者显示 0.00。',
+]
+
 </script>
 
 <template>
   <div class="d1-tab-adjudication">
+    <!-- 四表库取数溯源（消 dead output：消费 render 下发的 tb_source_codes；
+         口径 = {{ dCycleBasisLabel('D1') }}） -->
+    <WpFourTableSourcePanel
+      :source-codes="dTbSourceCodes"
+      gross-label="应收票据原值"
+      provision-label="坏账准备-应收票据"
+      fallback-row-code="BS-005"
+      :hints="dSourceHints"
+    />
     <div class="tab-header">
       <h4>审定表 D1-1</h4>
       <div class="toolbar-right">

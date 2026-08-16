@@ -64,6 +64,18 @@ H2_ACCOUNT_SPEC = SemanticAccountSpec(
             fallback_standard_codes=(),
             label="在建工程减值准备",
             is_provision=True,
+            # 🔴 槽级 row_code（消除假冲突告警）：spec 级 `BS-029 = TB('1604')` 只含原值，
+            # 而 `build_conflicts` 会拿它的码集**逐槽**比对 ⇒ 备抵槽一旦定位到客户自建的
+            # 减值准备科目就恒报 `('impairment','1604',<实际码>)` 假冲突。
+            # 备抵在 `report_config` 里自成一行 `IMP-012 在建工程减值准备`，
+            # 声明它即改用**它自己那条行**作对照基准。
+            #
+            # 该行两个变体公式**实测均为 NULL**（2026-08-12 postgres 只读复核：
+            # soe_standalone / soe_consolidated 都是 None）⇒ 声明后 basis 为空、
+            # 走 `build_conflicts` 的**三态跳过**（「未知」不等于「有冲突」）。
+            # 这**也是**修好 —— 假告警消除；不得因「无公式可对照」而不声明，
+            # 否则该槽会继续拿主行码集比对并恒报假冲突。
+            row_code="IMP-012",
         ),
     ),
 )

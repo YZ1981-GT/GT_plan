@@ -7,6 +7,13 @@
         <el-tag size="small" type="info">借贷平衡</el-tag>
       </div>
       <div class="section-actions">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="n5"
+          sheet="N5-3"
+          :disabled="isReadonly"
+          @imported="handleImported"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddEntry">+ 新增分录</el-button>
         <el-button size="small" @click="handleAiAssist">
           <el-icon><MagicStick /></el-icon>AI辅助
@@ -148,6 +155,7 @@ import { useN5FormData } from '../../composables/useN5FormData'
 import { eventBus } from '@/utils/eventBus'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{
   allResponses: Map<string, any>
@@ -206,12 +214,17 @@ const { centralStatus, syncing: centralSyncing, syncToCentral, refreshStatus } =
 
 // ─── 数据加载 ────────────────────────────────────────────────────────────────
 
-onMounted(async () => {
-  await formData.loadData()
+/** 从 responses 读回分录与文本（onMounted 与导入后共用同一读回路径）*/
+function restoreFromResponses(): void {
   const saved = formData.getField('3', 'entries')
   if (saved && Array.isArray(saved)) entries.value = saved
   auditNotes.value = formData.getField('3', 'audit-notes') ?? ''
   auditConclusion.value = formData.getField('3', 'audit-conclusion') ?? ''
+}
+
+onMounted(async () => {
+  await formData.loadData()
+  restoreFromResponses()
   refreshStatus()
 })
 
@@ -297,6 +310,19 @@ function handleReview() { openReviewDialog ? openReviewDialog('N5-3-调整分录
 function fmtAmount(val: number | null | undefined): string {
   if (val == null || val === 0) return '—'
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：N5-3 读回 = formData.getField(3, entries) 键链（形态 ④）。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  await formData.loadData()
+  restoreFromResponses()
 }
 </script>
 

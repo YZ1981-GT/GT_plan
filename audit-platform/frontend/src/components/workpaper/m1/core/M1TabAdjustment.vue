@@ -10,6 +10,13 @@
         </el-tag>
       </div>
       <div class="section-header-right">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="m1"
+          sheet="M1-3"
+          :disabled="isReadonly"
+          @imported="handleImported"
+        />
         <el-button size="small" type="primary" :disabled="isReadonly" @click="handleAddEntry">
           <el-icon><Plus /></el-icon> 新增分录
         </el-button>
@@ -226,6 +233,7 @@ import { useM1Adjustment, type M1AdjustmentEntry } from '../../composables/useM1
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{
   wpId: string
@@ -258,6 +266,7 @@ const {
   removeEntry,
   updateEntry,
   saveAndPublish,
+  loadFromResponses,
 } = useM1Adjustment(formData)
 
 // ─── 同步到集中调整登记（workpaper-adjustment-centralization） ─────────────────
@@ -332,8 +341,22 @@ function fmtAmount(val: number): string {
 
 onMounted(async () => {
   await formData.loadData()
+  loadFromResponses(formData.allResponses.value)
   refreshStatus()
 })
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：M1-3 读回 = useM1Adjustment.loadFromResponses（任务 4.2 新增，per-field 族）。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  await formData.loadData()
+  loadFromResponses(formData.allResponses.value)
+}
 </script>
 
 <style scoped>

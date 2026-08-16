@@ -206,6 +206,7 @@ const aiLoading = ref('')
 // ─── 同步链路 ───────────────────────────────────────────────────────────────
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM8SyncPayload, type M8DisclosureRow } from '../../composables/m8NoteSectionMap'
+import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
   const rows: M8DisclosureRow[] = dataRows.value.map((r: any) => ({
@@ -217,8 +218,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildM8SyncPayload(props.wpId, 'soe', rows, disclosureNote.value)
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 

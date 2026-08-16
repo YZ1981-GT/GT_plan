@@ -21,7 +21,13 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
 import http from '@/utils/http'
-import { useDisplayPrefsStore, DisplayPrefs_Key } from '@/stores/displayPrefs'
+// 🔴 `DisplayPrefs_Key` 的真源是 `composables/displayPrefsKey.ts`，
+// **不是** `@/stores/displayPrefs`（后者只导出 `useDisplayPrefsStore` 与三个类型）。
+// 从 store 里连带 import 它会让整页崩成
+// 「页面渲染出错：does not provide an export named 'DisplayPrefs_Key'」——
+// 且 `get_diagnostics` / vitest / Vite transform 四层全绿，只有浏览器暴露。
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../../composables/displayPrefsKey'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useD4Disclosure } from '../../composables/useD4Disclosure'
 import { useD4DisclosureAi } from '../../composables/useD4DisclosureAi'
@@ -33,7 +39,6 @@ import { useAuditContext } from '@/composables/useAuditContext'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_MAIN_COST_STANDARD, D4_OTHER_COST_STANDARD } from '../../composables/d4AccountScope'
 import {
-  D4_TRANSPOSE_CHECK_ITEMS,
   buildD4ObligationColumns,
   deriveObligationTotal,
   getObligationYearKeys,
@@ -41,6 +46,12 @@ import {
   type D4ObligationRow,
   type D4TwoPeriodRow,
 } from '../../composables/d4DisclosureModel'
+import {
+  D4_SEGMENT_ROWS,
+  D4_SEGMENT_INPUT_ROW_KEYS,
+  deriveSegmentCell,
+  segmentRowAcrossCategories,
+} from '../../composables/d4RevenueSegmentColumns'
 
 const props = defineProps<{
   wpId: string
@@ -119,7 +130,7 @@ const {
   section3Rows, section3Total, addSection3Row, removeSection3Row, updateSection3,
   section4Rows, section4Total, addSection4Row, removeSection4Row, updateSection4,
   // 列转置专用
-  section4Categories, section4Cells,
+  section4Categories, section4Cells, section4RowDefs,
   getSection4Cell, updateSection4Cell,
   addSection4Category, removeSection4Category, renameSection4Category,
   section4RowTotal, section4ColTotal,
@@ -133,8 +144,9 @@ const {
   isReadonly: isReadonlyRef,
 })
 
-// ─── 列转置辅助常量 ─────────────────────────────────────────────────────────
-const transposeCheckItems = D4_TRANSPOSE_CHECK_ITEMS
+// ─── 列转置行集（Task 31：真源 = d4RevenueSegmentColumns.D4_SEGMENT_ROWS）───
+// 🔴 不再用 `D4_TRANSPOSE_CHECK_ITEMS`（只 3 项，丢了父行/可扩行/合计行，且
+//    「时点/时段」在源模板各出现两次、字符串数组无法表达归属）。
 
 // ─── （6）剩余履约义务结构化表 ─────────────────────────────────────────────────
 const SECTION6_KEY = 'D4-disc-listed-section6-rows'
@@ -309,20 +321,19 @@ function buildSnapshot(): D4DisclosureSnapshot {
     regionRows: section3Rows.value.map((r: any) => ({
       label: r.name, currentRevenue: parseNum(r.amount), currentCost: parseNum(r.proportion),
     })),
-    timingRows: D4_TRANSPOSE_CHECK_ITEMS.map((checkLabel) => {
-      const row: Record<string, string | number | null> = { label: checkLabel }
-      let totalRev = 0
-      let totalCost = 0
+    // Task 31: 行集与源模板逐行对齐（9 行，含两个派生小计 + 空可扩行 + 合计行）；
+    // 🔴 不再产出 `total_revenue`/`total_cost` —— 源模板没有横向合计列。
+    timingRows: D4_SEGMENT_ROWS.map((rowDef) => {
+      const row: Record<string, string | number | null> = { label: rowDef.label }
       for (const cat of section4Categories.value) {
-        const rv = getSection4Cell(checkLabel, cat.key, 'revenue')
-        const cv = getSection4Cell(checkLabel, cat.key, 'cost')
-        row[`${cat.key}_revenue`] = rv
-        row[`${cat.key}_cost`] = cv
-        totalRev += (typeof rv === 'number' ? rv : 0)
-        totalCost += (typeof cv === 'number' ? cv : 0)
+        row[`${cat.key}_revenue`] = deriveSegmentCell(
+          section4Cells.value, cat.key, rowDef.key, 'revenue',
+        )
+        row[`${cat.key}_cost`] = deriveSegmentCell(
+          section4Cells.value, cat.key, rowDef.key, 'cost',
+        )
       }
-      row.total_revenue = totalRev
-      row.total_cost = totalCost
+      if (rowDef.kind === 'total' || rowDef.kind === 'subtotal') row.is_total = true
       return row
     }),
     timingCategories: section4Categories.value.map((c: any) => ({ key: c.key, label: c.label })),
@@ -640,52 +651,57 @@ const formulaMap = [
                   <el-button size="small" link type="danger" @click="handleRemoveCategory(cat.key, cat.label)" title="删除">✕</el-button>
                 </span>
               </th>
-              <th colspan="2" class="group-th total-group-th">合计</th>
             </tr>
             <tr class="leaf-header-row">
               <template v-for="cat in section4Categories" :key="'hdr-' + cat.key">
                 <th class="leaf-th">收入</th>
                 <th class="leaf-th">成本</th>
               </template>
-              <th class="leaf-th total-leaf-th">收入</th>
-              <th class="leaf-th total-leaf-th">成本</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(checkItem, rowIdx) in transposeCheckItems" :key="rowIdx">
-              <td class="label-td">{{ checkItem }}</td>
-              <template v-for="cat in section4Categories" :key="cat.key + '-' + rowIdx">
-                <td class="amount-td">
+            <!--
+              Task 31: 行集与源模板逐行对齐（上市 R48~R56 / 国企 R41~R49，两版同构）。
+              父行（主营业务 / 其他业务）与合计行是**读时派生**（源模板 SUM 公式），
+              不可录入、不持久化；空可扩行（源 R51/R44）在父行 SUM 范围内。
+            -->
+            <tr
+              v-for="row in section4RowDefs"
+              :key="row.key"
+              :class="{
+                'subtotal-row': row.kind === 'subtotal',
+                'total-row': row.kind === 'total',
+                'expandable-row': row.kind === 'expandable',
+              }"
+            >
+              <td class="label-td" :class="{ 'font-bold': row.readonly }">
+                <span v-if="row.kind === 'expandable'" class="expandable-hint">（可按实际情况补充项目）</span>
+                <!-- 🔴 字段名是 `label`（见 D4_SEGMENT_ROWS 的 D4SegmentRowDef），不是 `item`。
+                     写错时 Vue 静默渲染空串 ⇒ 9 个行标签（主营业务 / 其中：在某一时点确认 /
+                     … / 合  计）全部消失，而 get_diagnostics / vitest / Vite transform
+                     四层全绿，2026-08-07 浏览器实测才暴露。 -->
+                <span v-else>{{ row.label }}</span>
+              </td>
+              <template v-for="cat in section4Categories" :key="cat.key + '-' + row.key">
+                <td class="amount-td" :class="{ 'font-bold': row.readonly }">
                   <WpAmountInput
-                    v-if="!isReadonly"
-                    :model-value="getSection4Cell(cat.key, rowIdx, 'revenue')"
+                    v-if="!isReadonly && !row.readonly"
+                    :model-value="getSection4Cell(cat.key, row.key, 'revenue')"
                     size="small"
-                    @update:model-value="(v: number) => updateSection4Cell(cat.key, rowIdx, 'revenue', v || null)"
+                    @update:model-value="(v: number) => updateSection4Cell(cat.key, row.key, 'revenue', v ?? null)"
                   />
-                  <span v-else>{{ fmtAmt(getSection4Cell(cat.key, rowIdx, 'revenue') ?? 0) }}</span>
+                  <span v-else>{{ fmtAmt(getSection4Cell(cat.key, row.key, 'revenue')) }}</span>
                 </td>
-                <td class="amount-td">
+                <td class="amount-td" :class="{ 'font-bold': row.readonly }">
                   <WpAmountInput
-                    v-if="!isReadonly"
-                    :model-value="getSection4Cell(cat.key, rowIdx, 'cost')"
+                    v-if="!isReadonly && !row.readonly"
+                    :model-value="getSection4Cell(cat.key, row.key, 'cost')"
                     size="small"
-                    @update:model-value="(v: number) => updateSection4Cell(cat.key, rowIdx, 'cost', v || null)"
+                    @update:model-value="(v: number) => updateSection4Cell(cat.key, row.key, 'cost', v ?? null)"
                   />
-                  <span v-else>{{ fmtAmt(getSection4Cell(cat.key, rowIdx, 'cost') ?? 0) }}</span>
+                  <span v-else>{{ fmtAmt(getSection4Cell(cat.key, row.key, 'cost')) }}</span>
                 </td>
               </template>
-              <td class="amount-td total-td">{{ fmtAmt(section4RowTotal(rowIdx, 'revenue') ?? 0) }}</td>
-              <td class="amount-td total-td">{{ fmtAmt(section4RowTotal(rowIdx, 'cost') ?? 0) }}</td>
-            </tr>
-            <!-- 合计行 -->
-            <tr class="total-row">
-              <td class="label-td font-bold">合 计</td>
-              <template v-for="cat in section4Categories" :key="'tot-' + cat.key">
-                <td class="amount-td font-bold">{{ fmtAmt(section4ColTotal(cat.key, 'revenue') ?? 0) }}</td>
-                <td class="amount-td font-bold">{{ fmtAmt(section4ColTotal(cat.key, 'cost') ?? 0) }}</td>
-              </template>
-              <td class="amount-td total-td font-bold">{{ fmtAmt(section4Total.totalRevenue ?? 0) }}</td>
-              <td class="amount-td total-td font-bold">{{ fmtAmt(section4Total.totalCost ?? 0) }}</td>
             </tr>
           </tbody>
         </table>

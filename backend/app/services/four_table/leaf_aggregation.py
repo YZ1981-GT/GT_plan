@@ -63,9 +63,23 @@ def _f(v) -> float:
 
 
 def to_leaf_rows(rows) -> list[LeafRow]:
-    """把 SQLAlchemy Row / dict 序列归一为 :class:`LeafRow`（缺列按 0 / 空串）。"""
+    """把 SQLAlchemy Row / dict 序列归一为 :class:`LeafRow`（缺列按 0 / 空串）。
+
+    🔴 **对已是 `LeafRow` 的元素幂等**（2026-08-05 实测踩坑后加）：本函数按 **DB 列名**
+    取值（``closing_balance`` / ``debit_amount`` / ``closing_direction``），而 `LeafRow`
+    的字段名是 ``closing`` / ``debit`` / ``direction`` —— 两套名字不同。若把已归一的
+    `LeafRow` 列表再喂进来，``account_code`` 能取到但**全部金额会静默变 0**。
+
+    这个坑很容易踩：:func:`tb_query.fetch_tb_subtree` 返回的就是 `LeafRow`，而
+    :func:`parent_check.build_parent_check` 内部会对入参再调本函数一次
+    （H 循环各自用裸 SQL 拿原始行故未暴露）。症状是 ``leaf_sum`` 恒 0 而
+    ``trial_balance`` 有值，看起来像「叶子聚合坏了」。
+    """
     out: list[LeafRow] = []
     for r in rows or []:
+        if isinstance(r, LeafRow):
+            out.append(r)
+            continue
         get = r.get if isinstance(r, dict) else (lambda k, _r=r: getattr(_r, k, None))
         code = str(get("account_code") or "").strip()
         if not code:

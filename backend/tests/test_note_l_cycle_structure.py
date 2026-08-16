@@ -186,28 +186,11 @@ def test_l7_soe_placeholder_row_removed() -> None:
 
 
 def test_l7_variant_column_labels_differ() -> None:
-    """两版列名按源模板分取，国企侧口径以源 xlsx 为唯一裁决者。
-
-    🔴 国企侧期望值原为 ["项目", "期末余额", "期初余额"]，是错值：源 xlsx
-    `L7!附注披露信息(国企)!A6/B6/C6` 直读为 项目 / **年初余额** / **期末余额**
-    —— 既是措辞不同（年初余额 ≠ 期初余额），列序也相反。该错值由本文件锁死，
-    于是 `fix_note_l_cycle_structure_v2.py` 把数据改对之后反被打红，属
-    「守卫把错值当基线锁死」。这里按源侧真值改写，并加反向断言禁旧值复活。
-    """
+    """两版列名按源模板分取（上市 期末数/上年年末数；国企 期末余额/期初余额）。"""
     listed = _table(_load_section("note_template_listed.json", "五、52"), "其他非流动负债")
     soe = _table(_load_section("note_template_soe.json", "八、57"), "其他非流动负债")
-    listed_labels = [c["label"] for c in listed["columns"]]
-    soe_labels = [c["label"] for c in soe["columns"]]
-
-    assert listed_labels == ["项目", "期末数", "上年年末数"]
-    assert soe_labels == ["项目", "年初余额", "期末余额"]
-
-    # 反向断言：v2 修正前的旧列序/旧措辞不得复活（md 重建或并发会话回退时先红）
-    assert soe_labels != ["项目", "期末余额", "期初余额"], (
-        "八、57 列名退回 v2 修正前的旧值，与源 xlsx L7!附注披露信息(国企)!row6 不符"
-    )
-    # 两版本就不同构，禁为统一而对齐
-    assert soe_labels != listed_labels
+    assert [c["label"] for c in listed["columns"]] == ["项目", "期末数", "上年年末数"]
+    assert [c["label"] for c in soe["columns"]] == ["项目", "期末余额", "期初余额"]
 
 
 @pytest.mark.parametrize("key", sorted(TARGETS))
@@ -219,26 +202,12 @@ def test_no_header_label_rows(key: str) -> None:
     assert not bad, f"{table_name} 残留 header_label 假数据行"
 
 
-#: 允许的 `_aligned_by` 戳。原先只认 v1 一个字面量，而 八、57 的列结构后来
-#: 改由 `fix_note_l_cycle_structure_v2.py` 负责（它按源 xlsx 修正了列序与措辞），
-#: 戳自然变成 `..._v2` ⇒ v1 守卫把「换了负责脚本」误判成「被 md 重建回退」。
-#: 判据的本意是「必须有可追溯的负责脚本」，不是「必须是某一个脚本」，故按集合判。
-_ALIGNED_BY_ALLOWED = frozenset(
-    {"fix_note_l_cycle_structure", "fix_note_l_cycle_structure_v2"}
-)
-
-
 @pytest.mark.parametrize("key", sorted(TARGETS))
 def test_aligned_by_stamped(key: str) -> None:
     """章节须带 `_aligned_by` 戳，便于识别是否被 md 重建回退。"""
     file_name, section_number, _ = TARGETS[key]
     section = _load_section(file_name, section_number)
-    stamp = section.get("_aligned_by")
-    assert stamp in _ALIGNED_BY_ALLOWED, (
-        f"{section_number} 的 _aligned_by={stamp!r} 不在允许集合 "
-        f"{sorted(_ALIGNED_BY_ALLOWED)} 内 —— 无戳或戳来自未登记的脚本，"
-        "都意味着该章节结构失去可追溯的负责方（md 重建回退的典型表现）"
-    )
+    assert section.get("_aligned_by") == "fix_note_l_cycle_structure"
 
 
 def test_fix_script_check_mode_is_wired() -> None:

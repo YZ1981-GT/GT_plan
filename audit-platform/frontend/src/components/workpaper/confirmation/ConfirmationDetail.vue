@@ -133,11 +133,65 @@
               <el-option label="待核实" value="pending" />
             </el-select>
           </el-form-item>
+
+          <!--
+            是否收到回函 + 相符情况 —— **必须放在「回函信息」块之外的常显区**。
+
+            🔴 改造前的死锁（2026-08-05 实测）：
+               ① 明细面板**完全没有** `is_replied` 录入控件（全仓 `emitUpdate('is_replied'` 0 命中）
+               ② 「相符情况」被放在「回函信息」块内，而该块 `v-show="row.is_replied"`
+               ⇒ 新建行 `is_replied === undefined` → 块 display:none（实测 w=0,h=0）
+               ⇒ 既无法把 `match_status` 设成「未回函」，也无法把 `is_replied` 设成「否」
+               ⇒ `defaultUnrepliedFilter` 两个分支都不成立
+                  → **列表视图录入的行永远进不了 F0-5「从 F0-1 带入」**
+
+            🔴 「相符情况」是三态（相符 / 不符 / **未回函**），「未回函」恰恰在没有回函时才有意义
+               ⇒ 把它 gate 在「已回函」之下是分类错误，故移到此处常显。
+            spec: f0-confirmation-linkage-and-structural-enhancement Wave 9 / Defect 1
+          -->
+          <el-form-item label="是否收到回函">
+            <el-select
+              :model-value="replyFlag"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('is_replied', v)"
+              placeholder="请选择"
+              clearable
+              data-testid="is-replied-select"
+            >
+              <el-option
+                v-for="opt in REPLY_FLAG_OPTIONS"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="相符情况">
+            <el-select
+              :model-value="row.match_status"
+              :disabled="readonly"
+              @update:model-value="(v) => emitUpdate('match_status', v)"
+              placeholder="请选择"
+              clearable
+              data-testid="match-status-select"
+            >
+              <el-option
+                v-for="opt in getDictOptions('confirmation_match')"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
         </el-form>
       </el-collapse-item>
 
-      <!-- Stage 3: 回函信息 (visible only when is_replied) -->
-      <el-collapse-item v-show="row.is_replied" title="回函信息" name="reply">
+      <!--
+        Stage 3: 回函信息 —— 可见性走归一化谓词 `shouldShowReplyBlock`，
+        **不是** `row.is_replied` 裸真值判断（字符串 `'是'` 也要认；
+        且「只填了相符情况没填是否回函」的既有数据不能把回函金额藏起来）。
+      -->
+      <el-collapse-item v-show="shouldShowReplyBlock(row)" title="回函信息" name="reply">
         <el-form label-width="100px" size="small">
           <el-form-item label="回函日期">
             <el-date-picker
@@ -172,21 +226,6 @@
               :controls="false"
               @update:model-value="(v) => emitUpdate('reply_amount', v)"
             />
-          </el-form-item>
-          <el-form-item label="相符情况">
-            <el-select
-              :model-value="row.match_status"
-              :disabled="readonly"
-              @update:model-value="(v) => emitUpdate('match_status', v)"
-              placeholder="请选择"
-            >
-              <el-option
-                v-for="opt in getDictOptions('confirmation_match')"
-                :key="opt"
-                :label="opt"
-                :value="opt"
-              />
-            </el-select>
           </el-form-item>
           <el-form-item label="回函快递单号">
             <el-input
@@ -302,6 +341,40 @@
               @update:model-value="(v) => emitUpdate('remark', v)"
             />
           </el-form-item>
+          <!--
+            发函询证纪要（历史录入值）——**只读呈现，不提供编辑入口**。
+
+            🔴 源模板 `X0-1!C5:F5`「发函询证纪要」是**跨 4 列的合并段头**（下辖
+               选取样本目的 / 被询证单位名称 / 账户交易 / 金额），源模板中没有名为
+               「发函询证纪要」的可填标量列 ⇒ 平台既有的 `send_memo` 是**伪列**。
+            🔴 已从 `CYCLE_VARIANT_COLUMNS.L0` 撤下（不再进列渲染），但**字段不删**：
+               既有项目可能已录入内容，删字段即数据丢失（数据零丢失红线 R10.6）。
+               故只在有值时以只读形式呈现 + 说明来历，让审计师能看到并自行转录到
+               对应的段内列（选取样本目的等），而不再新增该维度录入。
+            spec: l0-confirmation-source-alignment R4.2 / Property 19
+          -->
+          <el-form-item v-if="row.send_memo" label="发函询证纪要">
+            <div class="confirmation-detail__legacy-memo">
+              <el-input
+                :model-value="row.send_memo"
+                type="textarea"
+                :rows="2"
+                readonly
+                data-testid="send-memo-legacy-readonly"
+              />
+              <el-alert
+                type="info"
+                :closable="false"
+                show-icon
+                class="confirmation-detail__legacy-memo-hint"
+              >
+                <template #title>
+                  源模板此处为合并段头（下辖「选取样本目的 / 被询证单位名称 / 账户交易 / 金额」四列），
+                  非可填列。本值为历史录入，仅作留档只读展示；如仍需记录，请填入对应的段内列。
+                </template>
+              </el-alert>
+            </div>
+          </el-form-item>
         </el-form>
       </el-collapse-item>
     </el-collapse>
@@ -311,6 +384,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import type { ConfirmationRow } from './confirmationTypes'
+import {
+  REPLY_FLAG_OPTIONS,
+  isNotReplied,
+  isReplied,
+  shouldShowReplyBlock,
+} from './replyStatus'
 
 const props = defineProps<{
   row: ConfirmationRow | null
@@ -325,14 +404,29 @@ const emit = defineEmits<{
 
 const activeStages = ref<string[]>(['basic', 'confirmation', 'reply', 'confirmed'])
 
+/**
+ * 「是否收到回函」下拉的 model —— 把三态映射回持久化字面 `'是'`/`'否'`。
+ *
+ * 🔴 未填（`undefined`）必须映射成 `undefined` 而不是 `'否'`，否则新建行会
+ * 显示成「否」并被 `defaultUnrepliedFilter` 当成明确未回函带进替代程序底稿。
+ */
+const replyFlag = computed<'是' | '否' | undefined>(() => {
+  const state = isReplied(props.row)
+  if (state === true) return '是'
+  if (state === false) return '否'
+  return undefined
+})
+
 /** 可确认金额的计算公式说明（根据当前行状态动态生成） */
 const confirmedAmountFormula = computed(() => {
   const row = props.row
   if (!row) return '尚未选择行'
   if (row.match_status === '相符') return '相符 → 可确认金额 = 函证金额'
   if (row.match_status === '不符') return '不符 → 可确认金额 = 回函金额（差异待 D0-4 调节）'
-  if (row.is_replied === '否' && row.confirmation_method === '消极式') return '消极式未回函 → 视同相符，可确认金额 = 函证金额'
-  if (row.is_replied === '否') return '积极式未回函 → 需替代程序确认（D0-5/D0-6）'
+  // 🔴 走归一谓词，不写 `row.is_replied === '否'` —— 完整表格视图写入的是布尔
+  // `false`，字符串比较对它恒不成立 ⇒ 改造前这两条提示从未渲染过（2026-08-05 实证）。
+  if (isNotReplied(row) && row.confirmation_method === '消极式') return '消极式未回函 → 视同相符，可确认金额 = 函证金额'
+  if (isNotReplied(row)) return '积极式未回函 → 需替代程序确认（D0-5/D0-6）'
   return '可确认金额 = 根据回函情况自动计算'
 })
 
@@ -386,5 +480,29 @@ function getDictOptions(dictKey: string): string[] {
   align-items: center;
   gap: 6px;
   width: 100%;
+}
+
+/* 历史录入的伪列值（send_memo）只读留档区 */
+.confirmation-detail__legacy-memo {
+  width: 100%;
+}
+.confirmation-detail__legacy-memo-hint {
+  margin-top: 6px;
+}
+.confirmation-detail__legacy-memo-hint :deep(.el-alert__title) {
+  font-size: 12px;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+.confirmation-detail__legacy-memo {
+  width: 100%;
+}
+.confirmation-detail__legacy-memo-hint {
+  margin-top: 6px;
+}
+.confirmation-detail__legacy-memo-hint :deep(.el-alert__title) {
+  font-size: 12px;
+  line-height: 1.6;
 }
 </style>

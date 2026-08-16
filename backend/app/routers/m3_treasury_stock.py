@@ -32,12 +32,43 @@ from app.routers.wp_render_strategies._m3_treasury_stock import (
     validate_contra_equity_formula,
 )
 
+from app.routers.wp_render_strategies._x3_adjustment_import_export import (
+    X3_SHEET_SPECS,
+    attach_shape_a_routes,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/api/m3-treasury-stock",
     tags=["M3 库存股"],
 )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# X-3 调整分录汇总表 —— 形态 A 三态（spec x3-adjustment-entry-import-export 任务 5.1）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+#: 本模块的短前缀 = catalog `import_export.api_prefix`，单份 UI 与批量两条通路共用它。
+_IE_API_PREFIX = "m3"
+
+#: 本前缀的 X-3 sheet 码 —— 从 `X3_SHEET_SPECS`（Key_Ledger 单一真源）按短前缀**反查**。
+#: 🔴 本模块内不写 X-3 字面量：写死一份即成后端第二真源，前端改键时不会打红。
+#: 反查为空 ⇒ 下面 `attach_shape_a_routes` 立即抛 `X3ContractError`（fail-loud，不静默少端点）。
+_X3_CODES: frozenset[str] = frozenset(
+    code for code, spec in X3_SHEET_SPECS.items() if spec.api_prefix == _IE_API_PREFIX
+)
+
+#: 本前缀 sheet 白名单的**唯一真源**（R4.4）。
+#:
+#: 🔴 本前缀的既有长前缀三态端点**没有** sheet 白名单校验（`sheet: str | None = None` 直接
+#:    透传 service），故本任务之前本模块不存在可派生的白名单常量。本任务**不**给既有端点补
+#:    校验：那会把「未知 sheet 静默按 service 默认处理」改成 400，属既有行为变更、超出任务
+#:    5.1 半径。该存量缺陷已登记 `Deviation_Registry` G6（10 条 = m1 + m2~m10），收口另立
+#:    任务。⇒ `IE_SHEETS` 此刻只覆盖 X-3（= 形态 A 端点的白名单）。
+IE_SHEETS: frozenset[str] = _X3_CODES
+
+attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

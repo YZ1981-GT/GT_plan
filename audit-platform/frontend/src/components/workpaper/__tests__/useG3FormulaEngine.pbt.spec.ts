@@ -84,7 +84,7 @@ describe('Feature: g3-dividend-receivable, Property 4: 逾期天数非负', () =
    */
   it('calcOverdueDays(currentDate, dueDate) >= 0 for any dates', () => {
     fc.assert(
-      fc.property(fc.date(), fc.date(), (currentDate, dueDate) => {
+      fc.property(fc.date({ noInvalidDate: true }), fc.date({ noInvalidDate: true }), (currentDate, dueDate) => {
         if (Number.isNaN(currentDate.getTime()) || Number.isNaN(dueDate.getTime())) return
         expect(calcOverdueDays(currentDate, dueDate)).toBeGreaterThanOrEqual(0)
       }),

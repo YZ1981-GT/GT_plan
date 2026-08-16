@@ -33,6 +33,11 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 
+from app.routers.wp_render_strategies._x3_adjustment_import_export import (
+    X3_SHEET_SPECS,
+    attach_shape_a_routes,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -46,8 +51,29 @@ router = APIRouter(
 
 _ROW_LIMIT = 500
 
+#: 本模块的短前缀 = catalog `import_export.api_prefix`，单份 UI 与批量两条通路共用它。
+_IE_API_PREFIX = "n5"
+
+#: 本前缀的 X-3 sheet 码 —— 从 `X3_SHEET_SPECS`（Key_Ledger 单一真源）按短前缀**反查**。
+#: 🔴 本模块内不写 X-3 字面量：写死一份即成后端第二真源，前端改键时不会打红。
+#: 反查为空 ⇒ 下面 `attach_shape_a_routes` 立即抛 `X3ContractError`（fail-loud，不静默少端点）。
+_X3_CODES: frozenset[str] = frozenset(
+    code for code, spec in X3_SHEET_SPECS.items() if spec.api_prefix == _IE_API_PREFIX
+)
+
 # 支持导入导出的sheet（动态行表格）
-_SUPPORTED_SHEETS: set[str] = {"N5-2", "N5-5"}
+#: 本前缀 sheet 白名单的**唯一真源**（R4.4）= 形态 B（长前缀）两张动态行表 + 形态 A 的 X-3。
+#: 🔴 派生方向刻意是 `IE_SHEETS → _SUPPORTED_SHEETS`，不是反过来：sheet 码只在这里写一次，
+#:    既有 `_validate_sheet` 的取值由它派生 ⇒ 改 `IE_SHEETS` 会真的改到既有端点的校验结果，
+#:    它因此是**活的**真源，而不是只喂守卫的影子常量。
+IE_SHEETS: frozenset[str] = frozenset({"N5-2", "N5-5"}) | _X3_CODES
+
+#: 形态 B（长前缀）端点可服务的 sheet = `IE_SHEETS` 去掉 X-3。取值与施加前逐字相同。
+#: 🔴 X-3 刻意不进这里：形态 B 的 `_SHEET_HEADERS` / `_FIELD_MAPS` 等配置表都没有 X-3 条目，
+#:    放进来会让 `sheet=N5-3` 越过 400 进到取不到配置的旧代码路径。X-3 只由形态 A 端点服务。
+_SUPPORTED_SHEETS: set[str] = set(IE_SHEETS - _X3_CODES)
+
+attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 # N5-2 明细表列头（10列，当期/递延分项明细）
 # N5-5 纳税调整明细表列头（8列，107行调增/调减）

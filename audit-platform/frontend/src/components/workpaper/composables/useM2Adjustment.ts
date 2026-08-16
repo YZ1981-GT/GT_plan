@@ -271,6 +271,66 @@ export function useM2Adjustment(formData: ReturnType<typeof useM2FormData>) {
     }
   }
 
+  // ─── 6. 加载已保存数据 ────────────────────────────────────────────────
+
+  /**
+   * 从 allResponses 恢复调整分录数据（**per-field 族**，design §C5a）
+   *
+   * 与范本 `useM6Adjustment.loadFromResponses` 的差异：本张**无 `-data` 整行 JSON 族**
+   * （清单 `backend/data/adjustment_ie_contract.json` → `M2-3.key_family = "per_field"`），
+   * 故不是 `JSON.parse` 整行，而是按 per-field 族**逐后缀取值组行**；`while` 到断档为止的
+   * 行序判据与范本一致。
+   *
+   * 键面真源 = 清单 `M2-3.key_families.per_field`：
+   * - `prefix = "M2-M2-3-entry-"` —— **双前缀**（M4-3~M10-3 与 N 族是单前缀），逐 sheet 取值；
+   * - `suffixes` 10 项 —— 与本文件写入侧 `saveAndPublish` / `_triggerSave` 的键面逐字同源，
+   *   前端**不另存一份后缀数组**（后缀只作为读写表达式里的键面出现），由守卫 GS10
+   *   「读回覆盖后缀集 == 清单登记集」与清单双向锁死；
+   * - `suffix_to_field` —— 本张索引列字段是 `refIndex`（L6-3 / L2-3 为 `indexRef`），逐 sheet 取值。
+   *
+   * 🔴 **表级独立键不得被当成分录行**：本张另有 `M2-M2-3-adjustment-note`（清单
+   * `observed.other_data_keys`，M2TabAdjustment 的「调整分录说明」文本）。它**不带行号、
+   * 后缀也不在登记的 10 项里** ⇒ 逐后缀键面天然不收；组行只认
+   * `M2-M2-3-entry-{n}-{登记后缀}`，故说明文本不会被读成某一行的字段。
+   *
+   * 行数由 `-desc` 键**存在**（而非取值非空）界定：写入侧与后端导入都逐行写全 10 个后缀键、
+   * 空值落 `remark: null` ⇒ 键在而值可空；自第 1 行连续取到断档为止（与后端
+   * `_rows_from_per_field_family` 的行序判据同口径）。用「取值非空」当判据会把
+   * 说明为空的行当成断档而截断。
+   *
+   * `type` 的 `|| 'AJE'` 沿用范本的**透传兜底**（不做大小写归一）：清单
+   * `M2-3.unmapped_fields[type]` 登记枚举为大写 `AJE` / `RJE`，落错大小写的行会原样穿过
+   * 本兜底，在 `filteredEntries` 的 AJE / RJE 两个分区里都不出现（静默丢行）。
+   */
+  function loadFromResponses(allResponses: Map<string, any>): void {
+    const text = (resp: any): string => resp?.remark ?? ''
+    const amount = (resp: any): number => {
+      const n = Number(resp?.remark)
+      return Number.isFinite(n) ? n : 0
+    }
+    const loaded: M2AdjustmentEntry[] = []
+    let n = 1
+    while (allResponses.get(`M2-M2-3-entry-${n}-desc`)) {
+      loaded.push({
+        index: n,
+        description: text(allResponses.get(`M2-M2-3-entry-${n}-desc`)),
+        category: text(allResponses.get(`M2-M2-3-entry-${n}-category`)) as M2AdjustmentCategory,
+        reportItem: text(allResponses.get(`M2-M2-3-entry-${n}-report`)),
+        accountName: text(allResponses.get(`M2-M2-3-entry-${n}-account`)),
+        noteItem: text(allResponses.get(`M2-M2-3-entry-${n}-note`)),
+        type: (text(allResponses.get(`M2-M2-3-entry-${n}-type`)) as M2AdjustmentType) || 'AJE',
+        debitAmount: amount(allResponses.get(`M2-M2-3-entry-${n}-debit`)),
+        creditAmount: amount(allResponses.get(`M2-M2-3-entry-${n}-credit`)),
+        refIndex: text(allResponses.get(`M2-M2-3-entry-${n}-ref`)),
+        remark: text(allResponses.get(`M2-M2-3-entry-${n}-remark`)),
+      })
+      n++
+    }
+    if (loaded.length > 0) {
+      entries.value = loaded
+    }
+  }
+
   // ─── Return ────────────────────────────────────────────────────────────
 
   return {
@@ -296,6 +356,9 @@ export function useM2Adjustment(formData: ReturnType<typeof useM2FormData>) {
 
     // 保存+发布
     saveAndPublish,
+
+    // 加载
+    loadFromResponses,
   }
 }
 

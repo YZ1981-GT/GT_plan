@@ -297,33 +297,18 @@ export function buildK3SyncPayload(
 
   const removed: string[] = [...K3_LEGACY_OBSOLETE_TABLES[variant]]
 
-  // 🔴 应付利息 / 应付股利：底稿尚无对应录入区块（见 spec Task 8）。
-  // 未提供行时**不推送**（而非推一张只有合计 0 的空表）—— `_source=workpaper` 下
-  // 投影器只渲染推来的 sub_table_data、不与模板 `_tables` 合并，推空表会把模板
-  // 骨架行整表覆盖掉。也不进 `_removed_table_keys`：它们是模板正式表，只是暂未接线。
-  if ((snapshot.interest ?? []).length > 0) {
-    sub[T.interest] = interestRows
-  } else {
-    delete columns[T.interest]
-  }
+  // 🔴 应付利息 / 逾期利息：写权已由 spec l-cycle-…completion 裁决 A 收敛到 L2。
+  // K3 不再推送这两张子表，也不把它们放进 _removed_table_keys（写权移交 ≠ 删表）。
+  // 主表「应付利息」汇总行仍读 L2 的聚合结果。
+  // 旧代码（已删）：if ((snapshot.interest ?? []).length > 0) sub[T.interest] = interestRows
+  delete columns[T.interest]
+  delete columns[T.interestOverdue]
+
+  // 应付股利：仍由 K3 推送
   if ((snapshot.dividend ?? []).length > 0) {
     sub[T.dividend] = dividendRows
   } else {
     delete columns[T.dividend]
-  }
-
-  const overdueInterestRows = (snapshot.interestOverdue ?? []).filter(
-    r => String(r?.unit ?? '').trim() || num(r?.amount),
-  )
-  if (overdueInterestRows.length > 0) {
-    sub[T.interestOverdue] = overdueInterestRows.map(r => ({
-      label: String(r.unit ?? '').trim(),
-      overdue_amount: num(r.amount),
-      overdue_reason: r.reason ?? '',
-    }))
-  } else {
-    removed.push(T.interestOverdue)
-    delete columns[T.interestOverdue]
   }
 
   if (isListed) {

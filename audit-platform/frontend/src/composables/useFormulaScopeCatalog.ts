@@ -24,6 +24,8 @@
  */
 import { ref, computed } from 'vue'
 import http from '@/utils/http'
+// spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
+import { formulaScope as formulaScopePaths } from '@/services/apiPaths/formula'
 import { useAcnr } from '@/services/acnr/useAcnr'
 
 // ── Formula_Scope 7 类（与后端 FORMULA_SCOPES / 组件 FormulaManagerScope 对齐）──
@@ -162,7 +164,7 @@ export function useFormulaScopeCatalog() {
     loading.value = true
     try {
       const response = await http.get(
-        `/api/formula-scope/${projectId}/formulas`,
+        formulaScopePaths.list(projectId),
         { params: { scope } },
       )
       const payload = (response?.data?.data ?? response?.data ?? {}) as {
@@ -187,7 +189,7 @@ export function useFormulaScopeCatalog() {
     if (!projectId) return emptyGrouped()
     loading.value = true
     try {
-      const response = await http.get(`/api/formula-scope/${projectId}/formulas`)
+      const response = await http.get(formulaScopePaths.list(projectId))
       const payload = (response?.data?.data ?? response?.data ?? {}) as {
         scopes?: Record<string, { items?: Record<string, unknown>[] }>
       }

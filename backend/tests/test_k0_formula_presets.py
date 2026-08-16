@@ -41,12 +41,14 @@ CONFIRM_CYCLE_XLSX: dict[str, str] = {
 #:
 #: G0 / H0 / K0 已修（G0·H0 由各自 spec，K0 由 `fix_k0_prefill_presets.py`）。
 KNOWN_BAD_SHEET_NAMES: dict[tuple[str, str], str] = {
-    ("D0", "审定表D0-1"): "归属 d0 循环侧（尚无 spec 立项）；源 xlsx 无该 tab",
-    ("D0", "分析程序D0-3"): "归属 d0 循环侧；D0-3 真名是「跟函函证过程控制D0-3」，块内容却是分析程序",
-    ("D0", "函证汇总表D0-2"): "归属 d0 循环侧；D0-2 真名是「核实被函证单位信息D0-2」",
+    # ("D0", "审定表D0-1") / ("D0", "分析程序D0-3") / ("D0", "函证汇总表D0-2")
+    # 已于 d-cycle-four-table-extraction-and-disclosure-completion Task 18 按源模板正名
+    # （→「函证结果汇总表D0-1」/「跟函函证过程控制D0-3」/「核实被函证单位信息D0-2」），
+    # 按「白名单只许变短」规则移出。
     ("E0", "审定表E0-1"): "归属 e0-confirmation-completion 遗留；memory 已记，源 xlsx 无该 tab",
     ("F0", "审定表F0-1"): "归属 f0-confirmation-linkage-and-structural-enhancement；源 xlsx 无该 tab",
-    ("L0", "审定表L0-1"): "归属 l0 循环侧（尚无 spec 立项）；源 xlsx 无该 tab",
+    # ("L0", "审定表L0-1") 已于 l0-confirmation-source-alignment Task 4 修好
+    # （→「函证结果汇总表L0-1」），按「白名单只许变短」规则移出。
 }
 
 K0_TARGET_SHEET = "函证结果汇总表K0-1"

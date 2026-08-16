@@ -507,7 +507,7 @@ async function syncToDisclosureNotes() {
   })
   try {
     const { default: axios } = await import('axios')
-    await axios.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, {
+    await axios.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
       project_id: props.projectId,
       year: auditYear.value,
       ...payload,

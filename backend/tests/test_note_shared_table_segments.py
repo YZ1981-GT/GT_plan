@@ -362,11 +362,16 @@ class TestSharedTableInventory:
     """全库共享表普查（Property 14 的数据基础）。"""
 
     def test_counts_match_measured_baseline(self):
-        """实测基线：listed 23 张 / soe 6 张，共 29 张。"""
+        """实测基线：listed 24 张 / soe 8 张，共 32 张。
+
+        2026-08-12 由 23/6 上调（+3）：K 循环补齐共享表段首码
+        （`fix_note_k_report_row_codes.py`）。理由与逐表清单见
+        `gen_note_shared_table_segments.EXPECTED_COUNTS` 注释。
+        """
         listed = list(iter_shared_tables(VARIANT_LISTED))
         soe = list(iter_shared_tables(VARIANT_SOE))
-        assert len(listed) == 23, f"listed 共享表数变了：{[t[2] for t in listed]}"
-        assert len(soe) == 6, f"soe 共享表数变了：{[t[2] for t in soe]}"
+        assert len(listed) == 24, f"listed 共享表数变了：{[t[2] for t in listed]}"
+        assert len(soe) == 8, f"soe 共享表数变了：{[t[2] for t in soe]}"
 
     def test_every_shared_table_has_at_least_two_segments(self):
         for variant in (VARIANT_LISTED, VARIANT_SOE):
@@ -483,11 +488,16 @@ class TestSharedTableInventory:
         assert str(rows[4].get("label")) == "……"
 
     def test_orphan_total_count_baseline(self):
-        """实测基线：**15 个段**的可写区窄于段区间（变了就要核实并更新）。
+        """实测基线：**18 个段**的可写区窄于段区间（变了就要核实并更新）。
 
-        14 条是「表最后一行的 合计 / 小计」（表级汇总，剔除后 owner 推送不会删掉它），
+        17 条是「表最后一行的 合计 / 小计」（表级汇总，剔除后 owner 推送不会删掉它），
         1 条是 soe `八、93 受限资产` 末行「其他」—— 模板显式标 `row_type: "unowned"`
         的表级兜底行（`restricted-assets-note-row-scope-rollout` Task 3 加的）。
+
+        2026-08-12 由 15 上调到 18（+3 条 `合计`）：K 循环补齐段首码后新增 3 张共享表
+        （listed `五、42 其他应付款` / soe `八、42 其他应付款` / soe `八、9 其他应收款`），
+        三张表末行都是 `合计` ⇒ 各自末段的 `data_end` 收窄一行。这正是期望行为 ——
+        K1/K3 推送自己的段时 `合计` 行原样保留。
         """
         hits = [
             (variant, num, name, seg.row_code, tuple(
@@ -499,7 +509,7 @@ class TestSharedTableInventory:
             for seg in segs
             if seg.data_end != seg.end
         ]
-        assert len(hits) == 15, f"受影响段数变了：{hits}"
+        assert len(hits) == 18, f"受影响段数变了：{hits}"
         for *_x, cut in hits:
             for lab, row_type in cut:
                 assert "计" in lab or row_type == UNOWNED_ROW_TYPE, (
@@ -644,7 +654,12 @@ class TestSharedTableInventory:
         for variant in VARIANTS:
             for num, _t, name, rows, segs in iter_shared_tables(variant):
                 got.append((variant, num, name, [(s.start, s.end, s.data_end) for s in segs]))
-        assert len(got) == 29
+        # 29 → 32（2026-08-12）：K 循环补齐共享表段首码后新增 3 张共享表
+        # （listed `五、42` / soe `八、42` / soe `八、9`）。补码前这 3 张表段数为 0
+        # ⇒ owner 带 `_row_scope` 推送时 `find_segment` 返 None ⇒ 整表 fail-closed
+        # 跳过写入。真源与理由见 `gen_note_shared_table_segments.EXPECTED_COUNTS`
+        # 注释与 `backend/scripts/fix/fix_note_k_report_row_codes.py`。
+        assert len(got) == 32
         assert got == want, "段区间与清单漂移 → 重跑 gen_note_shared_table_segments.py --write"
 
     def test_unowned_only_narrows_its_own_table(self):
@@ -721,10 +736,12 @@ class TestManifestDrift:
         assert gen.main() == 0, "共享表清单与模板漂移 —— 请重跑 --write"
 
     def test_manifest_counts_match_baseline(self):
+        # 23/6/29 → 24/8/32（2026-08-12，K 循环补段首码），理由见
+        # `gen_note_shared_table_segments.EXPECTED_COUNTS` 注释
         gen = _load_generator()
         payload = json.loads(gen.OUT_PATH.read_text(encoding="utf-8"))
-        assert payload["counts"] == {VARIANT_LISTED: 23, VARIANT_SOE: 6}
-        assert len(payload["tables"]) == 29
+        assert payload["counts"] == {VARIANT_LISTED: 24, VARIANT_SOE: 8}
+        assert len(payload["tables"]) == 32
 
     def test_manifest_segments_wellformed(self):
         """清单里每张表都必须是**真**共享表且段区间自洽。"""

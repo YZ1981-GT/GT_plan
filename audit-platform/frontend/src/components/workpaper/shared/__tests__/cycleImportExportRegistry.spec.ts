@@ -394,20 +394,80 @@ function backendPrefixToSheetKeys(): Map<string, Set<string>> {
 }
 
 /**
- * 19 个「工厂造了 router 但从未 include_router」的死前缀（2026-08-10 实证）。
+ * 「工厂造了 router 但从未 include_router」的死前缀 —— **清单不在此处写死**。
  *
  * 它们在 `wp_render_strategies/_{x}_import_export.py` 里由工厂声明了
  * `api_prefix`，但 `router_registry` 从未注册 ⇒ 运行期零端点。这些前缀的能力
  * 实际由 `backend/app/routers/{name}.py` 专属 router 提供，且专属 router 的
  * URL 前缀往往**不同名**（`h9` → `h9-lease-liabilities`）。
- *
  * ⇒ registry 抄工厂声明的 `api_prefix` 会得到 404 的前缀。本断言钉死这一点。
+ *
+ * 🔴 真源 = 后端守卫 `backend/tests/test_ie_route_inventory.py` 的
+ *    `_TRULY_DEAD_FACTORY_PREFIXES` —— 那是**运行期路由表**实测出来的，前端启不了
+ *    FastAPI，在这里抄一份必 stale。
+ *
+ * 抄一份的代价已实证一次（2026-08-15，spec `x3-adjustment-entry-import-export`
+ * 任务 10.1）：这里曾写死 19 项（`h9`/`l2`/`l6`/`l7`/`l8`/`m1`~`m10`/`n1`~`n3`/`n5`）。
+ * X-3 给其中 **16 个**短前缀补了形态 A 三态端点（宿主是
+ * `_x3_adjustment_import_export`，**不是**同名工厂模块），后端基线已在任务 6.3
+ * 同步下调到 3 项，而这里的字面量没跟着改 ⇒ 生成器把这 16 个前缀派生进 registry
+ * 后，本判据把**正确的新增**打成红。清单一旦写死，就只有两种结局：锁死缺陷，
+ * 或打红修复（memory 记的假绿第三源）。改成解析真源后，父 spec Task 25 下调死集
+ * 时前端自动跟随。
  */
-const DEAD_FACTORY_PREFIXES: readonly string[] = [
-  'h9', 'l2', 'l6', 'l7', 'l8',
-  'm1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10',
-  'n1', 'n2', 'n3', 'n5',
-]
+let _routeInventorySrc: string | null = null
+
+function routeInventorySrc(): string {
+  if (_routeInventorySrc === null) {
+    _routeInventorySrc = stripPyComments(
+      readFileSync(resolve(REPO_ROOT, 'backend/tests/test_ie_route_inventory.py'), 'utf-8'),
+    )
+  }
+  return _routeInventorySrc
+}
+
+/**
+ * 从后端守卫读 `<name> = frozenset({...})` 的字符串字面量集合。
+ *
+ * 🔴 抽不到必须**抛错**而不是返回空集：空集会让「死前缀不在 registry」恒绿。
+ *    行首锚定 + 花括号配对（禁行尾敏感正则，CRLF/LF 差异会静默不命中）。
+ */
+function backendPrefixSet(name: string): readonly string[] {
+  const src = routeInventorySrc()
+  const decl = new RegExp(`^${name}\\s*=\\s*frozenset\\(`, 'm').exec(src)
+  if (!decl) {
+    throw new Error(`未在 test_ie_route_inventory.py 找到 ${name} 声明 —— 解析失效即打红，不静默空转`)
+  }
+  const open = src.indexOf('{', decl.index)
+  if (open < 0) throw new Error(`${name} 的 frozenset( 之后未找到 '{'`)
+  let depth = 0
+  let body: string | null = null
+  for (let i = open; i < src.length; i++) {
+    if (src[i] === '{') depth++
+    else if (src[i] === '}') {
+      depth--
+      if (depth === 0) {
+        body = src.slice(open + 1, i)
+        break
+      }
+    }
+  }
+  if (body === null) throw new Error(`${name} 的花括号未配对`)
+  const out = [...body.matchAll(/"([^"]+)"/g)].map((m) => m[1])
+  if (out.length === 0) {
+    throw new Error(`${name} 抽取为空 —— 两侧都空会让断言假绿，故直接打红`)
+  }
+  return out
+}
+
+/** 当前判据命中的死前缀（后端实测，X-3 施加后为 h9/l7/l8） */
+const DEAD_FACTORY_PREFIXES: readonly string[] = backendPrefixSet('_TRULY_DEAD_FACTORY_PREFIXES')
+/** X-3 施加前的死集（19 项）—— 只作结构自洽的分母，不当生效基线 */
+const PRE_X3_DEAD_FACTORY_PREFIXES: readonly string[] = backendPrefixSet(
+  '_PRE_X3_DEAD_FACTORY_PREFIXES',
+)
+/** X-3 补了形态 A 三态端点的 16 个短前缀 */
+const X3_SHAPE_A_PREFIXES: readonly string[] = backendPrefixSet('_X3_SHAPE_A_PREFIXES')
 
 describe('registry 三向锁死 — catalog 侧', () => {
   it('catalog I/E 条目非空（扫描面自检，防两侧都空时假绿）', () => {
@@ -429,7 +489,7 @@ describe('registry 三向锁死 — catalog 侧', () => {
     ).toEqual([])
   })
 
-  it('registry 不含已知死前缀（工厂声明但从未注册的 19 个）', () => {
+  it('registry 不含已知死前缀（工厂声明但从未注册的那些）', () => {
     const used = new Set(Object.values(CYCLE_IMPORT_EXPORT).map((e) => e.apiPrefix))
     const dead = DEAD_FACTORY_PREFIXES.filter((p) => used.has(p))
     expect(
@@ -440,11 +500,62 @@ describe('registry 三向锁死 — catalog 侧', () => {
     ).toEqual([])
   })
 
-  it('反向自检：死前缀清单本身非空且与工厂声明对得上', () => {
-    // 非空自检 —— 空清单会让上一条恒绿
-    expect(DEAD_FACTORY_PREFIXES.length).toBe(19)
+  /**
+   * 🔴 X-3 的 16 个短前缀已在运行期被点亮 ⇒ 它们**必须**在 registry 里。
+   *
+   * 这条与上一条互为反向：上一条防「登记了 404 的前缀」，这条防「有端点却没登记」
+   * （= 后端有能力、用户点不到，本 spec 的缺口本体）。判据落在**门面最终值**上，
+   * 且要求它来自 `GENERATED_IMPORT_EXPORT` —— 手写塞进 `MANUAL_OVERRIDES` 也算没
+   * 走真源（catalog 更新时会 stale）。
+   */
+  it('🔴 X-3 点亮的 16 个短前缀：不在死集内，且已由生成器派生进 registry', () => {
+    expect(X3_SHAPE_A_PREFIXES.length, 'X-3 短前缀集抽取异常').toBe(16)
+
+    const stillDead = X3_SHAPE_A_PREFIXES.filter((p) => DEAD_FACTORY_PREFIXES.includes(p))
+    expect(
+      stillDead,
+      `以下前缀在运行期有形态 A 三态端点，却仍被算作死前缀: ${stillDead.join(', ')}\n`
+      + '→ 后端 _TRULY_DEAD_FACTORY_PREFIXES 与实测不符，先核后端基线',
+    ).toEqual([])
+
+    const registered = new Set(Object.values(CYCLE_IMPORT_EXPORT).map((e) => e.apiPrefix))
+    const missing = X3_SHAPE_A_PREFIXES.filter((p) => !registered.has(p))
+    expect(
+      missing,
+      `以下 X-3 短前缀后端已注册三态端点，但 registry 未登记（下拉点不到）: ${missing.join(', ')}\n`
+      + '→ 跑 python backend/scripts/fix/gen_cycle_import_export_registry.py --apply',
+    ).toEqual([])
+
+    const notGenerated = X3_SHAPE_A_PREFIXES.filter((p) => !(p in GENERATED_IMPORT_EXPORT))
+    expect(
+      notGenerated,
+      `以下 X-3 短前缀不在生成文件里（疑被手写进 MANUAL_OVERRIDES，catalog 更新即 stale）: `
+      + notGenerated.join(', '),
+    ).toEqual([])
+  })
+
+  it('反向自检：死前缀清单来自后端真源、只许收缩、不得混入已点亮的前缀', () => {
+    // 非空自检 —— 空清单会让「registry 不含死前缀」恒绿
+    expect(DEAD_FACTORY_PREFIXES.length).toBeGreaterThan(0)
+    // 分母自检：X-3 前的死集必须仍是 19 项（它是历史事实，不随施加变化）
+    expect(PRE_X3_DEAD_FACTORY_PREFIXES.length).toBe(19)
+    // 只许收缩：当前死集必须是 X-3 前死集的子集
+    const notShrunk = DEAD_FACTORY_PREFIXES.filter(
+      (p) => !PRE_X3_DEAD_FACTORY_PREFIXES.includes(p),
+    )
+    expect(
+      notShrunk,
+      `死集新增了 X-3 前不在册的前缀（疑有工厂模块被 include_router 漏了）: ${notShrunk.join(', ')}`,
+    ).toEqual([])
+    // 收缩量恰为已点亮的 16 个（多复活/少复活都要求裁决，不静默）
+    const revived = PRE_X3_DEAD_FACTORY_PREFIXES.filter(
+      (p) => !DEAD_FACTORY_PREFIXES.includes(p),
+    ).sort()
+    expect(revived, '死集收缩量与 X-3 的 16 个短前缀不吻合').toEqual(
+      [...X3_SHAPE_A_PREFIXES].sort(),
+    )
     // 这些前缀确实出现在工厂模块的 api_prefix 声明里（否则清单是凭空写的）
-    const sample = ['h9', 'm10', 'n5']
+    const sample = [...DEAD_FACTORY_PREFIXES]
     for (const p of sample) {
       const file = resolve(
         REPO_ROOT,
@@ -630,6 +741,29 @@ describe('registry 门面 —— generated + MANUAL_OVERRIDES', () => {
         `${key} 多出未登记的 sheet 键: ${undeclared.join(', ')}\n`
         + '→ 补键必须先在后端白名单核实，再写进 INTENTIONAL_ADDITIONS 并注明依据',
       ).toEqual([])
+    }
+  })
+
+  /**
+   * 🔴 `MANUAL_OVERRIDES` 后置覆盖**真生效**的行为判据。
+   *
+   * 判「文件里还有这个符号」是没用的（假绿第②源）：门面若写成
+   * `{ ...MANUAL_OVERRIDES }` 被漏掉、或某天生成器不再排除 `MANUAL_PREFIXES`
+   * 而由 generated 反向覆盖，符号依旧在，值却变了。
+   * 故这里判**对象恒等**（`===`）：门面里那 10 个 key 拿到的必须就是
+   * `MANUAL_OVERRIDES` 里的那个对象本身 —— 对象展开只拷引用，恒等即证明
+   * 最终值来自 overrides，而不是别处的同名副本。
+   */
+  it('🔴 MANUAL_OVERRIDES 后置覆盖生效：门面里那 10 个 key 的值是 overrides 的对象本身', () => {
+    const keys = Object.keys(MANUAL_OVERRIDES)
+    expect(keys.length, 'MANUAL_OVERRIDES 键数变了（与生成器 MANUAL_PREFIXES 双向锁死）').toBe(10)
+    for (const k of keys) {
+      expect(CYCLE_IMPORT_EXPORT[k], `${k} 在门面中缺席 ⇒ overrides 没被展开进去`).toBeTruthy()
+      expect(
+        CYCLE_IMPORT_EXPORT[k],
+        `${k} 的门面值不是 MANUAL_OVERRIDES 的对象 ⇒ 被别处覆盖了（传输层键会丢）`,
+      ).toBe(MANUAL_OVERRIDES[k])
+      expect(k in GENERATED_IMPORT_EXPORT, `${k} 两处都登记 ⇒ 覆盖顺序变成活风险`).toBe(false)
     }
   })
 

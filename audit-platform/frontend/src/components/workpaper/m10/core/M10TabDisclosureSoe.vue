@@ -183,6 +183,7 @@ import { calcEquityEndBalance } from '../../composables/useM10FormulaEngine'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM10SoeSyncPayload, type M10MovementRow } from '../../composables/m10NoteSectionMap'
+import http from '@/utils/http'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -223,8 +224,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildM10SoeSyncPayload(props.wpId, rows, noteText || undefined)
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 

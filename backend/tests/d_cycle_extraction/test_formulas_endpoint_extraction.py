@@ -124,6 +124,15 @@ def _wp_formula(target_cell, *, expression="TB('1141','期末余额')",
         created_by=None,
         created_at=None,
         updated_at=None,
+        # 🔴 spec formula-management-runtime-closure Task 11 给 `_formula_to_dict`
+        #    additive 加了这三个下发键（`lifecycle_state` / `definition_version` /
+        #    `formula_source` 此前实测**零消费**，根因就是它们不在响应体里）。
+        #    替身必须跟着补，否则 `SimpleNamespace` 缺属性 → AttributeError。
+        #    这不是「测试锁定了错误行为」，只是替身落后于 ORM 字段集，
+        #    故直接补齐而非改写断言（R9.6 的诚实改写不适用于此）。
+        lifecycle_state="active",
+        definition_version=1,
+        formula_source="user",
     )
 
 

@@ -108,6 +108,31 @@ export interface K11DisclosureRow {
 
 export type K11SyncPayload = KPlSyncPayload
 
+/**
+ * K11 披露表金额的符号口径：**明细表正数填列、披露表按负数填列**。
+ *
+ * 源 xlsx 两版末行注「本科目明细表按照正数填列、披露表按照负数填列」，标题注
+ * 「损失以"—"号填列」。底稿（明细表 / 审定表 K11-1）里录的是**正数**，
+ * 推附注时必须翻符号，否则附注里的资产减值损失会以正数出现 —— 与利润表口径相反。
+ *
+ * 🔴 单点翻转：只在本函数（唯一载荷构造口）做，绝不在组件里各翻一次
+ * （两处都翻 = 翻回正数，且没有任何报错）。
+ *
+ * 三条边界：
+ * - `0` 翻转后仍是 `0`（不得出现 `-0`：它会被 `JSON.stringify` 写成 `0` 但在
+ *   `Object.is` 比较与 `Math.sign` 上行为不同，且界面可能显示「-0.00」）
+ * - 非有限值（`NaN` / `Infinity`）原样返回，不伪造成 0（那是造数据）
+ * - 已经是负数的输入照常翻成正数 —— 本函数是**口径转换**而不是「取负绝对值」，
+ *   若底稿里录了负数，说明录入口径错了，应该在录入侧修，而不是这里悄悄吸收
+ *
+ * spec: Requirement 8.7
+ */
+export function k11DisclosureAmount(value: number): number {
+  if (!Number.isFinite(value)) return value
+  if (value === 0) return 0
+  return -value
+}
+
 export function buildK11SyncPayload(
   variant: K11DisclosureVariant,
   wpId: string,
@@ -117,6 +142,12 @@ export function buildK11SyncPayload(
   const texts: KPlNoteText[] = [
     { section: 'k11-note', title: '资产减值损失说明', text: narrativeText },
   ]
+  // Requirement 8.7：披露表按负数填列（底稿侧是正数）
+  const disclosureRows: K11DisclosureRow[] = rows.map((r) => ({
+    ...r,
+    currentAmount: k11DisclosureAmount(r.currentAmount),
+    priorAmount: k11DisclosureAmount(r.priorAmount),
+  }))
   return buildPlPayload({
     wpId,
     sheetName: K11_DISCLOSURE_SHEET_NAME[variant],
@@ -124,7 +155,7 @@ export function buildK11SyncPayload(
     variant,
     tableName: variant === 'listed' ? K11_LISTED_SUBTABLE.main : K11_SOE_SUBTABLE.main,
     spec: SPEC,
-    rows: rows as readonly KPlRow[],
+    rows: disclosureRows as readonly KPlRow[],
     texts,
     removedTableKeys: variant === 'listed' ? K11_LEGACY_OBSOLETE_TABLES : [],
   })

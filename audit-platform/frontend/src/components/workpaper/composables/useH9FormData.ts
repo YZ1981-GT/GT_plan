@@ -28,9 +28,9 @@ export interface ChecklistItem {
 
 export interface H9TbData {
   /** 科目2205租赁负债 未审数（贷方/负债类） */
-  unadjusted2205: number
+  unadjustedLeaseLiability: number
   /** 科目2205 审定数 */
-  audited2205: number
+  auditedLeaseLiability: number
   /** 未确认融资费用 未审数（借方/负债备抵类） */
   unadjustedFinanceCost: number
   /** 未确认融资费用 审定数 */
@@ -44,9 +44,12 @@ const DEBOUNCE_MS = 2000
  * 🔴 科目码单一真源 = `hCycleAccountScope.h9Scope`（租赁负债 2601 / 未确认融资费用 2602）。
  * 历史实现写死 `2205`（合同负债，D7 循环）与 `1802` → 取数与回写全部落在错科目上。
  */
-const ACCOUNT_CODE_2601 = h9Scope.def.slotFallbacks.gross[0]
+const ACCOUNT_CODE_LEASE_LIABILITY = h9Scope.def.slotFallbacks.gross[0]
 /** 未确认融资费用科目编码（借方/负债备抵类） */
 const ACCOUNT_CODE_FINANCE_COST = h9Scope.def.slotFallbacks.unearned_finance[0]
+/** render `tb_values` 键前缀（与后端 `H9_SLOT_KEY_PREFIX` 逐字对应） */
+const TB_KEY_LIABILITY = 'lease_liability'
+const TB_KEY_UNEARNED = 'unearned_finance'
 const ITEM_PREFIX = 'H9-'
 const ITEM_PREFIX_A = 'H9A-'
 
@@ -64,8 +67,8 @@ export function useH9FormData(params: {
   const lastSavedAt = ref<string | null>(null)
   const allResponses = ref<Map<string, ChecklistItem>>(new Map())
   const tbData = ref<H9TbData>({
-    unadjusted2205: 0,
-    audited2205: 0,
+    unadjustedLeaseLiability: 0,
+    auditedLeaseLiability: 0,
     unadjustedFinanceCost: 0,
     auditedFinanceCost: 0,
   })
@@ -232,15 +235,15 @@ export function useH9FormData(params: {
    * CAS21特有：H9与H8强联动，回写后通知附注及相关底稿。
    */
   async function writebackTrialBalance(
-    auditedAmount2205: number,
+    auditedAmountLeaseLiability: number,
     auditedAmountFinanceCost?: number
   ): Promise<void> {
     if (!projectId.value) return
     try {
       // 回写2205租赁负债（贷方/负债类）
       await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_2601,
-        audited_amount: auditedAmount2205,
+        account_code: ACCOUNT_CODE_LEASE_LIABILITY,
+        audited_amount: auditedAmountLeaseLiability,
       })
 
       // 回写未确认融资费用（借方/负债备抵类，如果提供）
@@ -254,9 +257,9 @@ export function useH9FormData(params: {
       // 发布 EventBus 事件通知其他底稿（附注/H8使用权资产/报表等）
       eventBus.emit('substantive:adjudicated' as any, {
         wpCode: 'H9',
-        accountCode: ACCOUNT_CODE_2601,
-        auditedAmount: auditedAmount2205,
-        adjudicatedAmount: auditedAmount2205,
+        accountCode: ACCOUNT_CODE_LEASE_LIABILITY,
+        auditedAmount: auditedAmountLeaseLiability,
+        adjudicatedAmount: auditedAmountLeaseLiability,
         auditedAmountFinanceCost: auditedAmountFinanceCost ?? null,
       })
     } catch {
@@ -355,38 +358,45 @@ export function useH9FormData(params: {
   async function _loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值
-    const seeded2205 = renderMeta.value?.tb_values?.lease_2205_unadjusted
-    if (seeded2205 != null) {
+    // 优先从 render-config seed 取值。
+    //
+    // 🔴 键前缀改为与后端 `H9_SLOT_KEY_PREFIX` 逐字一致的**规范键**：
+    //    `gross → lease_liability` / `unearned_finance → unearned_finance`。
+    //    此前读的 `lease_2205_*` / `lease_finance_cost_*` 是后端为兼容旧前端保留的
+    //    **别名键**（`_h9_lease_liabilities.build_h9_tb_values` 末尾镜像写出），
+    //    名字里带 `2205`（合同负债，D7 域）会持续诱导后来者以为 H9 科目是 2205。
+    const tv = renderMeta.value?.tb_values
+    const seededLiab = tv?.[`${TB_KEY_LIABILITY}_unadjusted`]
+    if (seededLiab != null) {
       tbData.value = {
-        unadjusted2205: Number(seeded2205) || 0,
-        audited2205: Number(renderMeta.value?.tb_values?.lease_2205_audited ?? 0),
-        unadjustedFinanceCost: Number(renderMeta.value?.tb_values?.lease_finance_cost_unadjusted ?? 0),
-        auditedFinanceCost: Number(renderMeta.value?.tb_values?.lease_finance_cost_audited ?? 0),
+        unadjustedLeaseLiability: Number(seededLiab) || 0,
+        auditedLeaseLiability: Number(tv?.[`${TB_KEY_LIABILITY}_audited`] ?? 0),
+        unadjustedFinanceCost: Number(tv?.[`${TB_KEY_UNEARNED}_unadjusted`] ?? 0),
+        auditedFinanceCost: Number(tv?.[`${TB_KEY_UNEARNED}_audited`] ?? 0),
       }
       return
     }
 
     try {
       // 查询2205租赁负债
-      const res2205 = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: ACCOUNT_CODE_2601 },
+      const resLeaseLiability = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
+        params: { account_prefix: ACCOUNT_CODE_LEASE_LIABILITY },
         _silent: true,
       } as any)
-      const list2205: any[] = Array.isArray(res2205?.data ?? res2205)
-        ? (res2205?.data ?? res2205)
-        : (res2205?.data?.items ?? [])
+      const listLeaseLiability: any[] = Array.isArray(resLeaseLiability?.data ?? resLeaseLiability)
+        ? (resLeaseLiability?.data ?? resLeaseLiability)
+        : (resLeaseLiability?.data?.items ?? [])
 
-      let unadjusted2205 = 0
-      let audited2205 = 0
-      let found2205 = false
+      let unadjustedLeaseLiability = 0
+      let auditedLeaseLiability = 0
+      let foundLeaseLiability = false
 
-      for (const item of list2205) {
+      for (const item of listLeaseLiability) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_2601)) {
-          unadjusted2205 = Number(item.unadjusted_amount ?? 0)
-          audited2205 = Number(item.audited_amount ?? 0)
-          found2205 = true
+        if (code.startsWith(ACCOUNT_CODE_LEASE_LIABILITY)) {
+          unadjustedLeaseLiability = Number(item.unadjusted_amount ?? 0)
+          auditedLeaseLiability = Number(item.audited_amount ?? 0)
+          foundLeaseLiability = true
         }
       }
 
@@ -410,13 +420,15 @@ export function useH9FormData(params: {
         }
       }
 
-      tbData.value = { unadjusted2205, audited2205, unadjustedFinanceCost, auditedFinanceCost }
+      tbData.value = { unadjustedLeaseLiability, auditedLeaseLiability, unadjustedFinanceCost, auditedFinanceCost }
 
-      if (!found2205) {
-        ElMessage.warning('科目2205租赁负债未在试算表中找到，请先导入试算平衡表')
+      if (!foundLeaseLiability) {
+        ElMessage.warning(
+          `科目 ${ACCOUNT_CODE_LEASE_LIABILITY} 租赁负债未在试算表中找到，请先导入试算平衡表`,
+        )
       }
     } catch {
-      tbData.value = { unadjusted2205: 0, audited2205: 0, unadjustedFinanceCost: 0, auditedFinanceCost: 0 }
+      tbData.value = { unadjustedLeaseLiability: 0, auditedLeaseLiability: 0, unadjustedFinanceCost: 0, auditedFinanceCost: 0 }
     }
   }
 

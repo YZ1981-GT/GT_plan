@@ -76,10 +76,20 @@
  *
  * 科目：2231 应付利息（贷方/负债类）
  */
-import { inject, toRef, onUnmounted } from 'vue'
+import { inject, toRef, onUnmounted, onBeforeUnmount, watch, ref } from 'vue'
 import { useL2FormData } from '../../composables/useL2FormData'
 import { useL2Disclosure } from '../../composables/useL2Disclosure'
+import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
+import {
+  buildL2SyncPayload,
+  L2_NOTE_SECTION,
+  L2_DISCLOSURE_SHEET_NAME,
+  type L2InterestRow,
+  type L2OverdueRow,
+} from '../../composables/l2NoteSectionMap'
 import { eventBus } from '@/utils/eventBus'
+import { api } from '@/services/apiProxy'
+import { ElMessage } from 'element-plus'
 import type { DisclosureRow } from '../../composables/useL2Disclosure'
 
 const props = defineProps<{
@@ -97,6 +107,49 @@ const { allResponses, loadData } = useL2FormData({
 loadData()
 
 const { disclosureTableData, overdueRows } = useL2Disclosure(allResponses)
+
+// ─── 附注同步链路（spec l-cycle-…completion R4.7）────────────────────────────
+
+const syncing = ref(false)
+const autoSync = useDisclosureAutoSync({ isReadonly: () => props.isReadonly })
+
+async function syncToDisclosureNotes(): Promise<void> {
+  if (props.isReadonly || !props.projectId) return
+  syncing.value = true
+  try {
+    const interestData: L2InterestRow[] = disclosureTableData.value.map((r: DisclosureRow) => ({
+      label: r.label,
+      endAmount: r.endAmount ?? 0,
+      priorAmount: r.priorAmount ?? 0,
+    }))
+    const overdueData: L2OverdueRow[] = overdueRows.value.map((r: any) => ({
+      label: r.borrower ?? '',
+      overdueAmount: r.overdueAmount ?? 0,
+      overdueReason: r.overdueReason ?? '',
+    }))
+    const payload = buildL2SyncPayload('soe', interestData, overdueData)
+    await api.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, {
+      wp_id: props.wpId,
+      sheet_name: L2_DISCLOSURE_SHEET_NAME.soe,
+      section_id: L2_NOTE_SECTION.soe,
+      current_standard: 'soe_standalone',
+      sub_table_data: payload.sub_table_data,
+      columns: payload._sub_table_columns,
+    })
+  } catch {
+    // 自动同步失败静默
+  } finally {
+    syncing.value = false
+  }
+}
+
+watch(
+  [disclosureTableData, overdueRows],
+  () => { autoSync.scheduleAutoSync(syncToDisclosureNotes) },
+  { deep: true },
+)
+
+onBeforeUnmount(() => autoSync.cancelPending())
 
 // ─── EventBus: 审定变化刷新 ──────────────────────────────────────────────────
 function handleAdjudicatedEvent(): void {

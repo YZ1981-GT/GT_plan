@@ -1,7 +1,7 @@
 /**
  * K10 其他收益 — 科目码单一真源。
  *
- * 报表行：IS-010（上市）/ IS-030（国企）
+ * 报表行：IS-010（两准则同号；2026-08-09 由 IS-030 改正 soe 侧）
  * 公式：TB('6117','本期发生额') 四准则一致
  * 兜底码：6117
  * 损益类/贷方科目 —— 取本期发生额非余额
@@ -13,11 +13,28 @@
  *       Requirements 5.1~5.3 / Property 9
  */
 
-/** 报表行编码 —— 上市准则 */
+/**
+ * 报表行编码 —— 上市准则。
+ *
+ * 🔴 **2026-08-09 连库对账改正**（spec k-cycle-…-closure Task 4/7）：
+ * soe 侧原写 ``IS-030``，而该码在 `report_config` 里实际是
+ * **五、其他综合收益的税后净额**（formula 为 NULL）。
+ *
+ * 后果分级 **TRACE_ONLY（仅溯源失真）** —— 该码的公式是 `ROW()` 派生或为 NULL ⇒
+ * `extract_signed_codes` 抽不出 `TB()` ⇒ 退兜底码 ⇒ **金额是对的**，
+ * 只有 `resolved_from` 谎报 `report_config`、溯源面板展示错误的来源行。
+ *
+ * 正确落点（`report_config` 四变体一致）::
+ *
+ *     IS-010 其他收益 = TB('6117','本期发生额')
+ *
+ * 🔴 两准则**同号**（K 循环无一例外）。保留 LISTED/SOE 两个常量是为了与其余
+ * K 循环形态一致，**不是**因为它们该不同。
+ */
 export const K10_REPORT_ROW_CODE_LISTED = 'IS-010'
 
-/** 报表行编码 —— 国企准则 */
-export const K10_REPORT_ROW_CODE_SOE = 'IS-030'
+/** 报表行编码 —— 国企准则（与上市同号，见上方改正说明） */
+export const K10_REPORT_ROW_CODE_SOE = 'IS-010'
 
 /** 兜底标准码 */
 export const K10_FALLBACK_STANDARD = '6117'
@@ -50,7 +67,7 @@ function normalize(codes: unknown): string[] {
  */
 export function k10QueryCodes(src?: K10TbSourceCodes | null): string[] {
   const resolved = normalize(src?.gross)
-  return resolved.length ? resolved : ['6117']
+  return resolved.length ? resolved : [K10_FALLBACK_STANDARD]
 }
 
 /**
@@ -59,5 +76,5 @@ export function k10QueryCodes(src?: K10TbSourceCodes | null): string[] {
  */
 export function k10AccountCode(src?: K10TbSourceCodes | null): string {
   const resolved = normalize(src?.gross_standard)
-  return resolved[0] || '6117'
+  return resolved[0] || K10_FALLBACK_STANDARD
 }

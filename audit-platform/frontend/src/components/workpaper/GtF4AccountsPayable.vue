@@ -221,9 +221,9 @@ const auditYear = computed(() => {
   return new Date().getFullYear() - 1
 })
 const bsDate = computed(
-  () => props.htmlData?.project_context?.bs_date
+  () => (props.htmlData?.project_context?.bs_date
     ?? props.htmlData?.projectContext?.bs_date
-    ?? formData.projectContext.value?.bs_date
+    ?? formData.projectContext.value?.bs_date)
     || '',
 )
 // 🔴 render 输出 project_context（snake_case）；formData.projectContext 仅在 selfLoad

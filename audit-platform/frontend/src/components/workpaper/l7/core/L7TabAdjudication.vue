@@ -35,6 +35,14 @@
       </template>
     </el-alert>
 
+    <!-- ═══ 四表库取数溯源（L7 宁缺勿造三态呈现） ═══ -->
+    <WpFourTableSourcePanel
+      :source-codes="tbSourceCodes"
+      gross-label="其他非流动负债"
+      fallback-row-code="BS-071"
+      :hints="L7_SOURCE_HINTS"
+    />
+
     <!-- ═══ 方法论上下文（琥珀色左边线+浅黄背景） ═══ -->
     <div class="methodology-context">
       <div class="methodology-text">
@@ -310,6 +318,7 @@
 import { computed, inject, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { MagicStick, Check, Download } from '@element-plus/icons-vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
+import WpFourTableSourcePanel from '../../shared/WpFourTableSourcePanel.vue'
 import { useL7FormData } from '../../composables/useL7FormData'
 import { useL7DualMode } from '../../composables/useL7DualMode'
 import {
@@ -327,6 +336,7 @@ const props = defineProps<{
   wpId: string
   projectId: string
   isReadonly: boolean
+  htmlData?: any
 }>()
 
 const emit = defineEmits<{
@@ -336,6 +346,24 @@ const emit = defineEmits<{
 // ─── Inject ──────────────────────────────────────────────────────────────────
 
 const openReviewDialog = inject<(sectionId: string, sectionLabel?: string) => void>('openReviewDialog', () => {})
+
+// ─── 四表库取数溯源（L7 宁缺勿造三态呈现）────────────────────────────────────
+
+/**
+ * 从 htmlData（render-config 返回）中提取 tb_source_codes。
+ * L7 宁缺勿造时 prefill_supported=false + empty_reason 非空 → 面板显示 absent 态。
+ */
+const tbSourceCodes = computed(() => props.htmlData?.tb_source_codes ?? null)
+
+/**
+ * L7 溯源面板口径说明。
+ * 🔴 判据是 prefill_supported === false（显式 false），undefined 不等于「无此科目」。
+ */
+const L7_SOURCE_HINTS: string[] = [
+  '其他非流动负债在 CAS 会计科目表中无专属科目 —— <code>2801</code> 是预计负债（K5）、'
+  + '<code>2901</code> 是递延所得税负债（N1/N3），均不得采用。',
+  '本项目审定表数据由审计师按报表重分类结果<strong>手工填列</strong>，四表库不做自动预填。',
+]
 
 // ─── FormData ────────────────────────────────────────────────────────────────
 

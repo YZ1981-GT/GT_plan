@@ -124,6 +124,14 @@ def test_no_fake_rows(key: str, path: Path, number: str) -> None:
                 f"{number}/{name} 第 {i} 行仍是 header_label 假数据行"
             )
             label = str(row.get("label", "")).strip()
+            # 🔴 2026-08-12 口径更正（spec `k-cycle-extraction-formula-and-disclosure-closure`
+            #    Task 18 / Requirement 9.1~9.2）：同一个标签有两种语义 ——
+            #    `row_type='data'` 是占位说明行（渲染成空披露数据，须改空白录入行，
+            #    本条本意）；`row_type='expandable'` 是**可扩位行**（源模板标了
+            #    「此处可无限量增行」，是审计师的加行落点，必须保留）。
+            #    原判据不分二者，会把 R9 的成果删掉，且后果是功能消失而非报错。
+            if str(row.get("row_type", "")) == "expandable":
+                continue
             assert label not in PLACEHOLDER_ROWS, (
                 f"{number}/{name} 第 {i} 行是占位说明「{label}」，应改空白录入行"
             )

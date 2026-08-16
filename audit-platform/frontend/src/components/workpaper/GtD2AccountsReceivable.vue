@@ -108,6 +108,7 @@
         v-else-if="currentSheet === 'D2-1'"
         :wp-id="props.wpId"
         :project-id="props.projectId"
+        :html-data="props.htmlData"
         :all-responses="allResponses"
         :is-readonly="isReadonly"
       />

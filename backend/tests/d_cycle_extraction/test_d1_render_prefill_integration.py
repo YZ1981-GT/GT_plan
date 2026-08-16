@@ -213,13 +213,20 @@ def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch):
     明细行 seed（D1-cat-rows / D1-bd-portfolio-rows），**非** D6 式 adjudication_prefill 顶层键。
 
     d1-extraction-chain-completion R1.6 起，主开关开时**额外**输出一个 additive 键
-    `tb_source_codes`（科目定位溯源：BS-005 → 标准码 → account_mapping → 原始码），
-    故顶层键集 == 基线 ∪ {tb_source_codes}；`adjudication_prefill` 仍恒不出现。
+    `tb_source_codes`（科目定位溯源：BS-005 → 标准码 → account_mapping → 原始码）。
+
+    d-cycle-four-table-extraction-and-disclosure-completion R1.6 起再多一个 additive 键
+    `parent_check`（三口径自检：叶子和 / 父行 / trial_balance）—— 用于暴露
+    `trial_balance` 的父子双算（实证 `1231` 父行与 `1231-01..05` 子行在该表**并存**），
+    只比对前两个口径发现不了这类差异。
+
+    故顶层键集 == 基线 ∪ {tb_source_codes, parent_check}；
+    `adjudication_prefill` 仍恒不出现（D1 走 responses_snapshot 明细行 seed）。
     """
     _enable_flag(monkeypatch)
     result = _run(d1.render(_ctx(_session())))
     assert "adjudication_prefill" not in result
-    assert set(result.keys()) == _BASELINE_KEYS | {"tb_source_codes"}
+    assert set(result.keys()) == _BASELINE_KEYS | {"tb_source_codes", "parent_check"}
     # 取数溯源结构固定，且 fail-open 兜底恒非空
     src = result["tb_source_codes"]
     assert src["gross"] and src["provision"]
@@ -247,9 +254,12 @@ def test_flag_on_off_byte_equivalent_when_no_tb_leaves(monkeypatch):
 
     # 灰度关：绝不出现新增键（零回归硬断言）
     assert "tb_source_codes" not in off
+    assert "parent_check" not in off
     assert not any(k.startswith("tb_provision_amount") for k in off["project_context"])
 
-    stripped = {k: v for k, v in on.items() if k != "tb_source_codes"}
+    stripped = {
+        k: v for k, v in on.items() if k not in {"tb_source_codes", "parent_check"}
+    }
     stripped["project_context"] = {
         k: v
         for k, v in on["project_context"].items()

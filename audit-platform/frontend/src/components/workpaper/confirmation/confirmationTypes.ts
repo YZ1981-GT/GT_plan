@@ -50,8 +50,17 @@ export interface ConfirmationRow {
   send_date?: string
   /** 收函日期 */
   reply_date?: string
-  /** 是否已回函 */
-  is_replied?: boolean
+  /**
+   * 是否已回函 —— **两种持久化形态并存，读取必须走 `replyStatus` 归一，禁裸比较**。
+   *
+   * 🔴 `boolean`：完整表格视图（`confirmationColumnSpec` 声明 `kind:'bool'` → `el-checkbox`）
+   * 🔴 `'是'|'否'`：明细面板 / Excel 导入 / 早期实现（源模板 X0-1 该列数据有效性即 `是,否`）
+   *
+   * 类型放宽为联合类型是为了**如实反映既有数据**（数据零丢失红线：不迁移已落库的值）。
+   * 读取一律用 `replyStatus.ts` 的 `isReplied`/`isRepliedTrue`/`isNotReplied`（三态，
+   * `undefined` = 未填，**不可当 false 用**）。
+   */
+  is_replied?: boolean | '是' | '否' | null
   /** 回函方式 */
   reply_method?: string
   /** 回函金额 */

@@ -212,6 +212,7 @@ const aiLoading = ref('')
 
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM6SyncPayload, type M6DisclosureRow } from '../../composables/m6NoteSectionMap'
+import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
   const rows: M6DisclosureRow[] = movementRows.value
@@ -225,8 +226,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildM6SyncPayload(props.wpId, 'soe', rows, noteText)
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 

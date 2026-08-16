@@ -176,14 +176,23 @@ def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch, wp_code):
     _enable_flag(monkeypatch, mod)
     result = _run(mod.render(_ctx(_session(), sheet_name)))
     assert "adjudication_prefill" not in result
-    assert set(result.keys()) == baseline
+    # d-cycle-four-table-extraction-and-disclosure-completion R1 起，灰度开时
+    # 额外输出两个 additive 溯源键；`adjudication_prefill` 仍恒不出现。
+    assert set(result.keys()) == baseline | {"tb_source_codes", "parent_check"}
 
 
 @pytest.mark.parametrize("wp_code", ["D5", "D7"])
 def test_flag_on_off_byte_equivalent(monkeypatch, wp_code):
-    """开关开/关 render 输出逐字节等价（不新增任何键，Property 9 天然成立）。
-    注：D4 已推翻「宁缺勿造」（2026-08），开关开时新增 tb_values/adjudication_prefill/segment_prefill
-    + project_context.tb_source_codes → 不再与关闭时逐字节等价。
+    """开关开/关 render 输出等价（剥离灰度开时新增的 additive 溯源键后）。
+
+    🔴 **灰度关必须零回归**（硬断言在下方），这是本用例的立法目的。
+
+    注：D4 已推翻「宁缺勿造」（2026-08），开关开时新增 tb_values/adjudication_prefill/
+    segment_prefill + project_context.tb_source_codes → 不参与本断言。
+
+    `project_context.tb_amount` **不在剥离清单**里：D5/D7 的取数在开关外执行
+    （与改造前的无条件取数一致），故两侧必须相等 —— 这是「硬编码码换成报表规则映射」
+    的零回归保护。
     """
     mod, _baseline, sheet_name, _ = _CYCLES[wp_code]
     checklist = [
@@ -194,7 +203,15 @@ def test_flag_on_off_byte_equivalent(monkeypatch, wp_code):
     off = _run(mod.render(_ctx(_session(checklist_rows=list(checklist)), sheet_name)))
     _enable_flag(monkeypatch, mod)
     on = _run(mod.render(_ctx(_session(checklist_rows=list(checklist)), sheet_name)))
-    assert off == on
+
+    # 灰度关：绝不出现新增键（零回归硬断言）
+    assert "tb_source_codes" not in off
+    assert "parent_check" not in off
+
+    stripped = {
+        k: v for k, v in on.items() if k not in {"tb_source_codes", "parent_check"}
+    }
+    assert off == stripped
     assert "adjudication_prefill" not in on
 
 

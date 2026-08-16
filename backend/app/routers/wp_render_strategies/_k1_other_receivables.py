@@ -51,38 +51,51 @@ from app.services.four_table.k1_detail_seed import (
     build_k1_bad_debt_seed_from_tb,
     seed_k1_bad_debt,
 )
+from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
+from app.services.four_table.parent_check import build_report_line_parent_check
 from app.services.four_table.report_line_accounts import (
     ReportLineAccounts,
-    ReportLineAccountSpec,
     resolve_report_line_accounts,
 )
+from app.services.four_table.tb_query import fetch_trial_balance_rows
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
+#: 🔴 科目定位声明的**唯一真源** = `four_table/k_cycle_specs.K_CYCLE_SPECS['K1']`
+#:    （spec k-cycle-…-closure Task 6，2026-08-09 收敛）。
+#:
+#: 收敛前本模块自建一份 `ReportLineAccountSpec` 字面量，与声明表构成**双真源** ——
+#: 改一处另一处不动就会让「render 取数」与「守卫/验收脚本读声明表」结论打架，
+#: 而两侧各自的测试都是绿的（这正是平台反复踩到的缺陷模式）。
+#:
+#: 下面这批 `K1_*` 常量**保留名字但全部从声明表派生**：外部有 3 个消费方
+#: （`_k1_import_export._resolve_k1_gross_prefixes` / `test_k1_adjudication_prefill`
+#: / 本模块的备抵名称过滤与 `bad_debt_account_prefix`），改名会波及它们且无收益。
+_K1_SPEC = K_CYCLE_SPECS["K1"]
+
 #: 报表行次（DB 实证：四个准则的「其他应收款」行 row_code 均为 BS-009）
-K1_REPORT_ROW_CODE = "BS-009"
+K1_REPORT_ROW_CODE = _K1_SPEC.row_code_soe
 
 #: 兜底标准码：原值 1221 其他应收款、备抵 1231-03 坏账准备-其他应收款
-K1_FALLBACK_GROSS = "1221"
+K1_FALLBACK_GROSS = _K1_SPEC.fallback_standard
 K1_FALLBACK_PROVISION = "1231-03"
 
 #: 附加科目（报表行 BS-009 含它们，但 K1-1 第一段「项目【不含应收利息、应收股利】」
 #: 明确排除 → 不并入原值，单独喂「与经审计的财务报表核对」区）
-K1_INTEREST_STANDARD = "1132"
-K1_DIVIDEND_STANDARD = "1131"
+#: 声明表里的顺序是 `('1131', '1132')` = (应收股利, 应收利息)。
+K1_DIVIDEND_STANDARD = _K1_SPEC.extra_standard_codes[0]
+K1_INTEREST_STANDARD = _K1_SPEC.extra_standard_codes[1]
 
 #: 备抵侧名称过滤（仅在反解退化为宽前缀 `1231` 时叠加，防把其它应收科目坏账算进 K1）
-K1_PROVISION_NAME_FILTER = "其他应收款"
+K1_PROVISION_NAME_FILTER = _K1_SPEC.provision_name_filter or "其他应收款"
 
-K1_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code=K1_REPORT_ROW_CODE,
-    fallback_gross=(K1_FALLBACK_GROSS,),
-    fallback_provision=(K1_FALLBACK_PROVISION,),
-    provision_name_filter=K1_PROVISION_NAME_FILTER,
-    extra_standard_codes=(K1_DIVIDEND_STANDARD, K1_INTEREST_STANDARD),
-)
+#: 共享件所需的规格 —— 由声明表按准则派生。
+#: 🔴 K1 两准则同码（`row_code_listed == row_code_soe == 'BS-009'`），故模块级
+#:    常量取 soe 侧即可；`render()` 内仍按 `spec_for(applicable_standards)` 取，
+#:    以便将来两侧分叉时自动跟随（本常量只作外部消费方的稳定入口）。
+K1_ACCOUNT_SPEC = _K1_SPEC.spec_for(["soe_standalone"])
 
 # 款项性质关键词 → K1-1 nature syncKey（与前端 `classifyK1Nature` 逐条同源）
 _NATURE_RULES: list[tuple[str, str]] = [
@@ -137,8 +150,16 @@ def _apply_provision_name_filter(
     return [r for r in leaves if kw in (r.account_name or "")]
 
 
-async def _fetch_tb_balance_leaves(ctx: RenderContext) -> list[LeafRow]:
-    """取 active 数据集全部 `tb_balance` 行并筛出叶子（失败返 []，fail-open）。"""
+async def _fetch_tb_balance_all(ctx: RenderContext) -> list[LeafRow]:
+    """取 active 数据集**全部** `tb_balance` 行（**不筛叶子**，失败返 []，fail-open）。
+
+    🔴 为什么必须给全量而不是叶子：``parent_check`` 的 ``parent`` 口径取的是**父科目
+    行本身**的金额（:func:`leaf_aggregation.parent_totals` 按 ``account_code == 前缀``
+    精确取行）。预先筛掉父行会让 ``parent`` 恒 0 —— 而共享件对 ``parent == 0`` 的处理
+    是「该侧不参与 ``consistent`` 判定」⇒ 三口径静默退化成两口径，**不会报错也不会打红**。
+
+    叶子由调用方经 :func:`leaf_aggregation.select_leaves` 派生（纯函数，无额外查询）。
+    """
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -155,7 +176,7 @@ async def _fetch_tb_balance_leaves(ctx: RenderContext) -> list[LeafRow]:
                 TbBalance.dataset_id,
             ).where(active_filter)
         )
-        return select_leaves(to_leaf_rows(result.fetchall()))
+        return to_leaf_rows(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("K1 TB balance fetch failed: %s", e)
         try:
@@ -443,7 +464,8 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("K1 render responses load failed: %s", e)
 
     accounts = await resolve_report_line_accounts(ctx, K1_ACCOUNT_SPEC)
-    leaves = await _fetch_tb_balance_leaves(ctx)
+    all_rows = await _fetch_tb_balance_all(ctx)
+    leaves = select_leaves(all_rows)
     tb_amounts = await _fetch_trial_balance_amounts(
         ctx,
         list(accounts.gross_standard)
@@ -452,6 +474,21 @@ async def render(ctx: RenderContext) -> dict | None:
     )
     tb_values = _build_tb_values(leaves, accounts, tb_amounts)
     project_context = await _load_project_context(ctx)
+
+    # 三口径自检（叶子和 / 父科目行 / trial_balance）——走跨循环共享件，
+    # 不在本模块自写。实测本循环在某项目上 leaf==parent 成立而 trial 差 1.69 亿，
+    # 只比对前两个口径发现不了（详见 `parent_check.build_report_line_parent_check`）。
+    parent_check: dict = {}
+    try:
+        trial_rows = await fetch_trial_balance_rows(
+            ctx.db,
+            ctx.project_id,
+            ctx.year,
+            list(accounts.gross_standard) + list(accounts.provision_standard),
+        )
+        parent_check = build_report_line_parent_check(accounts, all_rows, trial_rows)
+    except Exception as e:  # noqa: BLE001 — fail-open，不影响其余输出
+        logger.warning("K1 parent_check 构造失败: %s", e)
 
     adjudication_prefill: dict = {}
     if not _has_persisted_adjudication(responses_snapshot):
@@ -472,6 +509,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "tb_values": tb_values,
         "tb_source_codes": accounts.as_dict(),
         "adjudication_prefill": adjudication_prefill,
+        "parent_check": parent_check,
         "project_context": project_context,
         "prefix": "K1",
         "sheets": K1_SHEETS,

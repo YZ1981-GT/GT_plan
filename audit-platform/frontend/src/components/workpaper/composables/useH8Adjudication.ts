@@ -21,6 +21,7 @@ import {
   calcSubtotal,
 } from './useH8FormulaEngine'
 import { h8Scope } from './hCycleAccountScope'
+import type { TbSourceCodes } from './shared/tbSourceCodes'
 
 /** 使用权资产原值 / 累计折旧科目码（scope 单一真源） */
 const ROU_COST_CODE = h8Scope.def.slotFallbacks.gross[0]
@@ -398,9 +399,20 @@ export function useH8Adjudication(params: {
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   isReadonly?: Ref<boolean>
-  tbUnadjusted?: Ref<{ cost1901: number; dep1902: number; impair1903?: number }>
+  /**
+   * 试算平衡表未审数（三槽）。
+   *
+   * 🔴 键名从 `cost1901/dep1902/impair1903` 改为语义键 —— 那三个码是**旧错码**
+   * （`1901` 实为待处理财产损溢、`K2 BS-014` 亦引用），使用权资产真族是
+   * `1641/1651`（双族）/`1642/1652`/`1643`。改名前该形参**零生产者**
+   * （宿主从不传，`tbDiffRows` 因此恒回退本表口径 ⇒ 「与试算平衡表核对」
+   * 整块从未有真实 TB 数），故无存量数据风险。
+   */
+  tbUnadjusted?: Ref<{ cost: number; dep: number; impair?: number }>
+  /** 运行态 `tb_source_codes`（只用于 TB 核对行的**科目码展示**，取不到时用 scope 兜底码） */
+  tbSourceCodes?: Ref<TbSourceCodes | null | undefined>
   onSave?: (itemId: string, value: any) => void
-  onWritebackTB?: (audited1901: number, auditedAccDep: number, auditedImpair?: number) => Promise<void>
+  onWritebackTB?: (auditedCost: number, auditedAccDep: number, auditedImpair?: number) => Promise<void>
   onPublishEvent?: (event: string, payload: any) => void
 }) {
   const { allResponses, onSave, onWritebackTB, onPublishEvent } = params
@@ -587,30 +599,37 @@ export function useH8Adjudication(params: {
 
   // ─── TB / Cross checks ─────────────────────────────────────────────────────
 
-  const tbDiffRows = computed<H8TbDiffRow[]>(() => {
-    const tb = params.tbUnadjusted?.value ?? {
-      cost1901: 0,
-      dep1902: 0,
-      impair1903: 0,
+  /** TB 核对行的科目码展示：运行态优先（新族项目会显示 1651/1652），兜底走 scope 双族常量 */
+  const tbSlotCodeText = computed(() => {
+    const src = params.tbSourceCodes?.value ?? null
+    const pick = (slot: string) => {
+      const codes = h8Scope.slotCodes(src, slot)
+      return codes.length ? codes.join('/') : '本项目无此科目'
     }
-    const costTb = tb.cost1901 || tbScheduleUnaudited.value.cost
-    const depTb = tb.dep1902 || tbScheduleUnaudited.value.dep
-    const impairTb = (tb.impair1903 ?? 0) || tbScheduleUnaudited.value.impair
+    return { cost: pick('gross'), dep: pick('accum_dep'), impair: pick('impairment') }
+  })
+
+  const tbDiffRows = computed<H8TbDiffRow[]>(() => {
+    const tb = params.tbUnadjusted?.value ?? { cost: 0, dep: 0, impair: 0 }
+    const codes = tbSlotCodeText.value
+    const costTb = tb.cost || tbScheduleUnaudited.value.cost
+    const depTb = tb.dep || tbScheduleUnaudited.value.dep
+    const impairTb = (tb.impair ?? 0) || tbScheduleUnaudited.value.impair
     return [
       {
-        label: '使用权资产原值(1901)',
+        label: `使用权资产原值(${codes.cost})`,
         scheduleAmount: costSubtotal.value.endUnadjusted,
         tbAmount: costTb,
         difference: costSubtotal.value.endUnadjusted - costTb,
       },
       {
-        label: '累计折旧(1902)',
+        label: `累计折旧(${codes.dep})`,
         scheduleAmount: depSubtotal.value.endUnadjusted,
         tbAmount: depTb,
         difference: depSubtotal.value.endUnadjusted - depTb,
       },
       {
-        label: '减值准备(1903)',
+        label: `减值准备(${codes.impair})`,
         scheduleAmount: impairSubtotal.value.endUnadjusted,
         tbAmount: impairTb,
         difference: impairSubtotal.value.endUnadjusted - impairTb,
@@ -896,7 +915,7 @@ export function useH8Adjudication(params: {
     return { costFilled, depFilled, impairFilled, unmatchedCount, unmatchedCategories, message: msg }
   }
 
-  /** 从 H8-3 回写期末账项调整：1901→原值，1902→折旧（按未审权重分摊） */
+  /** 从 H8-3 回写期末账项调整：原值槽 → 原值区块，累计折旧槽 → 折旧区块（按未审权重分摊） */
   function syncEndAdjFromH83(
     costAjeNet?: number,
     costRjeNet?: number,
@@ -966,7 +985,7 @@ export function useH8Adjudication(params: {
     _persist()
     return {
       applied: true,
-      message: `已从 H8-3 回写期末账项调整：1901 ${costNet.toLocaleString('zh-CN')} / 1902 ${depNet.toLocaleString('zh-CN')}`,
+      message: `已从 H8-3 回写期末账项调整：原值 ${costNet.toLocaleString('zh-CN')} / 累计折旧 ${depNet.toLocaleString('zh-CN')}`,
     }
   }
 

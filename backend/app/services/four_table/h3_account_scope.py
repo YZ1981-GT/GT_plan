@@ -123,6 +123,17 @@ H3_ACCOUNT_SPEC = SemanticAccountSpec(
             fallback_standard_codes=("1527",),
             label="减值准备",
             is_provision=True,
+            # 🔴 槽级 row_code（消除假冲突告警）—— 本条与 H2/H7 不同，是**真能比对上**的：
+            # `IMP-010 = TB('1527','期末余额')`（soe_standalone，2026-08-12 postgres
+            # 只读复核）恰好就是本槽的兜底码 ⇒ 声明后 basis={'1527'}、与实际码有交集、
+            # 判**无冲突**（而不是靠三态跳过蒙过去）。
+            #
+            # 不声明时的假告警形态：spec 级 `BS-027` 四准则公式不同 ——
+            # `listed_consolidated` / `soe_consolidated` 都只有 `TB('1521')`
+            # （不含任何备抵码）⇒ 这两个变体下备抵槽恒报
+            # `('impairment','1521','1527')`；而 `soe_standalone` 的公式
+            # `TB('1521') - TB('1525')` 含 1525 却仍不含 1527，同样报。
+            row_code="IMP-010",
         ),
     ),
     # 旧准则同族科目：客户仍在用时提示人工映射，**不自动归槽**

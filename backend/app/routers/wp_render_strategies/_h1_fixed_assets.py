@@ -21,6 +21,9 @@ from app.core.config import settings
 from app.models.audit_platform_models import TbBalance, TbLedger, TrialBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table.h1_account_scope import H1_ACCOUNT_SPEC, H1_SLOT_KEY_PREFIX
+from app.services.four_table.h_cycle_adjudication_prefill import (
+    attach_h_segment_prefill,
+)
 from app.services.four_table.semantic_account_resolver import (
     SemanticAccountResult,
     resolve_semantic_accounts,
@@ -694,5 +697,17 @@ async def render(ctx: RenderContext) -> dict | None:
             payload["h1_four_table_prefill"] = await _build_h1_four_table_prefill(ctx)
         except Exception as e:  # noqa: BLE001
             logger.warning("H1 four-table prefill assembly failed: %s", e)
+
+    # ── 审定表逐槽预填（spec h-cycle Task 5）──
+    # H1~H4 改造前 `adjudication_segment_prefill` 计数为 0（H5~H10 均有）
+    # ⇒ 这四个审定表点「从四表库带入未审数」拿不到任何种子，
+    # 而它们恰是 H 类数据量最大的四个循环。
+    await attach_h_segment_prefill(
+        ctx,
+        payload,
+        cycle="H1",
+        accounts=accounts,
+        slot_key_prefix=H1_SLOT_KEY_PREFIX,
+    )
 
     return payload

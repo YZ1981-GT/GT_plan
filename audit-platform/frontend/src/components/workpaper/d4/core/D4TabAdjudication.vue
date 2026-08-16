@@ -18,6 +18,7 @@ import { useAdjudicationBringIn } from '../../composables/useAdjudicationBringIn
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, D4_REVENUE_ACCOUNT_NAME } from '../../composables/d4AccountScope'
 import WpFourTableSourcePanel from '@/components/workpaper/shared/WpFourTableSourcePanel.vue'
 import type { TbSourceCodes } from '../../composables/shared/tbSourceCodes'
+import { pickDTbSourceCodes } from '../../composables/dCycleAccountScope'
 import AdjudicationBringInDialog from '@/components/adjustment/AdjudicationBringInDialog.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -69,8 +70,11 @@ function fmtRate(rate: number | '' | 'N/A'): string {
 }
 
 // ─── 四表取数溯源 + 预填 ─────────────────────────────────────────────
+// 🔴 经单一真源 `pickDTbSourceCodes` 取（顶层 + project_context 两层都读）——
+// D4 是 7 个 D 循环里唯一把 `tb_source_codes` 写进 `project_context` 的，
+// 另 6 个写顶层；只读一层会让其中一侧恒 undefined（面板永不渲染，四层验证全绿）。
 const tbSourceCodes = computed<TbSourceCodes | null>(
-  () => props.htmlData?.project_context?.tb_source_codes ?? null,
+  () => (pickDTbSourceCodes(props.htmlData) as TbSourceCodes | null),
 )
 const adjudicationPrefill = computed(
   () => props.htmlData?.adjudication_prefill ?? null,

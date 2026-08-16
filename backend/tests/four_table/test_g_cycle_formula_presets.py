@@ -109,13 +109,27 @@ def test_property_10_disclosure_blocks_complete(g_mappings):
 
 
 def test_disclosure_presets_script_check():
-    """幂等脚本 --check 应返回 0 项欠账。"""
+    """幂等脚本 --check 应返回 0 项欠账。
+
+    🔴 `encoding="utf-8"` 必须显式声明：Windows 上 ``text=True`` 用 locale 编码
+    （GBK）解码子进程输出，而脚本输出含中文 → reader thread 抛
+    ``UnicodeDecodeError`` → ``result.stdout`` 变 ``None`` → 断言以
+    ``TypeError: argument of type 'NoneType' is not iterable`` 恒失败。
+    表现为「守卫恒红且零信号」——既判不出脚本真有欠账，也判不出脚本是好的。
+    """
     result = subprocess.run(
         [sys.executable, str(DISCLOSURE_SCRIPT), "--check"],
-        capture_output=True, text=True, cwd=str(BACKEND),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        cwd=str(BACKEND),
+    )
+    assert result.stdout is not None, (
+        "子进程 stdout 解码失败（应已由 encoding='utf-8' 兜住）"
     )
     assert result.returncode == 0, f"--check failed:\n{result.stdout}\n{result.stderr}"
-    assert "0 项欠账" in result.stdout
+    assert "0 项欠账" in result.stdout, f"--check 输出未见「0 项欠账」:\n{result.stdout}"
 
 
 # ─── 反向自检：已纠偏的错码不得复活 ─────────────────────────────────────────

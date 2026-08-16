@@ -40,7 +40,7 @@ export interface ChecklistItem {
 }
 
 export interface K5TbData {
-  /** 预计负债未审数（科目由报表行 BS-068/BS-094 映射解析） */
+  /** 预计负债未审数（科目由报表行 BS-065 映射解析，两准则同号） */
   unadjusted: number
   /** 预计负债审定数 */
   audited: number
@@ -140,7 +140,9 @@ export function useK5FormData(params: {
    * 从 trial_balance 获取预计负债的未审数和审定数。
    * 优先从 renderMeta seed 读取，否则请求 TB 端点。
    *
-   * 🔴 科目由报表行 `BS-068`（上市）/ `BS-094`（国企）映射解析，兜底 `2801`。
+   * 🔴 科目由报表行 `BS-065`（两准则同号）映射解析，兜底 `2801`。
+   *    旧写法 `BS-068`（其他非流动负债 / L7 的行，`TB('2911')` 且 2911 全库零命中）
+   *    与 `BS-094`（名对但 formula NULL）已于 2026-08-09 按 report_config 连库对账改正。
    * 历史实现写死 `2701` = **长期应付款**（L5 科目），取到的是别的循环的余额。
    */
   async function loadTbData(): Promise<void> {

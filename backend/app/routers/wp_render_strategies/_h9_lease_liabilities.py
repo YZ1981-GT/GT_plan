@@ -35,11 +35,14 @@ from app.services.four_table.semantic_account_resolver import (
     resolve_semantic_accounts,
 )
 from app.services.four_table.leaf_aggregation import (
-    aggregate_leaves,
-    select_leaves,
+    resolve_leaf_totals,
     to_leaf_rows,
 )
 from app.services.four_table.parent_check import build_parent_check
+from app.services.four_table.slot_trial_amounts import (
+    net_trial_for_slot,
+    provision_standard_codes,
+)
 
 from ._context import RenderContext
 
@@ -54,31 +57,54 @@ def build_h9_tb_values(
     accounts: SemanticAccountResult,
     tb_rows,
     trial_rows,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """按语义槽聚合租赁负债两层金额。纯函数。
 
-    输出键契约::
+    输出键契约（金额为 ``float``，``_trial_net_of`` 为 ``list[str]``）::
 
         lease_liability_unadjusted_opening / _closing / _debit / _credit   ← tb_balance
         unearned_finance_unadjusted_opening / _closing / _debit / _credit  ← tb_balance（新增）
         {prefix}_unadjusted / {prefix}_audited                             ← trial_balance
+        {prefix}_trial_net_of                                             ← 被扣减的备抵码（仅在有扣减时出现）
 
     某槽 `found=False` 时不产生该槽的任何键（宁缺勿造）。
 
     🔴 既有前端消费方可能读 `lease_2205_*` 旧键名 → 保留兼容别名。
+
+    🔴 **必须用 `resolve_leaf_totals` 而不是裸 `aggregate_leaves`**（2026-08-06 真实库
+    实测修复，项目 `c8621493`）：后者忽略 `closing_direction`，把**借方性质的 contra
+    子科目**加成正数 ——
+
+        2651.01 租赁负债_租赁付款额        credit  98,176.48
+        2651.02 租赁负债_未确认融资费用    debit    3,956.64
+        2651.99 一年内到期的租赁负债      credit   NULL
+        父科目 2651                       credit  94,219.84 = 98,176.48 − 3,956.64
+
+    裸求和得 **102,133.12**，与父额差 **7,913.28（= 2 × 3,956.64）** ⇒ 审定表「与试算
+    平衡表核对」显示假差异。`resolve_leaf_totals` 两种符号约定都算、取与**父科目额**
+    勾稽成立的那一种，故得 94,219.84 且 `diff_parent = 0`。
+
+    同族范式见 `four_table/h0_book_amounts._resolve_one`（H0 已按此实现）。
     """
-    leaves = select_leaves(to_leaf_rows(tb_rows))
-    out: dict[str, float] = {}
+    leaf_rows = to_leaf_rows(tb_rows)
+    out: dict[str, Any] = {}
 
     for slot_key, prefix in H9_SLOT_KEY_PREFIX.items():
         slot = accounts.slots.get(slot_key)
         if slot is None or not slot.found:
             continue
-        agg = aggregate_leaves(leaves, slot.codes)
-        out[f"{prefix}_unadjusted_opening"] = agg["opening"]
-        out[f"{prefix}_unadjusted_closing"] = agg["closing"]
-        out[f"{prefix}_unadjusted_debit"] = agg["debit"]
-        out[f"{prefix}_unadjusted_credit"] = agg["credit"]
+        # 多码槽（双族并取）逐码聚合后相加 —— 双族在同一项目内互斥，故至多一族有值
+        opening = closing = debit = credit = 0.0
+        for code in slot.codes:
+            totals = resolve_leaf_totals(leaf_rows, str(code), absolute=True)
+            opening += totals.opening
+            closing += totals.closing
+            debit += totals.debit
+            credit += totals.credit
+        out[f"{prefix}_unadjusted_opening"] = round(opening, 2)
+        out[f"{prefix}_unadjusted_closing"] = round(closing, 2)
+        out[f"{prefix}_unadjusted_debit"] = round(debit, 2)
+        out[f"{prefix}_unadjusted_credit"] = round(credit, 2)
 
     # 兼容旧键名（前端可能仍读 `lease_2205_*`）
     if "lease_liability_unadjusted_opening" in out:
@@ -105,17 +131,26 @@ def build_h9_tb_values(
             prev[1] + float(get("audited_amount") or 0),
         )
 
+    # 🔴 原值槽内**混入的备抵码**必须按报表行语义相减（不是相加）——
+    #    `2651` 反解出 `{2601, 2602}`，相加得 102,133.12、相减得 94,219.84（正确）。
+    #    判据走共享件 `slot_trial_amounts`，与 `parent_check` 同一份逻辑。
+    prov_std = provision_standard_codes(accounts.slots)
+    unadj_map = {c: v[0] for c, v in by_code.items()}
+    audited_map = {c: v[1] for c, v in by_code.items()}
+
     for slot_key, prefix in H9_SLOT_KEY_PREFIX.items():
         slot = accounts.slots.get(slot_key)
         if slot is None or not slot.found:
             continue
-        wanted = set(slot.standard_codes)
-        if not wanted:
+        if not slot.standard_codes:
             continue
-        unadj = sum(v[0] for c, v in by_code.items() if c in wanted)
-        audited = sum(v[1] for c, v in by_code.items() if c in wanted)
+        unadj, net_of = net_trial_for_slot(slot, unadj_map, prov_std)
+        audited, _ = net_trial_for_slot(slot, audited_map, prov_std)
         out[f"{prefix}_unadjusted"] = unadj
         out[f"{prefix}_audited"] = audited
+        if net_of:
+            # 审计追溯：该槽的试算表口径扣减了哪些备抵标准码
+            out[f"{prefix}_trial_net_of"] = net_of
         # 兼容旧键名
         if slot_key == "gross":
             out["lease_2205_unadjusted"] = unadj

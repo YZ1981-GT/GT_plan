@@ -55,13 +55,15 @@ from app.services.four_table.report_line_accounts import (
     fetch_applicable_standards,
     resolve_report_line_accounts,
 )
+from app.services.four_table.parent_check import build_report_line_parent_check
 from app.services.four_table.tb_fetch import (
-    fetch_tb_balance_leaves,
+    fetch_tb_balance_all,
     fetch_trial_balance_amounts,
     load_project_context,
     load_responses_snapshot,
     sum_amounts,
 )
+from app.services.four_table.tb_query import fetch_trial_balance_rows
 
 from ._context import RenderContext
 
@@ -163,8 +165,14 @@ async def render(ctx: RenderContext) -> dict | None:
     accounts = await resolve_report_line_accounts(ctx, K4_SPEC.spec_for(standards))
 
     # 解析不出科目时不查四表（省一次全表扫），直接给空结果
+    #
+    # 🔴 取**全量**行而非叶子：`parent_check` 的 `parent` 口径要读父科目行本身，
+    #    预先筛叶子会让该口径恒 0 并被共享件静默跳过（三口径退化成两口径，不打红）。
+    #    叶子经 `select_leaves` 派生，纯函数、无额外查询 ⇒ `tb_values` 逐分不变。
+    all_rows: list[LeafRow] = []
     if accounts.gross:
-        leaves = await fetch_tb_balance_leaves(ctx, label=_LABEL)
+        all_rows = await fetch_tb_balance_all(ctx, label=_LABEL)
+        leaves = select_leaves(all_rows)
         tb_amounts = await fetch_trial_balance_amounts(
             ctx, list(accounts.gross_standard), label=_LABEL
         )
@@ -177,6 +185,17 @@ async def render(ctx: RenderContext) -> dict | None:
     adjudication_prefill = build_adjudication_prefill(leaves, accounts)
     project_context = await load_project_context(ctx, label=_LABEL)
 
+    # 三口径自检 —— 走跨循环共享件（`found=False` 的槽不产生该键，三态语义）
+    parent_check: dict = {}
+    if accounts.gross:
+        try:
+            trial_rows = await fetch_trial_balance_rows(
+                ctx.db, ctx.project_id, ctx.year, list(accounts.gross_standard)
+            )
+            parent_check = build_report_line_parent_check(accounts, all_rows, trial_rows)
+        except Exception as e:  # noqa: BLE001 — fail-open，不影响其余输出
+            logger.warning("%s: parent_check 构造失败: %s", _LABEL, e)
+
     return {
         "component_type": "k4-other-current-liabilities",
         "account_codes": list(accounts.gross_standard),
@@ -186,6 +205,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "tb_source_codes": build_source_codes(accounts, K4_SPEC.account_name),
         "project_context": project_context,
         "adjudication_prefill": adjudication_prefill,
+        "parent_check": parent_check,
         "prefix": "K4",
         "sheets": K4_SHEETS,
     }

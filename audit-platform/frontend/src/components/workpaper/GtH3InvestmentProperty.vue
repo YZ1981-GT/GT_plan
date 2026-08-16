@@ -57,13 +57,16 @@
           :is-readonly="isReadonly"
         />
 
-        <!-- H3-1 审定表（双计量模式） -->
+        <!-- H3-1 审定表（双计量模式）
+             🔴 必须传 `:html-data` —— 两个审定表要读 `tb_source_codes` 渲染四表取数
+             溯源面板（漏传 = 面板静默不渲染，四层验证全查不出）。 -->
         <template v-else-if="currentSheet === 'H3-1'">
           <H3TabAdjudicationCost
             v-if="measurementModel === 'cost'"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
+            :html-data="props.htmlData"
             :is-readonly="isReadonly"
           />
           <H3TabAdjudicationFair
@@ -71,6 +74,7 @@
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
+            :html-data="props.htmlData"
             :is-readonly="isReadonly"
           />
         </template>
@@ -121,6 +125,7 @@
           :measurement-model="measurementModel"
           :is-readonly="isReadonly"
           :year="props.year"
+          :html-data="props.htmlData"
           @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
         />
 

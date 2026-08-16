@@ -166,8 +166,26 @@ export const CONFIRMATION_SOURCE_MANIFEST: Record<ConfirmCycle, string[]> = {
   // 源列「函证方式」由 send_channel 承载，故在此登记出处。
   // spec: h0-confirmation-source-fidelity-and-linkage R7.2
   H0: [...COMMON_KEYS, 'send_channel', 'term_book', 'term_reply', 'term_match', 'term_note'],
-  K0: [...COMMON_KEYS, 'send_memo'],
-  L0: [...COMMON_KEYS, 'send_memo'],
+  // K0 的 `send_channel` = 源模板「函证方式」列（`函证结果汇总表K0-1!G6`，由 K0-2!C7:C24 的 DV
+  // `邮寄/跟函/电子函证/其他` 经 VLOOKUP 带入），与承载积极式/消极式的 `confirmation_method`
+  // 是两个维度 → 源列「函证方式」由 send_channel 承载。
+  //
+  // 🔴 `send_memo` **保留登记但不再 resolve**（与 L0 同款处置）—— 源 `C5:F5` 是跨 4 列的
+  //    合并**段头**（下辖 选取样本目的 / 被询证单位名称 / 账户交易 / 金额），不是可填标量列
+  //    （伪列）。K0 已从 `CYCLE_VARIANT_COLUMNS.K0` 撤下它；此处留在 manifest 是为了让
+  //    既有项目已录入的 `send_memo` 值仍有出处可追溯（R2.2 数据零丢失红线）。
+  // spec: k0-confirmation-source-alignment R2.1 / R2.2 / R2.7
+  K0: [...COMMON_KEYS, 'send_memo', 'send_channel'],
+  // L0 的 `send_channel` = 源模板「函证方式」列（`函证结果汇总表L0-1!G6`，由 L0-2!C 的 DV
+  // `邮寄/跟函/电子函证/其他` 经 VLOOKUP 带入），与承载积极式/消极式的 `confirmation_method`
+  // 是两个维度 → 源列「函证方式」由 send_channel 承载。
+  //
+  // 🔴 `send_memo` **保留登记但不再 resolve** —— 源 `C5:F5` 是跨 4 列的合并**段头**
+  //    （下辖 选取样本目的 / 被询证单位名称 / 账户交易 / 金额），不是可填标量列（伪列）。
+  //    L0 已从 `CYCLE_VARIANT_COLUMNS.L0` 撤下它；此处留在 manifest 是为了让既有项目
+  //    已录入的 `send_memo` 值仍有出处可追溯（R4.2 数据零丢失 / R10.6）。
+  // spec: l0-confirmation-source-alignment R4.1 / R4.2 / R4.5
+  L0: [...COMMON_KEYS, 'send_memo', 'send_channel'],
 }
 
 /**

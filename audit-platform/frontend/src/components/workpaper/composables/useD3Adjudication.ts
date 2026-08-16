@@ -24,6 +24,8 @@ import {
   calcChangeRate,
   calcSubtotal,
 } from './useD3FormulaEngine'
+import { resolveTbAmountWithSeed } from './dCycleTbSeed'
+import { D3_NATURE_CATEGORIES, D3_NATURE_LABEL_TO_KEY } from './d3NatureCategories'
 import type { ChecklistResponse } from './useD3FormData'
 import type { useD3CrossSheet } from './useD3CrossSheet'
 
@@ -69,17 +71,30 @@ export interface UseD3AdjudicationOptions {
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
   crossSheet: ReturnType<typeof useD3CrossSheet>
   isReadonly: Ref<boolean>
+  /**
+   * 试算平衡表预收款项（2203）数 —— render `project_context.tb_amount`
+   * （`seed_tb_amount_scalars` 按 BS-046 报表行解析后的叶子口径）。
+   *
+   * 只在审计师未手工录入时回退使用（手工优先）。改造前该字段零消费方 =
+   * dead output ⇒ TB 核对行恒 0、差异显示为整额假差异。
+   *
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16
+   */
+  tbSeedAmount?: Ref<number>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** 区块一：按性质分类固定行 */
-export const NATURE_ROWS = [
-  { rowKey: 'fixed-asset-sales', label: '预收销售固定资产款' },
-  { rowKey: 'land-use-right', label: '预收销售土地使用权款' },
-  { rowKey: 'contract-invalid', label: '合同不成立时已收取的对价' },
-  { rowKey: 'other', label: '其他' },
-] as const
+/**
+ * 区块一：按性质分类固定行。
+ *
+ * 🔴 派生自 `d3NatureCategories.D3_NATURE_CATEGORIES`（枚举单一真源，同时驱动 D3-2 C 列下拉）。
+ * 禁在此处重写字面量 —— 标签必须与 D3-2 C 列取值逐字相同，否则源模板
+ * `B8=SUMIF(D3-2!$C$12:$C$22, A8, ...)` 对应的聚合恒为 0。
+ * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 26
+ */
+export const NATURE_ROWS: readonly { readonly rowKey: string; readonly label: string }[] =
+  D3_NATURE_CATEGORIES.map(({ rowKey, label }) => Object.freeze({ rowKey, label }))
 
 /** 区块二：按账龄分类固定行 */
 export const AGING_ROWS = [
@@ -89,13 +104,8 @@ export const AGING_ROWS = [
   { rowKey: 'over-3-years', label: '3年以上' },
 ] as const
 
-/** 性质标签→rowKey映射 */
-const NATURE_LABEL_TO_KEY: Record<string, string> = {
-  '预收销售固定资产款': 'fixed-asset-sales',
-  '预收销售土地使用权款': 'land-use-right',
-  '合同不成立时已收取的对价': 'contract-invalid',
-  '其他': 'other',
-}
+/** 性质标签→rowKey映射（派生自单一真源，禁写第二份字面量） */
+const NATURE_LABEL_TO_KEY: Readonly<Record<string, string>> = D3_NATURE_LABEL_TO_KEY
 
 /**
  * 默认 THREE_YEAR 账龄段 key → 旧 rowKey 映射。
@@ -261,13 +271,18 @@ export function useD3Adjudication(options: UseD3AdjudicationOptions) {
 
   // ─── Trial Balance Amount ────────────────────────────────────────────
 
-  const trialBalanceAmount: Ref<number> = ref(0)
-
-  // Load from allResponses or auto_data
-  watch(
-    () => allResponses.value.get('D3-adj-trial-balance-amount')?.remark,
-    (val) => { trialBalanceAmount.value = parseNum(val) },
-    { immediate: true },
+  /**
+   * 试算平衡表数（手工优先，其次 render 下发的四表口径）。
+   *
+   * 🔴 改造前是 `ref` + watch 只读 checklist，render 的
+   * `project_context.tb_amount` 零消费方 = dead output。
+   * 现按平台既有范式（D1 / D7 的 `tbSeedAmount`）加只读回退。
+   */
+  const trialBalanceAmount: ComputedRef<number> = computed(() =>
+    resolveTbAmountWithSeed(
+      allResponses.value.get('D3-adj-trial-balance-amount')?.remark,
+      options.tbSeedAmount?.value,
+    ),
   )
 
   /** trialBalanceDiff = 账龄合计 currentAudited - trialBalanceAmount */

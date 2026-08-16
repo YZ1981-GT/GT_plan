@@ -24672,6 +24672,14 @@
       "display_label": "底稿 > L2 > 应付利息调整分录汇总L2-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "l2",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "L2-L2-3-entries",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=L2-3",
       "origin": "standard",
       "parent_wp_code": "L2",
@@ -25310,6 +25318,14 @@
       "display_label": "底稿 > L6 > 调整分录汇总L6-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "l6",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "L6-L6-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=L6-3",
       "origin": "standard",
       "parent_wp_code": "L6",
@@ -25637,6 +25653,14 @@
       "display_label": "底稿 > M1 > 调整分录汇总M1-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m1",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M1-M1-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M1-3",
       "origin": "standard",
       "parent_wp_code": "M1",
@@ -25751,6 +25775,14 @@
       "display_label": "底稿 > M10 > 调整分录汇总M10-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m10",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M10-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M10-3",
       "origin": "standard",
       "parent_wp_code": "M10",
@@ -25865,6 +25897,14 @@
       "display_label": "底稿 > M2 > 调整分录汇总M2-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m2",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M2-M2-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M2-3",
       "origin": "standard",
       "parent_wp_code": "M2",
@@ -25979,6 +26019,14 @@
       "display_label": "底稿 > M3 > 调整分录汇总M3-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m3",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M3-M3-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M3-3",
       "origin": "standard",
       "parent_wp_code": "M3",
@@ -26093,6 +26141,14 @@
       "display_label": "底稿 > M4 > 调整分录汇总M4-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m4",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M4-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M4-3",
       "origin": "standard",
       "parent_wp_code": "M4",
@@ -26191,6 +26247,14 @@
       "display_label": "底稿 > M5 > 调整分录汇总M5-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m5",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M5-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M5-3",
       "origin": "standard",
       "parent_wp_code": "M5",
@@ -26305,6 +26369,14 @@
       "display_label": "底稿 > M6 > 调整分录汇总M6-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m6",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M6-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M6-3",
       "origin": "standard",
       "parent_wp_code": "M6",
@@ -26403,6 +26475,14 @@
       "display_label": "底稿 > M7 > 调整分录汇总M7-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m7",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M7-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M7-3",
       "origin": "standard",
       "parent_wp_code": "M7",
@@ -26517,6 +26597,14 @@
       "display_label": "底稿 > M8 > 调整分录汇总M8-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m8",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M8-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M8-3",
       "origin": "standard",
       "parent_wp_code": "M8",
@@ -26615,6 +26703,14 @@
       "display_label": "底稿 > M9 > 调整分录汇总M9-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "m9",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "M9-3-entry-*",
+        "storage_field": "remark"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=M9-3",
       "origin": "standard",
       "parent_wp_code": "M9",
@@ -26713,6 +26809,14 @@
       "display_label": "底稿 > N1 > 调整分录汇总N1-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "n1",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "N1-3-entries",
+        "storage_field": "conclusion"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=N1-3",
       "origin": "standard",
       "parent_wp_code": "N1",
@@ -26859,6 +26963,14 @@
       "display_label": "底稿 > N2 > 调整分录汇总表N2-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "n2",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "N2-3-entries",
+        "storage_field": "conclusion"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=N2-3",
       "origin": "standard",
       "parent_wp_code": "N2",
@@ -27037,6 +27149,14 @@
       "display_label": "底稿 > N3 > 调整分录汇总表N3-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "n3",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "N3-3-entries",
+        "storage_field": "conclusion"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=N3-3",
       "origin": "standard",
       "parent_wp_code": "N3",
@@ -27213,6 +27333,14 @@
       "display_label": "底稿 > N5 > 调整分录汇总表N5-3",
       "domain": "wp",
       "editor_engine": "html",
+      "import_export": {
+        "api_prefix": "n5",
+        "depends_on_sheets": [],
+        "enabled": true,
+        "import_order": 20,
+        "item_id": "N5-3-entries",
+        "storage_field": "conclusion"
+      },
       "jump_route_template": "/workpapers/{wp_id}?sheet=N5-3",
       "origin": "standard",
       "parent_wp_code": "N5",

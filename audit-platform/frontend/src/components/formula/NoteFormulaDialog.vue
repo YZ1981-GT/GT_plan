@@ -81,6 +81,8 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { handleApiError } from '@/utils/errorHandler'
 import { api } from '@/services/apiProxy'
+// spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
+import { noteFormula } from '@/services/apiPaths/formula'
 import { useAddressRegistry } from '@/stores/addressRegistry'
 import FormulaRefPicker from './FormulaRefPicker.vue'
 
@@ -159,7 +161,7 @@ async function loadFormulas() {
   try {
     // GET 返回 { formulas: [...] }（http 拦截器已解包 {code,data} 信封）
     const resp = await api.get(
-      `/api/disclosure-notes/${props.projectId}/${props.year}/${noteSection}/formulas`
+      noteFormula.list(props.projectId, props.year, noteSection)
     )
     const list = resp?.formulas
     formulas.value = (Array.isArray(list) ? list : []).map((f: any) => ({ ...f, _editing: false }))
@@ -223,7 +225,7 @@ async function persistFormulas(): Promise<boolean> {
   persisting.value = true
   try {
     await api.put(
-      `/api/disclosure-notes/${props.projectId}/${props.year}/${noteSection}/formulas`,
+      noteFormula.list(props.projectId, props.year, noteSection),
       { formulas: payload }
     )
     return true
@@ -272,7 +274,7 @@ async function onApply() {
     if (!saved) return
     const noteSection = props.currentNote.note_section
     const result = await api.post(
-      `/api/disclosure-notes/${props.projectId}/${props.year}/${noteSection}/apply-formulas`
+      noteFormula.apply(props.projectId, props.year, noteSection)
     )
     ElMessage.success(`公式已应用：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
     emit('applied')
@@ -294,7 +296,7 @@ async function onRegenerate() {
   try {
     const noteSection = props.currentNote.note_section
     const result = await api.post(
-      `/api/disclosure-notes/${props.projectId}/${props.year}/${noteSection}/apply-formulas`
+      noteFormula.apply(props.projectId, props.year, noteSection)
     )
     ElMessage.success(`已重新生成：执行 ${result?.executed || 0} 个，更新 ${result?.updated || 0} 个单元格`)
     // 重新生成后刷新列表，展示最新预设公式

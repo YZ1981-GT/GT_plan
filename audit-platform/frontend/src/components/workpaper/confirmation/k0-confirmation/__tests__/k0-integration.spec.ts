@@ -190,10 +190,20 @@ describe('K0 集成: K0-6 四区块列配置正确性', () => {
     expect(sumFields1).toContain('amount')
   })
 
-  it('K0-6 getGroupsK06 返回列分组（记账凭证+付款审批）', () => {
+  /**
+   * 🔴 改写记录（k0-confirmation-source-alignment R7.1，2026-08-07）：
+   *    原断言 `toContain('付款审批')` 锁定的是**改造前**的段头用词；源模板
+   *    `K0-6!F15` 逐字为「付款审批单」（openpyxl 直读，后端
+   *    `test_k0_source_template_facts.py::ALT_BLOCK1_EVIDENCE` 是裁决者）。
+   *    段头/叶子 label 已对齐源模板，**字段名一个未动**。
+   */
+  it('K0-6 getGroupsK06 返回列分组（记账凭证 + 付款审批单 + 银行回单）', () => {
     const groups1 = getGroupsK06('block1')
     expect(groups1).toContain('记账凭证')
-    expect(groups1).toContain('付款审批')
+    expect(groups1).toContain('付款审批单')
+    expect(groups1).toContain('银行回单')
+    // 反向锁：旧用词不得复活（否则与源模板再次漂移）
+    expect(groups1).not.toContain('付款审批')
   })
 
   it('K0-6 每区块首列为序号列（seq）', () => {

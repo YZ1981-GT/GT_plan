@@ -269,7 +269,13 @@ def test_resolve_fails_open_on_total_db_failure():
 
 
 def test_resolve_as_dict_shape_for_render_output():
-    """`tb_source_codes` 输出结构固定（前端取数溯源消费）。"""
+    """`tb_source_codes` 输出结构固定（前端取数溯源消费）。
+
+    🔴 `subject_keywords` 是 2026-08-05 真实库验收挖出的 P0 修复带来的**新增**字段
+    （spec d-cycle-four-table-extraction-and-disclosure-completion Task 1/13），
+    不是装饰性补齐 —— 本键集断言原为 6 键，正是它把「D1 备抵名称过滤静默空转」
+    这一缺陷冻结成了「期望行为」。详见下一条反向锁死。
+    """
     session = _FakeSession(formula=_SOE_FORMULA)
     codes = _run(resolve_d1_account_codes(_ctx(session)))
     d = codes.as_dict()
@@ -280,7 +286,42 @@ def test_resolve_as_dict_shape_for_render_output():
         "provision_standard",
         "resolved_from",
         "provision_resolved_from",
+        "subject_keywords",
     }
+
+
+def test_subject_keywords_present_and_narrow_enough():
+    """反向锁死：`subject_keywords` 不得缺失、不得为空、不得写宽。
+
+    三条判据各对应一个已实证的失效形态：
+
+    1. **字段缺失** —— `fetch_d_cycle_tb` 读的是
+       ``getattr(codes, "subject_keywords", ())``，缺字段时默认值 `()` 让
+       `filter_provision_codes` 原样返回（`applied=False`）⇒ 那道「无条件名称过滤」
+       对 D1 **静默空转**，备抵取到整个 `1231`（含应收账款坏账 26,401,719.77 /
+       某项目 1.02 亿），与 K1「虚增 31.6 倍」同源。
+    2. **写空** —— 等价于缺失。
+    3. **写宽** —— 只留「应收」会让 `坏账准备_长期应收款`（`1231.05` 在 client 侧
+       的语义）也被判为 D1 备抵；关键词必须含科目主体全名「应收票据」。
+
+    ⚠️ 单测替身查不出第 1 条（替身直接给定 `provision` 码集、不经
+    `account_mapping` 反解，永远产生不出宽口径前缀）—— 故此处只能做**声明级**
+    锁死，真实验收在 `verify_d_cycle_extraction_live.py`。
+    """
+    session = _FakeSession(formula=_SOE_FORMULA)
+    codes = _run(resolve_d1_account_codes(_ctx(session)))
+
+    kws = tuple(codes.subject_keywords)
+    assert kws, "subject_keywords 为空 ⇒ 备抵名称过滤退化为空操作（Task 13 实证 P0）"
+    assert "应收票据" in kws, (
+        f"subject_keywords={kws} 缺少科目主体全名「应收票据」—— "
+        "只写「应收」会把长期应收款/应收账款的坏账一并算进 D1 备抵"
+    )
+    assert "应收" not in kws, (
+        f"subject_keywords={kws} 含裸「应收」= 关键词写宽一格，过滤完全空转"
+    )
+    # as_dict 供 render 下发前端，须是 JSON 可序列化的 list
+    assert isinstance(codes.as_dict()["subject_keywords"], (list, tuple))
 
 
 def test_module_declares_bs005_row_code():

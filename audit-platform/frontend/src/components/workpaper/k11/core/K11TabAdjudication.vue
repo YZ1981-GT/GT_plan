@@ -389,8 +389,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6701: number; audited6701: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
-}>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 // 父组件模板绑定会自动解包 ref → 子组件收到纯 Map；重新包成 ref 供 composable 使用

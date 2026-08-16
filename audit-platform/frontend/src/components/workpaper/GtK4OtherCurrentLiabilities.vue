@@ -72,8 +72,8 @@
           :prefill="adjudicationPrefill"
           :is-readonly="isReadonly"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
-        > emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          :tb-source-codes="tbSourceCodes"
         />
 
         <!-- K4-2 明细表 -->
@@ -153,7 +153,10 @@
  * selfLoad: 当 htmlData prop 为 null 时自行调 render-config。
  * checklist_responses 前缀: "K4-{sheet}-{field}"
  *
- * 科目由报表行 BS-058/BS-081 映射解析（三表零命中 → 宁缺勿造）
+ * 科目由报表行 **BS-053**（两准则同号，见 `k4AccountScope`）映射解析（三表零命中 → 宁缺勿造）
+ * 🔴 旧注释写 BS-058/BS-081 已于 2026-08-09 按 report_config 连库对账改正：
+ *    BS-081 实为**实收资本（或股本）** `TB('4001')` ⇒ 4001 为 credit、K4 原未声明
+ *    负债方向 ⇒ 原值被判成备抵 ⇒ 表现为「恒空」而非错数（后果 SILENT_EMPTY）。
  * 核心：期末=期初+贷方-借方（负债类！方向与资产类相反）
  *       完整性认定为主
  *

@@ -68,41 +68,32 @@ export interface ReliabilityRow {
   /** 可靠性考虑文本 — X0-7「可靠性考虑」 */
   reliability_consideration?: string
 
-  // ─── 按渠道可靠性核对项（e0-confirmation-completion R7，源 F1-12）────────
-  // 全部 optional，旧 payload 读回为 undefined，写回不产生 undefined 键。
-  // 按 reply_method 只展开对应渠道列组，其余折叠。
-
-  // 通用（两项，适用所有渠道）
-  /** D 回函是否分别由经办人和复核人签名 — 源 F1-12 D 列 */
-  signed_by_both?: '是' | '否'
-  /** E 签字人员是否与银行公示名单相符 — 源 F1-12 E 列 */
-  signer_in_public_list?: '是' | '否'
-
-  // 邮寄渠道（3 项）
-  /** H 回函信封上名称、地址是否一致 — 源 F1-12 H 列 */
-  envelope_addr_match?: '是' | '否'
-  /** I 邮戳显示发出城市或地区是否一致 — 源 F1-12 I 列 */
-  postmark_city_match?: '是' | '否'
-  /** J 回函信息是否完整 — 源 F1-12 J 列 */
-  reply_info_complete?: '是' | '否'
-
-  // 跟函渠道（3 项）
-  /** K 是否了解处理函证的通常流程和处理人员 — 源 F1-12 K 列 */
-  followup_flow_known?: '是' | '否'
-  /** L 是否确认询证函处理人员的身份及权限 — 源 F1-12 L 列 */
-  followup_identity_verified?: '是' | '否'
-  /** M 处理人员是否按正常流程处理 — 源 F1-12 M 列 */
-  followup_normal_process?: '是' | '否'
-
-  // 电子平台渠道（4 项）
-  /** N 电子签名信息是否一致 — 源 F1-12 N 列 */
-  esign_match?: '是' | '否'
-  /** O 回函的 IP 地址是否一致 — 源 F1-12 O 列 */
-  ip_match?: '是' | '否'
-  /** Q 电子函证平台操作时间 — 源 F1-12 Q 列 */
-  platform_op_time?: string
-  /** S 意见反馈（如适用）— 源 F1-12 S 列 */
-  platform_feedback?: string
+  // ─── 已撤回：按渠道可靠性核对项 12 字段（k0-confirmation-source-alignment R9.1）──
+  //
+  // 🔴 **它们曾以死字段形态存在（类型声明了、UI 从未渲染），现按「明确撤回」处置。**
+  //
+  // 撤回依据（2026-08-07 openpyxl 直读七份源模板 + 库侧计数，三条并列）：
+  //
+  // 1. **六份 visible 源模板的可靠性表列集完全相同，且都没有这 12 列** ——
+  //    `邮件传真回函可靠性验证` 在 D0-7 / F0-7 / G0-7 / H0-6 / K0-7 / L0-6 六处
+  //    逐字同构：基本段 6 列（序号/函证索引号/被询证单位名称/回函方式/是否由审计项目组
+  //    直接接收/是否寄回原件）+ `G5:M5` 父表头「期末未收回原件函证可靠性验证」下 7 列
+  //    + 尾列「回函可靠性结论」= **14 列**，已由 `RELIABILITY_COLUMN_CONFIG` 与
+  //    `g0SharedComponentCoverage.spec.ts` 的 `COLUMN_TO_FIELD` 双向覆盖。
+  //
+  // 2. **这 12 个字段的原始出处是 E0 的 `邮件传真回函核对记录F1-12`，而该 sheet 是
+  //    `hidden`** —— 用户已于 2026-08-02 明确裁决「三张隐藏底稿不需要再实现了，已隐藏」
+  //    （裁决门 A = A-否），`e0-confirmation-completion` 的 R7.1/R7.5 因此作废、其
+  //    Wave 6 已整波删除。故它们**没有可实现的源模板落点**：接线出来的录入位在任何
+  //    circle 的源模板上都不存在 = 自造底稿列（违反「增强打磨禁止自造披露内容」铁律）。
+  //
+  // 3. **零存量数据** —— 全库 `working_paper` 498 行，`parsed_data::text` 命中这 12 个
+  //    字段名的行数为 **0**（逐字段查，全部 0）⇒ 删除不触碰「数据零丢失」红线。
+  //
+  // ⚠️ 请勿「顺手补回来」：若将来源模板真的新增按渠道核对列，正确做法是先在
+  //    `test_k0_source_template_facts.py::TestReliability` 把源侧 14 列基线改掉
+  //    （六份模板同构 ⇒ 六个 spec 的守卫会同时打红），再按新列集 additive 扩字段。
+  //    守卫 `k0ReliabilityChannelFields.spec.ts` 已把「不得复活」钉死。
 
   // ─── 元数据 ─────────────────────────────────────────────────────────────
 

@@ -25,6 +25,9 @@ import {
   D4_TRANSPOSE_CHECK_ITEMS,
   type D4TransposeCategory,
 } from '../d4DisclosureModel'
+// Task 31: 行集真源已迁到 d4RevenueSegmentColumns.D4_SEGMENT_ROWS，
+// 本文件对 D4_TRANSPOSE_CHECK_ITEMS 的断言只是「退役常量仍可编译」的存在性检查。
+import { D4_SEGMENT_ROWS } from '../d4RevenueSegmentColumns'
 
 // ═══════════════════════════════════════════════════════════════════════
 // §1 buildD4TwoPeriodColumns — 5 列两级表头
@@ -89,8 +92,10 @@ describe('buildD4TwoPeriodColumns', () => {
 describe('buildD4TransposeColumns', () => {
   it('零入参返回默认 4 类别的列集（Property 27）', () => {
     const cols = buildD4TransposeColumns()
-    // label + 4 categories × 2 (revenue/cost) + total × 2 = 1 + 8 + 2 = 11
-    expect(cols).toHaveLength(11)
+    // 🔴 Task 31: 源 xlsx 实证该表 **9 列**（label + 4 类别 × 收入/成本），
+    //    **没有横向合计列** —— 源模板的合计是**行**（上市 R56 `=B52+B48`）。
+    //    改造前这里断言 11 列，镜像的是自造出来的 total_revenue/total_cost。
+    expect(cols).toHaveLength(9)
   })
 
   it('每列声明 group 或 flat（Property 13）', () => {
@@ -136,12 +141,26 @@ describe('buildD4TransposeColumns', () => {
     )
   })
 
-  it('合计列恒在末尾', () => {
+  it('🔴 不得出现横向合计列（Task 31：源模板的合计是行不是列）', () => {
     const cols = buildD4TransposeColumns()
-    const lastTwo = cols.slice(-2)
-    expect(lastTwo[0].key).toBe('total_revenue')
-    expect(lastTwo[1].key).toBe('total_cost')
-    expect(lastTwo[0].group).toBe('合计')
+    const keys = cols.map(c => c.key)
+    expect(keys).not.toContain('total_revenue')
+    expect(keys).not.toContain('total_cost')
+    // 也不许换个名字把它加回来：除标签列外，列 key 必须全是 `cat_N_{revenue|cost}`
+    for (const c of cols) {
+      if (c.is_label) continue
+      expect(c.key, `出现了非类别列 ${c.key}`).toMatch(/^cat_\d+_(revenue|cost)$/)
+    }
+    // 反向自检：类别列本身确实存在（否则上面的断言在空列集上也会通过）
+    expect(cols.filter(c => !c.is_label).length).toBe(8)
+  })
+
+  it('末列是最后一个类别的成本列（源模板 I 列 = 其他-成本）', () => {
+    const cols = buildD4TransposeColumns()
+    const last = cols[cols.length - 1]
+    const lastCat = D4_DEFAULT_CATEGORIES[D4_DEFAULT_CATEGORIES.length - 1]
+    expect(last.key).toBe(`${lastCat.key}_cost`)
+    expect(last.group).toBe(lastCat.label)
   })
 
   it('group 名 = 类别 label', () => {
@@ -149,6 +168,26 @@ describe('buildD4TransposeColumns', () => {
     const catCols = cols.filter(c => !c.is_label && !c.key.startsWith('total_'))
     expect(catCols[0].group).toBe('消费品')
     expect(catCols[2].group).toBe('汽车')
+  })
+})
+
+describe('Task 31: 退役常量与新行集的关系', () => {
+  it('🔴 D4_TRANSPOSE_CHECK_ITEMS 的每一项都能在新行集里找到对应行', () => {
+    const labels = D4_SEGMENT_ROWS.map(r => r.label.trim())
+    for (const item of D4_TRANSPOSE_CHECK_ITEMS) {
+      expect(
+        labels.some(l => l.includes(item)),
+        `退役常量项「${item}」在新行集里找不到 ⇒ 行集漂移`,
+      ).toBe(true)
+    }
+  })
+
+  it('🔴 新行集严格多于退役常量（父行 / 可扩行 / 合计行）', () => {
+    expect(D4_SEGMENT_ROWS.length).toBeGreaterThan(D4_TRANSPOSE_CHECK_ITEMS.length)
+    const kinds = new Set(D4_SEGMENT_ROWS.map(r => r.kind))
+    expect(kinds.has('subtotal')).toBe(true)
+    expect(kinds.has('expandable')).toBe(true)
+    expect(kinds.has('total')).toBe(true)
   })
 })
 
@@ -236,17 +275,26 @@ describe('buildD4ObligationColumns', () => {
           expect(cols[2].label).toBe(`${auditYear + 2}年`)
           expect(cols[1].key).toBe(`year_${auditYear + 1}`)
           expect(cols[2].key).toBe(`year_${auditYear + 2}`)
-          // 不含硬编码年份字面量
-          expect(cols[1].label).not.toContain('2026')
-          expect(cols[2].label).not.toContain('2027')
-          // 除非 auditYear 恰好是 2025
+          // 🔴 「不含硬编码年份」只能**带条件**断言 —— auditYear=2025 时
+          //    label 本就是 `2026年`。改造前这里先无条件断言 not.toContain('2026')
+          //    再补一个带条件的同款断言，前者在 seed 命中 2025 时必失败
+          //    （随机种子脆弱：多数 seed 抽不到 2025 就一直是绿的）。
           if (auditYear !== 2025) {
             expect(cols[1].label).not.toContain('2026')
+          }
+          if (auditYear !== 2025) {
+            expect(cols[2].label).not.toContain('2027')
           }
         },
       ),
       { numRuns: 30 },
     )
+  })
+
+  it('审计年度 2025 边界（PBT 曾因随机 seed 漏过）', () => {
+    const cols = buildD4ObligationColumns(2025)
+    expect(cols[1].label).toBe('2026年')
+    expect(cols[2].label).toBe('2027年')
   })
 
   it('合计列 key 固定 total', () => {

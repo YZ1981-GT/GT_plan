@@ -52,33 +52,40 @@ from app.services.four_table.leaf_aggregation import (
     select_leaves,
     to_leaf_rows,
 )
+from app.services.four_table.k_cycle_specs import K_CYCLE_SPECS
+from app.services.four_table.parent_check import build_report_line_parent_check
 from app.services.four_table.report_line_accounts import (
     ReportLineAccounts,
-    ReportLineAccountSpec,
     resolve_report_line_accounts,
 )
+from app.services.four_table.tb_query import fetch_trial_balance_rows
 
 from ._context import RenderContext
 
 logger = logging.getLogger(__name__)
 
+#: 🔴 科目定位真源 = `four_table/k_cycle_specs.K_CYCLE_SPECS['K2']`
+#: （spec k-cycle-…-closure Task 6 / Requirement 3.1）。
+#:
+#: 改造前本模块自建一份 `ReportLineAccountSpec`，与声明表构成**双真源** ——
+#: 改一处另一处不动，而两侧单测各自都绿（谁也不比对对方）。现全部常量改为
+#: **从声明表派生**，常量名保留不变（`_k2_import_export` 与
+#: `test_k2_account_scope` 等外部消费方零改动）。
+_K2_SPEC = K_CYCLE_SPECS["K2"]
+
 #: 报表行次（DB 实证：四个准则的「其他流动资产」行 row_code 均为 BS-014；
 #: 另有 `BS-017` 同名行但 formula 为 NULL，故必须按 **row_code 精确匹配**，不按 row_name）
-K2_REPORT_ROW_CODE = "BS-014"
+K2_REPORT_ROW_CODE = _K2_SPEC.row_code_soe
 
 #: 兜底标准码：1901 待处理财产损溢（报表公式实际引用的科目）
-K2_FALLBACK_GROSS = "1901"
+K2_FALLBACK_GROSS = _K2_SPEC.fallback_standard
 
 #: 报表公式引用但**不并入原值**的科目：1131 应收股利已属 BS-009 其他应收款
-K2_DIVIDEND_STANDARD = "1131"
+K2_DIVIDEND_STANDARD = _K2_SPEC.extra_standard_codes[0]
 
-K2_ACCOUNT_SPEC = ReportLineAccountSpec(
-    row_code=K2_REPORT_ROW_CODE,
-    fallback_gross=(K2_FALLBACK_GROSS,),
-    fallback_provision=(),  # 其他流动资产无备抵科目
-    provision_name_filter=None,
-    extra_standard_codes=(K2_DIVIDEND_STANDARD,),
-)
+#: 🔴 K2 两准则同号（声明表实测），故这里用 soe 分支产出的 spec 即可覆盖两侧。
+#: 若将来 K2 真的分变体，改为在 render 内按 `ctx` 的准则调 `spec_for(...)`。
+K2_ACCOUNT_SPEC = _K2_SPEC.spec_for(["soe_standalone"])
 
 #: 披露 sheet 名 = 源 xlsx 真实中文 tab 名（openpyxl 实测 `wb.sheetnames`）。
 #: 🔴 国企侧是「国企」而非「国有企业」（原写错，导致 `?sheet=` 深链落空）。
@@ -176,8 +183,16 @@ def build_adjudication_prefill(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-async def fetch_tb_balance_leaves(ctx: RenderContext) -> list[LeafRow]:
-    """取 active 数据集全部 `tb_balance` 行并筛出叶子（失败返 []，fail-open）。"""
+async def fetch_tb_balance_all(ctx: RenderContext) -> list[LeafRow]:
+    """取 active 数据集**全部** `tb_balance` 行（**不筛叶子**，失败返 []，fail-open）。
+
+    🔴 为什么必须给全量而不是叶子：``parent_check`` 的 ``parent`` 口径取的是**父科目
+    行本身**的金额（:func:`leaf_aggregation.parent_totals` 按 ``account_code == 前缀``
+    精确取行）。预先筛掉父行会让 ``parent`` 恒 0 —— 而共享件对 ``parent == 0`` 的处理
+    是「该侧不参与 ``consistent`` 判定」⇒ 三口径静默退化成两口径，**不报错也不打红**。
+
+    叶子由调用方经 :func:`leaf_aggregation.select_leaves` 派生（纯函数，无额外查询）。
+    """
     try:
         active_filter = await get_active_filter(
             ctx.db, TbBalance.__table__, ctx.project_id, ctx.year
@@ -194,7 +209,7 @@ async def fetch_tb_balance_leaves(ctx: RenderContext) -> list[LeafRow]:
                 TbBalance.dataset_id,
             ).where(active_filter)
         )
-        return select_leaves(to_leaf_rows(result.fetchall()))
+        return to_leaf_rows(result.fetchall())
     except Exception as e:  # noqa: BLE001
         logger.warning("K2 TB balance fetch failed: %s", e)
         try:
@@ -293,13 +308,24 @@ async def render(ctx: RenderContext) -> dict | None:
         logger.warning("K2 render responses load failed: %s", e)
 
     accounts = await resolve_report_line_accounts(ctx, K2_ACCOUNT_SPEC)
-    leaves = await fetch_tb_balance_leaves(ctx)
+    all_rows = await fetch_tb_balance_all(ctx)
+    leaves = select_leaves(all_rows)
     tb_amounts = await fetch_trial_balance_amounts(
         ctx, list(accounts.gross_standard) + list(accounts.extra.keys())
     )
     tb_values = build_tb_values(leaves, accounts, tb_amounts)
     project_context = await _load_project_context(ctx)
     adjudication_prefill = build_adjudication_prefill(leaves, accounts)
+
+    # 三口径自检 —— 走跨循环共享件，不在本模块自写（详见共享件 docstring）
+    parent_check: dict = {}
+    try:
+        trial_rows = await fetch_trial_balance_rows(
+            ctx.db, ctx.project_id, ctx.year, list(accounts.gross_standard)
+        )
+        parent_check = build_report_line_parent_check(accounts, all_rows, trial_rows)
+    except Exception as e:  # noqa: BLE001 — fail-open，不影响其余输出
+        logger.warning("K2 parent_check 构造失败: %s", e)
 
     return {
         "component_type": "k2-other-current-assets",
@@ -309,6 +335,7 @@ async def render(ctx: RenderContext) -> dict | None:
         "tb_source_codes": accounts.as_dict(),
         "project_context": project_context,
         "adjudication_prefill": adjudication_prefill,
+        "parent_check": parent_check,
         "prefix": "K2",
         "sheets": K2_SHEETS,
     }

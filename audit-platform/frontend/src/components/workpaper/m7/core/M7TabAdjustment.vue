@@ -7,6 +7,13 @@
         <el-tag type="success" effect="dark" size="small">科目4201·专项储备</el-tag>
       </div>
       <div class="section-header-right">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="m7"
+          sheet="M7-3"
+          :disabled="isReadonly"
+          @imported="handleImported"
+        />
         <el-segmented
           v-model="activeType"
           :options="typeOptions"
@@ -156,6 +163,7 @@ import { useM7Adjustment, type M7AdjustmentType } from '../../composables/useM7A
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
 import type { GenerateWorkpaperAiText } from '../../composables/useWorkpaperScaffold'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 const props = defineProps<{ wpId: string; projectId: string; isReadonly: boolean }>()
 
@@ -315,6 +323,20 @@ function _restoreEntries(): void {
       } catch { /* skip corrupt */ }
     }
   }
+}
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：M7-3 读回 = 本 Tab _restoreEntries（-data 族，push 语义 ⇒ 必须先清空）。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  entries.value = []
+  await formData.loadData()
+  _restoreEntries()
 }
 </script>
 

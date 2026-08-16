@@ -4,6 +4,7 @@ spec: .kiro/specs/k1-extraction-chain-and-note-alignment/
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 import pytest
@@ -55,13 +56,52 @@ def test_k1_3_block_contains_no_wp_calls(k1_entries):
         assert "WP(" not in e.expression, e.target_cell
 
 
-def test_k1_2_block_contains_no_wp_calls():
-    """K1-2 明细表同样是被引用方，禁含 `WP(`（既有约束，本测试钉死不回归）。"""
+def test_k1_2_aux_presets_removed_and_stay_removed():
+    """K1-2 的**项目专属辅助项**预设已按 Property 22 移除，且不得重新引入。
+
+    🔴 2026-08-14 改写（spec `k-cycle-extraction-formula-and-disclosure-closure`
+    Task 11 / Property 22）。原断言是 ``assert k1_2, "K1-2 预设块未找到（守卫空转）"``
+    —— 它要求块非空，与 Property 22「预设不得含具体辅助项编码」直接冲突。
+
+    **为什么这些预设必须删**：原 6 条形如
+    ``AUX('1221','三方收款标识','SKT211','期末余额')``，第三参是**某一个项目**的
+    实际辅助项编码（description 里自己写着「实测代表性 aux_code #1/#2/#3」）。
+    而 `prefill_engine._resolve_aux_formula` 对 ``aux_code`` 用 ``==`` 精确匹配、
+    **不支持通配** ⇒ 换任何别的项目这 6 条全部返 0。写死代表性编码等于让预设
+    对绝大多数项目失效，且失效形态是「静默取到 0」而非报错。
+
+    **后继方案（登记，不在本 spec 作业面）**：按辅助项分行的明细表（K1-2 / K3-2）
+    本质上**不适合静态公式预设** —— 行集依项目而异。正确做法是走 render 侧动态预填
+    （读 `tb_aux_balance` 按本项目实际 ``aux_code`` 建行，形如 K2/K4/K6 的
+    ``adjudication_prefill``）。届时补的预设仍须遵守下面的「禁 WP()」约束。
+
+    本测试**不是空转**：它双向钉死「当前为空」这个结论 + 「将来补的也禁含 WP()」。
+    """
     entries = convert_prefill_presets()
-    k1_2 = [e for e in entries if e.page_key == "workpaper:K1" and "三方收款" in e.target_cell]
-    assert k1_2, "K1-2 预设块未找到（守卫空转）"
+    k1_aux = [
+        e
+        for e in entries
+        if e.page_key == "workpaper:K1" and "AUX(" in str(e.expression)
+    ]
+    hardcoded = [
+        e
+        for e in k1_aux
+        if re.search(r"AUX\([^)]*'(?:SKT\d+|YG\d+|A\d{3})'", str(e.expression))
+    ]
+    assert not hardcoded, (
+        "K1 预设里又出现了写死的项目专属辅助项编码（Property 22 禁止）："
+        f"{[(e.target_cell, e.expression) for e in hardcoded]}"
+    )
+    # 「K1-2 是被引用方、禁含 WP()」这条既有约束保留：对**任何**K1-2 预设成立
+    k1_2 = [
+        e
+        for e in entries
+        if e.page_key == "workpaper:K1" and "三方收款" in str(e.target_cell)
+    ]
     for e in k1_2:
-        assert "WP(" not in e.expression
+        assert "WP(" not in e.expression, (
+            f"K1-2 是被 K1-1 引用的明细方，禁含 WP() 防成环：{e.target_cell}"
+        )
 
 
 @pytest.mark.parametrize("formula_type", ["TB", "ADJ", "PREV", "WP", "AUX"])

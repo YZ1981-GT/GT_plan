@@ -304,6 +304,55 @@ export function useM9Adjustment(formData: ReturnType<typeof useM9FormData>) {
     }
   }
 
+  // ─── 6. 加载已保存数据 ────────────────────────────────────────────────
+
+  /**
+   * 从 allResponses 恢复调整分录数据（`-data` 族整行 JSON）
+   *
+   * 形态 = design §C5a 点名的范本 `useM6Adjustment.loadFromResponses`：读 `-data` 族、
+   * 自第 1 行 `while` 到断档（`remark` 为空）为止、`JSON.parse` 后整体替换 `entries`，
+   * 不发明新结构。族前缀 `M9-3-entry-` 是**单前缀**（清单
+   * `adjustment_ie_contract.json → M9-3.key_families.data.prefix` 的登记值；本文件
+   * `_triggerSave` 写的也是它）—— 批次 1 的 L6/M1/M2 才是 `{X}-{X}-3-entry-` 双前缀，
+   * 故前缀逐 sheet 取值、不套公式。
+   *
+   * 与范本的唯一差异 = 本张多一个 `ociBlock`（design E20）：`_triggerSave` 的整行 JSON
+   * 与后端导入的 `-data` 载荷都含它，读回漏掉它等于导入后 OCI 分类恒空。
+   *
+   * `type` 的 `|| 'AJE'` 沿用范本的**透传兜底**（不做大小写归一）：清单
+   * `M9-3.unmapped_fields[type]` 登记枚举为大写 `AJE` / `RJE`，落错大小写的行会原样穿过
+   * 本兜底，在 `filteredEntries` 的 AJE / RJE 两个分区里都不出现（静默丢行）。
+   */
+  function loadFromResponses(allResponses: Map<string, any>): void {
+    const loaded: M9AdjustmentEntry[] = []
+    let i = 1
+    while (true) {
+      const resp = allResponses.get(`M9-3-entry-${i}-data`)
+      if (!resp?.remark) break
+      try {
+        const data = JSON.parse(resp.remark)
+        loaded.push({
+          index: i,
+          description: data.description || '',
+          category: data.category || '',
+          reportItem: data.reportItem || '',
+          accountName: data.accountName || '',
+          noteItem: data.noteItem || '',
+          type: data.type || 'AJE',
+          ociBlock: data.ociBlock || '',
+          debitAmount: data.debitAmount || 0,
+          creditAmount: data.creditAmount || 0,
+          refIndex: data.refIndex || '',
+          remark: data.remark || '',
+        })
+      } catch { /* ignore parse error */ }
+      i++
+    }
+    if (loaded.length > 0) {
+      entries.value = loaded
+    }
+  }
+
   // ─── Return ────────────────────────────────────────────────────────────
 
   return {
@@ -331,6 +380,9 @@ export function useM9Adjustment(formData: ReturnType<typeof useM9FormData>) {
 
     // 保存+发布
     saveAndPublish,
+
+    // 加载
+    loadFromResponses,
   }
 }
 

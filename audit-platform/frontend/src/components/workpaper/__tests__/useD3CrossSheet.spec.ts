@@ -15,16 +15,15 @@ import {
   parseNum,
   type DetailRowForFormula,
 } from '../composables/useD3FormulaEngine'
+import { D3_NATURE_LABELS } from '../composables/d3NatureCategories'
 
 // ─── Generators ──────────────────────────────────────────────────────────────
 
-/** 4种款项性质 */
-const NATURE_OPTIONS = [
-  '预收销售固定资产款',
-  '预收销售土地使用权款',
-  '合同不成立时已收取的对价',
-  '其他',
-] as const
+/**
+ * 4种款项性质 —— 引用单一真源，禁在测试里抄第二份字面量。
+ * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 26
+ */
+const NATURE_OPTIONS = D3_NATURE_LABELS
 
 /** 关联方类型选项（含非关联方和空字符串） */
 const RELATION_TYPE_OPTIONS: string[] = [

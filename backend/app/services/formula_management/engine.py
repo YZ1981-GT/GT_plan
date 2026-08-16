@@ -299,6 +299,16 @@ def _exec_auto_calc(
 
     求值失败（表达式非法/除零/类型错误）→ 返回描述性错误、**保留目标单元原值
     不变、不写 last_computed_at**（Req 5.5）。
+
+    **运行态（2026-08-06 实测，spec formula-management-runtime-closure Task 11）**：
+    本函数的调用方是 ``execute_formula``；批量对应 ``_batch_exec_auto_calc``，
+    其唯一外部路径是 ``FormulaRuntimeCoordinator.generate_mutation_plan`` →
+    ``execute_batch``，而 coordinator 的 ``_load_formulas`` 读 ``wp_formula``
+    （全库 **0 行**）⇒ 整条链**空转**。
+    🔴 **空转 ≠ 死代码**：调用方存在，缺的是上游公式定义。Task 11 已让
+    ``generate_mutation_plan`` 在无公式时产出 ``kind='no_formulas'`` 的
+    ``scope_failures`` 并透到刷新弹窗 warnings，使空转对用户可见。
+    定性登记见 ``app/services/formula_type_runtime_status.py``。
     """
     result = FormulaExecResult(formula_id=formula.id, formula_type="auto_calc")
 
@@ -347,6 +357,14 @@ def _exec_logic_check(formula: FormulaRecord, ctx: FormulaContext) -> FormulaExe
 
     **绝不修改任何数据单元值**（Req 6.3）。条件表达式求值为真（!=0）视为通过。
     无法求值时**不静默跳过**，追加标注「公式无法求值」的问题项（Req 6.6）。
+
+    **运行态（2026-08-06 实测 / 2026-08-07 补落库，spec …runtime-closure Task 10/11）**：
+    三类型中**只有 logic_check 有独立于 ``wp_formula`` 的活路径** ——
+    ``formula_logic_check.py`` 的 ``GET /api/projects/{pid}/formula/report-cross-check``
+    → ``execute_report_cross_checks`` → ``run_cross_checks``（7 条种子勾稽，
+    公式定义来自 ``build_cross_check_formulas`` 而非 DB）⇒ 该链**可达**。
+    唯一缺口是结果不落库（``cross_check_results`` 曾 0 行），Task 10 已补
+    ``persist_cross_check_results``（upsert + fail-open）。
     """
     result = FormulaExecResult(formula_id=formula.id, formula_type="logic_check")
     fr = kernel_execute(formula.expression, ctx)
@@ -382,6 +400,12 @@ def _exec_reasonability(formula: FormulaRecord, ctx: FormulaContext) -> FormulaE
 
     **绝不修改任何数据单元值**（Req 7.3）。触发条件求值为真（!=0）时追加提醒项。
     无法求值时记 WARNING 日志并跳过该提示、不中断其余公式执行（Req 7.5）。
+
+    **运行态（2026-08-06 实测，spec …runtime-closure Task 11）**：空转，成因与
+    ``_exec_auto_calc`` 相同（唯一外部路径依赖 ``wp_formula``，全库 0 行）。
+    另有一处**产出不可见**已修：本类型产出的 ``hint_text`` 在底稿公式面板
+    改造前完全不展示（`FormulaStatusPanel.vue` 命中 0），Task 2 已补渲染。
+    定性登记见 ``app/services/formula_type_runtime_status.py``。
     """
     result = FormulaExecResult(formula_id=formula.id, formula_type="reasonability")
     fr = kernel_execute(formula.expression, ctx)
@@ -611,7 +635,13 @@ def _batch_exec_auto_calc(
     ctx: FormulaContext,
     result: BatchExecutionResult,
 ) -> None:
-    """auto_calc batch：求值 → 产出 MutationIntent（不直接写值、不写 computed time）。"""
+    """auto_calc batch：求值 → 产出 MutationIntent（不直接写值、不写 computed time）。
+
+    **唯一外部调用方 = ``FormulaRuntimeCoordinator.generate_mutation_plan`` →
+    ``execute_batch``**，其公式定义来自 ``wp_formula``（2026-08-06 实测 **0 行**）
+    ⇒ 本函数在真实库里从未被真实数据驱动过（spec …runtime-closure Task 11）。
+    定性与后续接线条件见 ``app/services/formula_type_runtime_status.py``。
+    """
     fr = kernel_execute(formula.expression, ctx)
 
     if not fr.ok:
@@ -653,7 +683,13 @@ def _batch_exec_logic_check(
     ctx: FormulaContext,
     result: BatchExecutionResult,
 ) -> None:
-    """logic_check batch：条件不通过 → issue；无法求值 → issue。不产 mutation。"""
+    """logic_check batch：条件不通过 → issue；无法求值 → issue。不产 mutation。
+
+    调用方同 ``_batch_exec_auto_calc``（依赖 ``wp_formula``，2026-08-06 实测 0 行）。
+    ⚠️ 注意 logic_check **另有一条不依赖 DB 的活路径**（7 条报表勾稽种子走
+    ``logic_check.run_cross_checks`` → ``_exec_logic_check`` 单条入口），
+    故「logic_check 空转」只对本批量入口成立（spec …runtime-closure Task 11）。
+    """
     fr = kernel_execute(formula.expression, ctx)
 
     if not fr.ok:
@@ -683,7 +719,12 @@ def _batch_exec_reasonability(
     ctx: FormulaContext,
     result: BatchExecutionResult,
 ) -> None:
-    """reasonability batch：条件成立 → hint；无法求值 → 跳过不中断。不产 mutation。"""
+    """reasonability batch：条件成立 → hint；无法求值 → 跳过不中断。不产 mutation。
+
+    调用方同 ``_batch_exec_auto_calc``（依赖 ``wp_formula``，2026-08-06 实测 0 行）
+    ⇒ 空转。产出 ``hint_text`` 的展示侧已由 Task 2 在 `FormulaStatusPanel.vue`
+    补齐（spec …runtime-closure Task 11；定性见 `formula_type_runtime_status.py`）。
+    """
     fr = kernel_execute(formula.expression, ctx)
 
     if not fr.ok:

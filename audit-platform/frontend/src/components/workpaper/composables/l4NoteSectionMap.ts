@@ -14,7 +14,10 @@ export const L4_NOTE_SECTION = {
   soe: '八、50',
 } as const
 
-export const L4_WITHIN1Y_NOTE_SECTION = { soe: '八、46' } as const
+export const L4_WITHIN1Y_NOTE_SECTION = {
+  listed: '五、43',
+  soe: '八、46',
+} as const
 
 export const L4_DISCLOSURE_SHEET_NAME = {
   listed: '附注披露信息核对（上市公司）',
@@ -22,19 +25,43 @@ export const L4_DISCLOSURE_SHEET_NAME = {
 } as const
 
 // ── 上市版子表名（必须与附注模板 tables[].name 逐字一致）──────────────────
+// 🔴 2026-08-15 校正（spec l-cycle-…completion R5.11~5.15）：
+//    4 处与模板不一致已修正 + 删 overdue（模板不存在）+ 新增 continued/instrumentMovement。
 
 export const L4_LISTED_SUBTABLE = {
   main: '应付债券',
-  movement: '应付债券增减变动',
-  within1y: '一年内到期的应付债券',
-  overdue: '已到期未偿付的应付债券',
-  otherFinInstrument: '划分为金融负债的其他金融工具',
+  movement: '应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）',
+  continued: '应付债券（续）',
+  otherFinInstrument: '（3）划分为金融负债的其他金融工具',
+  instrumentMovement: '期末发行在外的优先股、永续债等其他金融工具变动情况',
 } as const
 
 export const L4_SOE_SUBTABLE = {
   main: '应付债券',
-  movement: '应付债券增减变动',
+  movement: '应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）',
 } as const
+
+// ── 一年内到期子表名（五、43 / 八、46，两版不同构禁共用）────────────────────
+
+export const L4_WITHIN1Y_LISTED_SUBTABLE = {
+  bond: '一年内到期的应付债券',
+  bondCont: '一年内到期的应付债券（续）',
+} as const
+
+export const L4_WITHIN1Y_SOE_SUBTABLE = {
+  bond: '（2）一年内到期的应付债券',
+  bondCont: '一年内到期的应付债券',
+} as const
+
+/**
+ * 旧表名登记表——首次推送时经 `_removed_table_keys` 与本次推送键求差集后发送。
+ * 每条带理由，防「登记表本身过期」的假绿。
+ */
+export const L4_LEGACY_OBSOLETE_TABLES: ReadonlyArray<{ name: string; reason: string }> = [
+  { name: '应付债券增减变动', reason: '模板真实表名含"的…（不包括…）"整段，旧名是截断版' },
+  { name: '划分为金融负债的其他金融工具', reason: '模板真实表名带（3）序号前缀' },
+  { name: '已到期未偿付的应付债券', reason: '两份附注模板（五、46/八、50）均无此表名，源 xlsx 亦无' },
+]
 
 // ── 列定义 ──────────────────────────────────────────────────────────────────
 
@@ -81,15 +108,6 @@ function buildWithin1yColumns(variant: 'listed' | 'soe'): ColumnDef[] {
   ]
 }
 
-/** 已到期未偿付（上市专属，flat） */
-function buildOverdueColumns(): ColumnDef[] {
-  return [
-    { key: 'bondName', label: '债券名称', is_label: true, flat: true },
-    { key: 'dueDate', label: '到期日', format: 'text' },
-    { key: 'amount', label: '未偿付金额', format: 'amount' },
-  ]
-}
-
 /** 国企主表（单级 flat） */
 function buildSoeMainColumns(): ColumnDef[] {
   return [
@@ -109,8 +127,8 @@ export function buildL4ListedColumns(): Record<string, ColumnDef[]> {
   return {
     [L4_LISTED_SUBTABLE.main]: buildListedMainColumns(),
     [L4_LISTED_SUBTABLE.movement]: buildMovementColumns(),
-    [L4_LISTED_SUBTABLE.within1y]: buildWithin1yColumns('listed'),
-    [L4_LISTED_SUBTABLE.overdue]: buildOverdueColumns(),
+    [L4_LISTED_SUBTABLE.continued]: buildWithin1yColumns('listed'),  // 续表结构同一年内到期
+    [L4_LISTED_SUBTABLE.otherFinInstrument]: buildListedMainColumns(),  // 条件表，复用主表结构
   }
 }
 
@@ -134,16 +152,12 @@ export interface L4SyncPayloadOptions {
   mainRows?: Array<Record<string, unknown>>
   /** 增减变动表行 */
   movementRows?: Array<Record<string, unknown>>
-  /** 一年内到期行 */
-  within1yRows?: Array<Record<string, unknown>>
-  /** 已到期未偿付行（上市） */
-  overdueRows?: Array<Record<string, unknown>>
   /** 说明文本 */
   noteTexts?: Array<{ section: string; title: string; text: string }>
 }
 
 export function buildL4SyncPayload(opts: L4SyncPayloadOptions) {
-  const { variant, mainRows, movementRows, within1yRows, overdueRows, noteTexts } = opts
+  const { variant, mainRows, movementRows, within1yRows, noteTexts } = opts
 
   const sub_table_data: Record<string, unknown[]> = {}
   const columns = variant === 'listed' ? buildL4ListedColumns() : buildL4SoeColumns()
@@ -151,8 +165,6 @@ export function buildL4SyncPayload(opts: L4SyncPayloadOptions) {
   if (variant === 'listed') {
     if (mainRows?.length) sub_table_data[L4_LISTED_SUBTABLE.main] = mainRows
     if (movementRows?.length) sub_table_data[L4_LISTED_SUBTABLE.movement] = movementRows
-    if (within1yRows?.length) sub_table_data[L4_LISTED_SUBTABLE.within1y] = within1yRows
-    if (overdueRows?.length) sub_table_data[L4_LISTED_SUBTABLE.overdue] = overdueRows
   } else {
     if (mainRows?.length) sub_table_data[L4_SOE_SUBTABLE.main] = mainRows
     if (movementRows?.length) sub_table_data[L4_SOE_SUBTABLE.movement] = movementRows
@@ -160,6 +172,15 @@ export function buildL4SyncPayload(opts: L4SyncPayloadOptions) {
 
   if (noteTexts?.length) {
     (sub_table_data as any)._note_texts = noteTexts
+  }
+
+  // 旧表名清理：首次推送时把遗留的旧表名发 _removed_table_keys（与本次推送键求差集）
+  const currentKeys = new Set(Object.keys(sub_table_data))
+  const removedKeys = L4_LEGACY_OBSOLETE_TABLES
+    .map((t) => t.name)
+    .filter((name) => !currentKeys.has(name))
+  if (removedKeys.length) {
+    (sub_table_data as any)._removed_table_keys = removedKeys
   }
 
   return {

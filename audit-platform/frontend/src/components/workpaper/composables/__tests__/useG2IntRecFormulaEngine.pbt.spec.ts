@@ -105,7 +105,7 @@ describe('Feature: g2-interest-receivable, Property 4: ECL公式', () => {
 describe('Feature: g2-interest-receivable, Property 5: 逾期天数非负', () => {
   it('calcOverdueDays >= 0 for any due date', () => {
     fc.assert(
-      fc.property(fc.date(), fc.date(), (due, asOf) => {
+      fc.property(fc.date({ noInvalidDate: true }), fc.date({ noInvalidDate: true }), (due, asOf) => {
         if (Number.isNaN(due.getTime()) || Number.isNaN(asOf.getTime())) return
         const dueStr = due.toISOString().slice(0, 10)
         expect(calcOverdueDays(dueStr, asOf)).toBeGreaterThanOrEqual(0)

@@ -657,6 +657,15 @@ const noRendererGridFallback = computed<boolean>(() => {
   if (componentType.value === 'skip') return false
   // confirmation-* 精细组件（协作者 D0 函证模块）接收 grid cells 作为数据源，不走 grid 兜底
   if (componentType.value.startsWith('confirmation-')) return false
+  // 🔴 custom（自定义底稿）同理，且更隐蔽：它的 html_data 就是 xlsx 的**恒等坐标投影**
+  //    （`{cells, max_row, max_col, col_widths, merged_cells, header_rows}`，无 rows/
+  //    programs/audit_rows）⇒ 恰好命中下面的 isGridOnly 判据 ⇒ rendererEntry 被强制
+  //    undefined ⇒ 专属编辑器 `GtCustomWpEditor`（双模式 + 可编辑网格 + 自定义公式）
+  //    **永不渲染**，用户只看到只读 GtGridSheet。
+  //    「投影做对了反而把专属编辑器挤掉」—— 浏览器实测才暴露（registry 映射、
+  //    render-config、componentType 全部正确，四层验证零诊断）。
+  //    spec: custom-workpaper-dual-mode-formula-and-batch R2/R3（Task 26 实测发现）
+  if (componentType.value === 'custom') return false
   // html_data 含 cells（grid 格式）→ 优先走 GtGridSheet，无论注册表有无组件
   if (hasGridCells.value) {
     const hd = activeSheetHtmlData.value as any

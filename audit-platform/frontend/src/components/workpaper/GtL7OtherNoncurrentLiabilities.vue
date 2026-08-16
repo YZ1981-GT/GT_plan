@@ -30,6 +30,7 @@
         :wp-id="props.wpId"
         :project-id="props.projectId"
         :is-readonly="isReadonly"
+        :html-data="props.htmlData"
         @navigate="handleNavigate"
       />
       <!-- L7-2 明细表（27列区段Tab，按项目列示） -->

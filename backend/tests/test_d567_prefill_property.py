@@ -69,11 +69,20 @@ def audited_entries() -> dict[str, dict]:
 
 
 def _collect_tb_accounts(entry: dict) -> frozenset[str]:
-    """提取 entry.cells 所有 formula 中 TB() 的科目编码集合。"""
+    """提取该 entry 声明的科目编码集合（TB 公式 ∪ account_codes）。
+
+    🔴 2026-08-06：由「仅从 =TB() 公式抽」扩为「并上 entry.account_codes」。
+       D5 的 `1124` 已按 spec R5.5 改 PLACEHOLDER（该科目在两张科目表零命中、
+       `account_mapping` 零反解、`tb_balance` 零数据行 ⇒ TB 公式恒空），
+       但 `account_codes=['1124']` 仍在 —— 语义对齐没变，只是不再写成 TB 公式。
+       只认 TB 公式会让本守卫把「已按 spec 纠偏」误判成「科目串味」。
+    """
     accounts: set[str] = set()
     for cell in entry.get("cells", []):
         formula = cell.get("formula", "")
         accounts.update(TB_ACCOUNT_PATTERN.findall(formula))
+    # 并上 entry 声明的 account_codes（PLACEHOLDER 化后这是唯一来源）
+    accounts.update(str(c) for c in (entry.get("account_codes") or []))
     return frozenset(accounts)
 
 

@@ -17,7 +17,7 @@
 
 | 形态 | 样例 | 前缀段位 | 组数 |
 |---|---|---|---|
-| A | `/api/workpapers/{wp_id}/k5/export-data` | `segs[-2]` | 85 |
+| A | `/api/workpapers/{wp_id}/k5/export-data` | `segs[-2]` | 101 |
 | B | `/api/h9-lease-liabilities/{wp_id}/export-data` | `segs[-3]` | 22 |
 
 只处理形态 A 会把形态 B 的前缀全部误判成 `{wp_id}` 这一个「前缀」。
@@ -30,7 +30,14 @@
 3. 展开 `{wp_id}` 组的实际路径 ⇒ 它藏着 **20 个真实前缀**
    （`h9-lease-liabilities` / `l2-interest-payable` / `m1`~`m10` / `n1`~`n3` / `n5` /
    `s-estimate` 等），**不是误计而是另一种 URL 形态** ⇒ 改为「参数段时回退取
-   `segs[-3]`」⇒ 得 **107 组 / 三态齐全 100 组**（本文件基线）
+   `segs[-3]`」⇒ 得 **107 组 / 三态齐全 100 组**（2026-08-10 的基线）
+4. 2026-08-14（spec `x3-adjustment-entry-import-export` 任务 6.3）：X-3 调整分录
+   导入导出新增 **16 个形态 A 前缀 × 3 态 = 48 条**端点（`l2` / `l6` / `m1`~`m10` /
+   `n1` / `n2` / `n3` / `n5`，端点函数定义在
+   `wp_render_strategies/_x3_adjustment_import_export.py`，挂载在各自的专属 router
+   上）⇒ 基线上调为 **123 组 / 三态齐全 116 组 / 形态 A 101 / 形态 B 22（不变）/
+   三态端点 356 条**。这一轮是**纯增量**：形态 B、零装饰器模块数、工厂 `api_prefix`
+   数三项逐字未变，故 16 与 48 都能由「新基线 − 旧基线」复算出来
 
 立项需求文档写的「各 36 组 / 合计 314 个」与前两轮我自己的 81、80 **都是错的**。
 反向自检 `test_shape_b_prefixes_are_not_dropped` 钉死形态 B 不得再被丢弃。
@@ -42,8 +49,18 @@
 而是 `backend/app/routers/h9_lease_liabilities.py`（自带
 `prefix="/api/h9-lease-liabilities"`）造的，且**只有后者被 include_router**。
 
-⇒ **19 个工厂模块是死代码**（见 `_TRULY_DEAD_FACTORY_PREFIXES`）。
+⇒ 2026-08-10 实测 **19 个工厂模块是死代码**（见 `_PRE_X3_DEAD_FACTORY_PREFIXES`）。
 ⇒ registry 绝不能抄工厂声明的 `api_prefix`（会得到 404 的前缀）。
+
+🔴 **2026-08-14 判据命中面收缩（X-3 任务 6.3，必读）**：X-3 为 16 个前缀
+（`l2` / `l6` / `m1`~`m10` / `n1` / `n2` / `n3` / `n5`）新增了形态 A 端点，于是
+「声明的 `api_prefix` 在运行期零三态端点」这条判据**不再命中它们**，死集由 19 收缩
+到 **3**（`h9` / `l7` / `l8`）。但那 16 个**工厂模块本身仍是死代码** —— 它们的
+`router` 依旧从未被 `include_router`，新端点由
+`_x3_adjustment_import_export.py` 提供。⇒ 判它们死活**不能再靠本条判据**，须换成
+「该模块的 `router` 是否被 `include_router`」；删除仍属父 spec Task 25 的作业面
+（目标基线登记在 `_TASK25_PENDING_BASELINES`）。`test_dead_set_records_the_x3_revival`
+把这 16 个「非真复活」逐条钉死，防下一轮据「死集只剩 3」误判「16 个模块已经在用」。
 
 ## 本文件同时固化 design §核心事实修正 的台账
 
@@ -66,28 +83,78 @@ _THREE_STATE = ("export-template", "export-data", "import-data")
 _PARAM_SEG = re.compile(r"^\{.*\}$")
 
 # ─── 台账基线（2026-08-10 三轮实证；旧错数写在注释里，禁止改回）────────────────
-_BASE_IE_MODULES = 99            # 立项: 102
-_BASE_NO_DECORATOR_MODULES = 63  # 立项: 未记
-_BASE_FACTORY_PREFIXES = 62      # 立项: 未记
-_BASE_THREE_STATE_ROUTES = 308   # 立项: 314
-_BASE_GROUPS = 107               # 我的第 1 轮: 87 / 第 2 轮: 85
-_BASE_FULL3_PREFIXES = 100       # 立项: 36 / 我的第 1 轮: 81 / 第 2 轮: 80
-_BASE_SHAPE_A = 85
-_BASE_SHAPE_B = 22
-_BASE_ROUTE_KINDS = {
-    "export-template": 106,
-    "export-data": 102,
-    "import-data": 100,
+# 🔴 2026-08-14 上调一次（spec `x3-adjustment-entry-import-export` 任务 6.3）。
+#    唯一增量 = X-3 的 `_x3_adjustment_import_export.py`：**1 个模块 / 16 个形态 A
+#    前缀 / 48 条端点（16 × 3）**，其余口径一字未改 ⇒ 每个新值都能由
+#    「X-3 前的值 + 增量」复算，增量本身由 `X3_SHEET_SPECS` 的 16 张 sheet 派生。
+#    反向自检见 `TestBaselineRejectsStaleFigures`（改回任一旧值必打红）。
+_BASE_IE_MODULES = 100           # X-3 前: 99（+1 个 X-3 模块）/ 立项: 102
+_BASE_NO_DECORATOR_MODULES = 63  # X-3 不变（X-3 模块自带 `@router.`）/ 立项: 未记
+_BASE_FACTORY_PREFIXES = 62      # X-3 不变（X-3 不走 create_cycle_import_export_router）
+_BASE_THREE_STATE_ROUTES = 356   # X-3 前: 308（+48）/ 立项: 314
+_BASE_GROUPS = 123               # X-3 前: 107（+16）/ 我的第 1 轮: 87 / 第 2 轮: 85
+_BASE_FULL3_PREFIXES = 116       # X-3 前: 100（+16）/ 立项: 36 / 第 1 轮: 81 / 第 2 轮: 80
+_BASE_SHAPE_A = 101              # X-3 前: 85（+16，X-3 全走形态 A）
+_BASE_SHAPE_B = 22               # X-3 不变（X-3 无形态 B 端点）
+_BASE_ROUTE_KINDS = {            # X-3 前: 106 / 102 / 100（三态各 +16）
+    "export-template": 122,
+    "export-data": 118,
+    "import-data": 116,
+}
+#: X-3 增量的可复算分解（供反向自检与 spec 实录交叉核对；不是独立事实源）
+_X3_SHAPE_A_PREFIXES = frozenset({
+    "l2", "l6",
+    "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10",
+    "n1", "n2", "n3", "n5",
+})
+#: X-3 的 48 条端点函数的定义处（`endpoint.__module__`）
+_X3_HOST_MODULE = "app.routers.wp_render_strategies._x3_adjustment_import_export"
+_PRE_X3_BASELINES = {
+    "ie_modules": 99,
+    "three_state_routes": 308,
+    "groups": 107,
+    "full3_prefixes": 100,
+    "shape_a": 85,
+    "route_kinds": {"export-template": 106, "export-data": 102, "import-data": 100},
 }
 
-#: 🔴 19 个工厂模块的 router 从未被 include_router，且其 api_prefix 在运行期
-#: 零端点 —— 它们的能力由 `backend/app/routers/{name}.py` 专属 router 提供。
-#: 判据：`api_prefix` 在运行期三态端点里零命中。
-_TRULY_DEAD_FACTORY_PREFIXES = frozenset({
+#: 2026-08-10 实测：19 个工厂模块的 router 从未被 include_router，且其 api_prefix
+#: 在运行期零端点。X-3 施加后其中 16 个前缀有了形态 A 端点（宿主是 X-3 模块，
+#: **不是**这些工厂模块），故本判据的命中面收缩到 3 —— 详见文件头「判据命中面收缩」。
+_PRE_X3_DEAD_FACTORY_PREFIXES = frozenset({
     "h9", "l2", "l6", "l7", "l8",
     "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10",
     "n1", "n2", "n3", "n5",
 })
+
+#: 🔴 判据「声明的 `api_prefix` 在运行期三态端点里零命中」当前命中的 3 个前缀。
+#: 它们的能力由 `backend/app/routers/{name}.py` 专属 router 提供（形态 B / 第三形态）。
+#: **只许下调**：新增必须查清是不是又有工厂模块被 include_router 漏了。
+_TRULY_DEAD_FACTORY_PREFIXES = frozenset({"h9", "l7", "l8"})
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 🔴 父 spec `workpaper-import-export-lifecycle-closure` **Task 25 施加后**的目标基线
+#    —— **待 Task 25 执行时启用**。现在不是生效基线，禁止提前套用。
+#
+# Task 25 = 删除 19 个死代码工厂模块（`_PRE_X3_DEAD_FACTORY_PREFIXES` 各对应 1 个
+# `_{prefix}_import_export.py`；2026-08-14 AST 实测：19 前缀 ↔ 19 模块一一对应，
+# 每个模块恰好 1 次 `create_cycle_import_export_router`，且不声明任何别的前缀）。
+#
+# ⚠️ 其中两项与父 spec 自己记的数字不同，成因是**父 spec 的数字算在 X-3 之前**：
+#   · `_BASE_IE_MODULES`：父 spec 记 99 → 80；X-3 加了 1 个不在删除清单里的模块，
+#     故实际是 100 → **81**。
+#   · `IE_ADAPTER_REGISTRY`：父 spec 记 97 → 78（= 97 − 19）；X-3 已把那 16 个键
+#     改指专属 router 点路径（`app.routers.l2_interest_payable` 等），只剩
+#     `h9`/`l7`/`l8` 三个键的目标模块在删除清单内，故实际是 97 → **94**。
+#     （2026-08-14 实测：`registry_keys_pointing_at_dead_modules == ['h9','l7','l8']`）
+# ═══════════════════════════════════════════════════════════════════════════════
+_TASK25_PENDING_BASELINES: dict[str, object] = {
+    # 常量名 → Task 25 施加后应下调到的值
+    "_BASE_IE_MODULES": 81,               # 100 − 19（父 spec 口径 99 → 80）
+    "_BASE_FACTORY_PREFIXES": 43,         # 62 − 19（与父 spec 一致）
+    "IE_ADAPTER_REGISTRY": 94,            # 97 − 3（父 spec 口径 97 → 78，已被 X-3 改变）
+    "_TRULY_DEAD_FACTORY_PREFIXES": frozenset(),  # 19 个模块删完 ⇒ 声明面清空
+}
 
 #: 形态 B 的真实前缀样本（守卫钉死它们不得被当成 `{wp_id}` 丢弃）
 _SHAPE_B_SAMPLES = (
@@ -251,7 +318,7 @@ class TestScanSurfaceNonEmpty:
 
 class TestBaselineNumbers:
     def test_ie_module_count(self, ie_modules: list[Path]) -> None:
-        """台账 #3：99 个模块（立项写 102）。"""
+        """台账 #3：100 个模块（X-3 前 99 / 立项写 102）。"""
         assert len(ie_modules) == _BASE_IE_MODULES, (
             f"`*_import_export.py` 模块数变化: {len(ie_modules)} != "
             f"{_BASE_IE_MODULES}。若确为新增/删除，同步更新基线并在 spec Notes 留痕"
@@ -280,7 +347,7 @@ class TestBaselineNumbers:
         assert not dupes, f"api_prefix 撞车（会让后注册的覆盖前者）: {sorted(dupes)}"
 
     def test_three_state_route_counts(self, app_instance) -> None:
-        """台账 #4：308 条 = 106 + 102 + 100（立项写 314）。"""
+        """台账 #4：356 条 = 122 + 118 + 116（X-3 前 308 = 106 + 102 + 100）。"""
         counts = _count_ie_routes(app_instance)
         assert counts == _BASE_ROUTE_KINDS, (
             f"三态端点分布变化: {counts} != {_BASE_ROUTE_KINDS}"
@@ -288,7 +355,7 @@ class TestBaselineNumbers:
         assert sum(counts.values()) == _BASE_THREE_STATE_ROUTES
 
     def test_group_and_full3_counts(self, app_instance) -> None:
-        """台账 #4：107 组 / 三态齐全 100 组。
+        """台账 #4：123 组 / 三态齐全 116 组（X-3 前 107 / 100，X-3 各 +16）。
 
         立项写 36 组；我的第 1 轮算 81、第 2 轮算 80 —— 都因漏了形态 B。
         """
@@ -309,7 +376,7 @@ class TestBaselineNumbers:
 
 class TestTwoUrlShapes:
     def test_both_shapes_present(self, app_instance) -> None:
-        """两种形态都存在且组数符合实证（85 / 22）。"""
+        """两种形态都存在且组数符合实证（101 / 22；X-3 前 85 / 22）。"""
         shape_a, shape_b = classify_route_shapes(app_instance)
         assert len(shape_a) == _BASE_SHAPE_A, (
             f"形态 A 前缀数变化: {len(shape_a)} != {_BASE_SHAPE_A}"
@@ -368,9 +435,12 @@ class TestDeadFactoryModules:
     def test_dead_prefixes_have_zero_runtime_endpoints(
         self, app_instance, ie_modules: list[Path]
     ) -> None:
-        """🔴 19 个工厂 `api_prefix` 在运行期零三态端点 ⇒ 模块是死代码。
+        """🔴 3 个工厂 `api_prefix` 在运行期零三态端点（X-3 前 19 个）。
 
         判据是「运行期该 prefix 有没有端点」，不是「源码里有没有这个模块」。
+        ⚠️ 判据只证明「prefix 有端点」，**不证明**端点由这个工厂模块提供 ——
+        X-3 的 16 个前缀正是「prefix 活了但工厂模块仍死」，见
+        `test_dead_set_records_the_x3_revival`。
         """
         groups = group_ie_routes(app_instance)
         declared = set(_factory_api_prefixes(ie_modules))
@@ -404,6 +474,49 @@ class TestDeadFactoryModules:
             f"死代码 prefix 的能力无任何专属 router 覆盖 = 真功能缺口: {uncovered}"
         )
 
+    def test_dead_set_records_the_x3_revival(
+        self, app_instance, ie_modules: list[Path]
+    ) -> None:
+        """🔴 死集由 19 收缩到 3，收缩量必须**恰好**是 X-3 的 16 个前缀。
+
+        这条把「命中面收缩」钉成结构事实，作用有两层：
+
+        1. 防「死集只剩 3」被下一轮读成「另外 16 个工厂模块已经在用，不能删」——
+           它们只是 prefix 被 X-3 点亮，模块本身仍未被 `include_router`。
+        2. 若哪天真有工厂模块被接上，收缩量就会 != X-3 的 16 个 ⇒ 本条打红，
+           要求显式裁决，而不是静默并入死集变化里。
+        """
+        groups = group_ie_routes(app_instance)
+        declared = set(_factory_api_prefixes(ie_modules))
+        actually_dead = {p for p in declared if p not in groups}
+
+        revived = _PRE_X3_DEAD_FACTORY_PREFIXES - actually_dead
+        assert revived == set(_X3_SHAPE_A_PREFIXES), (
+            f"死集收缩量 != X-3 的 16 个前缀:\n"
+            f"  多复活: {sorted(revived - _X3_SHAPE_A_PREFIXES)}（须查是否有工厂 router 被接上）\n"
+            f"  未复活: {sorted(_X3_SHAPE_A_PREFIXES - revived)}（X-3 端点缺失）"
+        )
+        assert _TRULY_DEAD_FACTORY_PREFIXES == _PRE_X3_DEAD_FACTORY_PREFIXES - revived, (
+            "`_TRULY_DEAD_FACTORY_PREFIXES` 与「X-3 前死集 − 复活集」不自洽"
+        )
+        # 复活的 16 个前缀，其端点宿主必须是 X-3 模块而**不是**同名工厂模块
+        hosts: dict[str, set[str]] = {}
+        for r in app_instance.routes:
+            segs = getattr(r, "path", "").strip("/").split("/")
+            if len(segs) >= 2 and segs[-1] in _THREE_STATE and segs[-2] in revived:
+                hosts.setdefault(segs[-2], set()).add(
+                    getattr(getattr(r, "endpoint", None), "__module__", "?")
+                )
+        wrong = {
+            p: sorted(mods)
+            for p, mods in hosts.items()
+            if mods != {_X3_HOST_MODULE}
+        }
+        assert set(hosts) == set(revived) and not wrong, (
+            f"复活前缀的端点宿主不是 X-3 模块: {wrong}；缺前缀: "
+            f"{sorted(set(revived) - set(hosts))}"
+        )
+
     def test_l1_short_term_loans_has_live_endpoints(self, app_instance) -> None:
         """L1 短期借款三态端点必须存在（用户明确要求 L1 要有导入导出）。
 
@@ -427,25 +540,99 @@ class TestDeadFactoryModules:
 
 class TestBaselineRejectsStaleFigures:
     def test_baseline_numbers_reject_stale_figures(self) -> None:
-        """🔴 把台账改回立项旧数或我前两轮的错数必须打红。"""
+        """🔴 把台账改回立项旧数、我前两轮的错数、或 X-3 前的旧数必须打红。"""
         stale = {
-            "ie_modules": (102,),
-            "three_state_routes": (314,),
-            "full3_prefixes": (36, 81, 80),
-            "groups": (87, 85),
+            "ie_modules": (102, _PRE_X3_BASELINES["ie_modules"]),
+            "three_state_routes": (314, _PRE_X3_BASELINES["three_state_routes"]),
+            "full3_prefixes": (36, 81, 80, _PRE_X3_BASELINES["full3_prefixes"]),
+            "groups": (87, 85, _PRE_X3_BASELINES["groups"]),
+            "shape_a": (_PRE_X3_BASELINES["shape_a"],),
         }
         assert _BASE_IE_MODULES not in stale["ie_modules"], (
-            "基线被改回立项旧数 102（实证 99）"
+            "基线被改回旧数（立项 102 / X-3 前 99，实证 100）"
         )
         assert _BASE_THREE_STATE_ROUTES not in stale["three_state_routes"], (
-            "基线被改回立项旧数 314（实证 308）"
+            "基线被改回旧数（立项 314 / X-3 前 308，实证 356）"
         )
         assert _BASE_FULL3_PREFIXES not in stale["full3_prefixes"], (
-            "基线被改回旧错数（立项 36 / 第 1 轮 81 / 第 2 轮 80，实证 100）"
+            "基线被改回旧错数（立项 36 / 第 1 轮 81 / 第 2 轮 80 / X-3 前 100，实证 116）"
         )
         assert _BASE_GROUPS not in stale["groups"], (
-            "分组数基线被改回旧错数（第 1 轮 87 / 第 2 轮 85，实证 107）"
+            "分组数基线被改回旧错数（第 1 轮 87 / 第 2 轮 85 / X-3 前 107，实证 123）"
         )
+        assert _BASE_SHAPE_A not in stale["shape_a"], (
+            "形态 A 基线被改回 X-3 前的 85（实证 101）"
+        )
+        assert _BASE_ROUTE_KINDS != _PRE_X3_BASELINES["route_kinds"], (
+            "三态分布基线被改回 X-3 前的 106/102/100（实证 122/118/116）"
+        )
+        assert _TRULY_DEAD_FACTORY_PREFIXES != _PRE_X3_DEAD_FACTORY_PREFIXES, (
+            "死集被改回 X-3 前的 19 个（实证 3 个：h9/l7/l8）"
+        )
+        assert not (_TRULY_DEAD_FACTORY_PREFIXES & _X3_SHAPE_A_PREFIXES), (
+            "死集混入了已被 X-3 点亮的前缀 —— 它们在运行期有形态 A 端点，判据不会命中"
+        )
+
+    def test_x3_delta_is_internally_consistent(self) -> None:
+        """🔴 X-3 增量的算术自洽：4 个上调值 − X-3 前的值 == 16 / 16 / 16 / 48。
+
+        这条让 4 个新基线**不是魔法数**：只要有人单改其中一个，算术就对不上。
+        16 = `len(_X3_SHAPE_A_PREFIXES)`（= `X3_SHEET_SPECS` 的 16 张 sheet），
+        48 = 16 × 3（三态）。三态分布逐项也必须各 +16。
+        """
+        n = len(_X3_SHAPE_A_PREFIXES)
+        assert n == 16, f"X-3 前缀集规模变化: {n}"
+        assert _BASE_GROUPS - _PRE_X3_BASELINES["groups"] == n
+        assert _BASE_FULL3_PREFIXES - _PRE_X3_BASELINES["full3_prefixes"] == n
+        assert _BASE_SHAPE_A - _PRE_X3_BASELINES["shape_a"] == n
+        assert _BASE_THREE_STATE_ROUTES - _PRE_X3_BASELINES["three_state_routes"] == n * 3
+        for kind, before in _PRE_X3_BASELINES["route_kinds"].items():
+            assert _BASE_ROUTE_KINDS[kind] - before == n, (
+                f"{kind} 增量 != {n}: {_BASE_ROUTE_KINDS[kind]} - {before}"
+            )
+        assert sum(_BASE_ROUTE_KINDS.values()) == _BASE_THREE_STATE_ROUTES
+
+    def test_task25_targets_are_registered_but_not_yet_applied(self) -> None:
+        """🔴 Task 25 的目标值只登记、**不生效**；谁提前套用就打红。
+
+        为什么要有这条：目标值写在同一个文件里，最省事的误用是「先把基线改成目标
+        值让守卫看起来前瞻」—— 那会在 19 个模块还在仓里时把守卫锁成红/假绿。
+        本条同时钉死目标值与当前值的**差额**，防目标值被随手改成别的数。
+        """
+        assert set(_TASK25_PENDING_BASELINES) == {
+            "_BASE_IE_MODULES",
+            "_BASE_FACTORY_PREFIXES",
+            "IE_ADAPTER_REGISTRY",
+            "_TRULY_DEAD_FACTORY_PREFIXES",
+        }, "Task 25 目标值清单被改动 —— 须与父 spec Task 25 的作业面同步裁决"
+
+        # 尚未施加：当前基线必须仍是「删除前」的值
+        assert _BASE_IE_MODULES != _TASK25_PENDING_BASELINES["_BASE_IE_MODULES"], (
+            "`_BASE_IE_MODULES` 已被改成 Task 25 的目标值，但 19 个工厂模块还在仓里"
+        )
+        assert (
+            _BASE_FACTORY_PREFIXES != _TASK25_PENDING_BASELINES["_BASE_FACTORY_PREFIXES"]
+        ), "`_BASE_FACTORY_PREFIXES` 已被提前下调"
+        assert _TRULY_DEAD_FACTORY_PREFIXES, (
+            "死集被清空 —— 那是 Task 25 的目标态，现在清空 = 判据恒绿"
+        )
+
+        # 差额锁死（19 个待删模块，各贡献 1 模块 + 1 工厂 api_prefix）
+        n_dead_modules = len(_PRE_X3_DEAD_FACTORY_PREFIXES)
+        assert n_dead_modules == 19, f"待删模块数变化: {n_dead_modules}"
+        assert (
+            _BASE_IE_MODULES - _TASK25_PENDING_BASELINES["_BASE_IE_MODULES"]
+            == n_dead_modules
+        )
+        assert (
+            _BASE_FACTORY_PREFIXES
+            - _TASK25_PENDING_BASELINES["_BASE_FACTORY_PREFIXES"]
+            == n_dead_modules
+        )
+        # registry 只降 3：另外 16 个键已被 X-3 改指专属 router，不随删除消失
+        assert _TASK25_PENDING_BASELINES["IE_ADAPTER_REGISTRY"] == 97 - len(
+            _TRULY_DEAD_FACTORY_PREFIXES
+        ), "registry 目标值与「当前 97 − 仍指向待删模块的 3 个键」不自洽"
 
     def test_shape_ab_sum_consistent(self, app_instance) -> None:
         """形态 A + 形态 B 应等于总组数（无第三种形态被静默丢弃）。"""

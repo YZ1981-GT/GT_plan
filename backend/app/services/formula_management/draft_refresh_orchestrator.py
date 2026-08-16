@@ -85,6 +85,15 @@ class DraftRefreshOrchestrator:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.svc = DraftRefreshService()
+        #: 本次 generate 期间由 coordinator 报出的、需要透到用户的告警。
+        #:
+        #: spec: formula-management-runtime-closure Task 11（Requirements 6.4）——
+        #: 🔴 改造前 `plan.scope_failures` **只进 logger.warning**，而 `wp_formula`
+        #: 全库 0 行 ⇒ 合伙人点「全局一键刷新」看到的是「刷新成功、已应用 0 个单元」，
+        #: 与「公式都算过了、确实没有需要改的」**不可区分**。
+        #: `no_formulas` 这一态必须透到响应体 `warnings`（前端 GtRefreshScopeDialog
+        #: 已有 warnings 渲染区，故零前端改动即可见）。
+        self._coordinator_warnings: list[str] = []
 
     async def generate(
         self,
@@ -144,6 +153,7 @@ class DraftRefreshOrchestrator:
         # ── ② 按被勾选 scope 分派生成器 → 归集 units + page_keys ──────────────
         units: list[RefreshUnit] = []
         page_keys: list[str] = []
+        self._coordinator_warnings = []  # 每次 generate 重置（实例可被复用）
         for scope in selected:
             gen_units, gen_pages = await self._dispatch(
                 scope, project_id=project_id, year=year
@@ -167,6 +177,20 @@ class DraftRefreshOrchestrator:
         # ── ④ 审计留痕记录本次实际执行的勾选范围（Req 21.6，复用 Req 4 留痕）──────
         if result.status == "success" and result.refresh_id is not None:
             await self._record_scopes_to_audit(result.refresh_id, selected)
+
+        # ── ⑤ 把 coordinator 的「无公式定义」等告警透到响应体（Task 11 / R6.4）──
+        # fail-open：`result` 可能没有 `warnings` 属性（不同实现），此时只落日志。
+        if self._coordinator_warnings:
+            existing = getattr(result, "warnings", None)
+            if isinstance(existing, list):
+                for w in self._coordinator_warnings:
+                    if w not in existing:
+                        existing.append(w)
+            else:
+                logger.warning(
+                    "RefreshResult 无 warnings 通道，coordinator 告警仅落日志：%s",
+                    self._coordinator_warnings,
+                )
 
         return result, application
 
@@ -203,6 +227,7 @@ class DraftRefreshOrchestrator:
         Does NOT commit — consistent with service-only-flush contract.
         """
         from app.services.formula_runtime.coordinator import (
+            NO_FORMULAS_KIND,
             FormulaRuntimeCoordinator,
             MutationPlanResult,
         )
@@ -253,6 +278,15 @@ class DraftRefreshOrchestrator:
                 "FormulaRuntimeCoordinator scope_failures for scope=%r: %d items",
                 scope, len(plan.scope_failures),
             )
+            # Task 11（R6.4）：`no_formulas` 这一态必须**透到用户**，不能只落日志
+            # —— 否则「本项目尚未定义任何公式」会显示成「刷新成功、0 处变更」。
+            for failure in plan.scope_failures:
+                if failure.get("kind") != NO_FORMULAS_KIND:
+                    continue
+                detail = failure.get("detail") or "本项目尚未定义任何公式"
+                msg = f"范围 {scope}：{detail}"
+                if msg not in self._coordinator_warnings:
+                    self._coordinator_warnings.append(msg)
         if plan.issues:
             logger.info(
                 "FormulaRuntimeCoordinator issues for scope=%r: %d items",

@@ -180,6 +180,58 @@ async def _inject_h0_book_amounts(
         ctx["h0_book_conflicts"] = result.conflicts
 
 
+async def _inject_l0_book_amounts(
+    db: AsyncSession,
+    project_id: UUID | str,
+    year: int | None,
+    wp_code: str | None,
+    sheet_html_data: dict,
+) -> None:
+    """向 **L0-1** 的 ``confirmation-summary`` htmlData 加法式注入按品种账面金额。
+
+    用于源模板 `函证结果汇总表L0-1` 下区「一、函证情况」矩阵 `E30`/`F30`
+    「本期（期末）账面金额」两格的自动取数（可手工覆盖）。L0 恰 2 个品种
+    （源 `E29 长期应付款` / `F29 应付债券`），无 ``……`` 可扩位。
+
+    🔴 **为什么走加法式注入而不是 RENDERER_DISPATCH**：
+    ``confirmation-summary`` 是 **七枢纽共享** componentType，注册进
+    ``RENDERER_DISPATCH`` 会让 D0/E0/F0/G0/H0/K0 的载荷一起改道。本函数沿用
+    :func:`_inject_confirmation_population` 的通道，并按 ``wp_code`` 前缀门控
+    （门控**早于**取数调用，避免为其余六枢纽白跑 DB 查询）。
+
+    契约（l0-confirmation-source-alignment R3.3/R3.4/R10.1/R10.2 · Property 12）：
+    - ``wp_code`` 前缀非 ``L0`` → 直接 return（其余六枢纽载荷逐字节不变）
+    - 只写 ``project_context.l0_book_amounts`` / ``l0_book_source_codes``，
+      不改 ``rows``/``_format``/其它字段
+    - 「注入整体失败」与「解析成功但本项目无此科目」必须可区分：
+      前者**键不存在**，后者键存在且值为 ``None``（前端分别渲染
+      「未取数（可手填）」与「本项目无此科目」）→ 前端 **不得写 ``?? {}`` 兜底**，
+      那会把前者变成后者，让全部品种显示「本项目无此科目」
+    """
+    if not isinstance(sheet_html_data, dict):
+        return
+    # 🔴 门控**早于**取数调用 —— 否则会为其余六枢纽白跑一轮 tb_balance 查询，
+    #    且 `project_context` 会被塞进 L0 专属键（波及 D0/E0/F0/G0/H0/K0 载荷）。
+    if not str(wp_code or "").strip().upper().startswith("L0"):
+        return
+
+    from app.services.four_table.l0_book_amounts import (
+        ResolverContext,
+        resolve_l0_book_amounts,
+    )
+
+    result = await resolve_l0_book_amounts(
+        ResolverContext(db=db, project_id=project_id, year=year)
+    )
+    ctx = sheet_html_data.setdefault("project_context", {})
+    if not isinstance(ctx, dict):
+        return
+    ctx["l0_book_amounts"] = result.amounts
+    ctx["l0_book_source_codes"] = result.source_codes
+    if result.conflicts:
+        ctx["l0_book_conflicts"] = result.conflicts
+
+
 def inject_applicable_standards(sheets: list[dict], standards: list[str]) -> int:
     """向每个 sheet 的 ``html_data.project_context`` 统一注入 ``applicable_standards``。
 

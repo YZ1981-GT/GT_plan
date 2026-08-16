@@ -41,6 +41,7 @@ from app.services.formula_runtime.contracts import (
     FormulaMutation,
 )
 from app.services.formula_runtime.coordinator import (
+    NO_FORMULAS_KIND,
     FormulaRuntimeCoordinator,
     MutationPlanResult,
 )
@@ -332,7 +333,26 @@ class TestFormulaRuntimeCoordinator:
 
     @pytest.mark.asyncio
     async def test_no_formulas_returns_empty_plan(self):
-        """When no formulas exist, return empty plan without errors."""
+        """无公式时返回空 plan，但**必须留下可见的 no_formulas 记录**。
+
+        🔴 **本断言于 2026-08-07 按 R9.6 诚实改写**
+        （spec formula-management-runtime-closure Task 11 / Property 15）：
+
+        改造前 ``generate_mutation_plan`` 在 ``_load_formulas`` 返空时**静默
+        early-return**，于是「``wp_formula`` 表 0 行 ⇒ 整条运行时链空转」这一事实
+        在 UI 与日志里**完全不可见** —— 真实库实测该表就是 0 行，公式管理页面看到的
+        内容全部来自 ``prefill_formula_mapping.json`` / ``report_config`` 三条旁路，
+        用户以为「公式在跑」，实际一次都没跑过。
+
+        Task 11 的修复 = 无公式时往 ``scope_failures`` 追加一条
+        ``kind="no_formulas"`` 的条目，并由 ``draft_refresh_orchestrator``
+        透传进 ``RefreshResult.warnings`` → 前端 ``GtRefreshScopeDialog.vue``
+        既有 warnings 区直接可见（零前端改动）。
+
+        故原断言 ``plan.scope_failures == []`` **锁定的是被修复的错误行为**，
+        改写为「空 plan + 恰好一条 no_formulas 记录」。
+        ``mutations`` / ``issues`` / ``hints`` 三条断言**一字未动**（不放宽）。
+        """
         project_id = uuid.uuid4()
         year = 2025
 
@@ -351,7 +371,14 @@ class TestFormulaRuntimeCoordinator:
         assert plan.mutations == []
         assert plan.issues == []
         assert plan.hints == []
-        assert plan.scope_failures == []
+
+        # 空结果必须可见（不再静默 early-return）
+        assert len(plan.scope_failures) == 1
+        entry = plan.scope_failures[0]
+        assert entry["kind"] == NO_FORMULAS_KIND
+        # detail 必须写明「表里 0 行」与被请求的 scopes，否则运维看不出原因
+        assert "wp_formula" in entry["detail"]
+        assert "report" in entry["detail"]
 
     @pytest.mark.asyncio
     async def test_logic_check_produces_issues_not_mutations(self):

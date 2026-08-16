@@ -207,12 +207,9 @@ export const KNOWN_ORPHAN_MODULES: readonly OrphanEntry[] = Object.freeze([
       '列出处登记表，被 confirmationColumnSpec.spec.ts 用作「resolve ⊆ manifest」判据；'
       + '它是守卫专用真源，接进生产代码无收益（列解析本身走 confirmationColumnSpec.ts）。',
   },
-  {
-    path: 'confirmation/k0-confirmation/k0LowerZoneSpec.ts',
-    owner: 'k0-confirmation-source-alignment',
-    reason:
-      'K0-1 下区四块文字真源，该 spec Wave 3 才接线（7/18，且需等 F0 spec 收口）。',
-  },
+  // 🔴 2026-08-07 移出：`confirmation/k0-confirmation/k0LowerZoneSpec.ts` 已由
+  //    `K0SummaryLowerZone.vue`（四块渲染）与 `ConfirmationSampling.vue`（isK0 → 6 项）
+  //    真实消费（k0 spec Task 10 接线完成）。基线只许缩短，故直接删条目而不是改 reason。
   {
     // 🔴 这条是「有意只被守卫消费」的判据真源，不是待清理的死代码。
     //    七枢纽区块结构（title / sumField 列集 / sourceExtra 登记）的契约基准，

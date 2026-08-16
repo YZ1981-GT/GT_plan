@@ -38,6 +38,8 @@ import {
   RESTRICTED_ASSETS_OWNERS,
   summarizeRestrictedRows,
 } from '../composables/restrictedAssetsNoteSectionMap'
+// fail closed 提示文案单一真源（含**为什么**，不只是哪张表）
+import { rowScopeFailureMessage } from '../composables/shared/rowScopeFailure'
 import {
   E1_DEFAULT_CURRENCIES,
   E1_FX_GROUPS,
@@ -1136,10 +1138,14 @@ async function syncFxSectionToNote(year: number | undefined): Promise<void> {
       year ? { ...fxPayload, year } : fxPayload,
     )
     const data = resp?.data ?? resp
-    const unresolved: string[] = data?.row_scope_unresolved || []
-    if (unresolved.length) {
-      // fail closed 是静默跳过 → 必须让审计师知道这张表没同步成功
-      ElMessage.warning(`外币货币性项目未能同步（段边界解析失败）：${unresolved.join('、')}`)
+    // fail closed 是静默跳过 → 必须让审计师知道哪张表没同步成功、**以及为什么**
+    const failure = rowScopeFailureMessage(
+      '外币货币性项目',
+      data?.row_scope_unresolved,
+      data?.row_scope_unresolved_reasons,
+    )
+    if (failure) {
+      ElMessage.warning(failure)
       return
     }
     if (data && (data.success || data.section_id)) {
@@ -1268,10 +1274,14 @@ async function syncRestrictedAssetsToNote(year: number | undefined): Promise<voi
         year ? { ...payload, year } : payload,
       )
       const data = resp?.data ?? resp
-      const unresolved: string[] = data?.row_scope_unresolved || []
-      if (unresolved.length) {
-        // fail closed 是静默跳过 → 必须让审计师知道这张表没同步成功
-        ElMessage.warning(`受限资产未能同步（段边界解析失败）：${unresolved.join('、')}`)
+      // fail closed 是静默跳过 → 必须让审计师知道哪张表没同步成功、**以及为什么**
+      const raFailure = rowScopeFailureMessage(
+        '受限资产',
+        data?.row_scope_unresolved,
+        data?.row_scope_unresolved_reasons,
+      )
+      if (raFailure) {
+        ElMessage.warning(raFailure)
         continue
       }
       if (data && (data.success || data.section_id)) {

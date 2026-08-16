@@ -278,14 +278,22 @@ class TestCharacterizationMetadataKeys:
         # 本 spec（disclosure-note-row-level-merge Task 5）additive 加了两个键：
         # `row_scope_unresolved` 必须进返回值而非只进日志 —— fail closed 是静默跳过，
         # 前端据此提示「这张表没同步成功」，否则又是一个 dead path。
+        #
+        # 2026-08-12 再 additive 加第三个键 `row_scope_unresolved_reasons`
+        # （spec `k-cycle-extraction-formula-and-disclosure-closure` Task 15 /
+        # Requirement 11.3）：只给表名说不出**为什么**。三种成因修法完全不同
+        # —— 准则未设 / 表名与模板不一致 / 模板缺段首码 —— 只报「解析失败」
+        # 等于把三条岔路合成一条死胡同，而审计师看不到后端日志。
         assert set(result) == {
             "success", "section_id", "synced_at", "rows_synced",
             "created", "revived", "blocked_by_manual_override", "texts_synced",
             "row_scoped_tables", "row_scope_unresolved",
+            "row_scope_unresolved_reasons",
         }
-        # 无 `_row_scope` 的载荷两者恒为空（Property 1 的另一面）
+        # 无 `_row_scope` 的载荷三者恒为空（Property 1 的另一面）
         assert result["row_scoped_tables"] == []
         assert result["row_scope_unresolved"] == []
+        assert result["row_scope_unresolved_reasons"] == {}
 
     async def test_metadata_keys_never_counted_as_rows(self):
         """`_` 前缀元数据键不计入 `rows_synced`。"""

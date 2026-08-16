@@ -36,7 +36,7 @@ const voucherRowArb = fc.record({
 })
 
 /** 日期生成器：合理范围内的日期 */
-const dateArb = fc.date({
+const dateArb = fc.date({ noInvalidDate: true,
   min: new Date('2020-01-01'),
   max: new Date('2030-12-31'),
 })

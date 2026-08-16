@@ -117,7 +117,7 @@ describe('Feature: f3-notes-payable, Property 5: 集中度公式', () => {
 describe('Feature: f3-notes-payable, Property 6: 逾期天数非负', () => {
   it('calcOverdueDays >= 0 for any due date', () => {
     fc.assert(
-      fc.property(fc.date(), fc.date(), (due, asOf) => {
+      fc.property(fc.date({ noInvalidDate: true }), fc.date({ noInvalidDate: true }), (due, asOf) => {
         if (Number.isNaN(due.getTime()) || Number.isNaN(asOf.getTime())) return
         const dueStr = due.toISOString().slice(0, 10)
         expect(calcOverdueDays(dueStr, asOf)).toBeGreaterThanOrEqual(0)

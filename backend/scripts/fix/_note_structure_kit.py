@@ -26,10 +26,12 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import datetime as _dt
 import json
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
 
@@ -214,6 +216,159 @@ def drop_tables(section: dict[str, Any], names: list[str]) -> list[str]:
     return changes
 
 
+#: 可扩位行的 `row_type`（与 `app.services.note_expandable_markers` 同值；
+#: 此处不 import 是为了让 kit 保持 stdlib-only、可被脚本单独 importlib 加载）
+_EXPANDABLE_ROW_TYPE = "expandable"
+
+#: 汇总行的 `row_type`（可扩位行要插在它们**之前**）
+_TOTAL_ROW_TYPES_KIT = frozenset({"total", "subtotal"})
+
+
+def carry_row_codes(
+    old_rows: Any,
+    new_rows: list[dict[str, Any]],
+    *,
+    table_name: str = "",
+    warnings: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """整表重写 ``rows`` 时**保留** ``report_row_code``（按 label 配对）。
+
+    🔴 为什么必须有这一步（2026-08-12 实测踩到）：``report_row_code`` 是
+    `note_shared_table_segments.split_segments` 唯一的**切段依据** —— 共享表里
+    哪几行归哪个循环，全靠它。它由 `fix_note_k_report_row_codes.py` 按
+    `report_config` 连库对账后落到行上，**与结构对齐（表名/表头/列/行骨架）正交**。
+
+    而结构脚本的 rows 骨架（`data_row(...)` 那套）里不带这个字段，于是
+    「结构对齐脚本」与「段首码脚本」会**互相回退**：前者一跑就把码抹掉、后者
+    再跑又补回来，两个 `--check` 永远不可能同时归零。实测形态 = K1 listed
+    `五、8 其他应收款` 的 `rows：4 → 4 项`（行数一样、只差一个键）。
+
+    修在共享 kit 而不是逐个脚本里：所有 `fix_note_*_structure.py` 都走
+    :func:`apply_plan`，任何一个重写 rows 都会遇到同样的问题。
+
+    配对按 **label** 而不是下标 —— 结构修订常会插/删行，下标会串位。
+    同名行 >1 时不搬（并记 warning），避免猜错归属。
+    """
+    codes: dict[str, str] = {}
+    seen: dict[str, int] = {}
+    for row in old_rows or []:
+        if not isinstance(row, Mapping):
+            continue
+        label = str(row.get("label") or "").strip()
+        seen[label] = seen.get(label, 0) + 1
+        code = str(row.get("report_row_code") or "").strip()
+        if code:
+            codes.setdefault(label, code)
+    if not codes:
+        return new_rows
+
+    out: list[dict[str, Any]] = []
+    for row in new_rows:
+        if not isinstance(row, Mapping):
+            out.append(row)
+            continue
+        new_row = dict(row)
+        label = str(new_row.get("label") or "").strip()
+        code = codes.get(label)
+        if code and not str(new_row.get("report_row_code") or "").strip():
+            if seen.get(label, 0) > 1:
+                if warnings is not None:
+                    warnings.append(
+                        f"{table_name}：行「{label}」重名 {seen[label]} 次，"
+                        f"report_row_code={code} 不搬（避免猜错段归属）"
+                    )
+            else:
+                new_row["report_row_code"] = code
+        out.append(new_row)
+    return out
+
+
+def carry_expandable_rows(
+    old_rows: Any,
+    new_rows: list[dict[str, Any]],
+    *,
+    table_name: str = "",
+    warnings: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    """整表重写 ``rows`` 时**保留可扩位行**（`row_type == "expandable"`）。
+
+    🔴 与 :func:`carry_row_codes` 同一个道理，但保留的是**整行**而不是一个字段：
+    可扩位行（源模板标了「此处可无限量增行」的那一行）是**源模板事实**，与结构
+    骨架正交 —— 骨架说「这张表有哪些固定行」，可扩位行说「审计师可以在哪里加行」。
+    结构脚本的骨架里没有它，一跑就把它抹掉，而
+    `fix_note_k_expandable_rows.py` 再跑又插回来 ⇒ 两个 `--check` 永远不可能同时归零。
+
+    插入位置 = **末尾合计/小计行之前**（源模板 29 处标记全部就在那里）；表尾没有
+    合计行时追加到末尾。
+
+    去重与去陈旧由 `fix_note_k_expandable_rows.py` 的 PLAN 负责（它是可扩位行的
+    唯一权威：缺的补、多的删）。本函数只负责「结构重写时别弄丢」。
+    """
+    old_list = list(old_rows or [])
+    # 连带记下**前一行的 label** 作位置锚点：可扩位行可能落在表中间（源模板里
+    # 一张表有多处「此处可增行」），只会「插在合计前」会把它们全挤到表尾，
+    # 与 `fix_note_k_expandable_rows.py` 的落位打架 ⇒ 两个 `--check` 互相回退。
+    def _tail_total_start(rows: list[Any]) -> int:
+        at = len(rows)
+        for i in range(len(rows) - 1, -1, -1):
+            row = rows[i]
+            if isinstance(row, Mapping) and str(row.get("row_type") or "") in _TOTAL_ROW_TYPES_KIT:
+                at = i
+            else:
+                break
+        return at
+
+    old_tail = _tail_total_start(old_list)
+    keep: list[tuple[dict[str, Any], str]] = []
+    for i, r in enumerate(old_list):
+        if not isinstance(r, Mapping):
+            continue
+        if str(r.get("row_type") or "") != _EXPANDABLE_ROW_TYPE:
+            continue
+        # 🔴 两种落位要分开还原，否则会与 `fix_note_k_expandable_rows.py` 打架：
+        #   * 原本就贴在**表尾合计之前** → 新骨架里仍放到合计之前（哪怕骨架加了新行，
+        #     它也该留在数据区末尾，而不是被新行挤到中间）
+        #   * 原本在**表中间**（源模板一张表有多处「此处可增行」）→ 按**前一行 label**
+        #     还原相对位置
+        prev_label = ""
+        if i != old_tail - 1 and i > 0 and isinstance(old_list[i - 1], Mapping):
+            prev_label = str(old_list[i - 1].get("label") or "").strip()
+        keep.append((dict(r), prev_label))
+    if not keep:
+        return new_rows
+
+    have = sum(
+        1
+        for r in new_rows
+        if isinstance(r, Mapping)
+        and str(r.get("row_type") or "") == _EXPANDABLE_ROW_TYPE
+    )
+    if have >= len(keep):
+        return new_rows
+
+    out = [dict(r) if isinstance(r, Mapping) else r for r in new_rows]
+
+    for row, prev_label in keep[have:]:
+        at = None
+        if prev_label:
+            hits = [
+                i
+                for i, r in enumerate(out)
+                if isinstance(r, Mapping) and str(r.get("label") or "").strip() == prev_label
+            ]
+            if len(hits) == 1:
+                at = hits[0] + 1
+            elif warnings is not None:
+                warnings.append(
+                    f"{table_name}：可扩位行的位置锚点「{prev_label}」命中 {len(hits)} 次，"
+                    "退回「合计行之前」"
+                )
+        if at is None:
+            at = _tail_total_start(out)
+        out.insert(at, row)
+    return out
+
+
 def apply_plan(section: dict[str, Any], plan: list[dict[str, Any]]) -> tuple[list[str], list[str]]:
     """按计划就地修订 ``section.tables``（游标只前进，重名表由位置区分）。"""
     tables: list[dict[str, Any]] = section.get("tables") or []
@@ -254,6 +409,15 @@ def apply_plan(section: dict[str, Any], plan: list[dict[str, Any]]) -> tuple[lis
             want = r.get(key)
             if want is None:
                 continue
+            if key == "rows":
+                want = carry_row_codes(
+                    tbl.get("rows"), want, table_name=str(tbl.get("name", "")),
+                    warnings=warnings,
+                )
+                want = carry_expandable_rows(
+                    tbl.get("rows"), want, table_name=str(tbl.get("name", "")),
+                    warnings=warnings,
+                )
             if tbl.get(key) != want:
                 old_len = len(tbl.get(key) or [])
                 tbl[key] = json.loads(json.dumps(want, ensure_ascii=False))
@@ -504,6 +668,38 @@ def run_section(
             )
         for miss in missing_text_sections(section, require_text_sections or []):
             errs.append(f"text_sections 缺源模板说明段：「{str(miss).strip()[:30]}…」")
+
+        # ── 🔴 补强：把 `--check` 的判据与**写入路径**对齐（2026-08-12）─────────────
+        #
+        # 改造前 `--check` 只跑 `validate_section`（表名清单 + text_sections），
+        # **完全不跑 `apply_plan`** ⇒ `headers` / `columns` / `rows` / `guidance` /
+        # `_column_groups` 的任何偏差它都看不见。实测形态：
+        #
+        #   `fix_note_g7_soe_structure.py --dry-run` 报「共 2 处变更」
+        #   （T9 标签列头 `类型` → `结构化主体类型`），
+        #   而同一时刻 `--check` 报「0 项欠账」。
+        #
+        # 这是典型假绿：各 spec 普遍拿「`--check` 0 欠账」当幂等/对齐的验收判据
+        # （本仓 G7 spec 的 Task 19「幂等双证」正是如此），而该判据**结构上**
+        # 抓不到列结构欠账 ⇒ 验收恒过、欠账长期驻留。
+        #
+        # 修法：在**深拷贝**上重放写入路径的全部变换，任何 change 计为欠账。
+        # 判据从此与 `--dry-run` 同源（同一函数、同一顺序），不存在两套口径。
+        #
+        # 实测影响面（`--dry-run` 变更数逐脚本比对，24 个用 build_cli 的脚本）：
+        # 21 个本就干净、2 个原本已打红、**仅 1 个** `fix_note_l_cycle_structure.py`
+        # 由绿转红（专项应付款 2 处 `guidance` 文本欠账，属 L 循环 spec 作用域）——
+        # 即本次补强暴露的是真欠账，不是引入新失败。
+        probe = copy.deepcopy(section)
+        residual = drop_tables(probe, drops or [])
+        probe_changes, _probe_warnings = apply_plan(probe, plan)
+        residual += probe_changes
+        if text_sections is not None and probe.get("text_sections") != list(text_sections):
+            probe["text_sections"] = list(text_sections)
+        residual += ensure_text_sections(probe, require_text_sections or [])
+        residual += titleize_text_sections(probe)
+        for change in residual:
+            errs.append(f"结构未对齐（headers/columns/rows/guidance）：{change}")
         return [], [], errs
 
     changes = drop_tables(section, drops or [])

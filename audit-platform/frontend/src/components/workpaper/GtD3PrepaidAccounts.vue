@@ -44,6 +44,7 @@
           :all-responses="allResponses"
           :wp-id="wpIdRef"
           :project-id="projectIdRef"
+          :html-data="props.htmlData"
           :is-readonly="isReadonly"
           :save-immediate="saveImmediate"
           :debounced-save="debouncedSave"

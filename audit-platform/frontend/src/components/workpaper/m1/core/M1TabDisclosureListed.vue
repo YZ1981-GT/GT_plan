@@ -173,6 +173,7 @@ const aiLoading = ref('')
 // ─── 同步链路（浅合并推 K3 §五、42 的应付股利两张子表） ─────────────────────
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM1SyncPayload, type M1DividendRow, type M1OverdueRow } from '../../composables/m1NoteSectionMap'
+import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
   const dividendRows: M1DividendRow[] = detailRows.value.map((r: any) => ({
@@ -185,8 +186,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   const payload = buildM1SyncPayload(props.wpId, 'listed', dividendRows, overdueRows)
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 

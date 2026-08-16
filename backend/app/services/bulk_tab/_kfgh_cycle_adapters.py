@@ -58,13 +58,31 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # api_prefix → I/E 端点模块 映射（K/F/G/H 全量）
 #
-# 值为 `app.routers.wp_render_strategies.<module>` 的模块名（不含包前缀）。
-# 由 `backend/app/routers/wp_render_strategies/_*_import_export.py` 枚举得出，
-# 覆盖手写族与工厂族。仅收录真正暴露三端点（export-template/export-data/
-# import-data）的循环，其余（无 I/E 端点）不登记。
+# 值有两种形态，由 `_resolve_module_path` 统一解析：
+#   ① **相对名**（不含 `.`）—— `app.routers.wp_render_strategies.<module>` 下的工厂/
+#      手写族模块，如 `_k1_import_export`。由
+#      `backend/app/routers/wp_render_strategies/_*_import_export.py` 枚举得出。
+#   ② **完整点路径**（含 `.`）—— 专属 router 模块，如
+#      `app.routers.l2_interest_payable`。用于形态 A 端点由专属 router 自己提供的
+#      前缀（X-3 调整分录的 16 个短前缀），使界面（单份 UI）与批量（bulk）两条通路
+#      解析到**同一个端点函数对象**，避免 split-brain（GS6
+#      `test_x3_adapter_host_same_module` 钉死该不变量）。
+#
+# 仅收录真正暴露三端点（export-template/export-data/import-data）的循环，
+# 其余（无 I/E 端点）不登记。
 # ---------------------------------------------------------------------------
 
 _MODULE_PKG = "app.routers.wp_render_strategies."
+
+
+def _resolve_module_path(value: str) -> str:
+    """`_PREFIX_TO_MODULE` 的值 → 可 `import_module` 的模块点路径。
+
+    含 `.` ⇒ 已是完整点路径（专属 router 模块），原样返回；否则拼 `_MODULE_PKG`
+    前缀（工厂/手写族的相对名）。两种形态并存，故拼接只此一处。
+    """
+    return value if "." in value else _MODULE_PKG + value
+
 
 _PREFIX_TO_MODULE: dict[str, str] = {
     # ── F 循环 ────────────────────────────────────────────────────────────
@@ -140,31 +158,32 @@ _PREFIX_TO_MODULE: dict[str, str] = {
     "j1": "_j1_import_export",
     "j2": "_j2_import_export",
     # ── L 循环 ────────────────────────────────────────────────────────────
+    #   `l2` / `l6` 指专属 router（X-3 调整分录形态 A 由它们自己提供，两路同源）
     "l1": "_l1_import_export",
-    "l2": "_l2_import_export",
+    "l2": "app.routers.l2_interest_payable",
     "l3": "_l3_import_export",
     "l4": "_l4_import_export",
     "l5": "_l5_import_export",
-    "l6": "_l6_import_export",
+    "l6": "app.routers.l6_special_payables",
     "l7": "_l7_import_export",
     "l8": "_l8_import_export",
-    # ── M 循环 ────────────────────────────────────────────────────────────
-    "m1": "_m1_import_export",
-    "m2": "_m2_import_export",
-    "m3": "_m3_import_export",
-    "m4": "_m4_import_export",
-    "m5": "_m5_import_export",
-    "m6": "_m6_import_export",
-    "m7": "_m7_import_export",
-    "m8": "_m8_import_export",
-    "m9": "_m9_import_export",
-    "m10": "_m10_import_export",
-    # ── N 循环 ────────────────────────────────────────────────────────────
-    "n1": "_n1_import_export",
-    "n2": "_n2_import_export",
-    "n3": "_n3_import_export",
+    # ── M 循环（M1~M10 全部指专属 router，两路同源）─────────────────────────
+    "m1": "app.routers.m1_dividends_payable",
+    "m2": "app.routers.m2_paid_in_capital",
+    "m3": "app.routers.m3_treasury_stock",
+    "m4": "app.routers.m4_capital_reserve",
+    "m5": "app.routers.m5_surplus_reserve",
+    "m6": "app.routers.m6_retained_earnings",
+    "m7": "app.routers.m7_special_reserve",
+    "m8": "app.routers.m8_general_risk_reserve",
+    "m9": "app.routers.m9_other_comprehensive_income",
+    "m10": "app.routers.m10_other_equity_instruments",
+    # ── N 循环（`n4` 无 X-3 作业面，仍指工厂）──────────────────────────────
+    "n1": "app.routers.n1_deferred_tax_assets",
+    "n2": "app.routers.n2_taxes_payable",
+    "n3": "app.routers.n3_deferred_tax_liabilities",
     "n4": "_n4_import_export",
-    "n5": "_n5_import_export",
+    "n5": "app.routers.n5_income_tax_expense",
     # ── H 补充 ────────────────────────────────────────────────────────────
     "h5": "_h5_import_export",
     "h7": "_h7_import_export",
@@ -207,11 +226,24 @@ async def _call_endpoint(
     wp_id: str,
     sheet_code: str,
     upload_file: Any | None = None,
+    strategy: str | None = None,
 ) -> Any:
     """按 endpoint 实际签名传参并 await（绕过 FastAPI DI，显式注入 db/user）。
 
     仅传入端点签名中真实存在的参数，兼容各循环签名差异
     （有的 export_template 不取 db、有的取 include_guidance 等）。
+
+    🔴 `strategy` 必须与 `sheet`/`include_guidance`/`file` 同款按签名探测后**显式传入**：
+       不传的话该形参会落到端点默认值 `Query("overwrite")` 这个 `FieldInfo` 对象本身
+       （**不是**字符串 `"overwrite"`），后果两条且方向相反于直觉 ——
+       ① `resolve_conflict` 对未知策略走防御性 `else` ⇒ 合并语义**恰好**等同 overwrite，
+          于是用户在批量对话框里选的 `fill-empty` / `reject` 被静默丢掉：`reject` 本该
+          整表拒绝以防覆盖已编制内容，实际却按覆盖写入 = 静默数据丢失；
+       ② `_should_purge_residual` 比对 `== "overwrite"` 对 `FieldInfo` 不成立 ⇒ bulk
+          **从不清**残留族键（导入行数变少时留幽灵行），而界面通路会清 ⇒ 两条通路库态分叉。
+       带 `strategy` 形参的端点当前恰为 16 个 X-3 短前缀，其余 73 键签名里没有这个形参 ⇒
+       探测为假、`kwargs` 逐字不变（`test_x3_bulk_strategy_parity` 双向锁死这两侧）。
+       `strategy is None` 时（导出通路）一律不传，与施加前逐字相同。
     """
     params = inspect.signature(endpoint).parameters
     kwargs: dict[str, Any] = {}
@@ -229,6 +261,8 @@ async def _call_endpoint(
         kwargs["include_guidance"] = False
     if upload_file is not None and "file" in params:
         kwargs["file"] = upload_file
+    if strategy is not None and "strategy" in params:
+        kwargs["strategy"] = strategy
     return await endpoint(**kwargs)
 
 
@@ -241,7 +275,7 @@ def _make_export_fn(api_prefix: str, module_name: str):
         sheet_code: str,
         mode: Literal["template", "data"],
     ) -> bytes:
-        module = importlib.import_module(_MODULE_PKG + module_name)
+        module = importlib.import_module(_resolve_module_path(module_name))
         suffix = _SUFFIX_TEMPLATE if mode == "template" else _SUFFIX_DATA
         endpoint = _endpoint_for(module, api_prefix, suffix)
         if endpoint is None:
@@ -264,7 +298,7 @@ def _make_import_fn(api_prefix: str, module_name: str):
         xlsx_bytes: bytes,
         strategy: str,
     ) -> TabImportResult:
-        module = importlib.import_module(_MODULE_PKG + module_name)
+        module = importlib.import_module(_resolve_module_path(module_name))
         endpoint = _endpoint_for(module, api_prefix, _SUFFIX_IMPORT)
         if endpoint is None:
             return TabImportResult(
@@ -274,7 +308,12 @@ def _make_import_fn(api_prefix: str, module_name: str):
         upload = _make_upload_file(xlsx_bytes, sheet_code)
         try:
             result = await _call_endpoint(
-                endpoint, db=db, wp_id=wp_id, sheet_code=sheet_code, upload_file=upload
+                endpoint,
+                db=db,
+                wp_id=wp_id,
+                sheet_code=sheet_code,
+                upload_file=upload,
+                strategy=strategy,
             )
         except Exception as e:  # noqa: BLE001 — 单 sheet 失败逐条记，不整包崩
             logger.warning(

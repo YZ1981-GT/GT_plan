@@ -17,7 +17,12 @@ from app.services.wp_export.export_engine import determine_export_format
 # ─── Type Definitions ─────────────────────────────────────────────────────────
 
 # All known workpaper component types
-XLSX_TYPES = ["univer", "form", "hybrid", "table", "audit_sheet", "program_sheet"]
+# 🔴 这是 `export_engine._XLSX_TYPES` 的**测试侧副本**（第二真源）——
+#    生产集合新增取值必须同步这里，否则表现为「守卫清单漏一张 = 假失败」。
+#    `"custom"` = 自定义底稿（componentType=custom），2026-08-06 显式登记。
+XLSX_TYPES = [
+    "univer", "form", "hybrid", "table", "audit_sheet", "program_sheet", "custom",
+]
 DOCX_TYPES = ["word", "text"]
 ALL_WP_TYPES = XLSX_TYPES + DOCX_TYPES
 

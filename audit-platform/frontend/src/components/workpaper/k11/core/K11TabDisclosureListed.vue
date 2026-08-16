@@ -328,7 +328,7 @@ function handleNarrativeSave(): void {
 
 async function syncToDisclosureNotes(): Promise<void> {
   if (!props.projectId || props.isReadonly) return
-  const payload = buildK11SyncPayload('listed', props.wpId || '',
+    const payload = buildK11SyncPayload('listed', props.wpId || '',
     disclosureRows.value
       .filter(r => !r.isTotal)
       .map(r => ({ project: r.category, currentAmount: r.currentProvision - r.currentReversal, priorAmount: r.priorAmount })),

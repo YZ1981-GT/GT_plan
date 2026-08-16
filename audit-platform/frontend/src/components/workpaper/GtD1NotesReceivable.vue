@@ -115,6 +115,7 @@
         :wp-id="props.wpId"
 
         :project-id="props.projectId"
+        :html-data="props.htmlData"
 
         :is-readonly="props.readonly ?? false"
 

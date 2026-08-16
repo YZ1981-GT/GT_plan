@@ -139,11 +139,11 @@ export function buildD4TransposeColumns(
     )
   }
 
-  // 合计列
-  cols.push(
-    { key: 'total_revenue', label: '收入', format: 'amount', group: '合计' },
-    { key: 'total_cost', label: '成本', format: 'amount', group: '合计' },
-  )
+  // 🔴 **没有横向合计列** —— 源 xlsx 实证（上市 R44~R56 / 国企 R37~R49）该表
+  // 只有 9 列（label + 4 类别 × 收入/成本），合计是**行**（上市 R56 `=B52+B48`）。
+  // 改造前这里自造了 `total_revenue`/`total_cost` 两列，使推送给附注的列比源模板
+  // 多两列（Task 31 已移除）。底稿内部若需横向核对，用
+  // `d4RevenueSegmentColumns.segmentRowAcrossCategories`，它不进列定义。
 
   return cols
 }
@@ -156,8 +156,15 @@ export interface D4TransposeRow {
 }
 
 /**
- * 固定检查项行（源模板 A47~A49 = 行标签）。
- * 行可扩区但这三行是模板固有。
+ * @deprecated Task 31 起退役 —— 行集真源是
+ * `d4RevenueSegmentColumns.D4_SEGMENT_ROWS`（9 行，与源 xlsx 逐行对齐）。
+ *
+ * 本常量只有 3 项，丢了两个业务父行、空可扩行与合计行；且「在某一时点确认 /
+ * 在某一时段确认」在源模板里**各出现两次**（主营业务下 + 其他业务下），
+ * 单一字符串数组无法表达归属 ⇒ 单元格无法定位到正确的行。
+ *
+ * 保留仅为让存量引用可编译；新代码禁用（守卫 `d4SegmentRowAlignment.spec.ts`
+ * 断言生产代码不再引用它）。
  */
 export const D4_TRANSPOSE_CHECK_ITEMS = [
   '在某一时点确认',

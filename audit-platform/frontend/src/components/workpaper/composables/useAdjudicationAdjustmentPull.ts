@@ -29,17 +29,33 @@ export interface AdjudicationAdjMatch {
   accountNames: string[]
 }
 
-function unwrap<T>(v: Ref<T> | (() => T) | T): T {
+/**
+ * 归一 `Ref | getter | 值` 三形态。
+ *
+ * 🔴 数组与普通字符串都走「原样返回」分支（数组既非 function 也无 `value` 键）
+ * ⇒ 既有传纯字符串 / `string[]` 的调用方逐字不变。
+ */
+export function unwrap<T>(v: Ref<T> | (() => T) | T): T {
   if (typeof v === 'function') return (v as () => T)()
   if (v && typeof v === 'object' && 'value' in (v as any)) return (v as Ref<T>).value
   return v as T
 }
 
+/** 可延迟求值的入参（与 `projectId` / `year` 同形态） */
+export type Resolvable<T> = Ref<T> | (() => T) | T
+
 export interface UseAdjudicationAdjustmentPullOptions {
-  projectId: Ref<string> | (() => string) | string
-  year: Ref<number> | (() => number) | number
-  /** 科目码前缀（如 '6301'）；可多个 */
-  subjectPrefix: string | string[]
+  projectId: Resolvable<string>
+  year: Resolvable<number>
+  /**
+   * 科目码前缀（如 '6301'）；可多个。
+   *
+   * 🔴 2026-08-07 放宽为 `Resolvable` —— 走**语义定位**的循环（H 类）科目码是
+   * 逐项目解析出来的，setup 期 `htmlData` 可能还没到；传字符串快照会在
+   * 「render 后到」的路径上用兜底码拉分录（H9 实证部分项目用 `2651` 族、
+   * 部分用 `2601` 族，写死任一族都会在另一批项目一条都拉不到）。
+   */
+  subjectPrefix: Resolvable<string | string[]>
   /** 净发生额方向；默认 'credit'（损益贷方/负债/权益） */
   direction?: 'credit' | 'debit'
 }
@@ -52,7 +68,9 @@ export function useAdjudicationAdjustmentPull(opts: UseAdjudicationAdjustmentPul
     const pid = unwrap(opts.projectId)
     const yr = unwrap(opts.year)
     if (!pid || !yr) return
-    const prefixes = Array.isArray(opts.subjectPrefix) ? opts.subjectPrefix : [opts.subjectPrefix]
+    const rawPrefix = unwrap(opts.subjectPrefix)
+    const prefixes = (Array.isArray(rawPrefix) ? rawPrefix : [rawPrefix]).filter(Boolean)
+    if (!prefixes.length) return
     const direction = opts.direction ?? 'credit'
     loading.value = true
     try {

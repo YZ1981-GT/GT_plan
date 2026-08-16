@@ -130,7 +130,11 @@ def _session(*, checklist_rows=None, tb_balance_rows=None, raise_on_tb_balance=F
             business_category="general",
             applicable_standards="listed",
         ),
-        tb_row=SimpleNamespace(amount=98765.43),
+        tb_row=SimpleNamespace(
+            amount=98765.43,
+            unadjusted=98765.43,
+            audited=98765.43,
+        ),
         rp_rows=[SimpleNamespace(name="关联方甲", relation_type="subsidiary")],
         tb_balance_rows=tb_balance_rows or [],
         raise_on_tb_balance=raise_on_tb_balance,
@@ -232,12 +236,19 @@ def test_flag_on_no_subaccounts_fails_open(monkeypatch):
 
 
 def test_flag_on_tb_balance_error_fails_open(monkeypatch):
-    """开关开 + tb_balance 查询异常 → fail-open（省略 adjudication_prefill，render 正常）。"""
+    """开关开 + tb_balance 查询异常 → fail-open（省略 adjudication_prefill，render 正常）。
+
+    d-cycle-four-table-extraction-and-disclosure-completion R1 起额外输出两个 additive
+    溯源键。🔴 本用例的核心是 **tb_balance 抛异常时 render 仍正常返回** ——
+    故这两个键允许出现（它们自身也 fail-open：取数失败时 slots 为空态而非缺席）。
+    """
     _enable_flag(monkeypatch)
     _patch_active_filter(monkeypatch)
     result = _run(d6.render(_ctx(_session(raise_on_tb_balance=True))))
     assert "adjudication_prefill" not in result
-    assert set(result.keys()) == _BASELINE_KEYS
+    keys = set(result.keys())
+    assert _BASELINE_KEYS <= keys
+    assert keys - _BASELINE_KEYS <= {"tb_source_codes", "parent_check"}
 
 
 # ---------------------------------------------------------------------------

@@ -32,6 +32,8 @@ import {
   RESTRICTED_ASSETS_OWNERS,
   summarizeRestrictedRows,
 } from '../composables/restrictedAssetsNoteSectionMap'
+// fail closed 提示文案单一真源（含**为什么**，不只是哪张表）
+import { rowScopeFailureMessage } from '../composables/shared/rowScopeFailure'
 import type { ChecklistResponse } from '../composables/useD1FormData'
 import type { Ref } from 'vue'
 import { useAgingConfig, PRESET_SEGMENTS } from '@/composables/useAgingConfig'
@@ -1118,10 +1120,14 @@ async function syncRestrictedAssetsToNote(): Promise<void> {
         payload,
       )
       const data = resp?.data ?? resp
-      const unresolved: string[] = data?.row_scope_unresolved || []
-      if (unresolved.length) {
-        // fail closed 是静默跳过 → 必须让审计师知道这张表没同步成功
-        ElMessage.warning(`受限资产未能同步（段边界解析失败）：${unresolved.join('、')}`)
+      // fail closed 是静默跳过 → 必须让审计师知道哪张表没同步成功、**以及为什么**
+      const raFailure = rowScopeFailureMessage(
+        '受限资产',
+        data?.row_scope_unresolved,
+        data?.row_scope_unresolved_reasons,
+      )
+      if (raFailure) {
+        ElMessage.warning(raFailure)
         continue
       }
       window.dispatchEvent(new CustomEvent('disclosure:note-text-updated', {

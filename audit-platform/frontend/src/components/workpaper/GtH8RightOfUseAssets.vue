@@ -28,7 +28,7 @@
       >
         <template #title>
           审定合计(净值) {{ adjNetAudited.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}
-          ≠ 试算平衡表(1901净额) {{ tbAuditedRou?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}，
+          ≠ 试算平衡表({{ tbReconcileCodeText }}净额) {{ tbAuditedRou?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }}，
           差异 {{ tbReconcileDiff?.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) }} 元
         </template>
       </el-alert>
@@ -92,6 +92,7 @@
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :html-data="props.htmlData"
           />
         </template>
 
@@ -344,6 +345,7 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useH8CrossSheet } from './composables/useH8CrossSheet'
 import HiFourTableSourcePanel from './shared/HiFourTableSourcePanel.vue'
 import { getHiExtractionSegments } from './composables/hiExtractionSegments'
+import { h8Scope } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
@@ -440,7 +442,23 @@ const h9LinkageStatus = computed(() => {
   }
 })
 
-// ─── P1-⑤+⑦ TB 勾稽告警（审定合计 vs TB 1901 审定额） ─────────────────────────
+// ─── P1-⑤+⑦ TB 勾稽告警（审定合计 vs 使用权资产 TB 审定净额） ────────────────
+/**
+ * 告警文案里的科目码。
+ *
+ * 🔴 原写死 `1901`（待处理财产损溢，K2 `BS-014` 域）—— 浏览器实测看到
+ * 「≠ 试算平衡表(1901净额)」直接展示给审计师，破坏逻辑追溯。
+ * 真族是 `1641/1651`（原值）− `1642/1652`（累计折旧），且**逐项目互斥**
+ * ⇒ 只能取 render 下发的 `tb_source_codes`，未下发时退回 scope 双族兜底码。
+ */
+const tbReconcileCodeText = computed<string>(() => {
+  const src =
+    props.htmlData?.project_context?.tb_source_codes ?? props.htmlData?.tb_source_codes ?? null
+  const gross = h8Scope.slotCodes(src, 'gross')
+  const dep = h8Scope.slotCodes(src, 'accum_dep')
+  return `${gross.join('/')}−${dep.join('/')}`
+})
+
 /** 从 htmlData.tb_values (render 策略产出) 读试算平衡表数 */
 const tbAuditedRou = computed<number | null>(() => {
   const tv = props.htmlData?.tb_values

@@ -25,6 +25,9 @@ import sqlalchemy as sa
 
 from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
+from app.services.four_table.h_cycle_adjudication_prefill import (
+    attach_h_segment_prefill,
+)
 from app.services.four_table.h3_account_scope import (
     H3_ACCOUNT_SPEC,
     H3_SLOT_KEY_PREFIX,
@@ -279,7 +282,7 @@ async def render(ctx: RenderContext) -> dict | None:
     # 取数溯源（本项目实际命中的科目 + 报表行 + 与 report_config 的冲突）
     project_context["tb_source_codes"] = accounts.as_dict()
 
-    return {
+    payload: dict = {
         "component_type": "h3-investment-property",
         # 🔴 原写死 ["1503","1504"]（= 可供出售金融资产 / 债权投资，另两个循环的科目）
         #    改为本项目实际定位到的科目码；无该科目时为空列表（宁缺勿造）
@@ -294,3 +297,14 @@ async def render(ctx: RenderContext) -> dict | None:
         "prefix": "H3",
         "sheets": H3_SHEETS,
     }
+
+    # ─── 审定表四表预填（spec h-cycle Task 5；H5~H10 已有，H1~H4 原缺）──
+    await attach_h_segment_prefill(
+        ctx,
+        payload,
+        cycle="H3",
+        accounts=accounts,
+        slot_key_prefix=H3_SLOT_KEY_PREFIX,
+    )
+
+    return payload

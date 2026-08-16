@@ -37,14 +37,15 @@
     </div>
 
     <!--
-      源模板 6 项（G0-1!J19「二、样本选择」）——🔴 `isG0` 门控（裁决门 E）。
-      其余六枢纽走下方既有 4 项分支，渲染结果逐字节不变。
-      文字真源全部 import 自 `g0-confirmation/g0SummaryLowerZone`，本组件不抄第二份。
-      spec: g0-confirmation-source-alignment R3.6 / R3.6.1 / R3.6.2 / R3.6.3
+      源模板 6 项 ——🔴 `isG0`（G0-1!J19）/ `isK0`（K0-1!I27）门控（裁决门 E）。
+      其余五枢纽走下方既有 4 项分支，渲染结果逐字节不变。
+      文字真源各自 import（G0 ← `g0SummaryLowerZone`；K0 ← `k0LowerZoneSpec`），
+      本组件**不抄第二份**；两侧归一成同一形状后复用同一个表单块（G0 输出逐字不变）。
+      spec: g0-confirmation-source-alignment R3.6.x / k0-confirmation-source-alignment R3.6
     -->
-    <el-form v-if="isG0" label-width="132px" size="small" class="confirmation-sampling__form">
+    <el-form v-if="useSourceSix" label-width="132px" size="small" class="confirmation-sampling__form">
       <el-form-item
-        v-for="def in G0_SAMPLE_DEFS"
+        v-for="def in sourceSixDefs"
         :key="def.field"
         :label="def.label"
       >
@@ -71,10 +72,10 @@
           :placeholder="def.placeholder"
           @update:model-value="(v: string) => $emit('update', def.field, v)"
         />
-        <!-- 源模板补充说明段（K24 / K27），只读提示不是录入项 -->
-        <div v-if="hintOf(def.field)" class="confirmation-sampling__hint">
-          {{ hintOf(def.field) }}
-          <span class="confirmation-sampling__anchor">源模板 {{ hintAnchorOf(def.field) }}</span>
+        <!-- 源模板补充说明段（G0: K24/K27 · K0: J32/J36），只读提示不是录入项 -->
+        <div v-if="def.hint" class="confirmation-sampling__hint">
+          {{ def.hint }}
+          <span class="confirmation-sampling__anchor">源模板 {{ def.hintAnchor }}</span>
         </div>
       </el-form-item>
 
@@ -151,13 +152,19 @@
 /**
  * ConfirmationSampling.vue — 函证「二、样本选择」区块
  *
- * 🔴 `isG0` 门控（裁决门 E，spec g0-confirmation-source-alignment R3.6.2）：
+ * 🔴 `isG0` / `isK0` 门控（裁决门 E，spec g0 R3.6.2 + k0 R3.6）：
  * 本组件唯一消费方是 `GtConfirmationSummary.vue`，而后者服务**全部七枢纽** →
- * 无门控地改成 6 项会同时改掉 D0/E0/F0/H0/K0/L0 的样本选择区（与 R11.1 冲突）。
- * 故 G0 渲染源模板 6 项、其余六枢纽继续渲染既有 4 项。
+ * 无门控地改成 6 项会同时改掉 D0/E0/F0/H0/L0 的样本选择区。
+ * 故 G0 / K0 渲染各自源模板的 6 项、其余五枢纽继续渲染既有 4 项。
  *
  * 🔴 **门控只在渲染层** —— `SamplingData` 的 6 个字段对全部枢纽都可读写，
  * `emit('update', field, value)` 不按枢纽分叉，故其余枢纽若已存 6 项数据不会因门控丢失（R3.6.3）。
+ *
+ * 🔴 **L0 有意不在此开分支** —— 它的 6 项在下区专属组件 `L0SummaryLowerZone` 内
+ * （源 `L0-1!J28` 段属该 sheet 下区，落 `checklist_responses` 的 `L0-1-lower-sample-*`）；
+ * 两处都渲染 = 同一语义两个录入口（一个落 `SamplingConfig`、一个落 checklist）= 双真源。
+ * K0 与 G0 相反：其 6 项**在此渲染**，`K0SummaryLowerZone` 里一个抽样字段都不录入
+ * （判据固化在 `k0LowerZoneSpec.K0_LOWER_ZONE_BLOCKS` 的 `renderedHere: false`）。
  *
  * 🔴 旧 4 字段**每个都有落点**（数据零丢失）：
  *   `sampling_size` → `sample_size` · `sampling_criteria` → `specific_samples`
@@ -175,6 +182,13 @@ import {
   G0_SAMPLE_SELECTION_DEFS as G0_SAMPLE_DEFS,
   G0_SAMPLE_SELECTION_HINTS as G0_SAMPLE_HINTS,
 } from '../g0-confirmation/g0SummaryLowerZone'
+// K0 侧同款（源 `K0-1!I28..I34` 标签 / `J28..J35` 示例 / `J32`·`J36` 只读提示）。
+// 🔴 两侧字段结构不同（G0 用 `field`/`anchor`，K0 用 `key`/`labelAnchor`）→ 下方归一，
+//    绝不在本组件内抄第二份中文（改源模板文案只需改各自的声明模块）。
+import {
+  K0_SAMPLE_SELECTION,
+  K0_SAMPLE_SELECTION_HINTS,
+} from './k0-confirmation/k0LowerZoneSpec'
 
 const props = defineProps<{
   data: SamplingData
@@ -182,7 +196,7 @@ const props = defineProps<{
   dictData: Record<string, any[]>
   /**
    * 函证枢纽（`GtConfirmationSummary.vue` 由 wpCode 派生传入）。
-   * 缺省按**非 G0** 处理 —— 绝不默认 G0，否则其余枢纽会被误改成 6 项。
+   * 缺省按**非 G0/K0** 处理 —— 绝不默认开启 6 项，否则其余枢纽会被误改。
    */
   cycle?: ConfirmCycle
   /** 从父组件传入的发函统计数据 */
@@ -196,8 +210,61 @@ defineEmits<{
   (e: 'update', field: string, value: any): void
 }>()
 
-/** 🔴 渲染层门控：只有 G0 渲染源模板 6 项 */
+/** 🔴 渲染层门控：只有 G0 / K0 渲染源模板 6 项 */
 const isG0 = computed(() => props.cycle === 'G0')
+const isK0 = computed(() => props.cycle === 'K0')
+
+/** 归一后的 6 项定义（两侧字段结构不同，模板只认这一种形状） */
+interface NormalizedSampleDef {
+  /** `SamplingData` 字段名（持久化真源；两侧同名同源） */
+  field: string
+  label: string
+  placeholder: string
+  options?: readonly string[]
+  /** 只读提示语（源模板独立格，不是录入项） */
+  hint: string
+  hintAnchor: string
+}
+
+/**
+ * 源模板 6 项定义（G0 / K0 各自的文字真源，归一成同一形状）。
+ *
+ * 🔴 **G0 侧的输出必须与改造前逐字节相同**（零回归支点，守卫断言）——
+ * `field`/`label`/`placeholder`/`options` 直接转发，`hint`/`hintAnchor` 与原
+ * `hintOf()`/`hintAnchorOf()` 的查表结果一致（同一份 `G0_SAMPLE_HINTS`）。
+ */
+const sourceSixDefs = computed<NormalizedSampleDef[]>(() => {
+  if (isG0.value) {
+    return G0_SAMPLE_DEFS.map((d) => {
+      const h = G0_SAMPLE_HINTS.find((x) => x.field === d.field)
+      return {
+        field: d.field,
+        label: d.label,
+        placeholder: d.placeholder,
+        options: d.options,
+        hint: h?.text ?? '',
+        hintAnchor: h?.anchor ?? '',
+      }
+    })
+  }
+  if (isK0.value) {
+    return K0_SAMPLE_SELECTION.map((d) => {
+      const h = K0_SAMPLE_SELECTION_HINTS.find((x) => x.key === d.key)
+      return {
+        field: d.key,
+        label: d.label,
+        placeholder: d.placeholder,
+        options: d.options,
+        hint: h?.text ?? '',
+        hintAnchor: h?.anchor ?? '',
+      }
+    })
+  }
+  return []
+})
+
+/** 是否走「源模板 6 项」分支（缺省按非 G0/K0 处理，绝不默认开启） */
+const useSourceSix = computed(() => sourceSixDefs.value.length > 0)
 
 /** 新字段为空时的旧字段落点（读回映射；写入只写新字段） */
 const LEGACY_FALLBACK: Readonly<Record<string, keyof SamplingData>> = {
@@ -216,14 +283,6 @@ function valueOf(field: string): string {
     if (v !== undefined && v !== null && v !== '') return String(v)
   }
   return ''
-}
-
-function hintOf(field: string): string {
-  return G0_SAMPLE_HINTS.find((h) => h.field === field)?.text ?? ''
-}
-
-function hintAnchorOf(field: string): string {
-  return G0_SAMPLE_HINTS.find((h) => h.field === field)?.anchor ?? ''
 }
 
 const stats = computed(() => ({

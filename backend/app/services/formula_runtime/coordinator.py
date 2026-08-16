@@ -64,6 +64,13 @@ _SCOPE_DOMAIN_MAP: dict[str, str] = {
     "note": "note",
 }
 
+#: `scope_failures[].kind` 的「本项目无公式定义」取值（单一真源）。
+#:
+#: spec: formula-management-runtime-closure Task 11（Requirements 6.4, 6.5）
+#: 前端 `GtRefreshScopeDialog.vue` 与守卫 `test_formula_type_runtime_status.py`
+#: 都按这个字面量识别该态，禁在两侧各写一份字符串。
+NO_FORMULAS_KIND = "no_formulas"
+
 
 # ─── Coordinator ─────────────────────────────────────────────────────────────
 
@@ -103,6 +110,20 @@ class FormulaRuntimeCoordinator:
                 "FormulaRuntimeCoordinator: no formulas found for project=%s year=%d scopes=%s",
                 project_id, year, scopes,
             )
+            # 🔴 空结果必须可见（spec formula-management-runtime-closure Task 11 /
+            # Requirements 6.4, 6.5）：改造前这里静默 early-return，而 `wp_formula`
+            # 全库 **0 行** ⇒ 整条 mutation plan 流水线从上线起从未有真实数据流经过，
+            # 上层（draft_refresh → GtRefreshScopeDialog）显示的是「刷新成功、0 处变更」
+            # —— 与「公式都算过了、确实没有需要改的」不可区分。
+            # 追加一条 scope_failures 让「本项目尚未定义任何公式」这一事实透到 UI。
+            plan.scope_failures.append({
+                "addr_id": "",
+                "kind": NO_FORMULAS_KIND,
+                "detail": (
+                    f"项目 {project_id} 年度 {year} 无公式定义"
+                    f"（wp_formula 表内该项目 0 行，scopes={scopes}）"
+                ),
+            })
             return plan
 
         # ── Step 2: Build BatchFormulaDefinition + canonical targets ──────

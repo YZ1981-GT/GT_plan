@@ -23,16 +23,27 @@ const VOUCHER_COLS: BlockColumnDef[] = [
 
 /**
  * 区块①期后付款检查
- * 付款审批单日期编号/是否恰当审批 | 银行回单日期/收款方/付款金额/索引号/是否异常
+ *
+ * 🔴 源模板 `K0-6!A15:J16` 三段：记账凭证 / 付款审批单{日期/编号,是否经过恰当审批} /
+ *    银行回单{日期,**收款方**,金额}。真源 `alternativeK05/k0AlternativeSourceFidelity.K06_BLOCK1_SOURCE`。
+ *
+ * label/group 对齐源模板（spec k0-confirmation-source-alignment R7.1，2026-08-07）：
+ *   段头「付款审批」→「付款审批单」；叶子「付款审批单日期/编号」→「日期/编号」、
+ *   「是否恰当审批」→「是否经过恰当审批」、「银行回单日期」→「日期」、「付款金额」→「金额」。
+ *   **字段名一个不动**（既有项目已按此持久化，数据零丢失红线）。
+ *
+ * 🔴 `payee`「收款方」是**正确**的，SHALL NOT 改成「付款方」—— 其他应付款是期后**付出**
+ *    款项，银行回单上的对方是收款方。K0-5（其他应收款、期后收回）那侧才是「付款方」。
+ *    两侧统一即把业务方向搞反，守卫有反向自检。
  */
 const BLOCK1_COLUMNS: BlockColumnDef[] = [
   { field: 'seq', label: '序号', width: 50, type: 'number', editable: false, fixed: true, align: 'center' },
   ...VOUCHER_COLS,
-  { field: 'approvalDateNo', label: '付款审批单日期/编号', width: 140, type: 'text', group: '付款审批' },
-  { field: 'isProperApproval', label: '是否恰当审批', width: 100, type: 'select', group: '付款审批', align: 'center' },
-  { field: 'receiptDate', label: '银行回单日期', width: 110, type: 'date', group: '银行回单' },
+  { field: 'approvalDateNo', label: '日期/编号', width: 130, type: 'text', group: '付款审批单' },
+  { field: 'isProperApproval', label: '是否经过恰当审批', width: 120, type: 'select', group: '付款审批单', align: 'center' },
+  { field: 'receiptDate', label: '日期', width: 110, type: 'date', group: '银行回单' },
   { field: 'payee', label: '收款方', width: 120, type: 'text', group: '银行回单' },
-  { field: 'paymentAmount', label: '付款金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '银行回单', align: 'right' },
+  { field: 'paymentAmount', label: '金额', width: 110, type: 'number', render: 'amount', sumField: true, group: '银行回单', align: 'right' },
   { field: 'ref_index', label: '索引号', width: 90, type: 'text' },
   { field: 'is_abnormal', label: '是否异常', width: 80, type: 'select', align: 'center' },
 ]

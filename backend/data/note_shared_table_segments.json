@@ -4,8 +4,8 @@
   "_criterion": "同一张表的 rows[] 中出现 >=2 个不同的 report_row_code",
   "_note": "本清单只供守卫与前端消费；服务端运行期直接读模板，不读本清单（清单陈旧会让 fail closed 误判）。",
   "counts": {
-    "listed": 23,
-    "soe": 6
+    "listed": 24,
+    "soe": 8
   },
   "tables": [
     {
@@ -727,6 +727,29 @@
     },
     {
       "variant": "listed",
+      "section_number": "五、42",
+      "section_title": "其他应付款",
+      "table_name": "其他应付款",
+      "row_count": 4,
+      "segments": [
+        {
+          "row_code": "BS-055",
+          "label": "应付股利",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-050",
+          "label": "其他应付款",
+          "start": 2,
+          "end": 4,
+          "data_end": 3
+        }
+      ]
+    },
+    {
+      "variant": "listed",
       "section_number": "五、71",
       "section_title": "现金流量表补充资料",
       "table_name": "资产负债表中的列报项目和相关信息",
@@ -833,6 +856,29 @@
     },
     {
       "variant": "soe",
+      "section_number": "八、9",
+      "section_title": "其他应收款",
+      "table_name": "其他应收款",
+      "row_count": 4,
+      "segments": [
+        {
+          "row_code": "BS-016",
+          "label": "应收股利",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-009",
+          "label": "其他应收款项",
+          "start": 2,
+          "end": 4,
+          "data_end": 3
+        }
+      ]
+    },
+    {
+      "variant": "soe",
       "section_number": "八、31",
       "section_title": "递延所得税资产和递延所得税负债",
       "table_name": "未经抵销的递延所得税资产和递延所得税负债",
@@ -874,6 +920,29 @@
           "start": 9,
           "end": 16,
           "data_end": 16
+        }
+      ]
+    },
+    {
+      "variant": "soe",
+      "section_number": "八、42",
+      "section_title": "其他应付款",
+      "table_name": "其他应付款",
+      "row_count": 4,
+      "segments": [
+        {
+          "row_code": "BS-076",
+          "label": "应付股利",
+          "start": 1,
+          "end": 2,
+          "data_end": 2
+        },
+        {
+          "row_code": "BS-050",
+          "label": "其他应付款项",
+          "start": 2,
+          "end": 4,
+          "data_end": 3
         }
       ]
     },

@@ -564,8 +564,8 @@ import {
   type TitleCertRow,
 } from '../../composables/h1ListedDisclosureModel'
 import { mapOperatingToDisclosureRows, type OperatingLeaseRow } from '../../composables/useH1LeaseCheck'
-import {
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import {
   mapMortgagedVehiclesToDisclosureRows,
   mapMortgagedBuildingsToDisclosureRows,
   mergeRestrictedDisclosureRows,

@@ -54,13 +54,13 @@
                国企「期初余额」），与附注列头一致，避免底稿与交付物两套口径 -->
           <el-table-column :label="PERIOD_HEADERS.end" width="140" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.current" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'current', v ?? 0)" />
+              <WpAmountInput v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.current" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'current', v ?? 0)" />
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.current) }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="priorHeader" width="140" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
+              <WpAmountInput v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.prior) }}</span>
             </template>
           </el-table-column>
@@ -118,13 +118,13 @@
           </el-table-column>
           <el-table-column :label="PERIOD_HEADERS.end" width="140" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.current" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'current', v ?? 0)" />
+              <WpAmountInput v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.current" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'current', v ?? 0)" />
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.current) }}</span>
             </template>
           </el-table-column>
           <el-table-column :label="priorHeader" width="140" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" :controls="false" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
+              <WpAmountInput v-if="section.isDynamic && !row.rowId.startsWith('__') && !isReadonly" :model-value="row.prior" size="small" style="width:100%" @change="(v: number) => updateDynamicRow(section.sectionKey, row.rowId, 'prior', v ?? 0)" />
               <span v-else :class="{ 'cross-sheet-cell': !section.isDynamic && !row.rowId.startsWith('__') }">{{ fmtAmt(row.prior) }}</span>
             </template>
           </el-table-column>
@@ -219,10 +219,13 @@ import type { ChecklistResponse } from '../composables/useD7FormData'
 import type useD7CrossSheet from '../composables/useD7CrossSheet'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
 import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 
 const props = defineProps<{
   wpId: string
@@ -237,6 +240,9 @@ const props = defineProps<{
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const { year: auditYear } = useAuditContext()
+
+// 金额格式单一真源（平台铁律）：setup 顶层 inject，禁写进函数体（那样会静默失效）
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const variantOptions = [
   { label: '上市公司版', value: 'listed' },
@@ -341,10 +347,14 @@ function updateNoteText(key: string, value: string) {
   noteTexts.value = { ...noteTexts.value, [key]: value }
 }
 
+/**
+ * 只读金额展示 —— 委托 `displayPrefs.fmtAmount`（平台单一真源）。
+ *
+ * 改造前是组件内自造的 `toLocaleString` 闭包（硬编码 2 位小数、不带单位、
+ * 不消费用户偏好），切「万元」时本页不跟随。负数标红改由 CSS 类承担。
+ */
 function fmtAmt(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
-  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(val)
 }
 
 // ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────

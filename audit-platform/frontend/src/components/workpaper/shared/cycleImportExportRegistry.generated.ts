@@ -82,14 +82,30 @@ export const GENERATED_IMPORT_EXPORT: Record<string, CycleImportExportEntry> = {
   k8: { apiPrefix: 'k8', sheets: ['K8-2', 'K8-3', 'K8-5', 'K8-6', 'K8-7', 'K8-8'] },
   k9: { apiPrefix: 'k9', sheets: ['K9-2', 'K9-3', 'K9-5', 'K9-6', 'K9-7', 'K9-8'] },
   l1: { apiPrefix: 'l1', sheets: ['L1-2', 'L1-3'] },
+  l2: { apiPrefix: 'l2', sheets: ['L2-3'] },
   l3: { apiPrefix: 'l3', sheets: ['L3-2', 'L3-3'] },
   l4: { apiPrefix: 'l4', sheets: ['L4-2', 'L4-3'] },
   l5: { apiPrefix: 'l5', sheets: ['L5-2', 'L5-3'] },
+  l6: { apiPrefix: 'l6', sheets: ['L6-3'] },
+  m1: { apiPrefix: 'm1', sheets: ['M1-3'] },
+  m10: { apiPrefix: 'm10', sheets: ['M10-3'] },
+  m2: { apiPrefix: 'm2', sheets: ['M2-3'] },
+  m3: { apiPrefix: 'm3', sheets: ['M3-3'] },
+  m4: { apiPrefix: 'm4', sheets: ['M4-3'] },
+  m5: { apiPrefix: 'm5', sheets: ['M5-3'] },
+  m6: { apiPrefix: 'm6', sheets: ['M6-3'] },
+  m7: { apiPrefix: 'm7', sheets: ['M7-3'] },
+  m8: { apiPrefix: 'm8', sheets: ['M8-3'] },
+  m9: { apiPrefix: 'm9', sheets: ['M9-3'] },
+  n1: { apiPrefix: 'n1', sheets: ['N1-3'] },
+  n2: { apiPrefix: 'n2', sheets: ['N2-3'] },
+  n3: { apiPrefix: 'n3', sheets: ['N3-3'] },
   n4: { apiPrefix: 'n4', sheets: ['N4-2', 'N4-3'] },
+  n5: { apiPrefix: 'n5', sheets: ['N5-3'] },
 }
 
 /** 生成时的 catalog 前缀总数（含 MANUAL 接管的），供守卫核对覆盖面 */
-export const CATALOG_PREFIX_TOTAL = 72
+export const CATALOG_PREFIX_TOTAL = 88
 
 /** 本文件登记的前缀数 */
-export const GENERATED_PREFIX_COUNT = 62
+export const GENERATED_PREFIX_COUNT = 78

@@ -16,6 +16,11 @@
             >
               集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status] || centralStatus.review_status }}
             </el-tag>
+            <!--
+              🔴 H5 不能挂 `CycleImportExportDropdown` —— 详见 H5TabDetail.vue 同位注释。
+              h5 真实端点是 `/api/h5/*`（wp_id 在 body/Form），而该组件拼
+              `/api/workpapers/{wp_id}/h5/*`，运行期不存在 ⇒ 必 404。
+            -->
             <el-button size="small" type="default" link @click="handleReview('H5-3')">
               💬 复核
             </el-button>

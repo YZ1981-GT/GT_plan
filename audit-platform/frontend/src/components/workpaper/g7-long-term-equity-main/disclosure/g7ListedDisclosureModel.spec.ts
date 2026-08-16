@@ -263,7 +263,12 @@ describe('G7 listed disclosure source model', () => {
         'important-associate_2_prior',
       ])
       expect(cols.map(c => c.group)).toEqual(['联营企业A', '联营企业A', '联营企业B', '联营企业B'])
-      expect(cols.map(c => c.label)).toEqual(['期末/本期', '期初/上期', '期末/本期', '期初/上期'])
+      // 🔴 子列 label 逐字取源 xlsx（`g7-column-alignment-…` spec Task 7 的 D 类裁决）：
+      // 联营 FS 表源 A165:G187 的子列是「期末数 / 期初数」，**不是**此前写死的
+      // 「期末/本期 / 期初/上期」（那是把 FS 表与 PL 表两套子列混成一套的产物）。
+      // 本断言原先锁着旧值 ⇒ Task 7 改了 `IMPORTANT_ASSOCIATE_FS_SUB` 后本用例即转红，
+      // 但该任务当时未跑本 spec、仍被标记完成（假绿）。现按源原文更正。
+      expect(cols.map(c => c.label)).toEqual(['期末数', '期初数', '期末数', '期初数'])
     })
 
     it('sync data reflects the current entitySlots column set (not the static default)', () => {
@@ -276,7 +281,10 @@ describe('G7 listed disclosure source model', () => {
       // 且 buildG7ListedColumns 输出的列头须与 entitySlots 一致（不是静态默认 6 家）。
       const columns = buildG7ListedColumns(state.entitySlots)
       const ownershipCols = columns['未丧失控制权的所有者权益份额变动影响']
-      expect(ownershipCols.map(c => c.label)).toEqual(['项目', '独家投资方', '第二投资方'])
+      // 🔴 标签列头是「项  目」（**双空格**）—— 源 xlsx A96 原文如此，seed 的
+      // `headers[0]` 也一直是双空格。Task 12 把运行时 `labelHeader` 从归一化的
+      // 「项目」改回源原文以消除契约 P5 偏差（R4.1/R4.4：禁「统一成好看的那种」）。
+      expect(ownershipCols.map(c => c.label)).toEqual(['项  目', '独家投资方', '第二投资方'])
     })
 
     it('static (non-slot) tables are unaffected by resolveG7ListedTableColumns', () => {

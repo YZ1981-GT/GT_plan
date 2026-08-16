@@ -34,6 +34,11 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 
+from app.routers.wp_render_strategies._x3_adjustment_import_export import (
+    X3_SHEET_SPECS,
+    attach_shape_a_routes,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -47,10 +52,35 @@ router = APIRouter(
 
 _ROW_LIMIT = 500
 
+#: 本模块的短前缀 = catalog `import_export.api_prefix`，单份 UI 与批量两条通路共用它。
+_IE_API_PREFIX = "n1"
+
+#: 本前缀的 X-3 sheet 码 —— 从 `X3_SHEET_SPECS`（Key_Ledger 单一真源）按短前缀**反查**。
+#: 🔴 本模块内不写 X-3 字面量：写死一份即成后端第二真源，前端改键时不会打红。
+#: 反查为空 ⇒ 下面 `attach_shape_a_routes` 立即抛 `X3ContractError`（fail-loud，不静默少端点）。
+_X3_CODES: frozenset[str] = frozenset(
+    code for code, spec in X3_SHEET_SPECS.items() if spec.api_prefix == _IE_API_PREFIX
+)
+
 # 🔴 铁律：每张挂了「导入导出 ▾」的 sheet 都必须在此注册。
 #    N1-4/N1-5 此前未注册，而前端调用又不传 sheet → 落到 Query 默认值 "N1-2"
 #    → 在测算表/亏损表页面导出到的是明细表数据、导入会覆盖 N1-2 明细行（串表+数据破坏）。
-_SUPPORTED_SHEETS: set[str] = {"N1-2", "N1-4", "N1-5"}
+#
+#: 本前缀 sheet 白名单的**唯一真源**（R4.4）= 形态 B（长前缀）三张明细表 + 形态 A 的 X-3。
+#: 🔴 派生方向刻意是 `IE_SHEETS → _SUPPORTED_SHEETS`，不是反过来：sheet 码只在这里写一次，
+#:    既有 `_validate_sheet` 的取值由它派生 ⇒ 改 `IE_SHEETS` 会真的改到既有端点的校验结果，
+#:    它因此是**活的**真源，而不是只喂守卫的影子常量（写成 `IE_SHEETS = _SUPPORTED_SHEETS |
+#:    {X-3}` 时 `IE_SHEETS` 在生产路径上零消费方 = 死代码，属平台已登记的假绿形态之一）。
+IE_SHEETS: frozenset[str] = frozenset({"N1-2", "N1-4", "N1-5"}) | _X3_CODES
+
+#: 形态 B（长前缀）端点可服务的 sheet = `IE_SHEETS` 去掉 X-3。取值与施加前逐字相同。
+#: 🔴 X-3 刻意不进这里：形态 B 的五张配置表（`_SHEET_HEADERS` / `_FIELD_MAPS` /
+#:    `_SHEET_ITEM_ID` / `_SHEET_STORAGE_FIELD` / `_SHEET_ROW_ID_PREFIX`）都没有 X-3 条目，
+#:    放进来会让 `sheet=N1-3` 越过 400 进到取不到配置的旧代码路径（KeyError / 串表导出）——
+#:    那是既有行为变更且更糟。X-3 只由形态 A 短前缀端点服务（走共享实现）。
+_SUPPORTED_SHEETS: set[str] = set(IE_SHEETS - _X3_CODES)
+
+attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 # ⚠️ 导入导出铁律：表头/字段/item_id/存储列必须与前端 useN1Detail 完全一致，
 #    否则导出恒空、导入前端读不到（四重不匹配）。

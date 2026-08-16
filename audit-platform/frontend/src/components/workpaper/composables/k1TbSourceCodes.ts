@@ -59,22 +59,18 @@ export function k1ExtraEntries(src: K1TbSourceCodes | null | undefined): K1Extra
   return tbExtraEntries(src, K1_EXTRA_CODE_LABELS)
 }
 
-/** 坏账准备兜底标准码（其他应收款专属备抵；**不是** 宽口径 `1231`） */
-export const K1_BAD_DEBT_FALLBACK_STANDARD = '1231-03'
-
-/** 原值兜底标准码 */
-export const K1_GROSS_FALLBACK_STANDARD = '1221'
-
-/** 从溯源取坏账查询口径（标准码集）；缺省回退 `1231-03` */
-export function k1ProvisionQueryCodes(
-  src: K1TbSourceCodes | null | undefined,
-): string[] {
-  return tbQueryCodes(src?.provision_standard, K1_BAD_DEBT_FALLBACK_STANDARD)
-}
-
-/** 从溯源取原值查询口径（标准码集）；缺省回退 `1221` */
-export function k1GrossQueryCodes(
-  src: K1TbSourceCodes | null | undefined,
-): string[] {
-  return tbQueryCodes(src?.gross_standard, K1_GROSS_FALLBACK_STANDARD)
-}
+/**
+ * 科目口径真源已收敛至 `k1AccountScope.ts`（与后端 `K_CYCLE_SPECS['K1']` 交叉锁死）。
+ * 此处仅 re-export 以保持既有 import 路径不变，**不得**在本文件重复声明科目码。
+ */
+export {
+  K1_ACCOUNT_NAME,
+  K1_BAD_DEBT_FALLBACK_STANDARD,
+  K1_EXTRA_STANDARD_CODES,
+  K1_GROSS_FALLBACK_STANDARD,
+  K1_PROVISION_NAME_FILTER,
+  K1_REPORT_ROW_CODE,
+  k1AccountCode,
+  k1GrossQueryCodes,
+  k1ProvisionQueryCodes,
+} from './k1AccountScope'

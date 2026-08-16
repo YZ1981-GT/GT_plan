@@ -57,8 +57,8 @@
           :is-readonly="isReadonly"
           :prefill="adjudicationPrefill"
           @save="handleChildSave"
-          @navigate-sheet="(s: string) =          :tb-source-codes="tbSourceCodes"
-        > emit('navigate-sheet', s)"
+          @navigate-sheet="(s: string) => emit('navigate-sheet', s)"
+          :tb-source-codes="tbSourceCodes"
         />
 
         <!-- K10-2 明细表（12列，43行） -->

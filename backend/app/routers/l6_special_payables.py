@@ -32,6 +32,11 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 
+from app.routers.wp_render_strategies._x3_adjustment_import_export import (
+    X3_SHEET_SPECS,
+    attach_shape_a_routes,
+)
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
@@ -66,6 +71,29 @@ _SHEET_CONFIGS: dict[str, dict[str, Any]] = {
         ],
     },
 }
+
+#: 本模块的短前缀 = catalog `import_export.api_prefix`，单份 UI 与批量两条通路共用它。
+_IE_API_PREFIX = "l6"
+
+#: 本前缀的 X-3 sheet 码 —— 从 `X3_SHEET_SPECS`（Key_Ledger 单一真源）按短前缀**反查**。
+#: 🔴 本模块内不写 X-3 字面量：写死一份即成后端第二真源，前端改键时不会打红。
+#: 反查为空 ⇒ 下面 `attach_shape_a_routes` 立即抛 `X3ContractError`（fail-loud，不静默少端点）。
+_X3_CODES: frozenset[str] = frozenset(
+    code for code, spec in X3_SHEET_SPECS.items() if spec.api_prefix == _IE_API_PREFIX
+)
+
+#: 本前缀 sheet 白名单的**唯一真源**（R4.4）= 形态 B（长前缀）可构建的 sheet + 形态 A 的 X-3。
+#:
+#: 🔴 本前缀的白名单载体是 **dict**（`_SHEET_CONFIGS`，键 = sheet 码、值 = 该 sheet 的
+#:    列头/字段配置），既有校验表达式 `sheet in _SHEET_CONFIGS` 与其后的 `_SHEET_CONFIGS[sheet]`
+#:    取配置是**同一次查表**，不是一个纯白名单。故这里的派生方向只能是
+#:    `_SHEET_CONFIGS.keys() → IE_SHEETS`（sheet 码仍只写一次、漂移结构上不可能），
+#:    **不能**把既有表达式改指 `IE_SHEETS`：那样 `sheet=L6-3` 会越过 400 走到
+#:    `_SHEET_CONFIGS[sheet]` 抛 KeyError（500），或落到「不传 sheet 就导出全部 config」那条
+#:    分支静默导出全部 sheet —— 两者都是既有行为变更且更糟。X-3 只由形态 A 端点服务。
+IE_SHEETS: frozenset[str] = frozenset(_SHEET_CONFIGS) | _X3_CODES
+
+attach_shape_a_routes(router, api_prefix=_IE_API_PREFIX, sheets=_X3_CODES)
 
 _NUMERIC_FIELDS: set[str] = {
     "beginBalance", "periodGranted", "periodUsed", "periodCarryover", "endBalance",

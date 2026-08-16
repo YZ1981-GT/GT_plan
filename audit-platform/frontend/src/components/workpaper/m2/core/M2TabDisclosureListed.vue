@@ -215,6 +215,7 @@ import { useM2FormData } from '../../composables/useM2FormData'
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM2ListedSyncPayload, type M2ListedRow } from '../../composables/m2NoteSectionMap'
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import http from '@/utils/http'
 
 const props = defineProps<{
   wpId: string
@@ -257,8 +258,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   })
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open */ }
 }
 

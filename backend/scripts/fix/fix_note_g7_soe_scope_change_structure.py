@@ -49,18 +49,76 @@ def _numbered(n: int) -> list[dict[str, Any]]:
     return [data_row(str(i)) for i in range(1, n + 1)]
 
 
+# ═══════════════════════ 动态列槎位（与运行时同一真源） ═══════════════════════
+#
+# 🔴 槎位名与 key 拼接规则**逐字**取运行时
+# `g7SoeDisclosureModel.ts` 的 `*_SLOT` 常量 + `g7SlotColumns.buildG7SlotColumns()`
+# （`{slot}_{seq}` / `{slot}_{seq}_{subKey}`）。
+#
+# seed 侧原先写死序号前缀（`c1Current` / `aPrior` / `company1`），与动态列**不兼容**：
+# 审计师增删被投资单位或改名后，写死序号无法跟随，seed 与运行时会永久错位。改为按
+# 同一规则派生 ⇒ 两侧 key 恒等，且默认实体名只作占位（改名只动 `group` 显示，不动 key）。
+MINORITY_FS_SLOT = "minority-fs-company"
+MINORITY_FS_DEFAULT_NAMES = ["公司1", "公司2", "公司3", "公司4", "公司5"]
+SOLD_FS_POSITION_SLOT = "sold-fs-position-company"
+SOLD_FS_POSITION_DEFAULT_NAMES = ["公司1", "公司2"]
+SOLD_FS_RESULT_SLOT = "sold-fs-result-company"
+SOLD_FS_RESULT_DEFAULT_NAMES = ["A公司", "B公司", "C公司", "D公司", "E公司"]
+OWNERSHIP_CHANGE_SLOT = "ownership-change-company"
+OWNERSHIP_CHANGE_DEFAULT_NAMES = ["公司1", "公司2", "公司3"]
+
+
+def _slot_matrix(
+    slot: str,
+    names: list[str],
+    subs: list[tuple[str, str, str | None]],
+) -> list[tuple[str, str, str | None, str]]:
+    """按实体横向展开的矩阵列（`grouped_columns` 的数据列入参形态）。
+
+    与运行时 `buildG7SlotColumns(slot, names, sub)` 同构：外层遍历实体（序号
+    1-based），内层遍历子列，key = `{slot}_{seq}_{subKey}`，父分组名 = 实体名。
+    """
+    return [
+        (f"{slot}_{seq}_{sub_key}", sub_label, fmt, name)
+        for seq, name in enumerate(names, start=1)
+        for sub_key, sub_label, fmt in subs
+    ]
+
+
+def _slot_flat(slot: str, names: list[str], fmt: str | None) -> list[tuple[str, str, str | None]]:
+    """按实体横向展开的**单子列**形态（无 sub ⇒ key = `{slot}_{seq}`）。"""
+    return [
+        (f"{slot}_{seq}", name, fmt)
+        for seq, name in enumerate(names, start=1)
+    ]
+
+
 # ═══ （一）本期纳入合并报表范围的子公司基本情况（源 A9:M19）═══
 SEC_01 = "七、本期纳入合并报表"
 T01 = "本期纳入合并报表范围的子公司基本情况"
+# 🔴 标签列 key 统一为平台惯例 'label'（g7-column-alignment spec Task 5）：
+# 平台 211 个标签列定义里 148 个用 'label'；本文件原用 'name'/'item'/'investee'/'seq'/'type'
+# 等各表自拟 key，与运行时 buildG7*Columns() 的 'label' 不一致（B 类偏差）。
+# is_label / label 显示文字均不动 —— 投影器 note_sub_table_projector._project_row 对
+# 标签列有**双向兜底**（任意标签 key → 'label' 回填 / 反向回退），故改 key 零数据风险。
+# 🔴 数据列 key 服从运行时（`subsidiaryBasicColumns`）：`registered`→`registeredPlace`
+# / `region`→`principalPlace` / `nature`→`businessNature` / `paidRatio`→`paidInRatio`
+# / `method`→`acquisitionMethod`。理由 = `g7DisclosureCrossSheet.ts` 用**字面量 key**
+# 往 `row.values` 写跨表回填值，改运行时会静默失效；seed 侧无此类消费方。
+# 量化闸裁决 = SAFE_TO_RENAME_SEED（1 个行对象、0 处用消失 key 落值）。
+#
+# 🔴 `name`（企业名称）**保留为数据列**：源 xlsx A9:M9 行标识列是「序号」而
+# 「企业名称」是第 1 个数据列（共 12 个数据列）⇒ E 类裁决为「运行时缺列」，
+# 由运行时补 `name` 列，不是 seed 删列。列序逐位对齐源 xlsx。
 T01_COLUMNS = flat_columns([
-    ("seq", "序号", None), ("name", "企业名称", None), ("level", "级次", None),
-    ("enterpriseType", "企业类型", None), ("registered", "注册地", None),
-    ("region", "主要经营地", None), ("nature", "业务性质", None),
+    ("label", "序号", None), ("name", "企业名称", None), ("level", "级次", None),
+    ("enterpriseType", "企业类型", None), ("registeredPlace", "注册地", None),
+    ("principalPlace", "主要经营地", None), ("businessNature", "业务性质", None),
     ("paidInCapital", "实收资本", AMOUNT),
     ("subscribedRatio", "认缴持股比例（%）", PERCENT),
-    ("paidRatio", "实缴持股比例（%）", PERCENT),
+    ("paidInRatio", "实缴持股比例（%）", PERCENT),
     ("votingRights", "享有的表决权（%）", PERCENT),
-    ("investmentAmount", "投资额", AMOUNT), ("method", "取得方式", None),
+    ("investmentAmount", "投资额", AMOUNT), ("acquisitionMethod", "取得方式", None),
 ])
 T01_G = (
     "本期纳入合并报表范围的子公司基本情况（源 A9:M19）：大型企业集团可披露到二级"
@@ -75,7 +133,9 @@ T01_G = (
 SEC_02 = "七、母公司拥有被投资"
 T02 = "母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因"
 _CONTROL_EXCEPTION_COLS = [
-    ("seq", "序号", None), ("name", "企业名称", None),
+    # 首元组是标签列 → key 统一为平台惯例 'label'（91% 占比，跨 70 文件）；
+    # 显示文字仍是源 xlsx 的「序号」，不受影响。
+    ("label", "序号", None), ("name", "企业名称", None),
     ("subscribedRatio", "认缴持股比例（%）", PERCENT), ("votingRights", "享有的表决权", PERCENT),
     ("registeredCapital", "注册资本", AMOUNT), ("investmentAmount", "投资额", AMOUNT),
     ("level", "级次", None),
@@ -106,12 +166,17 @@ SEC_04 = "七、重要非全资子公司"
 
 # 1、少数股东（源 A55:F60）
 T04A = "少数股东"
+# 🔴 数据列 key 服从运行时（`minorityColumns`）：`minorityRatio`→`holdingRatio` /
+# `minorityProfit`→`currentProfit` / `minorityDividend`→`dividend` /
+# `minorityEquity`→`closingEquity`（`currentProfit`/`closingEquity` 被
+# `g7DisclosureCrossSheet.ts` 字面量写值消费）。`name` 保留为数据列：源 xlsx
+# A55:F55 行标识列是「序号」，「企业名称」是第 1 个数据列（共 5 个）。
 T04A_COLUMNS = flat_columns([
-    ("seq", "序号", None), ("name", "企业名称", None),
-    ("minorityRatio", "少数股东持股比例", PERCENT),
-    ("minorityProfit", "当期归属于少数股东的损益", AMOUNT),
-    ("minorityDividend", "当期向少数股东支付的股利", AMOUNT),
-    ("minorityEquity", "期末累计少数股东权益", AMOUNT),
+    ("label", "序号", None), ("name", "企业名称", None),
+    ("holdingRatio", "少数股东持股比例", PERCENT),
+    ("currentProfit", "当期归属于少数股东的损益", AMOUNT),
+    ("dividend", "当期向少数股东支付的股利", AMOUNT),
+    ("closingEquity", "期末累计少数股东权益", AMOUNT),
 ])
 T04A_G = "1、少数股东（源 A55:F60）：重要非全资子公司的少数股东持股比例及权益变动。"
 
@@ -121,16 +186,16 @@ _T04B_METRICS = [
     "流动资产", "非流动资产", "资产合计", "流动负债", "非流动负债", "负债合计",
     "营业收入", "净利润", "综合收益总额", "经营活动现金流量",
 ]
+# 🔴 动态列 key 必须服从运行时的 `{slot}_{seq}_{subKey}` 形态（不得写死 `c1Current`）：
+# 该表按「重要非全资子公司」横向展开，审计师可增删改名，写死序号后 seed key 无法跟随
+# （改名即丢落点）。运行时真源 = `g7SoeDisclosureModel.MINORITY_FS_SLOT`
+# + `buildG7SlotColumns()`（key = `${slot}_${seq}_${sub.key}`）。
 T04B_COLUMNS = grouped_columns(
-    ("item", "项  目"),
-    [
-        item
-        for i in range(1, 6)
-        for item in (
-            (f"c{i}Current", "期末数/本期发生额", AMOUNT, f"公司{i}"),
-            (f"c{i}Prior", "期初数/上期发生额", AMOUNT, f"公司{i}"),
-        )
-    ],
+    ("label", "项  目"),
+    _slot_matrix(
+        MINORITY_FS_SLOT, MINORITY_FS_DEFAULT_NAMES,
+        [("current", "期末数/本期发生额", AMOUNT), ("prior", "期初数/上期发生额", AMOUNT)],
+    ),
 )
 T04B_G = (
     "2、主要财务信息（源 A62:L73）：按重要非全资子公司横向展开期末数/本期发生额、"
@@ -142,21 +207,29 @@ SEC_05 = "七、本期不再纳入合并"
 
 # (1) 原子公司的基本情况（源 A78:G83）
 T05A = "原子公司的基本情况"
+# 🔴 数据列 key 服从运行时（`formerSubsidiaryColumns`）：`registered`→`registeredPlace` /
+# `nature`→`businessNature` / `votingRatio`→`votingRights`（三者均被
+# `g7DisclosureCrossSheet.ts` 字面量写值消费）。`name` 保留为数据列：源 xlsx
+# A78:G78 行标识列是「序号」，「企业名称」是第 1 个数据列（共 6 个）。
 T05A_COLUMNS = flat_columns([
-    ("seq", "序号", None), ("name", "企业名称", None), ("registered", "注册地", None),
-    ("nature", "业务性质", None), ("holdingRatio", "持股比例（%）", PERCENT),
-    ("votingRatio", "表决权比例（%）", PERCENT), ("reason", "本期不再成为子公司的原因", None),
+    ("label", "序号", None), ("name", "企业名称", None),
+    ("registeredPlace", "注册地", None),
+    ("businessNature", "业务性质", None), ("holdingRatio", "持股比例（%）", PERCENT),
+    ("votingRights", "表决权比例（%）", PERCENT),
+    ("reason", "本期不再成为子公司的原因", None),
 ])
 T05A_G = "（1）原子公司的基本情况（源 A78:G83）。数据来源：处置子公司测试表 G7-11/12。"
 
 # (2) 本期出售的子公司出售日的财务状况（源 A87:F96，两家公司×出售日,期初余额）
 T05B = "本期出售的子公司出售日的财务状况"
+# 🔴 动态列：key 服从运行时 `SOLD_FS_POSITION_SLOT` + `buildG7SlotColumns()`。
+# 注意 `saleDate` 子列是**文本**（出售日日期），不是金额 ⇒ fmt 传 None。
 T05B_COLUMNS = grouped_columns(
-    ("item", "项目"),
-    [
-        ("c1SaleDate", "出售日", None, "公司1"), ("c1Opening", "期初余额", AMOUNT, "公司1"),
-        ("c2SaleDate", "出售日", None, "公司2"), ("c2Opening", "期初余额", AMOUNT, "公司2"),
-    ],
+    ("label", "项目"),
+    _slot_matrix(
+        SOLD_FS_POSITION_SLOT, SOLD_FS_POSITION_DEFAULT_NAMES,
+        [("saleDate", "出售日", None), ("opening", "期初余额", AMOUNT)],
+    ),
 )
 T05B_LABELS = [
     "流动资产", "长期股权投资", "固定资产", "无形资产", "其他非流动资产",
@@ -170,16 +243,14 @@ T05B_G = (
 # (3) 本期出售的子公司出售日的经营成果（源 A98:L106，5家公司×本年年初-出售日,上年发生额）
 # 🔴 源模板逐字为「出售日」，模板 JSON 曾漂移写成「处置日」，本脚本正名。
 T05C = "本期出售的子公司出售日的经营成果"
+# 🔴 动态列：key 服从运行时 `SOLD_FS_RESULT_SLOT` + `buildG7SlotColumns()`。
+# seed 原用字母序前缀（`aCurrent`/`bPrior`…），与动态列不兼容。
 T05C_COLUMNS = grouped_columns(
-    ("item", "项目"),
-    [
-        item
-        for label, key in [("A", "a"), ("B", "b"), ("C", "c"), ("D", "d"), ("E", "e")]
-        for item in (
-            (f"{key}Current", "本年年初-出售日", AMOUNT, f"{label}公司"),
-            (f"{key}Prior", "上年发生额", AMOUNT, f"{label}公司"),
-        )
-    ],
+    ("label", "项目"),
+    _slot_matrix(
+        SOLD_FS_RESULT_SLOT, SOLD_FS_RESULT_DEFAULT_NAMES,
+        [("current", "本年年初-出售日", AMOUNT), ("prior", "上年发生额", AMOUNT)],
+    ),
 )
 T05C_LABELS = ["营业收入", "营业成本", "期间费用", "营业利润", "利润总额", "所得税费用", "净利润"]
 T05C_G = (
@@ -192,7 +263,7 @@ T05C_G = (
 SEC_06 = "七、本期新纳入合并范"
 T06 = "本期新纳入合并范围的主体"
 T06_COLUMNS = flat_columns([
-    ("name", "公司名称", None),
+    ("label", "公司名称", None),
     ("closingNetAssets", "期末净资产", AMOUNT),
     ("currentNetProfit", "本期净利润", AMOUNT),
 ])
@@ -203,12 +274,15 @@ SEC_07 = "七、本期发生的同一控"
 T07 = "本期发生的同一控制下企业合并情况"
 _YEAR_START_GROUP = "本年初至合并日的相关情况"
 T07_COLUMNS = grouped_columns(
-    ("name", "公司名称"),
+    ("label", "公司名称"),
     [
         ("consolidationDate", "合并日", None, None),
         ("bookNetAssets", "账面净资产", AMOUNT, None),
         ("consideration", "交易对价", AMOUNT, None),
-        ("controller", "实际控制人", None, None),
+        # 🔴 key 服从运行时（`commonControlColumns` 的 `ultimateController`）：
+        # `g7DisclosureCrossSheet.ts` 用字面量 `writeValue(row.values, 'ultimateController', …)`
+        # 从合并范围底稿回填最终控制人，改运行时会让该回填静默失效。
+        ("ultimateController", "实际控制人", None, None),
         ("revenue", "收入", AMOUNT, _YEAR_START_GROUP),
         ("netProfit", "净利润", AMOUNT, _YEAR_START_GROUP),
         ("cashIncrease", "现金净增加额", AMOUNT, _YEAR_START_GROUP),
@@ -226,21 +300,27 @@ SEC_08 = "七、本期发生的非同一"
 T08 = "本期发生的非同一控制下企业合并情况"
 _PURCHASE_DAY_GROUP = "购买日被购买方"
 T08_COLUMNS = grouped_columns(
-    ("name", "被购买方名称"),
+    ("label", "被购买方名称"),
     [
         ("purchaseDate", "购买日", None, None),
         ("purchaseDateBasis", "购买日的确定依据", None, None),
-        ("preHoldingRatio", "购买日前持有被购买方权益比例", PERCENT, None),
+        # 🔴 4 处数据列 key 服从运行时（`nonCommonControlColumns`）：
+        # `preHoldingRatio`→`preHolding` / `atCombinationHoldingRatio`→`atCombinationHolding`
+        # / `fvIdentifiableAmount`→`fvIdentifiable` / `fvIdentifiableMethod`→`fvMethod`。
+        # 四者**全部**被 `g7DisclosureCrossSheet.ts` 以字面量 key 往 `row.values` 写值
+        # （L2140~L2143），改运行时侧会让 G7-11/12 处置测试表到附注的跨表回填静默失效；
+        # seed 侧无同类消费方 ⇒ seed 服从运行时。
+        ("preHolding", "购买日前持有被购买方权益比例", PERCENT, None),
         (
-            "atCombinationHoldingRatio",
+            "atCombinationHolding",
             "形成合并时持有的被购买方权益比例（不含合并后的股权增减）",
             PERCENT, None,
         ),
         ("bookNetAssets", "账面净资产总额", AMOUNT, _PURCHASE_DAY_GROUP),
         # 源模板此处「可辨认净资产公允价值总额」下再分「金额/确定方法」两个三级子列；
         # group 只支持单级（禁 '/'），故把二级子标题并入叶子列名。
-        ("fvIdentifiableAmount", "可辨认净资产公允价值总额（金额）", AMOUNT, _PURCHASE_DAY_GROUP),
-        ("fvIdentifiableMethod", "可辨认净资产公允价值总额（确定方法）", None, _PURCHASE_DAY_GROUP),
+        ("fvIdentifiable", "可辨认净资产公允价值总额（金额）", AMOUNT, _PURCHASE_DAY_GROUP),
+        ("fvMethod", "可辨认净资产公允价值总额（确定方法）", None, _PURCHASE_DAY_GROUP),
         ("consideration", "交易对价", AMOUNT, None),
         ("goodwill", "形成商誉", AMOUNT, None),
         ("postRevenue", "购买日至期末被购买方的收入", AMOUNT, None),
@@ -259,7 +339,7 @@ T08_G = (
 SEC_09 = "七、本期发生的吸收合"
 T09 = "本期发生的吸收合并"
 T09_COLUMNS = grouped_columns(
-    ("type", "吸收合并的类型"),
+    ("label", "吸收合并的类型"),
     [
         ("assetItem", "项目", None, "并入的主要资产"),
         ("assetAmount", "金额", AMOUNT, "并入的主要资产"),
@@ -301,10 +381,16 @@ SEC_11_TEXT = [
 # ═══ （十三）母公司在子公司的所有者权益份额发生变化的情况（源 A184:E199）═══
 SEC_12 = "七、母公司在子公司的"
 T12 = "母公司在子公司的所有者权益份额发生变化的情况"
-T12_COLUMNS = flat_columns([
-    ("item", "项  目", None), ("company1", "公司1", AMOUNT),
-    ("company2", "公司2", AMOUNT), ("company3", "公司3", AMOUNT),
-])
+# 🔴 动态列（按子公司横向展开）：key 取运行时 `OWNERSHIP_CHANGE_SLOT` 的
+# `{slot}_{seq}` 形态，禁写死 `company1..3`（源模板默认名只作占位，审计师改名
+# 只动显示不动 key）。本表无子列 ⇒ 每实体 1 列。
+T12_COLUMNS = flat_columns(
+    [("label", "项  目", None)]
+    + [
+        (f"{OWNERSHIP_CHANGE_SLOT}_{seq}", name, AMOUNT)
+        for seq, name in enumerate(OWNERSHIP_CHANGE_DEFAULT_NAMES, start=1)
+    ]
+)
 T12_LABELS = [
     "购买成本/处置对价：", "现金", "非现金资产的公允价值", "发行或承担的债务的账面价值",
     "发行的权益性证券的面值", "或有对价", "购买成本/处置对价合计",

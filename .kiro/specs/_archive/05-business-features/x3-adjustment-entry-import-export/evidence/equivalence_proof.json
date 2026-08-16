@@ -4,7 +4,7 @@
     "task": "13.3",
     "artifact": "Equivalence_Proof",
     "purpose": "证明 16 张 X-3 的两条通路（UI 形态 A + Bulk adapter）均可达且不经由工厂模块",
-    "generated_at": "2026-08-16T00:34:21.940596+00:00",
+    "generated_at": "2026-08-16T07:27:50.855804+00:00",
     "requirements": [
       "9.1",
       "9.2",
@@ -42,7 +42,7 @@
           "import-data": "/api/workpapers/{wp_id}/l2/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6447,
+        "artifact_bytes": 6448,
         "probe_wp_id": "55834e10-7ead-4216-b5f0-a6b1a75ad5ac",
         "probe_wp_code": "L2",
         "error": null
@@ -55,7 +55,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6447,
+        "artifact_bytes": 6448,
         "error": null
       },
       "factory_module_referenced": false,
@@ -75,7 +75,7 @@
           "import-data": "/api/workpapers/{wp_id}/l6/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "probe_wp_id": "ccac5f0f-b57e-4cba-a536-40adfb6e0d99",
         "probe_wp_code": "L6",
         "error": null
@@ -88,7 +88,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "error": null
       },
       "factory_module_referenced": false,
@@ -108,7 +108,7 @@
           "import-data": "/api/workpapers/{wp_id}/m1/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "probe_wp_id": "1844d2e3-8116-4e4b-8821-3d879d6fb715",
         "probe_wp_code": "M1",
         "error": null
@@ -121,7 +121,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "error": null
       },
       "factory_module_referenced": false,
@@ -141,7 +141,7 @@
           "import-data": "/api/workpapers/{wp_id}/m10/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "probe_wp_id": "85c20b6f-e364-4924-9c8d-931699939773",
         "probe_wp_code": "M10",
         "error": null
@@ -154,7 +154,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "error": null
       },
       "factory_module_referenced": false,
@@ -174,7 +174,7 @@
           "import-data": "/api/workpapers/{wp_id}/m2/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "probe_wp_id": "f0ce78c9-2b6a-4acb-bee7-ddc602a6fdac",
         "probe_wp_code": "M2",
         "error": null
@@ -187,7 +187,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "error": null
       },
       "factory_module_referenced": false,
@@ -207,7 +207,7 @@
           "import-data": "/api/workpapers/{wp_id}/m3/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "probe_wp_id": "653708e4-cbc7-4e48-821a-6f94f06219de",
         "probe_wp_code": "M3",
         "error": null
@@ -220,7 +220,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "error": null
       },
       "factory_module_referenced": false,
@@ -240,7 +240,7 @@
           "import-data": "/api/workpapers/{wp_id}/m4/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "probe_wp_id": "4e05c127-e933-4d99-804e-0c19bf1cb420",
         "probe_wp_code": "M4",
         "error": null
@@ -253,7 +253,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "error": null
       },
       "factory_module_referenced": false,
@@ -273,7 +273,7 @@
           "import-data": "/api/workpapers/{wp_id}/m5/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "probe_wp_id": "9db23672-94db-483b-84b7-813837777460",
         "probe_wp_code": "M5",
         "error": null
@@ -286,7 +286,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "error": null
       },
       "factory_module_referenced": false,
@@ -306,7 +306,7 @@
           "import-data": "/api/workpapers/{wp_id}/m6/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "probe_wp_id": "e13fd5b8-a5d9-45df-b7b0-9ccbb7fb3ac9",
         "probe_wp_code": "M6",
         "error": null
@@ -319,7 +319,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "error": null
       },
       "factory_module_referenced": false,
@@ -339,7 +339,7 @@
           "import-data": "/api/workpapers/{wp_id}/m7/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "probe_wp_id": "30e1fef9-8689-49ea-8949-949520d80005",
         "probe_wp_code": "M7",
         "error": null
@@ -352,7 +352,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "error": null
       },
       "factory_module_referenced": false,
@@ -372,7 +372,7 @@
           "import-data": "/api/workpapers/{wp_id}/m8/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "probe_wp_id": "936f6474-2053-4fe1-85be-ae4fe5bcd341",
         "probe_wp_code": "M8",
         "error": null
@@ -385,7 +385,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6426,
+        "artifact_bytes": 6427,
         "error": null
       },
       "factory_module_referenced": false,
@@ -405,7 +405,7 @@
           "import-data": "/api/workpapers/{wp_id}/m9/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "probe_wp_id": "cba04e24-1eb2-484c-a373-58d052a5f549",
         "probe_wp_code": "M9",
         "error": null
@@ -418,7 +418,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "error": null
       },
       "factory_module_referenced": false,
@@ -438,7 +438,7 @@
           "import-data": "/api/workpapers/{wp_id}/n1/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "probe_wp_id": "23f1276c-71ac-4a29-af64-d06cd0a75b09",
         "probe_wp_code": "N1",
         "error": null
@@ -451,7 +451,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6425,
+        "artifact_bytes": 6426,
         "error": null
       },
       "factory_module_referenced": false,
@@ -471,7 +471,7 @@
           "import-data": "/api/workpapers/{wp_id}/n2/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6430,
+        "artifact_bytes": 6431,
         "probe_wp_id": "1b98d65d-ce63-4013-9c0e-a5fcb602970d",
         "probe_wp_code": "N2",
         "error": null
@@ -484,7 +484,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6430,
+        "artifact_bytes": 6431,
         "error": null
       },
       "factory_module_referenced": false,
@@ -504,7 +504,7 @@
           "import-data": "/api/workpapers/{wp_id}/n3/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6430,
+        "artifact_bytes": 6431,
         "probe_wp_id": "898bae6a-48a5-4871-bff4-0e9382558ef2",
         "probe_wp_code": "N3",
         "error": null
@@ -517,7 +517,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6430,
+        "artifact_bytes": 6431,
         "error": null
       },
       "factory_module_referenced": false,
@@ -537,7 +537,7 @@
           "import-data": "/api/workpapers/{wp_id}/n5/import-data"
         },
         "artifact_rows": 0,
-        "artifact_bytes": 6439,
+        "artifact_bytes": 6440,
         "probe_wp_id": "5093cc2b-fcc3-4027-9815-2ac51902580b",
         "probe_wp_code": "N5",
         "error": null
@@ -550,7 +550,7 @@
         "sheet_in_IE_SHEETS": true,
         "skip_reason": null,
         "artifact_rows": 1,
-        "artifact_bytes": 6439,
+        "artifact_bytes": 6440,
         "error": null
       },
       "factory_module_referenced": false,

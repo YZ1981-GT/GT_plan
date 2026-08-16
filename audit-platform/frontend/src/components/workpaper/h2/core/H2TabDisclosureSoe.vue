@@ -316,8 +316,8 @@ import { buildH2SoeChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_DISCLOSURE_SHEET_NAME, H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { useRestrictedAssetsSync } from '../../composables/useRestrictedAssetsSync'
 import { buildH2SoeSyncPayloads, type H2SoeSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
-import {
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import {
   H2_SOE_ITEM,
   createDefaultSoeSummary,
   createEmptySoeProject,

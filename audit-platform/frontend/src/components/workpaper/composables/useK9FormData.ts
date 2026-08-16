@@ -280,18 +280,18 @@ export function useK9FormData(opts: {
 
         // 优先从 render-config seed 取值（新架构输出 occurrence_unadjusted 单列权威值）
     const seeded = renderMeta.value?.tb_values
-    if (seeded) {{
+    if (seeded) {
       // 🔴 新架构：occurrence_unadjusted 是 trial_balance 权威口径，优先使用
       const occurrence = parseNum(seeded.occurrence_unadjusted ?? 0)
       const debit = parseNum(seeded.unadjusted_debit ?? 0)
       const credit = parseNum(seeded.unadjusted_credit ?? 0)
       const net = occurrence || (debit - credit)  // 兼容旧 render 未重启的场景
-      tbData.value = {{
+      tbData.value = {
         unadjustedDebit: debit,
         unadjustedCredit: credit,
         unadjustedNet: net,
         auditedAmount: parseNum(seeded.occurrence_audited ?? seeded.audited_amount ?? 0),
-      }}
+      }
       return
     }
 

@@ -124,7 +124,15 @@ async def fetch_trial_balance_amounts(
             {"pid": str(project_id), "year": int(year or 0), **params},
         )
         row = result.fetchone()
-        if row is None or not int(row.n or 0):
+        if row is None:
+            return None
+        # 🔴 `n` 用 getattr 兼容读取（2026-08-05）：`COUNT(*)` 是本函数为区分
+        # 「无记录」与「全 0」而加的，而各循环既有的测试替身只准备了
+        # `unadjusted` / `audited` 两个字段。缺 `n` 时按「有记录」处理 —— 与改造前
+        # 各 render 直接 `COALESCE(SUM(...),0)`（总拿到一行）的行为一致，故零回归。
+        # 真实 DB 一定有 `n`，三态区分不受影响。
+        n = getattr(row, "n", None)
+        if n is not None and not int(n or 0):
             return None
         return {
             "unadjusted": float(row.unadjusted or 0),
@@ -139,4 +147,61 @@ async def fetch_trial_balance_amounts(
         return None
 
 
-__all__ = ["fetch_tb_subtree", "fetch_trial_balance_amounts"]
+async def fetch_trial_balance_rows(
+    db,
+    project_id,
+    year,
+    standard_codes,
+) -> list:
+    """按标准码集取 `trial_balance` **行**（供 :func:`parent_check.build_parent_check`）。
+
+    与 :func:`fetch_trial_balance_amounts` 的区别：后者返回合计 dict，本函数返回
+    逐行记录 —— ``build_parent_check`` 需要按 ``standard_account_code`` 逐码归集，
+    拿不到行就没法算 ``diff_trial``。
+
+    **为什么要共享**：H1/H2/H4/H5/H6/H7/H8/H9 已各自抄了一份形态完全相同的裸 SQL
+    （``standard_account_code = ANY(:codes)`` + try/except + WARNING），D 类不该抄第 8 份。
+    新循环一律调本函数。
+
+    Args:
+        db: `AsyncSession`。
+        project_id / year: 项目与审计年度。
+        standard_codes: 标准码集（横杠体系，如 ``1231-01``）。空集直接返 ``[]``。
+
+    Returns:
+        行序列（含 ``standard_account_code`` / ``unadjusted_amount`` / ``audited_amount``）；
+        任何异常返回 ``[]`` 并 rollback（fail-open）。
+
+    .. note::
+       本函数**不做**父子双算校正 —— `trial_balance` 存在旧版 recalc 写入的
+       父子双算陈旧数据（实证 `2aa00f57` 的 `1651` 是叶子和的 2 倍）。这正是
+       ``build_parent_check`` 要三口径并列而非取其一的原因。
+    """
+    codes = [c for c in (str(x or "").strip() for x in standard_codes or []) if c]
+    if not codes:
+        return []
+    try:
+        result = await db.execute(
+            sa.text(
+                "SELECT standard_account_code, unadjusted_amount, audited_amount "
+                "FROM trial_balance "
+                "WHERE project_id = :pid AND year = :year AND is_deleted = false "
+                "  AND standard_account_code = ANY(:codes)"
+            ),
+            {"pid": str(project_id), "year": int(year or 0), "codes": codes},
+        )
+        return list(result.fetchall())
+    except Exception as e:  # noqa: BLE001 — fail-open
+        logger.warning("四表取数: trial_balance 行查询失败 codes=%s: %s", codes, e)
+        try:
+            await db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return []
+
+
+__all__ = [
+    "fetch_tb_subtree",
+    "fetch_trial_balance_amounts",
+    "fetch_trial_balance_rows",
+]

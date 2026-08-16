@@ -16,6 +16,15 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useB50FormData, type ChecklistItem } from './composables/useB50FormData'
 import { useB50RiskMatrix, RISK_COLOR_MAP, ASSERTIONS, CYCLE_OPTIONS, CONTROL_RELIANCE_OPTIONS, APPROACH_OPTIONS, CATEGORY_OPTIONS, type RiskLevel, type Assertion, type RiskLayer } from './composables/useB50RiskMatrix'
 import { useB50DetailColumnPrefs } from './composables/useB50DetailColumnPrefs'
+// B50 填写完成度（spec procedure-trimming-and-delegation-intelligence Task 3）：
+// 加法式面板，只读既有 accounts，不参与任何录入/持久化。
+// 🔴 与既有 `incompleteAccounts` 口径不同：那个要求六认定全填，这个只要求"至少一个
+// 认定有 RMM"（后者是「裁剪能否读到风险」的门槛，前者是「B50 是否编完」）。
+import {
+  resolveB50Completeness,
+  normalizeFromMatrixRows,
+  B50_COMPLETENESS_LABEL,
+} from './composables/b50Completeness'
 import { useB50Approval } from './composables/useB50Approval'
 import { useB50OoSheetMap } from './composables/useB50OoSheetMap'
 import { useWorkpaperEntryDualMode, type WorkpaperRenderMode } from './composables/useWorkpaperEntryDualMode'
@@ -91,6 +100,37 @@ const {
 // Tab3 元列显隐偏好（余额/类别/会计估计/循环/应对方案）
 const columnPrefs = useB50DetailColumnPrefs()
 const columnPopoverVisible = ref(false)
+
+// ─── B50 填写完成度（spec procedure-trimming-and-delegation-intelligence Task 3）───
+//
+// 🔴 口径与既有 `incompleteAccounts` **不同**，两者并存是有意的：
+//   - `incompleteAccounts`（本组件既有）= 六认定**全填**才算完整 → 服务矩阵录入完整性
+//   - `resolveB50Completeness`          = **至少一个**认定有 RMM 即算已评估 → 服务下游
+//     程序裁剪的「该科目有无风险数据可用」判断
+// 合并成一个会让裁剪页把「填了 3 个认定」误判成「没填」，进而退回循环级默认清单。
+// 🔴 必须经 `normalizeFromMatrixRows` 归一，不得手写 `{ name, cells }` 内联映射 ——
+// 手写等于在这里又解释了一遍「前端字段名是 name/combinedRisk」，与裁剪页侧的
+// `normalizeFromReader`（后端字段名 account/rmm）形成两处各自解释，改一处另一处不红。
+const b50Completeness = computed(() =>
+  resolveB50Completeness({ accounts: normalizeFromMatrixRows(accounts.value) }),
+)
+
+/** 点击未评估科目 → 定位到矩阵中该行（只滚动 + 高亮，不改任何数据） */
+function scrollToAccountRow(name: string) {
+  try {
+    const idx = accounts.value.findIndex(r => r.name === name)
+    if (idx < 0) return
+    const el = document.querySelector<HTMLElement>(`[data-b50-account="${CSS.escape(name)}"]`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('b50-row-flash')
+      window.setTimeout(() => el.classList.remove('b50-row-flash'), 1600)
+    } else {
+      // 该行被等级筛选隐藏时给出可操作提示，而不是静默无反应
+      ElMessage.info(`「${name}」当前被筛选条件隐藏，请清除筛选后查看`)
+    }
+  } catch { /* 定位失败不影响录入 */ }
+}
 
 const CATEGORY_LABELS: Record<string, string> = {
   scot: 'SCOT+',
@@ -1355,6 +1395,53 @@ watch(saving, (isSaving, wasSaving) => {
             </div>
           </div>
 
+          <!--
+            填写完成度面板（spec procedure-trimming-and-delegation-intelligence Task 3）。
+            加法式：只读展示，不碰任何录入逻辑。
+            存在意义 = 下游程序裁剪要按 B50 风险做三维判据，而「未填」与「低风险」
+            必须可区分；未填时裁剪页只能退回循环级默认清单。
+          -->
+          <div class="b50-completeness-bar" :class="`is-${b50Completeness.state}`">
+            <el-tag :type="B50_COMPLETENESS_TAG_TYPE[b50Completeness.state]" size="small" effect="dark">
+              {{ B50_COMPLETENESS_LABEL[b50Completeness.state] }}
+            </el-tag>
+            <span class="b50-completeness-counts">
+              已导入 <strong>{{ b50Completeness.importedCount }}</strong> 个科目 ·
+              已评估 <strong>{{ b50Completeness.assessedCount }}</strong> 个
+            </span>
+            <!-- 零科目：直接给出既有一键导入入口（不新建通路） -->
+            <template v-if="b50Completeness.state === 'not_started'">
+              <span class="b50-completeness-hint">可从试算表一键导入重要报表项目后开始评估</span>
+              <el-button
+                v-if="!isReadonly"
+                size="small"
+                type="success"
+                link
+                :loading="importingScope"
+                @click="handleImportScopeAccounts"
+              >
+                从试算表导入 →
+              </el-button>
+            </template>
+            <!-- 部分完成：列出未评估科目，点击定位到该行 -->
+            <template v-else-if="b50Completeness.unassessedAccounts.length">
+              <span class="b50-completeness-hint">未评估：</span>
+              <el-tag
+                v-for="name in b50Completeness.unassessedAccounts"
+                :key="name"
+                size="small"
+                type="warning"
+                class="b50-completeness-chip"
+                @click="scrollToAccountRow(name)"
+              >
+                {{ name }}
+              </el-tag>
+            </template>
+            <span v-else class="b50-completeness-hint">
+              每个已导入科目至少有一个认定已评估综合风险
+            </span>
+          </div>
+
           <!-- 方法论上下文（源 B50-3 编制逻辑）-->
           <details class="b50-methodology">
             <summary>编制方法（源 B50-3：确定审计范围 → 认定层次风险评估 → 风险应对）</summary>
@@ -1386,7 +1473,11 @@ watch(saving, (isSaving, wasSaving) => {
 
               <!-- 数据行 -->
               <template v-for="(row, rowIdx) in accounts" :key="row.name">
-                <div class="matrix-row-header" :class="{ 'incomplete-row': incompleteAccounts.includes(row.name) }">
+                <div
+                  class="matrix-row-header"
+                  :class="{ 'incomplete-row': incompleteAccounts.includes(row.name) }"
+                  :data-b50-account="row.name"
+                >
                   <div class="row-header-name">
                     {{ row.name }}
                     <span v-if="row.isPreset" class="preset-badge">预置</span>
@@ -1994,6 +2085,60 @@ watch(saving, (isSaving, wasSaving) => {
 
 .b50-audit-objective {
   margin-bottom: 10px;
+}
+
+/* ═══ B50 填写完成度 bar（spec procedure-trimming-and-delegation-intelligence Task 3）═══
+   紧凑单行 bar（不用空洞 el-card，遵循平台列表页打磨范式）。三态用左边线颜色区分。 */
+.b50-completeness-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  border-left: 3px solid var(--el-border-color);
+  background: var(--el-fill-color-lighter);
+}
+
+.b50-completeness-bar.is-not_started {
+  border-left-color: var(--el-color-info);
+  background: var(--el-color-info-light-9);
+}
+
+.b50-completeness-bar.is-partial {
+  border-left-color: var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+}
+
+.b50-completeness-bar.is-completed {
+  border-left-color: var(--el-color-success);
+  background: var(--el-color-success-light-9);
+}
+
+.b50-completeness-counts {
+  color: var(--el-text-color-regular);
+}
+
+.b50-completeness-hint {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+/* 未评估科目 chip：可点击定位到矩阵对应行 */
+.b50-completeness-chip {
+  cursor: pointer;
+}
+
+/* 定位后的瞬时高亮（1.6s 后由 JS 移除该 class） */
+.matrix-row-header.b50-row-flash {
+  animation: b50-row-flash 1.6s ease-out;
+}
+
+@keyframes b50-row-flash {
+  0%, 40% { background: var(--el-color-warning-light-7); }
+  100% { background: transparent; }
 }
 
 .b50-methodology {

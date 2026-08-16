@@ -57,6 +57,11 @@ H7_ACCOUNT_SPEC = SemanticAccountSpec(
             fallback_standard_codes=(),
             label="减值准备",
             is_provision=True,
+            # 🔴 槽级 row_code（消除假冲突告警）：spec 级 `BS-030 = TB('1621')` 只含原值
+            # （连累计折旧 `1622` 都不含）⇒ 备抵槽拿它比对必然无交集、恒报假冲突。
+            # `IMP-013 生产性生物资产减值准备` 两变体公式**实测均为 NULL**
+            # （2026-08-12 postgres 只读复核）⇒ 声明后走三态跳过，假告警消除。
+            row_code="IMP-013",
         ),
     ),
 )

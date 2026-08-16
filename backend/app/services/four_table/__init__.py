@@ -71,7 +71,11 @@ from .report_line_accounts import (
     to_original_codes,
     to_original_codes_with_flag,
 )
-from .tb_query import fetch_tb_subtree, fetch_trial_balance_amounts
+from .tb_query import (
+    fetch_tb_subtree,
+    fetch_trial_balance_amounts,
+    fetch_trial_balance_rows,
+)
 from .semantic_account_resolver import (
     RESOLVED_FROM_CLIENT_CHART,
     RESOLVED_FROM_NONE,
@@ -125,6 +129,7 @@ __all__ = [
     "extract_signed_codes",
     "fetch_tb_subtree",
     "fetch_trial_balance_amounts",
+    "fetch_trial_balance_rows",
     "filter_by_code_specs",
     "filter_by_prefixes",
     "is_top_level_code",

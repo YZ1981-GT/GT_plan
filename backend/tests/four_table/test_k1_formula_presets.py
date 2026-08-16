@@ -91,9 +91,39 @@ def test_detail_sheet_has_no_wp_reference(k1_detail: dict) -> None:
     assert "WP(" not in json.dumps(k1_detail, ensure_ascii=False)
 
 
-def test_detail_sheet_still_has_aux_formulas(k1_detail: dict) -> None:
-    """反向自检：K1-2 块本身非空（否则上一条断言恒真）。"""
-    assert any("AUX(" in f for f in _formulas(k1_detail))
+def test_detail_sheet_aux_presets_removed_by_property_22(k1_detail: dict) -> None:
+    """K1-2 的**项目专属**辅助项预设已按 Property 22 移除，且不得重新引入。
+
+    🔴 2026-08-14 改写（spec `k-cycle-extraction-formula-and-disclosure-closure`
+    Task 11 / Property 22）。原断言是 ``assert any("AUX(" in f ...)``（「块本身非空」
+    的反向自检），与 Property 22「预设不得含具体辅助项编码」直接冲突。
+
+    原 6 条形如 ``AUX('1221','三方收款标识','SKT211','期末余额')``，第三参是**某一个
+    项目**的实际辅助项编码（description 自己写着「实测代表性 aux_code #1/#2/#3」）。
+    `prefill_engine._resolve_aux_formula` 对 ``aux_code`` 用 ``==`` 精确匹配、
+    **不支持通配** ⇒ 换任何别的项目这 6 条全部静默返 0。
+
+    **后继方案（已登记，不在本 spec 作业面）**：按辅助项分行的明细表行集依项目而异，
+    本质上不适合静态公式预设 —— 应走 render 侧动态预填（读 `tb_aux_balance` 按本项目
+    实际 ``aux_code`` 建行，形如 K2/K4/K6 的 ``adjudication_prefill``）。
+
+    本测试**不空转**：正向断言「无写死编码」+ 反向断言「移除留痕在案」。
+    """
+    import re as _re
+
+    formulas = _formulas(k1_detail)
+    hardcoded = [
+        f for f in formulas if _re.search(r"AUX\([^)]*'(?:SKT\d+|YG\d+|A\d{3})'", f)
+    ]
+    assert not hardcoded, (
+        f"K1-2 又出现写死的项目专属辅助项编码（Property 22 禁止）：{hardcoded}"
+    )
+    # 移除动作必须留痕（防「块被别的改动顺手清空」而无人知晓）
+    if not formulas:
+        assert k1_detail.get("_aux_removal_note"), (
+            "K1-2 预设为空但缺 `_aux_removal_note` 留痕 —— 无法区分"
+            "「按 Property 22 有意移除」与「被别的改动误清空」"
+        )
 
 
 # ── R6.4：收敛进公式管理 ────────────────────────────────────────────────────

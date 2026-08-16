@@ -92,10 +92,20 @@ async def load_b50_accounts(db: AsyncSession, project_id: UUID) -> list[dict]:
         "reliance": str|None,
         "substantive_only": str|None,  # 'Y'/'N'
         "approach": str|None,          # 'substantive'/'combined'
+        "balance": float|None,         # B50-3 科目余额（源 remark；未录入为 None）
+        "category": str|None,          # B50-3 类别 'scot'/'amount_only'/'other'
+        "is_estimate": str|None,       # B50-3 是否涉及会计估计 'Y'/'N'
         "cells": {assertion: {"rmm": 'H'|'M'|'L'|None, "special": bool}},
         "max_risk": 'H'|'M'|'L'|None,
         "has_special": bool,
       }
+
+    🔴 ``balance`` / ``category`` / ``is_estimate`` 三键的写入形态**不同列**（实证
+    ``useB50RiskMatrix.ts``）：``B50-T3-balance-{account}`` 的数值在 **remark**，而
+    ``-category-`` / ``-estimate-`` 的取值在 **conclusion**。照抄同一列会让其中两个恒空。
+
+    🔴 未录入一律 ``None`` 而不是 ``0`` / ``''``：下游重要性判据要区分「余额为 0」（真实
+    业务事实，可自动裁）与「未填报」（判据不可用，不得裁）。
     """
     b50_wp = await _find_b50_wp_id(db, project_id)
     if not b50_wp:
@@ -125,6 +135,12 @@ async def load_b50_accounts(db: AsyncSession, project_id: UUID) -> list[dict]:
                 "reliance": None,
                 "substantive_only": None,
                 "approach": None,
+                # B50-3「确定审计范围」三列（前端一直在写、后端此前完全不解析）：
+                # balance 来自 remark（数值字符串）；category / is_estimate 来自 conclusion。
+                # 未录入一律 None（不是 0/空串）—— 「余额为 0」与「未填报」必须可区分。
+                "balance": None,
+                "category": None,
+                "is_estimate": None,
                 "cells": {},
             }
         return accounts[name]
@@ -152,6 +168,35 @@ async def load_b50_accounts(db: AsyncSession, project_id: UUID) -> list[dict]:
                     acc["substantive_only"] = conclusion or None
                 elif field == "approach":
                     acc["approach"] = conclusion or None
+            continue
+        # B50-3 审计范围三列（balance / category / estimate）。
+        # 🔴 三者的值列不同：balance 在 remark（数值字符串），另两个在 conclusion。
+        # 照抄同一列会让其中两个恒空。形态实证见 useB50RiskMatrix.ts。
+        if item_id.startswith("B50-T3-balance-"):
+            name = item_id.removeprefix("B50-T3-balance-")
+            if name:
+                acc = _ensure(name)
+                raw = r.remark
+                if raw is not None and str(raw).strip() != "":
+                    try:
+                        acc["balance"] = float(str(raw).strip())
+                    except (TypeError, ValueError):
+                        # 不可解析（历史脏值 / 用户误填文本）一律留 None，不写 0 ——
+                        # 0 会被下游重要性判据当成「余额为零」而自动裁掉该科目程序。
+                        _logger.warning(
+                            "B50 balance 解析失败 project=%s item=%s raw=%r",
+                            project_id, item_id, raw,
+                        )
+            continue
+        if item_id.startswith("B50-T3-category-"):
+            name = item_id.removeprefix("B50-T3-category-")
+            if name:
+                _ensure(name)["category"] = conclusion or None
+            continue
+        if item_id.startswith("B50-T3-estimate-"):
+            name = item_id.removeprefix("B50-T3-estimate-")
+            if name:
+                _ensure(name)["is_estimate"] = conclusion or None
             continue
         # matrix cell
         parsed = _parse_matrix_item_id(item_id)

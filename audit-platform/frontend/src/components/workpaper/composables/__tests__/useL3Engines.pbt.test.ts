@@ -254,7 +254,7 @@ describe('P7: 一年内到期重分类边界', () => {
    */
   it('到期日>报告日+1年时 calcCurrentPortion === 0', () => {
     // 生成reportDate，然后生成dueDate保证 > reportDate + 1年
-    const arbReportDate = fc.date({
+    const arbReportDate = fc.date({ noInvalidDate: true,
       min: new Date('2000-01-01T00:00:00Z'),
       max: new Date('2028-12-31T00:00:00Z'),
     })

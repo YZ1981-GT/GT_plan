@@ -21,6 +21,7 @@ import type {
   DiffConclusion,
   DiffReconcilePayload,
 } from '../diffReconcileTypes'
+import { fetchMaterialityConfig, hasUsablePm } from './fetchMaterialityConfig'
 
 // ─── ID 生成工具 ─────────────────────────────────────────────────────────────
 
@@ -35,6 +36,15 @@ export interface UseDiffReconcileDataProps {
   htmlData: () => any
   /** 是否只读 */
   readonly: boolean
+  /**
+   * 项目 ID —— 用于从 B15 自动取实际执行重要性（PM）。
+   *
+   * 🔴 **可选**：不传时行为与引入前逐字一致（PM 只从底稿载荷读），
+   * 这是零回归支点。传了才启用自动取数。
+   */
+  projectId?: string
+  /** 审计年度 —— 与 projectId 配套，缺省时后端取当前年度 */
+  year?: string | number
 }
 
 // ─── 返回接口 ────────────────────────────────────────────────────────────────
@@ -82,6 +92,24 @@ export function useDiffReconcileData(props: UseDiffReconcileDataProps): UseDiffR
 
   let _initializing = false
 
+  // ─── PM 自动取数状态（声明必须早于 initFromHtmlData 首次调用） ──────────────
+  //
+  // 🔴 TDZ：`initFromHtmlData()` 在下方立即被调用，它内部会读 `_autoConfig`。
+  // `let` 不像 `function` 那样提升，若把这两个声明留在文件后半段，
+  // 首次调用就会抛 `ReferenceError: Cannot access '_autoConfig' before initialization`
+  // —— 而 `get_diagnostics` / vitest 都查不出，只有浏览器挂载才暴露
+  // （与 E1TabDisclosure 那次 setup 期 TDZ 同族）。
+  let _autoFetched = false
+
+  /**
+   * B15 取到的配置缓存（`{performance_materiality, is_overridden:false, source:'auto'}`）。
+   *
+   * 必须缓存 —— `initFromHtmlData` 由 `watch(htmlData, {deep:true})` 反复触发，
+   * 每次都把 `materialityConfig` 重置为载荷值。只在取数那一刻赋值的话，
+   * 底稿保存/上游刷新后 auto 值会被静默冲掉（表现为「阈值时有时无」）。
+   */
+  let _autoConfig: MaterialityConfig | null = null
+
   // ─── 从 htmlData 初始化 ────────────────────────────────────────────────────
 
   function initFromHtmlData(data: any) {
@@ -93,6 +121,8 @@ export function useDiffReconcileData(props: UseDiffReconcileDataProps): UseDiffR
         conclusion.value = {}
         materialityConfig.value = {}
         analysisNotes.value = {}
+        // 非本格式载荷也要保留 B15 阈值 —— 它是项目级事实，与底稿格式无关
+        applyAutoMateriality()
         return
       }
       rows.value = Array.isArray(data.rows) ? data.rows.map(ensureRowId) : []
@@ -101,6 +131,9 @@ export function useDiffReconcileData(props: UseDiffReconcileDataProps): UseDiffR
       materialityConfig.value = data.materiality_config ?? {}
       analysisNotes.value = data.analysis_notes ?? {}
       isDirty.value = false
+      // 🔴 载荷无 PM 时回落 B15 auto 值（本函数由 deep watch 反复触发，
+      // 不在这里重新套用会让 auto 值被静默冲掉）
+      applyAutoMateriality()
     } finally {
       _initializing = false
     }
@@ -122,6 +155,37 @@ export function useDiffReconcileData(props: UseDiffReconcileDataProps): UseDiffR
     (newData) => { initFromHtmlData(newData) },
     { deep: true }
   )
+
+  // ─── PM 自动取数（B15 重要性水平底稿） ─────────────────────────────────────
+  //
+  // 🔴 UI 文案早已写明「默认从 B15 重要性水平底稿自动获取」，而改造前
+  // `materialityConfig` **只从底稿自身载荷读**、从不调 `/materiality` 端点
+  // → 新建底稿的 PM 恒为空 → `isOverMateriality` 恒 false →
+  // 「推送 N 笔超重要性差异至 A13」按钮永久禁用、行标红永不触发，
+  // 且 `MaterialityConfig.source === 'auto'` 这个 tag 分支不可达（死分支）。
+  //
+  // 手工优先：仅当底稿无 PM 且用户未手动覆盖时才套用自动值。
+  // （`_autoFetched` / `_autoConfig` 因 TDZ 已前移到 composable 顶部声明）
+
+  /** 把 auto 配置套进 state —— 手工优先，已有有效 PM 时空操作 */
+  function applyAutoMateriality(): void {
+    if (_autoConfig == null) return
+    const cur = materialityConfig.value
+    // 手工覆盖优先；载荷已有有效 PM 也不动（判据与 isOverMateriality 同口径）
+    if (cur.is_overridden || hasUsablePm(cur)) return
+    materialityConfig.value = { ...cur, ..._autoConfig }
+  }
+
+  async function loadAutoMateriality(): Promise<void> {
+    if (_autoFetched || !props.projectId) return
+    _autoFetched = true
+
+    _autoConfig = await fetchMaterialityConfig(props.projectId, props.year)
+    // 二次判定在 await 之后 —— 期间用户可能已手填，手工永远优先
+    applyAutoMateriality()
+  }
+
+  void loadAutoMateriality()
 
   // ─── 差异自动计算（精确小数） ──────────────────────────────────────────────
 

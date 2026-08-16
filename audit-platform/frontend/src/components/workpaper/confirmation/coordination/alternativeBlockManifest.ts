@@ -140,13 +140,22 @@ export const ALTERNATIVE_BLOCK_MANIFEST: Record<AltCycleSheet, BlockSpec[]> = {
   // ── L05 长期应付款/借款替代程序 ────────────────────────────────────────────
   // 注：L05 的 getSumFields 内联于 useAlternativeL05Data.ts（SUM_FIELDS，未导出），
   // 故不纳入 Property 10 的 getSumFields drift guard；仅校验其区块集合/splitByDirection/源外登记。
+  // 🔴 三处 title 已于 2026-08-05 逐字对齐源模板 `长期应付款替代程序L0-5` 的 A 列
+  //    （spec l0-confirmation-source-alignment R7.1~R7.3、R7.6）：
+  //      block1 ← `A13`「1、检查期后付款」（改前「①期后还款检查」）
+  //      block2 ← `A20`「2、检查构成期末长期应付款余额的支持性文件（如合同等）」
+  //               （改前「②期末余额支持性证据」，组件侧还带「借款合同/银行对账单」——
+  //                与 L0A 程序 1 的银行借款排除声明矛盾）
+  //      block3 ← `A28`「4、测试本期发生额」（改前「③本期借款检查」；源编号 4 而平台是第 3 块，
+  //               因源模板第 3 项 `A27`「检查期初余额…」无凭证明细表）
+  //    圈码 ①②③④ 是**平台区块前缀**（九套统一），不属源模板字面。
   L05: [
-    { block: 'block1', title: '①期后还款检查', columns: ['voucher_amount', 'repayment_principal', 'repayment_interest'] },
-    { block: 'block2', title: '②期末余额支持性证据', columns: ['voucher_amount', 'contract_amount', 'book_balance'] },
+    { block: 'block1', title: '①检查期后付款', columns: ['voucher_amount', 'repayment_principal', 'repayment_interest'] },
+    { block: 'block2', title: '②检查构成期末长期应付款余额的支持性文件（如合同等）', columns: ['voucher_amount', 'contract_amount', 'book_balance'] },
     {
-      block: 'block3', title: '③本期借款检查',
+      block: 'block3', title: '③测试本期发生额',
       columns: ['voucher_amount', 'arrival_amount'],
-      splitByDirection: true, // 源模板 L0-5 第③区块为借方(归还)/贷方(借入)两张表
+      splitByDirection: true, // 源模板 `A29`（1）本期借方发生额 / `A37`（2）本期贷方发生额 两张表
     },
     {
       block: 'block4', title: '④抵质押/担保证据',

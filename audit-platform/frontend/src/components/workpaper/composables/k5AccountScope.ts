@@ -13,18 +13,29 @@
  * - `loadTbData` 回退请求 `account_prefix: '2701'` → 取到长期应付款余额当预计负债显示
  * - EventBus `substantive:adjudicated` 载荷带错科目码 → 下游附注刷新定位到错科目
  *
+ * 🔴 **2026-08-09 报表行改正**（与上面的科目码缺陷是**两件不同的事**）：
+ * 后端 `k_cycle_specs.py` 已按 `report_config` 连库对账把两侧改为 **`BS-065`**，
+ * 本文件同步跟进（判据在 `kCycleAccountScopeCrossLock.spec.ts`）::
+ *
+ *     原值 listed=BS-068  实为**其他非流动负债**（L7 的行，`TB('2911')` 且 2911 全库零命中）
+ *     原值 soe=BS-094     row_name 是「预计负债」名对，但 **formula 为 NULL**
+ *                         ⇒ 后果 TRACE_ONLY（退兜底 2801，金额对、溯源失真）
+ *
+ * `BS-065` 四变体一致 `TB('2801','期末余额')`；两准则**同号**（K 循环没有一个科目
+ * 在 listed / soe 下用不同 row_code，此前「两侧必须不同」的假设本身就是错的）。
+ *
  * **使用铁律**：运行态一律取 render 下发的 `tb_source_codes.gross`（报表映射解析结果），
  * 本文件的常量只作**兜底 + 展示**。范式同 `k2AccountScope.ts`。
  *
- * spec: .kiro/specs/k-cycle-four-table-extraction-and-disclosure-completion/
- *       Requirements 1.3, 5.1~5.3 / Property 3, 9
+ * spec: .kiro/specs/k-cycle-extraction-formula-and-disclosure-closure/ (Task 7)
+ *       Requirements 1.4, 3.5 / Property 2, 10
  */
 
-/** 报表行编码 —— 上市准则（`report_config` 实证 `BS-068 预计负债`） */
-export const K5_REPORT_ROW_CODE_LISTED = 'BS-068'
+/** 报表行编码 —— 上市准则（两准则同号，保留两个常量以兼容既有 import） */
+export const K5_REPORT_ROW_CODE_LISTED = 'BS-065'
 
-/** 报表行编码 —— 国企准则（`report_config` 实证 `BS-094 预计负债`） */
-export const K5_REPORT_ROW_CODE_SOE = 'BS-094'
+/** 报表行编码 —— 国企准则（实测与 listed 同号） */
+export const K5_REPORT_ROW_CODE_SOE = 'BS-065'
 
 /**
  * 兜底标准码：`2801` 预计负债。

@@ -141,15 +141,29 @@ def test_flag_off_baseline_keys_no_prefill(monkeypatch):
 
 
 def test_flag_on_still_no_prefill_ningquewuzao(monkeypatch):
-    """开关开启 → D3 **仍不返回** adjudication_prefill（宁缺勿造 R3.4，性质/账龄固定分类不可从 TB 拆分）。"""
+    """开关开启 → D3 **仍不返回** adjudication_prefill（宁缺勿造 R3.4，性质/账龄固定分类不可从 TB 拆分）。
+
+    d-cycle-four-table-extraction-and-disclosure-completion R1 起，主开关开时**额外**输出
+    两个 additive 溯源键 `tb_source_codes` / `parent_check`；`adjudication_prefill`
+    仍恒不出现（分类是审计判断，四表无该维度）。
+    """
     _enable_flag(monkeypatch)
     result = _run(d3.render(_ctx(_session())))
     assert "adjudication_prefill" not in result
-    assert set(result.keys()) == _BASELINE_KEYS
+    assert set(result.keys()) == _BASELINE_KEYS | {"tb_source_codes", "parent_check"}
 
 
 def test_flag_on_off_byte_equivalent(monkeypatch):
-    """开关开/关 D3 render 输出逐字节等价（D3 不新增任何键，Property 9 天然成立）。"""
+    """开关开/关 D3 render 输出等价（剥离灰度开时新增的 additive 溯源键后）。
+
+    🔴 **灰度关必须零回归**（硬断言在下方），这是本用例的立法目的。
+    灰度开允许多出 additive 的取数溯源键 —— 与 D1 同款处理
+    （见 test_d1_render_prefill_integration.test_flag_on_off_byte_equivalent_when_no_tb_leaves）。
+
+    注意 `project_context.tb_amount` 系列**不在剥离清单**里：D3 改造后在灰度开/关
+    两侧都写该键（取数在开关外执行，与改造前的无条件取数行为一致），故它必须相等 ——
+    这条正是「补齐 D3 自己的 2203 取数」的零回归保护。
+    """
     checklist = [
         _checklist_row("D3-adj-nature-other-currentUnadjusted", remark="123456"),
         _checklist_row("D3-det-rows", remark='[{"customerName":"甲"}]'),
@@ -158,7 +172,15 @@ def test_flag_on_off_byte_equivalent(monkeypatch):
     off = _run(d3.render(_ctx(_session(checklist_rows=list(checklist)))))
     _enable_flag(monkeypatch)
     on = _run(d3.render(_ctx(_session(checklist_rows=list(checklist)))))
-    assert off == on
+
+    # 灰度关：绝不出现新增键（零回归硬断言）
+    assert "tb_source_codes" not in off
+    assert "parent_check" not in off
+
+    stripped = {
+        k: v for k, v in on.items() if k not in {"tb_source_codes", "parent_check"}
+    }
+    assert off == stripped
     assert "adjudication_prefill" not in on
 
 

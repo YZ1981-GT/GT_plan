@@ -347,11 +347,24 @@ class Settings(BaseSettings):
 
     # --- g7-linkage-extraction-completion（G7 长期股权投资取数灰度）---
     # 门控 G7-2 逐户四表取数（tb_aux_balance aux_type='客户' 1511 归集）+ G7-1 叶子分类合计
-    # 核对（tb_balance 1511/1512 叶子聚合 → tb_leaf_categories）。默认 False = 零回归：
-    # render 不输出 tb_leaf_categories、取数端点返回 imported_count=0 不写入，G7 各 sheet
-    # 逐字节不变。取数异常一律 fail-open（返空/None）不阻断 render。
+    # 核对（tb_balance 1511/1512 叶子聚合 → tb_leaf_categories）+ 审定表未审数预填。
+    # 取数异常一律 fail-open（返空/None）不阻断 render。
     # 联动入口/抽凭/stale 提示/合并范围反向补录（R1/R5/R6/R7）为纯 UI 接线，不受本开关约束。
-    G7_FOUR_TABLE_EXTRACTION_ENABLED: bool = False
+    #
+    # 🔴 2026-08-08 默认 False → True（对齐已上线的 H1/H2/H4/HI_CYCLE 同族开关）。
+    # 依据（真实库直跑 8 个有 1511 数据的项目，只读）：
+    #   1. 归档 spec `g7-four-table-extraction-and-disclosure-alignment` 已 26/26 收口；
+    #   2. `_load_g7_leaves` 的取数**本就不受本开关门控**（每次 render 都在跑），
+    #      开关只挡 `build_g7_leaf_categories` / `build_g7_adjudication_prefill`
+    #      两个**纯函数**的调用 —— 二者在 8 个项目上全部产出真值，
+    #      `parent_check.diff` 全为 0.0、6 个分类桶按科目名归类正确；
+    #   3. 前端已完整消费且**关闭时用户不可达**：`G7TabAdjudication` 的
+    #      「G7-1 账套分类合计核对卡片」是 `v-if="leafCategories"`（关闭 ⇒ 整卡不渲染）、
+    #      「从四表库带入未审数」按钮在 `adjudication_prefill` 为空时报
+    #      「四表库无该科目数据」、G7-2「从四表取数」按钮由 `g7_extraction_enabled` 显隐
+    #      ⇒ 关闭时的表象正是「四表已入库但底稿没数据」。
+    # 灰度机制保留：需回退在 `.env` 里显式设 False 即可。
+    G7_FOUR_TABLE_EXTRACTION_ENABLED: bool = True
 
     # --- h4-four-table-extraction ---
     # H4 工程物资四表取数灰度开关：H4-2 明细从 tb_balance 1605 叶子自动种子、

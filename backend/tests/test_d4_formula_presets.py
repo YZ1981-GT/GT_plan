@@ -231,6 +231,15 @@ class TestNoCyclicReferences:
             pytest.skip(f"块 {detail_sheet} 不存在（正常：明细表可能无预设）")
         for cell in block.get("cells") or []:
             formula = cell.get("formula") or ""
+            # 🔴 只拦 `WP()` —— 它是**同年**跨底稿取数，才会成环。
+            #    `PREV()` 取的是**上年**底稿同 sheet 的值（跨年度），明细表引用上年
+            #    审定数是合法且常见的（趋势对比），不构成循环依赖。
+            #    本断言原为 `SHEET_ADJ not in formula`（拦一切引用），与本类
+            #    docstring 自述的「不得含 WP() 引用审定表」不一致；2026-08-05 Task 18
+            #    把 `分析程序D4-3` 正名为源模板真实 tab `其他业务收入明细表D4-3` 后，
+            #    该块自带的 `PREV('D4','营业收入审定表D4-1','审定数')` 被误判成成环。
+            if "WP(" not in formula:
+                continue
             assert SHEET_ADJ not in formula, (
                 f"明细表 '{detail_sheet}' 反向引用审定表（成环）："
                 f"{cell['cell_ref']} → {formula}"

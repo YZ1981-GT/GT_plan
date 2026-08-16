@@ -1,5 +1,14 @@
 <template>
 <div class="d6-adjudication">
+    <!-- 四表库取数溯源（消 dead output：消费 render 下发的 tb_source_codes；
+         口径 = {{ dCycleBasisLabel('D6') }}） -->
+    <WpFourTableSourcePanel
+      :source-codes="dTbSourceCodes"
+      gross-label="合同资产原值"
+      provision-label="合同资产减值准备"
+      fallback-row-code="BS-011"
+      :hints="dSourceHints"
+    />
   <el-skeleton v-if="!blocks.length" :rows="8" animated />
 
   <template v-if="blocks.length">
@@ -377,6 +386,12 @@ import type useD6CrossSheet from '../composables/useD6CrossSheet'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
+import WpFourTableSourcePanel from '@/components/workpaper/shared/WpFourTableSourcePanel.vue'
+import {
+  pickDTbSourceCodes,
+  normalizeDSlots,
+  dCycleBasisLabel,
+} from '../composables/dCycleAccountScope'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -390,6 +405,17 @@ const props = defineProps<{
   crossSheet: ReturnType<typeof useD6CrossSheet>
   /** 四表库审定表预填（render 的 html_data.adjudication_prefill；灰度关/已填时为空）。 */
   adjudicationPrefill?: AdjudicationPrefillRow[]
+  /**
+   * render 下发的本 sheet `html_data`（含 `tb_source_codes` / `parent_check`）。
+   *
+   * 🔴 必须由宿主显式传入 —— 漏传不会报错、只会让四表取数溯源恒 `undefined`
+   * （未声明属性会静默落到根元素当 HTML 属性，四层验证全绿）。
+   *
+   * D6 备抵是 `prefix_mismatch` 态的唯一活体样本（`1231-05` 在 `account_mapping`
+   * 零反解 ⇒ 保留横杠标准码 ⇒ 在点号体系的 `tb_balance` 必然命中 0 行），
+   * 当前结果「碰巧正确」，必须让它可见。
+   */
+  htmlData?: Record<string, any> | null
 }>()
 
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
@@ -537,6 +563,18 @@ function onCellContextMenu(row: AdjudicationRow, _col: any, _cell: any, event: M
 function openReview(sectionId: string) {
   openReviewDialog(sectionId)
 }
+
+// ─── 四表库取数溯源（Task 16）────────────────────────────────────────
+// 🔴 落点两套并存：D1/D2/D3/D5/D6/D7 写 `html_data` 顶层、D4 写
+// `project_context` —— `pickDTbSourceCodes` 两层都读，只读一层会恒 undefined。
+const dTbSourceCodes = computed(() =>
+  normalizeDSlots(pickDTbSourceCodes(props.htmlData)),
+)
+const dSourceHints = [
+  '取数口径：<code>期末余额</code>；标准码查试算平衡表、客户原始码查余额表。',
+  '「本项目无此科目」与「余额为 0」是两回事 —— 前者金额显示为空，后者显示 0.00。',
+]
+
 </script>
 
 <style scoped>

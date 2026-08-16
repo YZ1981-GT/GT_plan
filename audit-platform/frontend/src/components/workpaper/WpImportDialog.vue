@@ -23,7 +23,9 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            仅支持 .xlsx / .docx 格式文件
+            仅支持 .xlsx / .docx 单份底稿文件。
+            <br />
+            如需导入「批量下载 ZIP」得到的整包，请改用「导入导出 → 🗂️ Tab 数据包」。
           </div>
         </template>
       </el-upload>
@@ -125,12 +127,38 @@ const conflictResult = ref<ConflictResult | null>(null)
 const importResult = ref<ImportResult | null>(null)
 const conflictWpId = ref<string>('')
 
+/**
+ * 🔴 ZIP 要给**定向引导**而不是笼统「格式不支持」（2026-08-09 修）。
+ *
+ * 用户从「导入导出 → 📦 批量下载 ZIP」拿到整包后，很自然会想从「增强导入」
+ * 传回来 —— 而本弹窗只处理**单份**底稿文件，于是只得到一句
+ * 「仅支持 .xlsx 和 .docx 格式」，看起来像「平台不支持 ZIP」。
+ * 实际能收整包的是另一个入口（🗂️ Tab 数据包 / WpBulkDialog），
+ * 两者在菜单上完全区分不出来。此处按扩展名分档给出去处。
+ */
+const ARCHIVE_EXTS = new Set(['zip', 'rar', '7z'])
+
 function handleFileChange(uploadFile: UploadFile) {
   const file = uploadFile.raw
   if (!file) return
-  const ext = file.name.split('.').pop()?.toLowerCase()
-  if (!['xlsx', 'docx'].includes(ext || '')) {
-    ElMessage.warning('仅支持 .xlsx 和 .docx 格式')
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+
+  if (ARCHIVE_EXTS.has(ext)) {
+    ElMessage({
+      type: 'warning',
+      duration: 6000,
+      showClose: true,
+      message:
+        `本入口只接收单份底稿文件（.xlsx / .docx），不支持 .${ext} 压缩包。` +
+        '若要导入「📦 批量下载 ZIP」得到的整包，请改用「导入导出 → 🗂️ Tab 数据包」。',
+    })
+    uploadRef.value?.clearFiles()
+    return
+  }
+
+  if (!['xlsx', 'docx'].includes(ext)) {
+    ElMessage.warning(`不支持的文件格式 .${ext}，仅支持 .xlsx 和 .docx`)
+    uploadRef.value?.clearFiles()
     return
   }
   selectedFile.value = file

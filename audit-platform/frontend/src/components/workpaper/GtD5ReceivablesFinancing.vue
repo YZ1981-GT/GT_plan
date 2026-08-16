@@ -42,6 +42,7 @@
           v-else-if="currentSheet === 'D5-1'"
           :wp-id="props.wpId"
           :project-id="props.projectId"
+          :html-data="props.htmlData"
           :is-readonly="isReadonly"
           :all-responses="allResponses"
           :save-immediate="saveImmediate"

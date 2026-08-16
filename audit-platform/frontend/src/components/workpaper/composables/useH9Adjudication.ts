@@ -27,6 +27,20 @@ import {
   calcChangeRate,
   calcSubtotal,
 } from './useH9FormulaEngine'
+import { h9Scope } from './hCycleAccountScope'
+
+/**
+ * 从调整分录行的「科目名称/报表项目/附注项目」拼串里识别两个区块的正则。
+ *
+ * 🔴 科目码部分由 `h9Scope` 派生（双族），历史实现写死 `2205` —— 那是**合同负债**
+ * （D7 循环 `BS-047`）⇒ 一个填了合同负债的调整分录会被误当租赁负债并入 H9-1。
+ */
+const _LEASE_LIAB_LABEL_RE = new RegExp(
+  ['租赁负债', ...h9Scope.def.slotFallbacks.gross].join('|'),
+)
+const _UNEARNED_LABEL_RE = new RegExp(
+  ['未确认融资', ...h9Scope.def.slotFallbacks.unearned_finance].join('|'),
+)
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -292,12 +306,12 @@ export function useH9Adjudication(params: {
         const debit = Number(r.debitAmount) || 0
         const credit = Number(r.creditAmount) || 0
         const isRje = String(r.category || '').toUpperCase() === 'RJE'
-        if (/未确认融资|1802/.test(label)) {
+        if (_UNEARNED_LABEL_RE.test(label)) {
           matched = true
           const net = debit - credit
           if (isRje) unearnedRje += net
           else unearnedAje += net
-        } else if (/租赁负债|2205/.test(label)) {
+        } else if (_LEASE_LIAB_LABEL_RE.test(label)) {
           matched = true
           const net = credit - debit
           if (isRje) liabRje += net

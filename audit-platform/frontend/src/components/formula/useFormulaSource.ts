@@ -17,6 +17,8 @@
  */
 import { ref, type Ref } from 'vue'
 import http from '@/utils/http'
+// spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
+import { wpFormula, wpUserFormula } from '@/services/apiPaths/formula'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ export function useFormulaSource(): UseFormulaSourceReturn {
     if (candidatesLoading.value) return
     candidatesLoading.value = true
     try {
-      const resp = await http.get(`/api/workpapers/${wpId}/formulas`)
+      const resp = await http.get(wpFormula.list(wpId))
       // http 拦截器已解包 {code,data} 信封 → resp.data 即 {items:[...]}
       const payload: any = resp?.data ?? {}
       const items: any[] = Array.isArray(payload.items)
@@ -88,7 +90,7 @@ export function useFormulaSource(): UseFormulaSourceReturn {
     restoring.value = true
     try {
       await http.delete(
-        `/api/workpapers/${wpId}/user-formulas/${encodeURIComponent(cellKey)}`,
+        wpUserFormula.restorePreset(wpId, encodeURIComponent(cellKey)),
       )
       return true
     } catch (e) {

@@ -11,7 +11,7 @@
  *
  * 禁止再按虚构的「上市5节 + 国企3节 / 统一17列」建模。
  */
-import { dataTableNames, buildRemovedTableKeys } from '../../composables/disclosureSyncedTables'
+import { attachRemovedTableKeys, dataTableNames } from '../../composables/disclosureSyncedTables'
 import { buildG7SlotColumns, dynamicRowCount, type G7SlotSubColumn } from '../../composables/g7SlotColumns'
 
 export type G7DisclosureValue = string | number | null
@@ -110,11 +110,17 @@ function cols(items: Array<[string, string, G7DisclosureColumnType?, number?]>):
   return items.map(([key, label, type = 'text', width]) => ({ key, label, type, width }))
 }
 
-/** 带两级表头分组的列定义：`(key, label, type, group|undefined)`。 */
+/**
+ * 带两级表头分组的列定义：`(key, label, type, group|undefined[, width])`。
+ *
+ * 第 5 位 `width` 为**可选**（additive）—— 既有 4 元组调用方行为逐字不变
+ * （`width` 为 `undefined` 时与改造前产出的对象等价）。加它是为了让原本用
+ * `flatCols(cols([...]))`（支持宽度）的表在补 `group` 后不必丢掉列宽。
+ */
 function groupedCols(
-  items: Array<[string, string, G7DisclosureColumnType, string | undefined]>,
+  items: Array<[string, string, G7DisclosureColumnType, string | undefined, number?]>,
 ): G7DisclosureColumn[] {
-  return items.map(([key, label, type, group]) => ({ key, label, type, group }))
+  return items.map(([key, label, type, group, width]) => ({ key, label, type, group, width }))
 }
 
 /** 显式标注单行表头（禁前缀推断凭空造父表头）；标签列（首列，通常 type='text'）也需要标注。 */
@@ -191,30 +197,55 @@ function groupRow(id: string, label: string, columns: G7DisclosureColumn[]): G7D
   return { id, label, values: valuesFor(columns), kind: 'group' }
 }
 
+// 🔴 行标识列是「序号」、`企业名称` 是**第 1 个数据列**（源 A9:M9 共 12 个数据列）。
+// 改造前漏了 `name` 列 ⇒ 运行时 11 列 vs 源 12 列（E 类偏差），且 seed 侧有 `name`
+// 而运行时没有，两侧永久错位（C 类偏差）。`labelHeader: '序号'` 见表定义处。
+//
+// 🔴 百分号括号一律**全角**，逐字取源 xlsx（`认缴持股比例（%）`）：改造前用半角
+// `(%)`，与源模板不符（D 类偏差）。此前被 E 类掩盖 —— 守卫在列数不等时跳过 label
+// 比对（`compareTableTriple` 的 `else` 分支），故补列后 D 类才浮现。
 const subsidiaryBasicColumns = flatCols(cols([
+  ['name', '企业名称', 'text', 140],
   ['level', '级次', 'text', 80],
   ['enterpriseType', '企业类型', 'text', 100],
   ['registeredPlace', '注册地', 'text', 110],
   ['principalPlace', '主要经营地', 'text', 110],
   ['businessNature', '业务性质', 'text', 110],
   ['paidInCapital', '实收资本', 'number', 120],
-  ['subscribedRatio', '认缴持股比例(%)', 'percent', 130],
-  ['paidInRatio', '实缴持股比例(%)', 'percent', 130],
-  ['votingRights', '享有的表决权(%)', 'percent', 130],
+  ['subscribedRatio', '认缴持股比例（%）', 'percent', 130],
+  ['paidInRatio', '实缴持股比例（%）', 'percent', 130],
+  ['votingRights', '享有的表决权（%）', 'percent', 130],
   ['investmentAmount', '投资额', 'number', 120],
   ['acquisitionMethod', '取得方式', 'text', 120],
 ]))
 
-const controlExceptionColumns = flatCols(cols([
-  ['subscribedRatio', '认缴持股比例(%)', 'percent', 130],
-  ['votingRights', '享有的表决权(%)', 'percent', 120],
-  ['registeredCapital', '注册资本', 'number', 120],
-  ['investmentAmount', '投资额', 'number', 120],
-  ['level', '级次', 'text', 80],
-  ['reason', '原因说明', 'text', 220],
-]))
+// 「表决权例外」两张表（A25:H35 表决权不足半数但形成控制 / A37:H52 表决权过半但未形成
+// 控制）列结构同构，**只有末列 label 不同**：源 xlsx 分别是「纳入合并范围原因」与
+// 「未纳入合并范围原因」。改造前共用一份且写成折衷的「原因说明」，两张表都与源模板不符
+// （D 类偏差）⇒ 拆成两份，各自逐字取源。
+//
+// 🔴 `享有的表决权` 源 xlsx **不带 (%)**（同表「认缴持股比例（%）」才带，且是全角）；
+// 改造前统一加了半角 `(%)`。`name`（企业名称）是第 1 个数据列，改造前漏列（E 类）。
+function controlExceptionColumnsFor(reasonLabel: string) {
+  return flatCols(cols([
+    ['name', '企业名称', 'text', 140],
+    ['subscribedRatio', '认缴持股比例（%）', 'percent', 130],
+    ['votingRights', '享有的表决权', 'percent', 120],
+    ['registeredCapital', '注册资本', 'number', 120],
+    ['investmentAmount', '投资额', 'number', 120],
+    ['level', '级次', 'text', 80],
+    ['reason', reasonLabel, 'text', 220],
+  ]))
+}
 
+/** A25:H35「表决权不足半数但能形成控制」——末列源文为「纳入合并范围原因」。 */
+const controlBelowHalfColumns = controlExceptionColumnsFor('纳入合并范围原因')
+/** A37:H52「表决权过半但未形成控制」——末列源文为「未纳入合并范围原因」。 */
+const noControlAboveHalfColumns = controlExceptionColumnsFor('未纳入合并范围原因')
+
+// 🔴 `name`（企业名称）是源 A55:F55 的第 1 个数据列（共 5 个），改造前漏列（E 类偏差）。
 const minorityColumns = flatCols(cols([
+  ['name', '企业名称', 'text', 140],
   ['holdingRatio', '少数股东持股比例', 'percent', 130],
   ['currentProfit', '当期归属于少数股东的损益', 'number', 160],
   ['dividend', '当期向少数股东支付的股利', 'number', 160],
@@ -229,9 +260,11 @@ const currentPriorColumns = flatCols(cols([
 /** 「非全资子公司主要财务信息」槎位（源模板按重要非全资子公司横向展开，字面 `公司1..N`）。 */
 const MINORITY_FS_SLOT = 'minority-fs-company'
 const MINORITY_FS_SLOT_DEFAULT_NAMES = ['公司1', '公司2', '公司3', '公司4', '公司5']
+// 🔴 子列 label 逐字取源模板 A61:L73（`期末数/本期发生额` / `期初数/上期发生额`），
+// 改造前简写成 `期末/本期`。列 key 不变（`current`/`prior`）。
 const MINORITY_FS_SUB: G7SlotSubColumn[] = [
-  { key: 'current', label: '期末/本期' },
-  { key: 'prior', label: '期初/上期' },
+  { key: 'current', label: '期末数/本期发生额' },
+  { key: 'prior', label: '期初数/上期发生额' },
 ]
 
 /** 由槎位实体名生成矩阵列（每实体 期末/本期·期初/上期 两子列，按实体名分组）。 */
@@ -245,11 +278,14 @@ function multiCompanyCurrentPriorColumnsFor(names: readonly string[]): G7Disclos
   ]))
 }
 
+// 🔴 `name`（企业名称）是源 A78:G78 的第 1 个数据列（共 6 个），改造前漏列（E 类偏差）；
+// 比例两列的括号源文是**全角**（`持股比例（%）`），改造前写成半角（D 类偏差）。
 const formerSubsidiaryColumns = flatCols(cols([
+  ['name', '企业名称', 'text', 140],
   ['registeredPlace', '注册地', 'text', 110],
   ['businessNature', '业务性质', 'text', 110],
-  ['holdingRatio', '持股比例(%)', 'percent', 110],
-  ['votingRights', '表决权比例(%)', 'percent', 120],
+  ['holdingRatio', '持股比例（%）', 'percent', 110],
+  ['votingRights', '表决权比例（%）', 'percent', 120],
   ['reason', '本期不再成为子公司的原因', 'text', 220],
 ]))
 
@@ -274,8 +310,9 @@ function soldFsPositionColumnsFor(names: readonly string[]): G7DisclosureColumn[
 /** 「本期出售的子公司出售日的经营成果」槎位（源模板字面 `A~E公司`，本质仍是横向展开）。 */
 const SOLD_FS_RESULT_SLOT = 'sold-fs-result-company'
 const SOLD_FS_RESULT_SLOT_DEFAULT_NAMES = ['A公司', 'B公司', 'C公司', 'D公司', 'E公司']
+// 🔴 子列 label 逐字取源模板（`本年年初-出售日`，用短横不是「至」）。列 key 不变。
 const SOLD_FS_RESULT_SUB: G7SlotSubColumn[] = [
-  { key: 'current', label: '本年年初至出售日' },
+  { key: 'current', label: '本年年初-出售日' },
   { key: 'prior', label: '上年发生额' },
 ]
 
@@ -294,38 +331,81 @@ const newEntityColumns = flatCols(cols([
   ['currentNetProfit', '本期净利润', 'number', 130],
 ]))
 
-const commonControlColumns = flatCols(cols([
-  ['consolidationDate', '合并日', 'text', 110],
-  ['bookNetAssets', '账面净资产', 'number', 120],
-  ['consideration', '交易对价', 'number', 120],
-  ['ultimateController', '实际控制人', 'text', 120],
-  ['revenue', '本年初至合并日-收入', 'number', 140],
-  ['netProfit', '本年初至合并日-净利润', 'number', 140],
-  ['cashIncrease', '现金净增加额', 'number', 120],
-  ['operatingCashFlow', '经营活动现金流量净额', 'number', 160],
-]))
+/**
+ * 同一控制下企业合并列 —— **两级表头**（源 `附注披露信息（国企）` A120:J126）。
+ *
+ * 🔴 源 xlsx 合并区实证：末 4 列共享父表头「本年初至合并日的相关情况」，
+ * 其叶子列名逐字为 `收入` / `净利润` / `现金净增加额` / `经营活动现金流量净额`。
+ * 改造前把父表头**压进 label 前缀**（`本年初至合并日-收入`）且整表标 `flat` ——
+ * 后者只是「丢了 group」的症状（`buildG7SoeColumns` 的
+ * `...(hasGroup ? {} : { flat: true })` 自动加），补 group 后 flat 随之消失。
+ * 列 key 一律不动（`revenue` / `netProfit` 等），只动 group 与 label。
+ */
+const COMMON_CONTROL_GROUP = '本年初至合并日的相关情况'
 
-const nonCommonControlColumns = flatCols(cols([
-  ['purchaseDate', '购买日', 'text', 110],
-  ['purchaseDateBasis', '购买日的确定依据', 'text', 150],
-  ['preHolding', '购买日前持有权益比例(%)', 'percent', 150],
-  ['atCombinationHolding', '形成合并时持有权益比例(%)', 'percent', 160],
-  ['bookNetAssets', '账面净资产总额', 'number', 130],
-  ['fvIdentifiable', '可辨认净资产公允价值总额', 'number', 160],
-  ['fvMethod', '公允价值确定方法', 'text', 140],
-  ['consideration', '交易对价', 'number', 120],
-  ['goodwill', '形成商誉', 'number', 120],
-  ['postRevenue', '购买日至期末收入', 'number', 140],
-  ['postProfit', '购买日至期末净利润', 'number', 140],
-  ['postCashFlow', '购买日至期末现金流量', 'number', 150],
-]))
+const commonControlColumns = groupedCols([
+  ['consolidationDate', '合并日', 'text', undefined, 110],
+  ['bookNetAssets', '账面净资产', 'number', undefined, 120],
+  ['consideration', '交易对价', 'number', undefined, 120],
+  ['ultimateController', '实际控制人', 'text', undefined, 120],
+  ['revenue', '收入', 'number', COMMON_CONTROL_GROUP, 140],
+  ['netProfit', '净利润', 'number', COMMON_CONTROL_GROUP, 140],
+  ['cashIncrease', '现金净增加额', 'number', COMMON_CONTROL_GROUP, 120],
+  ['operatingCashFlow', '经营活动现金流量净额', 'number', COMMON_CONTROL_GROUP, 160],
+])
 
-const absorptionColumns = flatCols(cols([
-  ['assetItem', '并入主要资产-项目', 'text', 140],
-  ['assetAmount', '并入主要资产-金额', 'number', 140],
-  ['liabilityItem', '并入主要负债-项目', 'text', 140],
-  ['liabilityAmount', '并入主要负债-金额', 'number', 140],
-]))
+/**
+ * 非同一控制下企业合并列 —— **两级表头**（源 `附注披露信息（国企）` A127:M136）。
+ *
+ * 🔴 源 xlsx 合并区实证：第 5~7 列共享父表头「购买日被购买方」，叶子列名逐字为
+ * `账面净资产总额` / `可辨认净资产公允价值总额金额` / `可辨认净资产公允价值总额确定方法`；
+ * 其余列 rowspan=2（不给 group）。另 4 处 label 需逐字取源文（比例列源文不带 `(%)`、
+ * 购买日至期末三列源文带「被购买方的」）。列 key 一律不动。
+ */
+const NON_COMMON_CONTROL_GROUP = '购买日被购买方'
+
+const nonCommonControlColumns = groupedCols([
+  ['purchaseDate', '购买日', 'text', undefined, 110],
+  ['purchaseDateBasis', '购买日的确定依据', 'text', undefined, 150],
+  ['preHolding', '购买日前持有被购买方权益比例', 'percent', undefined, 150],
+  [
+    'atCombinationHolding',
+    '形成合并时持有的被购买方权益比例（不含合并后的股权增减）',
+    'percent',
+    undefined,
+    160,
+  ],
+  ['bookNetAssets', '账面净资产总额', 'number', NON_COMMON_CONTROL_GROUP, 130],
+  ['fvIdentifiable', '可辨认净资产公允价值总额金额', 'number', NON_COMMON_CONTROL_GROUP, 160],
+  ['fvMethod', '可辨认净资产公允价值总额确定方法', 'text', NON_COMMON_CONTROL_GROUP, 140],
+  ['consideration', '交易对价', 'number', undefined, 120],
+  ['goodwill', '形成商誉', 'number', undefined, 120],
+  ['postRevenue', '购买日至期末被购买方的收入', 'number', undefined, 140],
+  ['postProfit', '购买日至期末被购买方的净利润', 'number', undefined, 140],
+  ['postCashFlow', '购买日至期末被购买方的现金流量', 'number', undefined, 150],
+])
+
+/**
+ * 吸收合并列 —— **两级表头**。
+ *
+ * 🔴 源模板 `附注披露信息（国企）` A139:F172 的合并区实证：
+ * `A139:B140` 标签列「吸收合并的类型」、`C139:D139`「并入的主要资产」下辖
+ * `C140='项目'` / `D140='金额'`、`E139:F139`「并入的主要负债」下辖 `E140/F140` 同名。
+ * 附注模板 seed 亦已按此落地
+ * （`_column_groups=[{并入的主要资产,1,2},{并入的主要负债,3,2}]`）。
+ *
+ * 改造前这里是 `flatCols` + label 拼接（`并入主要资产-项目`）= **压扁两级表头**，
+ * 推送后附注列头会从两级退化成单级（违反平台铁律「同步不得压扁列结构」）。
+ * 列 key 保持不变，只改 label 与 group ⇒ 既有已录数据不丢。
+ */
+const _ABSORB_ASSET_GROUP = '并入的主要资产'
+const _ABSORB_LIABILITY_GROUP = '并入的主要负债'
+const absorptionColumns = groupedCols([
+  ['assetItem', '项目', 'text', _ABSORB_ASSET_GROUP],
+  ['assetAmount', '金额', 'number', _ABSORB_ASSET_GROUP],
+  ['liabilityItem', '项目', 'text', _ABSORB_LIABILITY_GROUP],
+  ['liabilityAmount', '金额', 'number', _ABSORB_LIABILITY_GROUP],
+])
 
 /** 「母公司在子公司的所有者权益份额发生变化的情况」槎位（源模板字面 `公司1..N`）。 */
 const OWNERSHIP_CHANGE_SLOT = 'ownership-change-company'
@@ -378,9 +458,12 @@ const jvPlColumns = flatCols(cols([
 /** 「重要联营企业主要财务信息」矩阵槎位（源模板按合营企业2/联营企业1/2 横向展开）。 */
 const ASSOCIATE_FS_SLOT = 'associate-fs-company'
 const ASSOCIATE_FS_SLOT_DEFAULT_NAMES = ['合营企业2', '联营企业1', '联营企业2']
+// 🔴 子列 label 逐字取源模板 `附注披露信息（国企）` r258（`期末数` / `期初数`），
+// 不得简写成「期末/期初」—— 附注模板 seed 与本处必须一致，否则推送后列头从
+// 正确写法退化成简写（seed 侧由 `fix_note_g7_soe_structure.py` 保证）。
 const ASSOCIATE_FS_SUB: G7SlotSubColumn[] = [
-  { key: 'current', label: '期末' },
-  { key: 'prior', label: '期初' },
+  { key: 'current', label: '期末数' },
+  { key: 'prior', label: '期初数' },
 ]
 
 function associateFsMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
@@ -396,9 +479,10 @@ function associateFsMatrixColumnsFor(names: readonly string[]): G7DisclosureColu
 /** 「续：重要联营企业经营成果」矩阵槎位（同上，子列为本期/上期）。 */
 const ASSOCIATE_PL_SLOT = 'associate-pl-company'
 const ASSOCIATE_PL_SLOT_DEFAULT_NAMES = ['合营企业2', '联营企业1', '联营企业2']
+// 🔴 子列 label 逐字取源模板 r272（`本期发生额` / `上期发生额`），同 FS 表不得简写。
 const ASSOCIATE_PL_SUB: G7SlotSubColumn[] = [
-  { key: 'current', label: '本期' },
-  { key: 'prior', label: '上期' },
+  { key: 'current', label: '本期发生额' },
+  { key: 'prior', label: '上期发生额' },
 ]
 
 function associatePlMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
@@ -422,21 +506,47 @@ const unrecognizedLossColumns = flatCols(cols([
   ['closingCumulative', '本期末累积未确认的损失份额', 'number', 170],
 ]))
 
-const structuredExposureColumns = flatCols(cols([
-  ['sponsorScale', '发起规模', 'text', 110],
-  ['closingCarrying', '期末账面价值', 'number', 130],
-  ['closingMaxLoss', '期末最大损失敞口', 'number', 140],
-  ['openingCarrying', '期初账面价值', 'number', 130],
-  ['openingMaxLoss', '期初最大损失敞口', 'number', 140],
-  ['presentationItem', '列报项目', 'text', 120],
-]))
+/**
+ * 未纳入合并范围结构化主体的账面价值与最大损失敞口列 —— **三段两级表头**
+ * （源 `附注披露信息（国企）` A323:G328）。
+ *
+ * 🔴 源 xlsx 合并区实证：`发起`（1 列，叶子 `规模`）/ `期末数`（2 列，叶子
+ * `账面价值` / `最大损失敞口`）/ `期初数`（2 列，同名叶子）；`列报项目` rowspan=2
+ * 不给 group。改造前把父表头压进 label 前缀（`发起规模` / `期末账面价值`）并整表标
+ * `flat` —— 后者是「丢了 group」的症状。列 key 一律不动。
+ *
+ * 🔴 期末/期初两段的叶子 label **有意同名**（`账面价值` / `最大损失敞口`），靠父表头区分；
+ * 不得为「看起来不重复」而加期别前缀（那正是改造前的错误形态）。
+ */
+const STRUCTURED_GROUP_SPONSOR = '发起'
+const STRUCTURED_GROUP_CLOSING = '期末数'
+const STRUCTURED_GROUP_OPENING = '期初数'
 
-const sponsorIncomeColumns = flatCols(cols([
-  ['serviceFee', '服务收费', 'number', 120],
-  ['assetSaleGain', '向结构化主体出售资产的利得(损失)', 'number', 200],
-  ['total', '合计', 'number', 110],
-  ['transferredAssets', '当期向结构化主体转移资产账面价值', 'number', 200],
-]))
+const structuredExposureColumns = groupedCols([
+  ['sponsorScale', '规模', 'text', STRUCTURED_GROUP_SPONSOR, 110],
+  ['closingCarrying', '账面价值', 'number', STRUCTURED_GROUP_CLOSING, 130],
+  ['closingMaxLoss', '最大损失敞口', 'number', STRUCTURED_GROUP_CLOSING, 140],
+  ['openingCarrying', '账面价值', 'number', STRUCTURED_GROUP_OPENING, 130],
+  ['openingMaxLoss', '最大损失敞口', 'number', STRUCTURED_GROUP_OPENING, 140],
+  ['presentationItem', '列报项目', 'text', undefined, 120],
+])
+
+/**
+ * 发起人从结构化主体获得的收益及转移资产列 —— **两级表头**
+ * （源 `附注披露信息（国企）` A340:E345）。
+ *
+ * 🔴 源 xlsx 合并区实证：前 3 列共享父表头「当期从结构化主体获得的收益」；
+ * 第 2 列叶子 label 源文用**全角**括号 `向结构化主体出售资产的利得（损失）`
+ * （改造前写半角），末列 rowspan=2 不给 group。列 key 一律不动。
+ */
+const SPONSOR_INCOME_GROUP = '当期从结构化主体获得的收益'
+
+const sponsorIncomeColumns = groupedCols([
+  ['serviceFee', '服务收费', 'number', SPONSOR_INCOME_GROUP, 120],
+  ['assetSaleGain', '向结构化主体出售资产的利得（损失）', 'number', SPONSOR_INCOME_GROUP, 200],
+  ['total', '合计', 'number', SPONSOR_INCOME_GROUP, 110],
+  ['transferredAssets', '当期向结构化主体转移资产账面价值', 'number', undefined, 200],
+])
 
 const minorityFsLabels = [
   '流动资产', '非流动资产', '资产合计', '流动负债', '非流动负债', '负债合计',
@@ -508,6 +618,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'subsidiary-basic',
         title: '纳入合并范围的子公司基本情况',
         templateTableKey: '本期纳入合并报表范围的子公司基本情况',
+        labelHeader: '序号',
         sourceRows: 'A9:M19',
         columns: subsidiaryBasicColumns,
         rows: blankRows(
@@ -541,13 +652,16 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'control-below-half',
         title: '表决权不足半数但形成控制',
-        templateTableKey: '序号',
+        // 🔴 原值 '序号' 是**表头首格泄漏名**，且与下一张表撞名 ⇒ 附注模板无此表名
+        // → 推送出孤儿表（投影器只渲染模板里存在的表名），两张表还会互相覆盖丢整表。
+        templateTableKey: '母公司拥有被投资单位表决权不足半数但能对被投资单位形成控制的原因',
+        labelHeader: '序号',
         sourceRows: 'A25:H35',
-        columns: controlExceptionColumns,
+        columns: controlBelowHalfColumns,
         rows: blankRows(
           'control-below-half',
           dynamicRowCount(1),
-          controlExceptionColumns,
+          controlBelowHalfColumns,
           index => `G7-4 条件筛选（表决权≤50%）第${12 + index}行`,
         ),
         dynamic: true,
@@ -567,16 +681,19 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'no-control-above-half',
         title: '表决权过半但未纳入合并范围',
-        templateTableKey: '序号',
+        // 🔴 原值 '序号'（表头首格泄漏名），与上一张表撞名，见上方说明
+        templateTableKey:
+          '母公司直接或通过其他子公司间接拥有被投资单位半数以上的表决权但未能对其形成控制的原因',
+        labelHeader: '序号',
         sourceRows: 'A37:H52',
-        columns: controlExceptionColumns,
+        columns: noControlAboveHalfColumns,
         rows: [
-          groupRow('nc-jv-group', '合营企业', controlExceptionColumns),
-          ...blankRows('nc-jv', dynamicRowCount(1), controlExceptionColumns, index => `G7-4 合营条件筛选 第${23 + index}行`),
-          groupRow('nc-assoc-group', '联营企业', controlExceptionColumns),
-          ...blankRows('nc-assoc', dynamicRowCount(1), controlExceptionColumns, index => `G7-4 联营条件筛选 第${29 + index}行`),
-          groupRow('nc-other-group', '其他', controlExceptionColumns),
-          ...blankRows('nc-other', dynamicRowCount(1), controlExceptionColumns),
+          groupRow('nc-jv-group', '合营企业', noControlAboveHalfColumns),
+          ...blankRows('nc-jv', dynamicRowCount(1), noControlAboveHalfColumns, index => `G7-4 合营条件筛选 第${23 + index}行`),
+          groupRow('nc-assoc-group', '联营企业', noControlAboveHalfColumns),
+          ...blankRows('nc-assoc', dynamicRowCount(1), noControlAboveHalfColumns, index => `G7-4 联营条件筛选 第${29 + index}行`),
+          groupRow('nc-other-group', '其他', noControlAboveHalfColumns),
+          ...blankRows('nc-other', dynamicRowCount(1), noControlAboveHalfColumns),
         ],
         dynamic: true,
         maxRows: 40,
@@ -598,6 +715,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'minority-shareholders',
         title: '1、少数股东',
         templateTableKey: '少数股东',
+        labelHeader: '序号',
         sourceRows: 'A54:F60',
         columns: minorityColumns,
         rows: blankRows('minority', dynamicRowCount(1), minorityColumns),
@@ -608,6 +726,11 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'minority-financials',
         title: '2、主要财务信息',
         templateTableKey: '主要财务信息',
+        // 🔴 源 A62 原文是「项  目」（**两个空格**）—— 必须逐字带上（R4.1/R4.4）。
+        // 缺省回退值 `'项目'`（无空格）会让契约守卫 P5（labelHeader ↔ seed headers[0]）打红：
+        // seed 侧 `headers[0]` 逐字保留源原文，而 `facts.label_header` 经 `_norm()` 去掉全部
+        // 空白 ⇒ 边①/边③ 对这类差异**结构上不可见**，只有 P5 能抓到。
+        labelHeader: '项  目',
         sourceRows: 'A61:L73',
         columns: multiCompanyCurrentPriorColumnsFor(MINORITY_FS_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: MINORITY_FS_SLOT, sub: MINORITY_FS_SUB },
@@ -647,6 +770,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'former-subsidiary-basic',
         title: '（1）原子公司的基本情况',
         templateTableKey: '原子公司的基本情况',
+        labelHeader: '序号',
         sourceRows: 'A77:G83',
         columns: formerSubsidiaryColumns,
         rows: blankRows(
@@ -670,7 +794,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'former-subsidiary-results',
         title: '（3）本期出售的子公司出售日的经营成果',
-        templateTableKey: '本期出售的子公司处置日的经营成果',
+        // 🔴 原值把「出售日」写成「处置日」，与附注模板表名一字之差 ⇒ 孤儿表
+        templateTableKey: '本期出售的子公司出售日的经营成果',
         sourceRows: 'A97:L106',
         columns: soldFsResultColumnsFor(SOLD_FS_RESULT_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: SOLD_FS_RESULT_SLOT, sub: SOLD_FS_RESULT_SUB },
@@ -705,7 +830,9 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'newly-consolidated',
         title: '本期新纳入合并范围的主体',
-        templateTableKey: '公司名称',
+        // 🔴 原值 '公司名称' 是表头首格泄漏名，且与「同一控制下企业合并」撞名 ⇒ 孤儿表 + 互相覆盖
+        templateTableKey: '本期新纳入合并范围的主体',
+        labelHeader: '公司名称',
         sourceRows: 'A109:D119',
         columns: newEntityColumns,
         rows: blankRows(
@@ -733,7 +860,9 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
       {
         id: 'common-control-combination',
         title: '同一控制下企业合并',
-        templateTableKey: '公司名称',
+        // 🔴 原值 '公司名称'（表头首格泄漏名），与「本期新纳入合并范围的主体」撞名，见上方说明
+        templateTableKey: '本期发生的同一控制下企业合并情况',
+        labelHeader: '公司名称',
         sourceRows: 'A122:J126',
         columns: commonControlColumns,
         rows: blankRows('common-control', dynamicRowCount(1), commonControlColumns),
@@ -765,6 +894,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'non-common-control-combination',
         title: '非同一控制下企业合并',
         templateTableKey: '本期发生的非同一控制下企业合并情况',
+        labelHeader: '被购买方名称',
         sourceRows: 'A129:M134',
         columns: nonCommonControlColumns,
         rows: blankRows('non-common-control', dynamicRowCount(1), nonCommonControlColumns),
@@ -790,24 +920,28 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
     noteSectionTitle: '本期发生的吸收合并',
     guidance: ['应分别同一控制下和非同一控制下的吸收合并，披露并入的主要资产、负债项目及其金额。'],
     tables: [
+      // 🔴 源模板 A139:F172 是**一张表 + 两个段标签行**（`A141='同一控制下吸收合并'`、
+      // `A157='非同一控制下吸收合并'`，各段下 15 行动态区），附注模板 seed 亦为
+      // 单表 12 行（段标签 + 5 空行 ×2）。
+      // 改造前这里拆成两张表，且 `templateTableKey` 分别是表头首格泄漏名
+      // `吸收合并的类型`（附注模板已把它登记为 alias 正名掉）与**缺省**（回退 title）
+      // ⇒ 两张表在附注侧都是孤儿表，推送后永远拿不到数据。
+      // 合并后不能只改 key —— 两张表同指一个表名会让后推的覆盖先推的、丢同一控制段。
       {
-        id: 'absorption-common-control',
-        title: '同一控制下吸收合并',
-        templateTableKey: '吸收合并的类型',
-        sourceRows: 'A141:F156',
+        id: 'absorption-merger-table',
+        title: '（十）本期发生的吸收合并',
+        templateTableKey: '本期发生的吸收合并',
+        labelHeader: '吸收合并的类型',
+        sourceRows: 'A139:F172',
         columns: absorptionColumns,
-        rows: blankRows('abs-cc', dynamicRowCount(1), absorptionColumns),
+        rows: [
+          groupRow('abs-cc-group', '同一控制下吸收合并', absorptionColumns),
+          ...blankRows('abs-cc', dynamicRowCount(1), absorptionColumns),
+          groupRow('abs-ncc-group', '非同一控制下吸收合并', absorptionColumns),
+          ...blankRows('abs-ncc', dynamicRowCount(1), absorptionColumns),
+        ],
         dynamic: true,
-        maxRows: 20,
-      },
-      {
-        id: 'absorption-non-common-control',
-        title: '非同一控制下吸收合并',
-        sourceRows: 'A157:F172',
-        columns: absorptionColumns,
-        rows: blankRows('abs-ncc', dynamicRowCount(1), absorptionColumns),
-        dynamic: true,
-        maxRows: 20,
+        maxRows: 40,
       },
     ],
   },
@@ -858,6 +992,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'ownership-change-impact',
         title: '（2）交易对于少数股东权益及归属于母公司所有者权益的影响',
         templateTableKey: '母公司在子公司的所有者权益份额发生变化的情况',
+        // 🔴 源 A187 原文是「项  目」（双空格）。
+        labelHeader: '项  目',
         sourceRows: 'A186:E199',
         columns: ownershipChangeImpactColumnsFor(OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: OWNERSHIP_CHANGE_SLOT },
@@ -893,6 +1029,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'lte-classification',
         title: '长期股权投资分类',
         templateTableKey: '长期股权投资分类',
+        // 🔴 源 A202 原文是「项  目」（双空格）—— 原先写 `'项目'` 属 R4.4 禁止的
+        // 「统一成好看的那种」，且 seed 侧 `headers[0]` 一直是双空格 ⇒ P5 打红。
         labelHeader: '项  目',
         sourceRows: 'A201:F208',
         columns: classificationColumns,
@@ -973,6 +1111,8 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'important-jv-fs',
         title: '（3）重要合营企业的主要财务信息（划分为持有待售的除外）',
         templateTableKey: '重要合营企业的主要财务信息（划分为持有待售的除外）',
+        // 🔴 源 A229 原文是「项 目」（**一个空格**）—— 本 sheet 唯一的单空格表，
+        // 其余 7 张是「项  目」（双空格）。R4.4 明确禁止统一，逐表取原文。
         labelHeader: '项 目',
         sourceRows: 'A225:D241',
         columns: jvFsColumns,
@@ -983,6 +1123,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'important-jv-pl',
         title: '续：重要合营企业经营成果',
         templateTableKey: '续：重要合营企业本期及上期经营成果',
+        // 🔴 源 A243 原文是「项  目」（双空格）；注意上一张合营表 A229 是**单**空格。
         labelHeader: '项  目',
         sourceRows: 'A242:D251',
         columns: jvPlColumns,
@@ -992,7 +1133,10 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'important-associate-fs',
         title: '（4）重要联营企业的主要财务信息',
         templateTableKey: '重要联营企业的主要财务信息',
-        labelHeader: '项 目',
+        // 🔴 源 A257 是「项  目」（两个空格）；合营表 A229 才是「项 目」（一个空格）。
+        // 改造前此处注释已写明源原文带双空格，值却写成 `'项目'` —— 正是 R4.4 禁止的
+        // 「统一成好看的那种」，且注释与值自相矛盾。现按原文逐字带上。
+        labelHeader: '项  目',
         sourceRows: 'A253:H269',
         columns: associateFsMatrixColumnsFor(ASSOCIATE_FS_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: ASSOCIATE_FS_SLOT, sub: ASSOCIATE_FS_SUB },
@@ -1006,6 +1150,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'important-associate-pl',
         title: '续：重要联营企业经营成果',
         templateTableKey: '续：重要联营企业本期及上期经营成果',
+        // 🔴 源 A271 原文是「项  目」（双空格）。
         labelHeader: '项  目',
         sourceRows: 'A270:H277',
         columns: associatePlMatrixColumnsFor(ASSOCIATE_PL_SLOT_DEFAULT_NAMES),
@@ -1020,6 +1165,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'insignificant-aggregate',
         title: '（5）不重要合营企业和联营企业的汇总信息',
         templateTableKey: '不重要合营企业和联营企业的汇总信息',
+        // 🔴 源 A280 原文是「项  目」（双空格）。
         labelHeader: '项  目',
         sourceRows: 'A279:D292',
         columns: aggregateColumns,
@@ -1104,7 +1250,7 @@ export const G7_SOE_DISCLOSURE_SECTIONS: G7SoeDisclosureSection[] = [
         id: 'sponsor-income',
         title: '发起人从结构化主体获得的收益及转移资产',
         templateTableKey: '结构化主体获得收益及转移资产情况',
-        labelHeader: '类型',
+        labelHeader: '结构化主体类型',
         sourceRows: 'A340:E345',
         columns: sponsorIncomeColumns,
         rows: (() => {
@@ -1288,7 +1434,11 @@ export function materializeG7DisclosureRows(
       }
     }
     return {
-      项目: row.label,
+      // 🔴 行对象的标签键必须与 `buildG7SoeColumns()` 标签列的 `key` **逐字一致**，
+      //    否则投影器 `_project_row` 取 `r.get(label_key)` 拿不到值 ⇒ **整表行名变空**。
+      //    这条不变式由守卫 `g7ColumnThreeWayAlignment.spec.ts` 的
+      //    「行构造标签键 ≡ 标签列 key」断言钉死（只改一侧即打红）。
+      label: row.label,
       ...values,
       _row_id: row.id,
       _kind: row.kind ?? 'data',
@@ -1338,8 +1488,28 @@ export function buildG7SoeColumns(): Record<string, import('../../composables/di
       // 无 group 的表 → 标签列标 flat（显式单级表头，抑制后端前缀推断）。
       const hasGroup = columns.some(c => c.group)
       const labelText = table.labelHeader ?? '项目'
+      // 🔴 标签列 key 用平台惯例 `'label'`（不是中文字面量 `'项目'`）—— 裁决依据：
+      //   ① 平台 266 个标签列定义里 241 个（91%）用 `'label'`，跨 70 个文件；
+      //      硬编码 `'项目'` 全平台仅 7 处且全在 G 循环，属少数派偏离；
+      //   ② 中文字面量当 key 违反平台「禁硬编码」取向；
+      //   ③ 投影器 `note_sub_table_projector` 有双向兜底
+      //      （`_inverse_project_row` L92-93 任意标签 key ← 规范 `label`；
+      //       `project_sub_tables` L231-232 标签值为空 → 回退 `label`），
+      //      且标签列不承载数据（行名真源是 `rows[].label`，`_cell_meta`/`_cell_modes`
+      //      按 value 列索引、标签列不算数据列）。
+      //
+      // 🔴🔴 但兜底**只在一个方向成立** —— L231-232 的回退条件是 `label_key != "label"`，
+      //    改成 `'label'` 后该分支不再触发。故必须同时满足两条，缺一即丢行名：
+      //      (a) 行对象**必须带 `label` 键**（见 `materializeG7DisclosureRows`，已同步改）；
+      //      (b) 列元数据与行对象**同一次请求一起推送**（`sync-batch-from-workpaper` 的
+      //          每个 item 同时带 `sub_table_data` 与 `columns`，见 `G7TabDisclosureSOE.vue`），
+      //          不存在「列已更新而行仍是旧键」的中间态。
+      //    实测（`_wip_t4_live.py` 直跑投影器）：存量 5 张 soe 表的行对象只有 `项目` 键、
+      //    **没有 `label` 键**，若只改列不改行 ⇒ 行名全部变空串；两侧同改后 6/6 表行名保留。
+      //    存量记录在下一次同步时被整表覆盖（`sub_table_data` 按表名浅合并 + 行对象整体替换），
+      //    故不需要数据迁移；同步前的旧记录仍由 `_sub_table_columns` 旧值（`项目`）正确渲染。
       result[syncTableKey(table)] = [
-        { key: '项目', label: labelText, is_label: true, ...(hasGroup ? {} : { flat: true }) },
+        { key: 'label', label: labelText, is_label: true, ...(hasGroup ? {} : { flat: true }) },
         ...columns.map((c) => ({
           key: c.key,
           label: c.label,
@@ -1380,7 +1550,85 @@ export function buildG7SoeSyncPayloads(state: G7SoeDisclosureState): G7SoeSyncPa
       }
     }
   }
+
+  // ── `_removed_table_keys` 逐章节差集（Task 13）──────────────────────────────
+  //
+  // 🔴 改造前 soe 侧**整条链是死的**：`dataTableNames` / `buildRemovedTableKeys`
+  //    在本文件的调用数都是 **0**（死导入），`markG7SoeSynced` 不存在，
+  //    `previouslySyncedTables` 只在 `createG7SoeDisclosureState` 初始化成 `{}`
+  //    并被 `G7TabDisclosureSOE.vue` 持久化时原样透传 —— **无写入方、无消费方**。
+  //    后果：soe 侧删掉一张表（如把条件表清空、或改名动态槎位）后，附注侧的
+  //    `sub_table_data` / `_sub_table_columns` 永久残留过时明细（披露同步按 key
+  //    浅合并，删除必须显式上报），而 listed 侧同一能力早已接通 ⇒ 两变体行为不一致。
+  //
+  // 判定口径（逐章节，与 listed 同源）：
+  //   * **有录入区块**的章节 ⇒ 参与差集，「上次推送 − 本次推送」即需清理的过时表；
+  //   * **无录入区块**的章节（纯文字披露，`tables` 为空）⇒ 天然不进 `byNote`，
+  //     既不推表也不上报 removed（表不属本载荷所有，同章节可能被别的底稿推送）。
+  //
+  // 越权删的防线有三重，缺一不可：
+  //   ① 被减数只能是 `previouslySyncedTables[该章节]`（= 本底稿自己推过的），
+  //      不是附注现存表名 ⇒ 结构上删不到别的底稿的表；
+  //   ② `buildRemovedTableKeys` 内部「推送优先」——本次推送的 key 绝不进结果；
+  //   ③ 后端 `_drop_removed_tables` 同向再挡一次。
+  // 🔴 门控用「章节**声明**里有没有录入区块」这一**结构性事实**，
+  //    不是「本次推送了几张表」这一运行时数据：
+  //    * 声明有 `tables` 但本次推送 0 张 ⇒ 数据被清空 ⇒ **应当**删（正是条件表场景）；
+  //    * 声明无 `tables`（纯文字披露章节，只有 `narratives`）⇒ 该章节的表**不属本载荷所有**，
+  //      同一附注章节可能被别的底稿推送 ⇒ 永不参与差集。
+  //    实测 soe 有 3 个纯文字章节仍会进 `byNote`（它们有叙述段要推），
+  //    若按「推送数为 0」门控就会把别的底稿的表算成自己的孤儿并删掉（越权删）。
+  const sectionsWithTables = new Set(
+    G7_SOE_DISCLOSURE_SECTIONS.filter(section => (section.tables ?? []).length > 0).map(
+      section => section.noteSectionId,
+    ),
+  )
+  for (const payload of byNote.values()) {
+    if (!sectionsWithTables.has(payload.noteSectionId)) continue
+    // 用共享模块的正式 API `attachRemovedTableKeys`（内部就是
+    // `buildRemovedTableKeys` + 「空数组不挂键」），而不是手写赋值：
+    // 它的入参是 `Record<string, unknown>`，能容纳 `string[]` 的元数据键，
+    // 不必为一个元数据键去放宽 `G7SoeSyncPayload.subTableData` 的行数组类型。
+    attachRemovedTableKeys(payload.subTableData as Record<string, unknown>, {
+      previouslySynced: state.previouslySyncedTables?.[payload.noteSectionId],
+      pushed: dataTableNames(payload.subTableData),
+    })
+  }
+
   return [...byNote.values()]
+}
+
+/**
+ * 同步成功后调用：把本次各章节实际推送的表名记入 `previouslySyncedTables`，
+ * 供下次同步计算 `_removed_table_keys` 差集。返回新状态片段（浅合并进 `state`）。
+ *
+ * 🔴 **没有这个写入方，差集恒为空** —— `previouslySyncedTables` 会永远停留在
+ * `createG7SoeDisclosureState()` 给的 `{}`，`buildRemovedTableKeys` 的被减数恒空，
+ * `_removed_table_keys` 永不上报。这正是改造前 soe 侧的状态（能力写了但没有写入方），
+ * 也是平台记过的「additive 注入即死代码」形态：单测可以手动塞 `previouslySyncedTables`
+ * 把它测绿，而生产路径上整条链空转。
+ *
+ * 故 `G7TabDisclosureSOE.vue` 同步成功后必须调用本函数并 `persist()`，
+ * 且载入时要从持久化载荷恢复 `previouslySyncedTables`（三者缺一即断链）。
+ */
+export function markG7SoeSynced(
+  state: G7SoeDisclosureState,
+  payloads: G7SoeSyncPayload[],
+): Record<string, string[]> {
+  const sectionsWithTables = new Set(
+    G7_SOE_DISCLOSURE_SECTIONS.filter(section => (section.tables ?? []).length > 0).map(
+      section => section.noteSectionId,
+    ),
+  )
+  const next: Record<string, string[]> = { ...(state.previouslySyncedTables ?? {}) }
+  for (const payload of payloads) {
+    // 与 `buildG7SoeSyncPayloads` 的差集门控**同一判据**：纯文字披露章节不建基线。
+    // 否则会给它写一个空清单，下一轮该章节就带着「空基线」参与差集 ——
+    // 虽然空基线减出来也是空，但基线里凭空多出这些章节键会误导后人以为它们参与清理。
+    if (!sectionsWithTables.has(payload.noteSectionId)) continue
+    next[payload.noteSectionId] = dataTableNames(payload.subTableData)
+  }
+  return next
 }
 
 export function g7SoeChapterSections(chapter: G7SoeDisclosureSection['chapter']): G7SoeDisclosureSection[] {

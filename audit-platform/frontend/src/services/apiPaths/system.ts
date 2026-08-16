@@ -485,6 +485,12 @@ export const riskAssessments = {
   verifyCoverage: (pid: string, aId: string) => `/api/risk-assessments/projects/${pid}/risk-assessments/${aId}/verify-coverage`,
   riskMatrix: (pid: string) => `/api/risk-assessments/projects/${pid}/risk-matrix`,
   overallRisk: (pid: string) => `/api/risk-assessments/projects/${pid}/overall-risk`,
+  // B50 认定层次风险结构化行（只读）。project_id 走 axios params（本文件惯例：路径不内嵌 query）。
+  // 🔴 真源是 checklist_responses 的 `B50-T3-*`，不是 `risk_assessments` / `risk_matrix_records`
+  // 两张表（后两者全库 0 行 —— B50 专属组件从不写它们）。
+  // 该端点挂在 /api/b60 前缀下是历史原因（最初为 B60 章节导入而建），但返回的就是
+  // `load_b50_accounts()` 输出，故程序裁剪的风险维度直接复用它，不新建第二个端点。
+  b50RiskRows: () => `/api/b60/b50-risk-rows`,
 } as const
 
 // ─── 审计方案 ───────────────────────────────────────────────────────────────

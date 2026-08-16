@@ -21,6 +21,7 @@ import {
   sumif,
 } from './useD2FormulaEngine'
 import { D2_WRITEBACK_KEY } from './d2InjectionKeys'
+import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import { eventBus } from '@/utils/eventBus'
 import type { ChecklistItem, ChecklistResponse } from './useD2FormData'
 
@@ -44,6 +45,17 @@ export interface UseD2BaseOptions {
   allResponses: Ref<Map<string, any>>
   isReadonly: Ref<boolean>
   bsDate?: Ref<string>
+  /**
+   * 试算平衡表数（应收账款净额）的 render 种子 —— 由 `project_context.tb_amount`
+   * 经 `dCycleTbSeed.pickDTbAmount` 取得。
+   *
+   * 🔴 **只读回退**：仅在审计师未手工保存 `D2-adj-tb-amount` 时生效（手工优先）。
+   * 改造前该键只从 `allResponses` 读 ⇒ render 下发的 `tb_amount` 是 dead output，
+   * 「四表入库后审定表看不到 TB 核对数」的直接原因。
+   *
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16 / R4.4
+   */
+  tbSeedAmount?: Ref<number | null>
 }
 
 export interface AdjudicationRow {
@@ -341,13 +353,23 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
   // ─── Trial Balance Diff ────────────────────────────────────────────────
 
   /**
-   * 试算平衡表差异 = 审定数 - 试算表数
-   * 试算表数从 allResponses 中 D2-adj-tb-amount 读取
+   * 试算平衡表数（手工优先，其次 render 下发的四表口径）。
+   *
+   * 🔴 改造前只读 `D2-adj-tb-amount`，而 render 的 `project_context.tb_amount`
+   * （`seed_tb_amount_scalars` 按 BS-006 报表行解析后的叶子口径）**零消费方** =
+   * dead output ⇒ 未手工录入时该行恒 0、差异行显示为整额假差异。
+   * 现按平台既有范式（D1 `tbSeedAmount` / D7 `tbSeedAmount`）加只读回退。
+   *
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16
    */
+  const trialBalanceAmount: ComputedRef<number> = computed(() =>
+    resolveTbAmountWithSeed(getVal('D2-adj-tb-amount').remark, options.tbSeedAmount?.value),
+  )
+
+  /** 试算平衡表差异 = 审定数 - 试算表数 */
   const trialBalanceDiff: ComputedRef<{ amount: number; isZero: boolean }> = computed(() => {
     const auditedTotal = totalRow.value.currentAudited
-    const tbAmount = parseNum(getVal('D2-adj-tb-amount').remark)
-    const diff = auditedTotal - tbAmount
+    const diff = auditedTotal - trialBalanceAmount.value
     return { amount: diff, isZero: Math.abs(diff) < 0.005 }
   })
 
@@ -611,6 +633,7 @@ export function useD2Adjudication(options: UseD2BaseOptions) {
     // 审定表行数据
     adjudicationRows,
     totalRow,
+    trialBalanceAmount,
     trialBalanceDiff,
 
     // 操作

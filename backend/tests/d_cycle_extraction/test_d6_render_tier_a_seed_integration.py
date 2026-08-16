@@ -165,7 +165,11 @@ def _session(*, checklist_rows=None, user_formulas=None, tb_audited="98765.43",
             business_category="general",
             applicable_standards="listed",
         ),
-        tb_agg_row=SimpleNamespace(amount=98765.43),
+        tb_agg_row=SimpleNamespace(
+            amount=98765.43,
+            unadjusted=98765.43,
+            audited=98765.43,
+        ),
         rp_rows=[SimpleNamespace(name="关联方甲", relation_type="subsidiary")],
         user_formulas=user_formulas or [],
         tb_resolve_row=SimpleNamespace(
@@ -323,7 +327,11 @@ def test_failopen_resolve_effective_raises(monkeypatch):
     monkeypatch.setattr(d6, "resolve_effective", _boom)
     result = _run(d6.render(_ctx(_session())))
     assert _ANCHOR not in result["responses_snapshot"]
-    assert set(result.keys()) == _BASELINE_KEYS
+    # d-cycle-four-table-extraction-and-disclosure-completion R1 起，灰度开时额外输出
+    # 两个 additive 溯源键；本用例的核心是「resolve_effective 抛异常时不 seed 且不阻断」。
+    keys = set(result.keys())
+    assert _BASELINE_KEYS <= keys
+    assert keys - _BASELINE_KEYS <= {"tb_source_codes", "parent_check"}
 
 
 def test_failopen_eval_errors_no_seed(monkeypatch):

@@ -138,8 +138,8 @@ describe('Feature: f4-accounts-payable, Property 7: 挂账天数非负', () => {
   it('calcOutstandingDays(currentDate, startDate) >= 0', () => {
     fc.assert(
       fc.property(
-        fc.date(),
-        fc.date(),
+        fc.date({ noInvalidDate: true }),
+        fc.date({ noInvalidDate: true }),
         (currentDate, startDate) => {
           if (Number.isNaN(currentDate.getTime()) || Number.isNaN(startDate.getTime())) return
           expect(calcOutstandingDays(currentDate, startDate)).toBeGreaterThanOrEqual(0)

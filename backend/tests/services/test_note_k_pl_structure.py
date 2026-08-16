@@ -67,6 +67,14 @@ def test_no_leaked_or_placeholder(entry: dict[str, Any]) -> None:
     for tbl in sec.get("tables") or []:
         for row in tbl.get("rows") or []:
             label = str(row.get("label", "")).replace(" ", "").replace("\u3000", "")
+            # 🔴 2026-08-12 口径更正（spec `k-cycle-extraction-formula-and-disclosure-closure`
+            #    Task 18 / Requirement 9.1~9.2）：同一个 `……` 标签有两种语义 ——
+            #    `row_type='data'` 是**占位说明行**（渲染成空披露数据，须删，本条本意）；
+            #    `row_type='expandable'` 是**可扩位行**（源模板在该处标了「可无限量增行」，
+            #    是给审计师的加行落点，必须保留）。原判据不分二者，会把 R9 的成果删掉，
+            #    且后果是**功能消失而非报错**。
+            if str(row.get("row_type", "")) == "expandable":
+                continue
             assert label not in norm, f"{tbl.get('name')} 残留占位行「{row.get('label')}」"
             assert str(row.get("row_type", "")) != "header_label"
 

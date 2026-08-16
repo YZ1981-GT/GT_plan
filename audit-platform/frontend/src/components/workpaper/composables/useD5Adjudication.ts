@@ -26,6 +26,7 @@ import {
   calcFvTotal,
 } from './useD5FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
+import { resolveTbAmountWithSeed } from './dCycleTbSeed'
 import type { ChecklistResponse } from './useD5FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -69,6 +70,17 @@ export interface UseD5AdjudicationOptions {
     adjustmentTotals: ComputedRef<{ ajeTotal: number; rjeTotal: number }>
   }
   isReadonly: Ref<boolean>
+  /**
+   * 试算平衡表数种子（render `project_context.tb_amount`，BS-007 报表行解析后的
+   * 叶子口径）。**只读回退** —— 手工录入优先，未录入时用它。
+   *
+   * 🔴 D5 的 `1124 应收款项融资` 在活体 `account_chart` 两个 source 零命中、
+   * `account_mapping` 零反解、`tb_balance` 零数据行 —— 恒空是**业务事实**而非缺陷
+   * （这批项目没有应收款项融资业务）。故 seed 通常为 0，此时与改造前行为一致。
+   *
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16
+   */
+  tbSeedAmount?: Ref<number>
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -319,13 +331,20 @@ export function useD5Adjudication(options: UseD5AdjudicationOptions) {
 
   // ─── Trial Balance Amount ────────────────────────────────────────────
 
-  const trialBalanceAmount: Ref<number> = ref(0)
-
-  // Load from allResponses (auto_data from TB resolver for account 1124)
-  watch(
-    () => allResponses.value.get('D5-1-tb-amount')?.remark,
-    (val) => { trialBalanceAmount.value = parseNum(val) },
-    { immediate: true },
+  /**
+   * 试算平衡表数（手工优先，其次 render 下发的四表口径）。
+   *
+   * 🔴 改造前只读 `D5-1-tb-amount`，而 render 的 `project_context.tb_amount`
+   * （`seed_tb_amount_scalars` 按 BS-007 解析后的叶子口径）**零消费方** = dead
+   * output。现按平台既有范式（D1/D7 的 `tbSeedAmount`）加只读回退。
+   *
+   * spec: d-cycle-four-table-extraction-and-disclosure-completion Task 16
+   */
+  const trialBalanceAmount: ComputedRef<number> = computed(() =>
+    resolveTbAmountWithSeed(
+      allResponses.value.get('D5-1-tb-amount')?.remark,
+      options.tbSeedAmount?.value,
+    ),
   )
 
   /** trialBalanceDiff = 公允价值合计审定数 - 试算平衡表数 */

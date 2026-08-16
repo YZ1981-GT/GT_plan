@@ -441,8 +441,8 @@ import WpDisclosureConsistencyPanel from '../../shared/disclosure/WpDisclosureCo
 import { buildH2ListedChecks } from '../../composables/h2DisclosureConsistency'
 import { H2_NOTE_SECTION } from '../../composables/h2NoteSectionMap'
 import { buildH2ListedSyncPayloads, type H2ListedSyncSnapshot } from '../../composables/h2DisclosureSyncPayload'
-import {
 import WpAmountInput from '../../shared/WpAmountInput.vue'
+import {
   H2_LISTED_GUIDANCE,
   H2_LISTED_ITEM,
   buildMortgageNoteText,

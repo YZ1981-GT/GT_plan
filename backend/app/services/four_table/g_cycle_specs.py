@@ -90,11 +90,21 @@ def _provision(
     fallback: tuple[str, ...],
     label: str,
     extra_excludes: tuple[str, ...] = (),
+    row_code: str | None = None,
 ) -> SemanticAccountSlot:
     """备抵槽的构造助手。
 
     🔴 `is_provision` **显式声明**，不由 `direction` 推断 —— 实证 `account_chart`
     里备抵科目的 `direction` 也可能是 ``debit``（H3 的 1525/1526/1527 全是 debit）。
+
+    Args:
+        row_code: 该备抵**自己那条报表行**（``IMP-*``），仅用于冲突检测的对照基准。
+
+            🔴 不声明会恒报假冲突（2026-08-08 实证）：`SemanticAccountSpec` 只有一个
+            `row_code`（主行），而备抵在 `report_config` 里自成一行 ⇒ 拿主行公式比
+            备抵码必然无交集。G7 实测 7/8 个项目恒亮
+            ``[['provision','1511','1512']]``，而 ``IMP-009 = TB('1512')`` 本就是
+            备抵自己的行 —— 定位完全正确、告警是假的。
     """
     return SemanticAccountSlot(
         key=key,
@@ -103,6 +113,7 @@ def _provision(
         fallback_standard_codes=fallback,
         label=label,
         is_provision=True,
+        row_code=row_code,
     )
 
 
@@ -156,13 +167,13 @@ G3_SPEC = SemanticAccountSpec(
     slots=(_gross("gross", ("应收股利",), ("1131",), "应收股利"),),
 )
 
-#: G4 债权投资（原值 1504 + 备抵 1505）
+#: G4 债权投资（原值 1504 + 备抵 1505，备抵自成报表行 `IMP-008 = TB('1505')`）
 G4_SPEC = SemanticAccountSpec(
     row_code="BS-021",
     slots=(
         _gross("gross", ("债权投资",), ("1504",), "债权投资", ("其他债权投资",)),
         _provision("provision", ("债权投资减值准备",), ("1505",), "债权投资减值准备",
-                   ("其他债权投资",)),
+                   ("其他债权投资",), row_code="IMP-008"),
     ),
     legacy_standard_names=_LEGACY_FINANCIAL,
 )
@@ -181,12 +192,13 @@ G6_SPEC = SemanticAccountSpec(
     legacy_standard_names=_LEGACY_FINANCIAL,
 )
 
-#: G7 长期股权投资（原值 1511 + 备抵 1512，备抵自成报表行 `IMP-009`）
+#: G7 长期股权投资（原值 1511 + 备抵 1512，备抵自成报表行 `IMP-009 = TB('1512')`）
 G7_SPEC = SemanticAccountSpec(
     row_code="BS-024",
     slots=(
         _gross("gross", ("长期股权投资",), ("1511",), "长期股权投资"),
-        _provision("provision", ("长期股权投资减值准备",), ("1512",), "长期股权投资减值准备"),
+        _provision("provision", ("长期股权投资减值准备",), ("1512",), "长期股权投资减值准备",
+                   row_code="IMP-009"),
     ),
 )
 

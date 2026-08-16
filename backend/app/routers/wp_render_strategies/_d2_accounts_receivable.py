@@ -16,6 +16,14 @@ import logging
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.d_cycle_extraction.d_account_resolver import (
+    resolve_d_cycle_account_codes,
+)
+from app.services.d_cycle_extraction.d_tb_fetch import (
+    build_d_tb_source_codes,
+    fetch_d_cycle_tb,
+    seed_tb_amount_scalars,
+)
 from app.services.d_cycle_extraction.presets import resolve_effective
 from app.services.d_cycle_extraction.tier_a_seed import (
     seed_tier_a_reconciliation,
@@ -136,65 +144,42 @@ async def render(ctx: RenderContext) -> dict | None:
             wp_id,
         )
 
-        # ─── TB 核对标量（净额口径：原值 1122 − 坏账准备 1231-02）───────────────
-        # 源模板 审定表D2-1 的被比较项是「三、应收账款净值」合计 A27；
-        # report_config BS-006 soe_standalone 同口径。
-        # 给 project_context 下发 tb_amount（净额）供前端 seed 回退，保证
-        # 「灰度开 + Tier A 被停用」时核对行不回落到原值（D1 同款缺陷已实测）。
+        # ─── 科目定位：报表规则映射驱动（替代硬编码 1122 / 1231-02）─────────────
+        # spec: d-cycle-four-table-extraction-and-disclosure-completion R1
+        #
+        # 改造前这里是两段硬编码 `LIKE '1122%'` / `LIKE '1231-02%'` 的裸 SQL，且
+        # `tb_source_codes` 自标 `resolved_from="hardcoded"`。金额本身是对的
+        # （前缀精确到子码、无 1231 父子双算），问题在于 **`report_config` 改科目就失效**：
+        # BS-006 的公式在四个准则下并不相同（`listed_standalone` 是
+        # `TB('1122') - TB('1231')` 用**整个 1231**、`soe_standalone` 才是 `1231-02`、
+        # 两个 consolidated 不减备抵），硬编码只能对上其中一种。
+        #
+        # 🔴 备抵必须**无条件**叠名称过滤：`account_mapping` 有一条 `auto_fuzzy` 错映射
+        # `1231.05 坏账准备_长期应收款 → 1231-02`（2 个项目）。此时
+        # `provision_resolved_from='report_config'` ⇒ 共享件的 `use_provision_name_filter`
+        # 为 False ⇒ 既有机制**不叠过滤** ⇒ 长期应收款的坏账会进入 D2 备抵。
+        # 过滤在 `fetch_d_cycle_tb` 内部按 `subject_keywords=('应收账款',)` 执行
+        # （关键词不能写宽成「应收」—— 那条错映射的科目名含「应收」但不含「应收账款」）。
+        d2_codes = None
         try:
-            _gross_row = (
-                await db.execute(
-                    sa.text(
-                        "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
-                        "COALESCE(SUM(audited_amount), 0) AS audited "
-                        "FROM trial_balance "
-                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
-                        "AND standard_account_code LIKE '1122%'"
-                    ),
-                    {"pid": str(ctx.project_id), "year": ctx.year},
-                )
-            ).fetchone()
-            if _gross_row:
-                _aud = float(_gross_row.audited or 0)
-                _unadj = float(_gross_row.unadjusted or 0)
-                project_context["tb_amount"] = _aud if _aud else _unadj
-                project_context["tb_amount_unadjusted"] = _unadj
-                project_context["tb_amount_audited"] = _aud
-        except Exception as e:  # noqa: BLE001
-            logger.warning("D2 render: trial_balance 1122 查询失败: %s", e)
+            d2_codes = await resolve_d_cycle_account_codes(ctx, _D2_WP_CODE)
+        except Exception as e:  # noqa: BLE001 — fail-open
+            logger.warning("D2 render: 科目解析异常（fail-open 用兜底码）: %s", e)
 
-        try:
-            _prov_row = (
-                await db.execute(
-                    sa.text(
-                        "SELECT COALESCE(SUM(unadjusted_amount), 0) AS unadjusted, "
-                        "COALESCE(SUM(audited_amount), 0) AS audited "
-                        "FROM trial_balance "
-                        "WHERE project_id = :pid AND year = :year AND is_deleted = false "
-                        "AND standard_account_code LIKE '1231-02%'"
-                    ),
-                    {"pid": str(ctx.project_id), "year": ctx.year},
-                )
-            ).fetchone()
-            if _prov_row:
-                _p_aud = abs(float(_prov_row.audited or 0))
-                _p_unadj = abs(float(_prov_row.unadjusted or 0))
-                project_context["tb_provision_amount"] = _p_aud if _p_aud else _p_unadj
-                project_context["tb_provision_amount_unadjusted"] = _p_unadj
-                project_context["tb_provision_amount_audited"] = _p_aud
-        except Exception as e:  # noqa: BLE001
-            logger.warning("D2 render: trial_balance 1231-02 查询失败: %s", e)
+        if d2_codes is not None:
+            # TB 核对标量（净额口径：原值 − 坏账准备）。
+            # 源模板 审定表D2-1 的被比较项是「三、应收账款净值」合计 A27；
+            # report_config BS-006 soe_standalone 同口径。
+            # 给 project_context 下发 tb_amount（净额）供前端 seed 回退，保证
+            # 「灰度开 + Tier A 被停用」时核对行不回落到原值（D1 同款缺陷已实测）。
+            await seed_tb_amount_scalars(
+                ctx, d2_codes, project_context, net_of_provision=True
+            )
 
-        # 净额归一（无备抵数据时空操作保灰度等价）
-        from app.routers.wp_render_strategies._d1_notes_receivable import _net_tb_amount
-        _net_tb_amount(project_context)
-
-        # tb_source_codes 取数溯源（前端消费，非 dead output）
-        html_data["tb_source_codes"] = {
-            "gross_standard": ["1122"],
-            "provision_standard": ["1231-02"],
-            "resolved_from": "hardcoded",  # D2 暂未接 resolve_report_line_account_codes
-        }
+            # tb_balance 叶子级取数 + 备抵名称过滤 + 三口径自检（前端消费，非 dead output）
+            d2_tb = await fetch_d_cycle_tb(ctx, d2_codes)
+            html_data["tb_source_codes"] = build_d_tb_source_codes(d2_codes, d2_tb)
+            html_data["parent_check"] = d2_tb.parent_check
 
         # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
         # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）

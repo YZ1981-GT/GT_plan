@@ -139,8 +139,21 @@ describe('Property 3: 标签覆盖不污染 BASE，其余循环零回归', () =>
     expect(baseByKey.get('is_replied')).toBe('是否已回函')
   })
 
-  it('D0/F0/K0/L0 不受 G0 覆盖影响（未声明覆盖的循环仍取 BASE 用词）', () => {
-    for (const cycle of ['D0', 'F0', 'K0', 'L0'] as ConfirmCycle[]) {
+  /**
+   * 🔴 改写记录（l0-confirmation-source-alignment R4.5 / R9.6）
+   *
+   * 原断言把 `L0` 列在「未声明覆盖」一侧（`toBeUndefined()`）。L0 已按源模板
+   * `函证结果汇总表L0-1` 第 5/6 行表头声明 13 处 label 覆盖 → 该条必然打红，
+   * 这是**名单式锁死的设计意图**（新增覆盖必须显式登记），不是回归。
+   *
+   * 保留「未声明覆盖」名单本身 —— 它证明 override 机制不会外溢。
+   *
+   * 🔴 2026-08-07：K0 已按其 spec R2.5 声明 14 处 label 覆盖 → 从本名单移出
+   * （与上面 L0 的移出同理，属名单式锁死的设计意图）。剩 D0/F0 是真正未声明者；
+   * E0 有 EXCLUDED 但无 label 覆盖，故一并纳入以扩大零外溢的证明面。
+   */
+  it('D0/E0/F0 不受 G0/H0/K0/L0 覆盖影响（未声明覆盖的循环仍取 BASE 用词）', () => {
+    for (const cycle of ['D0', 'E0', 'F0'] as ConfirmCycle[]) {
       expect(CYCLE_COLUMN_LABEL_OVERRIDES[cycle]).toBeUndefined()
       const byKey = new Map(resolveConfirmationColumns(cycle).map((c) => [c.key, c.label]))
       expect(byKey.get('account_type')).toBe('科目')
@@ -148,8 +161,21 @@ describe('Property 3: 标签覆盖不污染 BASE，其余循环零回归', () =>
     }
   })
 
-  it('覆盖表只含 G0 / H0 两个 key', () => {
-    expect(Object.keys(CYCLE_COLUMN_LABEL_OVERRIDES).sort()).toEqual(['G0', 'H0'])
+  it('覆盖表只含 G0 / H0 / K0 / L0 四个 key（名单式锁死，新增须显式登记）', () => {
+    // 🔴 K0 于 2026-08-07 收口（k0 spec R2.5）加入该表；D0/E0/F0 必须保持缺省（零回归支点）。
+    expect(Object.keys(CYCLE_COLUMN_LABEL_OVERRIDES).sort()).toEqual(['G0', 'H0', 'K0', 'L0'])
+  })
+
+  it('L0 覆盖与 G0/H0 各自独立（同 key 三份用词互不影响）', () => {
+    const g0 = new Map(resolveConfirmationColumns('G0').map((c) => [c.key, c.label]))
+    const h0 = new Map(resolveConfirmationColumns('H0').map((c) => [c.key, c.label]))
+    const l0 = new Map(resolveConfirmationColumns('L0').map((c) => [c.key, c.label]))
+    // amount：G0「账面期末余额」/ H0「金额或合同条款」/ L0「金额」（源 L0-1!F6）
+    expect(g0.get('amount')).toBe('账面期末余额')
+    expect(h0.get('amount')).toBe('金额或合同条款')
+    expect(l0.get('amount')).toBe('金额')
+    // BASE 仍未被污染
+    expect(new Map(BASE_CONFIRMATION_COLUMNS.map((c) => [c.key, c.label])).get('amount')).toBe('函证金额')
   })
 
   it('G0 与 H0 的覆盖各自独立（同 key 可不同用词，互不影响）', () => {

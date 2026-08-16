@@ -55,6 +55,7 @@
           :project-id="props.projectId"
           :all-responses="allResponses"
           :is-readonly="isReadonly"
+          :html-data="props.htmlData"
         />
 
         <!-- 附注披露信息（上市公司） -->

@@ -35,7 +35,7 @@ from app.routers.wp_render_strategies._k2_other_current_assets import (
     K2_SHEETS,
     build_adjudication_prefill,
     build_tb_values,
-    fetch_tb_balance_leaves,
+    fetch_tb_balance_all,
     fetch_trial_balance_amounts,
     render,
 )
@@ -365,9 +365,15 @@ def test_resolve_fail_open_gross_non_empty(raise_on):
     assert acc.provision == []
 
 
-def test_leaves_fetch_fail_open():
+def test_tb_rows_fetch_fail_open():
+    """🔴 函数名 2026-08-12 由 `fetch_tb_balance_leaves` 改为 `fetch_tb_balance_all`
+    （spec k-cycle-…-closure Task 9）—— 三口径自检的 `parent` 口径要读父科目行本身，
+    预筛叶子会让该口径恒 0 且被共享件静默跳过。叶子改由 render 内 `select_leaves`
+    派生，`tb_values` 逐分不变（已连库逐项目核对 4/4 叶子集逐字相同）。
+    fail-open 语义不变：异常时返 `[]`。
+    """
     sess = _FakeSession(raise_on="all")
-    assert _run(fetch_tb_balance_leaves(_ctx(sess))) == []
+    assert _run(fetch_tb_balance_all(_ctx(sess))) == []
 
 
 def test_render_fail_open_and_shape():

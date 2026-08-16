@@ -1562,11 +1562,49 @@ def register_event_handlers() -> None:
             try:
                 from app.services.note_conversion_service import NoteConversionService
                 svc = NoteConversionService(session)
-                await svc.execute_conversion(payload.project_id, year, target_type)
+                result = await svc.execute_conversion(
+                    payload.project_id, year, target_type
+                )
                 await session.commit()
+                # spec soe-listed-note-conversion-correctness / Requirement 9.4：
+                # 自动触发路径 SHALL 记录快照 id 到日志，使事后可回滚。
+                # 🔴 改造前这里丢弃了 execute_conversion 的返回值 ⇒ snapshot_id
+                # 从未落日志 ⇒ 准则切换静默改写附注章节后无从定位可回滚的快照。
+                logger.info(
+                    "STANDARD_CHANGED 附注切换完成: project=%s year=%s %s→%s "
+                    "status=%s snapshot_id=%s mapped=%s archived=%s created=%s "
+                    "（如需回退：POST /api/projects/%s/notes/conversion/rollback year=%s）",
+                    payload.project_id,
+                    year,
+                    result.get("from_type"),
+                    result.get("to_type"),
+                    result.get("status"),
+                    result.get("snapshot_id"),
+                    result.get("mapped_notes"),
+                    result.get("archived_notes"),
+                    result.get("created_notes"),
+                    payload.project_id,
+                    year,
+                )
+                for warning in result.get("warnings") or []:
+                    logger.warning(
+                        "STANDARD_CHANGED 附注切换告警: project=%s year=%s snapshot_id=%s %s",
+                        payload.project_id, year, result.get("snapshot_id"), warning,
+                    )
             except Exception as e:
                 await session.rollback()
-                logger.warning("STANDARD_CHANGED 附注切换失败: project=%s: %s", payload.project_id, e)
+                # Requirement 9.4 的失败面：同样要留下快照线索。
+                # snapshot_id 由 execute_conversion 挂在异常上；``committed=False``
+                # 表示失败发生在 commit 之前 ⇒ 事务回滚后**连快照行都不保留**，
+                # 此时「没有快照」恰等价于「DB 未被改动」，不是遗漏。
+                snapshot_id = getattr(e, "conversion_snapshot_id", None)
+                committed = getattr(e, "conversion_committed", None)
+                logger.error(
+                    "STANDARD_CHANGED 附注切换失败: project=%s year=%s → %s "
+                    "snapshot_id=%s committed=%s（committed=False ⇒ 事务已回滚，"
+                    "DB 保持切换前状态，无需也无法按快照回退）: %s",
+                    payload.project_id, year, target_type, snapshot_id, committed, e,
+                )
 
     event_bus.subscribe(EventType.STANDARD_CHANGED, _on_standard_changed_notes)
     logger.debug("multi-standard-unification 需求 3: STANDARD_CHANGED → 附注切换 handler registered")

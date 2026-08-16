@@ -53,6 +53,38 @@ const MATRIX_SPEC_TS = resolve(__dirname, '../k0MatrixSpec.ts')
 
 const factsSrc = readFileSync(BACKEND_FACTS, 'utf-8')
 
+/**
+ * 从 `k_cycle_specs.py` 取某循环声明的 row_code（listed / soe）。
+ *
+ * 🔴 用**花括号/圆括号配对**截 `KCycleSpec(...)` 块，不用固定字符窗口 —— 块长度会随
+ * 注释增删漂移，写死 `slice(at, at+600)` 会在注释变长后截断、把断言变成空转。
+ */
+function backendRowCode(wp: string): { listed: string; soe: string } {
+  const src = readFileSync(K_CYCLE_SPECS, 'utf-8')
+  const at = src.indexOf(`"${wp}": KCycleSpec(`)
+  expect(at, `后端 K_CYCLE_SPECS 未找到 ${wp}`).toBeGreaterThan(-1)
+  const start = src.indexOf('(', src.indexOf('KCycleSpec', at))
+  let depth = 0
+  let end = -1
+  for (let i = start; i < src.length; i += 1) {
+    if (src[i] === '(') depth += 1
+    else if (src[i] === ')') {
+      depth -= 1
+      if (depth === 0) {
+        end = i
+        break
+      }
+    }
+  }
+  expect(end, `${wp} 的 KCycleSpec(...) 括号未配对`).toBeGreaterThan(start)
+  const block = src.slice(start, end)
+  const listed = block.match(/row_code_listed="([^"]+)"/)?.[1]
+  const soe = block.match(/row_code_soe="([^"]+)"/)?.[1]
+  expect(listed, `${wp} 未声明 row_code_listed`).toBeTruthy()
+  expect(soe, `${wp} 未声明 row_code_soe`).toBeTruthy()
+  return { listed: listed!, soe: soe! }
+}
+
 /** 从 python 源码里按「常量名 = [ ... ]」取块（括号配对），再抽双引号字符串 */
 function pyListStrings(src: string, constName: string): string[] {
   const at = src.indexOf(`${constName} = [`)
@@ -162,11 +194,24 @@ describe('Property 8: row_code 精确匹配（BS-009 / BS-050，非 BS-075）', 
 // ─── Requirement 4.6：与后端声明双向锁死 ─────────────────────────────────────
 
 describe('Requirement 4.6: 与后端 K 循环声明双向锁死', () => {
-  it('其他应收款的 row_code 与 K1 render 的 K1_REPORT_ROW_CODE 一致', () => {
+  /**
+   * 🔴 K1 render 的 `K1_REPORT_ROW_CODE` 已收敛为 `_K1_SPEC.row_code_soe`（不再是字面量），
+   * 故此处必须解一层：render 侧只断言「取自 spec」，真值到 `k_cycle_specs.py` 取。
+   * 若哪天 render 又写回字面量，第一条断言会打红。
+   */
+  it('其他应收款的 row_code 与 K1 后端声明一致（render 侧不得写字面量）', () => {
     const k1 = readFileSync(K1_RENDER, 'utf-8')
-    const m = k1.match(/K1_REPORT_ROW_CODE\s*=\s*"([^"]+)"/)
-    expect(m, '后端未找到 K1_REPORT_ROW_CODE').toBeTruthy()
-    expect(getK0Category('其他应收款')!.reportRowCode).toBe(m![1])
+    expect(
+      k1,
+      'K1 render 的 K1_REPORT_ROW_CODE 不再取自 _K1_SPEC —— 单一真源被绕开',
+    ).toMatch(/K1_REPORT_ROW_CODE\s*=\s*_K1_SPEC\.row_code_(soe|listed)\b/)
+    expect(k1, 'K1 render 不得把 row_code 写成字面量').not.toMatch(
+      /K1_REPORT_ROW_CODE\s*=\s*["']/,
+    )
+
+    const row = backendRowCode('K1')
+    expect(getK0Category('其他应收款')!.reportRowCode).toBe(row.listed)
+    expect(row.listed, 'K1 两准则应同码').toBe(row.soe)
   })
 
   it('账面金额来源底稿 = K1 / K3（相邻循环，不新建通路）', () => {
@@ -183,28 +228,42 @@ describe('Requirement 4.6: 与后端 K 循环声明双向锁死', () => {
   })
 
   /**
-   * 🔴 已登记的跨 spec 分歧（不在本 spec 修）：
-   * `K_CYCLE_SPECS['K3']` 声明 `row_code_listed="BS-053"` / `row_code_soe="BS-075"`，
-   * 而 `report_config` 实测 —— BS-053 是**其他流动负债**（K4 的行，formula 现为 NULL）、
-   * BS-075 在 soe 侧 row_name 是其他应付款但 formula 为 NULL（listed 侧竟是「股本」）。
-   * 有公式的其他应付款行是 **BS-050**（`TB('2241')+TB('2231')`）。
+   * ✅ 分歧已收敛（`k-cycle-extraction-formula-and-disclosure-closure` Task 7）：
+   * 后端 K3 原声明 `row_code_listed="BS-053"` / `row_code_soe="BS-075"` 均为错码 ——
+   * BS-053 实为**其他流动负债**（K4 的行，与 K4 跨循环撞码）、BS-075 在 soe 侧名对但
+   * formula 为 NULL、在 listed 侧竟是「股本」。有公式的其他应付款行是 **BS-050**
+   * （`TB('2241') + TB('2231')`，应付利息已并入其他应付款列报）。
    *
-   * K3 当前靠 `fallback_standard="2241"` 取数「碰巧对」，但：
-   * ① 溯源展示的报表行是错的；② 漏掉 BS-050 里的 `2231`（应付利息已并入其他应付款列报）。
-   * 归属：K 循环侧 / `report-config-account-code-integrity`（row_code 对账那批）。
-   *
-   * 本断言在 K3 被修正后会打红 → 提醒把 K0 侧改为直接引用后端声明。
+   * 后端已改为 BS-050 + `extra_standard_codes=("2231",)`，K0 侧本就是 BS-050 →
+   * 此处从「记录分歧」翻转为**双向锁死**：任一侧再漂移即打红。
    */
-  it('K3 row_code 与 K0 的 BS-050 分歧仍存在（修好即打红，提醒收敛）', () => {
+  it('K3 row_code 与 K0 双向锁死在 BS-050（含 2231 并表口径）', () => {
+    const row = backendRowCode('K3')
+    expect(row.listed, 'K3 listed 侧 row_code 漂移').toBe('BS-050')
+    expect(row.soe, 'K3 soe 侧 row_code 漂移').toBe('BS-050')
+    expect(getK0Category('其他应付款')!.reportRowCode, 'K0 侧与后端脱钩').toBe(row.listed)
+
+    // BS-050 公式含 2231（应付利息并入）→ 后端必须声明为附加码，否则取数漏一段
     const src = readFileSync(K_CYCLE_SPECS, 'utf-8')
     const at = src.indexOf('"K3": KCycleSpec(')
-    const block = src.slice(at, at + 600)
-    const listed = block.match(/row_code_listed="([^"]+)"/)?.[1]
-    const soe = block.match(/row_code_soe="([^"]+)"/)?.[1]
-    expect(listed).toBe('BS-053')
-    expect(soe).toBe('BS-075')
-    expect(getK0Category('其他应付款')!.reportRowCode).toBe('BS-050')
-    expect([listed, soe]).not.toContain('BS-050')
+    expect(at).toBeGreaterThan(-1)
+    const k3block = src.slice(at, at + 900)
+    expect(k3block, 'K3 未声明 extra_standard_codes=("2231",)').toMatch(
+      /extra_standard_codes=\(\s*"2231",?\s*\)/,
+    )
+
+    // 旧错码不得再作为 K3 的取值出现
+    expect(k3block).not.toMatch(/row_code_(listed|soe)="BS-(053|075)"/)
+  })
+
+  it('反向自检：backendRowCode 抽不到时必须抛错（不得静默返回 undefined）', () => {
+    expect(() => backendRowCode('K99')).toThrow()
+    // 已存在的循环必须抽得到，否则上面几条断言全是空转
+    for (const wp of ['K1', 'K3']) {
+      const row = backendRowCode(wp)
+      expect(row.listed, `${wp} listed 抽空`).toMatch(/^(BS|IS|IMP)-\d+$/)
+      expect(row.soe, `${wp} soe 抽空`).toMatch(/^(BS|IS|IMP)-\d+$/)
+    }
   })
 })
 

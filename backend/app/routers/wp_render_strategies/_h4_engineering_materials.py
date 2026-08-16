@@ -22,6 +22,9 @@ from app.models.audit_platform_models import TbBalance, TrialBalance
 from app.services.dataset_query import get_active_filter
 from app.core.config import settings
 from app.services.four_table.h4_account_scope import H4_ACCOUNT_SPEC, H4_SLOT_KEY_PREFIX
+from app.services.four_table.h_cycle_adjudication_prefill import (
+    attach_h_segment_prefill,
+)
 from app.services.four_table.semantic_account_resolver import (
     SemanticAccountResult,
     resolve_semantic_accounts,
@@ -233,6 +236,15 @@ async def render(ctx: RenderContext) -> dict | None:
         detail_prefill = await _build_h4_detail_prefill(ctx)
         if detail_prefill:
             result_dict["detail_prefill"] = detail_prefill
+
+    # ── 审定表逐槽预填（spec h-cycle Task 5）──
+    await attach_h_segment_prefill(
+        ctx,
+        result_dict,
+        cycle="H4",
+        accounts=accounts,
+        slot_key_prefix=H4_SLOT_KEY_PREFIX,
+    )
 
     return result_dict
 

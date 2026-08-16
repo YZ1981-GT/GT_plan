@@ -169,11 +169,32 @@ class TestPerCycleSpecsExist:
         assert j_semantic_spec_of("J1") is not None
         assert j_semantic_spec_of("J2") is not None
 
-    def test_k_cycle_has_semantic_bridge(self):
-        from app.services.four_table.k_cycle_specs import semantic_spec_of
+    def test_k_cycle_semantic_bridge_is_withdrawn(self):
+        """🔴 K 循环的语义桥接已**撤回**（Requirement 5.1 / Property 16）。
 
-        assert semantic_spec_of("K3") is not None
-        assert semantic_spec_of("K8") is not None
+        撤回而非接线的实证依据（2026-08-09 `account_chart` 按 source 分域对账）：
+        K 循环主科目在项目间**同码同名**（`2241` standard 10 / client 8 项目、
+        `2801` 8/5、`2401` 9/6、`6601` 10/8、`6602` 10/8 …），语义解析买不到东西；
+        而旧桥接 `to_semantic_spec` 硬编码 ``row_code_soe`` + 单槽规格 ⇒
+        接过去对**上市**项目即 regression。且它**生产零消费方**（只有本测试引用）。
+
+        本测试从「断言桥接存在」反转为「断言桥接不得重新引入」——
+        防下个会话看见 J 循环有 bridge 就给 K 也补一个（平台已因此返工过一轮）。
+        """
+        from app.services.four_table import k_cycle_specs
+
+        for name in ("to_semantic_spec", "semantic_spec_of"):
+            assert not hasattr(k_cycle_specs, name), (
+                f"k_cycle_specs.{name} 已于 K 循环收口 spec 撤回，不得重新引入。"
+                f"理由见 SEMANTIC_BRIDGE_WITHDRAWAL_REASON；"
+                f"要接语义定位须先修「硬编码 row_code_soe」与「多槽关闭报表兜底层」"
+            )
+
+        # 撤回理由必须留在生产代码里（不能只写在测试里，否则读源码的人看不到）
+        reason = getattr(k_cycle_specs, "SEMANTIC_BRIDGE_WITHDRAWAL_REASON", "")
+        assert len(reason) >= 40, f"撤回理由过短或缺失：{reason!r}"
+        assert "零消费方" in reason or "生产零" in reason
+        assert "row_code_soe" in reason, "撤回理由须写明旧桥接的具体缺陷"
 
 
 class TestFallbackCodeMutualExclusion:
@@ -413,7 +434,8 @@ ADJUDICATED_NOT_MIGRATED: dict[str, str] = {
         "2301 一码一名（Task 18 裁决）。",
     "_k5_provisions.py":
         "⚪ 判据 2（同 K4）：2801 预计负债由 K5 独占认领（L7 已撤同码兜底），"
-        "变体行号 BS-068 vs BS-094 由 KCycleSpec 选（Task 18 裁决）。",
+        "变体行号 BS-065 vs BS-094 由 KCycleSpec 选（Task 18 裁决；listed 侧原写 "
+        "BS-068 实为其他非流动负债，已于 2026-08-05 按 report_config 对账改正）。",
     "_k6_held_for_sale.py":
         "⚪ 无科目码字面量 + 判据 2：走 K6_SPEC + report_line_accounts，"
         "listed/soe 章节结构不对称（五、11 一节 vs 八、12+八、43 两节）（Task 18 裁决）。",

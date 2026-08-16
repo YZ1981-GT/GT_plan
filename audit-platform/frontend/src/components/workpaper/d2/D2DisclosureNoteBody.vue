@@ -35,6 +35,7 @@ import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import { dataTableNames } from '../composables/disclosureSyncedTables'
 import { D2_DISCLOSURE_SHEET_NAME } from '../composables/d2NoteSectionMap'
 import { useRestrictedAssetsSync } from '../composables/useRestrictedAssetsSync'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 
 const props = withDefaults(defineProps<{
   variant: D2DisclosureVariant
@@ -729,10 +730,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column :label="endLabel" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.endAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -747,10 +747,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column :label="priorLabel" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="row.editable && !isReadonly"
               :model-value="row.priorAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -820,10 +819,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="账面余额" align="center">
               <el-table-column label="金额" min-width="140" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.bookAmount"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -841,10 +839,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="坏账准备" align="center">
               <el-table-column label="金额" min-width="140" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.provision"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -877,10 +874,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="账面余额" align="center">
               <el-table-column label="金额" min-width="140" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.bookAmount"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -898,10 +894,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="坏账准备" align="center">
               <el-table-column label="金额" min-width="140" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.provision"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -937,10 +932,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="账面余额" align="center">
               <el-table-column label="金额" min-width="130" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.bookAmount"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -958,10 +952,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="坏账准备" align="center">
               <el-table-column label="金额" min-width="130" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.provision"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -994,10 +987,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="账面余额" align="center">
               <el-table-column label="金额" min-width="130" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.bookAmount"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -1015,10 +1007,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             <el-table-column label="坏账准备" align="center">
               <el-table-column label="金额" min-width="130" align="right">
                 <template #default="{ row }">
-                  <el-input-number
+                  <WpAmountInput
                     v-if="row.editable && !isReadonly"
                     :model-value="row.provision"
-                    :controls="false"
                     :precision="2"
                     size="small"
                     class="amt-input"
@@ -1087,9 +1078,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column :label="isSoeVariant ? '账面余额' : endLabel" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.endAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1100,9 +1090,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column v-if="!isSoeVariant" :label="priorLabel" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.priorAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1114,9 +1103,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         <!-- 坏账准备（期末，源模板 C53）：上市版+国企版统一显示 -->
         <el-table-column :label="isSoeVariant ? '坏账准备' : '期末坏账准备'" min-width="140" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.provision"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1128,9 +1116,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         <!-- 上年年末坏账准备（源模板 C60「续：」表）：上市双期披露必需 -->
         <el-table-column v-if="!isSoeVariant" label="上年年末坏账准备" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.priorProvision"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1237,9 +1224,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="期末数" align="center">
             <el-table-column label="应收账款" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.endAmount"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1255,9 +1241,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             </el-table-column>
             <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.provision"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1270,9 +1255,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="期初数" align="center">
             <el-table-column label="应收账款" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorAmount"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1288,9 +1272,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             </el-table-column>
             <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorProvision"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1310,9 +1293,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="期末余额" align="center">
             <el-table-column label="应收账款" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.endAmount"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1323,9 +1305,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             </el-table-column>
             <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.provision"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1343,9 +1324,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="上年年末余额" align="center">
             <el-table-column label="应收账款" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorAmount"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1356,9 +1336,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             </el-table-column>
             <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorProvision"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1396,9 +1375,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="期末数" align="center">
             <el-table-column label="账面余额" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.endAmount"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1414,9 +1392,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             </el-table-column>
             <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.provision"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1429,9 +1406,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           <el-table-column label="期初数" align="center">
             <el-table-column label="账面余额" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorAmount"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1447,9 +1423,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
             </el-table-column>
             <el-table-column label="坏账准备" min-width="130" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   :model-value="row.priorProvision"
-                  :controls="false"
                   :precision="2"
                   size="small"
                   class="amt-input"
@@ -1510,10 +1485,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="坏账准备金额" min-width="170" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!isReadonly"
               :model-value="row.amount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1551,10 +1525,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="期初数" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.priorAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1568,10 +1541,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         <el-table-column label="本期变动金额" align="center">
           <el-table-column label="计提" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.provisionAmount"
-                :controls="false"
                 :precision="2"
                 size="small"
                 class="amt-input"
@@ -1583,10 +1555,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           </el-table-column>
           <el-table-column label="收回或转回" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.reversalAmount"
-                :controls="false"
                 :precision="2"
                 size="small"
                 class="amt-input"
@@ -1598,10 +1569,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
           </el-table-column>
           <el-table-column label="转销或核销" min-width="130" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 v-if="!row.isTotal && !isReadonly"
                 :model-value="row.writeOffAmount"
-                :controls="false"
                 :precision="2"
                 size="small"
                 class="amt-input"
@@ -1614,10 +1584,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="期末数" min-width="130" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               v-if="!row.isTotal && !isReadonly"
               :model-value="row.endAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1687,9 +1656,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column v-if="isSoeVariant" label="转回或收回前累计已计提坏账准备金额" min-width="180" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.cumulativeProvision"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1700,9 +1668,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="转回或收回金额" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.amount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1743,10 +1710,9 @@ async function checkNoteConsistency(silent = false): Promise<void> {
 
       <div class="writeoff-amount">
         <span class="writeoff-amount__label">本期实际核销的应收账款金额：</span>
-        <el-input-number
+        <WpAmountInput
           v-if="!isReadonly"
           :model-value="writeOffAmountCell.amount"
-          :controls="false"
           :precision="2"
           size="small"
           class="amt-input"
@@ -1790,9 +1756,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="核销金额" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.amount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1895,9 +1860,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column :label="isSoeVariant ? '账面余额' : '应收账款期末余额'" min-width="150" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.arAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -1909,9 +1873,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         <template v-if="!isSoeVariant">
           <el-table-column label="合同资产期末余额" min-width="150" align="right">
             <template #default="{ row }">
-              <el-input-number
+              <WpAmountInput
                 :model-value="row.contractAssetAmount"
-                :controls="false"
                 :precision="2"
                 size="small"
                 class="amt-input"
@@ -1937,9 +1900,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column :label="isSoeVariant ? '坏账准备' : '坏账准备和合同资产减值准备期末余额'" min-width="170" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.provision"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -2023,9 +1985,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="终止确认金额" min-width="160" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.amount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -2036,9 +1997,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="与终止确认相关的利得或损失" min-width="200" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.gainLoss"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -2117,9 +2077,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="继续涉入形成的资产金额" min-width="180" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.assetAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"
@@ -2130,9 +2089,8 @@ async function checkNoteConsistency(silent = false): Promise<void> {
         </el-table-column>
         <el-table-column label="继续涉入形成的负债金额" min-width="180" align="right">
           <template #default="{ row }">
-            <el-input-number
+            <WpAmountInput
               :model-value="row.liabilityAmount"
-              :controls="false"
               :precision="2"
               size="small"
               class="amt-input"

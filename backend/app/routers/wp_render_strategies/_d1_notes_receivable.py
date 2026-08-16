@@ -267,6 +267,22 @@ async def render(ctx: RenderContext) -> dict | None:
             await _seed_tb_provision_amount(ctx, project_context, d1_codes)
             _net_tb_amount(project_context)
 
+            # ─── 三口径自检（新增，纯加法）─────────────────────────────────
+            # spec: d-cycle-four-table-extraction-and-disclosure-completion R1.6
+            # 🔴 D1 的科目定位路径（`resolve_d1_account_codes`）**刻意不动** —— 它是本
+            # spec 的零回归红线。这里只追加 `parent_check`：叶子和 / 父行 / trial_balance
+            # 三个口径并列，用于暴露 `trial_balance` 的父子双算（实证 `1231` 父行与
+            # `1231-01..05` 子行在本表**并存**）。只比对前两个口径发现不了这类差异。
+            try:
+                from app.services.d_cycle_extraction.d_tb_fetch import (
+                    fetch_d_cycle_tb as _fetch_d1_tb,
+                )
+
+                _d1_tb = await _fetch_d1_tb(ctx, d1_codes)
+                html_data["parent_check"] = _d1_tb.parent_check
+            except Exception as e:  # noqa: BLE001 — fail-open
+                logger.warning("D1 render: parent_check 构造异常（fail-open）: %s", e)
+
         if settings.D_CYCLE_DETAIL_SEED_ENABLED:
             try:
                 await seed_d1_detail_rows(ctx, responses_snapshot, d1_codes)

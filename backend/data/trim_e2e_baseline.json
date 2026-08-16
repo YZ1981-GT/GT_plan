@@ -1,0 +1,2052 @@
+{
+ "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+ "procedure_instances": [
+  {
+   "id": "07529f02-2e3a-45c2-b565-f055008fc643",
+   "wp_code": "D4-5",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "09c6e046-be6d-46e4-99e5-5c13030fd401",
+   "wp_code": "B13",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "0c2f6143-aa42-4160-b019-227caf6962c9",
+   "wp_code": "E1-26至E1-32",
+   "audit_cycle": "E",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "1107cac1-b770-4498-bd4a-d91d9c6615ad",
+   "wp_code": "B60-1",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "152dc376-7bf1-4675-b9c8-d2a3d2dcecc9",
+   "wp_code": "D1",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "199f0275-9d0c-4c17-a66d-c183d99ac719",
+   "wp_code": "B30-15",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "19a764b2-9c06-4ec2-a889-738153fe45f4",
+   "wp_code": "B19",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "19e75dc1-780c-4a5a-abe2-3341efddcd96",
+   "wp_code": "B13-2",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "20de6252-002f-43df-b19e-5b98fa92df0c",
+   "wp_code": "D4-1至D4-4",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "264698dd-2cb4-4603-9907-4b417b155408",
+   "wp_code": "D2-6至D2-13",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "2897d026-298e-4220-894b-ff001cfcb5b9",
+   "wp_code": "B23-15",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "2e23e363-69d2-4939-9e33-b03dce8edc32",
+   "wp_code": "D5",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "34ddd7f5-b929-4fce-b16d-eff8a7229ee6",
+   "wp_code": "B10",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "3a13d179-2c9d-4ac6-be34-3ecad4e24c44",
+   "wp_code": "B51",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "4109c74d-ab2b-4eaf-b3ed-51b33115ec36",
+   "wp_code": "D2-1至D2-4",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "43d8e7f3-05df-4384-a8dd-42281eb75d72",
+   "wp_code": "B2",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "52b02fa1-9de1-4eca-b20e-a82ad9dd2687",
+   "wp_code": "B1-5",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "5d06dd86-97d2-4c34-b13f-705091596b29",
+   "wp_code": "E1-1至E1-11",
+   "audit_cycle": "E",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "5d832181-da9f-4502-9c9c-74395c986304",
+   "wp_code": "B30-1",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "5e4a06c8-2b5c-49f5-a352-16c9169befcd",
+   "wp_code": "B18",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "6b101738-d85b-4189-b58d-6e6145308193",
+   "wp_code": "B30",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "6c1f1128-1ee5-4cba-8c08-d283ce366dff",
+   "wp_code": "B50-2",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "71eb7433-c2ed-494b-af75-42123e35623e",
+   "wp_code": "D4-13至D4-20",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "72326278-79d5-451b-b2e0-8b7279242de5",
+   "wp_code": "E1-14至E1-15",
+   "audit_cycle": "E",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "78fd8e21-c577-4c63-a61b-679b369f841b",
+   "wp_code": "B22C",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "7c8081ed-01d2-4eb7-a982-3ab6a6201054",
+   "wp_code": "B52",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "80468c1f-c5ff-44e9-a979-9e7d4463c612",
+   "wp_code": "B50-1",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "81e60d8e-40a9-4347-a22d-8c381e9c776d",
+   "wp_code": "B3",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "82e11b1f-9725-4dcb-a546-58ab52518167",
+   "wp_code": "B50-4",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "86906b10-ee71-49db-a04a-add250adaa4c",
+   "wp_code": "B50-3",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "8af7624e-d94a-42fe-a8e0-0bd6b58fb7b8",
+   "wp_code": "D2-5",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "8ed5cf9c-621d-41cd-a4f0-8d13d14593d9",
+   "wp_code": "B1-2",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "9786f36f-c7c9-4a7b-b3ce-acd190e949cc",
+   "wp_code": "D7",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "9b3fc8a2-2f80-407a-9a09-7e57d643fac2",
+   "wp_code": "D4-12",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "a219aea1-3ae4-4dc1-b606-30f3f5b10070",
+   "wp_code": "B11",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "a2971e8d-a09e-4369-82c9-fdcc9fccbb93",
+   "wp_code": "B23",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "a2f71929-04da-4a17-b0cd-89f418f1c5d1",
+   "wp_code": "B2-5",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "a4e3a9d6-4652-4c4f-ae59-b8d0f66e0cec",
+   "wp_code": "B12",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "abbe1969-8180-49b2-81f4-0457b6601a49",
+   "wp_code": "B30-13",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "b6e14b24-e00c-42f0-93f6-858576b17e22",
+   "wp_code": "D4-22至D4-32",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "bc021d76-4889-4a37-a233-769aa7421e71",
+   "wp_code": "B1B",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "bc110472-dcf9-412d-96b5-a9833233384d",
+   "wp_code": "D4-21",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "bc939734-88ce-4819-96da-a2f7a82797a4",
+   "wp_code": "E1-18至E1-23",
+   "audit_cycle": "E",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "c23e6815-4a94-46ef-8f64-31de6ad75c45",
+   "wp_code": "D4-33至D4-36",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "c351bad5-e1d9-4c5a-bcb9-de3c248127e7",
+   "wp_code": "B30-8",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "c8eb4fc6-6498-4a6b-a23f-24f1a2849428",
+   "wp_code": "B51-3",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "cdf2639b-665d-4155-8f98-142f9647683a",
+   "wp_code": "B19-1",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "d0794354-01bb-4a1e-a6cd-378aa01ee323",
+   "wp_code": "B1-1",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "d4ad5e97-4b50-4d9e-ae82-e3b5abe19f40",
+   "wp_code": "D4-6至D4-11",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "d79d6f18-9e7c-45c0-9f07-c7349fbe2373",
+   "wp_code": "E0",
+   "audit_cycle": "E",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "da3b77b0-138a-46f4-9866-e150086d44d6",
+   "wp_code": "B15",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "db6b4ac4-a133-4fe6-a77d-a9e6f40bd41d",
+   "wp_code": "B40",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "df844b18-e21d-420d-aac4-27023c9e543b",
+   "wp_code": "B30-12",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "e3832a4e-af4f-4da2-bdda-abf5686ac988",
+   "wp_code": "B1A",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "e42133f5-c67d-4657-b0cf-19f8d9e0b9f5",
+   "wp_code": "D0",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "e887de30-d097-4aaf-8f97-501b427eee2b",
+   "wp_code": "B22A",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "e95355c9-6d0d-4cd9-aa4d-4c5468f30573",
+   "wp_code": "B22B",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "ee2503c7-70cf-47a0-ae27-5e407952ee64",
+   "wp_code": "D6",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "f7a898be-f656-44c4-b907-de3b640102d9",
+   "wp_code": "D3",
+   "audit_cycle": "D",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "f913f1ab-2b16-4d63-b8db-17caf34d8871",
+   "wp_code": "B51-5",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  },
+  {
+   "id": "ff7eb404-c77c-4876-ad0a-5b82b23ad919",
+   "wp_code": "B50",
+   "audit_cycle": "B",
+   "status": "execute",
+   "skip_reason": null,
+   "suggestion_state": null
+  }
+ ],
+ "checklist_b50": [],
+ "row_tasks": [
+  {
+   "id": "14541c9f-d471-4446-a7d5-4539e7cf7bb9",
+   "wp_code": "A8",
+   "assignee_staff_id": "52ffe5bb-718d-4c39-9a31-a329d7fe1f31",
+   "reviewer_staff_id": null,
+   "assignment_version": 1,
+   "lock_version": 1,
+   "workflow_status": "assigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "1533a533-4b37-44d2-98bb-2564354b485f",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "24ede285-8cc3-476c-81e7-65b6f09a8895",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "2d41dd89-e0a4-4e8e-a7bb-5e87e9540e20",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "2e56f862-09e8-40b7-b5ba-1b6255889b9b",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "3af7c1e8-551d-4687-b09b-4ce4f17da14b",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "4458ee03-14a5-423a-9ce3-ada61aa4472b",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "59ac45ee-c0be-4855-b447-7e1c57299603",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "5d502312-8a05-451b-87a5-565ccf4d5a69",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "62649d36-36b2-4a20-8cd3-77c5ff5b0c41",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "635ef033-abb5-4582-8e81-ab3b92b1901a",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "69d3b248-42d5-4e35-a5be-3d3ace686164",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "71e35ec7-bd21-404a-a35b-aa3797580fd7",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "83181bef-5dd0-4158-8dc6-75f2499e61c7",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "8b904262-f417-460f-9a8f-816add293e27",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "8c7b0a28-717b-470d-8540-f08d871810b9",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "8f5942d2-4087-40f0-91a8-4752030a41ba",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "9d1539b8-1776-4cd0-a0cd-1a5d6caf5710",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "9e736546-18d5-4f4b-947d-1ec27cf66d39",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "a797a0e1-a127-4433-8839-f8f6cad19dcb",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "b5e0b226-57ec-42b9-b6bf-9a61410f1630",
+   "wp_code": "D0",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "b83a154a-450b-403a-83e7-1772b669de33",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "d71f4b56-019a-47bf-9cfb-40ffe5826d00",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "dc88c821-3de5-489a-9f24-5cb92cb5b828",
+   "wp_code": "A8",
+   "assignee_staff_id": "52ffe5bb-718d-4c39-9a31-a329d7fe1f31",
+   "reviewer_staff_id": null,
+   "assignment_version": 2,
+   "lock_version": 1,
+   "workflow_status": "assigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "e9fbec0b-d745-4e92-961a-352ce52503f3",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "eeb6df46-3ff2-47dd-9d95-10785bd9ec1e",
+   "wp_code": "D2",
+   "assignee_staff_id": null,
+   "reviewer_staff_id": null,
+   "assignment_version": 0,
+   "lock_version": 0,
+   "workflow_status": "unassigned",
+   "applicability_status": "execute"
+  },
+  {
+   "id": "f26d2de6-71ad-4371-b4b5-2df92d928642",
+   "wp_code": "A8",
+   "assignee_staff_id": "15f4e2e4-5ea0-4447-97ae-0b244a362362",
+   "reviewer_staff_id": null,
+   "assignment_version": 1,
+   "lock_version": 1,
+   "workflow_status": "assigned",
+   "applicability_status": "execute"
+  }
+ ],
+ "disclosure_notes": [
+  {
+   "id": "007eab00-b0b4-4ea5-8cb0-4b72de9ad151",
+   "note_section": "八、60",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0083de18-b21b-464a-b749-4f317fae71e6",
+   "note_section": "五、26",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "01578907-0ecb-4099-9ab1-041d8db7d874",
+   "note_section": "八、16",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "01c295d9-c36a-456c-9c67-aef13dc36ebd",
+   "note_section": "八、51",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "05b525c0-1001-46da-819b-5eb36e7c3342",
+   "note_section": "十三、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "092548e1-be0c-4298-98b2-ec1ab34715e9",
+   "note_section": "八、28",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0b55065c-1533-43cf-bcc4-7d3f348ae89f",
+   "note_section": "八、46",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0cfe9907-0d81-4bc6-9a64-6818d0318a39",
+   "note_section": "八、18",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0dcc0dd1-310d-42e4-84b2-b2306a30be7f",
+   "note_section": "二、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0e160e37-a53e-4178-91cf-06afa528f4b8",
+   "note_section": "十、重要的资产负债表",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0e7298e9-a4b7-4af2-b9f0-4d5255fb9161",
+   "note_section": "八、56",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0e7bab75-3edf-4a47-849c-84ae828b2d7d",
+   "note_section": "四、记账基础和计价原",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "0fd15a8e-280c-4f47-a631-8251b6b6758a",
+   "note_section": "八、55",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "107bf2b0-6c63-408a-876e-705281612864",
+   "note_section": "五、35",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "134789d5-fd8e-4544-9dd4-e40ba2d9ce39",
+   "note_section": "七",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "16fbc272-a8ca-4b04-aa4e-8bad07278fda",
+   "note_section": "七、本期发生的同一控",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "179f9d2e-8dbc-4973-be01-7c46fc773603",
+   "note_section": "四",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "19001e89-46bf-44f0-9677-97963c435500",
+   "note_section": "八、92",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "1aacff76-6cad-49e6-b835-e0f586cf39d1",
+   "note_section": "八、20",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "1cdfb2e1-2b6a-4b9b-b836-b896b6107a97",
+   "note_section": "七、母公司在子公司的",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "1cf5dc0b-1abe-452f-a818-cc44a7e1149e",
+   "note_section": "八、15",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "1e567372-faa9-434f-a33b-e4c67db9a32b",
+   "note_section": "八、84",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "1e61c698-68ca-46f0-9bc0-6272bfaea9a1",
+   "note_section": "五、31",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "1f734f63-4320-4314-a99e-589d29231fc1",
+   "note_section": "八、42",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "204d2694-e289-4e62-bdb6-cf3c06eee920",
+   "note_section": "四、资产证券化业务",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "208e335b-434b-45be-8f0d-f98f858fdb6f",
+   "note_section": "八、86",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "231ef4e3-e86a-42ca-8594-01c0965f786f",
+   "note_section": "八、49",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "24af5105-2346-4fb5-8e78-13e86a937719",
+   "note_section": "六、递延所得税资产及",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "256b16af-0d0f-4df0-9c61-ef3f49ddcb99",
+   "note_section": "八、29",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "289cab3f-b528-49b8-9d82-5e605c322a40",
+   "note_section": "五、23",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "28c21ce5-51ca-4da7-a265-035145b9d5a2",
+   "note_section": "五、34",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "29be5bc8-337d-4a16-8d3c-7d961467fead",
+   "note_section": "八、72",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "29e00045-5be3-4533-94b7-5a4068767e7e",
+   "note_section": "五、24",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "2c289aea-e8f9-4524-a0cf-1a6ef78fba99",
+   "note_section": "五、66",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "2fcae743-07df-4e2f-82d3-0ceb339e966b",
+   "note_section": "五、4",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3129503b-8faf-40f8-8164-4394de0eb6af",
+   "note_section": "五、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3458d28d-c8ef-4070-91d4-9676fe6bbfd1",
+   "note_section": "八、71",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3626d395-fdf3-4626-b61c-24e566ccfa0a",
+   "note_section": "十、资产负债表日后利",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3720ab39-3305-4e82-ae64-8e590a933ce3",
+   "note_section": "五、38",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "393f586b-59b4-4d4a-82c7-f054622c483a",
+   "note_section": "八、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3949256d-606e-4f39-9765-e1255a195324",
+   "note_section": "八、69",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3b0905dc-417a-4b26-ab94-5790ecd06e21",
+   "note_section": "五、32",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3ca041b6-73c5-42f9-8fb2-9a10bb5c0d7c",
+   "note_section": "十一、本公司的其他关联",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3d785692-3b22-4af1-9205-03457c340f99",
+   "note_section": "五、5",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3eb9d840-6d71-4f0e-8f1f-c9e964a0ee10",
+   "note_section": "八、21",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "3f0afb71-462c-484e-aea9-0bf165f21fce",
+   "note_section": "五、11",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "4177d86b-cc5d-47dc-aeb2-eb93065d55a6",
+   "note_section": "八、9",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "4370cd5a-330f-4c24-bdf1-cb8dc356b76f",
+   "note_section": "八、53",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "4521d946-0d39-4dd7-9dbc-c703fde0fc15",
+   "note_section": "四、生物资产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "45ddbd25-2a49-4af1-aa42-b464fa7e4d9d",
+   "note_section": "五、18",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "49628a89-ccac-4f62-a429-46316b82cdc0",
+   "note_section": "四、使用权资产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "49ca93f2-8f5b-426f-bc00-b0a68cee62ce",
+   "note_section": "五、30",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "4bb74048-3364-4cc7-957f-7a3096e7e907",
+   "note_section": "八、54",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "4dae1dd9-2187-4450-981c-32f55ae90c0b",
+   "note_section": "八、7",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "4f40ba4e-587b-406c-9908-338f4af9b187",
+   "note_section": "四、应付债券",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "5025e814-c0bb-4af6-9924-cfa8ea37d019",
+   "note_section": "五、19",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "51ffda0e-6aae-415d-ba81-2a6c72385388",
+   "note_section": "八、68",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "532439f2-cdec-4774-9684-047e19c8882d",
+   "note_section": "五、10",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "58761075-ff8e-4a9a-b9f8-ba0bcd68af09",
+   "note_section": "五、36",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "5bbabb3a-c302-4af1-aa29-b98db2d8f84c",
+   "note_section": "八、77",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "5c021226-3596-4926-a262-c31ef6ee0278",
+   "note_section": "八、82",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "5f84be86-0a8f-4623-8689-9a370c4a8460",
+   "note_section": "七、本期新纳入合并范",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "60328221-a5fc-4a80-a72d-f6ca0f7ffbbd",
+   "note_section": "八、14",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "60d1a147-0344-4a3b-b537-163caca77de5",
+   "note_section": "八、63",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "614826e8-75f2-43eb-ac38-9c7647533021",
+   "note_section": "十、其他资产负债表日",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "61921dda-4bf4-48c9-9648-dacbfd8ab487",
+   "note_section": "十二",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "61d65820-7bb8-4cf4-87a8-b3bd3567507b",
+   "note_section": "五、21",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "62c08edf-ca57-47ad-aa98-0e8d30a01057",
+   "note_section": "二",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "636f8283-9a8a-41e4-b691-6400d7f20fe4",
+   "note_section": "八、17",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "659be452-23e9-4ce7-a2ac-9624b9e3e923",
+   "note_section": "八、64",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "66e10311-978b-4b6a-92cf-32b5d2bcbcd3",
+   "note_section": "五、会计估计变更",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "67f9312f-f413-4556-b3f8-31b03b6aa8b5",
+   "note_section": "四、租赁",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "698a6968-2267-4529-a3f7-aa2bb891e43c",
+   "note_section": "八、44",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6a0433a6-4a84-4bfa-ad32-fea2a7bab9d8",
+   "note_section": "八、61",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6a8ac28b-02e0-4226-9243-b1210eccf861",
+   "note_section": "七、本期纳入合并报表",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6ada9a60-df51-4f6a-947a-63e97798700d",
+   "note_section": "八、76",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6c6d011f-b6d3-4f4f-a27f-6a59ed49582c",
+   "note_section": "五、39",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6cab22c8-27b5-40d1-b2e5-bfaa90dceff1",
+   "note_section": "四、记账本位币",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6d485a8a-50a0-4f2c-81b9-3346d7e67801",
+   "note_section": "四、合同成本",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6d8c1d8b-7a99-45a5-b5bf-6d0cf330f074",
+   "note_section": "八、62",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6d90fbc3-c2a3-46f5-a481-93734bfb8f96",
+   "note_section": "九、【企业应当在附注",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "6f28f225-8783-46f5-8fd2-12dd6ebd1f41",
+   "note_section": "八、70",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7037b390-c310-480a-8e0a-73dcc36fb1e5",
+   "note_section": "四、长期待摊费用",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "73038b0f-7eab-477d-98e2-170c023a45a4",
+   "note_section": "四、投资性房地产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "737ed51e-6e30-41fb-af48-a838a828c54c",
+   "note_section": "八、34",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7437528f-18a0-407d-bdd0-ec26dc1f42de",
+   "note_section": "八、48",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "743db513-e5e1-444c-86ea-436d1a78a975",
+   "note_section": "四、油气资产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "74438c76-331d-4a1f-9f21-54053ac79f20",
+   "note_section": "四、金融工具",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "75fbbbeb-7c33-49d4-a076-ca6700f272da",
+   "note_section": "四、优先股、永续债等",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7604ce94-5b5b-4166-b333-70333a48853b",
+   "note_section": "五、3",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "76dc25ae-aa90-4116-8f72-f13ab04c6497",
+   "note_section": "五、7",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "78324319-e559-4ca0-8141-33e0d603d729",
+   "note_section": "四、研究开发支出",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "78717728-e8e1-4314-a035-6a8c7dc7c85c",
+   "note_section": "四、安全生产费用及维",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "78bac6ce-6299-48b8-b5a3-b80e6eba3c31",
+   "note_section": "八、58",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7a5a1036-66ca-46b7-862f-51fe5735baa8",
+   "note_section": "八、32",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7ba6ac05-1f3c-495d-814c-52b30c374375",
+   "note_section": "八、66",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7bbb63a2-8d97-470c-af90-f0fa06b58309",
+   "note_section": "八、4",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7c73f189-a1f7-4eb4-add7-05a758861a53",
+   "note_section": "十一",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7ced91d7-cf5f-4ad1-80fe-a4160892b5c9",
+   "note_section": "八、93",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7dc3da92-e077-44a1-9f95-3350f854d573",
+   "note_section": "八、33",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7e3e5f82-2bad-4d9b-ae34-fb193fa2327d",
+   "note_section": "九",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7e458f2e-acc0-462c-b5d1-ef323c42ee75",
+   "note_section": "四、会计期间",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7e7cec77-f4ff-4225-ac23-390113f574fb",
+   "note_section": "八、40",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7f736afb-4648-4de2-91e1-fff4e7a5aa24",
+   "note_section": "一、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "7f8a8fd8-6ea9-4c07-b57f-7293347c1111",
+   "note_section": "四、股份支付",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "80799f6a-1d27-4f8c-a72c-c4fc5ac9251b",
+   "note_section": "八、74",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "80afd98c-03b8-4e9a-98d6-71c64d7a68d7",
+   "note_section": "五、28",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "81478b49-63e9-4650-a9c5-84b87d2e58fe",
+   "note_section": "七、重要非全资子公司",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "82175814-35c2-43fc-b622-8e652b742224",
+   "note_section": "八、81",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "82458445-d5bd-45c6-b0c2-017167742844",
+   "note_section": "五、2",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "827cddd6-ad08-4785-855a-41be406f4728",
+   "note_section": "八、85",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "82d3aad4-fd4f-4add-ae55-ba4496145100",
+   "note_section": "十四、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "82f5339e-cbe0-4ed1-bbc2-1d814a750b5e",
+   "note_section": "三、1",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "85b0dc7e-a68e-42e3-807f-d42bde4a5fd9",
+   "note_section": "十三",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "860e689e-f892-415e-86b4-c455d15b1e7e",
+   "note_section": "八、11",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "863b03e1-1a28-4e88-8753-9a2961ebbeaa",
+   "note_section": "八、80",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "864b42e2-b74b-4979-8b0d-6f8034032de7",
+   "note_section": "十一、关联方应收应付款",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "87487ea4-14ee-45f4-8fba-5364eef11678",
+   "note_section": "八、6",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "877c5666-6499-4f6c-bb9e-7a6452d27ea1",
+   "note_section": "八、83",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "8aa8a547-b414-4350-b36e-a6b9d583dc6d",
+   "note_section": "八、27",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "8bfe25e4-6111-452b-8919-1760f44d627c",
+   "note_section": "十四",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "8ca3a1b9-731b-4538-b434-96421d44108e",
+   "note_section": "八、3",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "8e2f5ebd-0f23-4b08-a97b-023382e91736",
+   "note_section": "五、27",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "8f79c223-2a48-4e16-ad23-19420aa28b10",
+   "note_section": "八、39",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "915fa6e4-4653-4311-a270-79dd9987134e",
+   "note_section": "七、母公司直接或通过",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "934e48f0-5c81-458c-b476-b9903376d4a8",
+   "note_section": "五、20",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "938c63d1-baf1-4cd3-bef3-47f95a944d99",
+   "note_section": "五、对期初所有者权益",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "93902456-17e4-408a-9c17-38c20d242db4",
+   "note_section": "十一、本公司的母公司情",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "93c4d9ff-4c01-4048-b964-b8694e7d78c8",
+   "note_section": "八、38",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "944d3d66-5e3a-425e-b9ee-09762a90d257",
+   "note_section": "八、89",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "95874ece-2b40-4f2b-a180-b7c300d00d30",
+   "note_section": "四、无形资产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "963adfec-f9bc-4eb8-9527-1646b7cf43c7",
+   "note_section": "七、子公司使用企业集",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "967352dd-d5a1-490c-a523-f0ced7a7ac92",
+   "note_section": "四、借款费用",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "97d828db-7e8b-4039-9252-7013cde019b5",
+   "note_section": "八、43",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "98113c41-4610-4f88-922f-5a7e38229f66",
+   "note_section": "四、职工薪酬",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "9914f8d4-743b-4c88-8491-9d5c48fb1833",
+   "note_section": "八、79",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "99384dff-d681-4987-a618-00a5836096ca",
+   "note_section": "五、22",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "9e5b1b7e-2aa2-4374-aeb1-f67d790f8f85",
+   "note_section": "三",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "9ecffc2f-5120-4a0b-a59a-f157ea02b598",
+   "note_section": "八、88",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "9f0eb91a-d5a0-43c8-9d7f-a4d1b6d19b30",
+   "note_section": "八、13",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a0efb7af-56aa-4036-9141-b25c6098f03d",
+   "note_section": "五、8",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a254c101-7a97-4bea-8c81-72a8d41be96c",
+   "note_section": "五、37",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a32b9c31-ee86-4763-826d-5e6a17ca13e7",
+   "note_section": "五、14",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a330ef35-0810-4b9d-86d0-a78c3965cc4c",
+   "note_section": "八、5",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a56189a6-27b3-4202-97f7-ad017461914a",
+   "note_section": "八、59",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a71f56ad-af96-411e-aa89-ff75756d162e",
+   "note_section": "八、41",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "a9af0220-30ff-4b84-9926-b01ad1cd5fb9",
+   "note_section": "四、收入的确认原则",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "aa920bf1-8b5b-4a59-a89a-db926a299845",
+   "note_section": "八、35",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ab98fa55-0afd-40e9-b3cb-9090160b7068",
+   "note_section": "四、预计负债",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "accc5f58-879e-4abf-869f-9bcb5b358bd1",
+   "note_section": "八、8",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ae9a967a-ace6-43f7-b3a8-1b01ef42a3b4",
+   "note_section": "八、36",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "af437686-8902-4f8e-b031-d7fbf208633a",
+   "note_section": "八、67",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b27b2d6d-d6d6-4e0e-bf4d-c1a0c3e44425",
+   "note_section": "六",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b3536a0f-25e2-45b8-b1d8-c688e9663afb",
+   "note_section": "五、29",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b4374041-5dfa-45a5-871d-c5ec1be725fa",
+   "note_section": "八、65",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b54d277a-1cb4-4c62-abc2-5413111e6bd0",
+   "note_section": "八、30",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b6d3aa41-46b9-4728-b2ec-95571266a685",
+   "note_section": "四、现金及现金等价物",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b6fd81ac-a1d8-4caf-b700-75c945ae6e71",
+   "note_section": "五",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "b8ae3f40-ce62-4400-a1e8-b1891b257d0e",
+   "note_section": "四、长期股权投资",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "bd4670f4-1307-4430-8e8a-6a6ec10b1e1a",
+   "note_section": "四、外币业务和外币报",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "bf3ec3ee-65fe-4f06-953d-a0f08f274abe",
+   "note_section": "十一、关联交易情况",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "bf5fe3ec-84b0-4a1c-9773-6562bba8f0ed",
+   "note_section": "八、78",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c07825af-9797-4412-b4b9-f047b85f1f09",
+   "note_section": "五、17",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c093596c-360e-40d5-9d90-3d12d02337dd",
+   "note_section": "七、本期发生的吸收合",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c0aef9be-4513-49fd-baed-22d371f68df7",
+   "note_section": "八、19",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c1035dd3-ef73-4a9d-95fb-64f8b035082f",
+   "note_section": "五、15",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c206b5a3-d5e7-4a83-b9d3-54c8e8fc547d",
+   "note_section": "八",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c44c8852-97b2-4bdd-8be9-ebd83dd56610",
+   "note_section": "六、优惠税负及批文",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c599c0e3-4bc3-4cb1-816c-8f4a0c23d424",
+   "note_section": "五、25",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c59f16b0-4272-4a61-ac13-5e21c9d57e2f",
+   "note_section": "八、75",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "c712729b-665d-4ec5-82f3-e8d2852c6e76",
+   "note_section": "八、31",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ca530525-eed2-4071-a4c4-1b02df56a6f9",
+   "note_section": "八、24",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "caaacaf5-69c0-47a4-a04b-8b890926d133",
+   "note_section": "八、2",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "cc4140c7-a205-4cf3-b7c7-541007ef13af",
+   "note_section": "八、87",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "cd466b2e-2afc-4bfc-bdb6-cf19be3edb73",
+   "note_section": "八、50",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "cedd8ebd-cba9-42ea-abc7-34655a5881d4",
+   "note_section": "五、13",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "d095a753-2834-4e63-be0c-bd8eb9d0db57",
+   "note_section": "七、本期发生的非同一",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "d2af9c3a-cb9e-453d-a633-49f727f477f7",
+   "note_section": "十",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "d6c14284-9f8b-4f9e-94f5-096e8b9703e2",
+   "note_section": "五、9",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "d951453f-b897-443c-8225-f00f76a197fb",
+   "note_section": "五、33",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "d998556e-c8a0-4d4a-b836-091ff3e6ca20",
+   "note_section": "四、固定资产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "dd3e193f-1454-4690-9253-633e1408d52b",
+   "note_section": "八、45",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ddb299de-c65a-47fa-92d5-940fe0acf22a",
+   "note_section": "八、23",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ddc88bed-b5ab-44b9-a2ad-68a15d4d306f",
+   "note_section": "六、主要税种及税率",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "dfc124f4-a805-427f-b453-5cedbb2ea8e9",
+   "note_section": "五、40",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e0033755-f46c-44c8-9d33-6867cf1aa593",
+   "note_section": "五、重要前期差错更正",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e29a53d5-11e6-47df-a536-fe490f67d944",
+   "note_section": "八、73",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e3358e9a-e2e1-4f50-a840-5806fad3e618",
+   "note_section": "八、37",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e39dae81-2585-45d2-a09d-fd5b080cb86f",
+   "note_section": "七、母公司拥有被投资",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e518c07b-72ab-4575-bdba-0d2f1ebd0157",
+   "note_section": "九、1、或有负债",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e6c53efc-e619-454c-9c26-9dc0f72c3859",
+   "note_section": "四、资产减值",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e6d2c80e-346c-49c1-9f1c-4ee5f50fd9b7",
+   "note_section": "八、47",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e6e7bc81-1298-44dc-945a-a722443156d9",
+   "note_section": "五、会计政策变更",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e892db6c-82b4-4b39-ae6d-bcb7452cceb7",
+   "note_section": "七、纳入合并财务报表",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "e9f9256a-fbf5-43e6-94f3-668a8605ae43",
+   "note_section": "四、政府补助",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ecfdb59a-73fc-4a3a-af63-b67a07664fcf",
+   "note_section": "五、12",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ef3b5cfa-6b1f-4713-89ac-667476356bfb",
+   "note_section": "四、持有待售及终止经",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ef701834-e357-4fa8-967f-480c7dce2ebf",
+   "note_section": "八、12",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f1056f4e-7135-4a24-b05e-1b541f60ae12",
+   "note_section": "五、16",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f121f77c-9f5e-4723-85b7-bca0ef83bede",
+   "note_section": "八、25",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f17b2da6-30fc-4ed6-8162-f8fad19d8440",
+   "note_section": "四、公允价值计量",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f4a830cb-129e-4445-af4f-11db59877ab9",
+   "note_section": "八、57",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f5da8102-1ea1-4fc1-b6c0-ce66cc44cf58",
+   "note_section": "八、26",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f6260798-1dbd-435a-966a-1d7832c0c4b0",
+   "note_section": "八、22",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f75cde36-3cd8-48be-a3c5-e4fc9586a440",
+   "note_section": "七、本期不再纳入合并",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f9dcb73d-aae0-4e9d-be85-ecb8f6c2cef8",
+   "note_section": "九、2、或有资产",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "f9de7d50-4bbf-4c69-bc6c-a4ed7c68faca",
+   "note_section": "四、套期会计",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "fa491515-288e-4a63-8aea-e2e03e4bac8a",
+   "note_section": "四、存货",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "fa49cde5-d65c-4f4c-bacb-883ba1dfce42",
+   "note_section": "八、10",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "fbf86d2f-c3f9-4334-a387-3234088f73cd",
+   "note_section": "八、52",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "feb1696a-2f3e-4327-b987-5501b8a1153a",
+   "note_section": "四、在建工程",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "febac664-46ba-4a58-ab28-9a2e8213e14b",
+   "note_section": "五、6",
+   "is_empty": false,
+   "template_lineage": null
+  },
+  {
+   "id": "ff5ec843-29a3-418b-8bfb-0b9a665e83b7",
+   "note_section": "一",
+   "is_empty": false,
+   "template_lineage": null
+  }
+ ],
+ "project_users": [],
+ "project_assignments": [],
+ "history_counts": {
+  "task_history": 3,
+  "deleg_history": 1
+ }
+}

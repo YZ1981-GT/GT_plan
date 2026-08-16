@@ -87,16 +87,54 @@ class TestLeafFilter:
 
         科目一律经 `G7_ACCOUNT_SPEC` + 报表映射解析；旧常量
         `_G7_ACCOUNT_PREFIX` / `_G7_IMPAIRMENT_PREFIX` 必须已删除。
+
+        🔴 2026-08-08 断言迁移到**语义规格**字段
+        --------------------------------------
+        原断言读 ``G7_ACCOUNT_SPEC.provision_row_code`` / ``fallback_gross`` /
+        ``fallback_provision`` —— 那是旧 :class:`ReportLineAccountSpec` 的字段，
+        而 ``G7_ACCOUNT_SPEC`` 早已 `= G7_SPEC`（:class:`SemanticAccountSpec`）
+        ⇒ 该断言自 G7 迁语义解析器起就以 ``AttributeError`` 长期红（零信号）。
+
+        备抵报表行的承载改为**槽级** ``row_code``（本轮新增能力，见
+        ``backend/tests/four_table/test_semantic_slot_row_code.py``）：
+        `SemanticAccountSpec` 只有一个 spec 级 row_code，备抵自成报表行时必须
+        由槽自己声明，否则 :func:`build_conflicts` 恒报假冲突。
         """
         from app.routers.wp_render_strategies import _g7_long_term_equity_main as g7
 
         assert not hasattr(g7, "_G7_ACCOUNT_PREFIX")
         assert not hasattr(g7, "_G7_IMPAIRMENT_PREFIX")
-        assert g7.G7_ACCOUNT_SPEC.row_code == "BS-024"
-        assert g7.G7_ACCOUNT_SPEC.provision_row_code == "IMP-009"
+
+        spec = g7.G7_ACCOUNT_SPEC
+        assert spec.row_code == "BS-024"
+        slots = {s.key: s for s in spec.slots}
+        assert set(slots) == {"gross", "provision"}, f"G7 应为双槽，实际 {set(slots)}"
+
+        # 备抵自成报表行 IMP-009（槽级声明；不声明会恒报假冲突）
+        assert slots["provision"].row_code == "IMP-009"
+        assert slots["provision"].is_provision is True
+        # 原值槽不声明槽级 row_code —— 它就该用主行 BS-024 比对
+        assert slots["gross"].row_code is None
+
         # 兜底码只许出现在 spec 声明里（fail-open 用），不得散落
-        assert g7.G7_ACCOUNT_SPEC.fallback_gross == ("1511",)
-        assert g7.G7_ACCOUNT_SPEC.fallback_provision == ("1512",)
+        assert slots["gross"].fallback_standard_codes == ("1511",)
+        assert slots["provision"].fallback_standard_codes == ("1512",)
+
+    def test_transition_rla_spec_agrees_with_semantic_spec(self):
+        """过渡期件 ``G7_RLA_SPEC`` 与语义规格**交叉锁死**（防两形态漂移）。
+
+        `G7_RLA_SPEC` 的存在理由是「供守卫直接验旧路径行为」，那它就必须与
+        语义规格声明同一批码与同一批报表行 —— 否则两处各说一套，
+        测试用旧形态验过的结论对生产路径（语义形态）不成立。
+        """
+        from app.routers.wp_render_strategies import _g7_long_term_equity_main as g7
+
+        rla = g7.G7_RLA_SPEC
+        slots = {s.key: s for s in g7.G7_ACCOUNT_SPEC.slots}
+        assert rla.row_code == g7.G7_ACCOUNT_SPEC.row_code == "BS-024"
+        assert rla.provision_row_code == slots["provision"].row_code == "IMP-009"
+        assert rla.fallback_gross == slots["gross"].fallback_standard_codes
+        assert rla.fallback_provision == slots["provision"].fallback_standard_codes
 
 
 class TestConsolLinkageServiceSemantics:

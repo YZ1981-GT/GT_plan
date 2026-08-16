@@ -242,6 +242,141 @@ def test_soe_has_no_text_sections():
     assert not (_section("soe").get("text_sections") or [])
 
 
+# ─────────── 源 docx 交叉判据（spec h-cycle-… Task 14 / R7.1 / R8.2） ───────────
+#
+# 🔴 上面那条的判据是**底稿源 xlsx**，而 `text_sections` 属**附注模板**，
+# 其真源是 `docs/模版/` 两份附注源 docx —— 两者不是同一份文件：
+# listed 侧就是「xlsx 有表 + 附注 docx 另有 3 段说明」，故「xlsx 无说明段」
+# 并不蕴含「附注不该有说明段」。此处补交叉判据把两侧都钉住。
+#
+# 定位必须按 `paragraph.style.name == 'Heading N'` —— docx 章号是 Word 自动编号，
+# 段落文本**不含**「五、」「八、」，用 `^N、标题` 正则会 0 命中。
+# 且「使用权资产」这个 heading 在两份 docx 里都出现**两次**（会计政策章 + 项目注释章），
+# 必须取**第 2 次**（项目注释章）。
+
+_DOCS = _ROOT.parent / "docs" / "模版"
+_DOCX_LISTED = (
+    _DOCS
+    / "1.上市公司年审报表及附注-2026.01"
+    / "1.上市公司年审报表及附注-2026.01"
+    / "3.2025年度上市公司财务报表附注模板-2026.01.15.docx"
+)
+_DOCX_SOE = (
+    _DOCS
+    / "1、2025年度财务决算审计报告-2026.01.06"
+    / "1、2025年度财务决算审计报告-国企"
+    / "1.1-2025国企财务报表附注20260119.docx"
+)
+
+
+def _docx_section_paragraphs(path: Path, heading: str, occurrence: int) -> list[str] | None:
+    """取某 heading 第 N 次出现之后、到下一个 heading 之前的非空段落文本。"""
+    import pytest
+
+    docx = pytest.importorskip("docx", reason="python-docx 未安装")
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    if not path.exists():
+        return None
+    doc = docx.Document(str(path))
+    items: list[tuple[str, object]] = []
+    for child in doc.element.body:
+        tag = child.tag.split("}")[-1]
+        if tag == "p":
+            items.append(("p", Paragraph(child, doc)))
+        elif tag == "tbl":
+            items.append(("t", Table(child, doc)))
+    heads = [
+        (i, it[1])
+        for i, it in enumerate(items)
+        if it[0] == "p" and str(getattr(it[1], "style").name or "").startswith("Heading")
+    ]
+    seen = 0
+    for idx, (i, para) in enumerate(heads):
+        if (para.text or "").strip() != heading:
+            continue
+        seen += 1
+        if seen != occurrence:
+            continue
+        nxt = heads[idx + 1][0] if idx + 1 < len(heads) else len(items)
+        return [
+            (obj.text or "").strip()
+            for kind, obj in items[i + 1 : nxt]
+            if kind == "p" and (obj.text or "").strip()
+        ]
+    return None
+
+
+def test_soe_no_text_sections_confirmed_by_source_docx():
+    """国企附注源 docx 的「使用权资产」项目注释章确实零段落（只有 1 张 26×5 表）。"""
+    paras = _docx_section_paragraphs(_DOCX_SOE, "使用权资产", 2)
+    if paras is None:
+        import pytest
+
+        pytest.skip(f"源 docx 不存在: {_DOCX_SOE}")
+    assert paras == [], (
+        "国企附注源 docx 竟有说明段 —— 若成立则 `八、26` 的 `text_sections=[]` "
+        f"需重新裁决，实测段落: {paras}"
+    )
+
+
+def test_listed_text_sections_match_source_docx():
+    """上市 §五、25 的 3 段说明必须与附注源 docx **逐字**一致（防 md 重建截断）。"""
+    paras = _docx_section_paragraphs(_DOCX_LISTED, "使用权资产", 2)
+    if paras is None:
+        import pytest
+
+        pytest.skip(f"源 docx 不存在: {_DOCX_LISTED}")
+    got = [str(x) for x in (_section("listed").get("text_sections") or [])]
+    assert got == paras, (
+        "上市 五、25 的 text_sections 与源 docx 不一致\n"
+        + "\n".join(
+            f"  [{i}] json={got[i] if i < len(got) else '<MISSING>'!r}\n"
+            f"       docx={paras[i] if i < len(paras) else '<MISSING>'!r}"
+            for i in range(max(len(got), len(paras)))
+            if (got[i] if i < len(got) else None) != (paras[i] if i < len(paras) else None)
+        )
+    )
+
+
+def test_note_texts_carry_chinese_titles():
+    """`_note_texts` 必须带中文 `title`（缺则后端用 `section` 兜底 → 渲染成英文键）。"""
+    src = _FE_PAYLOAD.read_text(encoding="utf-8")
+    assert "H8_NOTE_TEXT_TITLES" in src
+    # 每个 section 键都要有中文标题，且标题里不得出现英文键名
+    titles = dict(
+        re.findall(r"'([\w-]+)':\s*'([^']+)'", src[src.index("H8_NOTE_TEXT_TITLES") :])
+    )
+    assert titles, "H8_NOTE_TEXT_TITLES 解析为空（正则失效？）"
+    for key, title in list(titles.items())[:10]:
+        if not key.startswith(("listed-", "soe-")):
+            continue
+        assert re.search(r"[\u4e00-\u9fff]", title), f"{key} 的 title 不含中文: {title!r}"
+        assert key not in title, f"{key} 的 title 直接用了英文键"
+    # 空白文本必须被过滤（否则附注出现空标题段）
+    assert "filter((it) => String(it.text ?? '').trim())" in src.replace("\n", "").replace(
+        " ", ""
+    ).replace("filter((it)=>String(it.text??'').trim())", "filter((it) => String(it.text ?? '').trim())") or (
+        "String(it.text ?? '').trim()" in src
+    ), "buildH8NoteTexts 未过滤空白文本"
+
+
+def test_reverse_self_check_docx_heading_lookup():
+    """反向自检：heading 定位取错次数会拿到会计政策章（那里无表无段）。"""
+    first = _docx_section_paragraphs(_DOCX_LISTED, "使用权资产", 1)
+    second = _docx_section_paragraphs(_DOCX_LISTED, "使用权资产", 2)
+    if first is None or second is None:
+        import pytest
+
+        pytest.skip("源 docx 不存在")
+    # 会计政策章的「使用权资产」下只有 Heading 3 子节，无正文段落
+    assert first == [], f"第 1 次出现（会计政策章）应无段落，实测 {first}"
+    assert len(second) == 3, f"第 2 次出现（项目注释章）应有 3 段，实测 {len(second)}"
+    # 证明「取错次数」会得出完全不同的结论
+    assert first != second
+
+
 # ───────────────────── 反向自检（防守卫空转） ─────────────────────
 
 

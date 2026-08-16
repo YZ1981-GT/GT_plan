@@ -160,7 +160,32 @@ def apply_plan(data: dict, additions: list[dict]) -> int:
     return len(additions)
 
 
+def _utf8_stdout() -> None:
+    """把 stdout/stderr 钉成 UTF-8（Windows 专属假红修复）。
+
+    🔴 本脚本所有输出含中文。Windows 上 `capture_output=True` 时子进程 stdout 是
+    管道，CPython 按 locale（cp936/GBK）写出；而调用方守卫
+    `test_g_cycle_formula_presets.test_disclosure_presets_script_check` 用
+    `encoding="utf-8"` 解码 ⇒ 「0 项欠账」被腌成 `0 \u01f7...`，断言
+    `"0 项欠账" in stdout` 恒失败。
+
+    该守卫已在父侧声明 `encoding="utf-8"`，但**子侧编码未钉** ⇒ 结果取决于环境里
+    是否恰好有 `PYTHONIOENCODING=utf-8`（Kiro 终端有、裸 PowerShell 没有），
+    表现为**同一命令时红时绿**的间歇假红。在脚本内自愈而不依赖环境变量，
+    才能同时覆盖 CI、人工执行与守卫三条调用路径。
+    """
+    for s in (sys.stdout, sys.stderr):
+        rc = getattr(s, "reconfigure", None)
+        if rc is None:
+            continue
+        try:
+            rc(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):  # 已 detach / 非文本流
+            pass
+
+
 def main() -> int:
+    _utf8_stdout()
     ap = argparse.ArgumentParser(description=__doc__)
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--check", action="store_true", help="只报欠账，有欠账 exit 1")

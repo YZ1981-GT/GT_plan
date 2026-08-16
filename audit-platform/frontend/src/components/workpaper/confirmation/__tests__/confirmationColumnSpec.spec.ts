@@ -48,13 +48,19 @@ describe('Property 3: resolveConfirmationColumns ⊆ manifest', () => {
     }
   })
 
-  it('golden 零回归：五个未声明 EXCLUDED 的循环列集逐字节不变', () => {
+  it('golden 零回归：未声明 EXCLUDED 的循环列集逐字节不变', () => {
     // 🔴 H0 已于 h0-confirmation-source-fidelity-and-linkage R6.2 声明 3 项剔除
     //    （contact_person/contact_phone/currency —— 源模板 H0-1 28 列无此三列），
     //    故从本 golden 集合移出，改由下方 H0 专项断言覆盖。
     // 🔴 G0 同理：g0-confirmation-source-alignment R2.2 声明同样的 3 项剔除
     //    （源模板 G0-1 28 列亦无 联系人/联系电话/币种，二者在 G0-2 的 F/G 列）。
-    const NO_EXCLUSION_CYCLES: ConfirmCycle[] = ['D0', 'F0', 'K0', 'L0']
+    // 🔴 L0 同理：l0-confirmation-source-alignment R4.4 声明同样的 3 项剔除
+    //    （源模板 L0-1 28 列 A..AB 亦无 联系人/联系电话/币种，二者在 L0-2 的 F/G 列）
+    //    → 本白名单只许**变短**；剩下的循环是真正未声明剔除者。
+    // 🔴 K0 同理：k0-confirmation-source-alignment R2.6 声明同样的 3 项剔除
+    //    （源模板 K0-1 28 列 A..AB 亦无 联系人/联系电话/币种，二者在 K0-2 的 F/G 列）
+    //    → 2026-08-07 从本 golden 集合移出，改由 Property 4 的 K0 专项断言覆盖。
+    const NO_EXCLUSION_CYCLES: ConfirmCycle[] = ['D0', 'F0']
     for (const cycle of NO_EXCLUSION_CYCLES) {
       const excluded = CYCLE_EXCLUDED_COLUMNS[cycle]
       expect(excluded, `${cycle} EXCLUDED 不为空数组`).toEqual([])
@@ -75,6 +81,35 @@ describe('Property 3: resolveConfirmationColumns ⊆ manifest', () => {
     }
   })
 
+  it('L0 剔除三项源模板不存在的列，且总数守恒', () => {
+    // spec: l0-confirmation-source-alignment R4.4
+    expect(CYCLE_EXCLUDED_COLUMNS.L0).toEqual(['contact_person', 'contact_phone', 'currency'])
+    const keys = resolveConfirmationColumns('L0').map((c) => c.key)
+    for (const k of ['contact_person', 'contact_phone', 'currency']) {
+      expect(keys, `L0 不应含 ${k}`).not.toContain(k)
+    }
+    // L0 variant：send_channel + l0_row_conclusion（承载列 key = row_conclusion）
+    // send_memo 已撤（源 C5:F5 是合并段头 = 伪列，R4.1）
+    expect(CYCLE_VARIANT_COLUMNS.L0).toEqual(['send_channel', 'l0_row_conclusion'])
+    expect(keys).toContain('send_channel')
+    expect(keys).toContain('row_conclusion')
+    expect(keys, 'send_memo 是伪列，不应再渲染').not.toContain('send_memo')
+    expect(keys.length).toBe(BASE_CONFIRMATION_COLUMNS.length - 3 + 2)
+  })
+
+  it('L0 的 row_conclusion 归 row_summary 段（不在发函询证纪要段内）', () => {
+    // 源 AB5:AB7 是四段之外的独立末列 → 与 G0/H0 同法归 row_summary（R4.3）
+    const col = resolveConfirmationColumns('L0').find((c) => c.key === 'row_conclusion')!
+    expect(col.group).toBe('row_summary')
+    expect(col.source).toContain('L0-1')
+    // 🔴 改写记录（k0-confirmation-source-alignment R2.4，2026-08-07）：
+    //    原断言 `k0.group === 'send_memo'` 锁定的是 K0 改造**前**的缺陷状态
+    //    （注释里写「K0 spec 尚未收口，两者有意不同」）。K0 现已收口 ⇒ 四个循环统一 row_summary。
+    const k0 = resolveConfirmationColumns('K0').find((c) => c.key === 'row_conclusion')!
+    expect(k0.group).toBe('row_summary')
+    expect(k0.source).toContain('K0-1')
+  })
+
   it('H0 剔除三项源模板不存在的列，且总数守恒', () => {
     expect(CYCLE_EXCLUDED_COLUMNS.H0).toEqual(['contact_person', 'contact_phone', 'currency'])
     const keys = resolveConfirmationColumns('H0').map((c) => c.key)
@@ -89,18 +124,64 @@ describe('Property 3: resolveConfirmationColumns ⊆ manifest', () => {
 })
 
 describe('Property 4: K0/L0 五段与审计结论', () => {
-  it('K0 含 send_memo 和 row_conclusion', () => {
+  /**
+   * 🔴 改写记录（k0-confirmation-source-alignment R2.1 / R2.2 / R2.6 / R2.7，2026-08-07）
+   *
+   * 原断言：`K0 含 send_memo 和 row_conclusion`（`toContain('send_memo')`）——
+   * 与 L0 改造前那条同源，**锁定了同一个缺陷前提**：把源模板 `K0-1!C5:F5` 这个
+   * 跨 4 列的合并**段头**当成一个自由文本列（伪列）。
+   * K0 现已与 L0 对齐：撤列、启用 `send_channel`、剔三列空列、结论归 `row_summary`。
+   */
+  it('K0 不含伪列 send_memo（源 C5:F5 是合并段头），且已启用渠道列与三列剔除', () => {
     const cols = resolveConfirmationColumns('K0')
     const keys = cols.map((c) => c.key)
-    expect(keys).toContain('send_memo')
+    expect(keys, 'send_memo 是伪列，不应再渲染').not.toContain('send_memo')
+    expect(keys).toContain('send_channel')
     expect(keys).toContain('row_conclusion')
+    expect(CYCLE_VARIANT_COLUMNS.K0).toEqual(['send_channel', 'k0_row_conclusion'])
+    expect(CYCLE_EXCLUDED_COLUMNS.K0).toEqual(['contact_person', 'contact_phone', 'currency'])
+    for (const k of ['contact_person', 'contact_phone', 'currency']) {
+      expect(keys, `K0 不应含 ${k}`).not.toContain(k)
+    }
+    expect(keys.length).toBe(BASE_CONFIRMATION_COLUMNS.length - 3 + 2)
   })
 
-  it('L0 含 send_memo 和 row_conclusion', () => {
+  /**
+   * 🔴 改写记录（l0-confirmation-source-alignment R4.1 / R4.2 / Property 18）
+   *
+   * 原断言：`L0 含 send_memo 和 row_conclusion`（`toContain('send_memo')`）——
+   * 它**锁定了一个缺陷前提**：`send_memo` 被当成 L0-1 的一个自由文本列。
+   *
+   * openpyxl 直读源模板实证：`L0-1!C5:F5` 的「发函询证纪要」是**跨 4 列的合并段头**
+   * （下辖 C 选取样本目的 / D 被询证单位名称 / E 账户交易 / F 金额），
+   * 源模板中**不存在**名为「发函询证纪要」的标量可填列 ⇒ 该 variant 列是「伪列」
+   * （把合并分组表头当成一个数据列），会在宽表里多出源模板不存在的输入位。
+   *
+   * 撤列后本断言必然打红 —— 这是设计意图（「修好即打红提醒移出」），不是回归。
+   * 字段本身**未从 `ConfirmationRow` 删除**（既有项目可能已填值，R10.6 数据零丢失红线），
+   * 只是不再渲染为列；既有值改由行详情面板只读呈现（Task 15）。
+   *
+   * K0 的那条保持不变 —— K0 的处置归 `k0-confirmation-source-alignment`（其 Wave 3 未开工）。
+   */
+  it('L0 不含伪列 send_memo（源 C5:F5 是合并段头），审计结论走 row_summary 段', () => {
     const cols = resolveConfirmationColumns('L0')
     const keys = cols.map((c) => c.key)
-    expect(keys).toContain('send_memo')
+    expect(keys).not.toContain('send_memo')
+    // 审计结论列仍在（源 AB5:AB7 的独立末列），且持久化字段名与 K0/H0/G0 一致
     expect(keys).toContain('row_conclusion')
+    const conclusion = cols.find((c) => c.key === 'row_conclusion')!
+    // 🔴 group 必须是 row_summary（AB 列在四段之外），不是 K0 的 send_memo 段
+    expect(conclusion.group).toBe('row_summary')
+    expect(conclusion.source).toContain('L0-1')
+  })
+
+  it('L0 启用源模板「函证方式」渠道列 send_channel，且不与 confirmation_method 同名', () => {
+    const cols = resolveConfirmationColumns('L0')
+    const byKey = new Map(cols.map((c) => [c.key, c]))
+    expect(byKey.has('send_channel')).toBe(true)
+    expect(byKey.get('send_channel')!.label).toBe('函证方式')
+    // confirmation_method 承载准则 1312 的积极式/消极式，必须显式区分（否则两列同名）
+    expect(byKey.get('confirmation_method')!.label).toBe('函证类型（积极式/消极式）')
   })
 })
 

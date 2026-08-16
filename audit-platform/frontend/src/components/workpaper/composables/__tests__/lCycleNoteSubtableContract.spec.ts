@@ -223,15 +223,22 @@ describe('L7 其他非流动负债 披露映射', () => {
     expect(L7_DISCLOSURE_SHEET_NAME.soe).not.toContain('核对')
   })
 
-  it('两版列名按源模板分取（上市 期末数/上年年末数；国企 期末余额/期初余额）', () => {
+  // 🔴 2026-08-15 诚实改写（spec l-cycle-…completion 裁决 C / Task 11）：
+  //    原断言锁 soe = 「期末余额/期初余额」（附注交付物口径），已被裁决 C 推翻 ——
+  //    源 xlsx `L7!附注披露信息(国企)!A6/B6/C6` = 项目/年初余额/期末余额（期初在前），
+  //    附注模板 `八、57` 与 `l7NoteSectionMap` 已同步改为源模板列序。
+  //    **两版列序刻意相反是源模板事实**，不得为「统一」而对齐。
+  it('两版列序按源模板分取（上市 期末数/上年年末数；国企 年初余额/期末余额）', () => {
     const listed = l7ColumnsFor('listed')[L7_SUBTABLE.main]
     const soe = l7ColumnsFor('soe')[L7_SUBTABLE.main]
     expect(listed.map((c) => c.label)).toEqual(['项目', '期末数', '上年年末数'])
-    expect(soe.map((c) => c.label)).toEqual(['项目', '期末余额', '期初余额'])
+    expect(soe.map((c) => c.label)).toEqual(['项目', '年初余额', '期末余额'])
     // 反向：两版列头必须不同（防一份常量给两个变体共用 → 国企表头错位）
     expect(listed.map((c) => c.label)).not.toEqual(soe.map((c) => c.label))
-    // 列键两版一致（只有 label 分变体）
-    expect(listed.map((c) => c.key)).toEqual(soe.map((c) => c.key))
+    // 🔴 列**键集**两版一致（key 不变、只换顺序与 label ⇒ 已持久化数据零丢失），
+    //    但列**序**刻意相反 ⇒ 用集合比较而非数组比较。
+    expect([...listed.map((c) => c.key)].sort()).toEqual([...soe.map((c) => c.key)].sort())
+    expect(listed.map((c) => c.key)).not.toEqual(soe.map((c) => c.key))
   })
 
   it('单级表头必须显式 flat（抑制后端前缀推断凭空造父表头）', () => {
@@ -492,23 +499,39 @@ describe('L4 子表契约', () => {
     const cols = buildL4SoeColumns()
     assertColumnsStated(cols, 'L4 soe')
   })
-  it('上市有 4 张子表', () => {
+  // 🔴 2026-08-15 诚实改写（spec l-cycle-…completion Task 14）：
+  //    原断言锁的是**旧表名**，与附注模板 `五、46`/`八、50` 的 `tables[].name` 不符 ——
+  //    `应付债券增减变动` 是截断版（真实表名含「的…（不包括…）」整段）；
+  //    `已到期未偿付的应付债券` 在两份模板中**均不存在**（已删该键）；
+  //    `一年内到期的应付债券` 属 `五、43`/`八、46` 章节、由 within1y 常量承载。
+  //    照旧断言会把「产出孤儿子表」这个缺陷锁成正确行为。
+  it('上市有 4 张子表（表名逐字对齐附注模板 五、46）', () => {
     const keys = Object.keys(buildL4ListedColumns())
     expect(keys.length).toBe(4)
     expect(keys).toContain('应付债券')
-    expect(keys).toContain('应付债券增减变动')
-    expect(keys).toContain('一年内到期的应付债券')
-    expect(keys).toContain('已到期未偿付的应付债券')
+    expect(keys).toContain(
+      '应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）',
+    )
+    expect(keys).toContain('应付债券（续）')
+    expect(keys).toContain('（3）划分为金融负债的其他金融工具')
+    // 反向：模板不存在的表名不得复活
+    expect(keys).not.toContain('已到期未偿付的应付债券')
+    expect(keys).not.toContain('应付债券增减变动')
   })
-  it('国企有 2 张子表', () => {
+  it('国企有 2 张子表（表名逐字对齐附注模板 八、50）', () => {
     const keys = Object.keys(buildL4SoeColumns())
     expect(keys.length).toBe(2)
     expect(keys).toContain('应付债券')
-    expect(keys).toContain('应付债券增减变动')
+    expect(keys).toContain(
+      '应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）',
+    )
+    expect(keys).not.toContain('应付债券增减变动')
   })
   it('增减变动表列有 group（两级表头）', () => {
     const cols = buildL4ListedColumns()
-    const movCols = cols['应付债券增减变动']
+    const movCols =
+      cols['应付债券的增减变动（不包括划分为金融负债的优先股、永续债等其他金融工具）']
+    expect(movCols).toBeDefined()
     expect(movCols.some((c: any) => c.group === '期初余额')).toBe(true)
     expect(movCols.some((c: any) => c.group === '本期增加')).toBe(true)
     expect(movCols.some((c: any) => c.group === '本期减少')).toBe(true)

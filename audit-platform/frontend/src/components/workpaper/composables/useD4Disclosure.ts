@@ -25,10 +25,21 @@ import { D4_MAIN_REVENUE_STANDARD } from './d4AccountScope'
 import { parseNum, calcSubtotal } from './useD4FormulaEngine'
 import {
   D4_DEFAULT_CATEGORIES,
-  D4_TRANSPOSE_CHECK_ITEMS,
-  nextD4CategoryKey,
   type D4TransposeCategory,
 } from './d4DisclosureModel'
+import {
+  allocateSegment,
+  parseSegmentState,
+  removeSegmentCells,
+  migrateSegmentCellKeys,
+  segmentCellKey,
+  deriveSegmentCell,
+  segmentRowAcrossCategories,
+  D4_SEGMENT_ROWS,
+  D4_SEGMENT_INPUT_ROW_KEYS,
+  isSegmentRowReadonly,
+  type D4SegmentState,
+} from './d4RevenueSegmentColumns'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -529,39 +540,45 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
   // 🔴 Property 16: 列转置 key 稳定且不撞
   // 🔴 Req 4.4: 类别可增删改名，ElMessageBox.prompt 必须先输入名称再创建
 
-  /** 持久化的列转置数据结构 */
+  /**
+   * 持久化的列转置数据结构。
+   *
+   * 🔴 `seqCounter` 是**单调计数器**（Task 23 / Property 24）：删列不回退，
+   * 保证「删 cat_3 再新增」得到 cat_4 而不是复用 cat_3 —— 否则历史单元格
+   * `cat_3_0_revenue` 会串到新板块列上显示错误金额。
+   */
   interface Section4TransposeData {
     categories: D4TransposeCategory[]
     cells: Record<string, number | null>
+    seqCounter?: number
   }
 
   const section4Categories = ref<D4TransposeCategory[]>([...D4_DEFAULT_CATEGORIES])
   const section4Cells = ref<Record<string, number | null>>({})
+  /** 已分配序号上界（单调，仅增不减） */
+  const section4SeqCounter = ref<number>(D4_DEFAULT_CATEGORIES.length)
 
-  /** 生成单元格 key：`{catKey}_{rowIdx}_{revenue|cost}` */
-  function s4CellKey(catKey: string, rowIdx: number, type: 'revenue' | 'cost'): string {
-    return `${catKey}_${rowIdx}_${type}`
+  /**
+   * 生成单元格 key：`{catKey}_{rowKey}_{revenue|cost}`（Task 31）。
+   *
+   * 🔴 改造前是 `{catKey}_{rowIdx}_{type}`（rowIdx=0/1/2）—— 而源模板里
+   * 「在某一时点确认 / 在某一时段确认」**各出现两次**（主营业务下 + 其他业务下），
+   * 数字下标无法表达归属。加载时经 `migrateSegmentCellKeys` 一次性迁移。
+   */
+  function s4CellKey(catKey: string, rowKey: string, type: 'revenue' | 'cost'): string {
+    return segmentCellKey(catKey, rowKey, type)
   }
 
   function loadSection4() {
-    const raw = getResp(SECTION4_KEY)
-    if (!raw) {
-      section4Categories.value = [...D4_DEFAULT_CATEGORIES]
-      section4Cells.value = {}
-      return
-    }
-    try {
-      const data: Section4TransposeData = typeof raw === 'string' ? JSON.parse(raw) : raw
-      if (Array.isArray(data?.categories) && data.categories.length > 0) {
-        section4Categories.value = data.categories
-      } else {
-        section4Categories.value = [...D4_DEFAULT_CATEGORIES]
-      }
-      section4Cells.value = data?.cells && typeof data.cells === 'object' ? { ...data.cells } : {}
-    } catch {
-      section4Categories.value = [...D4_DEFAULT_CATEGORIES]
-      section4Cells.value = {}
-    }
+    // 🔴 一律经 parseSegmentState 归一：它负责 ① 容错回退默认类别
+    // ② 规整历史 `cat0`（模板 seed 形态，无下划线）并搬移其单元格
+    // ③ 重复 key 重新分配 ④ 缺 seqCounter 时按现有最大 seq 补齐。
+    const state: D4SegmentState = parseSegmentState(getResp(SECTION4_KEY))
+    section4Categories.value = state.categories.map(c => ({ ...c }))
+    // Task 31: 旧 `{catKey}_{rowIdx}_{type}` 键一次性迁移到 `{catKey}_{rowKey}_{type}`
+    // （幂等；无法识别的键原样保留，数据零丢失）
+    section4Cells.value = migrateSegmentCellKeys(state.cells).cells
+    section4SeqCounter.value = state.seqCounter ?? state.categories.length
   }
 
   watch(() => allResponses.value.get(prefix + SECTION4_KEY)?.remark, loadSection4, { immediate: true })
@@ -570,39 +587,55 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     const data: Section4TransposeData = {
       categories: section4Categories.value,
       cells: section4Cells.value,
+      // 🔴 必须落库，否则下次加载按「现有最大 seq」补齐 ⇒ 计数器退化、复用已删序号
+      seqCounter: section4SeqCounter.value,
     }
     persist(SECTION4_KEY, JSON.stringify(data))
   }
 
-  /** 获取单元格值 */
-  function getSection4Cell(catKey: string, rowIdx: number, type: 'revenue' | 'cost'): number | null {
-    return section4Cells.value[s4CellKey(catKey, rowIdx, type)] ?? null
+  /**
+   * 获取单元格值（Task 31：父行 / 合计行**读时派生**，不落库）。
+   *
+   * 🔴 派生列禁持久化 —— 源模板 R48/R52 是 `SUM(...)`、R56 是 `B52+B48`，
+   * 存下来会与明细行漂移（平台已登记的 D1「比例列 162.50%」同款）。
+   */
+  function getSection4Cell(catKey: string, rowKey: string, type: 'revenue' | 'cost'): number | null {
+    return deriveSegmentCell(section4Cells.value, catKey, rowKey, type)
   }
 
-  /** 更新单元格值 */
-  function updateSection4Cell(catKey: string, rowIdx: number, type: 'revenue' | 'cost', value: number | null): void {
+  /** 更新单元格值（仅可录入行；父行与合计行拒绝写入） */
+  function updateSection4Cell(catKey: string, rowKey: string, type: 'revenue' | 'cost', value: number | null): void {
     if (isReadonly.value) return
-    section4Cells.value[s4CellKey(catKey, rowIdx, type)] = value
+    if (!D4_SEGMENT_INPUT_ROW_KEYS.includes(rowKey)) return
+    section4Cells.value[s4CellKey(catKey, rowKey, type)] = value
     persistSection4()
   }
 
-  /** 添加类别（必须先命名） */
+  /** 添加类别（必须先命名；key 取自单调计数器，不复用已删序号） */
   function addSection4Category(label: string): void {
     if (isReadonly.value) return
-    const key = nextD4CategoryKey(section4Categories.value)
-    section4Categories.value.push({ key, label })
+    const trimmed = (label ?? '').trim()
+    if (!trimmed) return
+    const { key, nextCounter } = allocateSegment(
+      section4Categories.value,
+      section4SeqCounter.value,
+    )
+    section4Categories.value.push({ key, label: trimmed })
+    section4SeqCounter.value = nextCounter
     persistSection4()
   }
 
-  /** 删除类别（同时清理关联 cells） */
+  /**
+   * 删除类别（同时清理关联 cells）。
+   *
+   * 🔴 计数器**不回退** —— 下一次新增拿到的是更大的序号，历史单元格不会串列。
+   * 单元格清理走 `removeSegmentCells`（按 `{key}_{rowIdx}_{type}` 精确边界，
+   * 裸 `startsWith(key + '_')` 在 `cat_1` / `cat_10` 并存时会误删）。
+   */
   function removeSection4Category(catKey: string): void {
     if (isReadonly.value) return
     section4Categories.value = section4Categories.value.filter(c => c.key !== catKey)
-    // 清理该类别下的所有 cell
-    const keysToRemove = Object.keys(section4Cells.value).filter(k => k.startsWith(catKey + '_'))
-    for (const k of keysToRemove) {
-      delete section4Cells.value[k]
-    }
+    section4Cells.value = removeSegmentCells(section4Cells.value, catKey)
     persistSection4()
   }
 
@@ -616,51 +649,52 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     }
   }
 
-  /** 行合计（某个检查项行在所有类别下的收入/成本合计） */
-  function section4RowTotal(rowIdx: number, type: 'revenue' | 'cost'): number | null {
-    let sum: number | null = null
-    for (const cat of section4Categories.value) {
-      const v = section4Cells.value[s4CellKey(cat.key, rowIdx, type)]
-      if (v !== null && v !== undefined) {
-        sum = (sum ?? 0) + v
-      }
-    }
-    return sum
+  /**
+   * 横向合计（某行在所有类别下的收入/成本之和）。
+   *
+   * ⚠️ 源模板**没有**横向合计列（改造前自造过 `total_revenue`/`total_cost`，
+   * Task 31 已移除）。这里保留仅供底稿内部核对展示，**不进推送列定义**。
+   */
+  function section4RowTotal(rowKey: string, type: 'revenue' | 'cost'): number | null {
+    return segmentRowAcrossCategories(section4Cells.value, section4Categories.value, rowKey, type)
   }
 
-  /** 列合计（某个类别在所有检查项行下的收入/成本合计） */
+  /**
+   * 纵向合计（某类别的总计）—— 对应源模板 R56 `=B52+B48`（合计行）。
+   */
   function section4ColTotal(catKey: string, type: 'revenue' | 'cost'): number | null {
-    let sum: number | null = null
-    for (let i = 0; i < D4_TRANSPOSE_CHECK_ITEMS.length; i++) {
-      const v = section4Cells.value[s4CellKey(catKey, i, type)]
-      if (v !== null && v !== undefined) {
-        sum = (sum ?? 0) + v
-      }
-    }
-    return sum
+    return deriveSegmentCell(section4Cells.value, catKey, 'total', type)
   }
 
   // 兼容旧接口（section4Rows / section4Total / addSection4Row / removeSection4Row / updateSection4）
   // 这些现在仅作为兼容垫片，真正的列转置数据通过上方函数管理
+  /**
+   * 行定义（Task 31：9 行，与源模板逐行对齐；父行/合计行只读派生）。
+   *
+   * 🔴 `readonly` 必须在此**派生**下发 —— `D4SegmentRowDef` 本身没有该字段，
+   * 而组件模板用 `row.readonly` 控制加粗与禁用。此前只做 `{ ...r }` 浅拷贝，
+   * `row.readonly` 恒 `undefined` ⇒ 小计/合计行未禁用，派生格可被手工改写
+   * （2026-08-07 浏览器实测抓出，四层验证全绿）。判据单一真源 =
+   * `isSegmentRowReadonly`（按 `kind`）。
+   */
+  const section4RowDefs = computed(() =>
+    D4_SEGMENT_ROWS.map(r => ({ ...r, readonly: isSegmentRowReadonly(r) })),
+  )
+
   const section4Rows = computed(() => {
-    return D4_TRANSPOSE_CHECK_ITEMS.map((item, idx) => ({
-      rowId: `s4-check-${idx}`,
-      item,
-      rowIdx: idx,
+    return D4_SEGMENT_ROWS.map((r) => ({
+      rowId: `s4-${r.key}`,
+      rowKey: r.key,
+      item: r.label,
+      kind: r.kind,
+      readonly: r.kind === 'subtotal' || r.kind === 'total',
     }))
   })
 
-  const section4Total = computed(() => {
-    let totalRevenue: number | null = null
-    let totalCost: number | null = null
-    for (let i = 0; i < D4_TRANSPOSE_CHECK_ITEMS.length; i++) {
-      const rv = section4RowTotal(i, 'revenue')
-      const cv = section4RowTotal(i, 'cost')
-      if (rv !== null) totalRevenue = (totalRevenue ?? 0) + rv
-      if (cv !== null) totalCost = (totalCost ?? 0) + cv
-    }
-    return { totalRevenue, totalCost }
-  })
+  const section4Total = computed(() => ({
+    totalRevenue: section4RowTotal('total', 'revenue'),
+    totalCost: section4RowTotal('total', 'cost'),
+  }))
 
   function addSection4Row(): void { /* no-op: rows are fixed check items */ }
   function removeSection4Row(_rowId: string): void { /* no-op: rows are fixed check items */ }
@@ -753,6 +787,7 @@ export function useD4Disclosure(options: UseD4DisclosureOptions) {
     // 列转置专用接口
     section4Categories,
     section4Cells,
+    section4RowDefs,
     getSection4Cell,
     updateSection4Cell,
     addSection4Category,

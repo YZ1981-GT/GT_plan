@@ -13,6 +13,14 @@ import logging
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.d_cycle_extraction.d_account_resolver import (
+    resolve_d_cycle_account_codes,
+)
+from app.services.d_cycle_extraction.d_tb_fetch import (
+    build_d_tb_source_codes,
+    fetch_d_cycle_tb,
+    seed_tb_amount_scalars,
+)
 from app.services.d_cycle_extraction.presets import resolve_effective
 from app.services.d_cycle_extraction.tier_a_seed import (
     seed_tier_a_reconciliation,
@@ -138,6 +146,31 @@ async def render(ctx: RenderContext) -> dict | None:
         "soe": "soe" in standards,
     }
 
+    # ─── 本循环 TB 核对标量（预收款项 2203）─────────────────────────────────
+    # spec: d-cycle-four-table-extraction-and-disclosure-completion R1 / Task 6
+    #
+    # 🔴 改造前 D3 **一次都没查过自己的科目** —— 全文只有下方那段 `2205%`（那是有意的
+    # D3↔D7 交叉核对，取的是**合同负债**），于是 `project_context` 里既无 `tb_amount`
+    # 也无任何本循环金额。审定表的 TB 核对数只能靠 Tier A transient seed
+    # （锚点 `D3-adj-trial-balance-amount`），一旦该 Tier A 公式被停用或灰度关闭，
+    # 前端就完全没有回退来源。
+    #
+    # 实证：`2203` 在 `trial_balance` 有 9 个项目 / 合计 77,338,768.39
+    # （而它一直查的 `2205` 只有 7,855.34，差 4 个数量级）。
+    #
+    # 本段补齐 `tb_amount` / `tb_amount_unadjusted` / `tb_amount_audited`
+    # （与 D5/D6/D7 同键名，前端 seed 回退才能命中），并经 `resolve_d_cycle_account_codes`
+    # 走报表规则映射（`BS-046`），不硬编码 `2203`。
+    d3_codes = None
+    try:
+        d3_codes = await resolve_d_cycle_account_codes(ctx, _D3_WP_CODE)
+        await seed_tb_amount_scalars(
+            ctx, d3_codes, project_context, write_zero_when_missing=True
+        )
+    except Exception as e:  # noqa: BLE001 — fail-open
+        logger.warning("D3 render: 科目解析/取数异常（fail-open）: %s", e)
+        project_context.setdefault("tb_amount", 0)
+
     # ─── D7 合同负债(2205)审定数注入（供 D3 披露表 D3↔D7 交叉核对）─────────────
     # 前端 D3TabDisclosureListed/Soe 读 allResponses['D3-d7-tb-audited-amount'].remark
     # 显示「预收账款(D3) + 合同负债(D7)」金额对照（CAS14 预收拆分口径核对）。
@@ -204,6 +237,15 @@ async def render(ctx: RenderContext) -> dict | None:
             "不发 adjudication_prefill（wp_id=%s）",
             wp_id,
         )
+        # ─── 取数溯源与三口径自检（新增，前端消费）────────────────────────────
+        if d3_codes is not None:
+            try:
+                _d3_tb = await fetch_d_cycle_tb(ctx, d3_codes)
+                html_data["tb_source_codes"] = build_d_tb_source_codes(d3_codes, _d3_tb)
+                html_data["parent_check"] = _d3_tb.parent_check
+            except Exception as e:  # noqa: BLE001 — fail-open
+                logger.warning("D3 render: 取数溯源构造异常（fail-open）: %s", e)
+
         # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
         # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
         # 用 resolve_effective 的有效 Tier A 公式（默认 TB('2203','期末余额')）求值 transient

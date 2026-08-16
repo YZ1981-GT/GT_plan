@@ -115,10 +115,9 @@
             </el-table-column>
             <el-table-column label="上年末" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="row.priorEnd"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => onImpairmentCellChange(row.rowId, 'priorEnd', val ?? 0)"
@@ -128,10 +127,9 @@
             </el-table-column>
             <el-table-column label="本期计提" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="row.provision"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => onImpairmentCellChange(row.rowId, 'provision', val ?? 0)"
@@ -141,10 +139,9 @@
             </el-table-column>
             <el-table-column label="转回" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="row.reversal"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => onImpairmentCellChange(row.rowId, 'reversal', val ?? 0)"
@@ -154,10 +151,9 @@
             </el-table-column>
             <el-table-column label="核销" width="110" align="right">
               <template #default="{ row }">
-                <el-input-number
+                <WpAmountInput
                   v-if="!isReadonly"
                   :model-value="row.writeOff"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => onImpairmentCellChange(row.rowId, 'writeOff', val ?? 0)"
@@ -231,10 +227,9 @@
             <el-table-column label="期末已质押金额" width="180" align="right">
               <template #default="{ row, $index }">
                 <span v-if="row.isTotal" class="subtotal-label">{{ fmtAmount(row.pledgedAmount) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else-if="!isReadonly"
                   :model-value="row.pledgedAmount"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => updatePledged($index, val ?? 0)"
@@ -255,10 +250,9 @@
             <el-table-column label="期末终止确认金额" width="180" align="right">
               <template #default="{ row, $index }">
                 <span v-if="row.isTotal" class="subtotal-label">{{ fmtAmount(row.derecognizedAmount) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else-if="!isReadonly"
                   :model-value="row.derecognizedAmount"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => updateEndorsed($index, 'derecognizedAmount', val ?? 0)"
@@ -269,10 +263,9 @@
             <el-table-column label="期末未终止确认金额" width="180" align="right">
               <template #default="{ row, $index }">
                 <span v-if="row.isTotal" class="subtotal-label">{{ fmtAmount(row.notDerecognizedAmount) }}</span>
-                <el-input-number
+                <WpAmountInput
                   v-else-if="!isReadonly"
                   :model-value="row.notDerecognizedAmount"
-                  :controls="false"
                   size="small"
                   style="width:100%"
                   @change="(val: number) => updateEndorsed($index, 'notDerecognizedAmount', val ?? 0)"
@@ -387,28 +380,28 @@
           </el-table-column>
           <el-table-column label="上年末" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.priorEnd" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.priorEnd" size="small" style="width:100%"
                 @change="(val: number) => onImpairmentCellChange(row.rowId, 'priorEnd', val ?? 0)" />
               <span v-else>{{ fmtAmount(row.priorEnd) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="本期计提" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.provision" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.provision" size="small" style="width:100%"
                 @change="(val: number) => onImpairmentCellChange(row.rowId, 'provision', val ?? 0)" />
               <span v-else>{{ fmtAmount(row.provision) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="收回或转回" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.reversal" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.reversal" size="small" style="width:100%"
                 @change="(val: number) => onImpairmentCellChange(row.rowId, 'reversal', val ?? 0)" />
               <span v-else>{{ fmtAmount(row.reversal) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="核销" width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly" :model-value="row.writeOff" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly" :model-value="row.writeOff" size="small" style="width:100%"
                 @change="(val: number) => onImpairmentCellChange(row.rowId, 'writeOff', val ?? 0)" />
               <span v-else>{{ fmtAmount(row.writeOff) }}</span>
             </template>
@@ -433,7 +426,7 @@
           <el-table-column label="期末已质押金额" width="180" align="right">
             <template #default="{ row, $index }">
               <span v-if="row.isTotal" class="subtotal-label">{{ fmtAmount(row.pledgedAmount) }}</span>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.pledgedAmount" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.pledgedAmount" size="small" style="width:100%"
                 @change="(val: number) => updatePledged($index, val ?? 0)" />
               <span v-else>{{ fmtAmount(row.pledgedAmount) }}</span>
             </template>
@@ -449,7 +442,7 @@
           <el-table-column label="期末终止确认金额" width="180" align="right">
             <template #default="{ row, $index }">
               <span v-if="row.isTotal" class="subtotal-label">{{ fmtAmount(row.derecognizedAmount) }}</span>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.derecognizedAmount" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.derecognizedAmount" size="small" style="width:100%"
                 @change="(val: number) => updateEndorsed($index, 'derecognizedAmount', val ?? 0)" />
               <span v-else>{{ fmtAmount(row.derecognizedAmount) }}</span>
             </template>
@@ -457,7 +450,7 @@
           <el-table-column label="期末未终止确认金额" width="180" align="right">
             <template #default="{ row, $index }">
               <span v-if="row.isTotal" class="subtotal-label">{{ fmtAmount(row.notDerecognizedAmount) }}</span>
-              <el-input-number v-else-if="!isReadonly" :model-value="row.notDerecognizedAmount" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-else-if="!isReadonly" :model-value="row.notDerecognizedAmount" size="small" style="width:100%"
                 @change="(val: number) => updateEndorsed($index, 'notDerecognizedAmount', val ?? 0)" />
               <span v-else>{{ fmtAmount(row.notDerecognizedAmount) }}</span>
             </template>
@@ -500,7 +493,10 @@ import type { useD5CrossSheet } from '../composables/useD5CrossSheet'
 import type { ChecklistResponse } from '../composables/useD5FormData'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 import GtWpDisclosureSyncBar from '../GtWpDisclosureSyncBar.vue'
+import WpAmountInput from '@/components/workpaper/shared/WpAmountInput.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -516,6 +512,16 @@ const props = defineProps<{
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const { year: auditYear } = useAuditContext()
+
+/**
+ * 金额格式单一真源（平台铁律 R9.4）。
+ *
+ * 🔴 `useDisplayPrefsStore` 是 setup 作用域 composable，写进函数体会静默失效；
+ * 且 `fmtAmount` 是 store **成员**不是模块级导出（写
+ * `import { fmtAmount } from '@/stores/displayPrefs'` 会让整页崩成
+ * 「页面渲染出错」，而 get_diagnostics 与 vitest 都查不出）。
+ */
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -676,10 +682,18 @@ function onImpairmentCellChange(rowId: string, field: string, value: any) {
 
 // ─── Formatting Helpers ──────────────────────────────────────────────────────
 
+/**
+ * 只读金额格式化 —— 委托平台单一真源 `displayPrefs.fmtAmount`。
+ *
+ * 🔴 平台铁律：金额格式（千分符 / 小数位 / 单位「元」/ 零值显示）的唯一真源是
+ * `stores/displayPrefs`，禁在组件内自造 `toLocaleString` 闭包（改造前本函数就是
+ * 那样：硬编码 2 位小数、不带单位、不消费用户偏好，切「万元」时本页不跟随）。
+ *
+ * 负数改由 CSS 类 `gt-amount--negative` 标红（`displayPrefs.amountClass`），
+ * 不再用会计括号形态 —— 与 D2 披露表口径一致。
+ */
 function fmtAmount(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
-  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(val)
 }
 
 // ─── 同步到附注 / 跳转回附注 ─────────────────────────────────────────────────

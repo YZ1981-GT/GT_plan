@@ -312,6 +312,45 @@ def _merge_rows_by_scope(
     return merged, None
 
 
+#: 段边界解析失败的三种成因 → **可操作**的诊断话术（Requirement 11.3 / Property 40）。
+#:
+#: 🔴 为什么不能只把错误码原样丢给前端：三种成因的**修法完全不同** ——
+#:   * `variant_unresolved` → 去项目设置里把适用准则填对（不是附注模板的问题）
+#:   * `template_table_not_found` → 底稿声明的表名与附注模板不一致（改底稿或改模板）
+#:   * `owner_row_code_not_in_template` → 附注模板缺段首码（跑
+#:     `fix_note_k_report_row_codes.py --apply` 那一类脚本）
+#: 只报「段边界解析失败」等于把三条岔路合成一条死胡同 —— 审计师只能看到
+#: 「这张表没同步成功」，无从判断该找谁修。
+_ROW_SCOPE_ERROR_HINTS: dict[str, str] = {
+    "variant_unresolved": (
+        "未能确定附注模板变体（上市/国企）—— 请先在项目设置里填好适用准则，"
+        "再重新推送"
+    ),
+    "template_table_not_found": (
+        "附注模板里找不到该表 —— 底稿声明的表名与模板不一致（核对两侧表名逐字相同）"
+    ),
+    "owner_row_code_not_in_template": (
+        "附注模板该表缺少本循环的段首行标记（report_row_code）—— "
+        "需先补段首码，否则无法只替换本循环负责的那几行"
+    ),
+}
+
+#: 兜底话术：新增错误码时**不许**静默落到空串（那又变成「不得静默」的反例）
+_ROW_SCOPE_ERROR_FALLBACK = "段边界解析失败（未登记的原因码，请查后端日志）"
+
+
+def describe_row_scope_error(
+    err: str,
+    *,
+    section_number: str,
+    table_name: str,
+    scope: RowScope,
+) -> str:
+    """把段边界解析失败的错误码翻成审计师看得懂、且能照着做的一句话。"""
+    hint = _ROW_SCOPE_ERROR_HINTS.get(err, _ROW_SCOPE_ERROR_FALLBACK)
+    return f"{table_name}（章节 {section_number}，段 {scope.owner_row_code}）：{hint}"
+
+
 def _apply_row_scoped_merge(
     merged_sub: dict[str, Any],
     clean_sub_table_data: dict[str, Any],
@@ -332,10 +371,12 @@ def _apply_row_scoped_merge(
             当基线 —— 调用方已把 incoming 写进去了，那样基线就是 incoming 本身。
 
     Returns:
-        ``(row_scoped_tables, row_scope_unresolved)``
+        ``(row_scoped_tables, row_scope_unresolved, row_scope_unresolved_reasons)``
+        —— 第三项是 ``{表名: 可诊断原因}``（Requirement 11.3）。
     """
     scoped: list[str] = []
     unresolved: list[str] = []
+    reasons: dict[str, str] = {}
     for key, scope in row_scopes.items():
         if key not in clean_sub_table_data:
             continue  # 孤立声明已在调用方剔除；双保险
@@ -350,10 +391,16 @@ def _apply_row_scoped_merge(
         )
         if err:
             unresolved.append(key)
+            reasons[key] = describe_row_scope_error(
+                err,
+                section_number=section_number,
+                table_name=key,
+                scope=scope,
+            )
             logger.warning(
                 "wp_disclosure_sync: 行级合并失败 section=%s table=%s owner=%s reason=%s "
-                "→ 跳过该表写入（fail closed）",
-                section_number, key, scope.owner_row_code, err,
+                "→ 跳过该表写入（fail closed）：%s",
+                section_number, key, scope.owner_row_code, err, reasons[key],
             )
             # fail closed：既有数据原样保留；本来没有该表就不要凭空创建
             if isinstance(prev, list):
@@ -363,7 +410,7 @@ def _apply_row_scoped_merge(
             continue
         merged_sub[key] = merged_rows
         scoped.append(key)
-    return scoped, unresolved
+    return scoped, unresolved, reasons
 
 
 #: 显式删除叙述段的元数据键（对称 ``_removed_table_keys``）
@@ -806,6 +853,7 @@ async def sync_from_workpaper(
     )
     row_scoped_tables: list[str] = []
     row_scope_unresolved: list[str] = []
+    row_scope_reasons: dict[str, str] = {}
     if clean_sub_table_data:
         # 浅合并：保留未推送的既有子表，同名 key 覆盖。
         # 显式推送 ``{table_key: []}`` 表示该表"空行"有效状态（区别于删除），照常覆盖。
@@ -814,7 +862,11 @@ async def sync_from_workpaper(
             merged_sub[key] = rows
         # ★ 行级合并（多段共享表）：只对声明了 `_row_scope` 的表生效
         if row_scopes:
-            row_scoped_tables, row_scope_unresolved = _apply_row_scoped_merge(
+            (
+                row_scoped_tables,
+                row_scope_unresolved,
+                row_scope_reasons,
+            ) = _apply_row_scoped_merge(
                 merged_sub,
                 clean_sub_table_data,
                 row_scopes,
@@ -971,6 +1023,7 @@ async def sync_from_workpaper(
                     # 被守卫拦下 → 一行都没写，行级合并同样未发生
                     "row_scoped_tables": [],
                     "row_scope_unresolved": [],
+                    "row_scope_unresolved_reasons": {},
                 }
             # decision in ('auto_resolved', 'allow') → 继续走更新分支
         note.table_data = new_table_data
@@ -1016,6 +1069,10 @@ async def sync_from_workpaper(
         # 前端据此提示审计师「这张表没同步成功」，否则又是一个 dead path。
         "row_scoped_tables": row_scoped_tables,
         "row_scope_unresolved": row_scope_unresolved,
+        # 🔴 原因必须**随返回值**下发而不是只进日志：三种成因修法完全不同
+        #    （准则未设 / 表名不一致 / 模板缺段首码），只报「解析失败」等于把三条
+        #    岔路合成一条死胡同。审计师看不到后端日志。
+        "row_scope_unresolved_reasons": row_scope_reasons,
     }
 
 
@@ -1240,6 +1297,7 @@ class WpDisclosureSyncService:
         incoming_sub = normalize_sub_table_data(incoming_raw, sub_table_columns)
         html_row_scoped: list[str] = []
         html_row_scope_unresolved: list[str] = []
+        html_row_scope_reasons: dict[str, str] = {}
         if incoming_sub:
             merged_html_sub = dict(incoming_sub)
             if html_row_scopes:
@@ -1251,7 +1309,11 @@ class WpDisclosureSyncService:
                 html_variant = resolve_template_variant(
                     existing_table_data.get("_current_standard"), note.source_template
                 )
-                html_row_scoped, html_row_scope_unresolved = _apply_row_scoped_merge(
+                (
+                    html_row_scoped,
+                    html_row_scope_unresolved,
+                    html_row_scope_reasons,
+                ) = _apply_row_scoped_merge(
                     merged_html_sub,
                     incoming_sub,
                     html_row_scopes,
@@ -1315,6 +1377,7 @@ class WpDisclosureSyncService:
             # additive（行级合并）：与 `sync_from_workpaper` 同名同义
             "row_scoped_tables": html_row_scoped,
             "row_scope_unresolved": html_row_scope_unresolved,
+            "row_scope_unresolved_reasons": html_row_scope_reasons,
         }
 
     async def _get_section_mapping(

@@ -7,14 +7,25 @@
  *
  * 职责：
  * - allResponses Map 加载 + saveImmediate + debouncedSave(2s) + saveBatch
- * - writebackTrialBalance（成本模式科目1503+1504；公允模式科目1503）
+ * - writebackTrialBalance（成本模式：原值 + 累计折旧；公允模式：仅原值）
  * - selfLoad逻辑（render-config?force_component_type=h3-investment-property）
  * - projectContext加载（含business_category/applicable_standards）
- * - TB自动取数 unadjusted_amount → 审定表未审数（1503+1504）
+ * - TB自动取数 unadjusted_amount → 审定表未审数
+ *
+ * 🔴 **科目码一律经 `h3AccountScope` 取 render 下发的语义定位结果**，本文件不写死
+ * 字面量。改造前写死 `1503`/`1504`（= 可供出售金融资产 G6 域 / 债权投资 G4 域），
+ * 且 render seed 读的是 dead key ⇒ 未审数取数与审定数回写双双落在错误科目上。
  */
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import {
+  H3_SLOT_ACCUM_DEP,
+  H3_SLOT_GROSS,
+  H3_TB_PREFIX,
+  h3AccountScope,
+} from './h3AccountScope'
+import type { TbSourceCodes } from './shared/tbSourceCodes'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,23 +41,27 @@ export interface ProjectContext {
 }
 
 export interface TbData {
-  /** 科目1503投资性房地产 未审数（借方/资产类） */
-  cost1503: number
-  /** 科目1504累计折旧 未审数（贷方/资产备抵类，仅成本模式） */
-  dep1504: number
-  /** 科目1503 审定数 */
-  audited1503: number
-  /** 科目1504 审定数 */
-  audited1504: number
+  /** 投资性房地产原值 未审数（借方/资产类） */
+  grossUnadjusted: number
+  /** 累计折旧 未审数（贷方/资产备抵类，仅成本模式） */
+  accumDepUnadjusted: number
+  /** 投资性房地产原值 审定数 */
+  grossAudited: number
+  /** 累计折旧 审定数 */
+  accumDepAudited: number
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const DEBOUNCE_MS = 2000
-const ACCOUNT_CODE_1503 = '1503'
-const ACCOUNT_CODE_1504 = '1504'
 const ITEM_PREFIX = 'H3-'
 const ITEM_PREFIX_A = 'H3A-'
+const EMPTY_TB_DATA: TbData = {
+  grossUnadjusted: 0,
+  accumDepUnadjusted: 0,
+  grossAudited: 0,
+  accumDepAudited: 0,
+}
 
 // ─── Composable ──────────────────────────────────────────────────────────────
 
@@ -63,9 +78,36 @@ export function useH3FormData(params: {
   const lastSavedAt = ref<string | null>(null)
   const allResponses = ref<Map<string, ChecklistItem>>(new Map())
   const projectContext = ref<ProjectContext>({})
-  const tbData = ref<TbData>({ cost1503: 0, dep1504: 0, audited1503: 0, audited1504: 0 })
+  const tbData = ref<TbData>({ ...EMPTY_TB_DATA })
   const renderMeta = ref<Record<string, any>>({})
   const sheetCache = ref<Record<string, any>>({})
+
+  // ─── 科目定位（运行态取 render 下发的 `tb_source_codes`）──────────────────────
+  //
+  // 🔴 全部对外请求 / 回写 / 事件载荷的科目码都经这里，禁在本文件写死字面量。
+  function _tbSourceCodes(): TbSourceCodes | null {
+    const rm = renderMeta.value as Record<string, any> | undefined
+    return (rm?.tb_source_codes ?? rm?.project_context?.tb_source_codes ?? null) as
+      | TbSourceCodes
+      | null
+  }
+
+  /** 某槽的查询口径（标准码集）；本项目无该科目时返空数组 */
+  function h3QueryCodes(slotKey: string): string[] {
+    const src = _tbSourceCodes()
+    if (h3AccountScope.isAccountAbsent(src, slotKey)) return []
+    return h3AccountScope.queryCodes(src, slotKey)
+  }
+
+  /** 原值科目码（回写 / 事件载荷）；无则空串 */
+  function h3GrossCode(): string {
+    return h3QueryCodes(H3_SLOT_GROSS)[0] || ''
+  }
+
+  /** 累计折旧科目码；本项目无该科目时空串（不回写，宁缺勿造） */
+  function h3AccumDepCode(): string {
+    return h3QueryCodes(H3_SLOT_ACCUM_DEP)[0] || ''
+  }
 
   // Per-item debounce timers
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -202,34 +244,41 @@ export function useH3FormData(params: {
     await _doSave(checklistItems)
   }
 
-  // ─── writebackTrialBalance（1503+1504，根据计量模式） ───────────────────────
+  // ─── writebackTrialBalance（原值 + 累计折旧，按计量模式）─────────────────────
 
   /**
    * 审定数回写 trial_balance：
-   * - 成本模式：科目1503投资性房地产（借方/资产类）+ 1504累计折旧（贷方/备抵类）
-   * - 公允价值模式：仅科目1503（公允价值模式不计提折旧，无1504科目）
+   * - 成本模式：投资性房地产原值（借方/资产类）+ 累计折旧（贷方/备抵类）
+   * - 公允价值模式：仅原值（公允价值模式不计提折旧）
    *
-   * auditedData:
-   *   cost模式 → { cost1503: number, dep1504: number }
-   *   fair_value模式 → { cost1503: number }
+   * 🔴 科目码取 render 下发的语义定位结果（`h3AccountScope`），改造前写死
+   * `1503`/`1504` —— 那是**可供出售金融资产(G6 域)** 与 **债权投资(G4 域)**，
+   * 即长期在往别的两个循环的试算表行写投资性房地产审定数。
    */
   async function writebackTrialBalance(auditedData: {
-    cost1503: number
-    dep1504?: number
+    grossAudited: number
+    accumDepAudited?: number
   }): Promise<void> {
     if (!projectId.value) return
+    const grossCode = h3GrossCode()
+    const depCode = h3AccumDepCode()
     try {
-      // 回写科目1503投资性房地产（两种模式都需要）
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1503,
-        audited_amount: auditedData.cost1503,
-      })
-
-      // 成本模式额外回写1504累计折旧
-      if (measurementModel.value === 'cost' && auditedData.dep1504 != null) {
+      if (grossCode) {
         await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_1504,
-          audited_amount: auditedData.dep1504,
+          account_code: grossCode,
+          audited_amount: auditedData.grossAudited,
+        })
+      }
+
+      // 成本模式额外回写累计折旧；本项目无该科目时不写（宁缺勿造）
+      if (
+        measurementModel.value === 'cost'
+        && auditedData.accumDepAudited != null
+        && depCode
+      ) {
+        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
+          account_code: depCode,
+          audited_amount: auditedData.accumDepAudited,
         })
       }
 
@@ -237,8 +286,8 @@ export function useH3FormData(params: {
       window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
         detail: {
           wpCode: 'H3',
-          accountCode: ACCOUNT_CODE_1503,
-          auditedAmount: auditedData.cost1503,
+          accountCode: grossCode,
+          auditedAmount: auditedData.grossAudited,
           measurementModel: measurementModel.value,
         },
       }))
@@ -353,14 +402,19 @@ export function useH3FormData(params: {
     }
   }
 
-  // ─── TB自动取数 unadjusted_amount（1503+1504） ─────────────────────────────
+  // ─── TB自动取数 unadjusted_amount（原值 + 累计折旧）──────────────────────────
 
   /**
-   * 从 trial_balance 自动获取科目 1503+1504 的未审数和审定数。
-   * 填入审定表"未审数"列。
-   * - 1503: 投资性房地产（借方/资产类，两种模式都需要）
-   * - 1504: 投资性房地产累计折旧（贷方/备抵类，仅成本模式需要）
-   * 科目不存在时显示0+黄色warning。
+   * 从 trial_balance 自动获取投资性房地产原值与累计折旧的未审数/审定数，
+   * 填入审定表「未审数」列。科目不存在时显示 0 + 黄色 warning。
+   *
+   * 🔴 **改造前有两处独立缺陷，叠加后该函数从来没取对过数**：
+   * 1. render seed 读的键是 `inv_prop_1503_unadjusted` / `dep_1504_unadjusted`，
+   *    而后端 `build_h3_tb_values` 按 `H3_SLOT_KEY_PREFIX` 产出的是
+   *    `ip_unadjusted` / `dep_unadjusted` / `amort_*` / `impair_*`
+   *    ⇒ 四个键**全是 dead render key**，seed 分支永不命中；
+   * 2. 于是必然落到 HTTP 兜底查询，而它按 `account_prefix=1503,1504` 查 ——
+   *    那是**可供出售金融资产(G6)** 与 **债权投资(G4)** ⇒ 取的是别的循环的余额。
    */
   async function loadTbData(): Promise<void> {
     await _loadTbData()
@@ -369,57 +423,72 @@ export function useH3FormData(params: {
   async function _loadTbData(): Promise<void> {
     if (!projectId.value) return
 
-    // 优先从 render-config seed 取值（render策略已查好TB数据避免前端重复查询）
-    const seeded1503 = renderMeta.value?.tb_values?.inv_prop_1503_unadjusted
-    const seeded1504 = renderMeta.value?.tb_values?.dep_1504_unadjusted
-    if (seeded1503 != null) {
+    // 优先从 render-config seed 取值（render 策略已查好 TB 数据，避免前端重复查询）
+    const tv = renderMeta.value?.tb_values as Record<string, any> | undefined
+    const seededGross = tv?.[`${H3_TB_PREFIX.gross}_unadjusted`]
+    if (seededGross != null) {
       tbData.value = {
-        cost1503: Number(seeded1503) || 0,
-        dep1504: Number(seeded1504 ?? 0) || 0,
-        audited1503: Number(renderMeta.value?.tb_values?.inv_prop_1503_audited ?? 0),
-        audited1504: Number(renderMeta.value?.tb_values?.dep_1504_audited ?? 0),
+        grossUnadjusted: Number(seededGross) || 0,
+        accumDepUnadjusted: Number(tv?.[`${H3_TB_PREFIX.accumDep}_unadjusted`] ?? 0) || 0,
+        grossAudited: Number(tv?.[`${H3_TB_PREFIX.gross}_audited`] ?? 0),
+        accumDepAudited: Number(tv?.[`${H3_TB_PREFIX.accumDep}_audited`] ?? 0),
       }
+      return
+    }
+
+    const grossCodes = h3QueryCodes(H3_SLOT_GROSS)
+    const depCodes = h3QueryCodes(H3_SLOT_ACCUM_DEP)
+    const wanted = [...grossCodes, ...depCodes].filter(Boolean)
+    if (!wanted.length) {
+      tbData.value = { ...EMPTY_TB_DATA }
       return
     }
 
     try {
       const res = await api.get(`/api/projects/${projectId.value}/trial-balance`, {
-        params: { account_prefix: `${ACCOUNT_CODE_1503},${ACCOUNT_CODE_1504}` },
+        params: { account_prefix: wanted.join(',') },
         _silent: true,
       } as any)
       const list: any[] = Array.isArray(res?.data ?? res) ? (res?.data ?? res) : (res?.data?.items ?? [])
 
-      let cost1503 = 0
-      let dep1504 = 0
-      let audited1503 = 0
-      let audited1504 = 0
-      let found1503 = false
-      let found1504 = false
+      let grossUnadjusted = 0
+      let accumDepUnadjusted = 0
+      let grossAudited = 0
+      let accumDepAudited = 0
+      let foundGross = false
+      let foundDep = false
+
+      /** 严格边界：`1521` 不得误命中 `15210`（不同科目） */
+      const inFamily = (code: string, prefixes: string[]) =>
+        prefixes.some((p) => code === p || code.startsWith(`${p}.`) || code.startsWith(`${p}-`))
 
       for (const item of list) {
         const code = String(item.standard_account_code ?? item.account_code ?? '')
-        if (code.startsWith(ACCOUNT_CODE_1503)) {
-          cost1503 = Number(item.unadjusted_amount ?? 0)
-          audited1503 = Number(item.audited_amount ?? 0)
-          found1503 = true
-        } else if (code.startsWith(ACCOUNT_CODE_1504)) {
-          dep1504 = Number(item.unadjusted_amount ?? 0)
-          audited1504 = Number(item.audited_amount ?? 0)
-          found1504 = true
+        if (inFamily(code, depCodes)) {
+          // 备抵先判：`投资性房地产累计折旧` 也以原值科目名为前缀
+          accumDepUnadjusted += Number(item.unadjusted_amount ?? 0)
+          accumDepAudited += Number(item.audited_amount ?? 0)
+          foundDep = true
+        } else if (inFamily(code, grossCodes)) {
+          grossUnadjusted += Number(item.unadjusted_amount ?? 0)
+          grossAudited += Number(item.audited_amount ?? 0)
+          foundGross = true
         }
       }
 
-      tbData.value = { cost1503, dep1504, audited1503, audited1504 }
+      tbData.value = { grossUnadjusted, accumDepUnadjusted, grossAudited, accumDepAudited }
 
-      // 科目未找到时黄色提示
+      // 科目未找到时黄色提示（显示的是本项目实际查询口径，不是写死的码）
       const missing: string[] = []
-      if (!found1503) missing.push('1503投资性房地产')
-      if (!found1504 && measurementModel.value === 'cost') missing.push('1504累计折旧')
+      if (!foundGross) missing.push(`投资性房地产原值(${grossCodes.join('/')})`)
+      if (!foundDep && measurementModel.value === 'cost' && depCodes.length) {
+        missing.push(`累计折旧(${depCodes.join('/')})`)
+      }
       if (missing.length > 0) {
-        ElMessage.warning(`科目${missing.join('/')}未在试算表中找到，未审数显示为0`)
+        ElMessage.warning(`科目${missing.join('、')}未在试算表中找到，未审数显示为0`)
       }
     } catch {
-      tbData.value = { cost1503: 0, dep1504: 0, audited1503: 0, audited1504: 0 }
+      tbData.value = { ...EMPTY_TB_DATA }
     }
   }
 

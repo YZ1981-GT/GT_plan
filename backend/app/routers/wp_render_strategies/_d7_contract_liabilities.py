@@ -13,6 +13,14 @@ import logging
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.d_cycle_extraction.d_account_resolver import (
+    resolve_d_cycle_account_codes,
+)
+from app.services.d_cycle_extraction.d_tb_fetch import (
+    build_d_tb_source_codes,
+    fetch_d_cycle_tb,
+    seed_tb_amount_scalars,
+)
 from app.services.d_cycle_extraction.presets import resolve_effective
 from app.services.d_cycle_extraction.tier_a_seed import (
     seed_tier_a_reconciliation,
@@ -172,23 +180,27 @@ async def render(ctx: RenderContext) -> dict | None:
         except Exception:
             pass
 
-    # ─── tb_amount（科目2205期末审定数，供TB自动预填） ─────────────────────
+    # ─── tb_amount：报表规则映射驱动（替代硬编码 2205，供 TB 自动预填）──────────
+    # spec: d-cycle-four-table-extraction-and-disclosure-completion R1
+    #
+    # ⚠️ 本次改造**不是修取数 bug** —— 改造前的 `LIKE '2205%'` 查的是 `trial_balance`
+    # （**标准码**体系），而 `trial_balance` 本身就是经 `account_mapping` 映射后的标准码，
+    # 故它能正确命中：实测 5 个项目 / 合计 7,855.34（其中那个客户用 client 码 `2204`
+    # 的项目，映射后在本表就是 `2205`）。
+    # 收益在于**消除硬编码**：`report_config` 的 BS-047 一旦改科目（或项目级
+    # `project:{id}` 覆盖），硬编码就取错而无任何报错线索。
+    #
+    # 零回归判据：改造前后 `project_context.tb_amount` 在真实库上逐项目相等
+    # （`build_trial_balance_code_filter` 单码同样用 `LIKE '{code}%'`，语义一致）。
+    d7_codes = None
     try:
-        tb_result = await db.execute(
-            sa.text(
-                "SELECT COALESCE(SUM(COALESCE(audited_amount, unadjusted_amount)), 0) AS amt "
-                "FROM trial_balance "
-                "WHERE project_id = :pid AND year = :year AND is_deleted = false "
-                "AND standard_account_code LIKE '2205%'"
-            ),
-            {"pid": str(ctx.project_id), "year": int(project_context["audit_year"] or 0)},
+        d7_codes = await resolve_d_cycle_account_codes(ctx, _D7_WP_CODE)
+        await seed_tb_amount_scalars(
+            ctx, d7_codes, project_context, write_zero_when_missing=True
         )
-        tb_row = tb_result.fetchone()
-        if tb_row:
-            project_context["tb_amount"] = float(tb_row.amt)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("D7 render: tb_amount 查询失败: %s", e)
-        project_context["tb_amount"] = 0
+    except Exception as e:  # noqa: BLE001 — fail-open
+        logger.warning("D7 render: 科目解析/取数异常（fail-open）: %s", e)
+        project_context.setdefault("tb_amount", 0)
 
     # 附注适用性
     standards = str(project_context.get("applicable_standards", "")).lower()
@@ -231,6 +243,15 @@ async def render(ctx: RenderContext) -> dict | None:
             "SUMIF from D7-2），不发 adjudication_prefill（wp_id=%s）",
             wp_id,
         )
+        # ─── 取数溯源与三口径自检（新增，前端消费）────────────────────────────
+        if d7_codes is not None:
+            try:
+                _d7_tb = await fetch_d_cycle_tb(ctx, d7_codes)
+                html_data["tb_source_codes"] = build_d_tb_source_codes(d7_codes, _d7_tb)
+                html_data["parent_check"] = _d7_tb.parent_check
+            except Exception as e:  # noqa: BLE001 — fail-open
+                logger.warning("D7 render: 取数溯源构造异常（fail-open）: %s", e)
+
         # ─── Tier A 公式驱动 TB 核对行 transient seed（P0-1 主机制）──────────────
         # spec: d-cycle-tier-a-writeback-detail-seed R3（决策1/3 / Property 6/7/10/11/13）
         # 用 resolve_effective 的有效 Tier A 公式（默认 TB('2205','期末余额')）求值 transient

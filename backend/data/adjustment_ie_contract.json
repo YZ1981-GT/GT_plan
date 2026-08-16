@@ -781,6 +781,3295 @@
       "aligns_in_task": "2.7",
       "drift_dimensions": [],
       "notes": "✅ Wave 1 已对齐（Task 2.7）：item_id 一致；仅 storage_field 取工厂默认 conclusion 而前端（useI6Adjustment / i6AdjDraftHelpers）读写 remark。"
+    },
+    "L2-3": {
+      "cycle": "L2",
+      "item_id": "L2-L2-3-entries",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "single_json",
+      "key_families": {
+        "single_json": {
+          "item_id": "L2-L2-3-entries",
+          "const": "useL2Adjustment.ITEM_ID_ENTRIES",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（persistEntries）+ saveField（submitAdjustment），两处载荷均 { remark: JSON.stringify(entries.value) }（整表一个键）",
+          "read_by": "useL2Adjustment 内 watch(() => allResponses.value.get(ITEM_ID_ENTRIES)?.remark) → safeParseEntries → entries.value"
+        }
+      },
+      "read_family": "single_json",
+      "read_host": "useL2Adjustment watch(() => allResponses.value.get(ITEM_ID_ENTRIES)?.remark)",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        null
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行占位列（`……`），5 张全部为占位、前端行模型无对应字段；导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "indexRef"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": null,
+          "gap": "🔴 实测偏差（design §D2 只记了 F 列占位）：`useL2Adjustment.AdjustmentEntry` **无 remark 字段**，`normalizeEntry` 不接受该键，L2-3 界面表格亦无「备注」列 ⇒ J 列在前端无对应字段。导出写空、导入忽略；**不得为凑齐 10 列而登记 `remark`** —— 那会新造前端键，且导入的备注在 normalizeEntry 处被静默丢弃（往返丢数据）"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "entryType",
+          "handling": "AJE/RJE 标记（本张字段名是 entryType，不是 type），取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useL2Adjustment.ts:31`（`entryType: 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useL2Adjustment.ts:155` / `:160`（`ajeEntries` / `rjeEntries` 按 `e.entryType === 'AJE'` / `'RJE'` 过滤）→ `:165` `currentEntries` 二选一 的分区 filter · `l2/core/L2TabAdjustment.vue:60`（`:data=\"currentEntries\"`） 的表格绑定；界面单表绑 `currentEntries`（按 `activeEntryType` 在两个分区间二选一） ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`composables/useL2Adjustment.ts:111` 的 `normalizeEntry` 把非 `'RJE'` 的值归一成 `'AJE'` ⇒ 大小写落错表现为**值错**（行仍可见）。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "seqNo",
+          "handling": "序号（按 entryType 分别编号）；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        },
+        {
+          "field": "entryId",
+          "handling": "前端行标识（运行期 generateEntryId 生成）；导出不写列，导入新建"
+        },
+        {
+          "field": "accountCode",
+          "handling": "科目编码；源模板第 5 行只有「科目名称」无编码列。导出不写列，导入留空（前端 normalizeEntry 兜空串，不影响读回）"
+        },
+        {
+          "field": "createdAt",
+          "handling": "创建时间（ISO 串，运行期生成）；源模板第 5 行无对应列。导出不写列，导入新建"
+        }
+      ],
+      "sample_row": [
+        "北京",
+        "账项调整",
+        "货币资金",
+        "银行存款",
+        "银行存款",
+        "",
+        "200",
+        "200",
+        "北京",
+        "北京"
+      ],
+      "frontend_source": "composables/useL2Adjustment.ts: ITEM_ID_ENTRIES = 'L2-L2-3-entries'；写 debouncedSave/saveField(ITEM_ID_ENTRIES, { remark: JSON.stringify(entries) })，读 watch(allResponses.get(ITEM_ID_ENTRIES)?.remark)；allResponses 由 l2/core/L2TabAdjustment.vue 从 useL2FormData 传入",
+      "frontend_row_model": [
+        "entryId",
+        "entryType",
+        "seqNo",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "description",
+        "category",
+        "reportItem",
+        "noteItem",
+        "indexRef",
+        "createdAt"
+      ],
+      "frontend_extra_fields": [
+        "entryId",
+        "entryType",
+        "seqNo",
+        "accountCode",
+        "createdAt"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "L2-L2-3-entries"
+        ],
+        "entries_keys": [
+          "L2-L2-3-entries"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useL2Adjustment.ts",
+          "src/components/workpaper/l2/core/L2TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "L2-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "L2-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog('L2-3-adjustment', '调整分录')` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useL2Adjustment.ts",
+        "write": "debouncedSave(ITEM_ID_ENTRIES, { remark: JSON.stringify(entries.value) })（persistEntries） + saveField(同键同列)（submitAdjustment）",
+        "read_file": "composables/useL2Adjustment.ts",
+        "read": "watch(() => allResponses.value.get(ITEM_ID_ENTRIES)?.remark) → safeParseEntries（同族读回）",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/L/L2 应付利息.xlsx",
+          "tab": "应付利息调整分录汇总L2-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 1,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "🔴 两处实测偏差（以实测为准，任务表/design 表未记）：① 索引列字段是 `indexRef` 而非 `refIndex`（任务表写「L6-3 用 indexRef、其余用 refIndex」，实测 L2-3 与 L6-3 同为 `indexRef`）；② J 列「备注」在 L2-3 前端行模型无对应字段 ⇒ field_keys 有 **2 个** None 占位（F、J）。既有守卫 test_x3_key_ledger.py::test_entry_declares_triple_and_mechanism 断言「恰 1 个 None」（沿用 design §D2「F 列是唯一占位」的前提），故该条对 L2-3 会打红 —— 属守卫前提被实测推翻，不得靠给 J 列凭空登记 `remark` 来消红（会新造前端键且往返丢数据）。sample_row 取源模板第 6 行示例数据行（E13，16 张里仅本张非空）；F 列 openpyxl 实读为 None，按 design E13 登记为空串。"
+    },
+    "L6-3": {
+      "cycle": "L6",
+      "item_id": "L6-L6-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field",
+      "key_families": {
+        "per_field": {
+          "prefix": "L6-L6-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "indexRef",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useL6Adjustment.saveAndPublish，逐后缀 { remark }，键 `L6-L6-3-entry-{n}-{后缀}`） + debouncedSave（useL6Adjustment._triggerSave，同族逐后缀单键写）",
+          "read_by": "useL6Adjustment.loadFromResponses（任务 4.2 交付；待任务 11.1 由 l6/core/L6TabAdjustment.vue 的 onMounted 调用）"
+        }
+      },
+      "read_family": "per_field",
+      "read_host": "useL6Adjustment.loadFromResponses（任务 4.2 交付；待任务 11.1 由 l6/core/L6TabAdjustment.vue 的 onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行占位列（`……`），5 张全部为占位、前端行模型无对应字段；导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "indexRef"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useL6Adjustment.ts:30`（`export type L6AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useL6Adjustment.ts:97`（`filteredEntries` = `e.type === activeType.value`）+ `:102` / `:107` 的分区 filter · `l6/core/L6TabAdjustment.vue:48`（`:data=\"filteredEntries\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：本张 `read_family = none`（读回由任务 4.2 补齐）⇒ 猜错的后果取决于那时的实现，故登记先行。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useL6Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（per-field 族逐后缀），两处载荷均 { remark: … }；读回 = loadFromResponses（任务 4.2 交付，按本条 key_families.per_field 的 prefix / suffixes / suffix_to_field 逐后缀组行，前端零后缀表），待任务 11.1 接 onMounted",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "indexRef",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "L6-L6-3-entry-*"
+        ],
+        "entries_keys": [
+          "L6-L6-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useL6Adjustment.ts",
+          "src/components/workpaper/l6/core/L6TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [],
+        "previous_keys_verdict": "迁入前无登记（新登记），无需改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useL6Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（per-field 族逐后缀），两处载荷均 { remark: … }",
+        "read_file": "composables/useL6Adjustment.ts",
+        "read": "loadFromResponses（任务 4.2 交付）：按 per-field 族逐后缀 `allResponses.get(`{prefix}{n}-{后缀}`)` 取值组行 —— 键面（族前缀 / 10 个后缀 / 后缀→字段）与本条 key_families.per_field 登记值逐字一致，前端不另存后缀表；行存在判据 = `-desc` 键**存在**（值可为 null），自第 1 行连续取到断档为止。⚠️ 尚未接线：L6TabAdjustment.onMounted 仍未调用它（任务 11.1）⇒ 界面此刻仍读不回，R6.5 / R6.7 待 11.1 才满足",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/L/L6 专项应付款.xlsx",
+          "tab": "调整分录汇总L6-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": null,
+        "kind": null,
+        "task": "2.1",
+        "batch": 1,
+        "at": "2026-08-13",
+        "note": "L6-3 迁入前在清单中完全无登记（既不在 sheets 也不在 exempt）⇒ 本条为新登记"
+      },
+      "notes": "本条为**新登记**（迁入前 L6-3 既不在 sheets 也不在 exempt，是 16 张里唯一完全无登记的一张）。索引列字段实测为 `indexRef`（与 L2-3 同，其余 M 族为 `refIndex`）。read_family=none 是 E21 的存量缺陷：写入侧 saveBatch/debouncedSave 齐全，但全前端生产代码对 `L6-L6-3-entry-*` 族零读回 ⇒ 用户填完刷新即看不见（任务 4.2 补齐）。另：L6 tab 的复核入口是 `openReviewDialog?.()` **无实参** ⇒ 本张无复核键可排除（其余 4 张均有 `{X}-3-adjustment`），故 excluded_review_keys 为空不是漏扫。 ✅ 任务 4.2 已补齐读回：read_family 由 `none` 改为 `per_field`、read_host = `useL6Adjustment.loadFromResponses`、read_source = `formData.allResponses`；守卫 GS10（ieWiringIntegrity）+ 行为守卫 `composables/__tests__/x3ReadBackFromResponses.spec.ts`（夹具键面与期望字段全由本条清单生成）双向锁死。**仍待任务 11.1** 把它接到 onMounted，否则界面依旧不会调用它。",
+      "read_pending_task": "11.1",
+      "read_pending_note": "任务 4.2 已补 loadFromResponses（本条 read_family / read_host / read_source 与 key_families.per_field.read_by 已同步为实测值）；**仍待任务 11.1** 在 L6TabAdjustment.vue 的 onMounted 调用它 —— 未接线前界面仍读不回，Deviation_Registry G10 的 baseline_count 亦按其登记（owner_spec）在任务 11.2 下调"
+    },
+    "M1-3": {
+      "cycle": "M1",
+      "item_id": "M1-M1-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field",
+      "key_families": {
+        "per_field": {
+          "prefix": "M1-M1-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM1Adjustment.saveAndPublish，逐后缀 { remark }，键 `M1-M1-3-entry-{n}-{后缀}`） + debouncedSave（useM1Adjustment._triggerSave，同族逐后缀单键写）",
+          "read_by": "useM1Adjustment.loadFromResponses（任务 4.2 交付；待任务 11.1 由 m1/core/M1TabAdjustment.vue 的 onMounted 调用）"
+        }
+      },
+      "read_family": "per_field",
+      "read_host": "useM1Adjustment.loadFromResponses（任务 4.2 交付；待任务 11.1 由 m1/core/M1TabAdjustment.vue 的 onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行占位列（`……`），5 张全部为占位、前端行模型无对应字段；导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM1Adjustment.ts:29`（`export type M1AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM1Adjustment.ts:96`（`filteredEntries` = `e.type === activeType.value`）+ `:101` / `:106` 的分区 filter · `m1/core/M1TabAdjustment.vue:48`（`:data=\"filteredEntries\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：本张 `read_family = none`（读回由任务 4.2 补齐）⇒ 猜错的后果取决于那时的实现，故登记先行。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM1Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（per-field 族逐后缀），两处载荷均 { remark: … }；读回 = loadFromResponses（任务 4.2 交付，按本条 key_families.per_field 的 prefix / suffixes / suffix_to_field 逐后缀组行，前端零后缀表），待任务 11.1 接 onMounted",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M1-M1-3-entry-*"
+        ],
+        "entries_keys": [
+          "M1-M1-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM1Adjustment.ts",
+          "src/components/workpaper/m1/core/M1TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M1-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M1-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M1-3-adjustment', '调整分录')` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM1Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（per-field 族逐后缀），两处载荷均 { remark: … }",
+        "read_file": "composables/useM1Adjustment.ts",
+        "read": "loadFromResponses（任务 4.2 交付）：按 per-field 族逐后缀 `allResponses.get(`{prefix}{n}-{后缀}`)` 取值组行 —— 键面（族前缀 / 10 个后缀 / 后缀→字段）与本条 key_families.per_field 登记值逐字一致，前端不另存后缀表；行存在判据 = `-desc` 键**存在**（值可为 null），自第 1 行连续取到断档为止。⚠️ 尚未接线：M1TabAdjustment.onMounted 仍未调用它（任务 11.1）⇒ 界面此刻仍读不回，R6.5 / R6.7 待 11.1 才满足",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M1 应付股利（利润）.xlsx",
+          "tab": "调整分录汇总M1-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 1,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M1-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M1-M1-3-entry-*`（双前缀形态）。read_family=none 是 E21 的存量缺陷（写入齐全、零读回），任务 4.2 补 loadFromResponses。 ✅ 任务 4.2 已补齐读回：read_family 由 `none` 改为 `per_field`、read_host = `useM1Adjustment.loadFromResponses`、read_source = `formData.allResponses`；守卫 GS10（ieWiringIntegrity）+ 行为守卫 `composables/__tests__/x3ReadBackFromResponses.spec.ts`（夹具键面与期望字段全由本条清单生成）双向锁死。**仍待任务 11.1** 把它接到 onMounted，否则界面依旧不会调用它。",
+      "read_pending_task": "11.1",
+      "read_pending_note": "任务 4.2 已补 loadFromResponses（本条 read_family / read_host / read_source 与 key_families.per_field.read_by 已同步为实测值）；**仍待任务 11.1** 在 M1TabAdjustment.vue 的 onMounted 调用它 —— 未接线前界面仍读不回，Deviation_Registry G10 的 baseline_count 亦按其登记（owner_spec）在任务 11.2 下调"
+    },
+    "M2-3": {
+      "cycle": "M2",
+      "item_id": "M2-M2-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field",
+      "key_families": {
+        "per_field": {
+          "prefix": "M2-M2-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM2Adjustment.saveAndPublish，逐后缀 { remark }，键 `M2-M2-3-entry-{n}-{后缀}`） + debouncedSave（useM2Adjustment._triggerSave，同族逐后缀单键写）",
+          "read_by": "useM2Adjustment.loadFromResponses（任务 4.2 交付；待任务 11.1 由 m2/core/M2TabAdjustment.vue 的 onMounted 调用）"
+        }
+      },
+      "read_family": "per_field",
+      "read_host": "useM2Adjustment.loadFromResponses（任务 4.2 交付；待任务 11.1 由 m2/core/M2TabAdjustment.vue 的 onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行占位列（`……`），5 张全部为占位、前端行模型无对应字段；导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM2Adjustment.ts:30`（`export type M2AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM2Adjustment.ts:97`（`filteredEntries` = `e.type === activeType.value`）+ `:102` / `:107` 的分区 filter · `m2/core/M2TabAdjustment.vue:48`（`:data=\"filteredEntries\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：本张 `read_family = none`（读回由任务 4.2 补齐）⇒ 猜错的后果取决于那时的实现，故登记先行。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM2Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（per-field 族逐后缀），两处载荷均 { remark: … }；读回 = loadFromResponses（任务 4.2 交付，按本条 key_families.per_field 的 prefix / suffixes / suffix_to_field 逐后缀组行，前端零后缀表），待任务 11.1 接 onMounted",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M2-M2-3-adjustment-note",
+          "M2-M2-3-entry-*"
+        ],
+        "entries_keys": [
+          "M2-M2-3-entry-*"
+        ],
+        "other_data_keys": [
+          "M2-M2-3-adjustment-note"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM2Adjustment.ts",
+          "src/components/workpaper/m2/core/M2TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M2-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M2-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M2-3-adjustment', '调整分录')` 的第一参），非数据落点 ⇒ R7.3 已改正",
+        "other_data_keys_note": "`M2-M2-3-adjustment-note` 是「调整分录说明」文本键（M2TabAdjustment.saveAdjustmentNote 写 { remark }、onMounted 读 allResponses.get(...)），**不是 entries 族**，不参与 item_id 比对；登记它是为了让 R7.5 的重扫键集可逐条核对"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM2Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（per-field 族逐后缀），两处载荷均 { remark: … }",
+        "read_file": "composables/useM2Adjustment.ts",
+        "read": "loadFromResponses（任务 4.2 交付）：按 per-field 族逐后缀 `allResponses.get(`{prefix}{n}-{后缀}`)` 取值组行 —— 键面（族前缀 / 10 个后缀 / 后缀→字段）与本条 key_families.per_field 登记值逐字一致，前端不另存后缀表；行存在判据 = `-desc` 键**存在**（值可为 null），自第 1 行连续取到断档为止。⚠️ 尚未接线：M2TabAdjustment.onMounted 仍未调用它（任务 11.1）⇒ 界面此刻仍读不回，R6.5 / R6.7 待 11.1 才满足",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M2 实收资本（股本）.xlsx",
+          "tab": "调整分录汇总M2-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 1,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M2-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M2-M2-3-entry-*`。read_family=none 是 E21 的存量缺陷（entries 族零读回；tab 里那处 `allResponses.get('M2-M2-3-adjustment-note')` 读的是说明文本、不是分录）。🔴 附带发现：前端 R7.5 断言用 helper `declaredKeys()`，迁入 sheets 后它只取 `item_id` 单键，而本张重扫键集有 2 个（族键 + 说明键）⇒ 该断言对 M2-3 仍红（迁入前同样红）。属 helper 口径待扩（应对已迁入条目读 observed.entries_keys + other_data_keys），非本次登记落错值。 ✅ 任务 4.2 已补齐读回：read_family 由 `none` 改为 `per_field`、read_host = `useM2Adjustment.loadFromResponses`、read_source = `formData.allResponses`；守卫 GS10（ieWiringIntegrity）+ 行为守卫 `composables/__tests__/x3ReadBackFromResponses.spec.ts`（夹具键面与期望字段全由本条清单生成）双向锁死。**仍待任务 11.1** 把它接到 onMounted，否则界面依旧不会调用它。",
+      "read_pending_task": "11.1",
+      "read_pending_note": "任务 4.2 已补 loadFromResponses（本条 read_family / read_host / read_source 与 key_families.per_field.read_by 已同步为实测值）；**仍待任务 11.1** 在 M2TabAdjustment.vue 的 onMounted 调用它 —— 未接线前界面仍读不回，Deviation_Registry G10 的 baseline_count 亦按其登记（owner_spec）在任务 11.2 下调"
+    },
+    "M3-3": {
+      "cycle": "M3",
+      "item_id": "M3-M3-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M3-M3-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM3Adjustment.saveAndPublish，逐后缀 { remark }，键 `M3-M3-3-entry-{n}-{后缀}`）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M3-M3-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM3Adjustment._triggerSave，键 `M3-M3-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model，实测逐字段相同）",
+          "read_by": "M3TabAdjustment._restoreEntries"
+        }
+      },
+      "read_family": "data",
+      "read_host": "M3TabAdjustment._restoreEntries",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行占位列（`……`），5 张全部为占位、前端行模型无对应字段；导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM3Adjustment.ts:26`（`export type M3AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM3Adjustment.ts:92`（`filteredEntries` = `e.type === activeType.value`）+ `:97` / `:102` 的分区 filter · `m3/core/M3TabAdjustment.vue:50`（`:data=\"filteredEntries\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`m3/core/M3TabAdjustment.vue:376` 把非 `'RJE'` 的值归一成 `'AJE'` ⇒ 大小写落错表现为**值错**（行仍可见）。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM3Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 m3/core/M3TabAdjustment.vue 的 _restoreEntries（onMounted 调用）：遍历 formData.allResponses，按 startsWith('M3-M3-3-entry-') && endsWith('-data') 取 resp.remark → JSON.parse → 按 index 排序回填 entries",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M3-M3-3-entry-*"
+        ],
+        "entries_keys": [
+          "M3-M3-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM3Adjustment.ts",
+          "src/components/workpaper/m3/core/M3TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M3-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M3-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M3-3-adjustment', '调整分录')` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM3Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "m3/core/M3TabAdjustment.vue",
+        "read": "m3/core/M3TabAdjustment.vue 的 _restoreEntries（onMounted 调用）：遍历 formData.allResponses，按 startsWith('M3-M3-3-entry-') && endsWith('-data') 取 resp.remark → JSON.parse → 按 index 排序回填 entries",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M3 库存股.xlsx",
+          "tab": "调整分录汇总M3-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 1,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M3-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M3-M3-3-entry-*`。键族实测为 **per_field_plus_data**（design E19 已推翻早期「per_field」归类）：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON；界面只读 `-data` 族 ⇒ read_family=data。⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。"
+    },
+    "M4-3": {
+      "cycle": "M4",
+      "item_id": "M4-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M4-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM4Adjustment.saveAndPublish，逐后缀 { remark }，键 `M4-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M4-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM4Adjustment._triggerSave，键 `M4-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "m4/core/M4TabAdjustment.vue 的 restoreEntries（onMounted 调用）"
+        }
+      },
+      "read_family": "data",
+      "read_host": "m4/core/M4TabAdjustment.vue 的 restoreEntries（onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M4AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM4Adjustment.ts:26`（`export type M4AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM4Adjustment.ts:92`（`filteredEntries` = `e.type === activeType.value`）+ `:97` / `:102` 的分区 filter · `m4/core/M4TabAdjustment.vue:72`（`:data=\"adjustment.filteredEntries.value\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`m4/core/M4TabAdjustment.vue:423` 是 `data.type || 'AJE'` **透传**（只兜 falsy）⇒ 大小写落错会原样透传，该行在两个分区里都不出现。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM4Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 m4/core/M4TabAdjustment.vue 的 restoreEntries（onMounted 调用）：先遍历 formData.allResponses 按 /M4-3-entry-(\\d+)-data/ 求最大行号 maxIdx，再 1..maxIdx 逐个 get(`M4-3-entry-${i}-data`) 取 resp.remark → JSON.parse → push 进 entries",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M4-3-entry-*"
+        ],
+        "entries_keys": [
+          "M4-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM4Adjustment.ts",
+          "src/components/workpaper/m4/core/M4TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M4-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M4-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M4-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM4Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "m4/core/M4TabAdjustment.vue",
+        "read": "m4/core/M4TabAdjustment.vue 的 restoreEntries（onMounted 调用）：先遍历 formData.allResponses 按 /M4-3-entry-(\\d+)-data/ 求最大行号 maxIdx，再 1..maxIdx 逐个 get(`M4-3-entry-${i}-data`) 取 resp.remark → JSON.parse → push 进 entries",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M4 资本公积.xlsx",
+          "tab": "调整分录汇总M4-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M4-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M4-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM4FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M4-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M4-M4-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。"
+    },
+    "M5-3": {
+      "cycle": "M5",
+      "item_id": "M5-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M5-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM5Adjustment.saveAndPublish，逐后缀 { remark }，键 `M5-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M5-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM5Adjustment._triggerSave，键 `M5-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "m5/core/M5TabAdjustment.vue 的 restoreEntries（onMounted 调用）"
+        }
+      },
+      "read_family": "data",
+      "read_host": "m5/core/M5TabAdjustment.vue 的 restoreEntries（onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M5AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM5Adjustment.ts:30`（`export type M5AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM5Adjustment.ts:96`（`filteredEntries` = `e.type === activeType.value`）+ `:101` / `:106` 的分区 filter · `m5/core/M5TabAdjustment.vue:72`（`:data=\"adjustment.filteredEntries.value\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`m5/core/M5TabAdjustment.vue:415` 是 `data.type || 'AJE'` **透传**（只兜 falsy）⇒ 大小写落错会原样透传，该行在两个分区里都不出现。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM5Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 m5/core/M5TabAdjustment.vue 的 restoreEntries（onMounted 调用）：按 /M5-3-entry-(\\d+)-data/ 求最大行号 maxIdx，再 1..maxIdx 逐个 get(`M5-3-entry-${i}-data`) 取 resp.remark → JSON.parse → push 进 entries",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M5-3-entry-*"
+        ],
+        "entries_keys": [
+          "M5-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM5Adjustment.ts",
+          "src/components/workpaper/m5/core/M5TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M5-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M5-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M5-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM5Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "m5/core/M5TabAdjustment.vue",
+        "read": "m5/core/M5TabAdjustment.vue 的 restoreEntries（onMounted 调用）：按 /M5-3-entry-(\\d+)-data/ 求最大行号 maxIdx，再 1..maxIdx 逐个 get(`M5-3-entry-${i}-data`) 取 resp.remark → JSON.parse → push 进 entries",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M5 盈余公积.xlsx",
+          "tab": "调整分录汇总M5-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M5-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M5-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM5FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M5-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M5-M5-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。"
+    },
+    "M6-3": {
+      "cycle": "M6",
+      "item_id": "M6-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M6-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM6Adjustment.saveAndPublish，逐后缀 { remark }，键 `M6-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M6-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM6Adjustment._triggerSave，键 `M6-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "useM6Adjustment.loadFromResponses（由 m6/core/M6TabAdjustment.vue 的 restoreEntries → onMounted 调用）"
+        }
+      },
+      "read_family": "data",
+      "read_host": "useM6Adjustment.loadFromResponses（由 m6/core/M6TabAdjustment.vue 的 restoreEntries → onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M6AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM6Adjustment.ts:31`（`export type M6AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM6Adjustment.ts:97`（`filteredEntries` = `e.type === activeType.value`）+ `:102` / `:107` 的分区 filter · `m6/core/M6TabAdjustment.vue:72`（`:data=\"adjustment.filteredEntries.value\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`composables/useM6Adjustment.ts:270`（`loadFromResponses`）是 `data.type || 'AJE'` **透传**（只兜 falsy）⇒ 大小写落错会原样透传，该行在两个分区里都不出现。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM6Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 useM6Adjustment.loadFromResponses（composables/useM6Adjustment.ts）：while 从 i=1 起 get(`M6-3-entry-${i}-data`)，遇 resp.remark 空即断档退出 → JSON.parse → 整体替换 entries.value；由 m6/core/M6TabAdjustment.vue 的 restoreEntries 在 onMounted 内调用。**16 张里唯一把读回放在 composable 的**，design §C5a / 任务 4.2 指定它为另外 4 张只写不读 sheet 的抄写范本",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M6-3-entry-*"
+        ],
+        "entries_keys": [
+          "M6-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM6Adjustment.ts",
+          "src/components/workpaper/m6/core/M6TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M6-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M6-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M6-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM6Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "composables/useM6Adjustment.ts",
+        "read": "useM6Adjustment.loadFromResponses（composables/useM6Adjustment.ts）：while 从 i=1 起 get(`M6-3-entry-${i}-data`)，遇 resp.remark 空即断档退出 → JSON.parse → 整体替换 entries.value；由 m6/core/M6TabAdjustment.vue 的 restoreEntries 在 onMounted 内调用。**16 张里唯一把读回放在 composable 的**，design §C5a / 任务 4.2 指定它为另外 4 张只写不读 sheet 的抄写范本",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M6 未分配利润.xlsx",
+          "tab": "调整分录汇总M6-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M6-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M6-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM6FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M6-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M6-M6-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。读回宿主是 16 张里**唯一**放在 composable 的（useM6Adjustment.loadFromResponses，while 到断档为止），design §C5a / 任务 4.2 指定它为另外 4 张只写不读 sheet 的抄写范本 ⇒ 本条的 read_host 不要改写成 tab 内函数。"
+    },
+    "M7-3": {
+      "cycle": "M7",
+      "item_id": "M7-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M7-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM7Adjustment.saveAndPublish，逐后缀 { remark }，键 `M7-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M7-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM7Adjustment._triggerSave，键 `M7-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "m7/core/M7TabAdjustment.vue 的 _restoreEntries（onMounted 调用）"
+        }
+      },
+      "read_family": "data",
+      "read_host": "m7/core/M7TabAdjustment.vue 的 _restoreEntries（onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M7AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM7Adjustment.ts:32`（`export type M7AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM7Adjustment.ts:98`（`filteredEntries` = `e.type === activeType.value`）+ `:103` / `:108` 的分区 filter · `m7/core/M7TabAdjustment.vue:45`（`:data=\"filteredEntries\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`m7/core/M7TabAdjustment.vue:309` 是 `d.type || 'AJE'` **透传**（只兜 falsy）⇒ 大小写落错会原样透传，该行在两个分区里都不出现。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM7Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 m7/core/M7TabAdjustment.vue 的 _restoreEntries（onMounted 调用）：遍历 formData.allResponses，按 startsWith('M7-3-entry-') && endsWith('-data') && resp.remark 取 → JSON.parse → push 进 entries（不排序，按 Map 迭代序）",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M7-3-entry-*"
+        ],
+        "entries_keys": [
+          "M7-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM7Adjustment.ts",
+          "src/components/workpaper/m7/core/M7TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M7-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M7-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M7-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM7Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "m7/core/M7TabAdjustment.vue",
+        "read": "m7/core/M7TabAdjustment.vue 的 _restoreEntries（onMounted 调用）：遍历 formData.allResponses，按 startsWith('M7-3-entry-') && endsWith('-data') && resp.remark 取 → JSON.parse → push 进 entries（不排序，按 Map 迭代序）",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M7 专项储备.xlsx",
+          "tab": "调整分录汇总M7-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M7-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M7-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM7FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M7-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M7-M7-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。"
+    },
+    "M8-3": {
+      "cycle": "M8",
+      "item_id": "M8-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M8-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM8Adjustment.saveAndPublish，逐后缀 { remark }，键 `M8-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M8-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM8Adjustment._triggerSave，键 `M8-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "m8/core/M8TabAdjustment.vue 的 _restoreEntries（onMounted 调用）"
+        },
+        "standalone_note": {
+          "item_id": "M8-3-adjustmentNote",
+          "storage_field": "remark",
+          "written_by": "M8TabAdjustment.saveAdjustmentNote → formData.debouncedSave('M8-3-adjustmentNote', { remark: adjustmentNote || null })（@change 触发；AI 生成文本后亦调用）",
+          "read_by": "m8/core/M8TabAdjustment.vue onMounted：formData.allResponses.get('M8-3-adjustmentNote')?.remark → adjustmentNote",
+          "note": "🔴 16 张里唯一的**表级独立键**（不属逐字段族、不带行号）：承载「调整说明」整段文本，与源模板第 5 行 10 列**无任何对应关系** ⇒ 不进 column_map、不进 field_keys，导入导出往返一律不碰它（碰了会把表级说明当行数据）。据实登记于此是为了让 R2.5「键集完整」可核 —— 它确实是 M8-3 的数据落点之一。"
+        }
+      },
+      "read_family": "data",
+      "read_host": "m8/core/M8TabAdjustment.vue 的 _restoreEntries（onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M8AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM8Adjustment.ts:33`（`export type M8AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM8Adjustment.ts:99`（`filteredEntries` = `e.type === activeType.value`）+ `:104` / `:109` 的分区 filter · `m8/core/M8TabAdjustment.vue:45`（`:data=\"adjustment.filteredEntries.value\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`m8/core/M8TabAdjustment.vue:498` 是 `d.type || 'AJE'` **透传**（只兜 falsy）⇒ 大小写落错会原样透传，该行在两个分区里都不出现。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM8Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 m8/core/M8TabAdjustment.vue 的 _restoreEntries（onMounted 调用）：遍历 formData.allResponses，按 startsWith('M8-3-entry-') && endsWith('-data') && resp.remark 取 → JSON.parse → 收进 restored 后按 index 排序 → 整体替换 adjustment.entries.value",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M8-3-entry-*",
+          "M8-3-adjustmentNote"
+        ],
+        "entries_keys": [
+          "M8-3-entry-*"
+        ],
+        "other_data_keys": [
+          "M8-3-adjustmentNote"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM8Adjustment.ts",
+          "src/components/workpaper/m8/core/M8TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M8-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M8-3-adjustment",
+          "M8-3-adjustmentNote"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M8-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正；同批登记的 `M8-3-adjustmentNote` 经实测**是**真数据键（表级独立键），予以保留并移入 other_data_keys",
+        "other_data_keys_note": "`M8-3-adjustmentNote` 是「调整说明」整段文本键（M8TabAdjustment.saveAdjustmentNote 经 formData.debouncedSave 写 { remark }、onMounted 直接 allResponses.get('M8-3-adjustmentNote')?.remark 读回），**不是 entry 族**（无行号、无 `-data` 兄弟键），不参与 item_id 比对、不进 column_map / field_keys；登记它是为了让 R7.5 的重扫键集可逐条核对。🔴 与批次 1 的 `M2-3` 完全同形态：helper `declaredKeys()` 对已迁入 sheets 的条目只取单个 `item_id`，而本张重扫键集有 2 个 ⇒ R7.5 对 M8-3 迁入后仍红（迁入前亦红，红因由「记的是复核键」变为「2 键 vs 1 键」）。属 helper 口径待扩（应对已迁入条目读 observed.entries_keys + other_data_keys），非本次登记落错值。"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM8Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "m8/core/M8TabAdjustment.vue",
+        "read": "m8/core/M8TabAdjustment.vue 的 _restoreEntries（onMounted 调用）：遍历 formData.allResponses，按 startsWith('M8-3-entry-') && endsWith('-data') && resp.remark 取 → JSON.parse → 收进 restored 后按 index 排序 → 整体替换 adjustment.entries.value",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M8 一般风险准备.xlsx",
+          "tab": "调整分录汇总M8-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M8-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M8-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM8FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M8-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M8-M8-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。另有一个**表级独立键** `M8-3-adjustmentNote`（不带行号、不属任何族），实测由 M8TabAdjustment.saveAdjustmentNote 经 formData.debouncedSave 写 remark、onMounted 直接 get 读回 ⇒ 是真数据键，据实登记进 key_families.standalone_note 与 observed.other_data_keys，但**不进 column_map / field_keys**（源模板 10 列无对应列），导入导出往返不碰它。🔴 因此本张 R7.5 的重扫键集有 **2 个键**，而判据 `declaredKeys()` 对 `sheets` 段条目只取单个 `item_id` ⇒ 迁入后 R7.5 仍红，红因从「记的是复核键」变为「2 键 vs 1 键」。这是任务 1.9 判据侧的已知边界，**不得**靠删掉 adjustmentNote 登记来消红（那会丢一个真实数据落点）。"
+    },
+    "M9-3": {
+      "cycle": "M9",
+      "item_id": "M9-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M9-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "ociBlock",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "ociBlock": "ociBlock",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM9Adjustment.saveAndPublish，逐后缀 { remark }，键 `M9-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M9-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM9Adjustment._triggerSave，键 `M9-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "useM9Adjustment.loadFromResponses（任务 4.2 抄 useM6Adjustment 范本交付；待任务 11.1 由 m9/core/M9TabAdjustment.vue 的 onMounted 调用）"
+        }
+      },
+      "read_family": "data",
+      "read_host": "useM9Adjustment.loadFromResponses（任务 4.2 抄 useM6Adjustment 范本交付；待任务 11.1 由 m9/core/M9TabAdjustment.vue 的 onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M9AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM9Adjustment.ts:31`（`export type M9AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM9Adjustment.ts:102`（`filteredEntries` = `e.type === activeType.value`）+ `:107` / `:112` 的分区 filter · `m9/core/M9TabAdjustment.vue:49`（`:data=\"filteredEntries\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：本张 `read_family = none`（读回由任务 4.2 补齐）⇒ 猜错的后果取决于那时的实现，故登记先行。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        },
+        {
+          "field": "ociBlock",
+          "handling": "OCI 分块（实测枚举 'nonReclass' | 'reclass' | ''，即「不能重分类进损益 / 以后将重分类进损益」）；源模板第 5 行无对应列 ⇒ 导出不写列。导入无从取值，留空但**仍须写 `-ociBlock` 键**保持族完整（design §C5 / 任务 4.1「ociBlock 必须落库保留」）—— 缺键会让 M9-3 的逐字段族出现断档"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM9Adjustment.ts: saveBatch（per-field 族 ×11） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 = loadFromResponses（任务 4.2 抄 useM6Adjustment 范本，读 `-data` 族整行 JSON、含 ociBlock），待任务 11.1 接 onMounted",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "ociBlock",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type",
+        "ociBlock"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M9-3-entry-*"
+        ],
+        "entries_keys": [
+          "M9-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM9Adjustment.ts",
+          "src/components/workpaper/m9/core/M9TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M9-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M9-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M9-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM9Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×11） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "composables/useM9Adjustment.ts",
+        "read": "loadFromResponses（任务 4.2 抄 design §C5a 点名的范本 useM6Adjustment.loadFromResponses）：读 `-data` 族 `allResponses.get(`M9-3-entry-{n}-data`)`（**单前缀**）、`JSON.parse` 后整体替换 entries，`ociBlock` 一并读回（design E20）；行序自第 1 行 while 到断档（remark 为空）为止。⚠️ 尚未接线：M9TabAdjustment.onMounted 仍未调用它（任务 11.1）",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M9 其他综合收益.xlsx",
+          "tab": "调整分录汇总M9-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M9-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M9-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM9FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M9-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M9-M9-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×11，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。🔴 **read_family=none**（E21 / G10 存量缺陷）：M9TabAdjustment.vue 的 onMounted 只有 `await formData.loadData()` + `refreshStatus()`，全文零 allResponses 引用；useM9Adjustment.ts 也无 loadFromResponses ⇒ 写入齐全但界面永远读不回，属 design §C5a 点名的 4 张只写不读之一，任务 4.2 抄 useM6Adjustment.loadFromResponses 补齐。另：本张逐字段族后缀 **11 项**（多 `ociBlock`，design E20 实测确认，插在 `note` 与 `debit` 之间），`-data` 族 JSON 亦含 ociBlock ⇒ 任务 4.1 的后缀表必须逐 sheet 读，不能按 10 项写死。 ✅ 任务 4.2 已补齐读回：read_family 由 `none` 改为 `data`、read_host = `useM9Adjustment.loadFromResponses`、read_source = `formData.allResponses`；守卫 GS10（ieWiringIntegrity）+ 行为守卫 `composables/__tests__/x3ReadBackFromResponses.spec.ts`（夹具键面与期望字段全由本条清单生成）双向锁死。**仍待任务 11.1** 把它接到 onMounted，否则界面依旧不会调用它。"
+    },
+    "M10-3": {
+      "cycle": "M10",
+      "item_id": "M10-3-entry-*",
+      "storage_field": "remark",
+      "mechanism": "adjustment_savebatch",
+      "key_family": "per_field_plus_data",
+      "key_families": {
+        "per_field": {
+          "prefix": "M10-3-entry-",
+          "suffixes": [
+            "type",
+            "desc",
+            "category",
+            "report",
+            "account",
+            "note",
+            "debit",
+            "credit",
+            "ref",
+            "remark"
+          ],
+          "suffix_to_field": {
+            "type": "type",
+            "desc": "description",
+            "category": "category",
+            "report": "reportItem",
+            "account": "accountName",
+            "note": "noteItem",
+            "debit": "debitAmount",
+            "credit": "creditAmount",
+            "ref": "refIndex",
+            "remark": "remark"
+          },
+          "storage_field": "remark",
+          "written_by": "saveBatch（useM10Adjustment.saveAndPublish，逐后缀 { remark }，键 `M10-3-entry-{n}-{后缀}`；借贷不平衡时 early-return 不写）",
+          "read_by": null
+        },
+        "data": {
+          "prefix": "M10-3-entry-",
+          "suffix": "-data",
+          "storage_field": "remark",
+          "written_by": "debouncedSave（useM10Adjustment._triggerSave，键 `M10-3-entry-{n}-data`，载荷 { remark: JSON.stringify(整行) }；JSON 键集 == frontend_row_model（实测集合相等，仅 `type` 在 JSON 里位次靠前，无语义差异）",
+          "read_by": "m10/core/M10TabAdjustment.vue 的 restoreEntries（onMounted 调用）"
+        }
+      },
+      "read_family": "data",
+      "read_host": "m10/core/M10TabAdjustment.vue 的 restoreEntries（onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/，7 张与批次 1 的 5 张逐字一致），前端行模型 M10AdjustmentEntry 无对应字段 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "type",
+          "handling": "AJE/RJE 标记，取值 'AJE' | 'RJE' **大写**；源模板第 5 行无对应列（per-field 族另有 `-type` 后缀键承载）。导出不写列；导入由 B 列 `category` 派生后须按**本张的大写形态**落值（design §D2，映射表唯一定义处落 C1）。实测依据（任务 2.4 逐张取证，路径相对 `src/components/workpaper/`）：`composables/useM10Adjustment.ts:31`（`export type M10AdjustmentType = 'AJE' | 'RJE'`） 的联合类型声明 · `composables/useM10Adjustment.ts:97`（`filteredEntries` = `e.type === activeType.value`）+ `:102` / `:107` 的分区 filter · `m10/core/M10TabAdjustment.vue:72`（`:data=\"adjustment.filteredEntries.value\"`） 的表格绑定；界面单表按 `activeType` 过滤 ⇒ 大小写落错该行在 AJE / RJE 两个分区里都不出现（静默丢行）。读回侧：`m10/core/M10TabAdjustment.vue:430` 是 `data.type || 'AJE'` **透传**（只兜 falsy）⇒ 大小写落错会原样透传，该行在两个分区里都不出现。⚠️ 大小写**逐 sheet 登记**、禁跨 sheet 复用同一枚举常量 —— 本作业面实测存在小写形态的 sheet，一律以各自本字段的登记为准"
+        },
+        {
+          "field": "index",
+          "handling": "行序号；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "composables/useM10Adjustment.ts: saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }；读回 m10/core/M10TabAdjustment.vue 的 restoreEntries（onMounted 调用）：按 /M10-3-entry-(\\d+)-data/ 求最大行号 maxIdx，再 1..maxIdx 逐个 get(`M10-3-entry-${i}-data`) 取 resp.remark → JSON.parse → push 进 entries",
+      "frontend_row_model": [
+        "index",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "type",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "index",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "M10-3-entry-*"
+        ],
+        "entries_keys": [
+          "M10-3-entry-*"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/composables/useM10Adjustment.ts",
+          "src/components/workpaper/m10/core/M10TabAdjustment.vue"
+        ],
+        "frontend_field": "remark",
+        "excluded_review_keys": [
+          "M10-3-adjustment"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "M10-3-adjustment"
+        ],
+        "previous_keys_verdict": "复核键（`openReviewDialog?.('M10-3-adjustment', …)` 的第一参），非数据落点 ⇒ R7.3 已改正"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "adjustment_savebatch",
+        "write_file": "composables/useM10Adjustment.ts",
+        "write": "saveBatch（per-field 族 ×10） + debouncedSave（`-data` 族，整行 JSON），两处载荷均 { remark: … }",
+        "read_file": "m10/core/M10TabAdjustment.vue",
+        "read": "m10/core/M10TabAdjustment.vue 的 restoreEntries（onMounted 调用）：按 /M10-3-entry-(\\d+)-data/ 求最大行号 maxIdx，再 1..maxIdx 逐个 get(`M10-3-entry-${i}-data`) 取 resp.remark → JSON.parse → push 进 entries",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/M/M10 其他权益工具.xlsx",
+          "tab": "调整分录汇总M10-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键族 / 后缀 / 排除集）+ 逐读 use{X}Adjustment.ts 与 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 2,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "迁入前 exempt.observed.frontend_keys 记的是复核键 `M10-3-adjustment`（缺陷 B 的 11 条之一）⇒ 已改为实测族键 `M10-3-entry-*`。🔴 **单前缀形态**：`saveBatch` / `debouncedSave` 对传入 itemId **原样使用**（只有 useM10FormData 的 setField / saveFields 才拼 ITEM_PREFIX）⇒ 落库键是 `M10-3-entry-{n}-…` 而非批次 1 里 L6/M1/M2/M3 那种双前缀 `M10-M10-3-entry-`；任务 4.1 的族前缀必须逐 sheet 从本清单取，不得按 `{X}-{X}-3-entry-` 套公式。键族实测为 **per_field_plus_data**：saveAndPublish 写 per-field ×10，_triggerSave 另写 `-data` 整行 JSON ⇒ 任务 4.1 的 write_rows 对本张必须**两族都写**（per-field 供进度统计/跨表取数、`-data` 供界面读回）。"
+    },
+    "N1-3": {
+      "cycle": "N1",
+      "item_id": "N1-3-entries",
+      "storage_field": "conclusion",
+      "mechanism": "formdata_setfield",
+      "key_family": "single_json",
+      "key_families": {
+        "single_json": {
+          "item_id": "N1-3-entries",
+          "const": null,
+          "storage_field": "conclusion",
+          "written_by": "机制①三步链（形态④）：n1/core/N1TabAdjustment.vue 的 handleSaveAndPublish → formData.setField('3', 'entries', entries.value) → useN1FormData.setField 拼 itemId = `${ITEM_PREFIX}${sheet}-${field}`（ITEM_PREFIX = 'N1-'，单前缀）→ saveField(itemId, { conclusion: JSON.stringify(entries) })。另有**同键同列**的直呼形态：_autoPersist → formData.debouncedSave('N1-3-entries', { conclusion: JSON.stringify(entries.value) })（新增 / 删除 / 改字段即触发，不等「保存并发布」）⇒ 键与列逐字相同，非机制歧义（探针按此规则取机制①并双链留痕）。第三个写入点在 n1/calc/N1TabCalcTable.vue 的 handlePushDiffToAdjustment：formData.saveField('N1-3-entries', { conclusion: JSON.stringify(entries) })（N1-4 测算差异推送建议 AJE，按 description 去重追加）—— 同键同列，第三向印证写入列",
+          "read_by": "n1/core/N1TabAdjustment.vue 的 _restoreEntries（onMounted 内 await formData.loadData() 之后调用）：formData.allResponses.value.get('N1-3-entries')?.conclusion → JSON.parse → Array.isArray 才赋给 entries.value（解析失败静默吞，不覆盖原串）"
+        }
+      },
+      "read_family": "single_json",
+      "read_host": "n1/core/N1TabAdjustment.vue 的 _restoreEntries（onMounted 调用）",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/N/N1 递延所得税资产.xlsx 的 tab「调整分录汇总N1-3」，与批次 1 / 2 的 12 张逐字一致），前端行模型 N1TabAdjustment.AdjustmentEntry 无对应字段 —— 该 interface 自带 A~J 列注释，F 列在注释序列里本就被跳过（…noteItem: E → debitAmount: G…）⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "id",
+          "handling": "前端行标识（运行期 `adj-${Date.now()}-${random36}` 生成）；源模板第 5 行无对应列。导出不写列，导入新建"
+        },
+        {
+          "field": "type",
+          "handling": "AJE / RJE 标记（取值 'AJE' | 'RJE' **大写**，驱动 el-segmented 分区与 ajeNetAmount / rjeNetAmount 计算）；源模板第 5 行无对应列。导出不写列；导入由 B 列 `category` 派生（design §D2，映射表唯一定义处落 C1）"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "n1/core/N1TabAdjustment.vue（行模型 AdjustmentEntry 自带 A~J 列注释）+ composables/useN1FormData.ts（ITEM_PREFIX = 'N1-'；setField → saveField(itemId, { conclusion })）；写入三处（handleSaveAndPublish 的 setField、_autoPersist 的 debouncedSave、N1TabCalcTable 的 saveField）键与列全同；读回 _restoreEntries （onMounted）走 formData.allResponses.get('N1-3-entries')?.conclusion → JSON.parse。本 tab **无** allResponses prop（props 只有 wpId / projectId / isReadonly / year），allResponses 由组件自己 new 的 useN1FormData 实例持有",
+      "frontend_row_model": [
+        "id",
+        "type",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "id",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "N1-3-entries"
+        ],
+        "entries_keys": [
+          "N1-3-entries"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/n1/core/N1TabAdjustment.vue",
+          "src/components/workpaper/composables/useN1FormData.ts",
+          "src/components/workpaper/n1/calc/N1TabCalcTable.vue"
+        ],
+        "frontend_field": "conclusion",
+        "excluded_review_keys": [
+          "N1-3-调整分录"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参 / GtReviewTrigger 的 section-id）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "N1-3-entries"
+        ],
+        "previous_keys_verdict": "迁入前 exempt.N1-3.observed 记的就是真数据键 `N1-3-entries` 与真写入列 `conclusion`（16 张里仅 N1 / N2 / N3 三条如此）⇒ 本轮无需按 R7.3 改键，只把它连同新字段整体迁入 sheets"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "formdata_setfield",
+        "write_file": "n1/core/N1TabAdjustment.vue",
+        "write": "setField('3', 'entries', …)（handleSaveAndPublish，经 useN1FormData.setField → saveField(itemId, { conclusion })） + debouncedSave('N1-3-entries', { conclusion })（_autoPersist，同键同列） + n1/calc/N1TabCalcTable.vue 的 saveField('N1-3-entries', { conclusion })（N1-4 差异推送）",
+        "read_file": "n1/core/N1TabAdjustment.vue",
+        "read": "_restoreEntries（onMounted）：formData.allResponses.value.get('N1-3-entries')?.conclusion → JSON.parse → Array.isArray 校验后赋值",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/N/N1 递延所得税资产.xlsx",
+          "tab": "调整分录汇总N1-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致：N1-3=「调整分录汇总N1-3」无「表」字，N2-3 / N3-3 / N5-3 = 「调整分录汇总表{码}」）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键 / 键族 / 排除集）+ 逐读 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + use{X}FormData.ts 的 ITEM_PREFIX / setField / saveField 体 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 3,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "🔴 族前缀是**单前缀** `N1-3-`：useN1FormData.setField 拼 `${ITEM_PREFIX}${sheet}-${field}`，ITEM_PREFIX = 'N1-'（不是批次 1 的 `M3-M3-3-` 双前缀）⇒ 任务 4.1 的键必须逐 sheet 从本清单取，禁按 `N1-N1-3-` 套公式。列面 10 列与 L2-3 / M 族 11 张逐字一致，占位仅 F 列一个（本张行模型含 remark，故 J 列有字段，与 L2-3 的 F+J 双占位不同）；sample_row = null（源模板第 6 行 openpyxl 实读为空行，L2-3 是 16 张里唯一有示例数据行的）。🔴 跨 sheet 写入留痕（**不属本表键族**，不进 observed.other_data_keys）：handleSaveAndPublish 另写 `N1-1-aje-net` / `N1-1-rje-net`（setField('1', …)），_autoPersist 亦以 debouncedSave 写同两键 ⇒ 它们属 N1-1 审定表勾稽面，导入导出往返一律不碰；但导入 N1-3 后这两个键不会自动重算（净影响只在界面改动时写），任务 4.2 / 11.1 接线时须注意「导入后需在界面触发一次改动才回写 N1-1」。另：本张的净影响过滤按 `accountName.includes('递延所得税资产')`（按名不按码），故导入行只要 D 列科目名称含该串即可计入勾稽，无 accountCode 依赖。索引列字段名实测为 `refIndex`（与任务表「L6-3 用 indexRef 其余用 refIndex」相符；L2-3 实测是 indexRef、N2-3 实测是 indexNo，三种写法并存，禁写全局常量）"
+    },
+    "N2-3": {
+      "cycle": "N2",
+      "item_id": "N2-3-entries",
+      "storage_field": "conclusion",
+      "mechanism": "formdata_setfield",
+      "key_family": "single_json",
+      "key_families": {
+        "single_json": {
+          "item_id": "N2-3-entries",
+          "const": null,
+          "storage_field": "conclusion",
+          "written_by": "机制①三步链（形态④）：n2/core/N2TabAdjustment.vue 的 handleSaveAndPublish → formData.setField('3', 'entries', entries.value) → useN2FormData.setField 拼 itemId = `${ITEM_PREFIX}${sheet}-${field}`（ITEM_PREFIX = 'N2-'，单前缀）→ saveField(itemId, { conclusion: JSON.stringify(entries) })。本张**只有**这一个写入点（无 debouncedSave 直呼、无自动持久化）⇒ 借贷不平衡时 early-return 不写，且新增 / 删除 / 改字段都不落库，必须点「保存并发布」",
+          "read_by": "n2/core/N2TabAdjustment.vue setup 顶层的一次性 IIFE `;(function restoreEntries(){…})()`：props.allResponses.get('N2-3-entries')?.conclusion → JSON.parse → entries.value（**读的是父宿主下发的 props，不是自己 formData 的 allResponses**）"
+        }
+      },
+      "read_family": "single_json",
+      "read_host": "父宿主 GtN2TaxesPayable.vue（allResponses ref ← onMounted 从 props.htmlData 的 responses_snapshot / checklist_responses / allResponses 三键合并，selfLoad 可重建；以 :all-responses=\"allResponsesRef\" 下发）→ n2/core/N2TabAdjustment.vue setup 顶层一次性 IIFE restoreEntries",
+      "read_source": "props.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "indexNo",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/N/N2 应交税费.xlsx 的 tab「调整分录汇总表N2-3」），前端行模型 N2TabAdjustment.AdjustmentEntry 的 12 个字段里无任何一个对应该列 ⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "indexNo"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "id",
+          "handling": "前端行标识（运行期 `adj-${Date.now()}-${random36}` 生成）；源模板第 5 行无对应列。导出不写列，导入新建"
+        },
+        {
+          "field": "type",
+          "handling": "AJE / RJE 标记（取值 'AJE' | 'RJE' 大写）；源模板第 5 行无对应列。导出不写列；导入由 B 列 `category` 派生（design §D2，映射表唯一定义处落 C1）。⚠️ 本张 category 是**受约束枚举** AdjustmentCategory = '报表调整' | '账项调整' | '其他'（界面为下拉），与映射表的键集恰好同集"
+        },
+        {
+          "field": "accountCode",
+          "handling": "科目编码（界面有该录入列，但源模板第 5 行只有「科目名称」无编码列）⇒ 导出不写列，导入留空。🔴 本张 ajeNetAmount / rjeNetAmount 过滤条件是 `e.accountCode === '2221'`（**按码不按名**，与 N1-3 / N3-3 / N5-3 的按名过滤相反）⇒ 导入行在界面补填科目编码前不计入 N2-1 勾稽，属既有前端行为，导入侧不得擅自代填编码（会造审计数据）"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "n2/core/N2TabAdjustment.vue（行模型 AdjustmentEntry 12 字段，category 为受约束枚举）+ composables/useN2FormData.ts（ITEM_PREFIX = 'N2-'；setField → saveField(itemId, { conclusion })）；写入唯一点 = handleSaveAndPublish 的 setField('3','entries', …)；读回 = setup 顶层一次性 IIFE restoreEntries 读 props.allResponses.get('N2-3-entries')?.conclusion → JSON.parse。props.allResponses 由父宿主 GtN2TaxesPayable.vue 下发",
+      "frontend_row_model": [
+        "id",
+        "type",
+        "category",
+        "description",
+        "accountCode",
+        "accountName",
+        "debitAmount",
+        "creditAmount",
+        "reportItem",
+        "noteItem",
+        "indexNo",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "id",
+        "type",
+        "accountCode"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "N2-3-entries"
+        ],
+        "entries_keys": [
+          "N2-3-entries"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/n2/core/N2TabAdjustment.vue",
+          "src/components/workpaper/composables/useN2FormData.ts",
+          "src/components/workpaper/GtN2TaxesPayable.vue"
+        ],
+        "frontend_field": "conclusion",
+        "excluded_review_keys": [
+          "N2-3-调整分录"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参 / GtReviewTrigger 的 section-id）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "N2-3-entries"
+        ],
+        "previous_keys_verdict": "迁入前 exempt.N2-3.observed 记的就是真数据键 `N2-3-entries` 与真写入列 `conclusion` ⇒ 本轮无需按 R7.3 改键，只整体迁入并补全新字段"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "formdata_setfield",
+        "write_file": "n2/core/N2TabAdjustment.vue",
+        "write": "setField('3', 'entries', entries.value)（handleSaveAndPublish，唯一写入点；经 useN2FormData.setField → saveField(itemId, { conclusion })）",
+        "read_file": "n2/core/N2TabAdjustment.vue",
+        "read": "setup 顶层一次性 IIFE restoreEntries：props.allResponses.get('N2-3-entries')?.conclusion → JSON.parse（props.allResponses ← GtN2TaxesPayable.vue 的 allResponses）",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/N/N2 应交税费.xlsx",
+          "tab": "调整分录汇总表N2-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致：N1-3=「调整分录汇总N1-3」无「表」字，N2-3 / N3-3 / N5-3 = 「调整分录汇总表{码}」）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键 / 键族 / 排除集）+ 逐读 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + use{X}FormData.ts 的 ITEM_PREFIX / setField / saveField 体 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 3,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "🔴 族前缀是**单前缀** `N2-3-`：useN2FormData.setField 拼 `${ITEM_PREFIX}${sheet}-${field}`，ITEM_PREFIX = 'N2-'（不是批次 1 的 `M3-M3-3-` 双前缀）⇒ 任务 4.1 的键必须逐 sheet 从本清单取，禁按 `N2-N2-3-` 套公式。🔴 **读回宿主在父宿主那一层**：本 tab 的读回是 setup 顶层的一次性 IIFE、读 `props.allResponses`，既不是 watch 也不在 onMounted ⇒ 导入完成后仅让 Tab 「重新读自身状态」无效（`@imported` 只重载 Tab 自身对本张不成立）；必须由父宿主 GtN2TaxesPayable.vue 调 selfLoad() 重建 allResponses **且**该 Tab 重新 setup（v-else-if 切走再切回 / remount）才能读到新数据。任务 11.1 接 @imported 时须把刷新落到父宿主并触发 Tab 重建，否则用户导入后界面照样空表（design E21 同型风险）。列面 10 列与其余 15 张逐字一致，占位仅 F 列一个；sample_row = null（第 6 行实读空行）。索引列字段名实测为 `indexNo`（**第三种写法** —— L2-3 是 indexRef、N1-3 / N3-3 是 refIndex），共享实现必须逐 sheet 从 field_keys 取，禁写全局常量。跨 sheet 写入留痕（不属本表键族）：handleSaveAndPublish 另 setField('1','aje-net') / ('1','rje-net') 写 N2-1 勾稽键"
+    },
+    "N3-3": {
+      "cycle": "N3",
+      "item_id": "N3-3-entries",
+      "storage_field": "conclusion",
+      "mechanism": "formdata_setfield",
+      "key_family": "single_json",
+      "key_families": {
+        "single_json": {
+          "item_id": "N3-3-entries",
+          "const": null,
+          "storage_field": "conclusion",
+          "written_by": "机制①三步链（形态④）：n3/core/N3TabAdjustment.vue 的 handleSaveAndPublish → formData.setField('3', 'entries', entries.value) → useN3FormData.setField 拼 itemId = `${ITEM_PREFIX}${sheet}-${field}`（ITEM_PREFIX = 'N3-'，单前缀）→ saveField(itemId, { conclusion: JSON.stringify(entries) })。本张**只有**这一个写入点（无 debouncedSave 直呼）⇒ 借贷不平衡 early-return 不写，字段改动不自动落库",
+          "read_by": "n3/core/N3TabAdjustment.vue setup 顶层的一次性 IIFE `;(function restoreEntries(){…})()`：props.allResponses.get('N3-3-entries')?.conclusion → JSON.parse → Array.isArray 才赋值（**读的是父宿主下发的 props**）"
+        }
+      },
+      "read_family": "single_json",
+      "read_host": "父宿主 GtN3DeferredTaxLiabilities.vue（allResponses ref ← onMounted 从 props.htmlData 的 responses_snapshot / checklist_responses / allResponses 三键合并，selfLoad 可重建；以 :all-responses=\"allResponsesRef\" 下发）→ n3/core/N3TabAdjustment.vue setup 顶层一次性 IIFE restoreEntries",
+      "read_source": "props.allResponses",
+      "field_keys": [
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        null,
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": "category"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": "reportItem"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": "noteItem"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/N/N3 递延所得税负债.xlsx 的 tab「调整分录汇总表N3-3」），前端行模型 N3TabAdjustment.AdjustmentEntry 无对应字段（该 interface 与 N1-3 逐字同构，A~J 注释里同样跳过 F 列）⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debitAmount"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "creditAmount"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": "refIndex"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": "remark"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "id",
+          "handling": "前端行标识（运行期 `adj-${Date.now()}-${random36}` 生成）；源模板第 5 行无对应列。导出不写列，导入新建"
+        },
+        {
+          "field": "type",
+          "handling": "AJE / RJE 标记（取值 'AJE' | 'RJE' 大写，驱动分区与净影响计算）；源模板第 5 行无对应列。导出不写列；导入由 B 列 `category` 派生（design §D2，映射表唯一定义处落 C1）"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "n3/core/N3TabAdjustment.vue（行模型 AdjustmentEntry 与 N1-3 逐字同构，自带 A~J 列注释）+ composables/useN3FormData.ts（ITEM_PREFIX = 'N3-'；setField → saveField(itemId, { conclusion })）；写入唯一点 = handleSaveAndPublish；读回 = setup 顶层一次性 IIFE restoreEntries 读 props.allResponses.get('N3-3-entries')?.conclusion → JSON.parse。props.allResponses 由父宿主 GtN3DeferredTaxLiabilities.vue 下发",
+      "frontend_row_model": [
+        "id",
+        "type",
+        "description",
+        "category",
+        "reportItem",
+        "accountName",
+        "noteItem",
+        "debitAmount",
+        "creditAmount",
+        "refIndex",
+        "remark"
+      ],
+      "frontend_extra_fields": [
+        "id",
+        "type"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "N3-3-entries"
+        ],
+        "entries_keys": [
+          "N3-3-entries"
+        ],
+        "other_data_keys": [],
+        "frontend_files": [
+          "src/components/workpaper/n3/core/N3TabAdjustment.vue",
+          "src/components/workpaper/composables/useN3FormData.ts",
+          "src/components/workpaper/GtN3DeferredTaxLiabilities.vue"
+        ],
+        "frontend_field": "conclusion",
+        "excluded_review_keys": [
+          "N3-3-调整分录"
+        ],
+        "excluded_central_sync_keys": [],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参 / GtReviewTrigger 的 section-id）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "N3-3-entries"
+        ],
+        "previous_keys_verdict": "迁入前 exempt.N3-3.observed 记的就是真数据键 `N3-3-entries` 与真写入列 `conclusion` ⇒ 本轮无需按 R7.3 改键，只整体迁入并补全新字段"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "formdata_setfield",
+        "write_file": "n3/core/N3TabAdjustment.vue",
+        "write": "setField('3', 'entries', entries.value)（handleSaveAndPublish，唯一写入点；经 useN3FormData.setField → saveField(itemId, { conclusion })）",
+        "read_file": "n3/core/N3TabAdjustment.vue",
+        "read": "setup 顶层一次性 IIFE restoreEntries：props.allResponses.get('N3-3-entries')?.conclusion → JSON.parse → Array.isArray 校验后赋值（props.allResponses ← GtN3DeferredTaxLiabilities.vue 的 allResponses）",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/N/N3 递延所得税负债.xlsx",
+          "tab": "调整分录汇总表N3-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致：N1-3=「调整分录汇总N1-3」无「表」字，N2-3 / N3-3 / N5-3 = 「调整分录汇总表{码}」）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键 / 键族 / 排除集）+ 逐读 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + use{X}FormData.ts 的 ITEM_PREFIX / setField / saveField 体 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 3,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "🔴 族前缀是**单前缀** `N3-3-`：useN3FormData.setField 拼 `${ITEM_PREFIX}${sheet}-${field}`，ITEM_PREFIX = 'N3-'（不是批次 1 的 `M3-M3-3-` 双前缀）⇒ 任务 4.1 的键必须逐 sheet 从本清单取，禁按 `N3-N3-3-` 套公式。🔴 **读回宿主在父宿主那一层**（与 N2-3 同形态）：读回是 setup 顶层一次性 IIFE、读 `props.allResponses`，非 watch 非 onMounted ⇒ `@imported` 只重载 Tab 自身对本张无效；须父宿主 GtN3DeferredTaxLiabilities.vue 调 selfLoad() 重建 allResponses **且** Tab 重新 setup 才读得到。列面 10 列与其余 15 张逐字一致，占位仅 F 列一个；sample_row = null（第 6 行实读空行）。净影响过滤按 `accountName.includes('递延所得税负债')`（按名不按码），故导入行无 accountCode 依赖；行模型与 N1-3 逐字同构但方向相反（负债类：贷方 − 借方），该差异不落在导入导出列面上、仅影响勾稽计算。另：本张 handleSaveAndPublish 尾部还发 'disclosure:refresh' 并调 scheduleAutoSnapshot?.()（版本快照），导入侧若走前端保存链会连带触发，任务 4.1 的后端直写路径不经这两处（属已知行为差异，登记不修）"
+    },
+    "N5-3": {
+      "cycle": "N5",
+      "item_id": "N5-3-entries",
+      "storage_field": "conclusion",
+      "mechanism": "formdata_setfield",
+      "key_family": "single_json",
+      "key_families": {
+        "single_json": {
+          "item_id": "N5-3-entries",
+          "const": null,
+          "storage_field": "conclusion",
+          "written_by": "机制①三步链（形态④）：n5/core/N5TabAdjustment.vue 的 saveEntries（由 handleAddEntry / handleDeleteEntry / handleEntryChange 调用，**改动即写**）→ formData.setField('3', 'entries', entries.value) → useN5FormData.setField 拼 itemId = `${ITEM_PREFIX}${sheet}-${field}`（ITEM_PREFIX = 'N5-'，单前缀）→ saveField(itemId, { conclusion: JSON.stringify(entries) })。无借贷平衡 early-return（平衡校验只挡「同步到集中登记」按钮）",
+          "read_by": "n5/core/N5TabAdjustment.vue 的 onMounted：await formData.loadData() → formData.getField('3', 'entries')（useN5FormData.getField 用**同一条** `${ITEM_PREFIX}${sheet}-${field}` 拼装 + JSON.parse(resp.conclusion)）→ Array.isArray 才赋值 —— 读写两侧共用同一拼装表达式，是 16 张里唯一「getField 与 setField 同一对实参」的形态（探针 trail 有独立留痕）"
+        }
+      },
+      "read_family": "single_json",
+      "read_host": "n5/core/N5TabAdjustment.vue 的 onMounted → formData.getField('3', 'entries')",
+      "read_source": "formData.allResponses",
+      "field_keys": [
+        "description",
+        null,
+        null,
+        "accountName",
+        null,
+        null,
+        "debit",
+        "credit",
+        null,
+        null
+      ],
+      "column_map": [
+        {
+          "col": "调整事项说明",
+          "letter": "A",
+          "field": "description"
+        },
+        {
+          "col": "类别（报表调整/账项调整/其他）",
+          "letter": "B",
+          "field": null,
+          "gap": "N5-3 行模型 JournalEntry 无 category 字段，界面表格（序号 / 科目编码 / 科目名称 / 借方 / 贷方 / 摘要）也没有「类别」列 ⇒ B 列在前端无落点。🔴 不得挪用 `type` 顶替：它取值 'aje' | 'rje'，语义是 AJE / RJE 分录性质（已登记 unmapped_fields），与「报表调整 / 账项调整 / 其他」不是同一分类维度。导出写空保列序；导入时 B 列仅用于按 design §C1 的映射表派生 entryType，不作为行字段回写（凭空登记会让导入值在读回时无处安放 = 往返丢数据）"
+        },
+        {
+          "col": "报表项目",
+          "letter": "C",
+          "field": null,
+          "gap": "N5-3 行模型 JournalEntry 无 reportItem 字段；界面无「报表项目」录入位，useAdjustmentCentralSync 的 buildLineItems 也只上报 account_name / standard_account_code / debit_amount / credit_amount（**无** report_line_code，与 N1-3 的 buildLineItems 带 report_line_code 恰好相反）⇒ 三处证据一致表明 C 列在前端确无字段。导出写空保列序，导入忽略该列"
+        },
+        {
+          "col": "科目名称",
+          "letter": "D",
+          "field": "accountName"
+        },
+        {
+          "col": "附注项目",
+          "letter": "E",
+          "field": null,
+          "gap": "N5-3 行模型 JournalEntry 无 noteItem 字段（N1-3 / N2-3 / N3-3 三张都有，本张行模型精简到 8 个字段：id / seq / type / accountCode / accountName / debit / credit / description），界面亦无「附注项目」列 ⇒ E 列无前端落点。导出写空保列序，导入忽略；N5 附注取数走披露表自身的取值链，不经本表 E 列"
+        },
+        {
+          "col": "……",
+          "letter": "F",
+          "field": null,
+          "gap": "源模板第 5 行 F 列实读为占位符 `……`（openpyxl 直读 backend/wp_templates/N/N5 所得税费用.xlsx 的 tab「调整分录汇总表N5-3」），16 张全部为占位、任何前端行模型都无对应字段（本张的 JournalEntry 亦然）⇒ 导出写空字符串保持列序，导入忽略该列（design §D2 / R3.4）"
+        },
+        {
+          "col": "借方调整金额",
+          "letter": "G",
+          "field": "debit"
+        },
+        {
+          "col": "贷方调整金额",
+          "letter": "H",
+          "field": "credit"
+        },
+        {
+          "col": "索引",
+          "letter": "I",
+          "field": null,
+          "gap": "N5-3 行模型 JournalEntry 无索引字段 —— 平台三种既有写法（L2-3 的 indexRef、N1-3 / N3-3 的 refIndex、N2-3 的 indexNo）本张一个都没有，界面表格同样没有「索引」列 ⇒ I 列在前端无落点。导出写空保列序，导入忽略；本张的跨底稿追溯由 EventBus 'adjustment:entries-updated' 与集中调整登记承担，不依赖该列"
+        },
+        {
+          "col": "备注",
+          "letter": "J",
+          "field": null,
+          "gap": "N5-3 行模型 JournalEntry 无 remark 字段（与 L2-3 的 J 列同形态；N1-3 / N2-3 / N3-3 三张均有 remark，唯本张没有），界面唯一的自由文本列是「摘要」而它已映射到 A 列 description ⇒ J 列在前端无落点。🔴 不得为凑齐 10 列而登记 remark：那会新造一个前端不存在的键，导入的备注在读回时被静默丢弃（往返丢数据）。导出写空保列序，导入忽略"
+        }
+      ],
+      "unmapped_fields": [
+        {
+          "field": "id",
+          "handling": "前端行标识（运行期 `${entryType}-${Date.now()}` 生成，与其余 3 张的 `adj-…` 形态不同）；源模板第 5 行无对应列。导出不写列，导入新建"
+        },
+        {
+          "field": "seq",
+          "handling": "序号（按 type 分别编号：`entries.filter(e => e.type === entryType).length + 1`；界面首列展示）；源模板第 5 行无对应列。导出不写列，导入按行序重建"
+        },
+        {
+          "field": "type",
+          "handling": "🔴 AJE / RJE 标记，取值 'aje' | 'rje' **小写**（与 N1-3 / N2-3 / N3-3 的大写 'AJE' | 'RJE' 相反，且界面按此小写值分 AJE / RJE 两张 el-table）；源模板第 5 行无对应列。导出不写列；导入由 B 列 `category` 派生后须按**本张的小写形态**落值 —— 共享实现不得跨 sheet 复用同一枚举常量，否则导入行落 'AJE' 会同时从两张表里消失（filter 全不命中 = 静默丢行）"
+        },
+        {
+          "field": "accountCode",
+          "handling": "科目编码（界面有只读展示列，handleAddEntry 默认预填 '6801'）；源模板第 5 行只有「科目名称」无编码列 ⇒ 导出不写列，导入留空。本张回写 N5-1 的过滤条件是 `accountCode === '6801' || accountName === '所得税费用'`（**有按名兜底**），故导入行只要 D 列科目名称为「所得税费用」即可计入勾稽，与 N2-3 只按编码过滤的形态不同"
+        }
+      ],
+      "sample_row": null,
+      "frontend_source": "n5/core/N5TabAdjustment.vue（行模型 JournalEntry 仅 8 字段：id / seq / type / accountCode / accountName / debit / credit / description，是 16 张里最精简的）+ composables/useN5FormData.ts（ITEM_PREFIX = 'N5-'；setField → saveField(itemId, { conclusion })，getField 同拼装 + JSON.parse）；写入 saveEntries（改动即写），读回 onMounted 的 getField('3','entries')。⚠️ 本 tab 声明了 allResponses prop 且父宿主 GtN5IncomeTaxExpense.vue 确有 :all-responses 下发，但**组件内零处引用 props.allResponses** —— 实际读回走自己 new 的 useN5FormData 实例（loadData → GET checklist-responses），故 read_source 据实登记 formData.allResponses",
+      "frontend_row_model": [
+        "id",
+        "seq",
+        "type",
+        "accountCode",
+        "accountName",
+        "debit",
+        "credit",
+        "description"
+      ],
+      "frontend_extra_fields": [
+        "id",
+        "seq",
+        "type",
+        "accountCode"
+      ],
+      "frontend_extra_reason": "源模板第 5 行无对应列（登记但不参与 Property 9 断言）；逐字段处置见 unmapped_fields",
+      "observed": {
+        "frontend_keys": [
+          "N5-3-entries",
+          "N5-3-audit-notes",
+          "N5-3-audit-conclusion"
+        ],
+        "entries_keys": [
+          "N5-3-entries"
+        ],
+        "other_data_keys": [
+          "N5-3-audit-notes",
+          "N5-3-audit-conclusion"
+        ],
+        "frontend_files": [
+          "src/components/workpaper/n5/core/N5TabAdjustment.vue",
+          "src/components/workpaper/composables/useN5FormData.ts"
+        ],
+        "frontend_field": "conclusion",
+        "excluded_review_keys": [
+          "N5-3-调整分录"
+        ],
+        "excluded_central_sync_keys": [
+          "N5-3-entries"
+        ],
+        "rescan_method": "probeAllX3()（shared/__tests__/helpers/x3KeyProbe.ts 四形态判据，任务 1.9 交付）重扫；复核键（openReviewDialog 实参 / GtReviewTrigger 的 section-id）/ 中央同步键（useAdjustmentCentralSync.itemId）按 R2.4 排除",
+        "rescanned_at": "2026-08-13",
+        "previous_frontend_keys": [
+          "N5-3-entries"
+        ],
+        "previous_keys_verdict": "迁入前 exempt.N5-3.observed 只记了 `frontend_key: 'N5-3-entries'`、**未记写入列**（16 张里唯一如此）⇒ 本轮据机制①实测补 conclusion；键本身与重扫结果一致，无需改键。🔴 该键与本张 useAdjustmentCentralSync 的中央同步 itemId **同名纯属巧合**（design E12 → E17 / G11）：按字面量 grep 排除非数据键会把真数据键一起剔掉，正解是形态④三步链（键来源已证）⇒ 已确证，不得标 pending_manual",
+        "other_data_keys_note": "`N5-3-audit-notes` / `N5-3-audit-conclusion` 是审计说明 / 审计结论两段自由文本键（saveNotes / saveConclusion → formData.setField('3','audit-notes' | 'audit-conclusion') ⇒ 同机制①、同 conclusion 列；onMounted 用 getField 同对实参读回），属**同 sheet 表级独立键**、不是 entries 族（无行号、无兄弟后缀），不参与 item_id 比对、**不进 column_map / field_keys**（源模板 10 列无对应列），导入导出往返一律不碰。🔴 与批次 1 的 `M2-M2-3-adjustment-note` / 批次 2 的 `M8-3-adjustmentNote` 有一处关键差异：那两个由 `debouncedSave` 写、落在探针 collectWriteSites 的扫描形态内，故会进重扫键集并使 R7.5 因「2 键 vs 1 键」变红；本张两个键由 `setField` 写，而 collectWriteSites 只认 emit('save') / debouncedSave / saveField / saveBatch / allResponses.set 五种形态、**不认 setField** ⇒ 它们不在重扫集里，R7.5 对 N5-3 判绿。⚠️ 因此「R7.5 绿」不等于「本张没有其他数据键」；日后若按 M8-3 notes 里的正解把 declaredKeys() 扩成读 entries_keys + other_data_keys，**必须同时**把探针写入点扫描扩到 setField 形态，否则 N5-3 会以「登记 3 键 vs 重扫 1 键」被动变红（判据侧要成对改，不得只改一侧）"
+      },
+      "backend_current": {
+        "spec_registered": false,
+        "item_id": null,
+        "storage_field_declared": null,
+        "storage_field_effective": null,
+        "field_keys": null,
+        "pending_source": "app.routers.wp_render_strategies._x3_adjustment_import_export.X3_SHEET_SPECS（Wave 2 任务 4.1 交付；本清单是其唯一装载源，Python 侧不写键字面量）",
+        "runtime_route_evidence": ".kiro/specs/x3-adjustment-entry-import-export/evidence/route_matrix_x3.json"
+      },
+      "status": "pending_shared_impl",
+      "aligns_in_task": "4.1",
+      "drift_dimensions": [
+        "backend_spec_absent"
+      ],
+      "provenance": {
+        "kind": "frontend_path",
+        "mechanism": "formdata_setfield",
+        "write_file": "n5/core/N5TabAdjustment.vue",
+        "write": "saveEntries → setField('3', 'entries', entries.value)（新增 / 删除 / 改字段即触发；经 useN5FormData.setField → saveField(itemId, { conclusion })）",
+        "read_file": "n5/core/N5TabAdjustment.vue",
+        "read": "onMounted：await formData.loadData() → formData.getField('3', 'entries')（同一条 `${ITEM_PREFIX}${sheet}-${field}` 拼装 + JSON.parse(conclusion)）→ Array.isArray 校验后赋值",
+        "column_source": {
+          "kind": "source_template",
+          "file": "backend/wp_templates/N/N5 所得税费用.xlsx",
+          "tab": "调整分录汇总表N5-3",
+          "header_row": 5,
+          "cells": "A5:J5",
+          "sample_row_cells": "A6:J6",
+          "method": "openpyxl load_workbook(read_only=True, data_only=True) 直读（与任务 1.2 GS2 同口径）",
+          "note": "仅作列面取值溯源；运行期导出 sheet 名的真源 = ACNR catalog 的 sheet_name（R3.8），本清单不存第二份（实测两者逐字一致：N1-3=「调整分录汇总N1-3」无「表」字，N2-3 / N3-3 / N5-3 = 「调整分录汇总表{码}」）"
+        },
+        "probed_at": "2026-08-13",
+        "probe": "probeAllX3()（机制 / 键 / 键族 / 排除集）+ 逐读 {X}TabAdjustment.vue 的行模型 interface、写入点、读回点 + use{X}FormData.ts 的 ITEM_PREFIX / setField / saveField 体 + openpyxl 直读源模板第 5/6 行"
+      },
+      "migrated_from": {
+        "section": "exempt",
+        "kind": "no_backend_spec",
+        "task": "2.1",
+        "batch": 3,
+        "at": "2026-08-13",
+        "note": null
+      },
+      "notes": "🔴 族前缀是**单前缀** `N5-3-`：useN5FormData.setField 拼 `${ITEM_PREFIX}${sheet}-${field}`，ITEM_PREFIX = 'N5-'（不是批次 1 的 `M3-M3-3-` 双前缀）⇒ 任务 4.1 的键必须逐 sheet 从本清单取，禁按 `N5-N5-3-` 套公式。🔴 **占位列 6 个（B / C / E / F / I / J）—— 16 张里最多**：本张行模型 JournalEntry 只有 8 个字段（其余 3 张 N 族是 11~12 个），10 列里仅 A（description，界面标签「摘要」）/ D（accountName）/ G（debit）/ H（credit）四列有前端字段。六个占位各自的理由已逐列写在 column_map[i].gap，**没有复制同一句**；全程未为凑列数登记任何前端不存在的键（那会让导入值在读回时无处安放 = 往返丢数据）。⚠️ 借贷两列字段名是 `debit` / `credit`（**不带 Amount 后缀**，与其余 15 张的 debitAmount / creditAmount 不同）⇒ 任务 4.1 的 field_keys 必须逐 sheet 取。sample_row = null（第 6 行 openpyxl 实读空行）。跨 sheet 写入留痕（不属本表键族）：saveEntries 尾部按 6801 汇总 AJE / RJE 净额后 setField('1', 'current-row', {…, aje, rje}) 回写 N5-1，并发 'adjustment:entries-updated' 给 A13 —— 后端直写导入不经这两处，导入后需在界面触发一次改动才回写 N5-1（与 N1-3 同型，属已知行为差异，登记不修）"
     }
   },
   "exempt": {
@@ -1085,42 +4374,11 @@
         "frontend_field": "remark"
       }
     },
-    "N1-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端 N1TabAdjustment 'N1-3-entries' 且读写 conclusion 列（与多数循环相反），N 循环后端 IE 未注册调整 sheet。",
-      "observed": {
-        "frontend_key": "N1-3-entries",
-        "frontend_field": "conclusion"
-      }
-    },
-    "N2-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端 N2TabAdjustment 'N2-3-entries'（conclusion 列），后端未注册。",
-      "observed": {
-        "frontend_key": "N2-3-entries",
-        "frontend_field": "conclusion"
-      }
-    },
-    "N3-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端 N3TabAdjustment 'N3-3-entries'（conclusion 列），后端未注册。",
-      "observed": {
-        "frontend_key": "N3-3-entries",
-        "frontend_field": "conclusion"
-      }
-    },
     "N4-3": {
       "kind": "no_backend_spec",
       "reason": "前端 N4TabAdjustment 'N4-3-entries'（经 formData.saveResponse），后端未注册。",
       "observed": {
         "frontend_key": "N4-3-entries"
-      }
-    },
-    "N5-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端 N5TabAdjustment 'N5-3-entries'，后端未注册。",
-      "observed": {
-        "frontend_key": "N5-3-entries"
       }
     },
     "D1": {
@@ -1333,20 +4591,6 @@
         "backend_sheet_modules": []
       }
     },
-    "L2-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "L2-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/l2/core/L2TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
     "L7-3": {
       "kind": "no_backend_spec",
       "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
@@ -1356,34 +4600,6 @@
         ],
         "frontend_files": [
           "src/components/workpaper/l7/core/L7TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M1-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M1-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m1/core/M1TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M10-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M10-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m10/core/M10TabAdjustment.vue"
         ],
         "backend_key_hits": {},
         "backend_sheet_modules": []
@@ -1402,120 +4618,7 @@
         "backend_key_hits": {},
         "backend_sheet_modules": []
       }
-    },
-    "M2-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M2-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m2/core/M2TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M3-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M3-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m3/core/M3TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M4-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M4-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m4/core/M4TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M5-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M5-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m5/core/M5TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M6-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M6-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m6/core/M6TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M7-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M7-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m7/core/M7TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M8-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M8-3-adjustment",
-          "M8-3-adjustmentNote"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m8/core/M8TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
-    },
-    "M9-3": {
-      "kind": "no_backend_spec",
-      "reason": "前端存在调整分录持久化键，但全部 *_import_export.py 均未出现该 sheet / 键字面量 → 该 sheet 无底稿通道导入导出，无 Orphan_Key 风险，故豁免。",
-      "observed": {
-        "frontend_keys": [
-          "M9-3-adjustment"
-        ],
-        "frontend_files": [
-          "src/components/workpaper/m9/core/M9TabAdjustment.vue"
-        ],
-        "backend_key_hits": {},
-        "backend_sheet_modules": []
-      }
     }
   },
-  "_exempt_completion_note": "本 exempt 段已登记：全部后端已注册的调整 sheet（out_of_scope_backend_registered / not_cycle_ie_factory）+ 已 grep 核实的无后端 spec 前端调整 tab。前端调整 tab 总量约 81 张（D/E/F/G/H/I/J/K/L/M/N 各循环），D1-D3/D5-D7、L1-L7、M1-M10 等尚未逐一登记 —— Wave 3 Task 4.3 的 Property 11 守卫应以【前端调整 tab 遍历】为源，遇到未登记 sheet 即失败（这正是预期行为），届时按同款 kind 补登记，不得为通过守卫而放宽遍历口径。"
+  "_exempt_completion_note": "本 exempt 段已登记：全部后端已注册的调整 sheet（out_of_scope_backend_registered / not_cycle_ie_factory）+ 已 grep 核实的无后端 spec 前端调整 tab。前端调整 tab 总量约 81 张（D/E/F/G/H/I/J/K/L/M/N 各循环），D1-D3/D5-D7、L7/L8 等尚未逐一登记（L2-3 / L6-3 / M1-3 ~ M10-3 / N1-3 / N2-3 / N3-3 / N5-3 共 16 张 X-3 已由 spec `x3-adjustment-entry-import-export` 任务 2.1 分三批全部迁入 sheets 段，2026-08-13） —— Wave 3 Task 4.3 的 Property 11 守卫应以【前端调整 tab 遍历】为源，遇到未登记 sheet 即失败（这正是预期行为），届时按同款 kind 补登记，不得为通过守卫而放宽遍历口径。"
 }

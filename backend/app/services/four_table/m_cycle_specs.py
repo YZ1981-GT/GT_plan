@@ -24,18 +24,25 @@
     循环  概念            row_code   report_config 公式        层③可信？
     M1   应付股利         BS-055     None（仅 listed）          —
     M2   实收资本（或股本） BS-081     TB('4001')  ✅ 与实证一致   是
-    M3   库存股           BS-084     TB('4005')  ❌ 该码不存在    **否**
+    M3   库存股           BS-084     TB('4201')  ✅ V138 已修     是
     M4   资本公积         BS-083     TB('4002')  ✅              是
     M5   盈余公积         BS-087     TB('4101')  ✅              是
     M6   未分配利润        BS-088     TB('4104')  ✅              是
-    M7   专项储备         BS-086     TB('4103')  ❌ 实为本年利润   **否**
+    M7   专项储备         BS-086     TB('4301')  ✅ V138 已修     是
     M8   一般风险准备      BS-124     None（仅 soe）             —
-    M9   其他综合收益      BS-085     TB('4102')  ❌ 该码不存在    **否**
-    M10  其他权益工具      BS-082     TB('4003')  ❌ 实为 OCI     **否**
+    M9   其他综合收益      BS-085     TB('4003')  ✅ V138 已修     是
+    M10  其他权益工具      BS-082     TB('4401')  ✅ V138 已修     是
 
-`trust_report_config=False` 的 4 个（M3/M7/M9/M10）依据见
-:attr:`SemanticAccountSpec.trust_report_config`。**`BS-086` 的 `TB('4103')` 最危险**：
-4103 确实存在于科目表（本年利润），层③「码必须存在」那道闸拦不住 → 必须显式关闭。
+**2026-08-05 更新**：M3/M7/M9/M10 曾因上表那四行是错码而声明
+`trust_report_config=False`（关闭层③）。迁移 **V138**（spec
+``.kiro/specs/report-config-account-code-integrity/``）已把 `report_config` 改对，
+修正值与本文件兜底码逐一相同 ⇒ 四个 flag 全部移除、层③恢复启用。
+
+🔴 那批 flag 是**针对错码的临时防护**，不是长期设计：数据改对后继续关着层③，
+会让「客户科目表里缺该科目」的项目白白取不到数（层③本来能救）。
+两侧一致性由 ``test_cycle_specs_row_code_evidence`` 与
+``report_config_account_names.CODE_CORRECTIONS`` 交叉锁死 ——
+往 `_WRONG_FORMULA_ROWS` 里留下 V138 已修的行会打红。
 
 spec: .kiro/specs/semantic-account-resolver-full-rollout/
 
@@ -86,8 +93,11 @@ M2_SPEC = SemanticAccountSpec(
 )
 
 M3_SPEC = SemanticAccountSpec(
-    row_code="BS-084",  # 减：库存股 = TB('4005') ❌ 4005 全库两张表都不存在
-    trust_report_config=False,
+    # 减：库存股。原 `TB('4005')` ❌（4005 全库两张表都不存在）→ **V138 已改为 4201**，
+    # 与本 spec 兜底码一致 ⇒ 层③恢复启用（`trust_report_config` 回默认 True）。
+    # 那个 flag 是针对错码的临时防护，数据改对后继续关着会让「客户科目表缺该科目」的
+    # 项目白白取不到数（层③本来能救）。
+    row_code="BS-084",
     slots=(_equity("gross", ("库存股",), ("4201",), "库存股"),),
 )
 
@@ -107,10 +117,10 @@ M6_SPEC = SemanticAccountSpec(
 )
 
 M7_SPEC = SemanticAccountSpec(
-    # 专项储备 = TB('4103') ❌ —— 4103 client/standard 双侧都是「本年利润」，
-    # 且**确实存在** → 层③「码必须存在」拦不住，会静默取到本年利润。必须关闭。
+    # 专项储备。原 `TB('4103')` ❌ —— 4103 client/standard 双侧都是「本年利润」且**确实存在**，
+    # 层③「码必须存在」那道闸拦不住 → 曾必须显式关闭层③。
+    # **V138 已改为 4301**，与本 spec 兜底码一致 ⇒ 层③恢复启用。
     row_code="BS-086",
-    trust_report_config=False,
     slots=(_equity("gross", ("专项储备",), ("4301",), "专项储备"),),
 )
 
@@ -124,14 +134,16 @@ M8_SPEC = SemanticAccountSpec(
 )
 
 M9_SPEC = SemanticAccountSpec(
-    row_code="BS-085",  # 其他综合收益 = TB('4102') ❌ 4102 全库不存在（真值 4003）
-    trust_report_config=False,
+    # 其他综合收益。原 `TB('4102')` ❌（4102 全库不存在）→ **V138 已改为 4003**，
+    # 与本 spec 兜底码一致 ⇒ 层③恢复启用。
+    row_code="BS-085",
     slots=(_equity("gross", ("其他综合收益",), ("4003",), "其他综合收益"),),
 )
 
 M10_SPEC = SemanticAccountSpec(
-    row_code="BS-082",  # 其他权益工具 = TB('4003') ❌ 4003 实为「其他综合收益」
-    trust_report_config=False,
+    # 其他权益工具。原 `TB('4003')` ❌（4003 实为「其他综合收益」）→ **V138 已改为 4401**，
+    # 与本 spec 兜底码一致 ⇒ 层③恢复启用。
+    row_code="BS-082",
     slots=(_equity("gross", ("其他权益工具",), ("4401",), "其他权益工具"),),
 )
 

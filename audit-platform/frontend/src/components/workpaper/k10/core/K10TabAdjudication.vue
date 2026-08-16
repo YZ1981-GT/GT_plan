@@ -384,8 +384,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData?: { unadjusted6117: number; audited6117: number }
   isReadonly: boolean
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
-}>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  tbSourceCodes?: Record<string, any> | null
 }>()
 
 const emit = defineEmits<{

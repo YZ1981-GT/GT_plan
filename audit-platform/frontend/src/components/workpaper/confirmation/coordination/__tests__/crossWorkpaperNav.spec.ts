@@ -24,6 +24,8 @@ import {
   type CrossWorkpaperNavDef,
 } from '../cycleConfirmationMeta'
 import { G0_SHEET_NAMES } from '../../../g0-confirmation/g0SheetRegistry'
+import { L0_SHEET_NAMES } from '../../l0-confirmation/l0SheetRegistry'
+import { K0_SHEET_NAMES } from '../../k0-confirmation/k0SheetRegistry'
 
 // ─── REPO_ROOT：哨兵**文件**向上查找（禁写死回退级数） ───────────────────────
 const SENTINELS = [
@@ -136,6 +138,29 @@ const SIX_HUB_BASELINE: Readonly<Record<Exclude<ConfirmationCycle, 'G0'>, NavSha
 const shape = (defs: CrossWorkpaperNavDef[]): NavShape[] =>
   defs.map(({ wpCode, label, tooltip }) => ({ wpCode, label, tooltip }))
 
+/**
+ * 走 `deriveSheetsFromCodes`（无 tab 名真源）的循环。
+ *
+ * 🔴 L0 已于 spec `l0-confirmation-source-alignment` Task 18 接 `l0SheetRegistry`
+ *    → 它的 `sheetName` 变成真实中文 tab 名、`isSameWorkbookNavTarget` 转 true。
+ *    **`SIX_HUB_BASELINE.L0` 的 wpCode/label/tooltip 三元组仍逐字不变**（零回归锚点没动），
+ *    变的只是同工作簿定位能力。库侧实证：`wp_index` 里 L0 只有整册 `L0` 与遗留单 sheet
+ *    `L0-1`~`L0-5`，**没有 L0-6/L0-7** ⇒ 改造前按 wp_code 跳这两张表本来就落空。
+ *
+ * 🔴 K0 已于 spec `k0-confirmation-source-alignment` Task 12 接 `k0SheetRegistry`
+ *    → 同 L0（wpCode/label 零回归锚点未动），另有一处**有意的行为变更**：
+ *    K0 的三条「跨表引用索引号笔误」按 R6.2 必须在 tooltip 里标注 ⇒ `K0-3`/`K0-4`/`K0-7`
+ *    三项的 tooltip 在基础文案后**追加**了说明。故 K0 的 tooltip 判据由「逐字全等」
+ *    放宽为「以基线文案开头」（只许追加、不许改写），并由
+ *    `k0-confirmation/__tests__/k0SheetRegistry.spec.ts` 逐条锁死追加内容由真源派生。
+ *    库侧实证：`wp_index` 里 K0 只有整册 `K0` 与遗留 `K0-1`~`K0-5`，**没有 K0-6/K0-7/K0-8**。
+ */
+const DERIVED_CYCLES = ['D0', 'E0', 'F0', 'H0'] as const
+/** 有源模板 tab 名真源（走注册表）的循环 */
+const REGISTRY_CYCLES = ['G0', 'K0', 'L0'] as const
+/** tooltip 允许在基线文案后追加笔误说明的循环（其余必须逐字全等） */
+const TOOLTIP_SUFFIX_ALLOWED = new Set<string>(['K0'])
+
 // ─── Property 12: 按循环解析且无失效入口 ─────────────────────────────────────
 
 describe('Property 12: 跨表导航项按循环解析且无失效入口', () => {
@@ -183,16 +208,41 @@ describe('Property 12: 跨表导航项按循环解析且无失效入口', () => 
 describe('R11.1: 六枢纽导航项与改造前逐字一致（共享组件零回归）', () => {
   for (const cycle of Object.keys(SIX_HUB_BASELINE) as Array<keyof typeof SIX_HUB_BASELINE>) {
     it(`${cycle} 导航项集合不变`, () => {
-      expect(shape(buildCrossWorkpaperNavDefs(`${cycle}-1`))).toEqual(SIX_HUB_BASELINE[cycle])
+      const actual = shape(buildCrossWorkpaperNavDefs(`${cycle}-1`))
+      const base = SIX_HUB_BASELINE[cycle]
+      if (!TOOLTIP_SUFFIX_ALLOWED.has(cycle)) {
+        expect(actual).toEqual(base)
+        return
+      }
+      // 🔴 K0：wpCode/label 逐字冻结（零回归锚点），tooltip 只许在基线文案后追加笔误说明。
+      expect(actual.map(({ wpCode, label }) => ({ wpCode, label }))).toEqual(
+        base.map(({ wpCode, label }) => ({ wpCode, label })),
+      )
+      actual.forEach((d, i) => {
+        expect(d.tooltip, `${cycle}/${d.label} tooltip 被改写而非追加`).toContain(base[i].tooltip)
+        expect(d.tooltip.startsWith(base[i].tooltip), `${cycle}/${d.label} 基线文案必须在最前`).toBe(true)
+      })
     })
   }
 
-  it('六枢纽的 sheetName 必须由既有 code 派生（非 null 且 === wpCode），不得整体为 null', () => {
+  it('K0 恰有三项 tooltip 追加了笔误说明（其余项逐字不变）', () => {
+    const actual = shape(buildCrossWorkpaperNavDefs('K0-1'))
+    const base = SIX_HUB_BASELINE.K0
+    const appended = actual
+      .map((d, i) => ({ label: d.label, extra: d.tooltip.slice(base[i].tooltip.length) }))
+      .filter((x) => x.extra.length > 0)
+    expect(appended.map((x) => x.label).sort()).toEqual(['K0-3', 'K0-4', 'K0-7'])
+    for (const x of appended) {
+      expect(x.extra, `${x.label} 的追加说明未标注源模板出处`).toContain('源模板')
+    }
+  })
+
+  it('四个派生枢纽的 sheetName 必须由既有 code 派生（非 null 且 === wpCode），不得整体为 null', () => {
     // 🔴 这条是 Task 11「最容易做错的一处」的正面锁：若派生环节退化成 `sheetName: null`，
-    //    组件那条「null 就不生成入口」的规则会把六枢纽入口全部干掉。
+    //    组件那条「null 就不生成入口」的规则会把这些枢纽的入口全部干掉。
     //    断言不得写成 `if (d.sheetName !== null) …` —— 那样 null 会静默通过（首版守卫即如此，
     //    被变异测试 M7 抓出）。
-    for (const cycle of Object.keys(SIX_HUB_BASELINE) as Array<keyof typeof SIX_HUB_BASELINE>) {
+    for (const cycle of DERIVED_CYCLES) {
       const defs = buildCrossWorkpaperNavDefs(`${cycle}-1`)
       for (const d of defs) {
         if (d.wpCode.includes('/')) {
@@ -207,6 +257,49 @@ describe('R11.1: 六枢纽导航项与改造前逐字一致（共享组件零回
       const combined = defs.filter((d) => d.wpCode.includes('/')).length
       expect(defs.filter((d) => d.sheetName !== null).length, cycle).toBe(defs.length - combined)
     }
+  })
+
+  it('L0 已接注册表：wpCode/label/tooltip 三元组不变，但 sheetName 变成真实 tab 名', () => {
+    // 零回归锚点未动（上面的「L0 导航项集合不变」用的还是同一份 SIX_HUB_BASELINE.L0）
+    const defs = buildCrossWorkpaperNavDefs('L0-1')
+    expect(shape(defs)).toEqual(SIX_HUB_BASELINE.L0)
+    // 变化点：每一项都拿到源模板 tab 名 → 同工作簿 `?sheet=` 深链可达
+    for (const d of defs) {
+      expect(d.sheetName, d.label).toBeTruthy()
+      expect(L0_SHEET_NAMES, d.label).toContain(d.sheetName!)
+      expect(d.sheetName, d.label).not.toBe(d.wpCode)
+      expect(isSameWorkbookNavTarget(d), d.label).toBe(true)
+    }
+    // 反向锁：若哪天 L0 退回派生（sheetName === wpCode），本条必红
+    expect(defs.find((d) => d.label === 'L0-1')!.sheetName).toBe('函证结果汇总表L0-1')
+    expect(defs.find((d) => d.label === 'L0-7')!.sheetName).toBe('函证程序舞弊风险评价表L0-7')
+  })
+
+  it('K0 已接注册表：wpCode/label 不变、sheetName 变真实 tab 名、三项 tooltip 追加笔误说明', () => {
+    const defs = buildCrossWorkpaperNavDefs('K0-1')
+    // wpCode/label 零回归锚点未动
+    expect(defs.map((d) => d.wpCode)).toEqual(SIX_HUB_BASELINE.K0.map((b) => b.wpCode))
+    for (const d of defs) {
+      if (d.wpCode.includes('/')) {
+        // 组合替代程序（K0-5/K0-6）没有单一 sheet → 仍显式 null，回退按 wpCode 跳
+        expect(d.sheetName, d.label).toBeNull()
+        expect(isSameWorkbookNavTarget(d), d.label).toBe(false)
+        continue
+      }
+      expect(d.sheetName, d.label).toBeTruthy()
+      expect(K0_SHEET_NAMES, d.label).toContain(d.sheetName!)
+      expect(d.sheetName, d.label).not.toBe(d.wpCode)
+      expect(isSameWorkbookNavTarget(d), d.label).toBe(true)
+    }
+    // 反向锁：若哪天 K0 退回派生（sheetName === wpCode），本条必红
+    expect(defs.find((d) => d.label === 'K0-1')!.sheetName).toBe('函证结果汇总表K0-1')
+    expect(defs.find((d) => d.label === 'K0-8')!.sheetName).toBe('函证程序舞弊风险评价表K0-8')
+  })
+
+  it('注册表枢纽与派生枢纽两组互斥且合起来正好是七枢纽（防新增循环漏归组）', () => {
+    const all = [...DERIVED_CYCLES, ...REGISTRY_CYCLES].sort()
+    expect(new Set(all).size).toBe(all.length)
+    expect(all).toEqual(['D0', 'E0', 'F0', 'G0', 'H0', 'K0', 'L0'])
   })
 
   it('既有 *Code 字段一个都没删，且六枢纽取值不变（加法式扩展支点）', () => {

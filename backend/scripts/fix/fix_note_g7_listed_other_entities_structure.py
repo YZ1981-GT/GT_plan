@@ -54,26 +54,38 @@ def _blanks(n: int) -> list[dict[str, Any]]:
 
 # T1 企业集团的构成（源 A28:G39）
 T1 = "企业集团的构成"
+# 🔴 标签列 key 统一为平台惯例 'label'（g7-column-alignment spec Task 5）：
+# 平台 211 个标签列定义里 148 个用 'label'；本文件原用 'name'/'item'/'investee'/'seq'/'type'
+# 等各表自拟 key，与运行时 buildG7*Columns() 的 'label' 不一致（B 类偏差）。
+# is_label / label 显示文字均不动 —— 投影器 note_sub_table_projector._project_row 对
+# 标签列有**双向兜底**（任意标签 key → 'label' 回填 / 反向回退），故改 key 零数据风险。
+# 🔴 数据列 key 一律以**运行时**（`buildG7ListedColumns()`）为准（Task 9，量化闸裁决
+# `SAFE_TO_RENAME_SEED`）：`g7DisclosureCrossSheet.ts` 用**字面量 key** 往 `row.values`
+# 写跨表回填值（实测 56 处 `writeValue(row.values, '<key>', ...)`，本表命中
+# `principalPlace`/`registeredPlace`/`businessNature`/`directHolding`/`indirectHolding`/
+# `acquisitionMethod`），改运行时 key 会让这些回填**静默失效**；seed 侧无同类消费方
+# ⇒ seed 服从运行时。改动前后 key 集合 == 运行时那一侧（禁第三套 key）。
 T1_COLUMNS = grouped_columns(
-    ("name", "子公司名称"),
+    ("label", "子公司名称"),
     [
-        ("region", "主要经营地", None, None),
-        ("registered", "注册地", None, None),
-        ("nature", "业务性质", None, None),
-        ("direct", "直接", PERCENT, "持股比例%"),
-        ("indirect", "间接", PERCENT, "持股比例%"),
-        ("method", "取得方式", None, None),
+        ("principalPlace", "主要经营地", None, None),
+        ("registeredPlace", "注册地", None, None),
+        ("businessNature", "业务性质", None, None),
+        ("directHolding", "直接", PERCENT, "持股比例%"),
+        ("indirectHolding", "间接", PERCENT, "持股比例%"),
+        ("acquisitionMethod", "取得方式", None, None),
     ],
 )
 
 # T2 重要的非全资子公司（源 A49:E54）
 T2 = "重要的非全资子公司"
 T2_COLUMNS = flat_columns([
-    ("name", "子公司名称", None),
-    ("minorityRatio", "少数股东持股比例%", PERCENT),
-    ("minorityProfit", "本期归属于少数股东的损益", AMOUNT),
-    ("minorityDividend", "本期向少数股东宣告分派的股利", AMOUNT),
-    ("minorityEquity", "期末少数股东权益余额", AMOUNT),
+    ("label", "子公司名称", None),
+    # 数据列 key 服从运行时（同 T1 理由）：crossSheet 写 `currentProfit`/`closingEquity`
+    ("holdingRatio", "少数股东持股比例%", PERCENT),
+    ("currentProfit", "本期归属于少数股东的损益", AMOUNT),
+    ("dividend", "本期向少数股东宣告分派的股利", AMOUNT),
+    ("closingEquity", "期末少数股东权益余额", AMOUNT),
 ])
 
 # T3 重要非全资子公司主要财务信息—期末数（源 A58:G64）
@@ -84,14 +96,14 @@ _BALANCE_SUBS = [
     ("nonCurrentLiabilities", "非流动负债", AMOUNT), ("totalLiabilities", "负债合计", AMOUNT),
 ]
 T3_COLUMNS = grouped_columns(
-    ("name", "子公司名称"),
+    ("label", "子公司名称"),
     [(k, lbl, fmt, "期末数") for k, lbl, fmt in _BALANCE_SUBS],
 )
 
 # T4 续（1）—期初数（源 A65:G72，与 T3 同构，group 名换成「期初数」）
 T4 = "续（1）"
 T4_COLUMNS = grouped_columns(
-    ("name", "子公司名称"),
+    ("label", "子公司名称"),
     [(k, lbl, fmt, "期初数") for k, lbl, fmt in _BALANCE_SUBS],
 )
 
@@ -102,15 +114,23 @@ _RESULT_SUBS = [
     ("comprehensive", "综合收益总额", AMOUNT), ("cashFlow", "经营活动现金流量", AMOUNT),
 ]
 T5_COLUMNS = grouped_columns(
-    ("name", "子公司名称"),
+    ("label", "子公司名称"),
     [(f"current{k[0].upper()}{k[1:]}", lbl, fmt, "本期发生额") for k, lbl, fmt in _RESULT_SUBS]
     + [(f"prior{k[0].upper()}{k[1:]}", lbl, fmt, "上期发生额") for k, lbl, fmt in _RESULT_SUBS],
 )
 
 # T6 未丧失控制权的所有者权益份额变动影响（源 A96:G108，metric-rows × 公司 1~6 列）
 T6 = "未丧失控制权的所有者权益份额变动影响"
-T6_COLUMNS = flat_columns([("item", "项  目", None)] + [
-    (f"company{i}", f"公司{i}", AMOUNT) for i in range(1, 7)
+# 🔴 动态列 key 取运行时 `buildG7SlotColumns()` 的稳定形态 `{slot}_{seq}`，
+# **禁写死序号**（原为 `company1..company6`）：该表按被投资单位横向展开，审计师增删/
+# 改名后写死序号无法跟随（改名只该改 `entityName` 即显示文字，key 必须不变，
+# 否则已录数据丢落点）。slot 名与 `g7ListedDisclosureModel.OWNERSHIP_CHANGE_SLOT`
+# 逐字一致，序号由下标+1 派生 —— 与运行时同一套规则，不各写一份字面量。
+T6_SLOT = "ownership-change-company"
+T6_DEFAULT_ENTITY_NAMES = [f"公司{i}" for i in range(1, 7)]
+T6_COLUMNS = flat_columns([("label", "项  目", None)] + [
+    (f"{T6_SLOT}_{i}", name, AMOUNT)
+    for i, name in enumerate(T6_DEFAULT_ENTITY_NAMES, start=1)
 ])
 T6_METRIC_LABELS = [
     "购买成本/处置对价：", "现金", "非现金资产的公允价值", "发行或承担的债务的账面价值",
@@ -160,21 +180,23 @@ _S1_PLAN = [
 # T7 重要的合营企业或联营企业（源 A111:G124）
 T7 = "重要的合营企业或联营企业"
 T7_COLUMNS = grouped_columns(
-    ("name", "合营企业或联营企业名称"),
+    ("label", "合营企业或联营企业名称"),
     [
-        ("region", "主要经营地", None, None),
-        ("registered", "注册地", None, None),
-        ("nature", "业务性质", None, None),
-        ("direct", "直接", PERCENT, "持股比例(%)"),
-        ("indirect", "间接", PERCENT, "持股比例(%)"),
-        ("method", "对合营企业或联营企业投资的会计处理方法", None, None),
+        # 数据列 key 服从运行时（同 T1 理由）；末列运行时用 `accountingMethod`
+        # （区别于 T1 子公司表的 `acquisitionMethod`「取得方式」，两者语义不同不可混）
+        ("principalPlace", "主要经营地", None, None),
+        ("registeredPlace", "注册地", None, None),
+        ("businessNature", "业务性质", None, None),
+        ("directHolding", "直接", PERCENT, "持股比例(%)"),
+        ("indirectHolding", "间接", PERCENT, "持股比例(%)"),
+        ("accountingMethod", "对合营企业或联营企业投资的会计处理方法", None, None),
     ],
 )
 
 # T8 重要合营企业主要财务信息（源 A132:C151，18 行）
 T8 = "重要合营企业主要财务信息"
 T8_COLUMNS = flat_columns([
-    ("item", "项 目", None), ("current", "期末数", AMOUNT), ("prior", "期初数", AMOUNT),
+    ("label", "项 目", None), ("current", "期末数", AMOUNT), ("prior", "期初数", AMOUNT),
 ])
 T8_LABELS = [
     "流动资产", "其中：现金和现金等价物", "非流动资产", "资产合计", "流动负债", "非流动负债",
@@ -186,7 +208,7 @@ T8_LABELS = [
 # T9 续：重要合营企业本期及上期经营成果（源 A153:C163，8 行）
 T9 = "续：重要合营企业本期及上期经营成果"
 T9_COLUMNS = flat_columns([
-    ("item", "项  目", None), ("current", "本期发生额", AMOUNT), ("prior", "上期发生额", AMOUNT),
+    ("label", "项  目", None), ("current", "本期发生额", AMOUNT), ("prior", "上期发生额", AMOUNT),
 ])
 T9_LABELS = [
     "营业收入", "财务费用", "所得税费用", "净利润", "终止经营的净利润",
@@ -195,14 +217,37 @@ T9_LABELS = [
 
 # T10 重要联营企业主要财务信息（源 A169:G187，17 行，不含现金及现金等价物行）
 T10 = "重要联营企业主要财务信息"
-T10_COLUMNS = grouped_columns(
-    ("item", "项 目"),
-    [
-        ("c1Current", "期末数", AMOUNT, "联营企业1"), ("c1Prior", "期初数", AMOUNT, "联营企业1"),
-        ("c2Current", "期末数", AMOUNT, "联营企业2"), ("c2Prior", "期初数", AMOUNT, "联营企业2"),
-        ("c3Current", "期末数", AMOUNT, "联营企业3"), ("c3Prior", "期初数", AMOUNT, "联营企业3"),
-    ],
-)
+# 🔴 动态列：slot 名与 `g7ListedDisclosureModel.IMPORTANT_ASSOCIATE_SLOT` 逐字一致，
+# key = `{slot}_{seq}_{subKey}`（原写死 `c1Current`/`c1Prior`，见 T6 处说明）。
+# 🔴 T10（FS 表）与 T11（PL 表）**共用同一 slot** 但子列 label 不同 —— FS 取
+# 「期末数/期初数」、PL 取「本期发生额/上期发生额」（源 A169:G187 vs A189:G196）。
+# subKey 两表同为 `current`/`prior`（只有显示文字不同），故 key 天然一致。
+IMPORTANT_ASSOCIATE_SLOT = "important-associate"
+IMPORTANT_ASSOCIATE_DEFAULT_NAMES = ["联营企业1", "联营企业2", "联营企业3"]
+
+
+def _associate_matrix_columns(
+    label_header: str,
+    current_label: str,
+    prior_label: str,
+) -> list[dict[str, Any]]:
+    """联营企业矩阵动态列（每实体 current/prior 两子列，按实体名分组）。
+
+    与运行时 `buildG7SlotColumns(IMPORTANT_ASSOCIATE_SLOT, names, sub)` 同规则派生，
+    子列 label 由调用方按**本表**源文传入（禁两表共用一套 label，源文不同）。
+    """
+    subs = [("current", current_label), ("prior", prior_label)]
+    return grouped_columns(
+        ("label", label_header),
+        [
+            (f"{IMPORTANT_ASSOCIATE_SLOT}_{seq}_{sub_key}", sub_label, AMOUNT, name)
+            for seq, name in enumerate(IMPORTANT_ASSOCIATE_DEFAULT_NAMES, start=1)
+            for sub_key, sub_label in subs
+        ],
+    )
+
+
+T10_COLUMNS = _associate_matrix_columns("项 目", "期末数", "期初数")
 T10_LABELS = [
     "流动资产", "非流动资产", "资产合计", "流动负债", "非流动负债", "负债合计", "净资产",
     "  其中：少数股东权益", "归属于母公司的所有者权益", "按持股比例计算的净资产份额",
@@ -212,14 +257,8 @@ T10_LABELS = [
 
 # T11 续：重要联营企业本期及上期经营成果（源 A189:G196，6 行）
 T11 = "续：重要联营企业本期及上期经营成果"
-T11_COLUMNS = grouped_columns(
-    ("item", "项  目"),
-    [
-        ("c1Current", "本期发生额", AMOUNT, "联营企业1"), ("c1Prior", "上期发生额", AMOUNT, "联营企业1"),
-        ("c2Current", "本期发生额", AMOUNT, "联营企业2"), ("c2Prior", "上期发生额", AMOUNT, "联营企业2"),
-        ("c3Current", "本期发生额", AMOUNT, "联营企业3"), ("c3Prior", "上期发生额", AMOUNT, "联营企业3"),
-    ],
-)
+# 复用 T10 的 slot 与 key 规则，子列 label 取**本表**源文（A189:G196）。
+T11_COLUMNS = _associate_matrix_columns("项  目", "本期发生额", "上期发生额")
 T11_LABELS = [
     "营业收入", "净利润", "终止经营的净利润", "其他综合收益",
     "综合收益总额", "企业本期收到的来自联营企业的股利",
@@ -228,7 +267,7 @@ T11_LABELS = [
 # T12 其他不重要合营企业和联营企业的汇总财务信息（源 A200:C212）
 T12 = "其他不重要合营企业和联营企业的汇总财务信息"
 T12_COLUMNS = flat_columns([
-    ("item", "项  目", None),
+    ("label", "项  目", None),
     ("current", "期末数/本期发生额", AMOUNT),
     ("prior", "期初数/上期发生额", AMOUNT),
 ])
@@ -241,11 +280,17 @@ T12_LABELS = [
 
 # T13 对合营企业或联营企业发生超额亏损的分担额（源 A221:D232）
 T13 = "对合营企业或联营企业发生超额亏损的分担额"
+# 🔴 三列 key 服从运行时（`priorCumulative` / `currentUnrecognized` / `closingCumulative`）：
+# 该表是**已接线**的跨表回填目标 —— `g7DisclosureCrossSheet.ts` L1620~L1622 经
+# `columnKeys.{prior,current,closing}`（L2783~L2785 映射表）把 G7-16 未确认亏损测算
+# 结果写进 `row.values`，且 `g7UnrecognizedLossModel.ts` 亦按这三个 key 读写。
+# 改运行时侧会让该回填静默失效（Vue 传不存在的字段不报错），故 seed 服从运行时。
+# 另注 seed 原 key 用英式拼写 `Unrecognised`、运行时用美式 `Unrecognized`。
 T13_COLUMNS = flat_columns([
-    ("investee", "被投资单位名称", None),
-    ("priorUnrecognised", "前期累积未确认的损失份额", AMOUNT),
-    ("currentUnrecognised", "本期未确认的损失份额（或本期实现净利润的分享额）", AMOUNT),
-    ("closingUnrecognised", "本期末累积未确认的损失份额", AMOUNT),
+    ("label", "被投资单位名称", None),
+    ("priorCumulative", "前期累积未确认的损失份额", AMOUNT),
+    ("currentUnrecognized", "本期未确认的损失份额（或本期实现净利润的分享额）", AMOUNT),
+    ("closingCumulative", "本期末累积未确认的损失份额", AMOUNT),
 ])
 T13_ROWS = (
     [data_row("合营企业")] + _blanks(3) + [subtotal_row("小计")]
@@ -296,16 +341,22 @@ _S2_PLAN = [
 # ═══════════════ （8）重要的共同经营 ═══════════════
 
 T14 = "重要的共同经营"
+# 🔴 数据列 key 服从运行时（`jointOperationColumns`）：`region`→`principalPlace` /
+# `registered`→`registeredPlace` / `nature`→`businessNature`，且持股两列在本表是
+# `directShare`/`indirectShare`（**不是** T1/T7 的 `directHolding`/`indirectHolding`
+# —— 源模板本表口径为「持股比例或享有的份额」，运行时据此另起了列名）。
+# 五者均被 `g7DisclosureCrossSheet.ts` 以字面量 `writeValue(row.values, '<key>', …)`
+# 消费（实测 L690~L694），改运行时侧会让共同经营的跨表回填静默失效。
 T14_COLUMNS = grouped_columns(
-    ("name", "共同经营名称"),
+    ("label", "共同经营名称"),
     [
-        ("region", "主要经营地", None, None),
-        ("registered", "注册地", None, None),
-        ("nature", "业务性质", None, None),
+        ("principalPlace", "主要经营地", None, None),
+        ("registeredPlace", "注册地", None, None),
+        ("businessNature", "业务性质", None, None),
         # 源模板字面「持股比例/享有的份额(%)」含 '/'；group 禁 '/'（多级表头语义冲突，
         # 前端 activeTableColumns 只认扁平 {group,start,span}），改用等价无斜杠表述。
-        ("direct", "直接", PERCENT, "持股比例或享有的份额(%)"),
-        ("indirect", "间接", PERCENT, "持股比例或享有的份额(%)"),
+        ("directShare", "直接", PERCENT, "持股比例或享有的份额(%)"),
+        ("indirectShare", "间接", PERCENT, "持股比例或享有的份额(%)"),
     ],
 )
 

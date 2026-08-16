@@ -63,8 +63,13 @@ T_MAIN = "长期股权投资"
 
 _GROUP = "本期增减变动"
 
+# 🔴 标签列 key 统一为平台惯例 `'label'`（g7-column-alignment spec Task 5）：
+# 平台 211 个标签列定义里 148 个用 `'label'`；`'项目'` 这类**中文字面量当 key**
+# 违反「禁硬编码」且全平台仅 G 循环在用。`is_label`/`label` 显示文字不动 ——
+# 投影器 `note_sub_table_projector._project_row` 对标签列有**双向兜底**
+# （L67-68 任意标签 key → `label` 回填 / L204-205 反向回退），故改 key 零数据风险。
 LISTED_MAIN_COLUMNS = grouped_columns(
-    ("项目", "被投资单位"),
+    ("label", "被投资单位"),
     [
         ("openingBook", "期初余额（账面价值）", AMOUNT, None),
         ("openingImpairment", "减值准备期初余额", AMOUNT, None),

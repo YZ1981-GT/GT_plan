@@ -456,3 +456,62 @@ export const K0_EXISTING_PAYLOAD_KEYS = Object.freeze([
   'notes',
   'conclusion',
 ] as const)
+
+// ─── 🔴 下区录入的**实际持久化路径** = `checklist_responses` 的 itemId ──────────
+
+/**
+ * 🔴🔴 **为什么不用上面那四个 `html_data` 顶层键**（design.md 的 `K0LowerZonePayload`）：
+ *
+ * 宿主 `GtConfirmationSummary` 的 sheet 级 save 处理器把 `emit('save', 载荷)` 的载荷
+ * **整体写成**该 sheet 的 `parsed_data.html_data[sheetName]`。G0 侧 2026-08-04 浏览器实测
+ * 已复现后果：`html_data['函证结果汇总表G0-1']` 被覆盖成
+ * `{"value":"未见异常。","itemId":"G0-1-lower-conclusion"}`、`_format` 一并消失 ⇒
+ * 该 sheet 下次打开退化成「此底稿使用旧格式，仅支持只读查看」，**上区函证行全丢**。
+ *
+ * 下区是 **itemId 维度**录入 ⇒ 必须直接走平台标准
+ * `PUT /api/workpapers/{id}/checklist-responses`（G0/L0 两个已收口 spec 的既定形态）。
+ * 矩阵账面金额的手工覆盖键（`k0MatrixSpec.k0MatrixOverrideItemId`）本就是 checklist itemId，
+ * 且已与 `prefill_formula_mapping.json` 的 `cell_ref` 逐字锁死 ⇒ 两条路径必须同源。
+ *
+ * 上面那四个键**保留**（Property 9 的「与既有 html_data 键无交集」断言仍有效且无害），
+ * 但**不是运行时写入目标**；本节的 itemId 才是。
+ *
+ * 「二、样本选择」6 项**不在此列** —— 它们落 `SamplingData`（随 `sampling` 整体 JSON 往返），
+ * 由 `ConfirmationSampling.vue` 的 `isK0` 分支录入（见 `K0_SAMPLE_SELECTION` 上方分工说明）。
+ */
+export const K0_LOWER_KEY_PREFIX = 'K0-1-lower-'
+
+/** 审计说明 itemId 前缀（`K0-1-lower-audit-note-{seq}`） */
+export const K0_AUDIT_NOTE_KEY_PREFIX = `${K0_LOWER_KEY_PREFIX}audit-note-`
+
+/** 四、审计结论的 itemId */
+export const K0_CONCLUSION_KEY = `${K0_LOWER_KEY_PREFIX}conclusion`
+
+/** 审计说明第 seq 项的 itemId（seq 取自 `K0_AUDIT_NOTES[].seq`，1..5） */
+export function k0AuditNoteItemId(seq: number): string {
+  return `${K0_AUDIT_NOTE_KEY_PREFIX}${seq}`
+}
+
+/** 四、审计结论的 AI section（须在后端 `_k0_confirmation_ai._SUPPORTED_SECTIONS` 登记） */
+export const K0_CONCLUSION_AI_SECTION = 'k0-summary-conclusion'
+
+/** 四、审计结论的复核 section-id */
+export const K0_CONCLUSION_REVIEW_SECTION_ID = 'K0-1-conclusion'
+
+/**
+ * 下区全部 AI section（5 段审计说明 + 1 条结论）。
+ *
+ * 🔴 每一条都必须在后端 `_k0_confirmation_ai._SUPPORTED_SECTIONS` 登记 ——
+ * 该端点是**硬门 400**（`if section not in _SUPPORTED_SECTIONS: raise HTTPException(400)`），
+ * 未登记会被前端 catch 吞成「AI 生成失败」。守卫两侧交叉锁死。
+ */
+export const K0_AI_SECTIONS: readonly string[] = Object.freeze([
+  ...K0_AUDIT_NOTES.map((n) => n.aiSection),
+  K0_CONCLUSION_AI_SECTION,
+])
+
+/** 下区全部 itemId（守卫断言与既有键/矩阵键无交集） */
+export const K0_LOWER_ITEM_IDS: readonly string[] = Object.freeze([
+  ...K0_AUDIT_NOTES.map((n) => k0AuditNoteItemId(n.seq)),
+  K0_CONCLUSION_KEY,
+])

@@ -112,10 +112,13 @@ describe('d4NoteSectionMap', () => {
     // 类别列带 group
     expect(timCols[1]).toMatchObject({ key: 'cat_1_revenue', group: '消费品' })
     expect(timCols[2]).toMatchObject({ key: 'cat_1_cost', group: '消费品' })
-    // 合计列
+    // 🔴 Task 31: **不得**有横向合计列 —— 源 xlsx 实证该表 9 列，
+    //    合计是**行**（上市 R56 `=B52+B48`）。改造前这里断言 2 个 `total_*` 列，
+    //    镜像的是自造出来的列，会让附注比源模板多两列。
     const totalCols = timCols.filter(c => c.key.startsWith('total_'))
-    expect(totalCols).toHaveLength(2)
-    expect(totalCols[0]).toMatchObject({ group: '合计' })
+    expect(totalCols).toHaveLength(0)
+    // 反向自检：类别列确实推过来了（否则上面的断言在空列集上也会通过）
+    expect(timCols.filter(c => /^cat_\d+_(revenue|cost)$/.test(c.key)).length).toBeGreaterThan(0)
   })
 
   it('listed（6）义务表 flat + 动态年度列（Req 6.4 / 6.7）', () => {

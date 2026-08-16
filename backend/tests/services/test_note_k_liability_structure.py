@@ -68,6 +68,12 @@ def test_no_leaked_names_or_placeholder_rows(entry: dict[str, Any]) -> None:
     for tbl in sec.get("tables") or []:
         for row in tbl.get("rows") or []:
             label = str(row.get("label", "")).replace(" ", "").replace("\u3000", "")
+            # 🔴 2026-08-12 口径更正（spec `k-cycle-extraction-formula-and-disclosure-closure`
+            #    Task 18 / Requirement 9.1~9.2）：`row_type='expandable'` 是**可扩位行**
+            #    （源模板标了「此处可无限量增行」的加行落点，必须保留），只有
+            #    `row_type='data'` 的同名行才是要删的占位说明行。原判据不分二者。
+            if str(row.get("row_type", "")) == "expandable":
+                continue
             assert label not in _NORM_PLACEHOLDER, f"{tbl.get('name')} 残留占位行「{row.get('label')}」"
             assert str(row.get("row_type", "")) != "header_label"
 

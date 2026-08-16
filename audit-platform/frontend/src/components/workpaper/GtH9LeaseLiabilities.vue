@@ -74,12 +74,19 @@
             :is-readonly="isReadonly"
             @refresh-complete="selfLoad()"
           />
+          <!--
+            🔴 `:html-data` 必传 —— 审定表的四表溯源面板与「与试算平衡表核对」行
+            都消费 render 下发的 `tb_source_codes` / `tb_values`；漏传即静默失效
+            （Vue 对未声明/未传的 prop 不报错），守卫 `h9AdjudicationTbWiring.spec.ts`
+            已钉死本处传参。
+          -->
           <H9TabAdjudication
             @save="persistResponse"
             :wp-id="props.wpId"
             :project-id="props.projectId"
             :all-responses="allResponses"
             :is-readonly="isReadonly"
+            :html-data="props.htmlData"
           />
         </template>
 

@@ -11755,6 +11755,107 @@
           "applicable_default": "yes"
         }
       ]
+    },
+    "L0A": {
+      "name": "长期应付款/应付债券函证程序",
+      "items": [
+        {
+          "seq": 1,
+          "content": "以积极方式对长期应付款、应付债券进行函证。\n【提示】本函证不包含银行长期借款、银行短期借款函证，与银行借款相关函证详见货币资金循环",
+          "ref_index": "L0-1",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 2,
+          "content": "比较当年度及以前年度长期应付款、应付债券的增减变动、具体构成、账龄及主要供货商的变化，针对舞弊风险较大的债权人，考虑对合同条款、是否存在关联方关系及是否存在补充协议实施函证程序。",
+          "ref_index": "L0-1",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "舞弊应对/IPO/上市/新三板/重组"
+        },
+        {
+          "seq": 3,
+          "content": "设计询证函，考虑制作询证函防伪标识，并在发函前核实被函证单位信息（函证科目、单位名称、地址、联系人、联系电话、邮政编码、函证人等），对于函证地址与注册地址、办公地址等不一致，不同客户或供应商的函证地址相近、电话号段相邻，函证联系人非被询证单位员工等情况，需核查并记录原因。",
+          "ref_index": "L0-2",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 4,
+          "content": "注册会计师直接收发询证函，跟函时观察实地场所以及函证核对过程，确认处理函证的人员身份和权限，防范询证函被拦截、篡改或发生串通舞弊，并在底稿中记录或留存控制过程；",
+          "ref_index": "L0-1/L0-3",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 5,
+          "content": "留存亲自寄发函证的寄送单回执及被审计单位盖章确认的询证函复印件，核实发函快递物流信息；",
+          "ref_index": "L0-1/L0-2",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 6,
+          "content": "收到的回函应为被询证者书面答复，可以采取纸质、电子或其它介质等形式：\n（1）确认与发出的询证函是否为同一份、是否为原件；\n（2）检查回函发出地址、快递物流信息，核实回函地址是否与发函收件地址一致，比对回函印章和签字，确认回函的真实性；\n（3）检查函证信息是否相符，对回函不符的询证函，查明不符事项的原因确定是否存在错报，考虑是否存在舞弊的可能性；",
+          "ref_index": "L0-1/L0-2/L0-4",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 7,
+          "content": "如果被询证者以传真、电子邮件等方式回函，审计项目组应当直接接收，并验证传真、电邮邮件回函的可靠性，要求被询证者在审计报告日之前寄回询证函原件",
+          "ref_index": "L0-1/L0-6",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "备选"
+        },
+        {
+          "seq": 8,
+          "content": "如果利用第三方函证平台收发函证的，考虑评估第三方函证平台服务的可靠性，了解资质认证或有关控制设计及运行的有效性。\n【提示】第三方电子询证函平台的安全性评估内容相关要点详见函证技术提示3号，链接为：https://www.gt-china.com.cn/article_view.php?id=9682；",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "program_category": "备选"
+        },
+        {
+          "seq": 9,
+          "content": "分析核实退回或无法寄到的函证、未回函、回函率较低的原因，考虑与被询证者联系，要求对方作出回应或再次寄发询证函，必要时增加现场走访等程序，关注是否存在账面记录与外部证据矛盾的审计证据；",
+          "ref_index": "L0-1/L0-2",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 10,
+          "content": "针对再次发函未回函的项目，评价其重大错报风险以及其他审计程序的性质、时间安排和范围的影响实施替代审计程序，包括：\n（1）检查交易发生的记账凭证和相关的支持性证据； \n（2）检查资产负债表日后到付款情况或其他情况",
+          "ref_index": "L0-1/L0-5",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 11,
+          "content": "结合风险评估情况及函证程序执行过程中的舞弊风险迹象，考虑串通舞弊、伪造交易的可能性等，对函证程序的舞弊风险进行评价；",
+          "ref_index": "L0-7",
+          "auto_data_source": "confirmation_summary_for_cycle",
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        },
+        {
+          "seq": 12,
+          "content": "如果管理层不允许寄发询证函的原因不合理、或者认为回函不可靠，列出供应商清单，实施替代审计程序，并评价对评估的重大错报风险以及其他审计程序的性质、时间安排和范围的影响，考虑其对审计工作和审计意见的影响；",
+          "ref_index": null,
+          "auto_data_source": null,
+          "applicable_default": "yes",
+          "program_category": "常规★"
+        }
+      ]
     }
   },
   "G0A": {

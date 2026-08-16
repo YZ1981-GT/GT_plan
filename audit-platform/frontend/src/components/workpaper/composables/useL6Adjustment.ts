@@ -271,6 +271,61 @@ export function useL6Adjustment(formData: ReturnType<typeof useL6FormData>) {
     }
   }
 
+  // ─── 6. 加载已保存数据 ────────────────────────────────────────────────
+
+  /**
+   * 从 allResponses 恢复调整分录数据（**per-field 族**，design §C5a）
+   *
+   * 与范本 `useM6Adjustment.loadFromResponses` 的差异：本张**无 `-data` 整行 JSON 族**
+   * （清单 `backend/data/adjustment_ie_contract.json` → `L6-3.key_family = "per_field"`），
+   * 故不是 `JSON.parse` 整行，而是按 per-field 族**逐后缀取值组行**；`while` 到断档为止的
+   * 行序判据与范本一致。
+   *
+   * 键面真源 = 清单 `L6-3.key_families.per_field`：
+   * - `prefix = "L6-L6-3-entry-"` —— **双前缀**（M4-3~M10-3 与 N 族是单前缀），逐 sheet 取值；
+   * - `suffixes` 10 项 —— 与本文件写入侧 `saveAndPublish` / `_triggerSave` 的键面逐字同源，
+   *   前端**不另存一份后缀数组**（后缀只作为读写表达式里的键面出现），由守卫 GS10
+   *   「读回覆盖后缀集 == 清单登记集」与清单双向锁死；
+   * - `suffix_to_field` —— 本张索引列字段是 `indexRef`（M 族为 `refIndex`），逐 sheet 取值。
+   *
+   * 行数由 `-desc` 键**存在**（而非取值非空）界定：写入侧与后端导入都逐行写全 10 个后缀键、
+   * 空值落 `remark: null` ⇒ 键在而值可空；自第 1 行连续取到断档为止（与后端
+   * `_rows_from_per_field_family` 的行序判据同口径）。用「取值非空」当判据会把
+   * 说明为空的行当成断档而截断。
+   *
+   * `type` 的 `|| 'AJE'` 沿用范本的**透传兜底**（不做大小写归一）：清单
+   * `L6-3.unmapped_fields[type]` 登记枚举为大写 `AJE` / `RJE`，落错大小写的行会原样穿过
+   * 本兜底，在 `filteredEntries` 的 AJE / RJE 两个分区里都不出现（静默丢行）。
+   */
+  function loadFromResponses(allResponses: Map<string, any>): void {
+    const text = (resp: any): string => resp?.remark ?? ''
+    const amount = (resp: any): number => {
+      const n = Number(resp?.remark)
+      return Number.isFinite(n) ? n : 0
+    }
+    const loaded: L6AdjustmentEntry[] = []
+    let n = 1
+    while (allResponses.get(`L6-L6-3-entry-${n}-desc`)) {
+      loaded.push({
+        index: n,
+        description: text(allResponses.get(`L6-L6-3-entry-${n}-desc`)),
+        category: text(allResponses.get(`L6-L6-3-entry-${n}-category`)) as L6AdjustmentCategory,
+        reportItem: text(allResponses.get(`L6-L6-3-entry-${n}-report`)),
+        accountName: text(allResponses.get(`L6-L6-3-entry-${n}-account`)),
+        noteItem: text(allResponses.get(`L6-L6-3-entry-${n}-note`)),
+        type: (text(allResponses.get(`L6-L6-3-entry-${n}-type`)) as L6AdjustmentType) || 'AJE',
+        debitAmount: amount(allResponses.get(`L6-L6-3-entry-${n}-debit`)),
+        creditAmount: amount(allResponses.get(`L6-L6-3-entry-${n}-credit`)),
+        indexRef: text(allResponses.get(`L6-L6-3-entry-${n}-ref`)),
+        remark: text(allResponses.get(`L6-L6-3-entry-${n}-remark`)),
+      })
+      n++
+    }
+    if (loaded.length > 0) {
+      entries.value = loaded
+    }
+  }
+
   // ─── Return ────────────────────────────────────────────────────────────
 
   return {
@@ -296,6 +351,9 @@ export function useL6Adjustment(formData: ReturnType<typeof useL6FormData>) {
 
     // 保存+发布
     saveAndPublish,
+
+    // 加载
+    loadFromResponses,
   }
 }
 

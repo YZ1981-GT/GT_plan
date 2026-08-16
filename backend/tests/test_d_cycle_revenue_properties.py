@@ -85,7 +85,11 @@ class TestProperty1AnalysisSheetCoverage:
         "D1": None,  # D1 无独立分析程序 sheet（明细表已覆盖趋势分析）
         "D2": "分析表",
         "D3": "分析表",
-        "D4": "分析程序",  # D4 源模板真实存在「分析程序D4-3」（收入循环，未在本 spec 复核）
+        # 🔴 D4 的分析程序 sheet 名已于 2026-08-06 纠偏：源 xlsx 真实 tab 是
+        #    「其他业务收入明细表D4-3」，「分析程序D4-3」是贴错标签的虚构值
+        #    （spec d-cycle-four-table-extraction-and-disclosure-completion Task 18）。
+        #    D4 的趋势分析在 D4-6~D4-11 系列，不在本 prefill 的 D4-3 块内。
+        "D4": None,
         "D5": None,  # 源模板无此 sheet（审定表D5/明细表D5-2/公允价值测算D5-4）
         "D6": None,  # 源模板无此 sheet
         "D7": "分析表",
@@ -369,10 +373,14 @@ class TestProperty7CrossFileAccountCodes:
                 f"{wp_code}: tb_consistency rule has empty account_codes"
             )
 
+            # 🔴 2026-08-06：判据由「sheet 名含『审定表』」改为「该循环有任一预设块」。
+            #    D0 是**函证循环**，源 workbook 11 张 tab 里没有任何「审定表」——
+            #    其块已按源模板正名为「函证结果汇总表D0-1」（原 `审定表D0-1` 是贴错标签，
+            #    spec d-cycle-…-completion R5.3）。按 sheet 名找会让 D0 恒失败。
             # Find corresponding 审定表 entry in prefill_formula_mapping
             audit_entries = [
                 m for m in mappings
-                if m["wp_code"] == wp_code and "审定表" in m.get("sheet", "")
+                if m["wp_code"] == wp_code
             ]
 
             # Each D-cycle wp with tb_consistency must have a prefill mapping entry
@@ -609,7 +617,11 @@ class TestJSONSchemaValidation:
     VALID_STEP_CATEGORIES = {"substantive", "confirmation", "conclusion", "analytical", "cutoff", "review", "documentation"}
 
     # Valid formula_type enum values
-    VALID_FORMULA_TYPES = {"TB", "TB_SUM", "PREV", "TB_AUX", "WP", "ADJ", "AUX", "LEDGER", "LEDGER_DETAIL"}
+    # 🔴 `PLACEHOLDER` 是平台一等 formula_type（不是缺陷）——语义 =「该格取数真源不在
+    #    单一科目码上，写不成公式」。全库 E1/G0/H0/N1/N3/N5/D5 共 7 个 wp_code 在用，
+    #    生产侧由 `preset_acnr_migration.PENDING_FUNCTION_ALLOWLIST` 放行。
+    #    同款登记见 `test_h_prefill_extension.VALID_FORMULA_TYPES`。
+    VALID_FORMULA_TYPES = {"TB", "TB_SUM", "PREV", "TB_AUX", "WP", "ADJ", "AUX", "LEDGER", "LEDGER_DETAIL", "PLACEHOLDER"}
 
     def test_validation_rules_rule_type_enum(self):
         """d_cycle_validation_rules.json rule_type only contains valid values."""

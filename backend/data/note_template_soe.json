@@ -1777,7 +1777,7 @@
           ],
           "columns": [
             {
-              "key": "seq",
+              "key": "label",
               "label": "序号",
               "is_label": true,
               "flat": true
@@ -1795,15 +1795,15 @@
               "label": "企业类型"
             },
             {
-              "key": "registered",
+              "key": "registeredPlace",
               "label": "注册地"
             },
             {
-              "key": "region",
+              "key": "principalPlace",
               "label": "主要经营地"
             },
             {
-              "key": "nature",
+              "key": "businessNature",
               "label": "业务性质"
             },
             {
@@ -1817,7 +1817,7 @@
               "format": "percent"
             },
             {
-              "key": "paidRatio",
+              "key": "paidInRatio",
               "label": "实缴持股比例（%）",
               "format": "percent"
             },
@@ -1832,7 +1832,7 @@
               "format": "amount"
             },
             {
-              "key": "method",
+              "key": "acquisitionMethod",
               "label": "取得方式"
             }
           ],
@@ -1857,7 +1857,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-10 14:44:28"
     },
     {
       "section_number": "七、母公司拥有被投资",
@@ -1921,7 +1921,7 @@
           ],
           "columns": [
             {
-              "key": "seq",
+              "key": "label",
               "label": "序号",
               "is_label": true,
               "flat": true
@@ -1974,7 +1974,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-09 19:14:13"
     },
     {
       "section_number": "七、母公司直接或通过",
@@ -2058,7 +2058,7 @@
           ],
           "columns": [
             {
-              "key": "seq",
+              "key": "label",
               "label": "序号",
               "is_label": true,
               "flat": true
@@ -2111,7 +2111,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-09 19:14:13"
     },
     {
       "section_number": "七、重要非全资子公司",
@@ -2153,7 +2153,7 @@
           ],
           "columns": [
             {
-              "key": "seq",
+              "key": "label",
               "label": "序号",
               "is_label": true,
               "flat": true
@@ -2163,22 +2163,22 @@
               "label": "企业名称"
             },
             {
-              "key": "minorityRatio",
+              "key": "holdingRatio",
               "label": "少数股东持股比例",
               "format": "percent"
             },
             {
-              "key": "minorityProfit",
+              "key": "currentProfit",
               "label": "当期归属于少数股东的损益",
               "format": "amount"
             },
             {
-              "key": "minorityDividend",
+              "key": "dividend",
               "label": "当期向少数股东支付的股利",
               "format": "amount"
             },
             {
-              "key": "minorityEquity",
+              "key": "closingEquity",
               "label": "期末累计少数股东权益",
               "format": "amount"
             }
@@ -2244,66 +2244,66 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true
             },
             {
-              "key": "c1Current",
+              "key": "minority-fs-company_1_current",
               "label": "期末数/本期发生额",
               "group": "公司1",
               "format": "amount"
             },
             {
-              "key": "c1Prior",
+              "key": "minority-fs-company_1_prior",
               "label": "期初数/上期发生额",
               "group": "公司1",
               "format": "amount"
             },
             {
-              "key": "c2Current",
+              "key": "minority-fs-company_2_current",
               "label": "期末数/本期发生额",
               "group": "公司2",
               "format": "amount"
             },
             {
-              "key": "c2Prior",
+              "key": "minority-fs-company_2_prior",
               "label": "期初数/上期发生额",
               "group": "公司2",
               "format": "amount"
             },
             {
-              "key": "c3Current",
+              "key": "minority-fs-company_3_current",
               "label": "期末数/本期发生额",
               "group": "公司3",
               "format": "amount"
             },
             {
-              "key": "c3Prior",
+              "key": "minority-fs-company_3_prior",
               "label": "期初数/上期发生额",
               "group": "公司3",
               "format": "amount"
             },
             {
-              "key": "c4Current",
+              "key": "minority-fs-company_4_current",
               "label": "期末数/本期发生额",
               "group": "公司4",
               "format": "amount"
             },
             {
-              "key": "c4Prior",
+              "key": "minority-fs-company_4_prior",
               "label": "期初数/上期发生额",
               "group": "公司4",
               "format": "amount"
             },
             {
-              "key": "c5Current",
+              "key": "minority-fs-company_5_current",
               "label": "期末数/本期发生额",
               "group": "公司5",
               "format": "amount"
             },
             {
-              "key": "c5Prior",
+              "key": "minority-fs-company_5_prior",
               "label": "期初数/上期发生额",
               "group": "公司5",
               "format": "amount"
@@ -2355,7 +2355,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-10 14:44:28"
     },
     {
       "section_number": "七、本期不再纳入合并",
@@ -2398,7 +2398,7 @@
           ],
           "columns": [
             {
-              "key": "seq",
+              "key": "label",
               "label": "序号",
               "is_label": true,
               "flat": true
@@ -2408,11 +2408,11 @@
               "label": "企业名称"
             },
             {
-              "key": "registered",
+              "key": "registeredPlace",
               "label": "注册地"
             },
             {
-              "key": "nature",
+              "key": "businessNature",
               "label": "业务性质"
             },
             {
@@ -2421,7 +2421,7 @@
               "format": "percent"
             },
             {
-              "key": "votingRatio",
+              "key": "votingRights",
               "label": "表决权比例（%）",
               "format": "percent"
             },
@@ -2477,28 +2477,28 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项目",
               "is_label": true
             },
             {
-              "key": "c1SaleDate",
+              "key": "sold-fs-position-company_1_saleDate",
               "label": "出售日",
               "group": "公司1"
             },
             {
-              "key": "c1Opening",
+              "key": "sold-fs-position-company_1_opening",
               "label": "期初余额",
               "group": "公司1",
               "format": "amount"
             },
             {
-              "key": "c2SaleDate",
+              "key": "sold-fs-position-company_2_saleDate",
               "label": "出售日",
               "group": "公司2"
             },
             {
-              "key": "c2Opening",
+              "key": "sold-fs-position-company_2_opening",
               "label": "期初余额",
               "group": "公司2",
               "format": "amount"
@@ -2565,66 +2565,66 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项目",
               "is_label": true
             },
             {
-              "key": "aCurrent",
+              "key": "sold-fs-result-company_1_current",
               "label": "本年年初-出售日",
               "group": "A公司",
               "format": "amount"
             },
             {
-              "key": "aPrior",
+              "key": "sold-fs-result-company_1_prior",
               "label": "上年发生额",
               "group": "A公司",
               "format": "amount"
             },
             {
-              "key": "bCurrent",
+              "key": "sold-fs-result-company_2_current",
               "label": "本年年初-出售日",
               "group": "B公司",
               "format": "amount"
             },
             {
-              "key": "bPrior",
+              "key": "sold-fs-result-company_2_prior",
               "label": "上年发生额",
               "group": "B公司",
               "format": "amount"
             },
             {
-              "key": "cCurrent",
+              "key": "sold-fs-result-company_3_current",
               "label": "本年年初-出售日",
               "group": "C公司",
               "format": "amount"
             },
             {
-              "key": "cPrior",
+              "key": "sold-fs-result-company_3_prior",
               "label": "上年发生额",
               "group": "C公司",
               "format": "amount"
             },
             {
-              "key": "dCurrent",
+              "key": "sold-fs-result-company_4_current",
               "label": "本年年初-出售日",
               "group": "D公司",
               "format": "amount"
             },
             {
-              "key": "dPrior",
+              "key": "sold-fs-result-company_4_prior",
               "label": "上年发生额",
               "group": "D公司",
               "format": "amount"
             },
             {
-              "key": "eCurrent",
+              "key": "sold-fs-result-company_5_current",
               "label": "本年年初-出售日",
               "group": "E公司",
               "format": "amount"
             },
             {
-              "key": "ePrior",
+              "key": "sold-fs-result-company_5_prior",
               "label": "上年发生额",
               "group": "E公司",
               "format": "amount"
@@ -2678,7 +2678,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-10 14:44:28"
     },
     {
       "section_number": "七、本期新纳入合并范",
@@ -2737,7 +2737,7 @@
           ],
           "columns": [
             {
-              "key": "name",
+              "key": "label",
               "label": "公司名称",
               "is_label": true,
               "flat": true
@@ -2770,7 +2770,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-09 19:14:13"
     },
     {
       "section_number": "七、本期发生的同一控",
@@ -2807,7 +2807,7 @@
           ],
           "columns": [
             {
-              "key": "name",
+              "key": "label",
               "label": "公司名称",
               "is_label": true
             },
@@ -2826,7 +2826,7 @@
               "format": "amount"
             },
             {
-              "key": "controller",
+              "key": "ultimateController",
               "label": "实际控制人"
             },
             {
@@ -2878,7 +2878,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-10 14:50:24"
     },
     {
       "section_number": "七、本期发生的非同一",
@@ -2919,7 +2919,7 @@
           ],
           "columns": [
             {
-              "key": "name",
+              "key": "label",
               "label": "被购买方名称",
               "is_label": true
             },
@@ -2932,12 +2932,12 @@
               "label": "购买日的确定依据"
             },
             {
-              "key": "preHoldingRatio",
+              "key": "preHolding",
               "label": "购买日前持有被购买方权益比例",
               "format": "percent"
             },
             {
-              "key": "atCombinationHoldingRatio",
+              "key": "atCombinationHolding",
               "label": "形成合并时持有的被购买方权益比例（不含合并后的股权增减）",
               "format": "percent"
             },
@@ -2948,13 +2948,13 @@
               "format": "amount"
             },
             {
-              "key": "fvIdentifiableAmount",
+              "key": "fvIdentifiable",
               "label": "可辨认净资产公允价值总额（金额）",
               "group": "购买日被购买方",
               "format": "amount"
             },
             {
-              "key": "fvIdentifiableMethod",
+              "key": "fvMethod",
               "label": "可辨认净资产公允价值总额（确定方法）",
               "group": "购买日被购买方"
             },
@@ -3008,7 +3008,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-10 14:50:24"
     },
     {
       "section_number": "七、本期发生的吸收合",
@@ -3077,7 +3077,7 @@
           ],
           "columns": [
             {
-              "key": "type",
+              "key": "label",
               "label": "吸收合并的类型",
               "is_label": true
             },
@@ -3133,7 +3133,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-09 19:14:13"
     },
     {
       "section_number": "七、子公司使用企业集",
@@ -3252,23 +3252,23 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true,
               "flat": true
             },
             {
-              "key": "company1",
+              "key": "ownership-change-company_1",
               "label": "公司1",
               "format": "amount"
             },
             {
-              "key": "company2",
+              "key": "ownership-change-company_2",
               "label": "公司2",
               "format": "amount"
             },
             {
-              "key": "company3",
+              "key": "ownership-change-company_3",
               "label": "公司3",
               "format": "amount"
             }
@@ -3292,7 +3292,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_g7_soe_scope_change_structure",
-      "_aligned_at": "2026-08-01 10:05:12"
+      "_aligned_at": "2026-08-10 14:44:28"
     },
     {
       "section_number": "七、子公司向母公司转",
@@ -5621,11 +5621,13 @@
             },
             {
               "label": "应收股利",
-              "row_type": "data"
+              "row_type": "data",
+              "report_row_code": "BS-016"
             },
             {
               "label": "其他应收款项",
-              "row_type": "data"
+              "row_type": "data",
+              "report_row_code": "BS-009"
             },
             {
               "label": "合计",
@@ -6038,6 +6040,10 @@
               "row_type": "data"
             },
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -6116,6 +6122,10 @@
             {
               "label": "",
               "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -6984,7 +6994,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_k_complex_structure",
-      "_aligned_at": "2026-08-01 10:34:39"
+      "_aligned_at": "2026-08-15 14:52:43"
     },
     {
       "section_number": "八、10",
@@ -7707,6 +7717,10 @@
               "row_type": "data"
             },
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "",
               "row_type": "data"
             },
@@ -7726,6 +7740,10 @@
             {
               "label": "",
               "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -7815,6 +7833,10 @@
               "row_type": "data"
             },
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "",
               "row_type": "data"
             },
@@ -7834,6 +7856,10 @@
             {
               "label": "",
               "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -9209,7 +9235,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true,
               "flat": true
@@ -9279,7 +9305,7 @@
           ],
           "columns": [
             {
-              "key": "investee",
+              "key": "label",
               "label": "被投资单位",
               "is_label": true
             },
@@ -9416,7 +9442,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项 目",
               "is_label": true,
               "flat": true
@@ -9473,7 +9499,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true,
               "flat": true
@@ -9550,7 +9576,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true
             },
@@ -9645,7 +9671,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true
             },
@@ -9764,7 +9790,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项  目",
               "is_label": true,
               "flat": true
@@ -9841,23 +9867,23 @@
           ],
           "columns": [
             {
-              "key": "investee",
+              "key": "label",
               "label": "被投资单位名称",
               "is_label": true,
               "flat": true
             },
             {
-              "key": "priorUnrecognised",
+              "key": "priorCumulative",
               "label": "前期累积未确认的损失份额",
               "format": "amount"
             },
             {
-              "key": "currentUnrecognised",
+              "key": "currentUnrecognized",
               "label": "本期未确认的损失份额（或本期实现净利润的分享额）",
               "format": "amount"
             },
             {
-              "key": "closingUnrecognised",
+              "key": "closingCumulative",
               "label": "本期末累积未确认的损失份额",
               "format": "amount"
             }
@@ -9895,7 +9921,7 @@
           ],
           "columns": [
             {
-              "key": "item",
+              "key": "label",
               "label": "项目",
               "is_label": true
             },
@@ -9905,25 +9931,25 @@
               "group": "发起"
             },
             {
-              "key": "endBookValue",
+              "key": "closingCarrying",
               "label": "账面价值",
               "group": "期末数",
               "format": "amount"
             },
             {
-              "key": "endMaxLoss",
+              "key": "closingMaxLoss",
               "label": "最大损失敞口",
               "group": "期末数",
               "format": "amount"
             },
             {
-              "key": "beginBookValue",
+              "key": "openingCarrying",
               "label": "账面价值",
               "group": "期初数",
               "format": "amount"
             },
             {
-              "key": "beginMaxLoss",
+              "key": "openingMaxLoss",
               "label": "最大损失敞口",
               "group": "期初数",
               "format": "amount"
@@ -9955,7 +9981,7 @@
         {
           "name": "结构化主体获得收益及转移资产情况",
           "headers": [
-            "类型",
+            "结构化主体类型",
             "服务收费",
             "向结构化主体出售资产的利得（损失）",
             "合计",
@@ -9982,8 +10008,8 @@
           ],
           "columns": [
             {
-              "key": "type",
-              "label": "类型",
+              "key": "label",
+              "label": "结构化主体类型",
               "is_label": true
             },
             {
@@ -9999,7 +10025,7 @@
               "format": "amount"
             },
             {
-              "key": "incomeTotal",
+              "key": "total",
               "label": "合计",
               "group": "当期从结构化主体获得的收益",
               "format": "amount"
@@ -10047,8 +10073,8 @@
       "sort_index": 17,
       "auto_numbering": true,
       "lock_number": false,
-      "_aligned_by": "note-template-columns-and-legacy-snapshot-closure",
-      "_aligned_at": "2026-08-09 11:08:41"
+      "_aligned_by": "fix_note_g7_soe_structure",
+      "_aligned_at": "2026-08-14 21:12:50"
     },
     {
       "section_number": "八、19",
@@ -14619,11 +14645,13 @@
             },
             {
               "label": "应付股利",
-              "row_type": "data"
+              "row_type": "data",
+              "report_row_code": "BS-076"
             },
             {
               "label": "其他应付款项",
-              "row_type": "data"
+              "row_type": "data",
+              "report_row_code": "BS-050"
             },
             {
               "label": "合计",
@@ -14802,6 +14830,10 @@
               "row_type": "data"
             },
             {
+              "label": "可无限量添加行",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -14889,7 +14921,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "k-cycle-disclosure-alignment/liability",
-      "_aligned_at": "2026-07-30 19:04:56"
+      "_aligned_at": "2026-08-15 14:52:42"
     },
     {
       "section_number": "八、43",
@@ -15076,7 +15108,7 @@
         {
           "name": "（1）一年内到期的长期借款",
           "headers": [
-            "借款类别",
+            "项目",
             "期末余额",
             "期初余额"
           ],
@@ -15106,7 +15138,7 @@
           "columns": [
             {
               "key": "label",
-              "label": "借款类别",
+              "label": "项目",
               "is_label": true,
               "flat": true
             },
@@ -15140,7 +15172,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure_v2",
-      "_aligned_at": "2026-08-16 18:39:05"
+      "_aligned_at": "2026-08-16 00:17:38"
     },
     {
       "section_number": "八、46",
@@ -15274,7 +15306,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure_v2",
-      "_aligned_at": "2026-08-16 17:06:20"
+      "_aligned_at": "2026-08-16 00:17:38"
     },
     {
       "section_number": "八、47",
@@ -16046,7 +16078,7 @@
               "format": "amount"
             }
           ],
-          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 **L6 专项应付款**底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
+          "guidance": "勾稽：期末余额 = 期初余额 + 本期增加 − 本期减少；合计 = 各项之和。本表由 L6 专项应付款底稿推送（与长期应付款共章节，按子表名浅合并）。须说明专项应付款的来源、指定的专门用途与使用限制。源模板要求分项披露年末余额最大的前五项。注：列头取附注模版字面（源 xlsx 写的是 `201X.01.01` / `201X.12.31` 年份占位符）。"
         }
       ],
       "text_sections": [
@@ -16075,7 +16107,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure",
-      "_aligned_at": "2026-08-16 17:06:20"
+      "_aligned_at": "2026-07-31 10:36:27"
     },
     {
       "section_number": "八、54",
@@ -16655,7 +16687,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "k-cycle-disclosure-alignment/liability",
-      "_aligned_at": "2026-07-30 19:04:56"
+      "_aligned_at": "2026-08-15 14:52:42"
     },
     {
       "section_number": "八、56",
@@ -16879,7 +16911,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "fix_note_l_cycle_structure_v2",
-      "_aligned_at": "2026-08-16 17:06:20"
+      "_aligned_at": "2026-08-16 00:20:25"
     },
     {
       "section_number": "八、58",
@@ -17955,6 +17987,10 @@
           ],
           "rows": [
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -18015,6 +18051,10 @@
             {
               "label": "残疾人就业保障金",
               "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -18269,6 +18309,10 @@
             {
               "label": "代扣代缴个人所得税手续费返还",
               "row_type": "data"
+            },
+            {
+              "label": "……",
+              "row_type": "expandable"
             },
             {
               "label": "合计",
@@ -18771,6 +18815,10 @@
               "row_type": "data"
             },
             {
+              "label": "......",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -18960,6 +19008,10 @@
               "row_type": "data"
             },
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -19052,6 +19104,10 @@
               "row_type": "data"
             },
             {
+              "label": "……",
+              "row_type": "expandable"
+            },
+            {
               "label": "合计",
               "is_total": true,
               "row_type": "total"
@@ -19102,7 +19158,7 @@
       "auto_numbering": true,
       "lock_number": false,
       "_aligned_by": "k-cycle-disclosure-alignment/pl",
-      "_aligned_at": "2026-07-30 17:58:57"
+      "_aligned_at": "2026-08-15 14:52:42"
     },
     {
       "section_number": "八、78",

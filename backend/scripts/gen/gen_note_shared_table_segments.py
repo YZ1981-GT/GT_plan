@@ -33,7 +33,17 @@ from app.services.note_shared_table_segments import (  # noqa: E402
 OUT_PATH = _ROOT / "data" / "note_shared_table_segments.json"
 
 #: 实测基线（Property 14）：变了就要在此同步更新并说明原因
-EXPECTED_COUNTS = {"listed": 23, "soe": 6}
+#:
+#: 2026-08-12 由 23/6 调为 24/8（+3 张表），原因 = K 循环补齐共享表段首码
+#: （`fix_note_k_report_row_codes.py`，spec `k-cycle-extraction-formula-and-disclosure-closure`
+#: Task 14）。此前这 3 张表的 `report_row_code` 全缺 ⇒ 段数 0 ⇒ owner 推送
+#: `_row_scope` 时 `find_segment` 返 None ⇒ **整表 fail-closed 跳过写入**。补码后：
+#:   - listed `五、42 其他应付款`：应付股利 BS-055(M1) + 其他应付款 BS-050(K3)
+#:   - soe    `八、42 其他应付款`：应付股利 BS-076(M1) + 其他应付款项 BS-050(K3)
+#:   - soe    `八、9  其他应收款`：应收股利 BS-016(G3) + 其他应收款项 BS-009(K1)
+#: listed `五、8 其他应收款` **有意只有 1 个段首码**（其他应收款 BS-009）——
+#: 应收利息/应收股利在 listed 侧 `report_config` 零命中，宁缺勿造，故它不计入共享表。
+EXPECTED_COUNTS = {"listed": 24, "soe": 8}
 
 
 def build_payload() -> dict:
@@ -81,7 +91,28 @@ def dump(payload: dict) -> str:
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=False) + "\n"
 
 
+def _utf8_stdout() -> None:
+    """把 stdout/stderr 钉成 UTF-8。
+
+    🔴 2026-08-12 实测：本脚本成功分支打印 `✓`（U+2713），Windows GBK 控制台下
+    `--check` 会以 ``UnicodeEncodeError`` 崩掉、退出码非 0 ⇒ 从命令行看「清单明明
+    是最新的却报失败」。既有守卫 `test_check_passes` 是**进程内**调 `main()`
+    （monkeypatch argv），pytest 捕获的 stdout 不是 GBK 控制台，故一直没暴露 ——
+    典型的「守卫覆盖了逻辑但没覆盖调用形态」。在脚本内自愈，三条调用路径
+    （CI / 人工命令行 / 守卫）都受益。
+    """
+    for s in (sys.stdout, sys.stderr):
+        rc = getattr(s, "reconfigure", None)
+        if rc is None:
+            continue
+        try:
+            rc(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
 def main() -> int:
+    _utf8_stdout()
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--write", action="store_true", help="写入清单")
     ap.add_argument("--check", action="store_true", help="drift 检查（默认）")

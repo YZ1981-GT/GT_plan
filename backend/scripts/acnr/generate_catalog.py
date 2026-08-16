@@ -222,7 +222,14 @@ def generate_catalog(
 
     # --- Step 2: 合并 import_export（IE manifest） ---
     # 支持 cycle='all' 加载所有可用 manifest，或单循环加载
-    _ALL_CYCLES = ["d", "k", "f", "g", "h"]
+    #
+    # l / m / n 是 `partial: true` 清单（spec x3-adjustment-entry-import-export 任务 8.1）：
+    # 只登记本循环的 X-3 调整分录汇总表（L 2 条 / M 10 条 / N 4 条 = 16 条），
+    # 不是该循环 I/E 的全量清单 —— 未被覆盖的存量启用条目由 check_ie_catalog_sync 的
+    # 部分登记模式报告，不抄进真源（把未经核验的存量条目写进生成源 = 把错值锁成基线）。
+    # 这三条加进来后，`cycle='all'` 的输出会比 committed catalog 多出这 16 条
+    # import_export 段；差额由该 spec 任务 9.1 的 catalog 外科补丁抹平。
+    _ALL_CYCLES = ["d", "k", "f", "g", "h", "l", "m", "n"]
 
     if cycle.lower() == "all":
         cycles_to_load = _ALL_CYCLES
@@ -574,7 +581,7 @@ def main() -> int:
     parser.add_argument(
         "--cycle",
         default="all",
-        help="循环码（默认 all，加载所有可用 manifest；或指定如 d/k/f/g/h）",
+        help="循环码（默认 all，加载所有可用 manifest；或指定如 d/k/f/g/h/l/m/n）",
     )
     parser.add_argument(
         "--registry-version",

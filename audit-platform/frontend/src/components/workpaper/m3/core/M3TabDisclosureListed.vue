@@ -204,6 +204,7 @@ const aiLoading = ref('')
 
 import { useDisclosureAutoSync } from '../../composables/useDisclosureAutoSync'
 import { buildM3SyncPayload, type M3DisclosureRow as M3Row } from '../../composables/m3NoteSectionMap'
+import http from '@/utils/http'
 
 async function syncToDisclosureNotes(): Promise<void> {
   const rows: M3Row[] = treasuryChangeRows.value.map((r) => ({
@@ -219,8 +220,7 @@ async function syncToDisclosureNotes(): Promise<void> {
   )
   if (!payload) return
   try {
-    const { default: request } = await import('@/utils/request')
-    await request.post(`/api/workpapers/${props.wpId}/sync-from-workpaper`, payload)
+    await http.post(`/api/projects/${props.projectId}/disclosure-notes/sync-from-workpaper`, payload)
   } catch { /* fail-open: 同步失败不打断编辑 */ }
 }
 

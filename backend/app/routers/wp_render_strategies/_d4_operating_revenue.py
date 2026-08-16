@@ -25,6 +25,9 @@ from typing import Any
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.d_cycle_extraction.d_tb_fetch import (
+    build_parent_check_for_specs,
+)
 from app.services.d4_extraction.account_scope import (
     D4AccountScope,
     D4_ROOT_PAIRS,
@@ -499,6 +502,22 @@ async def render(ctx: RenderContext) -> dict | None:
             # tb_source_codes → project_context（踩坑铁律：在 html_data.project_context 里，
             # 以便每个 sheet 都能访问；非 html_data 顶层）
             project_context["tb_source_codes"] = build_d4_source_codes(scope)
+
+            # ─── 三口径自检（新增，纯加法）─────────────────────────────────
+            # spec: d-cycle-four-table-extraction-and-disclosure-completion R1.6
+            # 损益类走 occurrence 口径（发生额）。
+            # 🔴 不能直接把 `revenue_leaves` 喂给 `build_parent_check` —— 那已是
+            # **筛过的叶子**，父行不在集合里会让 `parent` 侧恒 0；故经
+            # `build_parent_check_for_specs` 按规格集重新宽取一次含父行的子树。
+            project_context["parent_check"] = await build_parent_check_for_specs(
+                ctx,
+                {"revenue": list(rev_specs), "cost": list(cost_specs)},
+                {
+                    "revenue": list(scope.revenue_standard or []),
+                    "cost": list(scope.cost_standard or []),
+                },
+                occurrence=True,
+            )
 
         except Exception as e:  # noqa: BLE001 — fail-open：单点失败不让整张底稿打不开
             logger.warning(

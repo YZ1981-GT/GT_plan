@@ -3,7 +3,12 @@
  *
  * report_config 实证（四准则一致）::
  *
- *     BS-062 / BS-086 应付债券 = TB('2502','期末余额')
+ *     BS-062 应付债券 = TB('2502','期末余额')
+ *
+ * 🔴 2026-08-05 更正注释：原写「BS-062 / BS-086」，而 `BS-086` 实为**专项储备**
+ * `TB('4301')`（M7 的行）。应付债券在两套准则下**共用 BS-062**，soe 侧没有独立行号。
+ * 后端 `l_cycle_extraction/account_scope.py` 的 `row_code_soe` 已同步改正为 BS-062；
+ * 本文件导出的常量一直是 BS-062（值本就对，错的只是注释）。
  *
  * 🔴 L4 需拆分「一年内到期」部分（`2502` 子科目按名称识别），
  * 后端 render 输出 `current_portion_codes` 供前端消费。
@@ -15,7 +20,7 @@
  */
 import { tbQueryCodes, type TbSourceCodes } from './shared/tbSourceCodes'
 
-/** 报表行次（上市 BS-062 / 国企 BS-086） */
+/** 报表行次（上市与国企共用 BS-062） */
 export const L4_REPORT_ROW_CODE = 'BS-062'
 
 /** 原值兜底标准码 */

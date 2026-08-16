@@ -74,11 +74,16 @@ def _extract_audited_entries(entries: list[dict]) -> dict[str, dict]:
 
 
 def _collect_tb_accounts(entry: dict) -> set[str]:
-    """提取 entry.cells 所有 formula 中 TB() 的科目编码集合。"""
+    """提取该 entry 声明的科目编码集合（TB 公式 ∪ account_codes）。
+
+    🔴 2026-08-06：同 `test_d567_prefill_property._tb_accounts` 的理由 ——
+       D5 的 TB 公式已按 spec R5.5 改 PLACEHOLDER，科目码只剩 `account_codes`。
+    """
     accounts: set[str] = set()
     for cell in entry.get("cells", []):
         formula = cell.get("formula", "")
         accounts.update(TB_ACCOUNT_PATTERN.findall(formula))
+    accounts.update(str(c) for c in (entry.get("account_codes") or []))
     return accounts
 
 
@@ -100,7 +105,10 @@ def test_d567_audited_entries_aligned(all_entries: list[dict]) -> None:
     union_accounts: set[str] = set()
     for wp_code, entry in audited.items():
         accounts = _collect_tb_accounts(entry)
-        assert accounts, f"wp_code={wp_code} 的 cells 中未找到 =TB() 公式"
+        # 形态无关：TB 公式 或 account_codes 任一提供科目码即可
+        assert accounts, (
+            f"wp_code={wp_code} 既无 =TB() 公式也无 account_codes"
+        )
         union_accounts.update(accounts)
 
     # 不重不漏：三者并集恰为 {1124, 1141, 2205}

@@ -13,6 +13,14 @@ import logging
 import sqlalchemy as sa
 
 from app.core.config import settings
+from app.services.d_cycle_extraction.d_account_resolver import (
+    resolve_d_cycle_account_codes,
+)
+from app.services.d_cycle_extraction.d_tb_fetch import (
+    build_d_tb_source_codes,
+    fetch_d_cycle_tb,
+    seed_tb_amount_scalars,
+)
 from app.services.d_cycle_extraction.detail_aggregation import (
     aggregate_d6_detail_rows,
 )
@@ -286,27 +294,29 @@ async def render(ctx: RenderContext) -> dict | None:
     # bs_date for cutoff / post-period usage
     project_context["bs_date"] = f"{project_context['audit_year']}-12-31" if project_context["audit_year"] else ""
 
-    # ─── TB预填: 科目1141合同资产期末审定/未审 ──────────────────────────
-    # 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。原 `1402` 是在途物资
-    # （存货类），属误用。
-    tb_amount = 0
+    # ─── TB 预填：报表规则映射驱动（替代硬编码 1141）─────────────────────────
+    # spec: d-cycle-four-table-extraction-and-disclosure-completion R1
+    #
+    # 合同资产科目为 `1141`；`report_config` 报表行 BS-011 四准则一致
+    # （历史上曾误用 `1402` 在途物资，已由前序 spec 修正）。
+    #
+    # 改造前是硬编码 `LIKE '1141%'` 的裸 SQL，**缺 `year` 过滤** → 多年度项目把所有
+    # 年份加总。本次经 `seed_tb_amount_scalars` 一并修掉（该函数一律带 year）。
+    #
+    # 🔴 该循环的实证形态：`1141`/`1142` 在 `trial_balance` 有 5 个项目的行但金额**全 0**，
+    # 在 `tb_balance` **零数据行**；备抵码 `1231-05` 在 `account_mapping` **零反解**
+    # ⇒ 保留横杠标准码 ⇒ 在点号体系的 `tb_balance` 必然命中 0 行。取数为空「恰好正确」，
+    # 但机理是碰巧 —— 由 `tb_source_codes.slots[*].prefix_mismatch` 如实标注，
+    # 一旦某项目真有数据不会静默取空。
+    d6_codes = None
     try:
-        tb_result = await db.execute(
-            sa.text(
-                "SELECT COALESCE(SUM(ABS(audited_amount)), SUM(ABS(unadjusted_amount)), 0) AS amount "
-                "FROM trial_balance "
-                "WHERE project_id = :pid AND standard_account_code LIKE '1141%' "
-                "AND is_deleted = false"
-            ),
-            {"pid": str(ctx.project_id)},
+        d6_codes = await resolve_d_cycle_account_codes(ctx, _D6_WP_CODE)
+        await seed_tb_amount_scalars(
+            ctx, d6_codes, project_context, write_zero_when_missing=True
         )
-        tb_row = tb_result.fetchone()
-        if tb_row and tb_row.amount:
-            tb_amount = float(tb_row.amount)
-    except Exception as e:
-        logger.warning("D6 render: trial_balance 1141 查询失败: %s", e)
-
-    project_context["tb_amount"] = tb_amount
+    except Exception as e:  # noqa: BLE001 — fail-open
+        logger.warning("D6 render: 科目解析/取数异常（fail-open）: %s", e)
+        project_context.setdefault("tb_amount", 0)
 
     # ─── 关联方注册表 ────────────────────────────────────────────────────
     related_parties: list = []
@@ -341,6 +351,19 @@ async def render(ctx: RenderContext) -> dict | None:
         except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
             logger.warning("D6 render: Tier A seed 兜底异常（fail-open）: %s", e)
 
+    # ─── 取数溯源与三口径自检（新增，前端消费）────────────────────────────────
+    # 备抵侧会因 `1231-05` 零反解而带 `prefix_mismatch` 标志（见上方取数段说明），
+    # 由溯源面板以 warning 级呈现，不显示成「无数据」。
+    d6_tb_source: dict | None = None
+    d6_parent_check: dict | None = None
+    if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED and d6_codes is not None:
+        try:
+            _d6_tb = await fetch_d_cycle_tb(ctx, d6_codes)
+            d6_tb_source = build_d_tb_source_codes(d6_codes, _d6_tb)
+            d6_parent_check = _d6_tb.parent_check
+        except Exception as e:  # noqa: BLE001 — fail-open
+            logger.warning("D6 render: 取数溯源构造异常（fail-open）: %s", e)
+
     html_data: dict = {
         "sections": sections,
         "adjudication_config": adjudication_config,
@@ -349,6 +372,11 @@ async def render(ctx: RenderContext) -> dict | None:
         "disclosure_visibility": disclosure_visibility,
         "responses_snapshot": responses_snapshot,
     }
+
+    if d6_tb_source is not None:
+        html_data["tb_source_codes"] = d6_tb_source
+    if d6_parent_check is not None:
+        html_data["parent_check"] = d6_parent_check
 
     # ─── Tier B 四表库审定表预填（ADDITIVE，灰度开关控制）─────────────────
     # spec: d-cycle-four-table-extraction-formulas (R1.1/1.5/1.6/2.3/7.1/7.2)

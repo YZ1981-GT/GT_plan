@@ -46,7 +46,11 @@
             </el-tooltip>
 
             <!-- 📥 导入导出 收敛为一个下拉 -->
-            <el-tooltip content="底稿文件/数据的批量导入导出（含模板、数据包、ZIP下载）" placement="bottom">
+            <!-- 🔴 文案与真实能力对齐（2026-08-09）：改造前 tooltip 写「含模板、数据包、
+                 ZIP下载」，让人以为「批量下载 ZIP」导出的包能原样从「Excel 导入 /
+                 增强导入」传回来 —— 那两个入口只收**单份** .xlsx/.docx，传 zip 必被拒。
+                 能收 ZIP 数据包的只有「Tab 数据包」。此处只改描述，不动 command。 -->
+            <el-tooltip content="底稿的批量导出与导入。导出：ZIP 整包 / 元数据快照；导入：单份 Excel（xlsx·docx）或 Tab 数据包（zip）" placement="bottom">
               <el-dropdown trigger="click" @command="onImportExportCommand">
               <el-button size="small">
                 📥 导入导出 <el-icon class="el-icon--right"><ArrowDown /></el-icon>
@@ -56,31 +60,31 @@
                   <el-dropdown-item command="excel-import">
                     <span style="display:flex;align-items:center;gap:6px">
                       📄 Excel 导入
-                      <span style="color:var(--el-text-color-secondary);font-size:11px">单份底稿模板覆盖</span>
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">单份 xlsx，覆盖该底稿</span>
                     </span>
                   </el-dropdown-item>
                   <el-dropdown-item command="enhanced-import">
                     <span style="display:flex;align-items:center;gap:6px">
                       📋 增强导入
-                      <span style="color:var(--el-text-color-secondary);font-size:11px">带映射/校验/批量</span>
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">单份 xlsx/docx，带校验与冲突处理</span>
                     </span>
                   </el-dropdown-item>
                   <el-dropdown-item divided command="batch-download">
                     <span style="display:flex;align-items:center;gap:6px">
                       📦 批量下载 ZIP
-                      <span style="color:var(--el-text-color-secondary);font-size:11px">{{ selectedWpIds.length ? `已选 ${selectedWpIds.length} 份` : '全部底稿' }}</span>
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">{{ selectedWpIds.length ? `已选 ${selectedWpIds.length} 份 · 仅下载` : '全部底稿 · 仅下载' }}</span>
                     </span>
                   </el-dropdown-item>
                   <el-dropdown-item command="batch-export-meta">
                     <span style="display:flex;align-items:center;gap:6px">
                       📊 元数据导出
-                      <span style="color:var(--el-text-color-secondary);font-size:11px">结构/配置快照</span>
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">按循环筛选 · 含 manifest</span>
                     </span>
                   </el-dropdown-item>
                   <el-dropdown-item command="bulk-tab">
                     <span style="display:flex;align-items:center;gap:6px">
                       🗂️ Tab 数据包
-                      <span style="color:var(--el-text-color-secondary);font-size:11px">结构化数据导入导出</span>
+                      <span style="color:var(--el-text-color-secondary);font-size:11px">唯一支持 zip 导入的入口</span>
                     </span>
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -92,6 +96,9 @@
             <template v-if="canManageWp">
               <el-tooltip content="从其他项目复制底稿模板配置" placement="bottom">
                 <el-button size="small" @click="showTemplateCopy = true">📋 模板复制</el-button>
+              </el-tooltip>
+              <el-tooltip content="粘贴清单或上传 Excel，一次创建多份自定义底稿" placement="bottom">
+                <el-button size="small" @click="showCustomBatch = true">➕ 批量自定义底稿</el-button>
               </el-tooltip>
               <el-tooltip content="将选中底稿批量委派给项目组成员" placement="bottom">
                 <el-button type="warning" size="small" :disabled="selectedWpIds.length === 0" @click="showBatchAssign = true">
@@ -208,6 +215,13 @@
       @copied="fetchWpIndex"
     />
 
+    <!-- 批量新建自定义底稿（粘贴清单 / 上传 Excel） -->
+    <GtCustomWpBatchDialog
+      v-model="showCustomBatch"
+      :project-id="projectId"
+      @created="fetchWpIndex"
+    />
+
     <!-- 底稿裁剪确认弹窗（生成前选择范围） -->
     <WorkpaperTrimDialog
       v-model="showTrimDialog"
@@ -264,6 +278,7 @@ import WpBatchExportDialog from '@/components/workpaper/WpBatchExportDialog.vue'
 import WpBulkDialog from '@/components/workpaper/bulk-tab/WpBulkDialog.vue'
 import WpTemplateCopyDialog from '@/components/workpaper/WpTemplateCopyDialog.vue'
 import WorkpaperTrimDialog from '@/components/workpaper/WorkpaperTrimDialog.vue'
+import GtCustomWpBatchDialog from '@/components/workpaper/custom/GtCustomWpBatchDialog.vue'
 
 defineOptions({ name: 'WorkpaperList' })
 
@@ -302,6 +317,8 @@ const showWpImportEnhanced = ref(false)
 const showBatchExportEnhanced = ref(false)
 const showBulkTab = ref(false)
 const showTemplateCopy = ref(false)
+/** 批量新建自定义底稿弹窗（custom-workpaper-dual-mode-formula-and-batch Task 21） */
+const showCustomBatch = ref(false)
 const showBatchAssign = ref(false)
 const downloadLoading = ref(false)
 const generateLoading = ref(false)

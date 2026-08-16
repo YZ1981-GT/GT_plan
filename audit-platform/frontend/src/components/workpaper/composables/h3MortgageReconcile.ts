@@ -31,7 +31,7 @@ async function resolveWpId(projectId: string, wpCode: string): Promise<string | 
 
 async function loadResponseItem(wpId: string, itemId: string): Promise<any> {
   try {
-    const res = await api.get(`/workpapers/${wpId}/checklist-responses`)
+    const res = await api.get(`/api/workpapers/${wpId}/checklist-responses`)
     const items: any[] = res?.data?.items || res?.items || res?.data || []
     if (Array.isArray(items)) {
       return items.find((it: any) => it.item_id === itemId) || null

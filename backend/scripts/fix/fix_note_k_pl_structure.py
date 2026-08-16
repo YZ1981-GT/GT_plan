@@ -56,10 +56,15 @@ from __future__ import annotations
 import argparse
 import datetime as _dt
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
 _BACKEND = Path(__file__).resolve().parent.parent.parent
+# 占位/可扩位词表要 import `app.services.note_expandable_markers`（平台唯一真源），
+# 而本脚本常从仓库根直接执行 ⇒ 必须自己把 `backend/` 放进 sys.path。
+if str(_BACKEND) not in sys.path:
+    sys.path.insert(0, str(_BACKEND))
 DATA_DIR = _BACKEND / "data"
 
 ALIGNED_BY = "k-cycle-disclosure-alignment/pl"
@@ -70,8 +75,45 @@ SOE_PATH = DATA_DIR / "note_template_soe.json"
 # ── 泄漏表名（表头首格被 md 重建当成表名）───────────────────────────────────
 LEAKED_TABLE_NAME = "项  目"
 
-# ── 占位说明行（渲染成空披露数据行，须删）───────────────────────────────────
-PLACEHOLDER_ROW_LABELS = {"可无限量添加行", "......", "……", "…", "...."}
+# ── 占位说明行 vs 可扩位行 ────────────────────────────────────────────────
+#
+# 🔴 2026-08-12 口径更正（spec `k-cycle-extraction-formula-and-disclosure-closure`
+#    Task 18 / Requirement 9.1~9.2）：同一个 `……` 标签有**两种**语义，取决于
+#    `row_type`，本脚本原先一律当垃圾删掉，与 R9 直接冲突。
+#
+#    * `row_type` 是 `data`/缺省 → **占位说明行**：渲染成一行空披露数据（本脚本
+#      当初要治的就是它），须删。
+#    * `row_type == 'expandable'` → **可扩位行**：源模板在该处标了「可无限量增行」，
+#      是给审计师的「在这里加行」落点，**必须保留**。平台共识见
+#      `app.services.note_expandable_markers`（唯一词表）与
+#      `note_shared_table_segments` 的「`……` 是段内合法可扩行，不得当无主行剔除」。
+#
+#    删掉它的后果不是报错而是**功能消失**：附注里那一处再也加不了行，审计师只能
+#    去改模板 JSON。
+#
+# 词表 **import 平台服务**（禁另写一份）；`....`（4 点）是本脚本实测过的额外形态，
+# 平台词表里没有，故以「本地补充」的形式并集进来并说明来源。
+_LOCAL_EXTRA_PLACEHOLDERS = frozenset({"...."})
+
+try:  # 脚本可能被 importlib 单独加载，容错但不静默
+    from app.services.note_expandable_markers import (
+        EXPANDABLE_ROW_TYPE,
+        LABEL_MARKERS,
+    )
+except ImportError as _err:  # pragma: no cover - 环境异常
+    raise SystemExit(
+        "无法 import app.services.note_expandable_markers —— "
+        f"占位/可扩位判据不得退回本地词表：{_err}"
+    ) from _err
+
+PLACEHOLDER_ROW_LABELS = set(LABEL_MARKERS) | set(_LOCAL_EXTRA_PLACEHOLDERS)
+
+
+def _is_expandable_row(row: Any) -> bool:
+    """该行是否已被标成**可扩位行**（保留）而非占位说明行（删）。"""
+    if not isinstance(row, dict):
+        return False
+    return str(row.get("row_type") or "") == EXPANDABLE_ROW_TYPE
 
 
 def _norm(label: Any) -> str:
@@ -357,7 +399,9 @@ def _strip_placeholder_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if str(r.get("row_type", "")) == "header_label":
             continue
         if _norm(r.get("label")) in {_norm(x) for x in PLACEHOLDER_ROW_LABELS}:
-            continue
+            # 已标 expandable 的是**可扩位行**，保留（见上方口径更正说明）
+            if not _is_expandable_row(r):
+                continue
         out.append(r)
     return out
 
@@ -478,7 +522,9 @@ def validate_section(section: dict[str, Any], entry: dict[str, Any]) -> list[str
         for j, row in enumerate(tbl.get("rows") or []):
             if str(row.get("row_type", "")) == "header_label":
                 errs.append(f"{name} 第 {j} 行仍为 header_label 假数据行")
-            if _norm(row.get("label")) in {_norm(x) for x in PLACEHOLDER_ROW_LABELS}:
+            if _norm(row.get("label")) in {
+                _norm(x) for x in PLACEHOLDER_ROW_LABELS
+            } and not _is_expandable_row(row):
                 errs.append(f"{name} 第 {j} 行仍为占位说明行「{row.get('label')}」")
             vals = row.get("values")
             if isinstance(vals, list) and len(vals) != max(len(headers) - 1, 0):

@@ -77,8 +77,18 @@ export function l7ColumnsFor(variant: L7DisclosureVariant): Record<string, Colum
   return {
     [L7_SUBTABLE.main]: defineColumns([
       { key: 'label', label: '项目', is_label: true, flat: true },
-      { key: 'end_amount', label: isListed ? '期末数' : '期末余额', format: 'amount', align: 'right' },
-      { key: 'prior_amount', label: isListed ? '上年年末数' : '期初余额', format: 'amount', align: 'right' },
+      // 🔴 soe 列序 = 源模板口径（年初余额/期末余额），与 listed（期末数/上年年末数）相反
+      //    是源模板事实（spec l-cycle-…completion 裁决 C）。
+      //    key 保持不变（prior_amount=期初/年初，end_amount=期末），只改 label 与数组顺序。
+      ...(isListed
+        ? [
+            { key: 'end_amount', label: '期末数', format: 'amount' as const, align: 'right' as const },
+            { key: 'prior_amount', label: '上年年末数', format: 'amount' as const, align: 'right' as const },
+          ]
+        : [
+            { key: 'prior_amount', label: '年初余额', format: 'amount' as const, align: 'right' as const },
+            { key: 'end_amount', label: '期末余额', format: 'amount' as const, align: 'right' as const },
+          ]),
     ]),
   }
 }

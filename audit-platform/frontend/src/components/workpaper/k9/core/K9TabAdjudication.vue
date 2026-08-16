@@ -322,8 +322,8 @@ const props = defineProps<{
   allResponses: Map<string, any>
   tbData: { unadjusted6602: number; audited6602: number }
   /** tb_balance 6602 明细子科目预填（来自后端 render adjudication_prefill） */
-  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number   tbSourceCodes?: Record<string, any> | null
-}>
+  prefill?: Array<{ name: string; unadjustedDebit: number; unadjustedCredit: number }>
+  tbSourceCodes?: Record<string, any> | null
   isReadonly: boolean
 }>()
 

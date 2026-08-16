@@ -117,18 +117,40 @@ export const H7_ACCOUNT_DEF: HCycleAccountDef = {
   grossFallback: '1621',
 }
 
+/**
+ * H8 使用权资产 —— **双族并存**（CAS 21 实施期平台标准科目表出现两套编码）。
+ *
+ * 真源 = 后端 `four_table/dual_family_codes.py`（`codes_for_cycle_slot('H8', slot)`），
+ * 本处只是它的前端镜像，由 `hCycleAccountScope.spec.ts` 三向锁死
+ * （前端注册表 ↔ 后端 scope ↔ 双族真源）。
+ *
+ * 🔴 顺序即 primary 在前（`1641` 是 `report_config BS-031` 与既有预设写的那个），
+ * `grossFallback` 取 primary；两族在同一项目内互斥（9 项目实证）故并取零双算。
+ * 🔴 只写 primary 会让 5 个用新族的项目只取到真实金额的 0.04%（比恒空更隐蔽）。
+ */
 export const H8_ACCOUNT_DEF: HCycleAccountDef = {
   cycle: 'H8',
   reportRowCode: 'BS-031',
-  slotFallbacks: { gross: ['1641'], accum_dep: ['1642'], impairment: ['1643'] },
+  slotFallbacks: {
+    gross: ['1641', '1651'],
+    accum_dep: ['1642', '1652'],
+    // 新族无对应减值准备码（客户科目表未见 1653）→ 宁缺勿造，不臆造 alternate
+    impairment: ['1643'],
+  },
   grossFallback: '1641',
   wrongLegacyCodes: ['1901', '190101'],
 }
 
+/**
+ * H9 租赁负债 —— 同为双族（`2601` / `2651`）。
+ *
+ * 🔴 `unearned_finance` 有意只留 primary：新族把未确认融资费用做成 `2651.02`
+ * 子科目（`account_mapping` 实证），已含在 `2651` 父额内，再并取一个新族码即双算。
+ */
 export const H9_ACCOUNT_DEF: HCycleAccountDef = {
   cycle: 'H9',
   reportRowCode: 'BS-063',
-  slotFallbacks: { gross: ['2601'], unearned_finance: ['2602'] },
+  slotFallbacks: { gross: ['2601', '2651'], unearned_finance: ['2602'] },
   grossFallback: '2601',
   wrongLegacyCodes: ['2205'],
 }

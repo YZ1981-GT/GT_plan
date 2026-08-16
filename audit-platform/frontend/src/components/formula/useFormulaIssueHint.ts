@@ -14,6 +14,8 @@
  */
 import { ref, type Ref } from 'vue'
 import http from '@/utils/http'
+// spec: formula-management-runtime-closure Task 14 — 端点收敛进 apiPaths（纯搬迁）
+import { projectFormula } from '@/services/apiPaths/formula'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -88,7 +90,7 @@ export function useFormulaIssueHint(): UseFormulaIssueHintReturn {
     issuesLoading.value = true
     try {
       const { data } = await http.get<CrossCheckResponse>(
-        `/api/projects/${projectId}/formula/report-cross-check`,
+        projectFormula.reportCrossCheck(projectId),
         { params: { year } },
       )
       const payload: CrossCheckResponse = (data ?? {}) as CrossCheckResponse

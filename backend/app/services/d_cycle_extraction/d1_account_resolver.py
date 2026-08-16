@@ -97,6 +97,26 @@ class D1AccountCodes:
     provision_standard: list[str] = field(default_factory=list)
     resolved_from: str = RESOLVED_FROM_FALLBACK
     provision_resolved_from: str = RESOLVED_FROM_FALLBACK
+    #: 备抵名称过滤的主体关键词（与 `DCycleAccountCodes.subject_keywords` 同构）。
+    #:
+    #: 🔴 **本字段是 2026-08-05 真实库验收挖出的缺陷修复**，不是装饰性补齐：
+    #:
+    #: `fetch_d_cycle_tb` 读的是 ``getattr(codes, "subject_keywords", ())``，
+    #: 而本类原先**没有这个字段** ⇒ 那道「无条件名称过滤」对 D1 静默退化成空操作
+    #: （`filter_provision_codes` 拿到空关键词即原样返回，`applied=False`）。
+    #:
+    #: 后果（8 个项目直跑实测）：4 个项目的 `account_mapping` 只有
+    #: ``1231 → 1231-01`` 这一条 `auto_exact` 反解行（没有 ``1231.01``），
+    #: 于是备抵前缀退化为**整个 `1231`**，把应收账款/其他应收款的坏账全算进 D1::
+    #:
+    #:     52c04ed1  D1 备抵 102,358,291.13   ← 应收票据真实坏账约 0
+    #:     2aa00f57  D1 备抵   1,718,193.78
+    #:     f064f5e4  D1 备抵   1,110,214.59
+    #:     4f6dbc36  D1 备抵       3,834.60
+    #:
+    #: 与 K1 那次「虚增 31.6 倍」完全同源。而**单测替身查不出** —— 替身直接给定
+    #: `provision` 码集，不经 `account_mapping` 反解，故永远不会产生宽口径前缀。
+    subject_keywords: tuple[str, ...] = (D1_PROVISION_NAME_FILTER, "票据")
 
     @property
     def use_provision_name_filter(self) -> bool:

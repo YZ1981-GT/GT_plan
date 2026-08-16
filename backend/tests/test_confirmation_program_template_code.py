@@ -23,14 +23,25 @@ class TestResolveProgramTemplateCode:
         """父码即 F0（F0A sheet 在 F0 下）：不变。"""
         assert resolve_program_template_code("函证程序表F0A", "F0") == "F0A"
 
-    def test_l0_f0a_falls_back_when_no_l0a_template(self):
-        """L0 内的「函证程序表F0A」：L0A 无模板 → 回退提取值 F0A（零回归）。
+    def test_l0_f0a_prefers_l0a_template(self):
+        """L0 内的「函证程序表F0A」：L0A 模板已补齐 → 采用父码 L0A。
 
-        实测 get_template('L0A') is None，故按 Property 22 回退原提取值，
-        保持既有 xlsx / F0A 提取兜底不丢程序行。
+        🔴 **本测试于 2026-08-05 诚实改写**（spec l0-confirmation-source-alignment
+        Requirements 1.1/1.2、Property 2）。改写前它断言::
+
+            assert get_template("L0A") is None      # 前提锁定
+            assert resolve_program_template_code("函证程序表F0A", "L0") == "F0A"
+
+        那是**锁定缺陷行为**：`L0A` 当时只存在于 `procedure_table_templates.json`
+        的**根级**，而 `get_template` 只读 `tables` → 返回 None → 兜底失败 →
+        L0 程序表实际加载「采购存货循环函证程序表」12 条、`ref_index` 全为 `F0-*`。
+        补齐 `tables.L0A` 后前提不再成立，故同步更新为正确期望。
+
+        源模板 tab 名带 `F0A` 是**索引号笔误**（底稿目录 `F4=L0A` 才是真源），
+        不改 tab 名，靠本兜底把它解析到 L0A。
         """
-        assert get_template("L0A") is None  # 前提锁定
-        assert resolve_program_template_code("函证程序表F0A", "L0") == "F0A"
+        assert get_template("L0A") is not None  # 前提锁定（改写后）
+        assert resolve_program_template_code("函证程序表F0A", "L0") == "L0A"
 
     def test_parent_code_preferred_when_template_exists(self):
         """构造：父码 A 模板存在时优先采用父码。

@@ -1,7 +1,7 @@
 /**
  * K7 递延收益 — 科目码单一真源。
  *
- * 报表行：BS-069（上市）/ BS-095（国企）
+ * 报表行：BS-066（两准则同号；2026-08-09 由 BS-069 / BS-095 改正）
  * 公式：TB('2401','期末余额') 四准则一致
  * 兜底码：2401
  *
@@ -12,11 +12,32 @@
  *       Requirements 5.1~5.3 / Property 9
  */
 
-/** 报表行编码 —— 上市准则 */
-export const K7_REPORT_ROW_CODE_LISTED = 'BS-069'
+/**
+ * 报表行编码 —— 上市准则。
+ *
+ * 🔴 **2026-08-09 连库对账改正**（spec k-cycle-…-closure Task 4/7）：
+ *
+ * ================  ==============  ================================================
+ * 字段               改正前           改正前那个码在 `report_config` 里实际是什么
+ * ================  ==============  ================================================
+ * listed row_code   ``BS-069``      **非流动负债合计**（`ROW()` 派生行）
+ * soe row_code      ``BS-095``      row_name 是「递延收益」但 **formula 为 NULL**
+ * ================  ==============  ================================================
+ *
+ * 后果分级 **TRACE_ONLY**：派生行抽不出 `TB()`、NULL 公式也解析不出码 ⇒ 两侧都退兜底
+ * `2401`，金额是对的，只有 `resolved_from` 谎报。但溯源面板会把「非流动负债合计」
+ * 当成递延收益的来源行展示。
+ *
+ * 正确落点（`report_config` 四变体一致）::
+ *
+ *     BS-066 递延收益 = TB('2401','期末余额')
+ *
+ * 🔴 两准则**同号**。保留 LISTED/SOE 两个常量是为了与其余 K 循环形态一致。
+ */
+export const K7_REPORT_ROW_CODE_LISTED = 'BS-066'
 
-/** 报表行编码 —— 国企准则 */
-export const K7_REPORT_ROW_CODE_SOE = 'BS-095'
+/** 报表行编码 —— 国企准则（与上市同号，见上方改正说明） */
+export const K7_REPORT_ROW_CODE_SOE = 'BS-066'
 
 /** 兜底标准码 */
 export const K7_FALLBACK_STANDARD = '2401'
@@ -49,7 +70,7 @@ function normalize(codes: unknown): string[] {
  */
 export function k7QueryCodes(src?: K7TbSourceCodes | null): string[] {
   const resolved = normalize(src?.gross)
-  return resolved.length ? resolved : ['2401']
+  return resolved.length ? resolved : [K7_FALLBACK_STANDARD]
 }
 
 /**
@@ -58,5 +79,5 @@ export function k7QueryCodes(src?: K7TbSourceCodes | null): string[] {
  */
 export function k7AccountCode(src?: K7TbSourceCodes | null): string {
   const resolved = normalize(src?.gross_standard)
-  return resolved[0] || '2401'
+  return resolved[0] || K7_FALLBACK_STANDARD
 }

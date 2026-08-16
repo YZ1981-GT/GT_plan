@@ -225,23 +225,41 @@ const subsidiaryBasicColumns = groupedCols([
   ['acquisitionMethod', '取得方式', 'text', undefined],
 ])
 
+// 🔴 首列 label 逐字取源 xlsx `少数股东持股比例%`（源文百分号紧跟其后，不得省略、
+// 也不得改成全角括号形态）。列 key 不动。
 const minorityColumns = flatCols(cols([
-  ['holdingRatio', '少数股东持股比例', 'percent'],
+  ['holdingRatio', '少数股东持股比例%', 'percent'],
   ['currentProfit', '本期归属于少数股东的损益', 'number'],
   ['dividend', '本期向少数股东宣告分派的股利', 'number'],
   ['closingEquity', '期末少数股东权益余额', 'number'],
 ]))
 
-// 「重要非全资子公司主要财务信息—期末数/续（1）—期初数」各自一张表（单期间），
-// 表内无跨期分组 → flat。
-const balanceColumns = flatCols(cols([
-  ['currentAssets', '流动资产', 'number'],
-  ['nonCurrentAssets', '非流动资产', 'number'],
-  ['totalAssets', '资产合计', 'number'],
-  ['currentLiabilities', '流动负债', 'number'],
-  ['nonCurrentLiabilities', '非流动负债', 'number'],
-  ['totalLiabilities', '负债合计', 'number'],
-]))
+// 「重要非全资子公司主要财务信息—期末数」（源 A56:G64）与「续（1）—期初数」（源 A65:G73）
+// 各自一张表，**源 xlsx 两表都是两级表头**：父表头分别为 `期末数` / `期初数`，
+// 下辖 流动资产/非流动资产/资产合计/流动负债/非流动负债/负债合计 六列。
+//
+// 🔴 改造前两表共用一份 `flatCols(...)` ⇒ 丢了 group、被 `buildG7*Columns()` 的
+//   `...(hasGroup ? {} : { flat: true })` 自动标成 flat ⇒ 附注两级表头被压成单级。
+//   `flat` 为真只是**症状**，病因是丢 group（spec Task 6 / A 类）。
+//   修法照 soe 侧 `ASSOCIATE_FS_SUB` / `ASSOCIATE_PL_SUB` 已正确拆分的范式：
+//   参数化父表头名，让两表各传自己的 group，**列 key 保持不变**（零数据风险）。
+const BALANCE_GROUP_CLOSING = '期末数'
+const BALANCE_GROUP_OPENING = '期初数'
+
+/** 由父表头名生成重要非全资子公司资产负债类列（六列同 key、只有 group 不同）。 */
+function balanceColumnsFor(group: string): G7DisclosureColumn[] {
+  return groupedCols([
+    ['currentAssets', '流动资产', 'number', group],
+    ['nonCurrentAssets', '非流动资产', 'number', group],
+    ['totalAssets', '资产合计', 'number', group],
+    ['currentLiabilities', '流动负债', 'number', group],
+    ['nonCurrentLiabilities', '非流动负债', 'number', group],
+    ['totalLiabilities', '负债合计', 'number', group],
+  ])
+}
+
+const balanceClosingColumns = balanceColumnsFor(BALANCE_GROUP_CLOSING)
+const balanceOpeningColumns = balanceColumnsFor(BALANCE_GROUP_OPENING)
 
 // 「续（2）—本期及上期发生额」单表内合并本期/上期两组（源 R74 两级表头）。
 const resultColumns = groupedCols([
@@ -275,19 +293,53 @@ const investeeBasicColumns = groupedCols([
   ['businessNature', '业务性质', 'text', undefined],
   ['directHolding', '直接', 'percent', '持股比例(%)'],
   ['indirectHolding', '间接', 'percent', '持股比例(%)'],
-  ['accountingMethod', '会计处理方法', 'text', undefined],
+  // 🔴 逐字取源 xlsx（源文为完整表述，不得简写成「会计处理方法」）。列 key 不动。
+  ['accountingMethod', '对合营企业或联营企业投资的会计处理方法', 'text', undefined],
 ])
 
+/**
+ * 「其他不重要合营企业和联营企业的汇总财务信息」列（源 A199:C213）。
+ *
+ * 🔴 该表源模板列名确为 `期末数/本期发生额` / `期初数/上期发生额`（同一列兼容两种口径），
+ * 与下面按表拆分的合营企业 FS/PL 两表**不同**，不得"统一"。
+ */
 const currentPriorColumns = flatCols(cols([
   ['current', '期末数/本期发生额', 'number'],
   ['prior', '期初数/上期发生额', 'number'],
 ]))
 
+/**
+ * 「重要合营企业主要财务信息」列（源 A132:C151）—— 资产负债口径，列名 `期末数`/`期初数`。
+ *
+ * 🔴 与下面 PL 表按表拆分：改造前两表共用一份 `currentPriorColumns`（`期末数/本期发生额`），
+ * 而源模板 FS 表是 `期末数`/`期初数`、PL 表是 `本期发生额`/`上期发生额` ——
+ * 共用一份必然让其中一张与源模板不符。范式参照 soe 侧已正确拆分的
+ * `_ASSOC_FS_COLUMNS` / `_ASSOC_PL_COLUMNS`。列 key 不变（`current`/`prior`）。
+ */
+const jointVentureFsColumns = flatCols(cols([
+  ['current', '期末数', 'number'],
+  ['prior', '期初数', 'number'],
+]))
+
+/** 「续：重要合营企业本期及上期经营成果」列（源 A152:C163）—— 损益口径。 */
+const jointVenturePlColumns = flatCols(cols([
+  ['current', '本期发生额', 'number'],
+  ['prior', '上期发生额', 'number'],
+]))
+
 // 超额亏损分担额表：单期数值，无跨期/跨主体分组 → flat
+// 🔴 label 逐字取源模板 A220:D232（`本期未确认的损失份额（或本期实现净利润的分享额）`
+// 全角括号、`本期末累积未确认的损失份额`），禁简写。
+//
+// 🔴 列 key 用**美式**拼写，与 soe 变体统一（g7-column-alignment spec Task 9）：
+// 本表原用英式 `Unrecognised`，soe 同表用美式 `priorCumulative`/`currentUnrecognized`/
+// `closingCumulative`。美式是平台主流（`g7UnrecognizedLossModel` / `useG7EquityMethodFormData`
+// / `G7TabUnrecognizedLoss.vue` / J3 / G6 共 40+ 处），英式仅本表 3 列在用 ⇒ 收敛到美式。
+// 数据风险为零：量化闸实测 listed `七、1` 全章节 `sub_table_data` 从未推送过。
 const excessLossesColumns = flatCols(cols([
-  ['priorUnrecognised', '前期累积未确认的损失份额', 'number'],
-  ['currentUnrecognised', '本期未确认损失份额/净利润分享额', 'number'],
-  ['closingUnrecognised', '期末累积未确认的损失份额', 'number'],
+  ['priorCumulative', '前期累积未确认的损失份额', 'number'],
+  ['currentUnrecognized', '本期未确认的损失份额（或本期实现净利润的分享额）', 'number'],
+  ['closingCumulative', '本期末累积未确认的损失份额', 'number'],
 ]))
 
 // 重要的共同经营：主要经营地/注册地/业务性质独立列 + 持股比例/享有的份额(%) 分组
@@ -300,17 +352,38 @@ const jointOperationColumns = groupedCols([
   ['indirectShare', '间接', 'percent', '持股比例或享有的份额(%)'],
 ])
 
-/** 「重要联营企业主要财务信息/续」共用槎位（同 3 家联营企业，源模板字面 `联营企业1..3`）。 */
+/**
+ * 「重要联营企业主要财务信息 / 续：本期及上期经营成果」共用**槎位**（同 3 家联营企业，
+ * 源模板字面 `联营企业1..3`）—— 槎位共用是对的（同一批实体），但**子列 label 必须按表拆分**。
+ *
+ * 🔴 源 xlsx 实证：FS 表（`A165:G187`）子列是 `期末数` / `期初数`，
+ * PL 表（`A188:G197`）子列是 `本期发生额` / `上期发生额`。改造前两表共用一份
+ * `IMPORTANT_ASSOCIATE_SUB`（`期末/本期` / `期初/上期`）⇒ 两张表都与源模板不符。
+ *
+ * 🔴 **列 key 不变** —— `buildG7SlotColumns` 拼 key 用 `{slot}_{seq}_{sub.key}`，
+ * `sub.key` 保持 `current`/`prior` ⇒ 只动 label 不动 key，零数据风险。
+ *
+ * 范式参照 soe 侧已正确拆分的 `ASSOCIATE_FS_SUB` / `ASSOCIATE_PL_SUB`（带「不得简写」注释）。
+ */
 const IMPORTANT_ASSOCIATE_SLOT = 'important-associate'
 const IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES = ['联营企业1', '联营企业2', '联营企业3']
-const IMPORTANT_ASSOCIATE_SUB: G7SlotSubColumn[] = [
-  { key: 'current', label: '期末/本期' },
-  { key: 'prior', label: '期初/上期' },
+/** FS 表子列（源 A165:G187 逐字）。 */
+const IMPORTANT_ASSOCIATE_FS_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '期末数' },
+  { key: 'prior', label: '期初数' },
+]
+/** PL 表子列（源 A188:G197 逐字，不得简写为「本期/上期」）。 */
+const IMPORTANT_ASSOCIATE_PL_SUB: G7SlotSubColumn[] = [
+  { key: 'current', label: '本期发生额' },
+  { key: 'prior', label: '上期发生额' },
 ]
 
-/** 由槎位实体名生成矩阵列（每实体 期末/本期·期初/上期 两子列，按实体名分组）。 */
-function associateMatrixColumnsFor(names: readonly string[]): G7DisclosureColumn[] {
-  const slotCols = buildG7SlotColumns(IMPORTANT_ASSOCIATE_SLOT, names, IMPORTANT_ASSOCIATE_SUB)
+/** 由槎位实体名 + 该表子列定义生成矩阵列（每实体两子列，按实体名分组）。 */
+function associateMatrixColumnsFor(
+  names: readonly string[],
+  sub: G7SlotSubColumn[],
+): G7DisclosureColumn[] {
+  const slotCols = buildG7SlotColumns(IMPORTANT_ASSOCIATE_SLOT, names, sub)
   return groupedCols(slotCols.map(c => [
     c.key,
     c.subLabel ?? '',
@@ -401,6 +474,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'subsidiary-composition',
         title: '（1）企业集团的构成',
         templateTableKey: '企业集团的构成',
+        labelHeader: '子公司名称',
         sourceRows: 'A28:G39',
         columns: subsidiaryBasicColumns,
         rows: blankRows(
@@ -417,6 +491,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'important-minority-subsidiaries',
         title: '（2）重要的非全资子公司',
         templateTableKey: '重要的非全资子公司',
+        labelHeader: '子公司名称',
         sourceRows: 'A47:E55',
         columns: minorityColumns,
         rows: blankRows('minority-subsidiary', dynamicRowCount(1), minorityColumns),
@@ -427,9 +502,10 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'minority-closing-balance',
         title: '（3）重要非全资子公司主要财务信息—期末数',
         templateTableKey: '重要非全资子公司主要财务信息—期末数',
+        labelHeader: '子公司名称',
         sourceRows: 'A56:G64',
-        columns: balanceColumns,
-        rows: blankRows('minority-closing', dynamicRowCount(1), balanceColumns),
+        columns: balanceClosingColumns,
+        rows: blankRows('minority-closing', dynamicRowCount(1), balanceClosingColumns),
         dynamic: true,
         maxRows: 30,
       },
@@ -437,9 +513,10 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'minority-opening-balance',
         title: '续（1）—期初数',
         templateTableKey: '续（1）',
+        labelHeader: '子公司名称',
         sourceRows: 'A65:G72',
-        columns: balanceColumns,
-        rows: blankRows('minority-opening', dynamicRowCount(1), balanceColumns),
+        columns: balanceOpeningColumns,
+        rows: blankRows('minority-opening', dynamicRowCount(1), balanceOpeningColumns),
         dynamic: true,
         maxRows: 30,
       },
@@ -447,6 +524,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'minority-results',
         title: '续（2）—本期及上期发生额',
         templateTableKey: '续（2）',
+        labelHeader: '子公司名称',
         sourceRows: 'A73:I81',
         columns: resultColumns,
         rows: blankRows('minority-results', dynamicRowCount(1), resultColumns),
@@ -457,6 +535,11 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'ownership-change-impact',
         title: '（6）未丧失控制权的所有者权益份额变动影响',
         templateTableKey: '未丧失控制权的所有者权益份额变动影响',
+        // 🔴 源 A96 原文是「项  目」（**两个空格**）—— 必须逐字带上（R4.1/R4.4）。
+        // 缺省回退值 `'项目'`（无空格）会让契约守卫 P5（labelHeader ↔ seed headers[0]）打红：
+        // seed 侧 `headers[0]` 逐字保留了源原文，而 `facts.label_header` 经 `_norm()` 去掉
+        // 全部空白 ⇒ 边①/边③ 对这类差异**结构上不可见**，只有 P5 能抓到。
+        labelHeader: '项  目',
         sourceRows: 'A95:G108',
         columns: companyColumnsFor(OWNERSHIP_CHANGE_SLOT_DEFAULT_NAMES),
         slotConfig: { slot: OWNERSHIP_CHANGE_SLOT },
@@ -527,6 +610,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'important-jv-associate',
         title: '（1）重要的合营企业或联营企业',
         templateTableKey: '重要的合营企业或联营企业',
+        labelHeader: '合营企业或联营企业名称',
         sourceRows: 'A111:G124',
         columns: investeeBasicColumns,
         rows: blankRows(
@@ -542,8 +626,11 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'important-jv-balance',
         title: '（2）重要合营企业主要财务信息—资产负债及权益法调节',
         templateTableKey: '重要合营企业主要财务信息',
+        // 🔴 源 A132 原文是「项 目」（**一个空格**）—— 与联营表 A169 同为单空格，
+        // 但与本 sheet 另外 4 张表的「项  目」（双空格）不同。R4.4 明确禁止统一，逐表取原文。
+        labelHeader: '项 目',
         sourceRows: 'A132:C151',
-        columns: currentPriorColumns,
+        columns: jointVentureFsColumns,
         rows: annotateEquityBridgeSources(metricRows(
           'important-jv-balance',
           [
@@ -566,7 +653,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
             '对合营企业权益投资的账面价值',
             '存在公开报价的权益投资的公允价值',
           ],
-          currentPriorColumns,
+          jointVentureFsColumns,
           '被投资单位财务信息（合营、联营）G7-5',
         )),
       },
@@ -574,12 +661,14 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'important-jv-results',
         title: '续：重要合营企业本期及上期经营成果',
         templateTableKey: '续：重要合营企业本期及上期经营成果',
+        // 🔴 源 A153 原文是「项  目」（双空格）；注意上一张合营表 A132 是**单**空格。
+        labelHeader: '项  目',
         sourceRows: 'A152:C163',
-        columns: currentPriorColumns,
+        columns: jointVenturePlColumns,
         rows: metricRows(
           'important-jv-results',
           ['营业收入', '财务费用', '所得税费用', '净利润', '终止经营的净利润', '其他综合收益', '综合收益总额', '本期收到的股利'],
-          currentPriorColumns,
+          jointVenturePlColumns,
           '被投资单位财务信息（合营、联营）G7-5',
         ),
       },
@@ -587,9 +676,14 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'important-associate-balance',
         title: '（3）重要联营企业主要财务信息—资产负债及权益法调节',
         templateTableKey: '重要联营企业主要财务信息',
+        // 🔴 源 A169 原文是「项 目」（**一个空格**）。
+        labelHeader: '项 目',
         sourceRows: 'A165:G187',
-        columns: associateMatrixColumnsFor(IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES),
-        slotConfig: { slot: IMPORTANT_ASSOCIATE_SLOT, sub: IMPORTANT_ASSOCIATE_SUB },
+        columns: associateMatrixColumnsFor(
+          IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES,
+          IMPORTANT_ASSOCIATE_FS_SUB,
+        ),
+        slotConfig: { slot: IMPORTANT_ASSOCIATE_SLOT, sub: IMPORTANT_ASSOCIATE_FS_SUB },
         // 🔴 Property 12：源模板 R171:R187 为 17 行，不含「其中：现金和现金等价物」
         // （该行只在合营表 R135 出现，18 行）—— 联营表禁复制合营表行集。
         rows: annotateEquityBridgeSources(metricRows(
@@ -613,7 +707,10 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
             '对联营企业权益投资的账面价值',
             '存在公开报价的权益投资的公允价值',
           ],
-          associateMatrixColumnsFor(IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES),
+          associateMatrixColumnsFor(
+            IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES,
+            IMPORTANT_ASSOCIATE_FS_SUB,
+          ),
           '被投资单位财务信息（合营、联营）G7-5',
         )),
       },
@@ -621,13 +718,21 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'important-associate-results',
         title: '续：重要联营企业本期及上期经营成果',
         templateTableKey: '续：重要联营企业本期及上期经营成果',
+        // 🔴 源 A189 原文是「项  目」（双空格）。
+        labelHeader: '项  目',
         sourceRows: 'A188:G197',
-        columns: associateMatrixColumnsFor(IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES),
-        slotConfig: { slot: IMPORTANT_ASSOCIATE_SLOT, sub: IMPORTANT_ASSOCIATE_SUB },
+        columns: associateMatrixColumnsFor(
+          IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES,
+          IMPORTANT_ASSOCIATE_PL_SUB,
+        ),
+        slotConfig: { slot: IMPORTANT_ASSOCIATE_SLOT, sub: IMPORTANT_ASSOCIATE_PL_SUB },
         rows: metricRows(
           'important-associate-results',
           ['营业收入', '净利润', '终止经营的净利润', '其他综合收益', '综合收益总额', '本期收到的股利'],
-          associateMatrixColumnsFor(IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES),
+          associateMatrixColumnsFor(
+            IMPORTANT_ASSOCIATE_SLOT_DEFAULT_NAMES,
+            IMPORTANT_ASSOCIATE_PL_SUB,
+          ),
           '被投资单位财务信息（合营、联营）G7-5',
         ),
       },
@@ -635,6 +740,8 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'unimportant-aggregate',
         title: '（4）其他不重要合营企业和联营企业的汇总财务信息',
         templateTableKey: '其他不重要合营企业和联营企业的汇总财务信息',
+        // 🔴 源 A200 原文是「项  目」（双空格）。
+        labelHeader: '项  目',
         sourceRows: 'A199:C213',
         columns: currentPriorColumns,
         rows: [
@@ -704,6 +811,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'excess-losses',
         title: '（6）对合营企业或联营企业发生超额亏损的分担额',
         templateTableKey: '对合营企业或联营企业发生超额亏损的分担额',
+        labelHeader: '被投资单位名称',
         sourceRows: 'A220:D232',
         columns: excessLossesColumns,
         rows: (() => {
@@ -786,6 +894,7 @@ export const G7_LISTED_DISCLOSURE_SECTIONS: G7DisclosureSection[] = [
         id: 'joint-operations',
         title: '重要共同经营基本情况',
         templateTableKey: '重要的共同经营',
+        labelHeader: '共同经营名称',
         sourceRows: 'A235:F240',
         columns: jointOperationColumns,
         rows: blankRows(
@@ -906,7 +1015,13 @@ export function materializeG7ListedRows(
       }
     }
     return {
-      项目: row.label,
+      // 🔴 行对象的标签键必须与 `buildG7ListedColumns()` 标签列的 `key` **逐字一致**，
+      //    否则投影器 `_project_row` 取 `r.get(label_key)` 拿不到值 ⇒ **整表行名变空**。
+      //    改造前这里是 `项目: row.label` 而列 key 已改成 `'label'` ⇒ 两侧不自洽
+      //    （实测该 skew 会让存量行 8/7/12/10 行的行名全部投影成 `''`）。
+      //    这条不变式由守卫 `g7ColumnThreeWayAlignment.spec.ts` 的
+      //    「行构造标签键 ≡ 标签列 key」断言钉死。
+      label: row.label,
       ...values,
       _row_id: row.id,
       _kind: row.kind ?? 'data',
@@ -935,8 +1050,19 @@ export function buildG7ListedColumns(
       // 只加一侧会让另一路径继续被 `_infer_groups_from_headers` 前缀推断出凭空父表头。
       const hasGroup = columns.some(c => c.group)
       const labelText = table.labelHeader ?? '项目'
+      // 🔴 标签列 key 用平台惯例 `'label'`（不是中文字面量 `'项目'`）—— 裁决依据：
+      //   ① 平台 266 个标签列定义里 241 个（91%）用 `'label'`，跨 70 个文件；
+      //      硬编码 `'项目'` 全平台仅 7 处且全在 G 循环，属少数派偏离；
+      //   ② 中文字面量当 key 违反平台「禁硬编码」取向；
+      //   ③ 零数据风险：`note_sub_table_projector._project_row` 有双向兜底
+      //      （L67-68 任意标签 key ← 规范 `label`；L204-205 标签值为空 → 回退 `label`），
+      //      且标签列不承载数据（行名真源是 `rows[].label`，`_cell_meta`/`_cell_modes`
+      //      按 value 列索引、标签列不算数据列）。
+      // `label: labelText` 是**显示文字**（与 key 无关），`table.labelHeader ?? '项目'` 不动。
+      // `is_label: true` 必须保留：投影器靠它选标签列并**跳过它**算 group 索引（header_idx 从 1 起），
+      // 去掉会让 group 的 start 整体偏移一位。
       result[key] = [
-        { key: '项目', label: labelText, is_label: true, ...(hasGroup ? {} : { flat: true }) },
+        { key: 'label', label: labelText, is_label: true, ...(hasGroup ? {} : { flat: true }) },
         ...columns.map((c) => ({
           key: c.key,
           label: c.label,

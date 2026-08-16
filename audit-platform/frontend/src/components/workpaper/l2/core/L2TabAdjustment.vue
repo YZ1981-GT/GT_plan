@@ -13,6 +13,13 @@
     <div class="section-header">
       <h3 class="section-title">L2-3 应付利息调整分录汇总</h3>
       <div class="section-actions">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="l2"
+          sheet="L2-3"
+          :disabled="isReadonly"
+          @imported="handleImported"
+        />
         <el-button size="small" type="primary" plain :loading="centralSyncing" :disabled="isReadonly || !currentBalanceCheck.isBalanced || currentEntries.length === 0" @click="syncToCentral" title="把本页调整分录汇聚到集中调整登记，供合伙人跨循环审阅">同步到集中登记</el-button>
         <el-tag v-if="centralStatus?.review_status" size="small" :type="centralStatus.review_status==='approved'?'success':(centralStatus.review_status==='rejected'?'danger':'info')" :title="centralStatus.rejection_reason||''">集中登记：{{ CENTRAL_STATUS_LABELS[centralStatus.review_status]||centralStatus.review_status }}</el-tag>
         <el-button
@@ -331,6 +338,7 @@ import { useL2FormData } from '../../composables/useL2FormData'
 import { useL2Adjustment } from '../../composables/useL2Adjustment'
 import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/workpaper/composables/useAdjustmentCentralSync'
 import { useAuditContext } from '@/composables/useAuditContext'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -539,6 +547,18 @@ function fmtAmount(val: number | null | undefined): string {
     return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
   }
   return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// ─── 导入完成 → 读回宿主（x3-adjustment-entry-import-export 任务 11.1）───
+
+/**
+ * 导入 xlsx 成功后重跑本底稿读回路径：L2-3 分录由 useL2Adjustment 内 watch(allResponses) 派生 ⇒ loadData() 落地即重渲染。
+ *
+ * 判据（R6.5 / R6.7）：接口返 200 不算通过，界面必须读得到导入的行，
+ * 故这里重载 responses 后**必须**重跑读回，而不是只弹一个成功提示。
+ */
+async function handleImported(): Promise<void> {
+  await loadData()
 }
 </script>
 

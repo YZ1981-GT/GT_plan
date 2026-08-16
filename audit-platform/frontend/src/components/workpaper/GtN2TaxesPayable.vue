@@ -78,6 +78,7 @@
         :all-responses="allResponsesRef"
         :wp-id="props.wpId"
         :is-readonly="isReadonly"
+        @imported="selfLoad"
         @navigate="handleNavigate"
         @navigate-sheet="handleNavigate"
       />

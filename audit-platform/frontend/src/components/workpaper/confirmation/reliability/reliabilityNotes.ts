@@ -69,6 +69,18 @@ export const RELIABILITY_HEADER_NOTE =
   '本表用于验证通过电子邮件或传真收到的回函的可靠性。电子回函因无法直接确认发件人身份，存在被伪造或篡改的风险，需逐笔执行验证程序。'
 
 /**
+ * `G:M` 七列的父表头（源模板 X0-7 `G5:M5` 合并单元格字面）。
+ *
+ * 🔴 单一真源：六个可见的回函可靠性 sheet（`D0-7` / `F0-7` / `G0-7` / `H0-6` / `K0-7` / `L0-6`）
+ * 的 `G5` 逐字相同，后端四份事实守卫各自以 openpyxl 直读断言过
+ * （如 `test_k0_source_template_facts.py::TestReliability::test_14_columns_with_parent_header`）
+ * ⇒ 平台侧只放一份常量、不按枢纽分叉；改字面必须先改源模板。
+ *
+ * spec: k0-confirmation-source-alignment R9.2 / Property 18
+ */
+export const RELIABILITY_PARENT_HEADER = '期末未收回原件函证可靠性验证'
+
+/**
  * 列配置常量（14列定义）
  * 用于 Grid 组件动态渲染列 + 条件列标记 + tooltip 映射
  */

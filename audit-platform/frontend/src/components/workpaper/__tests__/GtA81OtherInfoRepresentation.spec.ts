@@ -274,7 +274,7 @@ describe('GtA81OtherInfoRepresentation.vue', () => {
     it('when audit_report_date present, signature date defaults to it', () => {
       fc.assert(
         fc.property(
-          fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+          fc.date({ noInvalidDate: true, min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
           (auditDate) => {
             const dateStr = auditDate.toISOString().split('T')[0]
             // Simulate: if no signatureDate set and auditReportDate exists, use it
@@ -304,8 +304,8 @@ describe('GtA81OtherInfoRepresentation.vue', () => {
     it('when signature date already set, audit_report_date does not override', () => {
       fc.assert(
         fc.property(
-          fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
-          fc.date({ min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+          fc.date({ noInvalidDate: true, min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
+          fc.date({ noInvalidDate: true, min: new Date('2020-01-01'), max: new Date('2030-12-31') }),
           (existingDate, auditDate) => {
             const existingStr = existingDate.toISOString().split('T')[0]
             // If signatureDate already exists, keep it

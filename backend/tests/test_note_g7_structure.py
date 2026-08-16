@@ -83,13 +83,36 @@ class TestListedMainTable:
         sec = _section(_LISTED, "五、18")
         tbl = (sec.get("tables") or [])[0]
         cols = tbl.get("columns") or []
+        # 🔴 标签列 key 于 g7-column-alignment spec Task 5 由 '项目' 统一为平台惯例 'label'
+        # （平台 266 个标签列定义里 241 个用 'label'，跨 70 文件；'项目' 全平台仅 7 处且全在
+        # G 循环 = 少数派偏离 + 中文字面量当 key）。此处原断言锁死的是 Task 5 之前的状态，
+        # 已按落地后事实诚实改写；下方 test_label_key_is_platform_convention 反向锁死防回退。
         assert [c["key"] for c in cols] == [
-            "项目", "openingBook", "openingImpairment", "addition", "reduction",
+            "label", "openingBook", "openingImpairment", "addition", "reduction",
             "equityProfit", "oci", "otherEquity", "dividend", "impairment", "other",
             "closingBook", "closingImpairment",
         ]
         groups = tbl.get("_column_groups")
         assert groups == [{"group": "本期增减变动", "start": 3, "span": 8}], groups
+
+    def test_label_key_is_platform_convention(self):
+        """反向锁死：标签列 key 必须是 'label'，且不得回退成中文字面量当 key。
+
+        改回 '项目'（或任何中文 key）即打红 —— 这是 Task 5 的防回退断言。
+        `is_label` / `label` 显示文字不在本断言范围内（前者是投影器选标签列的依据、
+        后者是源 xlsx 原文，两者都不因 key 统一而变）。
+        """
+        sec = _section(_LISTED, "五、18")
+        tbl = (sec.get("tables") or [])[0]
+        cols = tbl.get("columns") or []
+        label_cols = [c for c in cols if c.get("is_label")]
+        assert len(label_cols) == 1, label_cols
+        assert label_cols[0]["key"] == "label", label_cols[0]
+        # 显示文字仍取源 xlsx 原文，未被 key 统一波及
+        assert label_cols[0]["label"] == "被投资单位", label_cols[0]
+        # 全表任何列的 key 都不得是中文字面量
+        cjk_keys = [c["key"] for c in cols if any("\u4e00" <= ch <= "\u9fff" for ch in c["key"])]
+        assert cjk_keys == [], f"列 key 不得用中文字面量（违反禁硬编码）: {cjk_keys}"
 
     def test_headers_match_source_xlsx(self):
         """源模板第 6 列「权益法下确认的投资损益」跨 R9/R10/R11 三行拼字，
@@ -326,3 +349,155 @@ class TestReverseSelfCheck:
         }
         errs = validate_section(broken, ["续："])
         assert any("重复" in e for e in errs), errs
+
+
+# ─────────────── `--check` 判据强度（平台级防回退，2026-08-12）───────────────
+
+
+class TestCheckModeStrength:
+    """`_note_structure_kit.run_section` 的 `--check` 必须与**写入路径**同源。
+
+    ## 为什么这条守卫必须存在
+
+    改造前 `--check` 分支只跑 `validate_section`（表名清单 + `text_sections`），
+    **完全不跑 `apply_plan`** ⇒ `headers` / `columns` / `rows` / `guidance` /
+    `_column_groups` 的偏差它一律看不见。实测形态：
+
+        fix_note_g7_soe_structure.py --dry-run   → 共 2 处变更
+        fix_note_g7_soe_structure.py --check     → 0 项欠账      ← 同一时刻
+
+    而各 spec（含本仓 G7 spec 的「幂等双证」任务）普遍拿「`--check` 0 欠账」
+    当对齐/幂等的验收判据 ⇒ **验收恒过、列结构欠账长期驻留**。这是平台级假绿，
+    且 24 个幂等脚本共用这一条通路，故守卫钉在共享 kit 上而不是逐脚本重复。
+
+    本类的判据是**行为级**（真跑一次 check、看偏差是否被计为欠账），
+    不是「源码里是否出现 apply_plan 字样」—— 后者被 `if False:` 之类一改就假绿。
+    """
+
+    @staticmethod
+    def _kit():
+        import sys as _sys
+
+        _sys.path.insert(0, str(_ROOT / "scripts" / "fix"))
+        import _note_structure_kit as kit
+
+        return kit
+
+    @classmethod
+    def _one_table_doc(cls, label_header: str, guidance: str = "g") -> dict:
+        """最小可用章节：1 张表、1 个标签列 + 1 个数据列。
+
+        🔴 `columns` / `rows` 必须由 **kit 自己的构造器**生成（不手写字面量）——
+        手写版少一个字段（如 `format: None`）就会让「已对齐」的替身也报变更，
+        那是**替身缺陷**，会把本类的反面用例（对齐时应 0 欠账）打成假红。
+        """
+        kit = cls._kit()
+        return {
+            "sections": [
+                {
+                    "section_number": "测试、1",
+                    "tables": [
+                        {
+                            "name": "T",
+                            "headers": [label_header, "金额"],
+                            "columns": kit.flat_columns(
+                                [("label", label_header, None), ("amt", "金额", kit.AMOUNT)]
+                            ),
+                            "rows": [kit.data_row("行1")],
+                            "guidance": guidance,
+                        }
+                    ],
+                }
+            ]
+        }
+
+    def _run_check(self, kit, tmp_path, disk_label: str, want_label: str):
+        """把 `disk_label` 写盘、用 `want_label` 作目标态跑 `--check`，返回 errs。"""
+        import json as _json
+
+        path = tmp_path / "note_template_probe.json"
+        path.write_text(
+            _json.dumps(self._one_table_doc(disk_label), ensure_ascii=False),
+            encoding="utf-8",
+        )
+        plan = [
+            kit.rule(
+                "T",
+                kit.flat_columns([("label", want_label, None), ("amt", "金额", kit.AMOUNT)]),
+                [kit.data_row("行1")],
+                "g",
+            )
+        ]
+        changes, warnings, errs = kit.run_section(
+            path,
+            "测试、1",
+            plan,
+            ["T"],
+            aligned_by="probe",
+            dry_run=False,
+            check=True,
+        )
+        # check 模式绝不写盘
+        assert _json.loads(path.read_text(encoding="utf-8"))["sections"][0]["tables"][0][
+            "headers"
+        ][0] == disk_label, "check 模式写盘了 —— 只读性被破坏"
+        assert changes == [] and warnings == [], (changes, warnings)
+        return errs
+
+    def test_check_catches_column_label_drift(self, tmp_path):
+        """列 label 偏差必须被 `--check` 计为欠账（改造前此处恒 0 欠账）。"""
+        kit = self._kit()
+        errs = self._run_check(kit, tmp_path, disk_label="项目", want_label="项  目")
+        assert errs, "列 label 偏差未被 --check 抓到 ⇒ 假绿回来了"
+        assert any("结构未对齐" in e for e in errs), errs
+
+    def test_check_is_green_when_aligned(self, tmp_path):
+        """反面：磁盘与目标态一致时必须 0 欠账（防判据写成恒红）。"""
+        kit = self._kit()
+        errs = self._run_check(kit, tmp_path, disk_label="项  目", want_label="项  目")
+        assert errs == [], errs
+
+    def test_check_and_dry_run_agree_on_same_input(self, tmp_path):
+        """同一输入下 `--check` 有欠账 ⟺ `--dry-run` 有变更（两口径不得再分叉）。"""
+        import json as _json
+
+        kit = self._kit()
+        for disk_label, aligned in (("项目", False), ("项  目", True)):
+            path = tmp_path / f"probe_{aligned}.json"
+            path.write_text(
+                _json.dumps(self._one_table_doc(disk_label), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            plan = [
+                kit.rule(
+                    "T",
+                    kit.flat_columns([("label", "项  目", None), ("amt", "金额", kit.AMOUNT)]),
+                    [kit.data_row("行1")],
+                    "g",
+                )
+            ]
+            _c, _w, errs = kit.run_section(
+                path, "测试、1", plan, ["T"], aligned_by="probe", dry_run=False, check=True
+            )
+            changes, _w2, _e2 = kit.run_section(
+                path, "测试、1", plan, ["T"], aligned_by="probe", dry_run=True, check=False
+            )
+            assert bool(errs) == bool(changes), (
+                f"disk_label={disk_label!r}: --check 欠账 {len(errs)} 处 "
+                f"vs --dry-run 变更 {len(changes)} 处 —— 两口径分叉即假绿复发"
+            )
+            assert bool(changes) is not aligned
+
+    def test_check_source_replays_write_path(self):
+        """源码级辅助判据：check 分支必须真调 `apply_plan`（在深拷贝上）。
+
+        单独看源码不足以证明判据有效（`if False:` 也能留住字样），故本条只作
+        **补充**；行为级判据是上面三条。这里额外钉住「深拷贝」——
+        少了它 `--check` 会污染内存态、并可能被后续逻辑写盘。
+        """
+        src = (_ROOT / "scripts" / "fix" / "_note_structure_kit.py").read_text(encoding="utf-8")
+        head = src.split("if check:", 1)
+        assert len(head) == 2, "check 分支锚点未命中"
+        branch = head[1].split("return [], [], errs", 1)[0]
+        assert "copy.deepcopy(section)" in branch, "check 分支缺深拷贝"
+        assert "apply_plan(probe" in branch, "check 分支未在副本上重放 apply_plan"

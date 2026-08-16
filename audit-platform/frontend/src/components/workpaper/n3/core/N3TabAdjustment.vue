@@ -6,6 +6,13 @@
         <span>调整分录汇总 N3-3</span>
       </div>
       <div class="section-actions">
+        <CycleImportExportDropdown
+          :wp-id="props.wpId"
+          api-prefix="n3"
+          sheet="N3-3"
+          :disabled="isReadonly"
+          @imported="emit('imported')"
+        />
         <el-button
           size="small"
           type="primary"
@@ -293,6 +300,7 @@ import { useAdjustmentCentralSync, CENTRAL_STATUS_LABELS } from '@/components/wo
 import { useAuditContext } from '@/composables/useAuditContext'
 // @ts-ignore
 import GtIndexChip from '../../GtIndexChip.vue'
+import CycleImportExportDropdown from '../../shared/CycleImportExportDropdown.vue'
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
@@ -301,6 +309,11 @@ const props = defineProps<{
   projectId: string
   allResponses: Map<string, any>
   isReadonly?: boolean
+}>()
+
+/** 导入完成 → 父宿主重载 allResponses（本 Tab 读回源是 props.allResponses）*/
+const emit = defineEmits<{
+  imported: []
 }>()
 
 // ─── Inject ──────────────────────────────────────────────────────────────────
@@ -373,7 +386,7 @@ const entries = ref<AdjustmentEntry[]>([])
 const isReadonly = computed(() => props.isReadonly ?? false)
 
 // 从 allResponses 恢复已有数据
-;(function restoreEntries() {
+function restoreEntries(): void {
   const resp = props.allResponses.get('N3-3-entries')
   if (resp?.conclusion) {
     try {
@@ -383,7 +396,15 @@ const isReadonly = computed(() => props.isReadonly ?? false)
       }
     } catch { /* 空 */ }
   }
-})()
+}
+restoreEntries()
+
+/**
+ * 导入完成的读回宿主（任务 11.1）：本 Tab 的读回源是 props.allResponses
+ * （父宿主 GtN3DeferredTaxLiabilities 下发），故 @imported 上抛父宿主
+ * selfLoad，父重载后下发新 Map ⇒ 这里 watch 到即重跑读回。
+ */
+watch(() => props.allResponses, () => restoreEntries())
 
 // ─── Tab选项 ─────────────────────────────────────────────────────────────────
 

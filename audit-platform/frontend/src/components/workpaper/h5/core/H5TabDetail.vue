@@ -8,6 +8,25 @@
       <div class="toolbar-right">
         <span class="chip-wrap"><GtIndexChip value="wp:H5-2" :context-project-id="projectId" /></span>
         <el-tag size="small" type="info">共 {{ state.rows.value.length }} 行</el-tag>
+        <!--
+          🔴 H5 不能挂 `CycleImportExportDropdown`（2026-08-12 实证）
+
+          该组件拼的是**路径形态** `/api/workpapers/{wp_id}/{prefix}/export-data`，
+          而 h5 的真实端点是第三形态，由 `app/routers/h5_oil_gas_assets.py` 提供：
+            POST /api/h5/export-template   body: H5ExportRequest（wp_id 在 body 里）
+            POST /api/h5/export-data       body: H5ExportRequest
+            POST /api/h5/import-data       Form: wp_id / sheet(默认 H5-2) / file
+          运行期路由表（2113 条）里 `/api/workpapers/{wp_id}/h5/*` **完全不存在**
+          ——`_h5_import_export.py` 工厂虽声明了这三条，但从未 include_router。
+
+          ⇒ 挂 dropdown 必 404。registry 的 72 个前缀中，只有 h5 与 n4 是这种
+            「registry 有登记但路径形态不可达」的情况，已由后端守卫
+            `backend/tests/test_ie_prefix_reachability.py` 钉死清单。
+
+          h5 的导入导出要接线，得走适配 body/Form 形态的 composable，
+          而现存 `composables/useH5ImportExport.ts` 也拼了错的路径形态
+          （`/api/workpapers/${wpId}/h5/...`），本身即坏 —— 修它属独立任务。
+        -->
       </div>
     </div>
 

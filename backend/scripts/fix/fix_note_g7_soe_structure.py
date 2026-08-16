@@ -78,8 +78,13 @@ def _blanks(n: int) -> list[dict[str, Any]]:
 # ═══════ T0 长期股权投资分类（源 A202:F208）═══════
 
 T0 = "长期股权投资分类"
+# 🔴 标签列 key 统一为平台惯例 'label'（g7-column-alignment spec Task 5）：
+# 平台 211 个标签列定义里 148 个用 'label'；本文件原用 'name'/'item'/'investee'/'seq'/'type'
+# 等各表自拟 key，与运行时 buildG7*Columns() 的 'label' 不一致（B 类偏差）。
+# is_label / label 显示文字均不动 —— 投影器 note_sub_table_projector._project_row 对
+# 标签列有**双向兜底**（任意标签 key → 'label' 回填 / 反向回退），故改 key 零数据风险。
 T0_COLUMNS = flat_columns([
-    ("item", "项  目", None),
+    ("label", "项  目", None),
     ("opening", "年初余额", AMOUNT),
     ("increase", "本期增加", AMOUNT),
     ("decrease", "本期减少", AMOUNT),
@@ -99,7 +104,7 @@ T0_ROWS = [
 T1 = "长期股权投资明细"
 _MOVE_GROUP = "本期增减变动"
 T1_COLUMNS = grouped_columns(
-    ("investee", "被投资单位"),
+    ("label", "被投资单位"),
     [
         ("investmentCost", "投资成本", AMOUNT, None),
         ("opening", "期初余额", AMOUNT, None),
@@ -130,7 +135,7 @@ T1_ROWS: list[dict[str, Any]] = [
 
 T2 = "重要合营企业的主要财务信息（划分为持有待售的除外）"
 _FS_COLUMNS = flat_columns([
-    ("item", "项 目", None), ("current", "期末数", AMOUNT), ("prior", "期初数", AMOUNT),
+    ("label", "项 目", None), ("current", "期末数", AMOUNT), ("prior", "期初数", AMOUNT),
 ])
 _JV_FS_LABELS = [
     "流动资产", "非流动资产", "资产合计", "流动负债", "非流动负债", "负债合计", "净资产",
@@ -142,7 +147,7 @@ _JV_FS_LABELS = [
 
 T3 = "续：重要合营企业本期及上期经营成果"
 _PL_COLUMNS = flat_columns([
-    ("item", "项  目", None), ("current", "本期发生额", AMOUNT), ("prior", "上期发生额", AMOUNT),
+    ("label", "项  目", None), ("current", "本期发生额", AMOUNT), ("prior", "上期发生额", AMOUNT),
 ])
 _JV_PL_LABELS = [
     "营业收入", "财务费用", "所得税费用", "净利润", "其他综合收益",
@@ -177,7 +182,7 @@ def _assoc_columns(slot: str, current_label: str, prior_label: str) -> list[dict
         leaves.append((f"{slot}_{seq}_current", current_label, AMOUNT, entity))
         leaves.append((f"{slot}_{seq}_prior", prior_label, AMOUNT, entity))
     # 标签列头逐字取源 xlsx A257（两个空格），与 A229 合营表的「项 目」（一个空格）不同
-    return grouped_columns(("item", "项  目"), leaves)
+    return grouped_columns(("label", "项  目"), leaves)
 
 
 _ASSOC_FS_COLUMNS = _assoc_columns(_ASSOC_FS_SLOT, "期末数", "期初数")
@@ -200,7 +205,7 @@ _ASSOC_PL_LABELS = [
 
 T6 = "不重要合营企业和联营企业的汇总信息"
 T6_COLUMNS = flat_columns([
-    ("item", "项  目", None), ("current", "本期数", AMOUNT), ("prior", "上期数", AMOUNT),
+    ("label", "项  目", None), ("current", "本期数", AMOUNT), ("prior", "上期数", AMOUNT),
 ])
 T6_LABELS = [
     "合营企业：", "投资账面价值合计", "下列各项按持股比例计算的合计数 ",
@@ -212,11 +217,16 @@ T6_LABELS = [
 # ═══════ T7 ②对合营企业或联营企业发生超额亏损的分担额（源 A301:E312）═══════
 
 T7 = "②对合营企业或联营企业发生超额亏损的分担额"
+# 🔴 数据列 key 服从运行时（`g7SoeDisclosureModel` 的 `unrecognizedLossColumns`）：
+# `g7UnrecognizedLossModel.ts` / `g7DisclosureCrossSheet.ts` 用 `priorCumulative` /
+# `currentUnrecognized` / `closingCumulative` 字面量往 `row.values` 写跨表回填值
+# （crossSheet L1620~L1622 + L2783~L2785 的 `columnKeys` 映射），改运行时会静默失效。
+# 量化闸（Task 8）裁决 = SAFE_TO_RENAME_SEED（该表无一行用 seed key 落过非空值）。
 T7_COLUMNS = flat_columns([
-    ("investee", "被投资单位名称", None),
-    ("priorUnrecognised", "前期累积未确认的损失份额", AMOUNT),
-    ("currentUnrecognised", "本期未确认的损失份额（或本期实现净利润的分享额）", AMOUNT),
-    ("closingUnrecognised", "本期末累积未确认的损失份额", AMOUNT),
+    ("label", "被投资单位名称", None),
+    ("priorCumulative", "前期累积未确认的损失份额", AMOUNT),
+    ("currentUnrecognized", "本期未确认的损失份额（或本期实现净利润的分享额）", AMOUNT),
+    ("closingCumulative", "本期末累积未确认的损失份额", AMOUNT),
 ])
 T7_ROWS = (
     [data_row("合营企业")] + _blanks(3) + [subtotal_row("小计")]
@@ -230,13 +240,16 @@ T7_ROWS = (
 
 T8 = "结构化主体权益的账面价值和最大损失敞口"
 T8_COLUMNS = grouped_columns(
-    ("item", "项目"),
+    ("label", "项目"),
     [
+        # 🔴 数据列 key 服从运行时（`g7SoeDisclosureModel.sponsorInterestColumns`）：
+        # 期末/期初用 `closing`/`opening` 前缀而非 `end`/`begin`。
+        # 量化闸裁决 = SAFE_TO_RENAME_SEED（该表未推送过，0 行对象）。
         ("sponsorScale", "规模", None, "发起"),
-        ("endBookValue", "账面价值", AMOUNT, "期末数"),
-        ("endMaxLoss", "最大损失敞口", AMOUNT, "期末数"),
-        ("beginBookValue", "账面价值", AMOUNT, "期初数"),
-        ("beginMaxLoss", "最大损失敞口", AMOUNT, "期初数"),
+        ("closingCarrying", "账面价值", AMOUNT, "期末数"),
+        ("closingMaxLoss", "最大损失敞口", AMOUNT, "期末数"),
+        ("openingCarrying", "账面价值", AMOUNT, "期初数"),
+        ("openingMaxLoss", "最大损失敞口", AMOUNT, "期初数"),
         ("presentationItem", "列报项目", None, None),
     ],
 )
@@ -255,11 +268,18 @@ T8_ROWS: list[dict[str, Any]] = [
 T9 = "结构化主体获得收益及转移资产情况"
 _INCOME_GROUP = "当期从结构化主体获得的收益"
 T9_COLUMNS = grouped_columns(
-    ("type", "类型"),
+    # 🔴 标签列头取源 xlsx **纵向拆分两格的拼接值**：A340='结构化主体' + A341='类型'
+    #    ⇒ '结构化主体类型'。改造前只写了下半格 '类型'，与运行时（已正确拼接）不一致，
+    #    被 Task 12 扩容后的契约 P5（labelHeader ↔ seed headers[0]）抓出。
+    #    这不是「转角标题」（那类是标签列两行各自标注表头行本身，源未给行标识列名）——
+    #    本表两格合起来正是行标识列名，故 facts 判 kind='name'、逐字拼接可比。
+    ("label", "结构化主体类型"),
     [
+        # 🔴 `incomeTotal` → `total`：服从运行时（`sponsorIncomeColumns`）。
+        # 量化闸裁决 = SAFE_TO_RENAME_SEED（该表未推送过，0 行对象）。
         ("serviceFee", "服务收费", AMOUNT, _INCOME_GROUP),
         ("assetSaleGain", "向结构化主体出售资产的利得（损失）", AMOUNT, _INCOME_GROUP),
-        ("incomeTotal", "合计", AMOUNT, _INCOME_GROUP),
+        ("total", "合计", AMOUNT, _INCOME_GROUP),
         ("transferredAssets", "当期向结构化主体转移资产账面价值", AMOUNT, None),
     ],
 )

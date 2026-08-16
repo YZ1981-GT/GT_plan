@@ -1497,7 +1497,6 @@
   "S35-3-1": "skip",
   "S35-4": "skip",
   "S35-5": "skip",
-  "函证差异检查表（示例）": "confirmation-diff-checklist",
   "G4-9": "g4-bond-investment-ecl",
   "G4-10": "g4-bond-investment-ecl",
   "G4-11": "g4-bond-investment-ecl",
@@ -1524,5 +1523,6 @@
   "J2": "j2-defined-benefit-plan",
   "J3": "j3-share-based-payment",
   "长期应付职工薪酬实质性程序表 L2A": "skip",
+  "L0-函证差异检查表（示例）": "skip",
   "市场平均收益率2017": "skip"
 }

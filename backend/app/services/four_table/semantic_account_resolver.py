@@ -105,6 +105,40 @@ class SemanticAccountSlot:
         label: 中文展示名（溯源面板用；缺省取 ``names[0]``）。
         is_provision: 该槽是否为备抵性质（累计折旧 / 累计摊销 / 各类减值准备）。
             仅作元数据下发给前端决定展示口径（取绝对值 / 负号列示），本模块不据此改聚合。
+        subject_keywords: 本槽所属**业务主体**的关键词，用于「反解结果的名称过滤」。
+            本模块**不使用**该字段，它是给调用方（如
+            :mod:`app.services.four_table.d_provision_filter`）在经
+            ``account_mapping`` 反解出客户原始码之后做二次校验用的。
+
+            🔴 存在理由（2026-08-05 真实库实证）：``account_mapping`` 里有
+            ``auto_fuzzy`` 错映射 —— ``1231.05 坏账准备_长期应收款 → 1231-02``
+            （2 个项目）。任何按标准码 ``1231-02`` 反解取「应收账款坏账准备」的
+            路径都会把**长期应收款**的坏账一并算进来。因为错在映射数据、不在
+            定位逻辑，故正解是在反解之后叠一道「原始科目名须含本槽主体关键词」
+            的过滤（同 F1 的 ``use_provision_name_filter`` 范式）。
+
+            缺省 ``()`` 表示不做过滤 —— 既有 28 个消费方（G/H/E1/M8）行为逐字不变。
+        row_code: **该槽自己的**报表行次编码（仅用于冲突检测，不参与定位）。
+
+            🔴 存在理由（2026-08-08 真实库实证，平台级假告警）：
+            :class:`SemanticAccountSpec` 只有**一个** ``row_code``（主槽的报表行），
+            而 :func:`build_conflicts` 拿它的码集**逐槽**比对 —— 于是「备抵自成一条
+            报表行」的循环恒报假冲突。G7 实测 7/8 个项目恒为
+            ``[['provision', '1511', '1512']]``：主行 ``BS-024 长期股权投资 = TB('1511')``
+            确实不引用 ``1512``，因为备抵有自己的行 ``IMP-009 = TB('1512')``。
+
+            旧 ``ReportLineAccountSpec`` 有 ``provision_row_code`` 能表达这件事，
+            语义解析器迁移时丢失了该能力。声明本字段即恢复：该槽的冲突检测改用
+            **它自己那条报表行**的公式码集。
+
+            影响面（按 ``report_config`` 实际公式逐条判定）：必假冲突 = G4 / G7 /
+            H2 / H7 / D6 / I3；部分变体假冲突 = D1 / D2 / H3；
+            不受影响 = H1（``BS-028`` 公式含 1602）/ H8（含 1642·1643）/ H9（含 2602）。
+
+            ⚠️ 这是**告警疲劳型**缺陷：常亮假告警会让审计师忽略真冲突，
+            而真冲突正是该机制存在的理由（``report_config`` 已实证 6 处错码）。
+
+            ``None`` = 沿用 spec 级 ``row_code``（既有行为逐字不变）。
     """
 
     key: str
@@ -113,6 +147,8 @@ class SemanticAccountSlot:
     fallback_standard_codes: tuple[str, ...] = ()
     label: str = ""
     is_provision: bool = False
+    subject_keywords: tuple[str, ...] = ()
+    row_code: str | None = None
 
     @property
     def display_label(self) -> str:
@@ -174,6 +210,9 @@ class ResolvedSlot:
             ``report_config`` / ``fallback`` / ``none``）。
         exact: 名称是否**精确**命中（归一后相等）。``False`` 表示走了包含匹配，
             调用方展示时应提示审计师复核。
+        report_row_code: 本槽**冲突检测所用**的报表行（槽级 ``row_code`` 优先，
+            否则为 spec 级）。溯源面板据此告诉审计师「与哪条报表行比对」——
+            没有它时 ``conflicts`` 只有码没有行号，无法追溯（审计 UI 铁律）。
     """
 
     key: str
@@ -184,6 +223,7 @@ class ResolvedSlot:
     matched: list[tuple[str, str]] = field(default_factory=list)
     resolved_from: str = RESOLVED_FROM_NONE
     exact: bool = False
+    report_row_code: str = ""
 
     @property
     def found(self) -> bool:
@@ -268,6 +308,7 @@ class SemanticAccountResult:
                     "resolved_from": v.resolved_from,
                     "exact": v.exact,
                     "found": v.found,
+                    "report_row_code": v.report_row_code,
                 }
                 for k, v in self.slots.items()
             },
@@ -428,23 +469,44 @@ def find_legacy_candidates(
 def build_conflicts(
     slots: dict[str, ResolvedSlot],
     report_codes: list[str],
+    slot_report_codes: dict[str, list[str]] | None = None,
 ) -> list[tuple[str, str, str]]:
     """报表公式给的码 vs 按名称定位的实际码，逐槽比对差异。纯函数。
 
-    只在「该槽确实定位到了标准码」且「报表码非空」时判定；
-    报表码集合与实际标准码集合无交集时记为冲突（取实际码的首个作为对照展示）。
+    只在「该槽确实定位到了标准码」且「该槽对应的报表码非空」时判定；
+    报表码集合与实际标准码集合无交集时记为冲突。
+
+    Args:
+        slots: 定位结果。
+        report_codes: **spec 级**报表行的公式码集（缺省对照基准）。
+        slot_report_codes: ``{slot_key: 该槽自己那条报表行的公式码集}``。
+            声明了自己 ``row_code`` 的槽用这里的码集比对，**不再拿主行的码集比**。
+
+            🔴 这是修「备抵自成报表行 ⇒ 恒报假冲突」的关键（G7 实测 7/8 项目恒亮
+            ``['provision','1511','1512']``，而 ``IMP-009 = TB('1512')`` 本就是
+            备抵自己的行）。缺省 ``None`` = 全槽用 ``report_codes``，行为逐字不变。
+
+            某槽在此声明了 key 但码集为**空**（该报表行公式为 NULL / 查询失败）时
+            **跳过该槽**不判冲突 —— 「查不到对照基准」不等于「有冲突」，
+            否则会把「报表行没配公式」误报成「科目定位错了」（同三态铁律）。
     """
-    if not report_codes:
-        return []
+    per_slot = slot_report_codes or {}
     out: list[tuple[str, str, str]] = []
     for key, slot in slots.items():
         actual = [c for c in slot.standard_codes if c]
         if not actual:
             continue
-        if set(actual) & set(report_codes):
+        if key in per_slot:
+            basis = [c for c in per_slot.get(key) or [] if c]
+        else:
+            basis = [c for c in report_codes or [] if c]
+        if not basis:
+            # 无对照基准（该行无公式 / 查询失败）→ 三态里的「未知」，不判冲突
             continue
-        # 该槽的实际码完全不在报表公式里 → 报表公式可能引错科目
-        out.append((key, ",".join(report_codes), ",".join(actual)))
+        if set(actual) & set(basis):
+            continue
+        # 该槽的实际码完全不在其对照报表公式里 → 报表公式可能引错科目
+        out.append((key, ",".join(basis), ",".join(actual)))
     return out
 
 
@@ -603,6 +665,20 @@ async def resolve_semantic_accounts(
     )
     report_codes = extract_formula_codes(formula)
 
+    # 槽级报表行（如 G7 备抵 `IMP-009`）：仅用于冲突检测的对照基准，不参与定位。
+    # 声明了自己 row_code 的槽才查（每个不同 row_code 只查一次），未声明的零开销。
+    slot_report_codes: dict[str, list[str]] = {}
+    _slot_formula_cache: dict[str, list[str]] = {}
+    for _slot in spec.slots:
+        rc = (_slot.row_code or "").strip()
+        if not rc or rc == (spec.row_code or ""):
+            continue
+        if rc not in _slot_formula_cache:
+            _slot_formula_cache[rc] = extract_formula_codes(
+                await _fetch_report_formula(ctx, rc)
+            )
+        slot_report_codes[_slot.key] = list(_slot_formula_cache[rc])
+
     resolved: dict[str, ResolvedSlot] = {}
     consumed: set[str] = set()
 
@@ -631,6 +707,8 @@ async def resolve_semantic_accounts(
     allow_report_config_tier = len(spec.slots) == 1 and spec.trust_report_config
 
     for slot in spec.slots:
+        # 本槽冲突检测对照的报表行（槽级优先，否则 spec 级）—— 溯源展示用
+        eff_row_code = (slot.row_code or spec.row_code or "").strip()
         # ① 客户科目表按名称
         rows, exact = match_slot_in_chart(slot, client_rows)
         source = RESOLVED_FROM_CLIENT_CHART
@@ -669,6 +747,7 @@ async def resolve_semantic_accounts(
                 matched=[],
                 resolved_from=RESOLVED_FROM_FALLBACK,
                 exact=False,
+                report_row_code=eff_row_code,
             )
             continue
         if not rows:
@@ -677,6 +756,7 @@ async def resolve_semantic_accounts(
                 label=slot.display_label,
                 is_provision=slot.is_provision,
                 resolved_from=RESOLVED_FROM_NONE,
+                report_row_code=eff_row_code,
             )
             continue
 
@@ -699,6 +779,7 @@ async def resolve_semantic_accounts(
             matched=[(r.account_code, r.account_name) for r in rows],
             resolved_from=source,
             exact=exact,
+            report_row_code=eff_row_code,
         )
 
     all_rows = [r for rows in chart.values() for r in rows]
@@ -707,7 +788,7 @@ async def resolve_semantic_accounts(
         row_code=spec.row_code or "",
         formula=formula,
         report_config_codes=report_codes,
-        conflicts=build_conflicts(resolved, report_codes),
+        conflicts=build_conflicts(resolved, report_codes, slot_report_codes),
         unmapped_candidates=find_legacy_candidates(spec, all_rows, consumed),
         chart_available=chart_available,
     )

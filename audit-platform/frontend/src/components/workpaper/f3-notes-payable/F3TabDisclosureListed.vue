@@ -9,7 +9,12 @@ import { buildF3SyncPayload, F3_NOTE_SECTION } from '../composables/f3NoteSectio
 import { useDisclosureAutoSync } from '../composables/useDisclosureAutoSync'
 import GtIndexChip from '../GtIndexChip.vue'
 import WpAmountInput from '../shared/WpAmountInput.vue'
-import { useDisplayPrefsStore, DisplayPrefs_Key } from '@/stores/displayPrefs'
+// 🔴 `DisplayPrefs_Key` 的真源是 `composables/displayPrefsKey.ts`，**不是** store 模块。
+// 从 `@/stores/displayPrefs` 连带 import 它会让整页崩成
+// 「页面渲染出错：does not provide an export named 'DisplayPrefs_Key'」
+// （get_diagnostics 与 vitest 全绿，只有浏览器暴露）。
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const props = defineProps<{

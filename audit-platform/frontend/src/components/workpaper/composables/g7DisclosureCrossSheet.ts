@@ -48,6 +48,26 @@ export const G7_12_ROWS_KEY = 'G7-12-rows'
 export const G7_11_ROWS_KEY = 'G7-11-rows'
 export const G7_16_ROWS_KEY = 'G7-16-rows'
 
+/**
+ * 超额亏损分担额表的数据列 key（listed / soe **共用一套**）。
+ *
+ * 🔴 单一真源：改造前两变体各写一套字面量 —— listed 用英式 `priorUnrecognised` /
+ * `currentUnrecognised` / `closingUnrecognised`，soe 用美式 `priorCumulative` /
+ * `currentUnrecognized` / `closingCumulative`。同一张披露表在两变体下列语义完全相同，
+ * 分两套拼写没有业务依据，只会让 seed 侧被迫也维护两份（G7 列对齐 spec C 类偏差之一）。
+ *
+ * 收敛到**美式**的依据：美式是平台主流（`g7UnrecognizedLossModel` /
+ * `useG7EquityMethodFormData` / `G7TabUnrecognizedLoss.vue` / J3 / G6 共 40+ 处引用），
+ * 英式仅 listed 披露这 3 列在用。改名零数据风险 —— 量化闸
+ * （`diagnose_g7_seed_key_impact.py`）实测 listed `七、1` 全章节
+ * `SAFE_TO_RENAME_SEED`（该章节记录均无 `sub_table_data`，从未推送过）。
+ */
+export const G7_EXCESS_LOSS_KEYS = {
+  prior: 'priorCumulative',
+  current: 'currentUnrecognized',
+  closing: 'closingCumulative',
+} as const
+
 export interface G7ClassificationBalances {
   opening: number
   increase: number
@@ -2542,11 +2562,7 @@ export function refreshListedTablesFromSources(
       assocPrefix: 'el-assoc-',
       jvSubtotalId: 'el-jv-subtotal',
       assocSubtotalId: 'el-assoc-subtotal',
-      columnKeys: {
-        prior: 'priorUnrecognised',
-        current: 'currentUnrecognised',
-        closing: 'closingUnrecognised',
-      },
+      columnKeys: G7_EXCESS_LOSS_KEYS,
       force,
     })) {
       filled.push('excess-losses')
@@ -2779,11 +2795,7 @@ export function refreshSoeTablesFromSources(
       assocPrefix: 'ul-assoc-',
       jvSubtotalId: 'ul-jv-subtotal',
       assocSubtotalId: 'ul-assoc-subtotal',
-      columnKeys: {
-        prior: 'priorCumulative',
-        current: 'currentUnrecognized',
-        closing: 'closingCumulative',
-      },
+      columnKeys: G7_EXCESS_LOSS_KEYS,
       force,
     })) {
       filled.push('unrecognized-losses')

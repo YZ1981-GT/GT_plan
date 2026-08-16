@@ -33,7 +33,7 @@ const arbNonNegFloat = fc.integer({ min: 0, max: 1_000_000_00 }).map(n => n / 10
 const arbPositiveFloat = fc.integer({ min: 1, max: 1_000_000_00 }).map(n => n / 100)
 
 /** 日期生成器 */
-const arbDate = fc.date({ min: new Date('2020-01-01'), max: new Date('2026-12-31') })
+const arbDate = fc.date({ noInvalidDate: true, min: new Date('2020-01-01'), max: new Date('2026-12-31') })
 
 // ─── P1: 审定数公式链 ───────────────────────────────────────────────────────
 

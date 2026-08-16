@@ -127,7 +127,7 @@
           </el-table-column>
           <el-table-column label="变动金额" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.amount" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.amount" size="small" style="width:100%"
                 @change="(v: number) => updateMajorChangeCell(row.rowId, 'amount', v ?? 0)" />
               <span v-else>{{ row._isPad ? '' : fmtAmt(row.amount) }}</span>
             </template>
@@ -555,7 +555,7 @@
           </el-table-column>
           <el-table-column label="变动金额" width="160" align="right">
             <template #default="{ row }">
-              <el-input-number v-if="!isReadonly && !row._isPad" :model-value="row.amount" :controls="false" size="small" style="width:100%"
+              <WpAmountInput v-if="!isReadonly && !row._isPad" :model-value="row.amount" size="small" style="width:100%"
                 @change="(v: number) => updateMajorChangeCell(row.rowId, 'amount', v ?? 0)" />
               <span v-else>{{ row._isPad ? '' : fmtAmt(row.amount) }}</span>
             </template>
@@ -631,6 +631,8 @@ import type useD6CrossSheet from '../composables/useD6CrossSheet'
 import { useAuditContext } from '@/composables/useAuditContext'
 import { checkNoteConsistencyGeneric } from '../composables/noteConsistencyCheck'
 import { useAgingConfig } from '@/composables/useAgingConfig'
+import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
+import { useDisplayPrefsStore } from '@/stores/displayPrefs'
 
 // @ts-ignore
 import GtIndexChip from '../GtIndexChip.vue'
@@ -651,6 +653,14 @@ const props = defineProps<{
 const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<string, ChecklistResponse>>
 
 const { year: auditYear } = useAuditContext()
+
+/**
+ * 金额显示偏好（平台单一真源）。
+ *
+ * 🔴 `useDisplayPrefsStore` 是 setup 作用域 composable，必须在 setup 顶层调用；
+ * 写进函数体会静默失效（平台已登记的踩坑铁律）。
+ */
+const displayPrefs = inject(DisplayPrefs_Key, null) ?? useDisplayPrefsStore()
 
 const {
   listedSections, soeSections, showListed, showSoe, activeVariant,
@@ -761,10 +771,15 @@ function updateNoteText(key: string, value: string) {
   noteTexts.value = { ...noteTexts.value, [key]: value }
 }
 
+/**
+ * 只读金额格式化 —— 委托平台单一真源 `stores/displayPrefs`。
+ *
+ * 🔴 禁在组件内自造 `toLocaleString` 闭包（改造前本函数就是那样：硬编码 2 位小数、
+ * 不带单位、不消费用户偏好，切「万元」时本页不跟随）。负数改由 CSS 类
+ * `gt-amount--negative` 标红，不再用会计括号形态 —— 与 D2 披露表口径一致。
+ */
 function fmtAmt(val: number | null | undefined): string {
-  if (val == null || val === 0) return '-'
-  if (val < 0) return `(${Math.abs(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`
-  return val.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return displayPrefs.fmtAmount(val)
 }
 
 /** 空表补足占位空行（至少2行），避免"No Data"太丑；占位行 _isPad=true 不渲染输入控件 */

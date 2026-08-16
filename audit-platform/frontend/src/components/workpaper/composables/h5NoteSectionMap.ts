@@ -32,6 +32,42 @@ export const H5_NOTE_SECTION = { soe: '八、25' } as const
 /** H5 SOE 版披露 sheet 真实 tab 名 */
 export const H5_DISCLOSURE_SHEET_SOE = '附注披露信息（国有企业）'
 
+/** H5 上市版披露 sheet 真实 tab 名（源 xlsx visible，但附注侧无落点，见下） */
+export const H5_DISCLOSURE_SHEET_LISTED = '附注披露信息（上市公司）'
+
+/**
+ * 上市侧「本版不适用」的判据文字（单一真源，供组件展示与守卫共读）。
+ *
+ * 🔴 措辞必须如实区分两种情形，**不得**照抄 N4 国企侧的「源模板内容为无」——
+ * 那是事实错误：N4 的 soe sheet 内容逐字是 `附注披露信息：` / `无`（真·无内容），
+ * 而 H5 的 `附注披露信息（上市公司）` sheet 是 **visible 且有完整 38 行四层表**
+ * （openpyxl 直读：`A7:G7` 表头 = 项目/探明矿区权益/未探明矿区权益/井及相关设施/
+ * `…`/`…`/合计；`A8` 一、账面原值 → `A38` 2.期初账面价值，含外购/自行建造/
+ * 其他增加/处置 等明细行）。
+ *
+ * 「不适用」的依据全部在**落点侧**（三条并列实证，2026-08-06）：
+ * 1. `note_template_variant_matrix.json` · `you_qi_zi_chan`：
+ *    `listed_standalone` / `listed_consolidated` **均为 `null`**
+ * 2. `note_template_listed.json` 共 204 个章节，含「油气」的**实测 0 个**
+ * 3. `H5_NOTE_SECTION` 只有 `soe` 一个键（本文件上方）
+ *
+ * ⇒ 上市准则下油气资产不单独设附注章节，源 sheet 是模板作者预留的通用格式。
+ * 强行推送会**凭空新建附注章节**（宁缺勿造红线）。
+ */
+export const H5_LISTED_NOT_APPLICABLE_REASON = {
+  /** 源 sheet 名（有表格这一事实的锚点） */
+  sourceSheet: H5_DISCLOSURE_SHEET_LISTED,
+  /** 一句话结论 */
+  summary: '本项目适用上市公司准则时，油气资产不单独设附注章节 —— 本页不适用。',
+  /** 逐条判据（UI 列表 + 守卫共读） */
+  evidence: [
+    `源模板 ${H5_DISCLOSURE_SHEET_LISTED} sheet 确实存在且有表格（38 行四层：账面原值 / 累计折旧 / 减值准备 / 账面价值），但它是模板作者预留的通用格式。`,
+    'note_template_variant_matrix.json 的「油气资产」条目在 listed_standalone 与 listed_consolidated 两个变体下均为 null（无附注落点）。',
+    'note_template_listed.json 共 204 个章节，含「油气」的章节数实测为 0。',
+    '国企准则下油气资产有独立章节「八、25」，请在「附注披露信息（国有企业）」页编制。',
+  ],
+} as const
+
 /** 与 note_template_soe §八、25 tables[].name 逐字一致 */
 export const H5_SOE_SUBTABLE = { main: '油气资产' } as const
 

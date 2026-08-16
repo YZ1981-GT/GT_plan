@@ -279,9 +279,68 @@
           @refresh-book-amounts="loadG0Sources"
         />
 
+        <!--
+          L0（债务循环函证）下区专属组件：
+          一、函证情况（2 品种 × 8 指标矩阵）/ 三、审计说明（5 段）/ 四、审计结论 / 参考结论
+          🔴 **含「二、样本选择」6 项**（源 `L0-1!J28` 段，属本 sheet 下区），故 L0 **不**给
+             共享 `ConfirmationSampling` 开 `isL0` 分支 —— 两处都渲染会形成双真源。
+          🔴 `v-if="isL0"` 门控 → 其余六枢纽模板逐字节不变（R10.1 零回归支点）。
+          🔴 矩阵**恰 2 品种**（长期应付款 / 应付债券）且源模板 `G29` 为空（无「……」可扩位）
+             ⇒ 不做 G0 那套「有就显示没有隐藏 + 显示全部品种」动态可见性，照搬会凭空引入可扩语义。
+          spec: l0-confirmation-source-alignment R3.1~R3.11
+        -->
+        <L0SummaryLowerZone
+          v-if="isL0"
+          ref="l0LowerRef"
+          :rows="data.rows.value"
+          :readonly="readonly"
+          :responses="l0Responses"
+          :html-data="props.htmlData"
+          :refreshing="l0Refreshing"
+          :ai-loading-key="l0AiLoadingKey"
+          @save="handleL0LowerSave"
+          @ai-generate="handleL0LowerAi"
+          @refresh-book-amounts="handleL0RefreshBookAmounts"
+        />
+
+        <!--
+          K0（管理循环函证）下区专属组件：
+          一、函证情况（2 品种 × 8 指标矩阵）/ 三、审计说明（5 项）/ 四、审计结论 / 编制说明
+          🔴 **不含「二、样本选择」** —— 那由下方共享 `ConfirmationSampling`（`isK0` → 6 项）承担，
+             两处都渲染会让同一份 `SamplingData` 有两个录入口（双真源）。判据固化在
+             `k0LowerZoneSpec.K0_LOWER_ZONE_BLOCKS` 的 `renderedHere: false`。
+          🔴 `v-if="isK0"` 门控 → 其余六枢纽模板逐字节不变（零回归支点）。
+          🔴 矩阵**恰 2 品种**（其他应收款 / 其他应付款）且源模板 `G28` 为空（无「……」可扩位）
+             ⇒ 不做 G0 那套「有就显示没有隐藏 + 显示全部品种」动态可见性。
+          spec: k0-confirmation-source-alignment R3.1~R3.5 / R3.7 / R3.10~R3.12
+        -->
+        <K0SummaryLowerZone
+          v-if="isK0"
+          ref="k0LowerRef"
+          :rows="data.rows.value"
+          :readonly="readonly"
+          :responses="k0Responses"
+          :book-amounts="k0Sources?.bookAmounts"
+          :diagnostics="k0Sources?.diagnostics"
+          :notes="data.notes.value as unknown as Record<string, string>"
+          :refreshing="k0SourcesLoading"
+          :ai-loading-key="k0AiLoadingKey"
+          @save="handleK0LowerSave"
+          @ai-generate="handleK0LowerAi"
+          @refresh-book-amounts="loadK0Sources"
+        />
+
         <!-- 辅助区（默认折叠） -->
         <el-collapse v-model="expandedSections">
-          <el-collapse-item title="样本选择" name="sampling">
+          <!--
+            样本选择（共享组件）——「二、样本选择」的通用录入口。
+            🔴 `v-if="!isL0"`：L0 的 6 项样本选择在**下区专属组件内**（源 `L0-1!J28` 段属该 sheet
+               下区，持久化到 `checklist_responses` 的 `L0-1-lower-sample-*`），两处都渲染会让
+               同一语义有两个录入口（一个落 `SamplingConfig`、一个落 checklist）= 双真源。
+               其余六枢纽（含 G0 的 6 项 `isG0` 分支）逐字不变（R10.1）。
+            spec: l0-confirmation-source-alignment R3.6 / Task 16 裁决记录
+          -->
+          <el-collapse-item v-if="!isL0" title="样本选择" name="sampling">
             <ConfirmationSampling
               :data="data.sampling.value"
               :readonly="readonly"
@@ -373,6 +432,20 @@ import {
   type G0MatrixSources,
 } from '../g0-confirmation/g0MatrixDataSources'
 import { G0_AUDIT_NOTE_DEFS, G0_LOWER_KEY_PREFIX } from '../g0-confirmation/g0SummaryLowerZone'
+// L0（债务循环函证）下区：矩阵（2 品种 × 8 指标）+ 样本选择 6 项 + 审计说明 5 段 + 审计结论
+// spec: l0-confirmation-source-alignment R3.1~R3.11 / Task 16
+import L0SummaryLowerZone from './l0-confirmation/L0SummaryLowerZone.vue'
+import K0SummaryLowerZone from './k0-confirmation/K0SummaryLowerZone.vue'
+import {
+  loadK0MatrixSources,
+  type K0MatrixSources,
+} from './k0-confirmation/k0MatrixDataSources'
+// 🔴 「已回函行数」统计必须走 `replyStatus` 归一谓词 —— `is_replied` 有 boolean 与
+//    `'是'/'否'` 两种真实持久化形态，裸 `=== true` / 裸真值判断各有一半恒不成立
+//    （`'否'` 是 truthy，会把明确未回函的行数成已回函）。
+//    本文件另有三处 G0/H0/L0 的 `r.is_replied === '是' || r.is_replied === true`
+//    是第三份内联口径，属已登记的待收敛项（不在本 spec 半径内，勿顺手改）。
+import { isRepliedTrue } from './replyStatus'
 import {
   describeH0PullResult,
   pullH0SummaryFromEntityVerify,
@@ -832,6 +905,266 @@ async function handleG0LowerAi(aiSection: string, key: string) {
   }
 }
 
+// ─── L0（债务循环函证）下区（矩阵 + 样本选择 + 审计说明 + 审计结论） ──────────
+// spec: l0-confirmation-source-alignment Task 16（R3.1~R3.11 / R9.3）
+//
+// 🔴 与 G0 的两处结构差异（有意，勿"统一"）：
+//   ① 账面金额**不需要跨底稿并行取数** —— L0 的 2 品种（长期应付款 / 应付债券）由后端
+//      注入器 `_inject_l0_book_amounts` 直接写进本 sheet 的
+//      `html_data.project_context.l0_book_amounts`（Task 7），故只需把 `htmlData` 原样传下去。
+//      「刷新账面金额」= 重新拉 render-config（宿主提供 reload），不是另发并行请求。
+//   ② 「二、样本选择」**在下区组件内**（源模板 L0-1!J28 段的 6 项属于该 sheet 下区），
+//      而 G0 那 6 项走的是共享 `ConfirmationSampling` → 两处都渲染会形成双真源，
+//      故 L0 **不**给 `ConfirmationSampling` 开 `isL0` 分支（见 Task 16 的裁决记录）。
+
+const isL0 = computed(() => confirmCycle.value === 'L0')
+const l0LowerRef = ref<{ applyAiText: (key: string, text: string) => void } | null>(null)
+const l0Responses = ref<Record<string, string>>({})
+const l0Refreshing = ref(false)
+
+/**
+ * 拉取 L0 下区**已持久化**录入值（样本选择 6 项 / 审计说明 5 段 / 结论 / 矩阵手工覆盖）。
+ *
+ * 🔴 必须走 `/checklist-responses`（持久化），**不能**用 `html_data.responses_snapshot` ——
+ * 后者含 Tier A 公式预设的 transient 种子，被当成手工覆盖会把「本项目无此科目」压成假 0。
+ * 🔴 必须带 `/api` 前缀（`utils/http` 的 baseURL 是 `/`，vite 只代理 `/api`；漏掉会拿回
+ *    index.html（200 + HTML），`Array.isArray` 判否后静默变成空 map）。
+ */
+async function loadL0Responses() {
+  if (!isL0.value || !props.wpId) return
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = (res.data?.data ?? res.data ?? []) as Array<Record<string, any>>
+    const map: Record<string, string> = {}
+    for (const item of Array.isArray(list) ? list : []) {
+      const id = String(item.item_id ?? item.itemId ?? '')
+      if (!id.startsWith('L0-1-')) continue
+      const v = item.remark ?? item.conclusion ?? item.value ?? ''
+      map[id] = v === null || v === undefined ? '' : String(v)
+    }
+    l0Responses.value = map
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] L0 下区录入值加载失败:', e?.message)
+  }
+}
+
+/**
+ * L0 下区录入落库。
+ *
+ * 🔴🔴 **绝不能** `emit('save', { itemId, value })` —— 宿主 save 处理器把载荷整体写成该
+ * sheet 的 `parsed_data.html_data[sheetName]`（G0 侧 2026-08-04 浏览器实测已复现：整册
+ * 函证行全丢 + `_format` 消失 → 下次打开退化成「旧格式只读」）。下区是 itemId 维度录入，
+ * 必须直接走平台标准 `checklist-responses` PUT。
+ */
+async function handleL0LowerSave(itemId: string, value: string) {
+  l0Responses.value = { ...l0Responses.value, [itemId]: value }
+  if (!props.wpId) return
+  try {
+    const payload: Record<string, any> = {
+      items: [{ item_id: itemId, remark: value, conclusion: null }],
+    }
+    if (props.projectId) payload.project_id = props.projectId
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, payload)
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] L0 下区录入保存失败:', e?.message)
+    ElMessage.warning('保存失败：' + (e?.message || '网络错误'))
+  }
+}
+
+/**
+ * 「刷新账面金额」= 重新拉 render-config 让后端注入器重算 2 品种（四表重新入库后用）。
+ *
+ * 🔴 与 `handleH0RefreshBookAmounts` 同源同形（勿改成 inject 的
+ * `reloadWorkpaperData` —— 本组件未 inject 它，写了会运行时 ReferenceError，
+ * 而 `get_diagnostics` 查不出）。
+ * 🔴 必须带 `/api` 前缀 —— `utils/http` 的 baseURL 是 `/` 且无 /api 注入拦截器，
+ *    vite proxy 只代理 `/api` → 漏掉会打到 SPA 路由拿回 index.html（200 + HTML），
+ *    请求"看起来成功"而后端从未收到。
+ */
+async function handleL0RefreshBookAmounts() {
+  if (!props.wpId) {
+    ElMessage.warning('缺少底稿标识，无法刷新取数')
+    return
+  }
+  l0Refreshing.value = true
+  try {
+    await http.get(`/api/workpapers/${props.wpId}/render-config`)
+    ElMessage.success('已请求后端重算账面金额，请刷新页面查看最新取数')
+  } catch (e: any) {
+    ElMessage.error(`刷新取数失败：${e?.message || '未知错误'}`)
+  } finally {
+    l0Refreshing.value = false
+  }
+}
+
+/**
+ * L0 下区 AI 辅助 —— 走**通用** `/ai/generate-text`（L0 无专属 AI 端点）。
+ *
+ * 🔴 三处约定（写错即静默失效）：
+ *   ① `section` 必须已在 `wp_ai._SUPPORTED_SECTIONS` 登记（**硬门 400**，前端 catch 会
+ *      吞成「AI 生成失败」）→ 两个 section 由 Task 19 的守卫双向锁死
+ *   ② `context` 是 `dict[str,str]`，**值必须全字符串**（传数字会 422，被 catch 吞掉）
+ *   ③ `existingContent` 是**驼峰**（写 `existing_content` 会被 pydantic 静默忽略）
+ */
+const l0AiLoadingKey = ref<string | null>(null)
+
+async function handleL0LowerAi(aiSection: string, key: string) {
+  if (!props.wpId) {
+    ElMessage.warning('缺少底稿标识，无法调用 AI')
+    return
+  }
+  l0AiLoadingKey.value = key
+  try {
+    const res = await http.post(`/api/workpapers/${props.wpId}/ai/generate-text`, {
+      section: aiSection,
+      existingContent: l0Responses.value[key] ?? '',
+      context: {
+        底稿编码: String(props.wpCode || 'L0-1'),
+        函证行数: String(data.rows.value.length),
+        已回函行数: String(
+          data.rows.value.filter((r: ConfirmationRow) => r.is_replied === '是' || r.is_replied === true).length,
+        ),
+        不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
+      },
+    })
+    const content = String((res.data?.data ?? res.data)?.content ?? '')
+    if (!content) {
+      ElMessage.warning('AI 未返回内容')
+      return
+    }
+    l0LowerRef.value?.applyAiText(key, content)
+    ElMessage.success('AI 已生成，请复核后保存')
+  } catch (e: any) {
+    ElMessage.error(`AI 生成失败：${e?.message || '未知错误'}`)
+  } finally {
+    l0AiLoadingKey.value = null
+  }
+}
+
+// ─── K0（管理循环函证）下区（矩阵 + 审计说明 + 审计结论 + 编制说明） ─────────
+// spec: k0-confirmation-source-alignment Task 10（R3.1~R3.5 / R3.7 / R3.10~R3.12）
+//
+// 🔴 与 G0 的两处差异（有意，勿"统一"）：
+//   ① 「二、样本选择」6 项走共享 `ConfirmationSampling` 的 `isK0` 分支（与 G0 同款；
+//      L0 才是放在下区专属组件里的那个）。
+//   ② AI 端点形态不同：K0 是 `POST /api/workpapers/{id}/k0/ai/{section}`
+//      —— **section 在 URL path**、body 只有 `{existingContent, relatedContext}`；
+//      G0 是 `/g0/ai-generate` + body 带 `section`。照抄 G0 的形态会 404。
+
+const isK0 = computed(() => confirmCycle.value === 'K0')
+const k0LowerRef = ref<{ applyAiText: (itemId: string, text: string) => void } | null>(null)
+const k0Responses = ref<Record<string, string>>({})
+const k0Sources = ref<K0MatrixSources | null>(null)
+const k0SourcesLoading = ref(false)
+const k0AiLoadingKey = ref<string | null>(null)
+
+/**
+ * 拉取下区**已持久化**录入值（审计说明 5 段 / 结论 / 矩阵手工覆盖）。
+ *
+ * 🔴 必须走 `/checklist-responses`（持久化），**不能**用 `html_data.responses_snapshot` ——
+ * 后者含 Tier A 公式预设的 transient 种子，被 `parseK0ManualOverrides` 当成手工覆盖会把
+ * 「本项目无此科目」压成假 0（`Number(null) === 0` 同族坑）。
+ * 🔴 必须带 `/api` 前缀（`utils/http` 的 baseURL 是 `/`，vite 只代理 `/api`；漏掉会拿回
+ *    dev server 的 index.html，`Array.isArray` 判否后静默变成空 map）。
+ */
+async function loadK0Responses() {
+  if (!isK0.value || !props.wpId) return
+  try {
+    const res = await http.get(`/api/workpapers/${props.wpId}/checklist-responses`)
+    const list = (res.data?.data ?? res.data ?? []) as Array<Record<string, any>>
+    const map: Record<string, string> = {}
+    for (const item of Array.isArray(list) ? list : []) {
+      const id = String(item.item_id ?? item.itemId ?? '')
+      if (!id.startsWith('K0-1-')) continue
+      const v = item.remark ?? item.conclusion ?? item.value ?? ''
+      map[id] = v === null || v === undefined ? '' : String(v)
+    }
+    k0Responses.value = map
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] K0 下区录入值加载失败:', e?.message)
+  }
+}
+
+/** 并行拉 K1（BS-009 净额）/ K3（BS-050）作矩阵账面金额；两者 wp_code 不同故不触发请求去重 */
+async function loadK0Sources() {
+  if (!isK0.value) return
+  k0SourcesLoading.value = true
+  try {
+    k0Sources.value = await loadK0MatrixSources(props.projectId)
+  } finally {
+    k0SourcesLoading.value = false
+  }
+}
+
+/**
+ * K0 下区录入落库 —— 与 `handleG0LowerSave` / `handleL0LowerSave` 同源。
+ *
+ * 🔴🔴 **绝不能** `emit('save', { itemId, value })`：宿主 save 处理器把载荷整体写成
+ * 该 sheet 的 `parsed_data.html_data[sheetName]`（G0 侧已浏览器实测复现：`_format` 一并消失
+ * → 该 sheet 退化成「旧格式只读」、上区函证行全丢）。下区是 itemId 维度录入，
+ * 必须直接走平台标准 `checklist-responses` PUT。
+ */
+async function handleK0LowerSave(itemId: string, value: string) {
+  k0Responses.value = { ...k0Responses.value, [itemId]: value }
+  if (!props.wpId) return
+  try {
+    const payload: Record<string, any> = {
+      items: [{ item_id: itemId, remark: value, conclusion: null }],
+    }
+    // 空字符串会让后端 UUID 校验 422；缺省时服务端按底稿解析 project_id
+    if (props.projectId) payload.project_id = props.projectId
+    await http.put(`/api/workpapers/${props.wpId}/checklist-responses`, payload)
+  } catch (e: any) {
+    console.warn('[GtConfirmationSummary] K0 下区录入保存失败:', e?.message)
+    ElMessage.warning('保存失败：' + (e?.message || '网络错误'))
+  }
+}
+
+/**
+ * 下区审计说明/结论的 AI 辅助 —— 走 **K0 专属端点**
+ * `POST /api/workpapers/{id}/k0/ai/{section}`（`_k0_confirmation_ai.py`）。
+ *
+ * 🔴 三处约定与 G0 端点不同，写错就静默失效：
+ *   ① **section 在 URL path**（不是 body 字段）—— G0 是 `/g0/ai-generate` + body `{section}`
+ *   ② body 只有 `{existingContent, relatedContext}`（pydantic 会静默忽略多余字段）
+ *   ③ section 必须已在 `_SUPPORTED_SECTIONS` 登记 —— 该端点是**硬门 400**，
+ *      前端 catch 会吞成「AI 生成失败」。本轮已补 6 条（5 说明 + 1 结论），守卫双向锁死。
+ * 🔴 必须带 `/api` 前缀（`utils/http` 无 /api 注入拦截器，vite proxy 只代理 `/api`）。
+ */
+async function handleK0LowerAi(aiSection: string, itemId: string) {
+  if (!props.wpId) {
+    ElMessage.warning('缺少底稿标识，无法调用 AI')
+    return
+  }
+  k0AiLoadingKey.value = itemId
+  try {
+    const res = await http.post(
+      `/api/workpapers/${props.wpId}/k0/ai/${encodeURIComponent(aiSection)}`,
+      {
+        existingContent: k0Responses.value[itemId] ?? '',
+        relatedContext: {
+          底稿编码: String(props.wpCode || 'K0-1'),
+          函证行数: String(data.rows.value.length),
+          已回函行数: String(data.rows.value.filter((r: ConfirmationRow) => isRepliedTrue(r)).length),
+          不符行数: String(data.rows.value.filter((r: ConfirmationRow) => r.match_status === '不符').length),
+          账面金额已取数品种: (k0Sources.value?.diagnostics.resolved ?? []).join('、') || '无',
+        },
+      },
+    )
+    const content = String((res.data?.data ?? res.data)?.content ?? '')
+    if (!content) {
+      ElMessage.warning('AI 未返回内容')
+      return
+    }
+    k0LowerRef.value?.applyAiText(itemId, content)
+    ElMessage.success('AI 已生成，请复核后保存')
+  } catch (e: any) {
+    ElMessage.error(`AI 生成失败：${e?.message || '未知错误'}`)
+  } finally {
+    k0AiLoadingKey.value = null
+  }
+}
+
 // F0 矩阵数据源（账面金额 ← F1/F3/F4 tb_amount；替代确认 ← F0-5/F0-6 companies）
 const f0Sources = ref<F0MatrixSources | null>(null)
 const f0SourcesLoading = ref(false)
@@ -855,6 +1188,13 @@ onMounted(() => {
   if (isG0.value) {
     void loadG0Responses()
     void loadG0Sources()
+  }
+  // L0 只需拉持久化录入值 —— 账面金额由后端注入器写进 htmlData，无需前端并行取数
+  if (isL0.value) void loadL0Responses()
+  // K0 与 G0 同款：既要持久化录入值，也要前端并行拉 K1/K3 的账面金额
+  if (isK0.value) {
+    void loadK0Responses()
+    void loadK0Sources()
   }
 })
 

@@ -289,13 +289,53 @@ async def build_report_entries(db, project_id: str, year: int) -> list[AddressEn
     return entries
 
 
+#: tb 域登记的列名 —— **由求值器的列名注册表派生**（单一真源）。
+#:
+#: 🔴 **为什么不能硬编码**（spec formula-management-runtime-closure Task 18，
+#: 2026-08-07 真实库实测）：改造前这里写死 5 项
+#: ``['未审数','审定数','AJE调整','RJE调整','期初余额']``，而 ``COLUMN_ALIASES``
+#: 有 14 键 ⇒ **9 个已注册列名在地址目录里不存在**（`期末余额` / `年初余额` /
+#: `本期发生额` / `本期借方` / `本期贷方` / `借方发生额` / `贷方发生额` 及两个长别名）。
+#:
+#: 后果（逐条实测，项目 0ec33ac9 / year 2025 / tb 域 980 条目 / 196 科目）：
+#: ``validate_formula_refs`` 按「ref 文本转 URI 后是否在 uri_set 里」判定，
+#: 而 `PUT /formulas` 与 `PUT /user-formulas` 都在写库前跑该校验 ⇒
+#: **任何用这 9 个列名写的可编辑公式保存时必被 422 `FORMULA_REF_NOT_FOUND` 拒绝**，
+#: 报错文案还是「引用地址在当前项目中不存在」（指向数据缺失，实为目录缺列 = 误导）。
+#: 而 `期末余额` 恰是预设里用得最多的列（`prefill_formula_mapping.json` 实测 280 格），
+#: D1 的 Tier A 预设本体就是 ``TB('1121','期末余额') - TB('1231-01','期末余额')``
+#: ⇒ 审计师在公式管理面板里**改任何一条 Tier A 公式都存不进去**。
+#:
+#: 🔴 **该改动是纯 additive**：它只往 ``uri_set`` 里**增加**条目，
+#: 而校验只在「URI 不在集合里」时报 issue ⇒ 校验只会变宽松、不可能产生新的 422。
+#: 这是零回归的**结构性保证**，不依赖回归测试碰运气。
+#: 守卫见 ``backend/tests/test_formula_column_alias_coverage.py``
+#: （断言 tb 域列名 ⊇ ``COLUMN_ALIASES`` 键集 + 原 5 项仍在册）。
+_TB_LEGACY_COLUMNS: tuple[str, ...] = ('未审数', '审定数', 'AJE调整', 'RJE调整', '期初余额')
+
+
+def trial_balance_address_columns() -> list[str]:
+    """tb 域应登记的列名集合 = ``COLUMN_ALIASES`` 键集 ∪ 历史 5 项。
+
+    实测历史 5 项全部是 ``COLUMN_ALIASES`` 的键（差集为空），故并集只是
+    「防将来有人从别名表里删掉其中之一」的保险；顺序固定以便快照稳定。
+    """
+    from app.services.formula_engine import COLUMN_ALIASES
+
+    ordered = list(_TB_LEGACY_COLUMNS)
+    for col in COLUMN_ALIASES:
+        if col not in ordered:
+            ordered.append(col)
+    return ordered
+
+
 async def build_trial_balance_entries(db, project_id: str, year: int) -> list[AddressEntry]:
     """从试算表构建地址条目"""
     from sqlalchemy import select
     from app.models.audit_platform_models import TrialBalance
 
     entries = []
-    columns = ['未审数', '审定数', 'AJE调整', 'RJE调整', '期初余额']
+    columns = trial_balance_address_columns()
     try:
         result = await db.execute(
             select(TrialBalance).where(
