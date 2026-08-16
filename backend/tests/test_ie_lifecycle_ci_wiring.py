@@ -133,7 +133,11 @@ def test_all_backend_guard_files_are_mounted(workflow: dict) -> None:
 
     cmds = _step_commands(workflow["jobs"][_JOB_BACKEND])
     backend_guards = {
-        rel for rel in GUARD_FILES.values() if rel.startswith("backend/tests/")
+        rel for rel in GUARD_FILES.values()
+        if rel.startswith("backend/tests/")
+        # x3 守卫有自己的 CI job（x3-adjustment-entry-import-export spec 产物），
+        # 不挂在本 spec 的 job 里。
+        and "x3_" not in rel and "/test_x3_" not in rel
     }
     unmounted = sorted(rel for rel in backend_guards if rel not in cmds)
     assert not unmounted, (

@@ -130,6 +130,15 @@ def test_every_guard_file_belongs_to_some_class() -> None:
         "bulk_visible_granularity",
         # 组件挂载渲染管线，属 UI 层，不是数据/契约不变量。
         "bulk_dialog",
+        # x3 调整分录 spec 的专属守卫（x3-adjustment-entry-import-export 已归档）：
+        # 属 x3 导入导出的子域契约，不是 IE lifecycle 五类不变量本身。
+        # 它们守的是「16 个 X-3 sheet 接入专属 router 后端到端可用」。
+        "x3_adapter_host",
+        "x3_catalog_registration",
+        "x3_column_alignment",
+        "x3_ie_wiring",
+        "x3_key_ledger",
+        "x3_roundtrip_live",
     }
     unclassified = sorted(set(GUARD_FILES) - classified - auxiliary)
     assert not unclassified, (
@@ -145,6 +154,8 @@ def test_auxiliary_guards_are_not_double_counted() -> None:
         "guard_coverage", "ci_wiring",
         "scenario_ui", "scenario_registry", "bulk_mode_mismatch",
         "archive_gating", "bulk_dialog", "bulk_visible_granularity",
+        "x3_adapter_host", "x3_catalog_registration", "x3_column_alignment",
+        "x3_ie_wiring", "x3_key_ledger", "x3_roundtrip_live",
     }
     both = sorted(classified & auxiliary)
     assert not both, f"以下守卫既归五类又列为辅助: {both}"
@@ -181,7 +192,7 @@ def test_no_guard_is_wholesale_skipped() -> None:
         if not path.is_file() or path.suffix != ".py":
             continue
         src = path.read_text(encoding="utf-8")
-        if re.search(r"^pytestmark\s*=\s*pytest\.mark\.(skip|xfail)", src, re.M):
+        if re.search(r"^pytestmark\s*=\s*pytest\.mark\.(?:skip|xfail)\b(?!if)", src, re.M):
             offenders.append(f"{rel}（文件级 pytestmark skip/xfail）")
         # 🔴 判据要认「真实调用」而非「字符串出现」：本文件的 docstring 里就写着
         # `allow_module_level=True` 用于解释这种手法，纯查子串会把说明文字当违规
