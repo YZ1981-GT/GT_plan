@@ -121,8 +121,17 @@ def _cmd_list(
             continue
         try:
             lines = read_lines(target)
-            idx = find_anchor(lines, m.anchor, m.line)
-            print(f"      anchor: L{idx + 1} 唯一命中")
+            # 🔴 必须与 `apply.apply_mutation` 传同一组消歧参数（scope/offset 也要传）。
+            # 2026-08-16 实测缺陷：本处与 `_cmd_check_anchors` 都只传了 `m.line`，于是
+            # 用 scope 相对定位的变异在 `--list` / `--check-anchors` 下被误报
+            # 「命中 5 次」ANCHOR-MISS，而 `--run` 能正确定位 ——
+            # **静态自检弱于实际执行**，且 `--list` 正是 CI 里的静态闸 ⇒ 必假红。
+            idx = find_anchor(lines, m.anchor, m.line, m.scope, m.offset)
+            where = f"L{idx + 1}"
+            if m.scope:
+                print(f"      anchor: {where} 经 scope+offset({m.offset}) 定位")
+            else:
+                print(f"      anchor: {where} 唯一命中")
             if m.kind in ("swap", "move"):
                 j = find_anchor(lines, m.anchor2)
                 a = block_range(lines, idx, m.block_open)
@@ -163,7 +172,9 @@ def _cmd_check_anchors(mutations: list[Mutation], repo: Path) -> int:
             continue
         try:
             lines = read_lines(target)
-            i = find_anchor(lines, m.anchor, m.line)
+            # 同 `_cmd_list`：消歧参数必须与 apply 侧一致，否则 scope 相对定位的变异
+            # 在只读自检里被误判成 ANCHOR-MISS（见该处注释的实测记录）。
+            i = find_anchor(lines, m.anchor, m.line, m.scope, m.offset)
             extra = ""
             if m.kind in ("swap", "move"):
                 j = find_anchor(lines, m.anchor2)

@@ -32,6 +32,7 @@ from _mutation_kit import Mutation, run_cli  # noqa: E402
 REPO = Path(__file__).resolve().parents[3]
 
 KIT = "backend/scripts/_mutation_kit"
+ADOPTION = "backend/tests/test_mutation_kit_adoption.py"
 
 #: 覆盖面分母 —— 本 spec 为共享件与治理机制创建的守卫文件全集。
 #:
@@ -40,12 +41,14 @@ GUARD_FILES: dict[str, str] = {
     "test_mutation_kit_capabilities.py": "Task 10 新建（共享件七项能力）",
     "test_mutation_kit_scripts_tracked.py": "Task 4 新建（变异脚本入库）",
     "test_mutation_kit_exemptions.py": "Task 4 新建（豁免表与失效检测）",
+    "test_mutation_kit_adoption.py": "Task 14 新建（采纳守卫：存量冻结名单）",
 }
 
 BE_ARGS = [
     "backend/tests/test_mutation_kit_capabilities.py",
     "backend/tests/test_mutation_kit_scripts_tracked.py",
     "backend/tests/test_mutation_kit_exemptions.py",
+    "backend/tests/test_mutation_kit_adoption.py",
     "-q",
     "--tb=no",
     "-rf",
@@ -57,7 +60,12 @@ BE_ARGS = [
 #: 62 -> 63：M02 判 GREEN 后补 test_find_anchor_rejects_multiline_anchor。
 #: 63 -> 65：Task 11 迁移时暴露「子集运行恒非零退出」缺陷，补两条退出码守卫。
 #: 65 -> 77：Task 12 为迁移吸收 scope 相对定位与多目标 wants 两项能力，补 12 条守卫。
-BASELINE_BE_PASSED = 77
+#: 77 -> 92：Task 14 两件事叠加 —— ① 新建采纳守卫 test_mutation_kit_adoption.py（13 例）
+#: 并纳入分母；② 修 test_mutation_kit_exemptions.py 的两条既存红（失效检测命中 k/i-cycle
+#: 归档 + test_active_spec_scan_is_not_empty 把 `len(active)>=3` 当基线而 active 只剩 2 个）。
+#: 故 77(其中 2 条红) → 79 全绿 → +13 = 92。**首版误写 90**（拿旧的 77 直接加 13，
+#: 漏算那 2 条由红转绿的），实测 91 passed + 1 failed = 92 时才发现。
+BASELINE_BE_PASSED = 92
 
 MUTATIONS: list[Mutation] = [
     Mutation(
@@ -214,24 +222,37 @@ EXEMPTIONS = "backend/data/mutation_kit_exemptions.json"
 MUTATIONS += [
     Mutation(
         id="M14", side="be", path=EXEMPTIONS, kind="replace",
-        anchor='      "spec": "k-cycle-extraction-formula-and-disclosure-closure",',
+        anchor='      "spec": "workpaper-import-export-lifecycle-closure",',
+        scope='      "script": "backend/scripts/diagnose/mutate_wp_export_resolver_guards.py",',
+        offset=1,
         new='      "spec": "e-cycle-extraction-formula-and-disclosure-completion",',
         want="test_no_stale_exemption_after_spec_archived",
         why="把豁免项的 spec 换成一个**已归档**的 spec 名 ⇒ 失效检测必须报出该豁免应撤销。"
             "不改成不存在的假名字：假名字与「已归档」在 active 集合判定上等价，"
-            "但用真实已归档 spec 更贴近该机制要防的场景（豁免变成永久后门）。",
+            "但用真实已归档 spec 更贴近该机制要防的场景（豁免变成永久后门）。"
+            "🔴 **锚点已从 k-cycle 那条改到 exemptions[0]**（2026-08-16）：Task 14 撤销了"
+            "k/i-cycle 与 ie_lifecycle 三项豁免，原锚点字符串虽然仍存在（撤销留档也写 spec 字段），"
+            "但已落在 `_revoked_log` 里 ⇒ scope_check 判 ANCHOR-MISS。**这次是作用域自证"
+            "按设计生效的实例**：锚点命中了、变异也落盘了，只是落在被测判据的作用域之外，"
+            "若无 scope_check 就会被四态判定式误报成 GREEN（守卫缺陷）。"
+            "现锚点用 scope 相对定位到 exemptions[0]（唯一剩下的豁免项）。",
         scope_check=_exemption_field_is(
             "spec", "e-cycle-extraction-formula-and-disclosure-completion"
         ),
     ),
     Mutation(
         id="M15", side="be", path=EXEMPTIONS, kind="replace",
-        anchor='      "script": "backend/scripts/diagnose/mutate_k_cycle_guards.py",',
+        anchor='      "script": "backend/scripts/diagnose/mutate_wp_export_resolver_guards.py",',
         new='      "script": "backend/scripts/diagnose/mutate_never_existed.py",',
         want="test_every_mutation_script_is_tracked_or_exempt",
-        why="把豁免项指向另一个路径 ⇒ 真正未入库的 mutate_k_cycle_guards.py 失去豁免，"
-            "tracked 守卫必须抓到它；同时 test_exempt_scripts_actually_exist 也应红"
-            "（豁免表出现僵尸项）。一条变异同时反证两个判据。",
+        why="把豁免项指向另一个路径 ⇒ 真正未入库的 mutate_wp_export_resolver_guards.py"
+            "失去豁免，tracked 守卫必须抓到它；同时 test_exempt_scripts_actually_exist"
+            "也应红（豁免表出现僵尸项）。一条变异同时反证两个判据。"
+            "🔴 **锚点已从 k-cycle 改到 wp_export_resolver**（2026-08-16），这不只是"
+            "修锚点漂移，更是修一个**行将失效的变异**：`mutate_k_cycle_guards.py` 登记时"
+            "是 `??` 未跟踪，如今已由其推进方入库 ⇒ 即便锚点仍有效，让它失去豁免也不会"
+            "让 tracked 守卫变红（它 tracked），本条会退化成 GREEN 假报守卫缺陷。"
+            "现在锚在全平台**唯一仍未入库**的那个脚本上，变异才真正有效。",
         scope_check=_exemption_field_is(
             "script", "backend/scripts/diagnose/mutate_never_existed.py"
         ),
@@ -240,12 +261,19 @@ MUTATIONS += [
         id="M16", side="be", path=EXEMPTIONS, kind="replace",
         anchor='      "registered_at": "2026-08-15",',
         new='      "registered_at": "2026/08/15",',
-        line=26,
+        scope='      "script": "backend/scripts/diagnose/mutate_wp_export_resolver_guards.py",',
+        offset=3,
         want="test_every_entry_has_valid_fields",
-        why="把登记日期改成非 ISO 格式 ⇒ 字段校验必须报出。锚点在文件里命中 5 次"
-            "（含 _schema 里的示例），故用 line 消歧到 exemptions[0]，"
+        why="把登记日期改成非 ISO 格式 ⇒ 字段校验必须报出。锚点在文件里命中多次"
+            "（_revoked_log 各条 + _schema 示例 + exemptions[0]），故须消歧到 exemptions[0]，"
             "并配 scope_check 双重确认改动落在被测结构内 —— "
-            "Wave 1 正是因为锚点落到 _schema 文档说明上而把脚本缺陷误报成 GREEN。",
+            "Wave 1 正是因为锚点落到 _schema 文档说明上而把脚本缺陷误报成 GREEN。"
+            "🔴 **消歧方式已从 line=26 改为 scope 相对定位**（2026-08-16）：Task 14 收敛"
+            "豁免表时撤销了 3 项、给 _revoked_log 补了 3 条撤销留档，绝对行号当场漂移"
+            "（--list 报「消歧行号 26 内容不符：期望 registered_at，实为 revoked_at」）。"
+            "scope 锚在 exemptions[0] 的 script 行（全文唯一，_revoked_log 里无此脚本），"
+            "offset=3 指向同一条目的 registered_at ⇒ _revoked_log 再增删都不影响它。"
+            "这正是共享件吸收 scope+offset 能力的理由在自己身上兑现了一次。",
         scope_check=_exemption_field_is("registered_at", "2026/08/15"),
     ),
     # ── Task 12 为迁移吸收的两项新能力（相对定位 / 多目标 want）───────────────
@@ -272,6 +300,59 @@ MUTATIONS += [
         why="让 matched 丢掉 wants 只看 want ⇒ 多目标退化成单目标。迁移 trim_decision"
             "（expect_red: tuple）与 note_conversion（expect_tests: list）都依赖多目标，"
             "退化后它们的判定会从 RED 变 WRONG-TEST（命中不到被挑掉的那些模式）。",
+    ),
+    # ── Task 14 的采纳守卫（存量冻结名单形态）——────────────────────────────────
+    #
+    # 🔴 为什么这一组必须固化在这里、不能用临时脚本跑一次：Wave 3 的覆盖面 tally 曾
+    # 报出两个 [GAP]（test_mutation_kit_exemptions / test_mutation_kit_scripts_tracked
+    # 从未被任何变异打红），原因正是 Wave 1 给它们做变异时用的是临时脚本、跑完即删。
+    # 采纳守卫是本 spec 收敛后的核心机制，它的四条不变量都要有常驻反证。
+    Mutation(
+        id="M19", side="be", path=ADOPTION, kind="replace",
+        anchor='    "backend/scripts/check/mutate_task13_wiring_guards.py":',
+        new='    "backend/scripts/check/mutate__never_existed_probe__.py":',
+        want="test_new_scripts_must_use_the_shared_kit",
+        why="把一个真实存量脚本从冻结名单里「挪走」（键改成不存在的路径）⇒ 它变成"
+            "「名单外且未采纳」，主判据必须报出它。这条验的是采纳守卫的**正向能力** —— "
+            "名单不是把所有脚本都放过的万能白名单，漏登记就会被抓。"
+            "不能直接 delete 该行：值在下一行，删键会留下孤立字符串 ⇒ 语法错误，"
+            "判定退化成 collect error（WRONG-TEST）而非精确命中。",
+    ),
+    Mutation(
+        id="M20", side="be", path=ADOPTION, kind="replace",
+        anchor="_FROZEN_SIZE = 19",
+        new="_FROZEN_SIZE = 18",
+        want="test_frozen_list_only_shrinks",
+        why="下调冻结上限模拟「名单增长了一条」⇒ only-shrinks 判据必红。这条守的是"
+            "R8.2 的第二条不变量：新脚本不得把自己加进名单来逃避约束，否则名单退化成"
+            "免责声明（e-cycle 的 M20 变异针对的正是同一形态）。"
+            "🔴 之所以改上限而不是真加一条名单项：真加一条需要同时给出一个不存在的脚本"
+            "路径，会连带打红 zombie/路径形态那几条判据 ⇒ 判定不再精确对应本条不变量。",
+    ),
+    Mutation(
+        id="M21", side="be", path=ADOPTION, kind="insert",
+        anchor='        "删除完成则本条成为可清理的僵尸项（只 INFO），若被恢复则按存量处理不打红",',
+        new='    "backend/scripts/check/mutate_task13_wiring_guards.py": "短",',
+        want="test_every_frozen_entry_has_a_real_reason",
+        why="在名单末尾插入一条**重复键**的空话理由（Python dict 字面量后者覆盖前者）"
+            "⇒ task13 的理由变成「短」，理由质量闸必红。这条守的是「豁免必须说明为什么"
+            "不迁」——空话让名单退化成免责声明。"
+            "🔴 用重复键而不是新键：新键会让条目数 +1 从而连带打红 only-shrinks，"
+            "判定就分不清是哪条不变量在承重了（重复键下 len 不变，只有理由闸红）。"
+            "实证价值：本闸上线时立刻抓到作者自己写的两条「同上」（15 字）。",
+    ),
+    Mutation(
+        id="M22", side="be", path=ADOPTION, kind="replace",
+        anchor="        elif isinstance(node, ast.Import):",
+        new="        elif KIT_PACKAGE in src:  # mut: 退化成字符串匹配",
+        want="test_reverse_selfcheck_comment_mention_is_not_adoption",
+        why="把 AST 判据的第二个分支换成字符串匹配 ⇒ 「docstring 里提一句 _mutation_kit」"
+            "会被判成已采纳（memory 假绿第②源：grep 式守卫只查字符串存在）。"
+            "🔴 本条同时验证了一次判据重构的必要性：初版的这条自检是**自包含**的"
+            "（内联源码串自己 ast.walk 一遍），改坏 imports_kit_src 打不红它 —— "
+            "证明的是「AST 语义如此」而非「本文件的实现如此」。抽成纯函数后才咬得住。"
+            "不能整体删掉 ImportFrom 分支：那样真实 import 也认不出，会连带打红形态自检"
+            "⇒ 判定不精确对应「退化为字符串匹配」这一形态。",
     ),
 ]
 
