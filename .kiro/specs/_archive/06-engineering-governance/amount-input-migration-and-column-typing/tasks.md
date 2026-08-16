@@ -341,3 +341,28 @@ python backend/scripts/fix/fix_amount_input_batch.py --apply --files "g4-bond-in
 
 **批 3 最终入库量**：迁移 **1127 处**（原 1151 减去这 3 文件的 24 处），
 `el-input-number` 4260→3063、`WpAmountInput` 682→1881、`confirmed` 1898→837、`reverse`=0。
+
+### 2026-08-16 端到端实测阻塞解除与补做
+
+**阻塞根因诊断**：此前「后端全 API 500」判定有误 —— 真实健康端点是 `/api/health`
+（当时误测 `/health` 得 404 而误判）。本次诊断确认后端进程健康：`/api/health` 200
+（postgres ok / redis ok / 迁移 applied_count=146 failures=[] / schema_drift count=0）、
+`/docs` 200、业务 API `/api/version`|`/api/users/`|`/livez`|`/readyz` 200，需登录的
+`/api/users/me` 等 401（正常）。当时的 500 是临时故障态（后端 `--reload` 中或瞬时），
+现已恢复，**非代码 bug，无需改代码**。
+
+**端到端实测（Playwright，后端 9980 + 前端 3030 均在线）**：
+- 🔴 Vite dev server 只监听 IPv6 `::1`，浏览器/curl 必须用 `localhost:3030`
+  （`127.0.0.1:3030` 连接被拒 / curl=000），这是此前"浏览器连不上"的另一真因。
+- 路径：项目「重庆和平药房_2024」→ 底稿管理 → H 循环 → H1 编辑 →「明细表 H1-2」
+  （`H1TabDetail`，批 3 迁移的文件）。
+- **千分符判据通过**：明细表真实渲染 **5 个 `WpAmountInput`**（初值 `0.00` = amountFormatter
+  已生效）；在金额输入框输 `1234567.5` 失焦 → 显示 **`1,234,567.50`**（千分符 + 2 位小数）。
+  迁移前 `el-input-number` 显示 `1234567.50` 无千分符，对比印证迁移端到端生效。
+- **数据无漂移**：network 全程零 save/autosave 请求（仅 editing-lock POST + heartbeat PATCH），
+  输入值只在前端 draft、从未写库；离开 edit 页即丢弃 draft、释放编辑锁。DB 无变化。
+
+**判据覆盖**：Task 6/8 的「千分符显示」核心已**端到端实测通过**；「持久化 number」由
+`WpAmountInput.spec` 单测覆盖（onBlur emit number 非字符串）；「写库持久化 + 数据复原
+`--diff`」为避免污染生产项目未做完整写库测。**端到端实测的阻塞已消除**，后续如需完整
+写库验证可在专用测试项目上进行。
