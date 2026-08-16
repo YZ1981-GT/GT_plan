@@ -59,6 +59,14 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]  # → backend/
 PREFILL_PATH = ROOT / "data" / "prefill_formula_mapping.json"
 
+# 🔴 Windows 默认控制台是 GBK（cp936），本脚本打印的诊断串含 U+21D2「⇒」等
+# 非 GBK 字符 —— 不收口会在 print() 处抛 UnicodeEncodeError 直接崩掉整个
+# --check，看起来像「脚本坏了」而非「控制台编码不够」。stdlib 一行收口，
+# 不必强迫调用方每次先设 PYTHONIOENCODING=utf-8。
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure"):
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+
 #: 抽「首实参是科目码」的函数实参（TB/ADJ）。PREV 首实参是 wp_code、
 #: PLACEHOLDER 首实参是自由文本，故都不在此列。
 #: 🔴 仅供审定表块使用（那些块只有 TB/ADJ/PREV/PLACEHOLDER 四种）。
