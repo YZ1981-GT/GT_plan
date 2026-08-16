@@ -1,28 +1,55 @@
 # 任务 15.2 Playwright 实测状态
 
-## 执行时间
-2026-08-16T00:39+08:00
+## 结论（2026-08-16 第二轮，阻塞已解除）
 
-## 环境
-- 后端 9980: 200（health 可达）
-- 前端 3030: 200（页面可渲染）
-- 登录: 成功（admin/admin123）
+**首轮判定的「API proxy 404」是误诊。** Vite proxy 配置本来就是对的
+（`vite.config.ts`：`/api` → `http://127.0.0.1:9980`，含 `changeOrigin` 与 307 重写）。
 
-## 阻塞
-前端页面渲染底稿编辑器时，API 请求 `/api/projects/{id}` 返回 404。
-Console errors: 3 × "Failed to load resource: 404"
+真实根因：**首轮选的 `project_id` 在后端 API 视角不存在**。
+那个 id（`df5b8403-abbb-48af-b6a4-6fd44dfae5c9`）是我直接从 `working_paper JOIN wp_index`
+取的，但它不在 `/api/projects` 返回的可见集里（软删除/不可见），故
+`GET /api/projects/{id}` 恒 404 ⇒ 底稿编辑器拿不到项目上下文 ⇒ 内容区空白。
 
-原因：`start-dev.bat` 启动的前端 dev server 的 API proxy 配置可能未正确指向 9980。
-底稿编辑器依赖项目数据加载，项目 API 404 导致编辑器内容区为空。
+实证（带 token 直打后端 9980，绕开前端）：
 
-## 已有替代验证
-- 15.1 verify_x3_roundtrip_live.py: 16/16 往返通过 + 16/16 还原校验通过
-- 13.4 test_x3_roundtrip_live.py: 9 用例全绿（含真实库 write→load）
-- 11.1 的 ieWiringIntegrity.spec.ts: 前端 dropdown 挂载 + 读回路径结构性验证
+| 路径 | 状态 |
+|---|---|
+| `/api/projects` | **200**（32 个项目） |
+| `/api/projects/df5b8403-…`（首轮用的 id） | **404** |
+| `/api/projects/{上述 32 个里任意一个}` | **200** |
 
-## 下一步
-需确认 Vite proxy 配置后重试。或用 `npx playwright test` 方式从前端项目内执行
-（该方式走 Vite 内建 proxy，不受端口隔离影响）。
+⇒ 教训：**选测试数据必须走「后端 API 认可的可见集」，不能直接从库表 JOIN 取 id**。
+直接 JOIN 会拿到 API 层不可见的对象，表现成「接口坏了」，很容易误诊成配置问题
+（首轮就据此写下了「proxy 配置需修」的错误结论）。
+
+## 已验证项（2026-08-16）
+
+项目：`2aa00f57-1df4-4fe8-9840-2d65d0fd8749`（重庆和平药房连锁有限责任公司_2025）
+
+| 判据 | L2-3 | N5-3 | 说明 |
+|---|---|---|---|
+| 底稿页正常渲染 | ✅ | ✅ | 内容区有 Tab 与正文（首轮空白） |
+| X-3 Tab 可见可点 | ✅ | ✅ | `应付利息调整分录汇总L2-3` / `调整分录汇总表N5-3` |
+| **「导入导出 ▾」下拉可见** | ✅ | ✅ | 任务 11.1 挂载的 `CycleImportExportDropdown` |
+| **下拉三项可见可点** | ✅ | — | `导出模板` / `导出数据` / `导入数据` |
+| **0 console error** | ✅ | ✅ | 首轮为 3 个 404 |
+
+选这两张的理由：分属两个键族与两种机制 —— L2-3 = `single_json` +
+`adjustment_savebatch`(remark)；N5-3 = `single_json` + `formdata_setfield`(conclusion)
+且是形态④（跨文件 `ITEM_PREFIX`）+ 小写 `aje/rje` 枚举，覆盖面不同。
+
+## 仍未验证（本任务尚不完整）
+
+tasks.md 15.2 还要求下列项，**本轮未做**，故该任务保持未完成：
+
+- [ ] 16 张**全部**逐页核验（本轮只验了 2 张）
+- [ ] **导入后表格显示导入的行**（需真的上传 xlsx 走完导入流程；接口 200 不构成通过）
+- [ ] 金额千分符与「元」单位显示正确
+- [ ] `N2-3` / `N3-3` 父宿主重载生效（读回源是 `props.allResponses`）
+- [ ] `L6-3` / `M1-3` / `M2-3` / `M9-3` 读回补齐生效（刷新页面后仍显示）
+- [ ] 实测写入的数据验收后完整复原并二次比对
 
 ## 截图
-`evidence/playwright_env_status.png`
+
+- `playwright_L2-3_dropdown_3items.png` —— L2-3 下拉三项展开态
+- `playwright_env_status.png` —— 首轮空白页（误诊时的状态，留作对照）
