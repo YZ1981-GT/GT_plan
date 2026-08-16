@@ -18,6 +18,20 @@ import yaml
 
 from app.services.wp_classification_service import _WP_CODE_OVERRIDE, VALID_COMPONENT_TYPES
 
+from tests.l_cycle_extraction._l_component_registry import (
+    DECLARED_AUDIT_SHEET_CODES,
+    DECLARED_FORM_TABLE_CODES,
+    DEDICATED_TYPE_RE,
+    L0_SHARED_CONFIRMATION_NOTE,
+    PRE_MIGRATION_GENERIC_TYPES,
+    cycle_of,
+    dedicated_owners_by_cycle,
+    evaluate_dedicated_ownership,
+    evaluate_host_references_code,
+    evaluate_no_pre_migration_type,
+    load_renderer_registry,
+)
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # 数据加载
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -115,12 +129,28 @@ class TestP0Registration:
             )
 
     def test_all_program_codes_have_override(self):
-        """所有 L 类程序表在 _WP_CODE_OVERRIDE 中有映射。"""
+        """所有 L 类程序表在 _WP_CODE_OVERRIDE 中有映射。
+
+        🔴 原断言 `== "a-program-console"` 恒红：L1A~L8A 已随各自循环迁到专属组件
+        （程序表是该 wp 的一张 sheet，由宿主内部分发），只有 L0A 仍用通用程序台
+        —— L0 没有专属宿主可承载程序表（见 L0_SHARED_CONFIRMATION_NOTE）。
+        故判据改为「注册 + 归属本循环」，L0A 的通用类型作为登记在案的例外。
+        """
         for code in self._PROGRAM_CODES:
             assert code in _WP_CODE_OVERRIDE, (
                 f"L 类程序表 '{code}' 未在 _WP_CODE_OVERRIDE 中注册"
             )
-            assert _WP_CODE_OVERRIDE[code] == "a-program-console"
+        assert _WP_CODE_OVERRIDE["L0A"] == "a-program-console", (
+            "L0A 应保持通用程序台：" + L0_SHARED_CONFIRMATION_NOTE
+        )
+        for code in self._PROGRAM_CODES:
+            if code == "L0A":
+                continue
+            ct = _WP_CODE_OVERRIDE[code]
+            m = DEDICATED_TYPE_RE.match(ct)
+            assert m and m.group(1) == cycle_of(code)[1:], (
+                f"程序表 {code} 的 componentType {ct!r} 未归属本循环的专属组件"
+            )
 
     def test_all_component_types_valid(self):
         """所有 L 类子码 componentType 必须是合法类型。"""
@@ -135,26 +165,64 @@ class TestP0Registration:
         assert _WP_CODE_OVERRIDE.get("L0") == "confirmation-hub"
 
     def test_type_distribution(self):
-        """L 类 componentType 分布符合预期。"""
-        l_codes = {
-            code: ct for code, ct in _WP_CODE_OVERRIDE.items()
-            if re.match(r'^L\d', code)
-        }
-        type_counts: dict[str, int] = {}
-        for ct in l_codes.values():
-            type_counts[ct] = type_counts.get(ct, 0) + 1
-        # 9 c-note-table (L0~L8 parent) - L0 is confirmation-hub so 8
-        assert type_counts.get("c-note-table", 0) >= 8
-        # d-form-table: 5(L0-x) + 8(审定表) + 1(L3-4) + 8(调整分录) = 22+
-        assert type_counts.get("d-form-table", 0) >= 20
-        # audit-sheet: formula/detail/analysis
-        assert type_counts.get("audit-sheet", 0) >= 15
+        """L 类 componentType 分布符合预期。
+
+        🔴 原断言是三条通用类型的地板线（c-note-table ≥8 / d-form-table ≥20 /
+        audit-sheet ≥15），迁到专属组件后三者对 L1~L8 全部归零，恒红。
+        地板线本身也是坏判据：数字来自当时的人工计数，改一个 override 就漂移。
+        改成结构不变式 —— L1~L8 各恰好贡献 1 个专属组件，且计数之和覆盖全部 L 码。
+        """
+        owners = dedicated_owners_by_cycle(_WP_CODE_OVERRIDE)
+        assert set(owners) == {f"L{i}" for i in range(9)}, (
+            f"L 循环缺失或多出：{sorted(owners)}"
+        )
+        dedicated = {c: next(iter(t)) for c, t in owners.items() if c != "L0"}
+        assert len(set(dedicated.values())) == 8, (
+            f"L1~L8 应各有一个互不相同的专属组件，实际 {sorted(set(dedicated.values()))}"
+        )
+        # L0 只用共享函证组件 + 通用程序台，不得出现专属 l{n}- 类型
+        l0_types = owners["L0"]
+        assert not any(DEDICATED_TYPE_RE.match(t) for t in l0_types), (
+            f"L0 出现专属组件 {sorted(l0_types)} —— " + L0_SHARED_CONFIRMATION_NOTE
+        )
+
+    def test_dedicated_ownership_is_unique_per_cycle(self):
+        """判据 1+2：每个 L{n} 归属唯一的专属组件，且组件名编码本循环号。
+
+        可抓出 `== "d-form-table"` 那种写法永远抓不到的接线错误：
+        某个 L4-x 误指向 `l3-long-term-loans`。
+        """
+        problems = evaluate_dedicated_ownership(_WP_CODE_OVERRIDE)
+        assert not problems, "专属组件归属违规：\n  " + "\n  ".join(problems)
+
+    def test_no_pre_migration_generic_type_resurrects(self):
+        """判据 5（反向）：迁移前的通用类型不得对 L1~L8 复活。
+
+        原判据的本意是防回退，这条把它保住 —— 不再要求「等于某个通用值」，
+        而是要求「不得退回通用值」。
+        """
+        problems = evaluate_no_pre_migration_type(_WP_CODE_OVERRIDE)
+        assert not problems, (
+            f"L1~L8 出现迁移前的通用 componentType（{sorted(PRE_MIGRATION_GENERIC_TYPES)}）：\n  "
+            + "\n  ".join(problems)
+        )
 
     @pytest.mark.parametrize("wp_code", ["L1-1", "L2-1", "L3-1", "L4-1",
                                           "L5-1", "L6-1", "L7-1", "L8-1"])
-    def test_audit_determination_tables_are_d_form(self, wp_code):
-        """L{n}-1 审定表映射为 d-form-table。"""
-        assert _WP_CODE_OVERRIDE.get(wp_code) == "d-form-table"
+    def test_audit_determination_tables_owned_by_cycle_component(self, wp_code):
+        """L{n}-1 审定表由本循环专属组件承载。
+
+        🔴 原断言 `== "d-form-table"` 恒红。审定表/检查表这个**角色**区分迁移后
+        在 override 层已不可表达（一个 wp 的所有 sheet 同一个专属组件），落点是
+        宿主内部按 wp_code/sheet 分发，见
+        `derive_component_type(ignore_wp_code_override=True)` 的注释。
+        故这里断言归属，角色级断言应写在宿主组件的前端测试里。
+        """
+        ct = _WP_CODE_OVERRIDE.get(wp_code)
+        m = DEDICATED_TYPE_RE.match(str(ct))
+        assert m and m.group(1) == cycle_of(wp_code)[1:], (
+            f"审定表 {wp_code} 的 componentType {ct!r} 未归属本循环专属组件"
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -357,25 +425,29 @@ class TestP4SpecialProcedures:
         assert "is_within_one_year" in field_names
         assert "reclassify_amount" in field_names
 
-    def test_l4_3_is_audit_sheet(self):
-        """L4-3 实际利率计算映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("L4-3") == "audit-sheet"
-
-    def test_l4_4_is_audit_sheet(self):
-        """L4-4 摊余成本摊销表映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("L4-4") == "audit-sheet"
-
-    def test_l1_3_is_audit_sheet(self):
-        """L1-3 利息测算映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("L1-3") == "audit-sheet"
-
-    def test_l3_3_is_audit_sheet(self):
-        """L3-3 利息测算映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("L3-3") == "audit-sheet"
-
-    def test_l8_5_is_audit_sheet(self):
-        """L8-5 汇兑损益映射为 audit-sheet。"""
-        assert _WP_CODE_OVERRIDE.get("L8-5") == "audit-sheet"
+    # 🔴 这 5 处原为 `== "audit-sheet"` 的单点断言，迁到专属组件后恒红。
+    # 改为「归属本循环专属组件 + 宿主源码真的引用该 wp_code」—— 后者是三向的
+    # 第三边，能抓出「override 指向一个并不处理这张表的组件」，而旧写法只要
+    # 字面量对得上就过，即便宿主文件根本不存在。
+    @pytest.mark.parametrize(
+        ("wp_code", "what"),
+        [
+            ("L4-3", "实际利率计算"),
+            ("L4-4", "摊余成本摊销表"),
+            ("L1-3", "短期借款利息测算"),
+            ("L3-3", "长期借款利息测算"),
+            ("L8-5", "汇兑损益测算"),
+        ],
+    )
+    def test_special_procedure_owned_and_handled_by_host(self, wp_code, what):
+        """特殊测算表由本循环专属组件承载，且宿主确实处理该 wp_code。"""
+        ct = _WP_CODE_OVERRIDE.get(wp_code)
+        m = DEDICATED_TYPE_RE.match(str(ct))
+        assert m and m.group(1) == cycle_of(wp_code)[1:], (
+            f"{wp_code}（{what}）的 componentType {ct!r} 未归属本循环专属组件"
+        )
+        problems = evaluate_host_references_code(_WP_CODE_OVERRIDE, [wp_code])
+        assert not problems, f"{wp_code}（{what}）宿主判定失败：\n  " + "\n  ".join(problems)
 
     def test_l8_1_schema_has_sections(self):
         """L8-1 schema 有利息/汇兑/手续费等分类行。"""
@@ -445,42 +517,54 @@ class TestP5Linkage:
 class TestP6ExportImport:
     """P6: 导入导出基础设施验证。"""
 
-    # L 类 d-form-table wp_codes
-    _L_FORM_TABLE_CODES = [
-        "L0-1", "L0-2", "L0-3", "L0-4", "L0-5",
-        "L1-1", "L1-6",
-        "L2-1", "L2-4",
-        "L3-1", "L3-4", "L3-6",
-        "L4-1", "L4-8",
-        "L5-1", "L5-4",
-        "L6-1", "L6-4",
-        "L7-1", "L7-4",
-        "L8-1", "L8-6",
-    ]
+    # 角色清单的真源下沉到判据层（`_l_component_registry`），此处只做别名，
+    # 避免同一份领域数据在仓库里存两份副本。
+    _L_FORM_TABLE_CODES = list(DECLARED_FORM_TABLE_CODES)
+    _AUDIT_SHEET_CODES = list(DECLARED_AUDIT_SHEET_CODES)
 
-    # L 类 audit-sheet wp_codes
-    _AUDIT_SHEET_CODES = [
-        "L1-2", "L1-3", "L1-4", "L1-5",
-        "L2-2", "L2-3",
-        "L3-2", "L3-3", "L3-5",
-        "L4-2", "L4-3", "L4-4", "L4-5", "L4-6", "L4-7",
-        "L5-2", "L5-3",
-        "L6-2", "L6-3",
-        "L7-2", "L7-3",
-        "L8-2", "L8-3", "L8-4", "L8-5",
-    ]
-
-    @pytest.mark.parametrize("wp_code", _L_FORM_TABLE_CODES)
+    # 🔴 原两个参数化共 47 条断言写成 `== "d-form-table"` / `== "audit-sheet"`，
+    # 迁到专属组件后全红。判据改为「注册 + 可渲染 + 宿主真的引用该 wp_code」，
+    # 比旧写法强：旧写法即便 componentType 前端没注册、宿主 .vue 不存在、宿主
+    # 根本不处理该子码，也照样通过。
+    @pytest.mark.parametrize("wp_code", DECLARED_FORM_TABLE_CODES)
     def test_l_form_table_registered(self, wp_code):
-        """L 类 d-form-table 底稿在 _WP_CODE_OVERRIDE 中注册正确。"""
-        assert wp_code in _WP_CODE_OVERRIDE
-        assert _WP_CODE_OVERRIDE[wp_code] == "d-form-table"
+        """检查表类子码：已注册，且其 componentType 可渲染、宿主处理该码。"""
+        assert wp_code in _WP_CODE_OVERRIDE, f"{wp_code} 未注册"
+        problems = evaluate_host_references_code(_WP_CODE_OVERRIDE, [wp_code])
+        assert not problems, "\n  ".join(problems)
 
-    @pytest.mark.parametrize("wp_code", _AUDIT_SHEET_CODES)
+    @pytest.mark.parametrize("wp_code", DECLARED_AUDIT_SHEET_CODES)
     def test_l_audit_sheet_registered(self, wp_code):
-        """L 类 audit-sheet 底稿在 _WP_CODE_OVERRIDE 中注册正确。"""
-        assert wp_code in _WP_CODE_OVERRIDE
-        assert _WP_CODE_OVERRIDE[wp_code] == "audit-sheet"
+        """审定/测算类子码：已注册，且其 componentType 可渲染、宿主处理该码。"""
+        assert wp_code in _WP_CODE_OVERRIDE, f"{wp_code} 未注册"
+        problems = evaluate_host_references_code(_WP_CODE_OVERRIDE, [wp_code])
+        assert not problems, "\n  ".join(problems)
+
+    def test_every_l_override_is_renderable(self):
+        """全量判据（形态 A：违规清单为空）—— 不止清单里那 47 个子码。
+
+        参数化只覆盖登记在册的子码；这条扫 override 里**全部** L 条目，
+        能抓出「新增了一个 L 子码但忘了给它可渲染的 componentType」。
+        """
+        codes = [c for c in _WP_CODE_OVERRIDE if re.match(r"^L\d", str(c))]
+        assert len(codes) >= 60, f"L override 只有 {len(codes)} 条，疑似加载不全"
+        problems = evaluate_host_references_code(_WP_CODE_OVERRIDE, codes)
+        assert not problems, f"{len(problems)} 处不可渲染：\n  " + "\n  ".join(problems)
+
+    def test_renderer_registry_is_parseable(self):
+        """反向自检：registry 解析出足量条目，防判据对着空 dict 空转。
+
+        若正则失配，`load_renderer_registry()` 返回空 dict，则上面所有
+        「宿主引用」判据都会退化成恒过 —— 这正是假绿第②源。
+        """
+        registry = load_renderer_registry()
+        assert len(registry) >= 80, (
+            f"htmlRendererRegistry 只解析出 {len(registry)} 条，疑似正则失配"
+        )
+        resolved = [e for e in registry.values() if e.host_exists]
+        assert len(resolved) >= 80, (
+            f"{len(registry) - len(resolved)} 条宿主 .vue 在磁盘上不存在"
+        )
 
     def test_all_l_codes_in_mapping(self, l_class_entries):
         """所有 L 类 wp_code 在 wp_account_mapping 注册（批量导出可枚举）。"""
@@ -496,16 +580,29 @@ class TestP6ExportImport:
             assert entry["wp_code"].startswith("L")
 
     def test_batch_export_type_distribution(self):
-        """L 类 componentType 分布合理。"""
+        """批量导出可枚举：全部 L 码都落在 8 个专属组件或 L0 共享函证族里。
+
+        🔴 原断言与 TestP0.test_type_distribution 是同两条通用类型地板线的重复
+        副本（d-form-table ≥20 / audit-sheet ≥15），迁移后同样恒红。改成覆盖式
+        判据：不留「既不属专属组件也不属 L0 族」的孤儿码 —— 批量导出真正怕的是
+        枚举漏掉某张表，而不是某个类型的计数够不够。
+        """
         l_codes = {
             code: ct for code, ct in _WP_CODE_OVERRIDE.items()
-            if re.match(r'^L\d', code)
+            if re.match(r"^L\d", str(code))
         }
-        type_counts: dict[str, int] = {}
-        for ct in l_codes.values():
-            type_counts[ct] = type_counts.get(ct, 0) + 1
-        assert type_counts.get("d-form-table", 0) >= 20
-        assert type_counts.get("audit-sheet", 0) >= 15
+        orphans = {
+            code: ct
+            for code, ct in l_codes.items()
+            if not DEDICATED_TYPE_RE.match(ct) and cycle_of(code) != "L0"
+        }
+        assert not orphans, (
+            "以下 L 码既不由专属组件承载、也不属 L0 共享函证族，批量导出会漏："
+            f"{orphans}"
+        )
+        covered = {c for c in l_codes if DEDICATED_TYPE_RE.match(l_codes[c])}
+        l0 = {c for c in l_codes if cycle_of(c) == "L0"}
+        assert covered | l0 == set(l_codes), "覆盖集与全集不等，判据本身有漏洞"
 
     def test_l4_1_yaml_schema_parseable_for_import(self):
         """L4-1 审定表 YAML schema 可正确解析用于导入填充。"""
