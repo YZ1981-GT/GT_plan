@@ -174,22 +174,36 @@ class TestEdge2IndexSourceToSearch:
 
     @pytest.mark.asyncio
     async def test_search_address_returns_proper_fields(self):
-        """Mention 搜索返回稳定 addr_id、label、domain、formula_ref、jump_route（Req 6.1）。
+        """Mention 搜索返回稳定 addr_id、label、jump_route（Req 6.1）。
+
+        🔴 候选粒度已从**单元格级**改为**表级**：一条候选 = 一张数据表，
+        引用后 AI 拿整表自行分析。因此 ``id`` 是表级 URI（``tb://1001``，无
+        ``#cell``），``label`` 不含列名。粒度本身的守卫见
+        ``test_mention_address_table_level.py``。
 
         **Validates: Requirements 6.1**
         """
         project_id = uuid4()
-        entry = MockAddressEntry()
+        tb_entry = MockAddressEntry(
+            uri="tb://1001#审定数",
+            domain="tb",
+            source="1001",
+            path="",
+            cell="审定数",
+            label="试算表 > 1001 库存现金 > 审定数",
+            jump_route="/projects/x/trial-balance?year=2025&highlight=1001",
+        )
 
         mock_db = AsyncMock()
-        with patch(
-            "app.services.address_registry.address_registry"
-        ) as mock_registry:
-            mock_registry.search = AsyncMock(return_value=[entry])
+        with patch("app.services.address_registry.address_registry") as mock_registry:
+            # 表级聚合走 get_domain（按域整体取，再把 cell 维度聚合掉）
+            async def _get_domain(db, pid, year, template_type, domain):
+                return [tb_entry] if domain == "tb" else []
+
+            mock_registry.get_domain = AsyncMock(side_effect=_get_domain)
 
             svc = MentionSearchService(mock_db)
-            # 直接调用内部 _search_address 方法
-            results = await svc._search_address("%货币资金%", project_id, 10)
+            results = await svc._search_address("%库存现金%", project_id, 10, 2025)
 
         assert len(results) >= 1
         candidate = results[0]
@@ -197,29 +211,33 @@ class TestEdge2IndexSourceToSearch:
         assert candidate.id  # 稳定 addr_id 不为空
         assert candidate.label  # label 不为空
         assert candidate.jump_route  # jump_route 不为空
+        # 表级契约：id 无单元格片段、label 不以列名结尾
+        assert "#" not in candidate.id
+        assert candidate.id == "tb://1001"
+        assert candidate.label == "试算表 > 1001 库存现金"
 
     @pytest.mark.asyncio
     async def test_search_address_empty_project_returns_empty(self):
         """无项目时地址搜索返回空（不暴露任何数据）。"""
         mock_db = AsyncMock()
         svc = MentionSearchService(mock_db)
-        results = await svc._search_address("%test%", None, 10)
+        results = await svc._search_address("%test%", None, 10, 2025)
         assert results == []
 
     @pytest.mark.asyncio
     async def test_search_address_error_returns_empty_not_raises(self):
-        """搜索异常返回空列表（semantic_unavailable 语义），不抛异常（Req 6.6）。
+        """域构建异常返回空列表（semantic_unavailable 语义），不抛异常（Req 6.6）。
 
         **Validates: Requirements 6.6**
         """
         mock_db = AsyncMock()
-        with patch(
-            "app.services.address_registry.address_registry"
-        ) as mock_registry:
-            mock_registry.search = AsyncMock(side_effect=RuntimeError("embedding down"))
+        with patch("app.services.address_registry.address_registry") as mock_registry:
+            mock_registry.get_domain = AsyncMock(
+                side_effect=RuntimeError("registry down")
+            )
 
             svc = MentionSearchService(mock_db)
-            results = await svc._search_address("%test%", uuid4(), 10)
+            results = await svc._search_address("%test%", uuid4(), 10, 2025)
 
         assert results == []
 
@@ -628,7 +646,8 @@ class TestFourEdgeContractSummary:
         svc = MentionSearchService(mock_db)
 
         # 验证 _search_address 被调用时 project_id 是必要条件
-        result = await svc._search_address("%test%", None, 10)
+        # （传真实 year，确保空结果是缺 project_id 导致，而非缺 year 短路）
+        result = await svc._search_address("%test%", None, 10, 2025)
         assert result == [], "无项目时搜索必须返回空"
 
     def test_edge4_manifest_carries_version_and_stale(self):

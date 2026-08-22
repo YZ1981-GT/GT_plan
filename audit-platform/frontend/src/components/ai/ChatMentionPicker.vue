@@ -41,22 +41,47 @@
       >
         全部
       </el-tag>
-      <el-tag
+      <el-tooltip
         v-for="ft in availableFilters"
         :key="ft.value"
-        :type="typeFilter === ft.value ? 'primary' : 'info'"
-        size="small"
-        :effect="typeFilter === ft.value ? 'dark' : 'plain'"
-        class="chat-mention-picker__filter-tag"
-        role="button"
-        tabindex="0"
-        :aria-pressed="String(typeFilter === ft.value)"
-        @click="setTypeFilter(ft.value)"
-        @keydown.enter="setTypeFilter(ft.value)"
-        @keydown.space.prevent="setTypeFilter(ft.value)"
+        :content="ft.hint"
+        :disabled="!ft.disabled"
+        placement="top"
       >
-        {{ ft.label }}
-      </el-tag>
+        <el-tag
+          :type="typeFilter === ft.value ? 'primary' : 'info'"
+          size="small"
+          :effect="typeFilter === ft.value ? 'dark' : 'plain'"
+          class="chat-mention-picker__filter-tag"
+          :class="{ 'is-disabled': ft.disabled }"
+          role="button"
+          :tabindex="ft.disabled ? -1 : 0"
+          :aria-pressed="String(typeFilter === ft.value)"
+          :aria-disabled="String(ft.disabled)"
+          :data-testid="`mention-filter-${ft.value}`"
+          @click="handleFilterClick(ft)"
+          @keydown.enter="handleFilterClick(ft)"
+          @keydown.space.prevent="handleFilterClick(ft)"
+        >
+          {{ ft.label }}
+        </el-tag>
+      </el-tooltip>
+    </div>
+
+    <!--
+      部分类型失败的降级提示（Property 13）：搜到了一些结果，但某几类没搜成。
+      与下方 error / unavailable 空态互补 —— 有结果时那些分支不渲染，
+      若没有这一条，单类失败就会被完全吞掉（历史缺陷）。
+    -->
+    <div
+      v-if="degradedHint && items.length > 0"
+      class="chat-mention-picker__status chat-mention-picker__status--degraded"
+      role="status"
+      aria-live="polite"
+      data-testid="mention-degraded-state"
+    >
+      <el-icon aria-hidden="true"><WarningFilled /></el-icon>
+      <span>{{ degradedHint }}</span>
     </div>
 
     <!-- 搜索状态：加载中 -->
@@ -102,7 +127,7 @@
       aria-live="polite"
       data-testid="mention-empty-state"
     >
-      <span>无匹配结果</span>
+      <span>{{ emptyReason }}</span>
     </div>
 
     <!-- 搜索结果列表 -->
@@ -172,6 +197,7 @@ import { Search, Loading, WarningFilled, CircleClose, Check } from '@element-plu
 import {
   useAiMention,
   MENTION_TYPE_LABELS,
+  PROJECT_REQUIRED_MENTION_TYPES,
   type MentionItem,
   type MentionType,
   type UseAiMentionOptions,
@@ -220,6 +246,9 @@ const {
   isError,
   isUnavailable,
   isLoading,
+  degradedHint,
+  projectBindingMissing,
+  emptyReason,
   openPicker,
   closePicker,
   selectItem,
@@ -323,13 +352,36 @@ function focusInput() {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** 可用的类型过滤选项 */
+/**
+ * 可用的类型过滤选项。
+ *
+ * 无项目绑定（受限全局知识模式）时，需要项目的四类**置灰**并给出原因：
+ * 此前它们可点，点完后端返回空集，界面显示"无匹配结果" ——
+ * 用户会以为库里没有底稿/附注/报表，而真实原因是当前页面没有项目上下文。
+ */
 const availableFilters = computed(() => {
   const types: MentionType[] = [
     'workpaper', 'note', 'report', 'knowledge_doc', 'knowledge_folder', 'address',
   ]
-  return types.map((t) => ({ value: t, label: MENTION_TYPE_LABELS[t] }))
+  return types.map((t) => {
+    const needsProject = PROJECT_REQUIRED_MENTION_TYPES.includes(t)
+    const disabled = needsProject && projectBindingMissing.value
+    return {
+      value: t,
+      label: MENTION_TYPE_LABELS[t],
+      disabled,
+      hint: disabled
+        ? `${MENTION_TYPE_LABELS[t]}需要先绑定项目：请从某个项目的底稿或报表页打开 AI 对话`
+        : '',
+    }
+  })
 })
+
+/** 点击类型 tab（置灰项不响应，避免发出注定为空的请求） */
+function handleFilterClick(filter: { value: MentionType; disabled: boolean }) {
+  if (filter.disabled) return
+  setTypeFilter(filter.value)
+}
 
 function getTypeLabel(type: MentionType): string {
   return MENTION_TYPE_LABELS[type] ?? type
@@ -376,6 +428,12 @@ onBeforeUnmount(() => {
   user-select: none;
 }
 
+/* 无项目绑定时置灰：可见但不可点，配 tooltip 说明原因 */
+.chat-mention-picker__filter-tag.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
 .chat-mention-picker__status {
   display: flex;
   align-items: center;
@@ -396,6 +454,16 @@ onBeforeUnmount(() => {
 
 .chat-mention-picker__status--empty {
   color: var(--el-text-color-placeholder, #a8abb2);
+}
+
+/* 降级提示：有结果但部分类型失败，用警示色但不占满高度 */
+.chat-mention-picker__status--degraded {
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--el-color-warning-dark-2, #a77730);
+  background: var(--el-color-warning-light-9, #fdf6ec);
+  border-bottom: 1px solid var(--el-color-warning-light-7, #f8e3c5);
+  justify-content: flex-start;
 }
 
 .chat-mention-picker__list {

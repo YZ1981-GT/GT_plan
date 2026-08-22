@@ -70,8 +70,99 @@ export const MENTION_TYPE_ICONS: Record<MentionType, string> = {
  */
 export type MentionSearchStatus = 'idle' | 'loading' | 'success' | 'error' | 'unavailable'
 
-/** 各类型级别的搜索状态信号（后端 type_status 字段的镜像）。 */
-export type TypeSearchStatus = 'success' | 'empty' | 'error' | 'unavailable' | 'timeout'
+/**
+ * 各类型级别的搜索状态信号（后端 `MentionTypeStatus` 枚举的镜像，由 vitest 对账）。
+ *
+ * `project_required` = 当前宿主没有项目绑定，该类型压根搜不了；与 `empty`
+ * （真的搜了、没匹配）必须区分 —— 混用会让审计师在受限全局知识模式下看到
+ * "无匹配结果"，误以为库里没有底稿/附注/报表。
+ */
+export type TypeSearchStatus =
+  | 'success'
+  | 'empty'
+  | 'error'
+  | 'unavailable'
+  | 'timeout'
+  | 'project_required'
+
+/**
+ * 必须有项目绑定才能搜索的类型（镜像后端 `PROJECT_REQUIRED_MENTION_TYPES`）。
+ *
+ * 知识文档/知识库**不在**此列：知识资产可跨项目共享，无项目绑定时仍可引用。
+ */
+export const PROJECT_REQUIRED_MENTION_TYPES: readonly MentionType[] = [
+  'workpaper',
+  'note',
+  'report',
+  'address',
+] as const
+
+/** 失败类型状态 → 中文原因短语（空态与降级提示共用同一条文案真源）。 */
+const TYPE_FAILURE_HINTS: Record<string, string> = {
+  project_required: '需要先绑定项目',
+  error: '搜索失败',
+  unavailable: '暂不可用',
+  timeout: '搜索超时',
+}
+
+/** 该状态是否代表"没搜成"（区别于 success / empty）。 */
+function isFailureStatus(status: TypeSearchStatus | undefined): boolean {
+  return !!status && status in TYPE_FAILURE_HINTS
+}
+
+/**
+ * 类型名列表 → 中文顿号串（`底稿、附注、报表`）。
+ *
+ * 按 `MENTION_TYPE_LABELS` 的声明顺序排（底稿→附注→报表→知识→地址坐标），
+ * 而不是后端返回的字母序 —— 否则文案会读成"地址坐标、附注、报表、底稿"。
+ */
+const TYPE_DISPLAY_ORDER = Object.keys(MENTION_TYPE_LABELS) as MentionType[]
+
+function joinTypeLabels(types: string[]): string {
+  const rank = (t: string) => {
+    const i = TYPE_DISPLAY_ORDER.indexOf(t as MentionType)
+    return i < 0 ? TYPE_DISPLAY_ORDER.length : i
+  }
+  return [...types]
+    .sort((a, b) => rank(a) - rank(b))
+    .map((t) => MENTION_TYPE_LABELS[t as MentionType] ?? t)
+    .join('、')
+}
+
+/**
+ * 失败类型清单 → 面向审计师的中文原因（导出供测试直接断言）。
+ *
+ * 同一原因的类型合并成一句，避免"底稿需要先绑定项目、附注需要先绑定项目、…"的啰嗦串。
+ */
+export function buildFailureMessage(
+  failed: readonly [string, TypeSearchStatus][],
+): string {
+  if (failed.length === 0) return ''
+
+  const byStatus = new Map<TypeSearchStatus, string[]>()
+  for (const [type, status] of failed) {
+    const list = byStatus.get(status) ?? []
+    list.push(type)
+    byStatus.set(status, list)
+  }
+
+  const clauses: string[] = []
+  for (const [status, types] of byStatus) {
+    const names = joinTypeLabels(types)
+    if (status === 'project_required') {
+      clauses.push(`${names}需要先绑定项目才能引用`)
+    } else {
+      clauses.push(`${names}${TYPE_FAILURE_HINTS[status] ?? '不可用'}`)
+    }
+  }
+
+  const detail = clauses.join('；')
+  // 全是"需要项目"时补一句可操作指引（受限全局知识模式最常见）
+  if (byStatus.size === 1 && byStatus.has('project_required')) {
+    return `${detail}。请先从某个项目的底稿或报表页打开 AI 对话。`
+  }
+  return `${detail}。`
+}
 
 // ---------------------------------------------------------------------------
 // Options
@@ -133,6 +224,39 @@ export function useAiMention(options: UseAiMentionOptions) {
   const isLoading = computed(() => searchStatus.value === 'loading')
   /** 已选 ID set（快速查重） */
   const selectedIds = computed(() => new Set(selected.value.map((s) => `${s.type}:${s.id}`)))
+
+  /**
+   * 部分类型失败时的降级提示（**有结果**也要提示，否则用户不知道有几类没搜）。
+   *
+   * 与 `errorMessage` 互补：`errorMessage` 用于"全军覆没"的空态，
+   * 本提示用于"搜到一些、但某几类没搜成"。
+   */
+  const degradedHint = computed<string>(() => {
+    if (searchStatus.value !== 'success') return ''
+    const failed = (Object.entries(typeStatus.value) as [string, TypeSearchStatus][])
+      .filter(([t, s]) => t !== 'attachment' && isFailureStatus(s))
+    if (failed.length === 0) return ''
+    return buildFailureMessage(failed)
+  })
+
+  /** 当前是否有类型因缺少项目绑定而不可用（供 UI 置灰对应 tab）。 */
+  const projectBindingMissing = computed<boolean>(
+    () => host.value?.projectId == null,
+  )
+
+  /**
+   * 空态文案。
+   *
+   * 🔴 零结果时**不能**一律说"无匹配结果"：受限全局知识模式下最常见的情形是
+   * 「四类项目资源压根没搜（project_required）+ 知识两类真的没匹配」——
+   * 此时 failed(4) ≠ participating(6) 走不进失败态，空态若只说"无匹配结果"，
+   * 用户仍会以为库里没有底稿/附注/报表。（浏览器实测抓出的缺口）
+   */
+  const emptyReason = computed<string>(() => {
+    if (!isEmpty.value) return ''
+    const hint = degradedHint.value
+    return hint ? `未搜到匹配项。${hint}` : '无匹配结果'
+  })
 
   // ---------------------------------------------------------------------------
   // Auth
@@ -206,15 +330,6 @@ export function useAiMention(options: UseAiMentionOptions) {
       // 解析 type_status（Property 13：各类型级别状态）
       typeStatus.value = data.type_status ?? {}
 
-      // 判断整体状态：如果所有类型都 unavailable → unavailable
-      const statuses = Object.values(typeStatus.value) as TypeSearchStatus[]
-      if (statuses.length > 0 && statuses.every((s) => s === 'unavailable')) {
-        searchStatus.value = 'unavailable'
-        errorMessage.value = '所有引用搜索服务暂不可用。'
-        items.value = []
-        return
-      }
-
       items.value = (data.items ?? []).map((item: any) => ({
         type: item.type as MentionType,
         id: item.id,
@@ -222,6 +337,22 @@ export function useAiMention(options: UseAiMentionOptions) {
         sublabel: item.sublabel ?? '',
         jump_route: item.jump_route ?? '',
       }))
+
+      // 🔴 单个类型的失败**不能**被吞成 success。
+      // 旧实现只在「所有类型都 unavailable」时才报错，于是后端 4 个类型长期恒 error
+      // （ORM 字段名写错）在界面上一律显示成"无匹配结果" —— 用户与开发都看不到真实原因。
+      // 现在：零结果且参与的类型全部失败 ⇒ 按失败态渲染并给出精确中文原因。
+      const entries = Object.entries(typeStatus.value) as [string, TypeSearchStatus][]
+      // 只统计本次真正参与的类型（后端对 attachment 恒回 empty，不参与判定）
+      const participating = entries.filter(([t]) => t !== 'attachment')
+      const failed = participating.filter(([, s]) => isFailureStatus(s))
+
+      if (items.value.length === 0 && failed.length > 0 && failed.length === participating.length) {
+        searchStatus.value = 'unavailable'
+        errorMessage.value = buildFailureMessage(failed)
+        return
+      }
+
       searchStatus.value = 'success'
     } catch (err: any) {
       if (err?.name === 'AbortError') return // 被取消的搜索忽略
@@ -351,6 +482,9 @@ export function useAiMention(options: UseAiMentionOptions) {
     isUnavailable,
     isLoading,
     selectedIds,
+    degradedHint,
+    projectBindingMissing,
+    emptyReason,
 
     // Methods
     openPicker,

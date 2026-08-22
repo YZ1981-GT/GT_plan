@@ -32,3 +32,12 @@ audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclo
 #     spec: dsh-agent-panel-integration / P0 收口（路由孤儿连带修复）
 audit-platform/frontend/e2e/dsh-agent-panel-acceptance.spec.ts  1706
 audit-platform/frontend/src/views/ManagerDashboard.vue  1525
+
+#   mention_service.py —— **改动前即 808 行**（9 个错误字段 + 旧 _load_resource_content
+#     重复实现 174 行）；本次修正字段名 + 删除重复实现 + 新增表级地址坐标搜索 / 正文加载，
+#     净增 270 行（因为旧正文加载 174 行删掉了，实际新加内容是表级聚合 + status enum +
+#     常量）。拆分方向：把地址坐标的搜索/正文加载抽到 address_mention_loader.py。
+#   doc_ai_context_builder.py —— **改动前即 889 行**；本次仅 +9 行
+#     （暴露 load_document_content 公共方法），不值得拆分。
+backend/app/services/ai_chat/mention_service.py  1078
+backend/app/services/doc_ai_context_builder.py  898

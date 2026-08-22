@@ -341,13 +341,23 @@ class ContextBuilder:
     # 内部方法
     # -------------------------------------------------------------------------
 
-    async def _get_doc_content(self, host: AuthorizedHostContext) -> str:
-        """获取当前宿主正文（按 ``host.resource_type`` 分派到专属 loader）。
+    async def load_document_content(self, host: AuthorizedHostContext) -> str:
+        """按宿主类型加载正文（**公共入口**，供 mention 正文加载复用）。
 
-        分派表 ``self._doc_loaders`` 覆盖全部 ``HostType`` 且**没有 default 分支** ——
-        新增宿主类型时构造期 assert 立即失败，不会静默落到底稿 loader（Req 3.7）。
+        存在理由：``mention_service.load_mention_context`` 也要"按资源类型取正文"，
+        它此前自己写了第二套 SQL，且字段名全错（``WorkingPaper.content`` /
+        ``DisclosureNote.content`` / ``FinancialReport.content`` /
+        ``KnowledgeDocument.content`` 四个属性在模型上都不存在），异常被 fail-open
+        吞成 ``status="unavailable"`` ⇒ 用户选中的引用从未真正进入上下文。
+
+        正文取数只有这一份分派表（``self._doc_loaders``）：新增宿主类型时构造期
+        assert 立即失败，不会静默落到底稿 loader（Req 3.7）。
         """
         return await self._doc_loaders[host.resource_type](host)
+
+    async def _get_doc_content(self, host: AuthorizedHostContext) -> str:
+        """获取当前宿主正文（内部别名，保持既有调用点不变）。"""
+        return await self.load_document_content(host)
 
     async def _get_workpaper_content(self, host: AuthorizedHostContext) -> str:
         """底稿正文：``working_paper JOIN wp_index``，**绑定权威 project_id**。"""
