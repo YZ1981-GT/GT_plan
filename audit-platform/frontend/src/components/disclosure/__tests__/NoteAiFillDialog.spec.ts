@@ -68,9 +68,18 @@ const stubs: Record<string, any> = {
   'el-tooltip': { template: '<div class="el-tooltip"><slot /></div>', props: ['content', 'disabled', 'placement'] },
 }
 
+/**
+ * 服务端为本次草稿签发的 assistant 消息 ID。
+ *
+ * dsh-agent-panel-integration / Task 7（Req 8.1）：`/api/ai-chat/adopt` 只按服务端
+ * message ID 读库取正文，因此 `/ai-fill` 响应必须带 `message_id`，前端不再本地造 ID。
+ */
+const DRAFT_MESSAGE_ID = '9f1c1a3e-2b47-4d6a-8f21-7e5b0c9d4a12'
+
 function makeResult(over: Partial<any> = {}) {
   return {
     text: '本科目期末余额较上年增长，主要系……',
+    message_id: DRAFT_MESSAGE_ID,
     citations: [
       {
         document_name: '2024年度审计报告及附注.pdf',
@@ -208,7 +217,7 @@ describe('NoteAiFillDialog — Req3.6: 锁定禁用采纳', () => {
 })
 
 describe('NoteAiFillDialog — Req3.3: 采纳走 adoptContent 治理流', () => {
-  it('AI 草稿采纳 → 调 adoptContent + emit adopted + 关闭', async () => {
+  it('AI 草稿采纳 → 用服务端 message_id 调 adoptContent + emit adopted + 关闭', async () => {
     httpPost.mockResolvedValue({ data: makeResult() })
     const wrapper = mountDialog()
     await flushPromises()
@@ -219,12 +228,30 @@ describe('NoteAiFillDialog — Req3.3: 采纳走 adoptContent 治理流', () => 
     await flushPromises()
 
     expect(adoptContent).toHaveBeenCalledTimes(1)
+    // Task 7 / Req 8.1：引用的是服务端签发的 message ID，不是本地造的 `notefill_…`
+    expect(adoptContent).toHaveBeenCalledWith(DRAFT_MESSAGE_ID)
     expect(wrapper.emitted('adopted')).toBeTruthy()
     const payload = wrapper.emitted('adopted')![0][0] as any
     expect(payload.noteSection).toBe('note_cash')
     expect(payload.text).toContain('本科目期末余额较上年增长')
     // 关闭
     expect(wrapper.emitted('update:visible')?.some((e) => e[0] === false)).toBe(true)
+  })
+
+  it('服务端未签发 message_id 时采纳禁用（不退回提交客户端正文）', async () => {
+    // reference_only / 章节未实例化 / 登记失败 ⇒ 后端回传 message_id=null
+    httpPost.mockResolvedValue({ data: makeResult({ message_id: null }) })
+    const wrapper = mountDialog()
+    await flushPromises()
+    await findBtn(wrapper, '生成草稿')!.trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('本科目期末余额较上年增长')
+    const adoptBtn = findBtn(wrapper, '采纳草稿')!
+    expect(adoptBtn.attributes('disabled')).toBeDefined()
+    await adoptBtn.trigger('click')
+    await flushPromises()
+    expect(adoptContent).not.toHaveBeenCalled()
   })
 })
 

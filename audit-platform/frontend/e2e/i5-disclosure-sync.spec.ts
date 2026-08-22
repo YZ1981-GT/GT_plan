@@ -6,7 +6,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   TEST_PROJECT_ID,
   findWorkpaper,
-  clickWorkpaperSheetTab,
+  clickDisclosureSheetTab,
 } from './fixtures/ensure-test-project'
 
 const PROJECT_ID = TEST_PROJECT_ID
@@ -36,7 +36,13 @@ test.describe('I5 附注双向同步', () => {
     await page.goto(`/projects/${PROJECT_ID}/workpapers/${wpResult.wpId}/edit`)
     await page.waitForTimeout(3000)
 
-    const switched = await clickWorkpaperSheetTab(page, /附注.*上市|Disclosure_Listed/i)
+    // clickDisclosureSheetTab 找不到 Tab 时抛错（click 超时），故用 try/catch 换成可跳过信号
+    let switched = true
+    try {
+      await clickDisclosureSheetTab(page, 'listed')
+    } catch {
+      switched = false
+    }
     test.skip(!switched, '附注上市 sheet 不可用')
 
     await page.waitForTimeout(2000)

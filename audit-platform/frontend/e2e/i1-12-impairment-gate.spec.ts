@@ -66,11 +66,11 @@ test.describe('I1-12 须测试闸门', () => {
   test('缺 I1-13 时展示闸门提示', async ({ page, request }) => {
     const token = await loginAs(page)
     const apiToken = await getToken(request)
-    const wp = await findWorkpaper(request, apiToken, PROJECT_ID, /I1|无形资产/)
-    test.skip(!wp, '未找到 I1 底稿')
+    const wp = await findWorkpaper(request, apiToken, 'I1', PROJECT_ID)
+    test.skip(!wp.exists, '未找到 I1 底稿')
 
     const assetName = `${MARKER}-软件`
-    await putChecklist(request, apiToken, wp!.id, [
+    await putChecklist(request, apiToken, wp.wpId!, [
       {
         item_id: 'I1-12-rows',
         remark: JSON.stringify([
@@ -100,8 +100,8 @@ test.describe('I1-12 须测试闸门', () => {
       { item_id: 'I1-13-rows', remark: JSON.stringify([]) },
     ])
 
-    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wp!.id}`)
-    await clickWorkpaperSheetTab(page, /I1-12|减值准备/)
+    await page.goto(`/projects/${PROJECT_ID}/workpapers/${wp.wpId}`)
+    await clickWorkpaperSheetTab(page, 'I1-12')
 
     await expect(page.getByText(/缺 I1-13|须测试闸门/)).toBeVisible({ timeout: 15000 })
     await expect(page.getByText(/须完成 I1-13 后方可定稿|缺 I1-13/)).toBeVisible()

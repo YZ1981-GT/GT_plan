@@ -41,3 +41,8 @@ audit-platform/frontend/src/views/ManagerDashboard.vue  1525
 #     （暴露 load_document_content 公共方法），不值得拆分。
 backend/app/services/ai_chat/mention_service.py  1078
 backend/app/services/doc_ai_context_builder.py  898
+
+#   _test_x3_keyfamily_property_criteria.py —— 声明式 property 判据测试（keyfamily 维度），
+#     每组 property 含 source 期望值 + 结构校验 + 反空转，拆分会让单组的三段分离。
+#     spec: x3-adjustment-entry-import-export
+backend/tests/_test_x3_keyfamily_property_criteria.py  808

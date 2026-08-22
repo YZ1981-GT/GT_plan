@@ -188,8 +188,9 @@ test.describe('F1 关键闭环', () => {
     const f12 = await findWorkpaper(request, token, 'F1-2', PROJECT_ID)
     const f1 = await findWorkpaper(request, token, 'F1', PROJECT_ID)
     const f11 = await findWorkpaper(request, token, 'F1-1', PROJECT_ID)
-    const wpId = f12.wpId || f1.wpId || f11.wpId
-    test.skip(!wpId, 'F1 函证程序底稿不可达')
+    const resolvedWpId = f12.wpId || f1.wpId || f11.wpId
+    test.skip(!resolvedWpId, 'F1 函证程序底稿不可达')
+    const wpId = resolvedWpId!
 
     const beforeDet = await checklistItem(request, token, wpId, DET_ROWS_KEY)
     const beforeRows = parseJsonArray(beforeDet)

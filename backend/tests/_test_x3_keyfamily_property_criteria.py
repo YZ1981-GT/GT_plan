@@ -11,9 +11,8 @@
 就是 collection error，会让整份守卫的断言零执行而表面上「没有失败」。
 
 原文件 docstring 原样保留在下方。
-"""
 
-"""Feature: x3-adjustment-entry-import-export, Property 2: 族键爆炸与归约保行数、无幽灵残留
+Feature: x3-adjustment-entry-import-export, Property 2: 族键爆炸与归约保行数、无幽灵残留
 
 *For any* X-3 分录列表与任意目标行数 ``n``（含 ``n = 0`` 与 ``n <`` 库中现有行数），按该
 sheet 的 ``key_family`` 执行「族键爆炸 → 落库 → 族键归约」后，界面读路径读回的行数恰为

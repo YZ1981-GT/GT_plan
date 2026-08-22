@@ -63,7 +63,7 @@ test.describe('D-cycle 审定表/调整分录 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D2', PROJECT_ID)
     test.skip(!wp.exists, 'D2 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd2', 'D2-1')
+    await roundTripImport(request, wp.wpId!, token, 'd2', 'D2-1')
   })
 
   test('D3-1 审定表 + D3-3 调整分录', async ({ request }) => {
@@ -71,9 +71,9 @@ test.describe('D-cycle 审定表/调整分录 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D3', PROJECT_ID)
     test.skip(!wp.exists, 'D3 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd3', 'D3-1')
-    await roundTripImport(request, wp.wpId, token, 'd3', 'D3-3')
-    await roundTripImport(request, wp.wpId, token, 'd3', 'D3-4-debit')
+    await roundTripImport(request, wp.wpId!, token, 'd3', 'D3-1')
+    await roundTripImport(request, wp.wpId!, token, 'd3', 'D3-3')
+    await roundTripImport(request, wp.wpId!, token, 'd3', 'D3-4-debit')
   })
 
   test('D4-1 审定表', async ({ request }) => {
@@ -81,7 +81,7 @@ test.describe('D-cycle 审定表/调整分录 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D4', PROJECT_ID)
     test.skip(!wp.exists, 'D4 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd4', 'D4-1')
+    await roundTripImport(request, wp.wpId!, token, 'd4', 'D4-1')
   })
 
   test('D5-1 审定表 + D5-3 调整分录', async ({ request }) => {
@@ -89,8 +89,8 @@ test.describe('D-cycle 审定表/调整分录 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D5', PROJECT_ID)
     test.skip(!wp.exists, 'D5 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd5', 'D5-1')
-    await roundTripImport(request, wp.wpId, token, 'd5', 'D5-3')
+    await roundTripImport(request, wp.wpId!, token, 'd5', 'D5-1')
+    await roundTripImport(request, wp.wpId!, token, 'd5', 'D5-3')
   })
 
   test('D6-5 关联方 + D6-8 ECL', async ({ request }) => {
@@ -98,7 +98,7 @@ test.describe('D-cycle 审定表/调整分录 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D6', PROJECT_ID)
     test.skip(!wp.exists, 'D6 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd6', 'D6-5')
-    await roundTripImport(request, wp.wpId, token, 'd6', 'D6-8')
+    await roundTripImport(request, wp.wpId!, token, 'd6', 'D6-5')
+    await roundTripImport(request, wp.wpId!, token, 'd6', 'D6-8')
   })
 })

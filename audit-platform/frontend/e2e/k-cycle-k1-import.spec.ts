@@ -63,7 +63,7 @@ test.describe('K1 导入导出 API 往返', () => {
     test.skip(!wp.exists, 'K1 底稿不存在')
 
     for (const sheet of ['K1-1', 'K1-3', 'K1-9'] as const) {
-      await roundTripSheet(request, wp.wpId, token, sheet)
+      await roundTripSheet(request, wp.wpId!, token, sheet)
     }
   })
 

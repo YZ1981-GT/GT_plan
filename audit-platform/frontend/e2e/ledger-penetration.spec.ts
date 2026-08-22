@@ -30,7 +30,7 @@ test.describe('查账穿透', () => {
     await expect(page.locator('.gt-penetration')).toBeVisible({ timeout: 5000 })
 
     // 验证序时账数据加载
-    await expect(page.locator('.el-table__row')).toHaveCount.greaterThan(0)
+    expect(await page.locator('.el-table__row').count()).toBeGreaterThan(0)
   })
 
   test('序时账穿透到凭证详情', async ({ page }) => {
