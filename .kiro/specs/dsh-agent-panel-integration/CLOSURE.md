@@ -585,6 +585,7 @@ CI：`dsh-agent-panel-frontend` job 追加两步（守卫实跑 + 锚点静态�
 | 1 | `TypeError: 'NoneType' object is not callable` @ `mapped_column(Vector(1024))` | `pgvector` 不在 requirements，而 `ai_models.py` 有 `except ImportError: Vector = None` 的 fail-open ⇒ 缺包被伪装成看不懂的 TypeError | `pgvector==0.4.2` |
 | 2 | `ModuleNotFoundError: No module named 'psycopg2'` | `init_tables.py:31` 把 URL 的 `+asyncpg` 换成 `+psycopg2` 用同步 `create_engine`，而 requirements 只有 `asyncpg` | `psycopg2-binary==2.9.11` |
 | 3 | `ModuleNotFoundError: No module named 'mcp'` → 装上后变 `No module named 'mcp.server.fastmcp'` | ① CI job 只装 `backend/requirements.txt`，漏了 `tools/audit-data-mcp/requirements.txt`（`test_audit_data_mcp_server.py` 的 17 条靠它）② 该文件写 `mcp>=1.14.0` **无上界**，clean checkout 装到 `mcp 2.0.0`，而 FastMCP 在 2.0 里被移出 `mcp.server` 命名空间 | CI 补装该文件 + 约束改 `mcp>=1.14.0,<2` |
+| 4 | CI 上 `505 passed, 1 skipped` | **job 无 redis service**（实测整个 workflow 161 个 job 一个都没配）。`test_task5_run_coordinator.py:581` 有 `pytest.skip("need Redis (Stream 回放)")` —— `TestRedisStreamBackend` 覆盖 Req 4.12 的真实 Redis Stream 路径（TTL / MAXLEN / 跨实例回放），其余用例走 `_no_redis` 内存镜像。无 Redis ⇒ 该类整体 skip ⇒ ① 判据从未在 CI 执行 ② 本 job 的「出现任何 skipped 即打红」硬断言必红 | 补 `redis:7-alpine` service + `REDIS_URL`（键名已核对 `config.py`）。本地有 Redis 时实测该类 **1 passed**（不再 skip） |
 
 > 🔴 **第 3 层是时间炸弹的教科书案例**：代码一行没改，上游发 2.0 就崩。
 > 实测对比 —— 主环境 `mcp 1.28.1`（`import mcp.server.fastmcp` OK）
@@ -666,6 +667,29 @@ mock 的是 `address_registry.search`，而**工作树版本**的
 （该文件 `git diff` 为 **+598/−310**，属并发会话正在进行的 mention 域重构）。
 **HEAD 版本用的是 `search`**，即该测试在 HEAD 上是绿的。
 ⇒ 需要那个会话同步测试的 mock 目标。本次遵守「同一文件禁与并发会话并行编辑」，只登记不改。
+
+#### CI 侧的闭环确证（run 32582092281，含 pgvector + psycopg2）
+
+| job | 结论 | 变化 |
+|---|---|---|
+| `dsh-agent-panel-frontend` | ✅ success | 三轮均绿（含 P0 新增的两个守卫） |
+| `dsh-agent-panel-mcp-data` | ✅ **success** | **首次转绿** —— 25 tests 在 CI 上真跑通了 |
+| `dsh-agent-panel-backend` | ❌ failure | **不再挂 Bootstrap**，前进到 `Phase A 守卫` |
+
+Bootstrap 步骤日志：`migrations executed: 147 failed: ['106']` ——
+与本地干净库**逐字一致**，证明那套三步引导在 runner 上成立。
+
+Phase A 的实际结果是 `2 failed, 505 passed, 1 skipped`：
+
+1. `test_task3_chat_persistence.py::test_history_returns_most_recent_n_ascending_with_real_metadata`
+   —— **正是本地干净环境发现的 seq 缺陷，CI 独立复现** ⇒ V150 的必要性双重确认
+   （V150 在下一个 commit 才提交，该轮尚未包含它）。
+2. `test_task5_run_coordinator.py::TestReconnectAndDrain::test_drain_emits_identifiable_abort_frame_without_id`
+   —— 本地（有 Redis）实测 drain 相关 **3 passed**，CI（无 Redis）红。
+   该用例自身用 `_no_redis`，但 `coordinated` 是 **module-scope** 夹具，
+   同 module 内的 Redis 环境差异会波及它。**补 redis service 后待下一轮验证**，
+   不声称已修。
+3. `1 skipped` = 第 4 层缺口（见上表）。
 
 #### 附带发现（登记，不修）
 

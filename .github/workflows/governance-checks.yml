@@ -5326,8 +5326,25 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # 🔴 redis service 同样是必需项，理由与 postgres 一致（都是「防静默 skip」）：
+      # `test_task5_run_coordinator.py:581` 有 `pytest.skip("need Redis (Stream 回放)")`
+      # —— `TestRedisStreamBackend` 覆盖的是 Req 4.12 的**真实 Redis Stream 路径**
+      # （TTL / MAXLEN / 跨实例回放），其余用例走的是 `_no_redis` 内存镜像。
+      # 无 redis 时该类整体 skip ⇒ ① 那条判据从未在 CI 执行 ② 本 job 末尾的
+      # 「出现任何 skipped 即打红」硬断言必红（即使其余测试全过）。
+      # 2026-08-22 实测 CI（run 32582092281）：`505 passed, 1 skipped` ← 就是它。
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      REDIS_URL: redis://localhost:6379/0
       # 🔴 挡住 init_tables.py 的 seed 端点回调（CI 无后端时它本就跳过，这里显式钉死，
       # 避免将来 runner 上恰好有服务监听 9980 时把种子写进别人的库）。
       API_BASE_URL: http://127.0.0.1:9
