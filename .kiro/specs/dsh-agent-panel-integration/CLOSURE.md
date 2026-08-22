@@ -635,17 +635,41 @@ except ImportError:
 `set -euo pipefail` 让脚本在第 ② 步就退出，所以引导步骤里的 migration 命令
 （第 ③ 步）根本没执行 —— 「已修复项 §3b」那套空库引导逻辑本身**尚未在 runner 上验证过**。
 
-#### 修复
+#### 修复（两层，逐层暴露）
 
-`backend/requirements.txt` 补 `pgvector==0.4.2`（固定版本），并把上面这段
-fail-open 的成因写进注释。这是补一个**遗漏的硬依赖**，不是引入新依赖 ——
-生产模型直接 import 它。106 个 failure job 里可能有一批同源。
+**第一层 `pgvector==0.4.2`** —— 已验证生效：下一轮 CI 的日志出现
+`Loaded 82 model modules, skipped 0`（此前在 import 阶段就崩），
+说明 ORM 模型全部加载成功。
+
+**第二层 `psycopg2-binary==2.9.11`** —— 同一轮暴露的下一个缺失：
+
+```
+File "backend/scripts/seed/init_tables.py", line 32, in <module>
+  engine = create_engine(DB_URL)
+File ".../sqlalchemy/dialects/postgresql/psycopg2.py", line 697, in import_dbapi
+  import psycopg2
+ModuleNotFoundError: No module named 'psycopg2'
+```
+
+`init_tables.py:31` 把 URL 的 `+asyncpg` 换成 `+psycopg2` 后用**同步**
+`create_engine` 建表，而 requirements 里只有 `asyncpg`。
+
+> 🔴 **这一条静态扫描抓不到**。我写了个脚本扫引导路径（86 个文件）的第三方
+> 顶层 import 与 requirements 对账，结果只报了 `dotenv` / `pydantic`
+> 两个传递依赖的误报，**psycopg2 一次都没出现** —— 因为 SQLAlchemy 是
+> **按方言动态 import** 驱动的，源码里没有任何一处直接 `import psycopg2`。
+> ⇒ 「扫 import 与 requirements 对账」这类检查对**驱动类依赖结构性失效**。
+> 唯一可靠判据是**在干净环境真跑一次**。
 
 #### 仍未证明
 
 `dsh-agent-panel-backend` / `-mcp-data` 在 runner 上的**实际测试结论**
-（508 / 189 / 25 passed、0 skipped）以及那套三步空库引导，需要下一轮 CI 才能确认。
-本次修的是让它们**能走到测试那一步**。
+（508 / 189 / 25 passed、0 skipped）以及「已修复项 §3b」那套三步空库引导，
+仍需下一轮 CI 确认。已推进两层，但因为依赖是逐层暴露的，不排除还有第三层。
+
+**根治建议**：在本地建一个干净 venv 只装 `backend/requirements.txt`，
+指向一个临时空库真跑一遍 CI 的三步引导。这比「push → 等 10 分钟 → 看下一层报错」
+的迭代快得多，也是唯一能一次性证明 requirements 完备的手段。
 
 #### 通用教训
 

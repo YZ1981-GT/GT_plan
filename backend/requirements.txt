@@ -51,6 +51,13 @@ sqlfluff
 prometheus_client==0.25.0
 markitdown[all]==0.1.6  # 多格式文档→Markdown（知识库 RAG 输入，本地纯 Python 无远端）
 pyzipper==0.3.6  # AES-256 encrypted ZIP for password-protected bulk export
+psycopg2-binary==2.9.11  # 同步驱动：scripts/seed/init_tables.py 把 URL 的 +asyncpg
+# 换成 +psycopg2 后用同步 create_engine 建表（create_all）。
+# 🔴 静态 import 扫描抓不到它 —— SQLAlchemy 是**按方言动态 import** 驱动的
+#    （postgresql/psycopg2.py::import_dbapi），源码里没有一处直接 `import psycopg2`。
+#    所以「扫 import 与 requirements 对账」这类检查对驱动类依赖结构性失效，
+#    只有真在干净环境跑一次才暴露。CI 上表现为
+#    `ModuleNotFoundError: No module named 'psycopg2'`。
 pgvector==0.4.2  # KnowledgeIndex.embedding_vec = mapped_column(Vector(1024)) 的硬依赖
 # 🔴 曾遗漏在此文件外：app/models/ai_models.py 对它做了
 #    `try: from pgvector.sqlalchemy import Vector / except ImportError: Vector = None`
