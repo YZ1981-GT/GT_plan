@@ -587,14 +587,72 @@ CI：`dsh-agent-panel-frontend` job 追加两步（守卫实跑 + 锚点静态�
 > 判「某产物入没入库」的成本只有一条 `git status --porcelain -- <path>`，
 > 没有理由让文档替代实测。
 
-### 2. Clean Checkout 运行验证（部分证明）
+### 2. Clean Checkout 运行验证 — 🔴 **CI 已真跑，两个 job 失败（实证，已定位并修）**
 
-产物已入库 ⇒ 「找不到文件」这个阻塞因素消失。但**三个 CI job 至今没有一次成功记录**，
-所以 clean checkout 下的实际结论仍未证明。尤其「已修复项 §3b」那套空库引导
-（pgvector 镜像 / `init_tables.py` / DROP V147 四表重建 / 7 个 CHECK 断言）
-只在本地探针库 `audit_platform_ci_probe2` 验过，GitHub runner 首跑仍可能暴露新问题。
+原文写「三个 CI job 至今没有一次成功记录」。**说法不准确** —— 实测
+`gh run list` 显示 `55c5e0fe` 的 push **已经触发过 workflow**
+（`on: push: branches: ['work/**']`，不需要 PR），而且**两个 workflow 都 failure**。
+不是「没跑过」，是**跑过、失败了、没人看**。
 
-**下一步**：开 PR 触发这三个 job，用真实运行结果替换本节。
+`gh run view 32575246116`（governance-checks，160 个 job）里三个 spec job 的真实结论：
+
+| job | 结论 |
+|---|---|
+| `dsh-agent-panel-frontend` | ✅ **success** |
+| `dsh-agent-panel-backend` | ❌ failure — 挂在 `Bootstrap schema` 步骤 |
+| `dsh-agent-panel-mcp-data` | ❌ failure — 同一步骤、同一根因 |
+
+> 附带事实：该 run 共 **106 / 160 个 job failure**。仓库 CI 整体是红的，
+> 与本 spec 无关，但意味着「CI 绿」在本仓库当前不能作为任何判据。
+
+#### 根因（完整 Traceback 已抓到）
+
+```
+File "backend/scripts/seed/init_tables.py", line 6, in <module>
+  from app.models.base import Base
+File "backend/app/models/__init__.py", line 96, in <module>
+  from app.models.ai_models import ...
+File "backend/app/models/ai_models.py", line 681, in KnowledgeIndex
+  embedding_vec = mapped_column(Vector(1024), nullable=True)
+                                ^^^^^^^^^^^^
+TypeError: 'NoneType' object is not callable
+```
+
+**`pgvector` Python 包不在 `backend/requirements.txt` 里。**
+而 `ai_models.py` 对它做了 fail-open 兜底：
+
+```python
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    Vector = None
+```
+
+于是「依赖没装」**不在 import 处报错**，而是推迟到类定义时抛一个指向
+`mapped_column` 的 `TypeError` —— 完全看不出是缺包。本地环境早已装了它
+（实测 `pgvector 0.4.2`），所以这个缺失**只在 clean checkout 暴露**。
+
+`set -euo pipefail` 让脚本在第 ② 步就退出，所以引导步骤里的 migration 命令
+（第 ③ 步）根本没执行 —— 「已修复项 §3b」那套空库引导逻辑本身**尚未在 runner 上验证过**。
+
+#### 修复
+
+`backend/requirements.txt` 补 `pgvector==0.4.2`（固定版本），并把上面这段
+fail-open 的成因写进注释。这是补一个**遗漏的硬依赖**，不是引入新依赖 ——
+生产模型直接 import 它。106 个 failure job 里可能有一批同源。
+
+#### 仍未证明
+
+`dsh-agent-panel-backend` / `-mcp-data` 在 runner 上的**实际测试结论**
+（508 / 189 / 25 passed、0 skipped）以及那套三步空库引导，需要下一轮 CI 才能确认。
+本次修的是让它们**能走到测试那一步**。
+
+#### 通用教训
+
+**「CI 绿」和「CI 跑过」是两件事，而「CI 没跑过」和「CI 跑了但没人看」是第三件事。**
+本 spec 前一轮收口把状态记成「零成功记录」，语气上暗示「还没跑」，
+于是没人去看已经存在的失败日志。判据应该是
+`gh run list --branch <branch>` 的实际 conclusion，而不是「有没有 PR」。
 
 ### 2b. `dsh-agent-panel-backend` job 缺 postgres service — ✅ **已修，见「已修复项 §3」**
 
@@ -718,9 +776,13 @@ e2e 夹具已存在可用项目（`TEST_PROJECT_ID=2aa00f57-…`，含 FIX-F / F
 
 1. ~~将所有 `??` 产物 `git add` 并提交~~ ✅ **已完成**（commit `55c5e0fe`，154 files，已推 origin）
 2. ~~向 governance-checks.yml 注册 CI job~~ ✅ **已完成**（3 个 job + P0 追加的 2 步）
-2a. **立即**：**开 PR 让这三个 job 真跑一次** —— 至今零成功记录。
-   §3b 那套空库引导只在本地探针库验过，runner 首跑仍可能暴露新问题。
-   本 spec 自己的结论就是「入库 + 让 CI 真跑一次不是收尾流程而是验证手段本身」。
+2a. ~~开 PR 让这三个 job 真跑一次~~ ✅ **已完成（无需 PR，push 即触发）**。
+   实证：`frontend` success，`backend` / `mcp-data` 挂在 Bootstrap schema，
+   根因 = `pgvector` 漏在 requirements 外 + `ai_models.py` 的 fail-open 兜底
+   把缺包伪装成 `TypeError`。已补 `pgvector==0.4.2`。见「未完成项 §2」。
+2a-2. **下一轮 CI 待确认**：两个后端 job 走到测试步骤后的实际结论
+   （508 / 189 / 25 passed、0 skipped），以及 §3b 那套三步空库引导在 runner 上是否成立
+   —— 它此前从未执行到（第 ② 步就退出了）。
 2b. ~~给 `dsh-agent-panel-backend` job 补 postgres service~~ ✅ **已完成**（见「已修复项 §3」）
 2c. **移交建议**：空库上 `V106` 失败（`service_identities.id` 无 PG 默认值）属证据治理域的
    空库引导问题，与本 spec 无关，建议该域单独立任务

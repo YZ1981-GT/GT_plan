@@ -51,3 +51,11 @@ sqlfluff
 prometheus_client==0.25.0
 markitdown[all]==0.1.6  # 多格式文档→Markdown（知识库 RAG 输入，本地纯 Python 无远端）
 pyzipper==0.3.6  # AES-256 encrypted ZIP for password-protected bulk export
+pgvector==0.4.2  # KnowledgeIndex.embedding_vec = mapped_column(Vector(1024)) 的硬依赖
+# 🔴 曾遗漏在此文件外：app/models/ai_models.py 对它做了
+#    `try: from pgvector.sqlalchemy import Vector / except ImportError: Vector = None`
+#    的 fail-open 兜底，于是「依赖没装」不会在 import 处报错，而是推迟到类定义时
+#    抛 `TypeError: 'NoneType' object is not callable`（指向 mapped_column 那一行，
+#    完全看不出是缺包）。CI 上 `python scripts/seed/init_tables.py` 因此整步失败，
+#    连带 dsh-agent-panel-backend / -mcp-data 两个 job 挂在 Bootstrap schema。
+#    本地环境早已装了它，所以这个缺失只在 clean checkout 暴露。
