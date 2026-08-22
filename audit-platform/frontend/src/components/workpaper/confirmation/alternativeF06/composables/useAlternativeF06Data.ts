@@ -17,12 +17,15 @@
  * - metrics：receipt_ratio←payment、shipment_ratio←inbound（metricRatioKeys 声明）
  */
 import { type Ref, type ComputedRef } from 'vue'
+// alternativeD05 是 confirmation 的**同级兄弟目录**，而本文件在
+// confirmation/alternativeF06/composables/ ⇒ 要上两级（'../../'）。
+// 下面 '../alternativeF06Types' 只上一级是对的，两者深度不同，别照抄。
 import type {
   AlternativeCompany,
   AlternativeD05Metrics,
   CheckRow,
   BlockType,
-} from '../alternativeD05/alternativeD05Types'
+} from '../../alternativeD05/alternativeD05Types'
 import type { AlternativeF06Payload } from '../alternativeF06Types'
 import { getSumFieldsF06 } from '../blockColumnConfigsF06'
 import { createAlternativeConfirmationData } from '../../coordination/createAlternativeConfirmationData'

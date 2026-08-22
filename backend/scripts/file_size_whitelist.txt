@@ -20,3 +20,15 @@ audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairme
 audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts
+
+#   dsh-agent-panel-acceptance.spec.ts —— 单 spec 的完整浏览器验收（三视口 × 五角色 ×
+#     Phase A/B/C），**改动前即 1690 行已超限**；本次仅 +16 行，为 AC 1.5 补「渲染结果」
+#     判据（原判据只断言 URL，而 Vue Router 的 catch-all 不改 URL ⇒ 对 404 恒绿）。
+#     该文件确实应按 Phase 拆分，属独立任务，不在本次 P0 范围。
+#     spec: dsh-agent-panel-integration / P0 收口
+#   ManagerDashboard.vue —— **改动前即 1523 行已超限**；本次仅 +2 行，
+#     把 goToWorkHoursApprove 从不存在的 '/work-hours/approve'（点击落 404）
+#     改成 query 深链。拆分属该域独立任务。
+#     spec: dsh-agent-panel-integration / P0 收口（路由孤儿连带修复）
+audit-platform/frontend/e2e/dsh-agent-panel-acceptance.spec.ts  1706
+audit-platform/frontend/src/views/ManagerDashboard.vue  1525

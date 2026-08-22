@@ -311,7 +311,11 @@ export function buildAmbientHost(input: {
 export function hostScopeHint(request: AiHostRequest): string {
   if (!request.available) return request.unavailableReason ?? '当前页面无法使用 AI 对话'
   if (!request.projectToolsEnabled) {
-    return '全局知识模式：仅检索你有权访问的公共知识，项目工具不可用'
+    // 🔴 别写成「仅检索你有权访问的公共知识」——服务端在无项目绑定时是**不检索**的：
+    // ContextBuilder._get_global_knowledge_content() 直接返回空串，
+    // _search_related_knowledge() 在 project_id 为 None 时跳过 semantic_search。
+    // 承诺"会检索"会让审计师把「上下文空」当成故障来排查。
+    return '全局知识模式：未绑定项目，不自动检索项目数据与知识库，项目工具不可用'
   }
   return `当前范围：${request.label}`
 }

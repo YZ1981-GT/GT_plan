@@ -335,11 +335,27 @@ test.describe('A. 三视口响应式与交互', () => {
         newWindowBtn.click(),
       ])
       await newPage.waitForLoadState('domcontentloaded')
-      // 新窗口必须是平台自己的聊天路由，不是 DSH Web UI（Req：无双轨、无 iframe）
+      // ── 第一层：请求的是平台自己的地址，不是 DSH Web UI（Req 1.5：无双轨、无 iframe）
       expect(newPage.url()).toContain(BASE_URL)
       expect(newPage.url()).toContain('/ai-chat')
       expect(newPage.url()).not.toContain('3080')
       expect(newPage.url()).not.toContain('dsh-web-ui')
+
+      // ── 第二层：新窗口真的渲染出了聊天面板
+      //
+      // 🔴 只断言 URL 是**不够**的，这不是冗余而是本条用例此前的真实缺陷：
+      // Vue Router 的 NotFound 是 catch-all 客户端路由（`/:pathMatch(.*)*`），
+      // 命中它**不改变 URL**。所以当 `/ai-chat` 路由未注册时（实测 commit 55c5e0fe
+      // 的 router/index.ts 里 path 声明数为 0，原文还写着 "Do NOT re-add these routes"），
+      // 新窗口打开的是 404 页面，而上面四条 URL 断言**全部照样通过**。
+      // AC 1.5 因此在「已标完成」的交付里坏着，靠浏览器手点才暴露。
+      //
+      // 判据必须落到渲染结果：面板挂载 + 404 标志不存在。两条都要 ——
+      // 只查 404 不存在的话，白屏（组件加载失败）也会放过。
+      await expect(newPage.locator('.gt-not-found')).toHaveCount(0)
+      await expect(newPage.locator('.platform-ai-chat-panel').first()).toBeVisible({
+        timeout: 15000,
+      })
       await newPage.close()
     })
 

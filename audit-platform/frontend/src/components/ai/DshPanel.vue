@@ -318,8 +318,21 @@ function trapFocus(e: KeyboardEvent) {
 // 其他
 // ---------------------------------------------------------------------------
 
+/**
+ * 在独立窗口打开 AI 助手（路由 '/ai-chat'，见 router/index.ts）。
+ *
+ * 传**原始 route 值**而不是 `aiHost` 的派生结果：新窗口用同一个 `buildAmbientHost`
+ * 自行推导宿主，宿主口径只有一处实现。不带参数会让新窗口无条件退回全局知识模式，
+ * 丢掉用户当前正在看的项目/底稿上下文。
+ */
 function openInNewWindow() {
-  window.open('/ai-chat', '_blank', 'width=1200,height=800')
+  const params = new URLSearchParams()
+  const projectId = route.params.projectId ?? route.query.project_id
+  const wpId = route.params.wpId ?? route.query.wp_id
+  if (typeof projectId === 'string' && projectId) params.set('project_id', projectId)
+  if (typeof wpId === 'string' && wpId) params.set('wp_id', wpId)
+  const query = params.toString()
+  window.open(`/ai-chat${query ? `?${query}` : ''}`, '_blank', 'width=1200,height=800')
 }
 </script>
 

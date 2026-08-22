@@ -55,7 +55,8 @@
           <div v-else-if="!loading" class="chart-empty">
             <span style="color: var(--gt-color-text-tertiary)">暂无活跃人员负荷数据</span>
             <div style="display: flex; gap: 12px; margin-top: 8px">
-              <el-button text type="primary" size="small" @click="$router.push('/staff')">前往人员管理</el-button>
+              <!-- 人员管理的路由是 'settings/staff'；原写 '/staff' 无声明，点击落 404 -->
+              <el-button text type="primary" size="small" @click="$router.push('/settings/staff')">前往人员管理</el-button>
               <el-button text type="primary" size="small" @click="$router.push('/projects')">前往委派</el-button>
             </div>
           </div>

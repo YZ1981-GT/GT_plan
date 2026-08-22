@@ -826,7 +826,9 @@ function goToUnassigned(projectId?: string) {
 
 function goToWorkHoursApprove() {
   recordOrigin()
-  router.push('/work-hours/approve')
+  // 审批是 `/work-hours` 页面里的一个 tab，没有独立路由 ——
+  // 原写法 '/work-hours/approve' 无对应路由声明，点击会落到 404。
+  router.push({ path: '/work-hours', query: { tab: 'approve' } })
 }
 
 // ── 辅助函数 ──

@@ -92,7 +92,10 @@ import {
 } from '../../composables/useWorkpaperScaffold'
 import type { AlternativeCompany, BlockType, CheckRow } from '../alternativeD05/alternativeD05Types'
 import { importUnrepliedAsCompanies } from '../coordination/importFromSummary'
-import { F0_ALTERNATIVE_MASTER_LABELS } from '../../composables/f0MasterLabels'
+// 真源在 confirmation/composables/（本文件在 confirmation/alternativeF06/，故为 '../composables/'）。
+// 上面 useWorkpaperScaffold 走的是 '../../composables/'（workpaper/composables/）——
+// 两个 composables 目录不同层，照抄相邻 import 的深度会解析失败。
+import { F0_ALTERNATIVE_MASTER_LABELS } from '../composables/f0MasterLabels'
 import { BLOCK_COLUMN_CONFIGS_F06 } from './blockColumnConfigsF06'
 
 // 复用 D0-5 的 Dashboard 和 Master 组件

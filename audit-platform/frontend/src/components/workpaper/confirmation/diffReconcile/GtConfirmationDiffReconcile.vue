@@ -105,7 +105,8 @@ import { CONFIRMATION_DICTS, fallbackSelectOptions } from '../coordination/confi
 import { getCycleConfirmationMeta } from '../coordination/cycleConfirmationMeta'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import { eventBus } from '@/utils/eventBus'
-import { buildDiffMisstatementPayload } from '../../composables/confirmationRiskPush'
+// 真源在 confirmation/composables/（本文件在 confirmation/diffReconcile/，故为 '../composables/'）
+import { buildDiffMisstatementPayload } from '../composables/confirmationRiskPush'
 import type { DiffReconcileRow } from './diffReconcileTypes'
 
 import DiffReconcileDashboard from './DiffReconcileDashboard.vue'

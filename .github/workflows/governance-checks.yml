@@ -5446,6 +5446,28 @@ jobs:
       - name: useAiChat composable (Property 9, 39)
         run: npx vitest run src/__tests__/useAiChat.spec.ts --reporter=verbose
         working-directory: audit-platform/frontend
+      # 引用完整性（AC 1.5 / 1.9）—— 抓「引用了不存在的目标」这一整类：
+      #   ① 路由孤儿：window.open('/ai-chat') 而路由未注册 ⇒ 落 404。
+      #      原 e2e 只断言 URL，而 Vue Router 的 catch-all 不改 URL ⇒ 判据恒绿。
+      #   ② 模块孤儿：import 相对深度写错 ⇒ 整个 vite build 挂掉（实测同批 7 处）。
+      # 这个 spec 不在 src/components/ai/__tests__/ 目录 glob 内，必须显式列出。
+      - name: Frontend reference integrity (AC 1.5, 1.9)
+        run: npx vitest run src/__tests__/FrontendReferenceIntegrity.spec.ts --reporter=verbose
+        working-directory: audit-platform/frontend
+      # 静态锚点检查（只读源码，不需要 DB/前端依赖）。
+      # 它与「变异实跑」互不覆盖：静态查「锚点还在不在、测试名还对不对」，
+      # 实跑查「守卫抓不抓得到」。ubuntu runner 上是 python3 不是 python。
+      # 路由孤儿守卫抓出的连带修复：ManagerDashboard 原跳 '/work-hours/approve'
+      # （无此路由，审批是 WorkHoursPage 的 tab）。改成 query 深链后必须有行为判据，
+      # 否则「跳到了页面但停在默认 tab」没人看得出来。
+      - name: Work-hours tab deep link (route orphan follow-up)
+        run: npx vitest run src/views/__tests__/workHoursTabDeepLink.spec.ts --reporter=verbose
+        working-directory: audit-platform/frontend
+      # 静态锚点检查（只读源码，不需要 DB/前端依赖）。
+      # 它与「变异实跑」互不覆盖：静态查「锚点还在不在、测试名还对不对」，
+      # 实跑查「守卫抓不抓得到」。ubuntu runner 上是 python3 不是 python。
+      - name: Reference integrity mutation anchors (6 anchors)
+        run: python3 backend/scripts/diagnose/mutate_frontend_reference_integrity.py --check-anchors
 
   dsh-agent-panel-mcp-data:
     # DSH Agent Panel Integration — MCP 7 个只读工具的**取数数据流**守卫

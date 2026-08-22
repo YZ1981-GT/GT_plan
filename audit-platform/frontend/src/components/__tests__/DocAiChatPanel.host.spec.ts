@@ -14,7 +14,8 @@
  *    **一次都不发**，避免旧实现那种 `doc_id=''` 的必然失败请求）。
  * 2. **模板形态判据**：四个宿主页面（WorkpaperEditor / ReportView / DisclosureEditor /
  *    KnowledgeBase）依赖树太大、无法在 jsdom 里整页 mount，改为解析其 SFC 模板中
- *    `<DocAiChatPanel>` 标签的**绑定形态**：必须只绑 `:host`，且被绑表达式在同文件里由
+ *    `<PlatformAiChatPanel>` 标签（Task 9 起统一内核面板）的**绑定形态**：必须只绑
+ *    `:host`，且被绑表达式在同文件里由
  *    对应的 `buildXHost(...)` adapter 产生；旧的 `:doc-type` / `:doc-id` / `:project-id` /
  *    `:year` 绑定一个都不能剩。这条判据能抓住"改回把 projectId 当 docId"的回退
  *    （见 Task 2 变异脚本 M2x）。
@@ -41,6 +42,7 @@ global.fetch = mockFetch as unknown as typeof fetch
 
 import DocAiChatPanel from '../DocAiChatPanel.vue'
 import {
+  buildAmbientHost,
   buildGlobalKnowledgeHost,
   buildKnowledgeFolderHost,
   buildReportHost,
@@ -241,10 +243,18 @@ const HOST_VIEWS: HostWiring[] = [
   },
 ]
 
-/** 抓出 `<DocAiChatPanel ... />` 标签体（含全部绑定）。 */
+/**
+ * 抓出 `<PlatformAiChatPanel ... />` 标签体（含全部绑定）。
+ *
+ * Task 9 把四个宿主 view 从旧的 `<DocAiChatPanel>` 迁到统一内核
+ * `<PlatformAiChatPanel>`，本判据锁的是**当前生产形态**。
+ * 注意：这里断言失败发生在 `describe.each` 的同步 body 里 ⇒ 整个文件会
+ * 零测试执行（collection error），所以标签名一旦漂移必须立刻改这里，
+ * 不能靠"反正会报错"糊过去。
+ */
 function panelTag(source: string): string {
-  const match = source.match(/<DocAiChatPanel\b[\s\S]*?\/>/)
-  expect(match, 'DocAiChatPanel 标签未找到（宿主页面是否被改名或删除？）').toBeTruthy()
+  const match = source.match(/<PlatformAiChatPanel\b[\s\S]*?\/>/)
+  expect(match, 'PlatformAiChatPanel 标签未找到（宿主页面是否被改名或删除？）').toBeTruthy()
   return match![0]
 }
 

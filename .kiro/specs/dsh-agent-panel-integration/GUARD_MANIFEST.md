@@ -178,10 +178,13 @@
 - `dsh-agent-panel-backend` — 后端 **697** tests = `dsh_agent_panel/` **508** + 其余 6 文件 **189**
   （access/host/run/context/attachment/note/review/MCP/DSH）
   **带 pgvector/pgvector:pg16 service + schema 引导 + 两条防静默 skip 硬断言**
-- `dsh-agent-panel-frontend` — 前端 **289** tests / 16 files（2026-08-22 实测；原 242/14）
-  （`src/components/ai/__tests__/` 全目录 + `chatRunState` + `sseEventTypes` + `useAiChat`；
-  transport/core/sanitize/a11y/mention/OCR/note/review/capability/**渲染宿主可达性**/**run 载荷**）
-  该 job 用**目录级** glob 收 `src/components/ai/__tests__/`，故新增两个 spec 自动纳入，未改 CI 配置
+- `dsh-agent-panel-frontend` — 前端 **324** tests / 18 files（2026-08-22 P0 收口后；原 289/16、242/14）
+  （`src/components/ai/__tests__/` 全目录 + `chatRunState` + `sseEventTypes` + `useAiChat`
+  + **`FrontendReferenceIntegrity`**；transport/core/sanitize/a11y/mention/OCR/note/review/
+  capability/渲染宿主可达性/run 载荷/**引用完整性**）
+  目录级 glob 会自动收 `src/components/ai/__tests__/` 下的新 spec；
+  但 `FrontendReferenceIntegrity`（`src/__tests__/`）与 `workHoursTabDeepLink`（`src/views/__tests__/`）
+  不在该目录内，**已显式加三步**（两个守卫实跑 + 锚点静态检查）
 - `dsh-agent-panel-mcp-data` — MCP 取数 **25** tests（**带 pgvector/pgvector:pg16 service + 同一套 schema 引导**）
 
 > 697 + 25 = 722 = Backend Guards 全集。三个 job 无重叠、无遗漏。
@@ -322,19 +325,94 @@ python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick "假绿�
   已 diff 归因确认属本次 MCP 取数补口，非并发会话改动；消费方 = `mcp_tools.tool_kb_search`，
   变异 M35 RED 证明在活路径上，不是 additive 死代码)
 
-### 结论
+### 结论 — ✅ **已入库（2026-08-22 实测更正）**
 
-本 spec 的全部正式产物当前处于 `??` 未跟踪状态。CI job 定义已写入已跟踪的 `governance-checks.yml`。
-**丢工作树即全部蒸发**——须在 PR 提交前 `git add` 全部产物。
+上面整节「未跟踪产物清单」**已过期**。实测 `git status --porcelain`：
 
-> **2026-08-22 复核（Task 15 接线补口收口时实测）**：
-> `git status --porcelain -- <本 spec 产物清单>` 逐条查，7 条全部仍为 `??`，
-> 包括 `PlatformAiChatPanel.vue` 与 `e2e/dsh-agent-panel-acceptance.spec.ts` 本体，
-> 以及整个 `.kiro/specs/dsh-agent-panel-integration/` 目录。
-> ⚠️ 后果两条（与 memory 的通用铁律一致）：
-> ① `governance-checks.yml` 里已登记的 `dsh-agent-panel-frontend` job
-> 在**干净 checkout** 下会因文件不存在而挂；② 工作树一丢全部蒸发。
-> `.gitignore` 已确认**不会**误挡这批产物（无 `tmp_`/`_wip_` 前缀）。
+- commit **`55c5e0fe`**「feat(ai): DSH Agent 面板平台化集成（PlatformAiChatPanel 统一宿主）」
+  纳入 **154 个文件** —— 上述清单中的每一项均已 tracked。
+- 分支 `work/2026-08-22-dsh-agent-panel-integration` 已推到 `origin`。
+- 「丢工作树即蒸发」与「clean checkout 必挂」两个风险已解除。
+
+**仍未证明的是**：三个 CI job 至今**零成功记录**。产物入库只是让它们**能**跑，
+不等于**跑过**。见 `CLOSURE.md`「未完成项 §2」。
+
+> ⚠️ 本节与 `CLOSURE.md`「未完成项 §1」在入库后**过期了 6 天**，
+> 期间接手方读到的都是错误前提。判「产物入没入库」只需一条
+> `git status --porcelain -- <path>` —— 别让文档替代实测。
+
+---
+
+## P0 收口新增守卫（2026-08-22）
+
+### `FrontendReferenceIntegrity.spec.ts`（15 tests）
+
+**抓的是「引用了不存在的目标」这一整类**，不点名具体实例。
+位置 `src/__tests__/FrontendReferenceIntegrity.spec.ts`，
+共享扫描工具在 `src/__tests__/_helpers/frontendSourceScan.ts`
+（`stripJsComments` 收敛到这里作单一真源 —— 它那个「朴素正则会截断
+`'https://x'` 导致同行后续 import 被吃掉」的坑不该有第二份副本）。
+
+| Property / AC | 判据 | 防的形态 |
+|---|---|---|
+| **AC 1.5** | 写死的 `window.open` / `router.push` / `router.replace` / `to=` 目标必须匹配到**非 catch-all** 的声明路由；另有一条点名断言 `/ai-chat` 已注册（不依赖调用方存在） | **路由孤儿** —— `window.open('/ai-chat')` 而路由未注册 ⇒ 落 404。原 e2e 只断言 URL，而 catch-all **不改 URL** ⇒ 判据恒绿 |
+| **AC 1.9** | 全仓生产源码（5112 个文件，已排除测试）的相对/别名 import 必须可解析；6 个死代码文件登记在 `KNOWN_DEAD_MODULE_FILES` 且**只减不增** | **模块孤儿** —— import 深度写错 ⇒ 整个 `vite build` 挂掉（实测同批 **7 处**，横跨 3 个域，rollup 一次只报一个） |
+
+**核心设计 —— catch-all 必须显式排除**：若把它算进可达集合，任何路径都"匹配得上"，
+判据恒真。这与 AC 1.5 那条 e2e 失效的机制完全相同，故有专门一条锁它
+（变异 MR2 验证有效）。
+
+**豁免桶的语义是「死代码待删」而非「这个错可以接受」**，配三条约束：
+①清单只减不增 ②每条必须给 >10 字原因 ③断言它们**确实零活消费方**
+（死代码内部互引与自动生成的 `components.d.ts` 不算）。
+
+**判据不空洞的自检**：扫描面 >2000 个生产文件 · 路由声明 >100 条 ·
+catch-all 必须被解析到 · `children:` 恰好出现 1 次（单层嵌套假设，
+多一层会让「子路由父路径 = `/`」的拼接静默失效）。
+
+**首跑即抓到 3 类真缺陷**：AC 1.5 本身 · 2 个新的生产 404
+（`ManagementDashboard` 的 `/staff`、`ManagerDashboard` 的 `/work-hours/approve`）·
+7 处 import 深度错。
+
+**变异**：锚点 **MR1–MR6**，静态 6/6 命中恰好 1 次，**实跑 6/6 全 RED**
+（GREEN / ANCHOR-MISS / WRONG-TEST 各 0），sha256 字节级复原已校验。
+runner = `backend/scripts/diagnose/mutate_frontend_reference_integrity.py`，
+结果记 `mutation_results_reference_integrity.json`（未覆盖既有四份）。
+
+### `workHoursTabDeepLink.spec.ts`（10 tests，路由孤儿的连带修复）
+
+上面那条守卫抓出 `ManagerDashboard` 跳 `/work-hours/approve`（无此路由，
+审批是 `WorkHoursPage` 里 `name="approve"` 的 tab）。改成
+`{ path:'/work-hours', query:{ tab:'approve' } }` 后**必须有行为判据** ——
+否则「跳到了页面但停在默认 tab」既没人看得出来，也没有任何测试会红。
+
+判据两组：①「query → 初始 tab」规则（白名单 / 无权用户手敲 `tab=approve` 退回默认 /
+非字符串与数组形态 / 合法值放行）②**接线判据**（页面真的读 `route.query.tab`、
+`activeTab` 由 `initialTab()` 初始化而非硬编码、`approve` 仍受
+`can('approve_workhours')` 门控、dashboard 不再含旧路径）。
+
+> 🔴 **本文件踩过一次「注释污染 grep 判据」**：首版直接对原始源码断言
+> `not.toContain("'/work-hours/approve'")`，被**修复时写的说明注释**打红（注释正文
+> 引用了旧路径）。反向同样成立 —— 正向 `toContain` 会被注释里的字面量喂成假绿。
+> 现已统一走 `stripJsComments(stripHtmlComments(...))`，并加一条
+> **剥注释确实生效**的自检（注释原文在 raw 里、剥后不在）。
+> 这就是 memory 记的「守卫读源码前必 `stripComments()` + 反向自检」。
+
+复现：
+
+```powershell
+python backend/scripts/diagnose/mutate_frontend_reference_integrity.py --check-anchors
+python backend/scripts/diagnose/mutate_frontend_reference_integrity.py --run `
+  --out .kiro/specs/dsh-agent-panel-integration/mutation_results_reference_integrity.json
+```
+
+**CI**：`dsh-agent-panel-frontend` job 追加两步（守卫实跑 + 锚点静态检查）。
+该 job 用**目录级** glob 收 `src/components/ai/__tests__/`，本守卫不在该目录内，
+**必须显式列出**。锚点检查步骤在 ubuntu runner 上用 `python3`（不是 `python`）。
+归因型验收：`governance-checks.yml` 相对 HEAD **单个纯插入 hunk、13 行零删除、
+job 数 161 → 161 不变**。
+
+**前端守卫计数**：289 / 16 files → **324 / 18 files**（+35 / +2 —— 引用完整性 15 + 工时 tab 深链 10，另 10 条为深链守卫的接线判据与自检）。
 
 ---
 

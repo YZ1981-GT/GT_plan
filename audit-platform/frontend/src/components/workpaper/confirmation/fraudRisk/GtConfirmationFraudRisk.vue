@@ -75,10 +75,11 @@ import { useFraudSignalCollector } from '../coordination/useFraudSignalCollector
 import { filterSummaryRows, fetchWorkpaperHtmlRows, fetchConfirmationSummaryRows } from '../coordination/importFromSummary'
 import { navigateToCycleSheet } from '../coordination/navigateToCycleSheet'
 import { eventBus } from '@/utils/eventBus'
+// 真源在 confirmation/composables/（本文件在 confirmation/fraudRisk/，故为 '../composables/'）
 import {
   buildB50RiskFactorPayload,
   hasPresentFraudIndicators,
-} from '../../composables/confirmationRiskPush'
+} from '../composables/confirmationRiskPush'
 import type { FraudSignal } from '../coordination/useFraudSignalCollector'
 import FraudRiskDashboard from './FraudRiskDashboard.vue'
 import FraudRiskChecklist from './FraudRiskChecklist.vue'

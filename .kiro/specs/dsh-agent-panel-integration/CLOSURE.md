@@ -8,13 +8,15 @@
 | AC 覆盖率 | 120/120（所有 AC 被 task 引用） |
 | Property 覆盖率 | 40/40（所有 Property 被 task 引用） |
 | Task 依赖图 | 35 tasks / 21 waves / 无同波强依赖 |
-| 变异 --check-anchors | **41/41 通过**（15 Task 33 + 12 假绿修复 + 8 MCP 取数 + **6 渲染宿主**） |
-| 变异**实跑** | **41/41 全 RED**（15 + 12 + 8 + **6**，GREEN/MISS/WRONG 各 0） |
-| 守卫实测 | backend **722 passed** / frontend **289 passed / 16 files**（2026-08-22 实测，原 242/14） |
-| Playwright 实跑 | **37 passed / 4 failed / 19 skipped**（2026-08-22；4 failed 均为本 spec 之外的既有问题，见「未完成项 §8」） |
+| 变异 --check-anchors | **47/47 通过**（15 Task 33 + 12 假绿修复 + 8 MCP 取数 + 6 渲染宿主 + **6 引用完整性**） |
+| 变异**实跑** | **47/47 全 RED**（15 + 12 + 8 + 6 + **6**，GREEN/MISS/WRONG 各 0） |
+| 守卫实测 | backend **722 passed** / frontend **324 passed / 18 files**（2026-08-22；289/16 + 引用完整性 15 + 工时深链 10） |
+| Playwright 实跑 | **37 passed / 4 failed / 19 skipped**（4 failed 中 **3 条是本 spec 自己的 AC**，归因已更正 → 「未完成项 §8」） |
 | Clean-DB CI 引导实测 | 全新空库上 508 / 25 / 189 passed，0 skipped |
 | 最新迁移号 | V149（V147 + V149 为本 spec 新增） |
 | 迁移幂等性 | 两个迁移均使用 IF NOT EXISTS |
+| **产物入库** | ✅ commit `55c5e0fe`（154 files），已推 origin |
+| **AC↔Property 覆盖** | 🔴 Task 引用 120/120 但 **Property 仅覆盖 94/120** → 「未完成项 §10」 |
 | tmp_*/wip_* 清理 | 已删 2 个，余 7 个属他人 |
 
 ## 已验证能力
@@ -430,34 +432,169 @@ skip 文案也换成实测过的可执行说明（原文案把"无候选"归因�
 
 ---
 
+### 6. AC 1.5「新窗口打开平台聊天路由」在已入库的交付里是坏的（P0 收口，2026-08-22）
+
+#### 实证
+
+```
+git show 55c5e0fe:audit-platform/frontend/src/router/index.ts
+  → '/ai-chat' 的 path 声明数 = 0
+  → 原文写着：// ── AIChatView / AIWorkpaperView routes removed (Phase 11) ──
+              //    Do NOT re-add these routes.
+```
+
+而同一 commit 里 `DshPanel.openInNewWindow()` 执行的是
+`window.open('/ai-chat', '_blank', 'width=1200,height=800')`
+⇒ 点「在新窗口打开」落到 `NotFound`。
+
+Task 9 标 `[x]` 且 Validates 列了 **1.5**；Task 34 的 Playwright 也声称覆盖 `new-window`。
+
+#### 为什么全绿
+
+e2e 那条用例（`dsh-agent-panel-acceptance.spec.ts`）的判据是四条 **URL 断言**：
+
+```ts
+expect(newPage.url()).toContain('/ai-chat')      // ← 对 404 恒真
+expect(newPage.url()).not.toContain('3080')
+```
+
+**Vue Router 的 catch-all（`/:pathMatch(.*)*`）不改变 URL。** 所以新窗口渲染的是
+404 页面时，四条断言全部照样通过。这是「断言我们请求了什么」而不是
+「断言用户看到了什么」——与 memory 记的「grep 式守卫只查字符串存在」同族，
+只不过换到了 e2e 层，因此更难察觉（谁都以为浏览器测试就是行为测试）。
+
+**根因归类**：AC 1.5 属于**26 条「有 Task 引用但零 Property 覆盖」**的 AC 之一
+（见「未完成项 §10」）。它被 Task 9 引用所以计入了 CLOSURE 声称的「AC 120/120」，
+但 40 个 Property 里没有一条 `Validates 1.5` ⇒ 唯一判据就是那条有缺陷的 e2e。
+**「AC 被 task 引用」只证明有人负责，不证明有可执行判据。**
+
+#### 修复（四段）
+
+| # | 落法 |
+|---|------|
+| ① 路由 | `router/index.ts` 注册顶层 `/ai-chat`（`name: 'AIChatWindow'`）。放顶层而非 `DefaultLayout` 子路由 —— 1200x800 弹窗里主布局侧栏/顶栏只会挤占对话区 |
+| ② 上下文 | `openInNewWindow()` 带 `project_id` / `wp_id` query（取**原始 route 值**而非 `aiHost` 的派生结果，新窗口用同一个 `buildAmbientHost` 自行推导，保持单一真源）。不带参数会让新窗口无条件退回全局知识模式，丢掉用户正在看的项目/底稿 |
+| ③ 视口 | `AIChatView.vue` 的 `height:100%` → `100vh/100dvh` + `overflow:hidden`。独立窗口不套 `DefaultLayout`，`html/body/#app` 没有高度链 ⇒ `100%` 塌成 `auto` |
+| ④ 判据 | e2e 补**第二层**断言：`.gt-not-found` 计数为 0 **且** `.platform-ai-chat-panel` 可见。两条都要 —— 只查 404 不存在的话，白屏（组件加载失败）也会放过 |
+
+#### 通用守卫：`FrontendReferenceIntegrity.spec.ts`（15 tests）
+
+抓的是「**引用了不存在的目标**」这个**类**，不是 `/ai-chat` 这一个实例。
+新建 `src/__tests__/_helpers/frontendSourceScan.ts` 作共享扫描工具
+（`stripJsComments` 收敛到这里作单一真源，它那个坑不该有第二份副本）。
+
+| 节 | 判据 | 防的形态 |
+|---|------|---------|
+| §1 模块引用 | 全仓生产源码（5112 个文件，已排除测试）的相对/别名 import 必须可解析 | import 深度错 ⇒ 整个 `vite build` 挂掉 |
+| §2 路由导航 | 写死的 `window.open` / `router.push` / `router.replace` / `to=` 目标必须匹配到**非 catch-all** 的声明路由 | 路由孤儿 ⇒ 用户点击落 404 |
+
+**关键设计 —— catch-all 必须显式排除**：若把它算进可达集合，任何路径都"匹配得上"，
+判据恒真。这与 AC 1.5 那条 e2e 失效的机制完全相同，所以有一条测试专门锁它
+（`判据自检：catch-all 不得参与匹配`，变异 MR2 验证有效）。
+
+**豁免桶的语义**：当前有 6 个文件带坏 import（`components/ai/index.js` 死 barrel +
+4 个 import 不存在的 `@/api` 的旧组件 + `views/ai/AIWorkpaperView.vue`），
+登记在 `KNOWN_DEAD_MODULE_FILES`。语义是「**这是死代码待删**」而不是「这个错可以接受」，
+因此配了三条约束：①清单**只减不增** ②每条必须给 >10 字的原因
+③另有一条断言它们**确实零活消费方**（死代码内部互引与自动生成的 `components.d.ts` 不算）——
+一旦有人给它们接上真实消费方，守卫打红要求先修 import。
+`index.js` 指向的 `AIChatPanel.vue` 正是本 spec 删掉的，所以这条悬挂引用**属本 spec 责任**。
+
+**判据不空洞的自检**：扫描面 >2000 个生产文件 · 路由声明 >100 条 · catch-all 必须被解析到 ·
+`children:` 出现次数恰好 1（本仓库是单层嵌套，多一层就会让「子路由父路径 = `/`」的拼接失效，
+必须打红而不是静默给出错误的可达集合）。
+
+#### 守卫立刻抓到 2 个新缺陷（同形态，非本 spec 域）
+
+它证明了「抓类而不抓实例」的价值 —— 第一次跑就发现两个已在生产的 404：
+
+| 位置 | 原写法 | 真实路由 | 修法 |
+|---|---|---|---|
+| `ManagementDashboard.vue:58`「前往人员管理」按钮 | `$router.push('/staff')` | `settings/staff` | `'/settings/staff'` |
+| `ManagerDashboard.vue:829` `goToWorkHoursApprove()` | `router.push('/work-hours/approve')` | 只有 `work-hours`，审批是 `WorkHoursPage` 里 `name="approve"` 的 tab | `{ path:'/work-hours', query:{ tab:'approve' } }`，并给 `WorkHoursPage.vue` 加 query 深链支持（tab 白名单 + `approve` 仍受 `can('approve_workhours')` 门控，无权用户手敲参数也只看到默认页） |
+
+#### 同批修掉的 7 处 import 深度错
+
+| 文件 | 错写 | 真源 |
+|---|---|---|
+| `alternativeF05/GtConfirmationAlternativeF05.vue` | `../../composables/f0MasterLabels` | `../composables/` |
+| `alternativeF06/GtConfirmationAlternativeF06.vue` | 同上 | 同上 |
+| `diffReconcile/GtConfirmationDiffReconcile.vue` | `../../composables/confirmationRiskPush` | `../composables/` |
+| `fraudRisk/GtConfirmationFraudRisk.vue` | 同上 | 同上 |
+| `g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue` | `../../composables/useG4EclFormulaEngine` | 真源在 `src/composables/`（跨 4 级）⇒ 改用 `@/composables/` 别名 |
+| `alternativeF05/composables/useAlternativeF05Data.ts` | `../alternativeD05/alternativeD05Types` | `../../alternativeD05/` |
+| `alternativeF06/composables/useAlternativeF06Data.ts` | 同上 | 同上 |
+
+**共同成因**：照抄相邻 import 的深度。`G4TabEclMeasurement.vue` 里其余
+`../../composables/xxx` 全部正确（指 `workpaper/composables/`），只有这一条的真源
+在顶层 `src/composables/`；`useAlternativeF05Data.ts` 里 `../alternativeF05Types`
+只上一级是对的，而 `alternativeD05` 是**兄弟目录**要上两级。
+两处都已把「为什么深度不同」写进注释，防下一个人再照抄。
+
+#### 验证
+
+- **静态扫描**：0 条未登记坏 import（5112 个生产文件）
+- **rollup 解析阶段**：8GB 堆下无 `Could not resolve`（完整 build 仍因本机内存 OOM 跑不完 ——
+  项目 `package.json` 的 `build` 脚本本身没配 `NODE_OPTIONS`，属既有环境问题，非本次引入）
+- **守卫**：15 tests 全 passed
+- **变异**：锚点 **MR1–MR6，静态 6/6 命中恰好 1 次，实跑 6/6 全 RED**
+  （GREEN / ANCHOR-MISS / WRONG-TEST 各 0），每条都精确打红预期那一条测试；
+  文件 sha256 字节级复原已校验，无 `.bak` 残留。
+  结果记 `mutation_results_reference_integrity.json`（未覆盖既有四份记录）
+
+| 锚点 | 变异 | 打红的测试 |
+|---|---|---|
+| MR1 | 删掉 `/ai-chat` 路由声明（**精确复刻 AC 1.5 的原始缺陷形态**） | `AC 1.5：新窗口聊天路由 /ai-chat 已注册` |
+| MR2 | 让 catch-all 参与匹配（判据恒真的核心形态） | `判据自检：catch-all 不得参与匹配` |
+| MR3 | 把已修好的导航目标改回不存在的路由 | `所有写死的站内导航目标都能匹配到非 catch-all 路由` |
+| MR4 | `stripJsComments` 换成朴素正则（会截断 `'https://x'`） | `判据自检：stripJsComments 不得截断含 // 的字符串` |
+| MR5 | 把一个生产 import 改成不存在的路径 | `不存在未登记的坏 import` |
+| MR6 | 路径匹配放宽成前缀式（段数不等也算匹配） | `判据自检：动态段匹配任意单段，段数必须相等` |
+
+CI：`dsh-agent-panel-frontend` job 追加两步（守卫实跑 + 锚点静态检查）。
+该 job 用**目录级** glob 收 `src/components/ai/__tests__/`，本守卫不在该目录内，
+故必须显式列出。归因型验收：`governance-checks.yml` 相对 HEAD **单个纯插入 hunk、
+13 行零删除、job 数 161 → 161 不变**，其余 160 个 job 一字未动。
+
+#### 通用教训
+
+**「浏览器测试」不等于「行为判据」。** 只要断言的是请求侧的量（URL、发出的参数、
+调用了哪个函数），就仍然停在「我们打算做什么」，而没有触及「用户实际看到什么」。
+本条的 URL 断言、G7 的 `column.group` 声明、Task 15 的组件孤岛，
+三者是同一形状的三个层级：**声明/请求齐全 + 判据齐全 + 渲染结果为空**。
+
+判据要求：任何「跳转 / 打开 / 渲染」类能力，守卫必须至少有一条断言**目标真的出现了**
+（DOM 节点可见、或目标声明在真源里存在），而不只断言「我们朝那个方向发了个请求」。
+
+---
+
 ## 🔴 未完成 / 未验证项（诚实记录）
 
-### 1. 产物未入版本控制（CRITICAL）
+### 1. 产物未入版本控制 — ✅ **已解除**（2026-08-22）
 
-**所有正式产物均为 `??` untracked 状态**，仅 `utils/sse.ts` 是 tracked（M）。
+原文记载「所有正式产物均为 `??` untracked」。**该状态已不成立**：
 
-受影响产物：
-- `.kiro/specs/dsh-agent-panel-integration/` 整个目录
-- `backend/app/services/ai_chat/`（29 files，含 `mcp_tools.py`）
-- `backend/app/routers/ai_chat_mcp.py`
-- `backend/migrations/V147` + `V149`
-- `tools/audit-data-mcp/`
-- 前端 5 个新组件 + composable
-- 后端全部测试文件（22 files，含 `test_ai_chat_mcp_tools_data.py`）
-- Playwright 测试
-- mutation runner（M01–M35）
+- commit **`55c5e0fe`**「feat(ai): DSH Agent 面板平台化集成（PlatformAiChatPanel 统一宿主）」
+  一次性纳入 **154 个文件**，含整个 `.kiro/specs/dsh-agent-panel-integration/`、
+  `backend/app/services/ai_chat/`、V147 + V149、`tools/audit-data-mcp/`、
+  前端组件与 composable、后端 22 个测试文件、mutation runner、
+  `governance-checks.yml` 的 3 个 job（+232 行）。
+- 分支 `work/2026-08-22-dsh-agent-panel-integration` 已推到 `origin`。
 
-> 例外：`backend/app/services/knowledge_index_service.py` 是**已跟踪**文件的 `M` 修改
-> （纯增 `semantic_search_strict` 58 行 0 删），不在蒸发风险内，但需随同一 commit 提交，
-> 否则 `test_ai_chat_mcp_tools_data.py` 的 `semantic_unavailable` 断言在 clean checkout 下会挂。
+> ⚠️ 本节与 `GUARD_MANIFEST.md` 的「Artifact Tracking Status」在入库后**过期了 6 天没人更新**，
+> 期间任何接手方读到的都是「产物会蒸发、CI 必挂」的错误前提。
+> **教训**：收口文档里的「阻塞项」必须在解除时立刻改，否则它从证据退化成误导 ——
+> 判「某产物入没入库」的成本只有一条 `git status --porcelain -- <path>`，
+> 没有理由让文档替代实测。
 
-**风险**：工作树清理/重置将导致全部产物蒸发。CI 在 clean checkout 下**必定失败**（找不到文件）。
+### 2. Clean Checkout 运行验证（部分证明）
 
-**建议**：尽快执行 `git add` 并提交到工作分支，或发起 PR。
+产物已入库 ⇒ 「找不到文件」这个阻塞因素消失。但**三个 CI job 至今没有一次成功记录**，
+所以 clean checkout 下的实际结论仍未证明。尤其「已修复项 §3b」那套空库引导
+（pgvector 镜像 / `init_tables.py` / DROP V147 四表重建 / 7 个 CHECK 断言）
+只在本地探针库 `audit_platform_ci_probe2` 验过，GitHub runner 首跑仍可能暴露新问题。
 
-### 2. Clean Checkout 运行验证（NOT VERIFIED）
-
-由于产物未跟踪，clean checkout 下的 pytest/vitest/typecheck/lint/Playwright **无法在 CI 环境运行**。本地工作树验证通过，但 CI 层面未证明。
+**下一步**：开 PR 触发这三个 job，用真实运行结果替换本节。
 
 ### 2b. `dsh-agent-panel-backend` job 缺 postgres service — ✅ **已修，见「已修复项 §3」**
 
@@ -501,41 +638,40 @@ DSH 通过 feature flag 控制，当前 allowlist 为空（实验阶段）。需
 
 结构化指标已暴露（active runs / queue wait / latency / tokens / denials / cleanup failures），但告警阈值需 Ops 团队根据生产基线设定。
 
-### 7. `vite build` 在 HEAD 上整体失败（**与本 spec 无关，只登记不修**）
+### 7. `vite build` 在 HEAD 上整体失败 — ✅ **已修，且实测远不止一处（见「已修复项 §6」）**
 
-```
-error during build:
-Could not resolve "../../composables/f0MasterLabels" from
-  "src/components/workpaper/confirmation/alternativeF05/GtConfirmationAlternativeF05.vue"
-```
+原文只登记了 `GtConfirmationAlternativeF05.vue` 一处，并归为「函证域问题，只登记不修」。
 
-真源在 `src/components/workpaper/confirmation/composables/f0MasterLabels.ts`，
-从 `alternativeF05/` 出发正确写法是 `../composables/f0MasterLabels`（上一级），
-现写成 `../../composables/`（**多上了一级**，指向不存在的 `workpaper/composables/`）。
+**实测结论：同批共 7 处，横跨 3 个域**。rollup 一次只报一个 —— 修掉 F05 后立刻冒出
+F06，修掉 F06 又冒出 diffReconcile ⇒ **靠 `vite build` 逐个试错要跑 7 轮**，
+这也是它长期没人修的原因之一。改用静态扫描一次性列全，7 处一并修完。
 
-- 该文件**已提交**、工作树干净，最后触碰它的是 `11c5309f`「…**6 Vue import 深度**…」——
-  属那批 import 深度批改的回归，不是并发会话在途改动。
-- 影响面：**整个前端生产构建挂掉**（rollup 解析整张模块图，任何一处解析失败即终止），
-  于是任何人想用 `vite build` 验证自己的前端改动都会被这一条挡住。
-- 属函证域（F0）而非本 spec，且遵守「同一文件禁与并发会话并行编辑」，故只登记。
-  修法是一个字符级改动：`../../composables/` → `../composables/`。
-  **建议由函证域立刻单独修**，它挡着所有人的构建校验。
-- 本 spec 的编译校验因此改走 dev server transform 管道（见「已修复项 §4 · 编译校验」）。
+> 教训：`vite build` 是**串行短路**的诊断手段（第一处失败即终止），
+> 不能用它来判断「还剩几处」。同类问题必须先做全量静态扫描再动手。
 
-### 8. Playwright 全量跑仍有 4 条 failed（**均为本 spec 之外的既有问题**）
+详见「已修复项 §6」。
+
+### 8. Playwright 全量跑仍有 4 条 failed（🔴 **归因已更正：3 条是本 spec 自己的 AC**）
 
 2026-08-22 实测 `37 passed / 4 failed / 19 skipped`。接线前同一文件是 `36 / 6 / 18`，
-差额就是本次修的两条（`搜索失败与空结果` failed→**passed**、`Context Manifest` failed→skip 并补了无条件真断言）。
-剩下 4 条在接线前后**完全一致**，与 Task 15 无关：
+差额就是 Task 15 接线修的两条。
 
-| 用例 | 现象 |
-|------|------|
-| A · 面板打开后焦点进入输入区 | 焦点未落到输入区 |
-| B · 无项目上下文时项目工具禁用并显示中文原因 | 断言未过 |
-| C · 对话 history 可加载且按时间正序 | 断言未过 |
-| D · 非底稿宿主禁用复核模式并显示中文原因 | `openAiPanel` 点击被上层节点拦截（`subtree intercepts pointer events`），属 helper 的点击稳定性问题 |
+原文把这 4 条归为「**均为本 spec 之外的既有问题**」，理由是「接线前后完全一致」。
+**该归因不成立**：「接线前后一致」只证明**不是 Task 15 引入的**，
+不等于**不属本 spec**。逐条对到 AC：
 
-未在本任务内诊断（超出「Task 15 接线」范围），建议单独立任务逐条查。
+| 用例 | 对应 AC | 归属 | 备注 |
+|------|---------|------|------|
+| A · 面板打开后焦点进入输入区 | **1.7**（焦点在面板与触发元素间正确转移） | **本 spec** | Task 11 标 `[x]`，Property 37 声称覆盖 |
+| B · 无项目上下文时项目工具禁用并显示中文原因 | **3.4**（无法解析项目上下文时禁用项目工具并显示原因） | **本 spec** | Task 2 标 `[x]`，Property 5 声称覆盖 |
+| C · 对话 history 可加载且按时间正序 | **4.10**（返回最近 N 条后按时间正序） | **本 spec** | Task 3 标 `[x]`，Property 10 声称覆盖 |
+| D · 非底稿宿主禁用复核模式 | — | helper | `openAiPanel` 点击被上层节点拦截（`subtree intercepts pointer events`），点击稳定性问题 |
+
+**B / C 各有后端 Property 声称覆盖且后端全绿，浏览器却红** —— 这正是
+「守卫层级不够」的信号，与 G7「三向守卫 39 例全绿 / DOM 0/38 渲染」同一形状。
+不该记在别人账上。
+
+**建议**：单独立任务逐条查 A/B/C，判据落到 DOM；D 修 helper 的点击目标。
 
 ### 9. Context Manifest **非空**路径仍未在浏览器验过
 
@@ -548,17 +684,62 @@ e2e 夹具已存在可用项目（`TEST_PROJECT_ID=2aa00f57-…`，含 FIX-F / F
 但本文件目前**从不引用它**（`TEST_PROJECT_ID` 出现 0 次），全程在全局宿主下跑。
 补一个「进项目再开面板」的 helper 即可让这三条转真跑 —— 建议作为下一步。
 
+### 10. 🔴 26 条 AC 有 Task 引用但**零 Property 覆盖**（覆盖率口径修正）
+
+本文件概览表写的「AC 覆盖率 120/120」是按**「被 task 的 Validates 引用」**统计的。
+实扫三件套后的真实分布：
+
+| 口径 | 数 |
+|---|---|
+| AC 总数 | 120 |
+| 被 Task 引用 | 120（100%） |
+| **被 Property 覆盖** | **94（78%）** |
+| **有 Task 无 Property** | **26** |
+
+```
+1.1  1.4  1.5  1.10  3.5  3.6  4.2  4.9  5.1  5.9  6.4  7.1  7.3
+8.5  8.8  8.9  9.4  9.5  10.2  10.6  10.7  12.3  14.1  14.2  14.3  14.7
+```
+
+**AC 1.5 就在这 26 条里** —— 这是它坏掉却全绿的完整死因（见「已修复项 §6」）。
+「AC 被 task 引用」只证明**有人负责**，不证明**有可执行判据**。
+
+同批里另有两条更该补：
+
+- **AC 1.1**（面板用平台原生组件、不用 iframe）—— 整个 Requirement 1 的立论基础，零 Property。
+- **AC 12.3**（运行时 egress 测试证明模型/MCP/OCR/embedding/plugin 均无公网连接）——
+  全本地化的安全底线。Task 31 声称验过，但没有锚在 Property 上的可复跑判据。
+
+**建议**：做一张 **AC → Property → 守卫文件 → 变异锚点** 四列表，26 个空格子即缺口清单。
+这比继续增加守卫数量更有价值 —— 现有 722 + 324 条守卫密度已经很高，
+问题不在密度而在**分布**。
+
 ## 后续行动（按优先级）
 
-1. **立即**：将所有 `??` 产物 `git add` 并提交到工作分支
-2. **立即**：向 governance-checks.yml 注册 CI job（产物 tracked 后）
+1. ~~将所有 `??` 产物 `git add` 并提交~~ ✅ **已完成**（commit `55c5e0fe`，154 files，已推 origin）
+2. ~~向 governance-checks.yml 注册 CI job~~ ✅ **已完成**（3 个 job + P0 追加的 2 步）
+2a. **立即**：**开 PR 让这三个 job 真跑一次** —— 至今零成功记录。
+   §3b 那套空库引导只在本地探针库验过，runner 首跑仍可能暴露新问题。
+   本 spec 自己的结论就是「入库 + 让 CI 真跑一次不是收尾流程而是验证手段本身」。
 2b. ~~给 `dsh-agent-panel-backend` job 补 postgres service~~ ✅ **已完成**（见「已修复项 §3」）
 2c. **移交建议**：空库上 `V106` 失败（`service_identities.id` 无 PG 默认值）属证据治理域的
    空库引导问题，与本 spec 无关，建议该域单独立任务
-3. **近期**：开展 6000 用户负载测试，校准配额配置
-4. **近期**：运维设定生产告警阈值
-5. **后续**：按验收流程逐项目开放 DSH allowlist
-6. **后续**：评估 ChatMessageList/ChatComposer 是否需拆分（当前 860 行可控）
+3. **近期**：补 26 条零 Property 覆盖的 AC 判据，优先 **1.1**（不用 iframe）与
+   **12.3**（无 egress）—— 见「未完成项 §10」
+4. **近期**：逐条查 Playwright 的 A/B/C 三条 failed（分别对应 AC 1.7 / 3.4 / 4.10，
+   后端 Property 绿而浏览器红），D 修 helper 点击稳定性 —— 见「未完成项 §8」
+5. **近期**：清理 `KNOWN_DEAD_MODULE_FILES` 里的 6 个死文件
+   （`components/ai/index.js` + 4 个 `@/api` 旧组件 + `views/ai/AIWorkpaperView.vue`）。
+   已实证零活消费方；其中 `index.js` 指向本 spec 删掉的 `AIChatPanel.vue`，按 Req 1.9 应删。
+   删除属跨文件破坏性操作，需明确授权后执行
+6. **近期**：给 e2e 补「进项目再开面板」的 helper —— `TEST_PROJECT_ID` 当前出现 **0 次**，
+   全程在全局宿主下跑，Requirement 5（mention + Context Manifest）只验到了空态
+7. **近期**：开展 6000 用户负载测试，校准配额配置；运维设定生产告警阈值
+8. **后续**：按验收流程逐项目开放 DSH allowlist（当前 allowlist 为空 ⇒ Phase C 零生产流量）
+9. **后续**：评估 ChatMessageList/ChatComposer 是否需拆分（当前 860 行可控）
+10. **移交建议**：`package.json` 的 `build` 脚本未配 `NODE_OPTIONS`，
+   本机 4GB 默认堆下 `vite build` 必 OOM ⇒ 全仓生产构建校验实际跑不通。
+   建议加 `--max-old-space-size`（本次用 8192 可走过解析阶段）
 
 ## 结论
 
@@ -583,11 +764,33 @@ Task 35 之后共补三处：
 > ③**测试存在且 CI 绿但从未真跑**。共同判据要求只有一条：判「某能力是否真生效」
 > 必须落到**真实执行的可观测结果**上 —— 不是字符存在、不是结构完整、不是退出码为 0。
 
-唯一未满足项仍是 **产物未入版本控制**。按 spec 自身条款（"spec 目录当前若仍为 `??`
-SHALL 视为未完成"），**本 task 标记为 `[-]`（有条件完成）**，完全闭合需等待
-git add + commit + CI 通过。
+**2026-08-22 P0 收口补第四处**：
 
-> 🔴 §3b 里那 3 个 CI 缺陷本身就是「产物未入库」的直接后果：`dsh-agent-panel-mcp-data`
-> job 从写好起就带着裸 `postgres:16` + 缺引导两个错，但因为整个 spec 是 `??`、
-> **CI 从未真跑过这个 job**，所以错了几天都没人知道。这条比任何论证都更能说明
-> 「入库 + 让 CI 真跑一次」不是收尾流程而是验证手段本身。
+4. **AC 1.5 在已入库的交付里是坏的** —— `/ai-chat` 路由不存在而 `DshPanel` 却
+   `window.open('/ai-chat')`，点「新窗口打开」落 404。e2e 判据只断言 URL，
+   而 Vue Router 的 catch-all 不改 URL ⇒ 恒绿。已修路由/上下文/视口/判据四段，
+   并新增通用守卫 `FrontendReferenceIntegrity.spec.ts`（15 tests）抓「引用不存在的目标」
+   这一整类，变异 MR1–MR6 全 RED。该守卫第一次跑就抓到 2 个新的生产 404
+   与 7 处 import 深度错（后者让全仓 `vite build` 挂了 6 天）。见「已修复项 §6」。
+
+> 这四处是同一个假绿家族的四种形态：①**被消费了但没人检查消费到了什么**
+> ②**守卫存在但抓不到**（「静态检查通过」被当成「已验证」）
+> ③**测试存在且 CI 绿但从未真跑** ④**判据停在请求侧，没有触及渲染结果**。
+> 共同判据要求只有一条：判「某能力是否真生效」必须落到**真实执行的可观测结果**上 ——
+> 不是字符存在、不是结构完整、不是退出码为 0、**也不是 URL 对不对**。
+
+### 当前状态
+
+**产物已入库**（commit `55c5e0fe`），Task 35 的原阻塞条款（"spec 目录若仍为 `??` SHALL 视为未完成"）
+已满足，故标记 `[x]` 成立。
+
+**剩余未证明项**（不再是「未完成」，而是「已交付待验证」）：
+
+| 项 | 状态 |
+|---|---|
+| 三个 CI job 的真实运行结果 | 零成功记录 → 需开 PR |
+| 26 条 AC 的 Property 判据 | 缺口已登记（§10） |
+| Playwright A/B/C 三条 failed | 归因已更正为本 spec，待诊断（§8） |
+| 6 个死代码文件 | 已实证零活消费方，待授权删除 |
+| 6000 并发容量 | 配置值有界，未负载测试 |
+| DSH allowlist | 空（Phase C 零生产流量） |

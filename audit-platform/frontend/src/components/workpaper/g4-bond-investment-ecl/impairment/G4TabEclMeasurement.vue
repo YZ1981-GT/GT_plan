@@ -817,7 +817,10 @@ import {
   calcLossRateVariance,
   calcSumColumn,
   parseNum,
-} from '../../composables/useG4EclFormulaEngine'
+  // 真源在 src/composables/（顶层），不是 workpaper/composables/ ——
+  // 本文件其余 '../../composables/xxx' 指的都是后者，这一条跨了 4 级目录，
+  // 故用 @/ 别名，避免再被相邻 import 的深度带错。
+} from '@/composables/useG4EclFormulaEngine'
 
 const props = defineProps<{
   htmlData: Record<string, any> | null

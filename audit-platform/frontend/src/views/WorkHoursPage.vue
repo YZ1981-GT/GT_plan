@@ -66,6 +66,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { getAISuggestions, getMyStaffId, getMyAssignments } from '@/services/staffApi'
 import { usePermission } from '@/composables/usePermission'
@@ -77,7 +78,24 @@ import WorkHourStatsDashboard from '@/components/workhour/WorkHourStatsDashboard
 import { handleApiError } from '@/utils/errorHandler'
 
 const { can } = usePermission()
-const activeTab = ref('mine')
+const route = useRoute()
+
+/**
+ * 允许外部深链直达某个 tab（如经理看板的「待审批」入口）。
+ *
+ * 只接受下面白名单里的值，且 `approve` 仍受 `can('approve_workhours')` 门控 ——
+ * 无权用户即使手敲 `?tab=approve` 也只会看到默认页，不会出现空白 tab。
+ */
+const TAB_NAMES = ['mine', 'approve', 'stats', 'budget'] as const
+function initialTab(): string {
+  const requested = route.query.tab
+  if (typeof requested !== 'string' || !TAB_NAMES.includes(requested as (typeof TAB_NAMES)[number])) {
+    return 'mine'
+  }
+  if (requested === 'approve' && !can('approve_workhours')) return 'mine'
+  return requested
+}
+const activeTab = ref(initialTab())
 
 // [R9 F15 Task 35] 待审批数量 badge
 const pendingApprovalCount = ref(0)
