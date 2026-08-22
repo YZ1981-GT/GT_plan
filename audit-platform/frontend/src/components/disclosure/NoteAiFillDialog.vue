@@ -21,6 +21,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
 import { useDocAiChat } from '@/composables/useDocAiChat'
+import { buildNoteHost } from '@/composables/useAiHostContext'
 
 interface Citation {
   document_name: string | null
@@ -159,31 +160,48 @@ const draftHasNumber = computed(() => /[0-9]/.test(draftText.value))
 const skippedDocs = computed(() => result.value?.skipped_docs || [])
 
 // ── 采纳(走 useDocAiChat.adoptContent 治理确认流) ──────────
+// 宿主契约由 useAiHostContext 的附注 adapter 构造：这里的稳定标识是 section key
+// （本对话框只拿到章节号），服务端凭 project + year 断言把它反查成附注实例。
 const docChat = useDocAiChat({
-  docType: 'note',
-  docId: computed(() => props.noteSection),
-  projectId: computed(() => props.projectId),
-  year: computed(() => props.year),
+  host: computed(() =>
+    buildNoteHost({
+      noteSection: props.noteSection,
+      projectId: props.projectId,
+      year: props.year,
+    }),
+  ),
 })
 
 const adopting = ref(false)
+/**
+ * 服务端为本次草稿签发的 assistant 消息 ID。
+ *
+ * 🔴 dsh-agent-panel-integration / Task 7（Req 8.1/8.6）：采纳只引用**服务端** message ID，
+ * 正文由服务端读库。旧实现是本地造一个 `notefill_${Date.now()}` 再把 `draftText` 当正文提交 ——
+ * 那条路径已随 adopt 契约收紧被关掉，没有 message_id 时采纳按钮禁用而不是退回传正文。
+ */
+const draftMessageId = computed<string | null>(() => result.value?.message_id ?? null)
 const canAdopt = computed(
-  () => mode.value === 'ai' && !!draftText.value && !props.locked,
+  () => mode.value === 'ai' && !!draftText.value && !!draftMessageId.value && !props.locked,
 )
 
 async function adopt(): Promise<void> {
   if (!canAdopt.value) return
+  const msgId = draftMessageId.value
+  if (!msgId) {
+    ElMessage.warning('该草稿未取得服务端消息编号, 无法采纳; 请重新生成')
+    return
+  }
   adopting.value = true
   try {
-    const msgId = `notefill_${Date.now()}`
     docChat.messages.value.push({ id: msgId, role: 'assistant', text: draftText.value })
-    const { success } = await docChat.adoptContent(msgId)
+    const { success, message } = await docChat.adoptContent(msgId)
     if (success) {
       ElMessage.success('已提交采纳(经治理确认流, 未直接落库)')
       emit('adopted', { noteSection: props.noteSection, text: draftText.value })
       dialogVisible.value = false
     } else {
-      ElMessage.error('采纳失败, 请稍后重试')
+      ElMessage.error(message || '采纳失败, 请稍后重试')
     }
   } finally {
     adopting.value = false

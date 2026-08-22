@@ -42,6 +42,12 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN",
         "-e",
         "GITHUB_TOOLSETS",
+        "-e",
+        "HTTP_PROXY=",
+        "-e",
+        "HTTPS_PROXY=",
+        "-e",
+        "NO_PROXY=*",
         "ghcr.io/github/github-mcp-server:latest"
       ],
       "envFile": "${workspaceFolder}/.cursor/mcp.env"

@@ -254,10 +254,14 @@ const router = createRouter({
           name: 'WorkpaperSummary',
           component: () => import('@/views/WorkpaperSummary.vue'),
         },
-        // ── AIChatView / AIWorkpaperView routes removed (Phase 11) ──
-        // Backend endpoints (POST /api/ai/chat, POST /api/ai/chat/file-analysis,
-        // GET /api/projects/{id}/chat/history) are not registered in router_registry.py,
-        // so all operations return 404. Do NOT re-add these routes.
+        // ── AIWorkpaperView route removed (Phase 11) ──
+        // 旧端点（POST /api/ai/chat/file-analysis、GET /api/projects/{id}/chat/history）
+        // 未在 router_registry.py 注册，操作一律 404。不要重新加这条路由。
+        //
+        // AIChatView 不在此列：它已按 dsh-agent-panel-integration 重建为
+        // PlatformAiChatPanel 宿主，走真实存在的 /api/ai-chat/* 端点（backend/app/routers/doc_ai_chat.py）。
+        // 因为是 DshPanel「在新窗口打开」弹出的独立窗口（无需主布局侧栏），
+        // 它注册在**顶层**路由而不是这里，见下方 '/ai-chat'。
 
         // ── Phase 8 Extension Routes ──
         {
@@ -641,6 +645,16 @@ const router = createRouter({
           meta: { permission: 'project:view' },
         },
       ],
+    },
+    {
+      // AI 审计助手独立窗口（DshPanel 头部「在新窗口打开」的目标）
+      // 顶层路由而非 DefaultLayout 子路由：1200x800 弹窗里主布局侧栏/顶栏只会挤占对话区。
+      // 宿主上下文经 query 传入（project_id / wp_id），由 AIChatView 用
+      // buildAmbientHost 自行推导，无参数时为显式全局知识模式。
+      path: '/ai-chat',
+      name: 'AIChatWindow',
+      component: () => import('@/views/ai/AIChatView.vue'),
+      meta: { requireAuth: true },
     },
     {
       path: '/:pathMatch(.*)*',

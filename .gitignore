@@ -36,7 +36,7 @@ backend/uploads/
 backend/storage/
 backend/wp_storage/
 backend/backups/
-# Univer Server install artifacts (univer_install.sh target dir, gitignored — not used in current deployment)
+# Univer Server install artifacts (安装目录，已废弃)
 univer-server/
 *.xlsx
 !2025人员情况.xlsx
@@ -148,6 +148,9 @@ backend/.coverage
 
 # 构建期版本注入产物（CI 写入，不入库）
 backend/app/_build_version.json
+
+# 早期架构规划笔记（已被 .kiro/specs 完全替代，代码零引用）
+.omm/
 
 # CodeGraph 本地索引（机器本地，不入库）
 .codegraph/

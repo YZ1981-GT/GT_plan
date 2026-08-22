@@ -198,6 +198,7 @@ test.describe('G14 — 底稿目录与审定状态条', () => {
   })
 })
 
+test.describe('G14 — 附注披露行数', () => {
   test('上市 10+合计=11 行', async ({ page, request }) => {
     test.setTimeout(90_000)
     await loginAs(page)

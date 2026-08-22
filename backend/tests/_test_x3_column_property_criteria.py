@@ -11,9 +11,8 @@
 就是 collection error，会让整份守卫的断言零执行而表面上「没有失败」。
 
 原文件 docstring 原样保留在下方。
-"""
 
-"""Feature: x3-adjustment-entry-import-export, Property 3: 导出列面与 sheet 名对齐源模板
+Feature: x3-adjustment-entry-import-export, Property 3: 导出列面与 sheet 名对齐源模板
 
 *For any* 16 张目标 sheet，``X3_Exporter`` 产出的列头序列与 openpyxl 直读
 ``backend/wp_templates/`` 对应 tab 第 5 行的标签序列逐字相等（等势且同序），

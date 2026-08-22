@@ -63,7 +63,7 @@ test.describe('D6/D7 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D6', PROJECT_ID)
     test.skip(!wp.exists, 'D6 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd6', 'D6-2')
+    await roundTripImport(request, wp.wpId!, token, 'd6', 'D6-2')
   })
 
   test('D7-2 export-template → import-data', async ({ request }) => {
@@ -71,7 +71,7 @@ test.describe('D6/D7 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D7', PROJECT_ID)
     test.skip(!wp.exists, 'D7 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd7', 'D7-2')
+    await roundTripImport(request, wp.wpId!, token, 'd7', 'D7-2')
   })
 
   test('D7-7-period export-template → import-data', async ({ request }) => {
@@ -79,6 +79,6 @@ test.describe('D6/D7 导入 round-trip', () => {
     const token = await getToken(request)
     const wp = await findWorkpaper(request, token, 'D7', PROJECT_ID)
     test.skip(!wp.exists, 'D7 底稿不存在')
-    await roundTripImport(request, wp.wpId, token, 'd7', 'D7-7-period')
+    await roundTripImport(request, wp.wpId!, token, 'd7', 'D7-7-period')
   })
 })
