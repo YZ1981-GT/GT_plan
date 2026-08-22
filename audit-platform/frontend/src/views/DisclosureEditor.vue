@@ -1239,15 +1239,10 @@
     @insert-page-break="onInsertPageBreak"
   />
 
-  <!-- AI 文档对话面板 -->
-  <DocAiChatPanel
-    :doc-type="'note'"
-    :doc-id="currentNote?.id || currentNote?.note_section || ''"
-    :project-id="projectId"
-    :year="year"
+  <!-- AI 对话面板（统一内核；宿主契约由 useAiHostContext 的附注 adapter 构造） -->
+  <PlatformAiChatPanel
+    :host="aiHost"
     :visible="showDocAiChat"
-    @update:visible="showDocAiChat = $event"
-    @close="showDocAiChat = false"
     @adopt="onDocAiAdopt"
   />
 </template>
@@ -1355,7 +1350,8 @@ import NoteVersionTreePanel from '@/components/notes/NoteVersionTreePanel.vue'
 import NoteGroupBaselineDialog from '@/components/notes/NoteGroupBaselineDialog.vue'
 import NoteParagraphVarsEditor from '@/components/notes/NoteParagraphVarsEditor.vue'
 import NotePriorYearPanel from '@/components/notes/NotePriorYearPanel.vue'
-import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
+import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
+import { buildNoteHost } from '@/composables/useAiHostContext'
 import { useNoteSectionNumbering } from '@/composables/useNoteSectionNumbering'
 import { useNoteTree, type TreeNode } from '@/views/composables/useNoteTree'
 import { useNoteDetail } from '@/views/composables/useNoteDetail'
@@ -1400,6 +1396,20 @@ const conflictPanelVisible = ref(false)
 function onConflictResolved(_id: string, _resolution: string) {
   // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
 }
+
+// ─── AI 宿主上下文（dsh-agent-panel-integration Req 3.2/3.5） ─────────────────
+// 附注宿主的稳定标识：优先 instance ID，其次稳定 section key（section_id / note_section）。
+// 旧实现 `currentNote?.id || currentNote?.note_section || ''` 让服务端无法判断收到的是哪种
+// 形态，且未选定章节时会发出 doc_id=''。adapter 显式区分两种形态并在未选定时给中文原因。
+const aiHost = computed(() =>
+  buildNoteHost({
+    noteId: currentNote.value?.id,
+    sectionId: (currentNote.value as any)?.section_id,
+    noteSection: currentNote.value?.note_section,
+    projectId: projectId.value,
+    year: year.value,
+  }),
+)
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(_payload: { content: string; messageId: string }) {

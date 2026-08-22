@@ -7,12 +7,15 @@
     :destroy-on-close="false"
     @update:model-value="handleVisibleChange"
   >
-    <!-- 文档上下文信息 -->
-    <div class="doc-context-bar">
-      <el-tag type="info" size="small" effect="plain">
-        {{ docTypeLabel }}
+    <!-- 文档上下文信息（宿主 adapter 产出的唯一真源） -->
+    <div class="doc-context-bar" :class="{ 'doc-context-bar--unavailable': !hostAvailable }">
+      <el-tag :type="hostAvailable ? 'info' : 'warning'" size="small" effect="plain">
+        {{ host.label }}
       </el-tag>
-      <span class="doc-context-id">{{ docId }}</span>
+      <span v-if="hostResourceId" class="doc-context-id">{{ hostResourceId }}</span>
+      <span class="doc-context-hint" :class="{ 'is-warning': !hostAvailable }">
+        {{ scopeHint }}
+      </span>
     </div>
 
     <!-- 对话历史 -->
@@ -115,8 +118,11 @@
           v-model="inputText"
           type="textarea"
           :rows="2"
-          placeholder="输入问题...（输入 @ 选择额外知识范围）"
-          :disabled="loading"
+          :placeholder="hostAvailable
+            ? '输入问题...（输入 @ 选择额外知识范围）'
+            : scopeHint"
+          :disabled="loading || !hostAvailable"
+          :aria-label="hostAvailable ? 'AI 对话输入框' : `AI 对话不可用：${scopeHint}`"
           @keydown="handleInputKeydown"
         />
       </div>
@@ -124,8 +130,11 @@
         <el-button
           size="small"
           :icon="FolderOpened"
+          :disabled="!projectToolsEnabled"
+          :title="projectToolsEnabled
+            ? '选择额外知识范围'
+            : '当前无项目上下文，项目知识范围不可用'"
           @click="showMentionPopover = !showMentionPopover"
-          title="选择额外知识范围"
         >
           @
         </el-button>
@@ -133,7 +142,7 @@
           type="primary"
           size="small"
           :loading="loading"
-          :disabled="!inputText.trim()"
+          :disabled="!inputText.trim() || !hostAvailable"
           @click="sendMessage"
         >
           发送
@@ -150,6 +159,7 @@ import { Check, Folder, FolderOpened } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { useDocAiChat, type DocChatMessage, type Citation } from '@/composables/useDocAiChat'
+import { hostScopeHint, type AiHostRequest } from '@/composables/useAiHostContext'
 import { useCellLocate } from '@/composables/useCellLocate'
 import { eventBus } from '@/utils/eventBus'
 
@@ -163,14 +173,14 @@ interface ScopeOption {
 }
 
 const props = defineProps<{
-  /** 文档类型（workpaper / note / report / knowledge_folder） */
-  docType: string
-  /** 文档 ID */
-  docId: string
-  /** 项目 ID */
-  projectId: string
-  /** 审计年度 */
-  year: number
+  /**
+   * 宿主上下文请求 —— 由 `useAiHostContext` 的六个宿主 adapter 之一构造。
+   *
+   * 各宿主页面（底稿 / 报表 / 附注 / 知识库 / 全局面板 / 独立窗口）都提交**同一形状**，
+   * 面板本身不再拼 doc_type/doc_id/project_id/year，也就不可能把项目 ID 当文档 ID
+   * （dsh-agent-panel-integration Req 3.5）。
+   */
+  host: AiHostRequest
   /** 控制抽屉显隐 */
   visible: boolean
 }>()
@@ -192,6 +202,7 @@ const router = useRouter()
 const { locateCell } = useCellLocate()
 
 const {
+  hostAvailable,
   messages,
   loading,
   streamingText,
@@ -199,11 +210,17 @@ const {
   fetchHistory,
   adoptContent,
 } = useDocAiChat({
-  docType: computed(() => props.docType),
-  docId: computed(() => props.docId),
-  projectId: computed(() => props.projectId),
-  year: computed(() => props.year),
+  host: computed(() => props.host),
 })
+
+/** 宿主稳定标识（展示用；未解析时不渲染空串占位）。 */
+const hostResourceId = computed(() => props.host.host?.id || '')
+/** 宿主权威项目 ID（跳转与知识范围查询共用；受限全局模式为 null）。 */
+const hostProjectId = computed(() => props.host.host?.projectId || null)
+/** 当前范围 / 不可用原因（中文，单一渲染路径）。 */
+const scopeHint = computed(() => hostScopeHint(props.host))
+/** 项目工具是否可用（Req 3.4：受限全局知识模式关闭项目类入口）。 */
+const projectToolsEnabled = computed(() => props.host.projectToolsEnabled)
 
 // ---------------------------------------------------------------------------
 // Local UI State
@@ -216,19 +233,6 @@ const chatHistoryRef = ref<HTMLElement | null>(null)
 const showMentionPopover = ref(false)
 const selectedScopes = ref<string[]>([])
 const availableScopes = ref<ScopeOption[]>([])
-
-// ---------------------------------------------------------------------------
-// 文档类型标签
-// ---------------------------------------------------------------------------
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  workpaper: '底稿',
-  note: '附注',
-  report: '报表',
-  knowledge_folder: '知识库文件夹',
-}
-
-const docTypeLabel = computed(() => DOC_TYPE_LABELS[props.docType] || props.docType)
 
 // ---------------------------------------------------------------------------
 // 抽屉显隐
@@ -255,10 +259,16 @@ watch(() => props.visible, async (val) => {
 // ---------------------------------------------------------------------------
 
 async function fetchAvailableScopes() {
+  const projectId = props.host.host?.projectId
+  if (!projectId) {
+    // 无项目绑定（受限全局知识模式）：不发空 project_id 查询（Req 3.4）
+    availableScopes.value = []
+    return
+  }
   try {
     const authStore = useAuthStore()
     const res = await fetch(
-      `/api/knowledge/folders?project_id=${props.projectId}`,
+      `/api/knowledge/folders?project_id=${encodeURIComponent(projectId)}`,
       {
         headers: { Authorization: `Bearer ${authStore.token || ''}` },
       },
@@ -299,12 +309,14 @@ async function sendMessage() {
 // ---------------------------------------------------------------------------
 
 async function handleAdopt(msg: DocChatMessage) {
-  const { success } = await adoptContent(msg.id)
+  // Task 7：采纳失败必须带出服务端 typed 原因（Req 8.5：保留选择状态 + 可重试原因），
+  // 不再统一显示"请稍后重试"把「消息编号不是服务端签发」这类可操作原因盖掉。
+  const { success, message } = await adoptContent(msg.id)
   if (success) {
     emit('adopt', { content: msg.text, messageId: msg.id })
     ElMessage.success('已提交采纳，等待确认')
   } else {
-    ElMessage.error('采纳提交失败，请稍后重试')
+    ElMessage.error(message || '采纳提交失败，请稍后重试')
   }
 }
 
@@ -327,10 +339,11 @@ function handleCitationClick(cite: Citation) {
       break
 
     case 'trial_balance':
-      // 试算表：导航到试算表视图
+      // 试算表：导航到试算表视图（无项目绑定时不跳，避免拼出空 projectId 路由）
+      if (!hostProjectId.value) break
       router.push({
         name: 'TrialBalance',
-        params: { projectId: props.projectId },
+        params: { projectId: hostProjectId.value },
       })
       break
 
@@ -371,10 +384,11 @@ function navigateToWorkpaper(cite: Citation) {
     })
   }
 
-  // 导航到底稿编辑器
+  // 导航到底稿编辑器（无项目绑定时不跳）
+  if (!hostProjectId.value) return
   router.push({
     name: 'WorkpaperEditor',
-    params: { projectId: props.projectId, wpId },
+    params: { projectId: hostProjectId.value, wpId },
   })
 }
 
@@ -448,6 +462,10 @@ function renderMarkdown(text: string): string {
   font-size: var(--gt-font-size-xs, 12px);
 }
 
+.doc-context-bar--unavailable {
+  background: var(--el-color-warning-light-9, #fdf6ec);
+}
+
 .doc-context-id {
   color: var(--gt-color-text-tertiary, #909399);
   font-family: monospace;
@@ -455,6 +473,19 @@ function renderMarkdown(text: string): string {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  flex-shrink: 0;
+  max-width: 40%;
+}
+
+.doc-context-hint {
+  color: var(--gt-color-text-secondary, #606266);
+  font-size: var(--gt-font-size-xs, 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.doc-context-hint.is-warning {
+  color: var(--el-color-warning, #e6a23c);
 }
 
 /* 对话历史 */

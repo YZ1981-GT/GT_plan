@@ -46,6 +46,13 @@ EventType = Literal[
     "formula_changed",
     "report_config_changed",
     "onlyoffice_callback_rejected",
+    # --- AI Chat Run 哈希链审计（dsh-agent-panel-integration Task 12 / Req 12.6–12.7）---
+    "ai_chat_run_lifecycle",
+    "ai_chat_access_denied",
+    "ai_chat_note_saved",
+    "ai_chat_adopt_requested",
+    "ai_chat_attachment_cleanup",
+    "ai_chat_tool_lifecycle",
 ]
 
 
@@ -83,6 +90,15 @@ EVENT_TYPE_SCHEMAS: dict[str, set[str]] = {
     "formula_changed": {"module", "row_code", "action", "old_formula", "new_formula", "result_value"},
     "report_config_changed": {"sub_action", "standard", "report_type", "row_code", "candidate_id"},
     "onlyoffice_callback_rejected": {"reason"},
+    # --- AI Chat Run 审计事件 schemas（Req 12.6/12.7）---
+    # 🔴 只存 ID/hash/计数/字节数/时长/error code，禁止记录 token/完整正文/附件内容/未脱敏上下文
+    "ai_chat_run_lifecycle": {"run_id", "status", "engine"},
+    "ai_chat_access_denied": {"run_id", "denial_code", "resource_type"},
+    "ai_chat_note_saved": {"run_id", "message_id", "note_id", "content_hash"},
+    "ai_chat_adopt_requested": {"run_id", "message_id", "content_hash", "host_type"},
+    "ai_chat_attachment_cleanup": {"run_id", "attachment_id", "status", "bytes_freed"},
+    # Property 32：tool call 审计（started + finished/failed 成对）
+    "ai_chat_tool_lifecycle": {"run_id", "tool_call_id", "tool_name", "status"},
 }
 
 # 创世哈希（与 audit_log_writer_worker 保持一致）

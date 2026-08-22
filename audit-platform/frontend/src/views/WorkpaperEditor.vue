@@ -359,15 +359,10 @@
     />
   </el-drawer>
 
-  <!-- AI 文档对话面板 -->
-  <DocAiChatPanel
-    :doc-type="'workpaper'"
-    :doc-id="wpId"
-    :project-id="projectId"
-    :year="projectYear || new Date().getFullYear() - 1"
+  <!-- AI 对话面板（统一内核；宿主契约由 useAiHostContext 的底稿 adapter 构造） -->
+  <PlatformAiChatPanel
+    :host="aiHost"
     :visible="showDocAiChat"
-    @update:visible="showDocAiChat = $event"
-    @close="showDocAiChat = false"
     @adopt="onDocAiAdopt"
   />
 
@@ -431,7 +426,8 @@ import CycleDialogHost from './workpaper-editor/CycleDialogHost.vue'
 import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
-import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
+import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
+import { buildWorkpaperHost } from '@/composables/useAiHostContext'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
@@ -812,6 +808,17 @@ function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRe
 function onReviewMarked() {
   eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
 }
+
+// ─── AI 宿主上下文（dsh-agent-panel-integration Req 3.2/3.5） ─────────────────
+// 稳定标识 = working paper instance ID；年度传项目 audit_year，取不到就传 null
+// （不用「当前年份-1」兜底 —— 那会构造出与服务端反查值冲突的断言）。
+const aiHost = computed(() =>
+  buildWorkpaperHost({
+    wpId: wpId.value,
+    projectId: projectId.value,
+    auditYear: projectYear.value,
+  }),
+)
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(payload: { content: string; messageId: string }) {

@@ -1,0 +1,894 @@
+{
+  "spec": "dsh-agent-panel-integration",
+  "task": 33,
+  "description": "DSH Agent Panel Integration 完整变异清单（41 条 = Task 33 的 15 条 + 假绿守卫修复补的 12 条 + MCP 取数责任真空补的 8 条 + 渲染宿主接线补的 6 条）",
+  "runner": "backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py",
+  "check_command": "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --check-anchors",
+  "full_command": "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py",
+  "guard_files": {
+    "backend": [
+      "backend/tests/dsh_agent_panel/test_task1_resource_access.py",
+      "backend/tests/dsh_agent_panel/test_task2_host_context.py",
+      "backend/tests/dsh_agent_panel/test_task3_chat_persistence.py",
+      "backend/tests/dsh_agent_panel/test_task4_run_contract.py",
+      "backend/tests/dsh_agent_panel/test_task5_run_coordinator.py",
+      "backend/tests/dsh_agent_panel/test_task6_native_engine.py",
+      "backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py",
+      "backend/tests/dsh_agent_panel/test_task13_phase_a_guards.py",
+      "backend/tests/dsh_agent_panel/test_task23_address_mention.py",
+      "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "backend/tests/dsh_agent_panel/test_task28_dsh_engine.py",
+      "backend/tests/dsh_agent_panel/test_task30_capabilities.py",
+      "backend/tests/dsh_agent_panel/test_task31_phase_c_gate.py",
+      "backend/tests/test_ai_chat_mcp_router.py",
+      "backend/tests/test_ai_chat_mcp_token.py",
+      "backend/tests/test_ai_chat_task12_audit_metrics.py",
+      "backend/tests/test_ai_chat_task29_dsh_masking.py",
+      "backend/tests/test_audit_data_mcp_server.py",
+      "backend/tests/test_dsh_discovery_task27.py",
+      "backend/tests/test_ai_chat_mcp_tools_data.py"
+    ],
+    "frontend": [
+      "audit-platform/frontend/src/__tests__/sseEventTypes.spec.ts",
+      "audit-platform/frontend/src/__tests__/useAiChat.spec.ts",
+      "audit-platform/frontend/src/stores/__tests__/chatRunState.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/PlatformAiChatPhaseA.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/PlatformAiChatXss.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/DshPanelA11y.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/ChatMentionPicker.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/ChatAttachmentPicker.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/ChatContextInspector.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/PhaseBGateGuards.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/AiRenderHostReachability.spec.ts",
+      "audit-platform/frontend/src/components/ai/__tests__/PlatformAiChatRunPayload.spec.ts"
+    ]
+  },
+  "mutations": [
+    {
+      "id": "M01",
+      "name": "移除前置 gate（enforce_host 不抛 ExternalNotFound）",
+      "category": "access-gate",
+      "target": "backend/app/services/ai_chat/access.py",
+      "anchor_preview": "            raise ExternalNotFound()",
+      "mutation_type": "移除前置 gate",
+      "expect_test": "Property1",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task1_resource_access.py",
+      "properties_covered": [
+        1,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "M02",
+      "name": "调换 host loader（note 改用 workpaper locator）",
+      "category": "host-loader-swap",
+      "target": "backend/app/services/ai_chat/host_context.py",
+      "anchor_preview": "            HostType.note: self._locate_note,",
+      "mutation_type": "调换 host loader",
+      "expect_test": "Property5",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task2_host_context.py",
+      "properties_covered": [
+        2,
+        5
+      ]
+    },
+    {
+      "id": "M03",
+      "name": "去掉 MentionRef id min_length 校验",
+      "category": "unique-constraint",
+      "target": "backend/app/services/ai_chat/run_contract.py",
+      "anchor_preview": "    id: str = Field(..., min_length=1, max_length=128, ...",
+      "mutation_type": "去掉 unique",
+      "expect_test": "Property",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task4_run_contract.py",
+      "properties_covered": [
+        6,
+        7
+      ]
+    },
+    {
+      "id": "M04",
+      "name": "error 后发 done（破坏终态唯一性）",
+      "category": "terminal-cas",
+      "target": "backend/app/services/ai_chat/run_contract.py",
+      "anchor_preview": "    return new in ALLOWED_RUN_TRANSITIONS.get(current, frozenset())",
+      "mutation_type": "error 后发 done",
+      "expect_test": "Property7",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task4_run_contract.py",
+      "properties_covered": [
+        7
+      ]
+    },
+    {
+      "id": "M05",
+      "name": "取消不传 child（cancel 不设跨进程标记）",
+      "category": "cancel-propagation",
+      "target": "backend/app/services/ai_chat/run_coordinator.py",
+      "anchor_preview": "        signalled = await self._cancels.request(run_id)",
+      "mutation_type": "取消不传 child",
+      "expect_test": "Property8",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task5_run_coordinator.py",
+      "properties_covered": [
+        8
+      ]
+    },
+    {
+      "id": "M06",
+      "name": "SSE 拆包（feedChunk 清空 buffer 而非累积）",
+      "category": "sse-transport",
+      "target": "audit-platform/frontend/src/utils/sse.ts",
+      "anchor_preview": "  state.buffer += chunk",
+      "mutation_type": "SSE 拆包",
+      "expect_test": "",
+      "suite": "fe",
+      "selector": "sseEventTypes",
+      "properties_covered": [
+        9,
+        39
+      ]
+    },
+    {
+      "id": "M07",
+      "name": "放宽 attachment owner 校验",
+      "category": "attachment-owner",
+      "target": "backend/app/services/ai_chat/attachment_service.py",
+      "anchor_preview": "        if attachment.owner_id != actor_id:",
+      "mutation_type": "放宽 attachment owner",
+      "expect_test": "Property18",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "properties_covered": [
+        18,
+        19,
+        20
+      ]
+    },
+    {
+      "id": "M08",
+      "name": "采纳信任客户端正文（不从 DB 读取）",
+      "category": "adopt-trust-client",
+      "target": "backend/app/services/ai_chat/adopt.py",
+      "anchor_preview": "        content = message_row.message_text",
+      "mutation_type": "采纳信任客户端",
+      "expect_test": "Property22",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py",
+      "properties_covered": [
+        22,
+        32,
+        33
+      ]
+    },
+    {
+      "id": "M09",
+      "name": "启用 semantic fallback（embedding down 改 BM25）",
+      "category": "semantic-fallback",
+      "target": "backend/app/services/ai_chat/address_index_source.py",
+      "anchor_preview": "            return SearchResult(error_code=\"semantic_unavailable\", items=[])",
+      "mutation_type": "启用 semantic fallback",
+      "expect_test": "Property16",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "properties_covered": [
+        15,
+        16
+      ]
+    },
+    {
+      "id": "M10",
+      "name": "复用跨用户 MCP token（跳过 user_id 校验）",
+      "category": "cross-user-token",
+      "target": "backend/app/services/ai_chat/mcp_token.py",
+      "anchor_preview": "        if token_claims.user_id != actor_id:",
+      "mutation_type": "复用跨用户 token",
+      "expect_test": "Property28",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_token.py",
+      "properties_covered": [
+        28,
+        29,
+        30
+      ]
+    },
+    {
+      "id": "M11",
+      "name": "移除前端终态 guard（error 后接受 delta）",
+      "category": "frontend-terminal-guard",
+      "target": "audit-platform/frontend/src/stores/chatRunState.ts",
+      "anchor_preview": "    if (isTerminal.value) {",
+      "mutation_type": "移除 sanitize",
+      "expect_test": "terminal",
+      "suite": "fe",
+      "selector": "chatRunState",
+      "properties_covered": [
+        9,
+        34,
+        35,
+        39
+      ]
+    },
+    {
+      "id": "M12",
+      "name": "恢复 localStorage 正文（清理函数跳过 AI 前缀）",
+      "category": "localStorage-cleanup",
+      "target": "audit-platform/frontend/src/utils/aiChatCacheCleanup.ts",
+      "anchor_preview": "    const AI_PREFIXES = ['doc_ai_chat_', 'ai_chat_', ...",
+      "mutation_type": "恢复 localStorage 正文",
+      "expect_test": "localStorage",
+      "suite": "fe",
+      "selector": "PlatformAiChatPhaseA",
+      "properties_covered": [
+        35
+      ]
+    },
+    {
+      "id": "M13",
+      "name": "DSH 失败降级到 native（engine_unavailable 改为 NativeEngine）",
+      "category": "dsh-no-fallback",
+      "target": "backend/app/services/ai_chat/dsh_engine.py",
+      "anchor_preview": "            raise EngineUnavailableError(detail)",
+      "mutation_type": "Cordis 加 bash / DSH fallback",
+      "expect_test": "Property25",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task28_dsh_engine.py",
+      "properties_covered": [
+        25,
+        38
+      ]
+    },
+    {
+      "id": "M14",
+      "name": "切 cloud model（local_only 校验移除）",
+      "category": "local-only-violation",
+      "target": "backend/app/services/ai_chat/capability_endpoint.py",
+      "anchor_preview": "        if not _is_local_model(effective_route):",
+      "mutation_type": "切 cloud model",
+      "expect_test": "local_only",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task30_capabilities.py",
+      "properties_covered": [
+        24,
+        25,
+        26
+      ]
+    },
+    {
+      "id": "M15",
+      "name": "脱敏未知角色不 fail-closed（返回空映射）",
+      "category": "masking-fail-closed",
+      "target": "backend/app/services/ai_chat/dsh_masking.py",
+      "anchor_preview": "        raise MaskingConfigError(...)",
+      "mutation_type": "脱敏 fail-closed",
+      "expect_test": "Property30",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_task29_dsh_masking.py",
+      "properties_covered": [
+        30,
+        31,
+        32
+      ]
+    },
+    {
+      "id": "M16",
+      "name": "[假绿修复] as_dict 二次转义 label（P34-A）",
+      "category": "untrusted-passthrough",
+      "target": "backend/app/services/ai_chat/context_budget.py",
+      "anchor_preview": "            d[\"label\"] = self.label",
+      "mutation_type": "后端二次转义 label",
+      "expect_test": "passes_untrusted_label_through_unmodified",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "properties_covered": [
+        34
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty34UntrustedDataBoundary::test_manifest_entry_passes_untrusted_label_through_unmodified"
+      ]
+    },
+    {
+      "id": "M17",
+      "name": "[假绿修复] as_dict 静默截断 label（P34-A）",
+      "category": "untrusted-passthrough",
+      "target": "backend/app/services/ai_chat/context_budget.py",
+      "anchor_preview": "            d[\"label\"] = self.label",
+      "mutation_type": "后端静默截断 label",
+      "expect_test": "passes_untrusted_label_through_unmodified",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "properties_covered": [
+        34
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty34UntrustedDataBoundary::test_manifest_entry_passes_untrusted_label_through_unmodified"
+      ]
+    },
+    {
+      "id": "M18",
+      "name": "[假绿修复] 恢复 extra_scopes 消费路径（P14-A）",
+      "category": "legacy-dual-track",
+      "target": "backend/app/services/ai_chat/mention_service.py",
+      "anchor_preview": "logger = logging.getLogger(__name__)",
+      "mutation_type": "恢复 extra_scopes 取值",
+      "expect_test": "test_no_extra_scopes_consumption_in_ai_chat_package",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "properties_covered": [
+        14
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty14ExtraScopesRemoved::test_no_extra_scopes_consumption_in_ai_chat_package"
+      ]
+    },
+    {
+      "id": "M19",
+      "name": "[假绿修复] 拒绝名单移除 extra_scopes（P14-D）",
+      "category": "legacy-dual-track",
+      "target": "backend/app/services/ai_chat/run_contract.py",
+      "anchor_preview": "        \"extra_scopes\",",
+      "mutation_type": "拒绝名单移除旧字段",
+      "expect_test": "test_client_submitted_extra_scopes_is_rejected",
+      "suite": "be",
+      "selector": "backend/tests/dsh_agent_panel/test_task24_phase_b_guards.py",
+      "properties_covered": [
+        14
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty14ExtraScopesRemoved::test_client_submitted_extra_scopes_is_rejected",
+        "backend\\tests\\dsh_agent_panel\\test_task24_phase_b_guards.py::TestProperty14ExtraScopesRemoved::test_only_run_contract_deny_list_holds_the_literal"
+      ]
+    },
+    {
+      "id": "M20",
+      "name": "[假绿修复] useSanitize ALLOWED_ATTR 放宽 on*（FE-P34-A）",
+      "category": "frontend-sanitize",
+      "target": "audit-platform/frontend/src/composables/useSanitize.ts",
+      "anchor_preview": "  'colspan', 'rowspan', 'class', 'style',",
+      "mutation_type": "放宽 on* 事件属性",
+      "expect_test": "事件属性挂在",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        34
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 34: 不可信 HTML 走真实 sanitizer 事件属性挂在**允许标签**上时仍被剥离，安全正文与 href 保留"
+      ]
+    },
+    {
+      "id": "M21",
+      "name": "[假绿修复] canEnable 去掉 workpaper 判定（FE-P23-A）",
+      "category": "review-host-gate",
+      "target": "audit-platform/frontend/src/components/ai/ChatReviewModeBar.vue",
+      "anchor_preview": "  return props.host.host.type === 'workpaper'",
+      "mutation_type": "去掉宿主门控",
+      "expect_test": "开关 disabled",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        23
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 knowledge_doc 宿主：开关 disabled 且 DOM 给出中文原因",
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 宿主从 workpaper 切到非 workpaper：复核模式自动关闭",
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 每种非 workpaper 宿主给出各自可区分的中文原因"
+      ]
+    },
+    {
+      "id": "M22",
+      "name": "[假绿修复] handleToggle 不触发 fetchPreview（FE-P23-B）",
+      "category": "review-host-gate",
+      "target": "audit-platform/frontend/src/components/ai/ChatReviewModeBar.vue",
+      "anchor_preview": "  if (enabled && canEnable.value) {",
+      "mutation_type": "复核模板成死代码",
+      "expect_test": "切换后真的去取复核模板",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        23
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 workpaper 宿主：开关可用，切换后真的去取复核模板"
+      ]
+    },
+    {
+      "id": "M23",
+      "name": "[假绿修复] 删除宿主切换自动关闭（FE-P23-C）",
+      "category": "review-host-gate",
+      "target": "audit-platform/frontend/src/components/ai/ChatReviewModeBar.vue",
+      "anchor_preview": "watch(canEnable, (val) => {",
+      "mutation_type": "删除自动关闭 watcher",
+      "expect_test": "自动关闭",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        23
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 宿主从 workpaper 切到非 workpaper：复核模式自动关闭"
+      ]
+    },
+    {
+      "id": "M24",
+      "name": "[假绿修复] disabledReason 塌缩兜底文案（FE-P23-D）",
+      "category": "review-host-gate",
+      "target": "audit-platform/frontend/src/components/ai/ChatReviewModeBar.vue",
+      "anchor_preview": "      return '仅在底稿页面可用，当前为附注编辑'",
+      "mutation_type": "禁用原因塌缩",
+      "expect_test": "可区分的中文原因",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        23,
+        24
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 23: 复核模式只在 workpaper 宿主可用 每种非 workpaper 宿主给出各自可区分的中文原因"
+      ]
+    },
+    {
+      "id": "M25",
+      "name": "[假绿修复] 每次 saveAsNote 都换新 key（FE-P21-A）",
+      "category": "note-idempotency",
+      "target": "audit-platform/frontend/src/composables/useAiNoteCapture.ts",
+      "anchor_preview": "    if (!currentIdempotencyKey) {",
+      "mutation_type": "重试换新 key",
+      "expect_test": "复用同一 idempotency_key",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        21
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 21: 笔记转存幂等键 失败后重试复用同一 idempotency_key；新的选择意图换新 key"
+      ]
+    },
+    {
+      "id": "M26",
+      "name": "[假绿修复] 选择变化不重置 key（FE-P21-B）",
+      "category": "note-idempotency",
+      "target": "audit-platform/frontend/src/composables/useAiNoteCapture.ts",
+      "anchor_preview": "    // 选择变化时重新生成 idempotency key（新的选择集 = 新的保存意图）\n    currentIdempotencyKey = nul",
+      "mutation_type": "选择变化复用旧 key",
+      "expect_test": "复用同一 idempotency_key",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        21
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 21: 笔记转存幂等键 失败后重试复用同一 idempotency_key；新的选择意图换新 key"
+      ]
+    },
+    {
+      "id": "M27",
+      "name": "[假绿修复] manifest 只渲染 included（FE-P12-A）",
+      "category": "manifest-consumption",
+      "target": "audit-platform/frontend/src/components/ai/ChatContextInspector.vue",
+      "anchor_preview": "v-for=\"(item, idx) in manifest\"",
+      "mutation_type": "四态塌缩为单态",
+      "expect_test": "各自渲染并计入中文摘要",
+      "suite": "fe",
+      "selector": "PhaseBGateGuards",
+      "properties_covered": [
+        12
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "Phase B Gate Guards Property 12: Context Manifest 四态真渲染 included/trimmed/denied/unavailable 各自渲染并计入中文摘要"
+      ]
+    },
+    {
+      "id": "M28",
+      "name": "[MCP取数] wp_list 回到空占位（M28）",
+      "category": "mcp-data-nonempty",
+      "target": "backend/app/routers/ai_chat_mcp.py",
+      "anchor_preview": "    return await tool_wp_list(ctx, arguments)",
+      "mutation_type": "真实取数回退为空占位",
+      "expect_test": "test_wp_list_returns_real_workpapers",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        26,
+        28
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_wp_list_returns_real_workpapers",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_wp_list_excludes_workpapers_outside_token_cycle_scope"
+      ]
+    },
+    {
+      "id": "M29",
+      "name": "[MCP取数] wp_read 回到空 content（M29）",
+      "category": "mcp-data-nonempty",
+      "target": "backend/app/routers/ai_chat_mcp.py",
+      "anchor_preview": "    return await tool_wp_read(ctx, arguments)",
+      "mutation_type": "真实取数回退为空壳 content",
+      "expect_test": "test_wp_read_returns_real_parsed_data",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        26,
+        28
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestNoPlaceholderRemains::test_runtime_results_carry_no_placeholder_status",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_wp_read_returns_real_parsed_data",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_cross_project_token_cannot_read_workpaper",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_out_of_scope_cycle_workpaper_is_denied",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_wp_read_denied_when_cycle_outside_token_cycle_scope",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_endpoint_maps_tool_error_code_verbatim",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_invalid_arguments_are_rejected_distinctly",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_missing_resource_is_not_found_not_empty"
+      ]
+    },
+    {
+      "id": "M30",
+      "name": "[MCP取数] tb_query 回到空 rows（M30）",
+      "category": "mcp-data-nonempty",
+      "target": "backend/app/routers/ai_chat_mcp.py",
+      "anchor_preview": "    return await tool_tb_query(ctx, arguments)",
+      "mutation_type": "叶子聚合与方向定符号整体失效",
+      "expect_test": "test_tb_query_leaf_mode_aggregates_only_leaves",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        26,
+        30
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_tb_query_leaf_mode_aggregates_only_leaves",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_tb_query_top_level_mode_returns_rows",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_manager_gets_range_description_not_raw_amount",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_strict_and_none_role_results_differ",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_sub_threshold_amounts_keep_numeric_type",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_tb_query_denied_for_non_member"
+      ]
+    },
+    {
+      "id": "M31",
+      "name": "[MCP取数] note_read 回到 placeholder（M31）",
+      "category": "mcp-data-nonempty",
+      "target": "backend/app/routers/ai_chat_mcp.py",
+      "anchor_preview": "    return await tool_note_read(ctx, arguments)",
+      "mutation_type": "恢复 status=placeholder 空壳",
+      "expect_test": "test_note_read_returns_rows_from_table_data",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        26
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestNoPlaceholderRemains::test_runtime_results_carry_no_placeholder_status",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestNoPlaceholderRemains::test_tool_dispatchers_contain_no_placeholder_literal",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_note_read_returns_rows_from_table_data",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_note_read_cross_project_note_is_denied",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_invalid_arguments_are_rejected_distinctly"
+      ]
+    },
+    {
+      "id": "M32",
+      "name": "[MCP取数] 放宽工具内 ResourceAccessResolver 判定（M32）",
+      "category": "mcp-authorization",
+      "target": "backend/app/services/ai_chat/mcp_tools.py",
+      "anchor_preview": "    if not decision.allowed:",
+      "mutation_type": "移除工具内第二道授权",
+      "expect_test": "test_out_of_scope_cycle_workpaper_is_denied",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        1,
+        4,
+        28
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_out_of_scope_cycle_workpaper_is_denied",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_tb_query_denied_for_non_member"
+      ]
+    },
+    {
+      "id": "M33",
+      "name": "[MCP取数] token cycle_scope 裁剪恒放行（M33）",
+      "category": "mcp-authorization",
+      "target": "backend/app/services/ai_chat/mcp_tools.py",
+      "anchor_preview": "    return str(cycle or \"\") in scope",
+      "mutation_type": "循环范围共用上界被绕开",
+      "expect_test": "test_wp_read_denied_when_cycle_outside_token_cycle_scope",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        4,
+        28,
+        29
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_wp_read_denied_when_cycle_outside_token_cycle_scope"
+      ]
+    },
+    {
+      "id": "M34",
+      "name": "[MCP取数] mask_tool_result 跳过金额脱敏（M34）",
+      "category": "mcp-masking",
+      "target": "backend/app/services/ai_chat/dsh_masking.py",
+      "anchor_preview": "    _mask_amounts_in_place(masked, role)",
+      "mutation_type": "跳过金额脱敏（五角色结果将逐字节相同）",
+      "expect_test": "test_strict_and_none_role_results_differ",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        30
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_manager_gets_range_description_not_raw_amount",
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_strict_and_none_role_results_differ"
+      ]
+    },
+    {
+      "id": "M35",
+      "name": "[MCP取数] semantic_search_strict 恢复词法伪降级（M35）",
+      "category": "mcp-no-fake-degradation",
+      "target": "backend/app/services/knowledge_index_service.py",
+      "anchor_preview": "            raise EmbeddingUnavailableError(",
+      "mutation_type": "恢复 ILIKE 伪降级冒充语义命中",
+      "expect_test": "test_kb_search_embedding_down_returns_semantic_unavailable",
+      "suite": "be",
+      "selector": "backend/tests/test_ai_chat_mcp_tools_data.py",
+      "properties_covered": [
+        16
+      ],
+      "verdict": "RED",
+      "red_tests": [
+        "backend/tests/test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_kb_search_embedding_down_returns_semantic_unavailable"
+      ]
+    },
+    {
+      "id": "M36",
+      "name": "删掉 ChatMentionPicker 模板标签保留 import",
+      "category": "render-host",
+      "target": "audit-platform/frontend/src/components/ai/PlatformAiChatPanel.vue",
+      "anchor_preview": "        <ChatMentionPicker",
+      "mutation_type": "组件孤岛（import 了不用）",
+      "expect_test": "面板 template 里真的渲染",
+      "suite": "fe",
+      "selector": "AiRenderHostReachability",
+      "properties_covered": [
+        12,
+        13
+      ]
+    },
+    {
+      "id": "M37",
+      "name": "删掉 ChatContextInspector 模板标签保留 import",
+      "category": "render-host",
+      "target": "audit-platform/frontend/src/components/ai/PlatformAiChatPanel.vue",
+      "anchor_preview": "      <ChatContextInspector",
+      "mutation_type": "组件孤岛（import 了不用）",
+      "expect_test": "面板 template 里真的渲染",
+      "suite": "fe",
+      "selector": "AiRenderHostReachability",
+      "properties_covered": [
+        12
+      ]
+    },
+    {
+      "id": "M38",
+      "name": "@ 触发链断开（watch(draft) 不开 picker）",
+      "category": "render-host",
+      "target": "audit-platform/frontend/src/components/ai/PlatformAiChatPanel.vue",
+      "anchor_preview": "  mentionPickerOpen.value = hasActiveMentionToken(val)",
+      "mutation_type": "挂载了但永不触发",
+      "expect_test": "输入 @ 唤出 mention picker",
+      "suite": "fe",
+      "selector": "PlatformAiChatRunPayload",
+      "properties_covered": [
+        13
+      ]
+    },
+    {
+      "id": "M39",
+      "name": "handleSend 丢弃已选 mention",
+      "category": "render-host",
+      "target": "audit-platform/frontend/src/components/ai/PlatformAiChatPanel.vue",
+      "anchor_preview": "    mentions: selectedMentions.value.map((m) => ({ type: m.type, id: m.id })),",
+      "mutation_type": "渲染了但不提交",
+      "expect_test": "已选引用出现在 mentions 里",
+      "suite": "fe",
+      "selector": "PlatformAiChatRunPayload",
+      "properties_covered": [
+        12
+      ]
+    },
+    {
+      "id": "M40",
+      "name": "buildExtrasPayload 不写 mentions 键",
+      "category": "render-host",
+      "target": "audit-platform/frontend/src/composables/usePlatformAiChat.ts",
+      "anchor_preview": "      payload.mentions = mentions.map((m) => ({ type: m.type, id: m.id }))",
+      "mutation_type": "渲染了但不提交",
+      "expect_test": "已选引用出现在 mentions 里",
+      "suite": "fe",
+      "selector": "PlatformAiChatRunPayload",
+      "properties_covered": [
+        12
+      ]
+    },
+    {
+      "id": "M41",
+      "name": "normalizeContextManifest 投影恒空",
+      "category": "render-host",
+      "target": "audit-platform/frontend/src/utils/chatContextManifest.ts",
+      "anchor_preview": "    if (META_KEYS.has(key) || !Array.isArray(value)) continue",
+      "mutation_type": "挂载了但恒空",
+      "expect_test": "服务端分组 manifest 被投影后逐条渲染",
+      "suite": "fe",
+      "selector": "PlatformAiChatRunPayload",
+      "properties_covered": [
+        12
+      ]
+    }
+  ],
+  "coverage_summary": {
+    "total_mutations": 41,
+    "backend_mutations": 24,
+    "frontend_mutations": 17,
+    "properties_directly_covered": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      12,
+      14,
+      15,
+      16,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      38,
+      39
+    ],
+    "task_required_mutations": {
+      "移除前置 gate": "M01",
+      "调换 host loader": "M02",
+      "去掉 unique": "M03",
+      "error 后发 done": "M04",
+      "取消不传 child": "M05",
+      "SSE 拆包": "M06",
+      "放宽 attachment owner": "M07",
+      "采纳信任客户端": "M08",
+      "启用 semantic fallback": "M09",
+      "Cordis 加 bash / 切 cloud model": "M13 + M14",
+      "复用跨用户 token": "M10",
+      "移除 sanitize": "M11",
+      "恢复 localStorage 正文": "M12",
+      "删掉宿主模板标签保留 import → 渲染宿主可达性变红": "M36（另有 M37 同类）",
+      "已选 mention 不进请求体 → 载荷断言变红": "M39 / M40"
+    }
+  },
+  "falsegreen_fix": {
+    "why": "三处已实证假绿守卫（后端 Property 34 恒真断言 / 后端 Property 14 零断言 / 前端 PhaseBGateGuards 断言输入字面量与 toBeDefined 空壳）修复后，须证明判据真在保护生产代码。",
+    "mutations": [
+      "M16",
+      "M17",
+      "M18",
+      "M19",
+      "M20",
+      "M21",
+      "M22",
+      "M23",
+      "M24",
+      "M25",
+      "M26",
+      "M27"
+    ],
+    "pick_command": "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick \"假绿修复\" --only be|fe --out <path>",
+    "verdicts": {
+      "M16": "RED",
+      "M17": "RED",
+      "M18": "RED",
+      "M19": "RED",
+      "M20": "RED",
+      "M21": "RED",
+      "M22": "RED",
+      "M23": "RED",
+      "M24": "RED",
+      "M25": "RED",
+      "M26": "RED",
+      "M27": "RED"
+    }
+  },
+  "mcp_data_backfill": {
+    "why": "routers/ai_chat_mcp.py 的 7 个 _tool_* 分发器原本是空占位（wp_list 返回 {\"items\": []}；wp_read/addr_lookup/note_read/review_prompt 返回 {\"status\": \"placeholder\"}；tb_query 返回 {\"rows\": []}；kb_search 返回 {\"results\": []}）。三层管道（REST → tools/audit-data-mcp/server.py → DshEngine）全通、Phase C 207 测试全绿，因为没有一条测试断言过返回值 —— DSH Agent 实际拿不到任何数据。Task 25 的范围是 MCP REST 安全边界，Task 26 建的是调用方（stdio server），两者都不拥有平台侧取数实现 ⇒ 责任真空。",
+    "mutations": [
+      "M28",
+      "M29",
+      "M30",
+      "M31",
+      "M32",
+      "M33",
+      "M34",
+      "M35"
+    ],
+    "pick_command": "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick \"MCP取数\" --out .kiro/specs/dsh-agent-panel-integration/mutation_results_mcp_data.json",
+    "verdicts": {
+      "M28": "RED",
+      "M29": "RED",
+      "M30": "RED",
+      "M31": "RED",
+      "M32": "RED",
+      "M33": "RED",
+      "M34": "RED",
+      "M35": "RED"
+    },
+    "task_required_mutations": {
+      "某工具改回 return {\"items\": []} → 非空断言变红": "M28（另有 M29/M30/M31 同类）",
+      "放宽某工具授权检查 → 授权断言变红": "M32（另有 M33 循环范围）",
+      "跳过脱敏 → 脱敏断言变红": "M34"
+    }
+  },
+  "render_host_backfill": {
+    "why": "ChatMentionPicker.vue 与 ChatContextInspector.vue 存在、有 23 条 vitest 守卫全绿、Task 15 标记 [x]，但**没有任何宿主 import 它们** —— PlatformAiChatPanel.vue 只挂了 ChatAttachmentPicker / ChatReviewModeBar。后果：浏览器里用户打不出 @、看不到 Context Manifest，Req 5.1/5.4/5.7/5.9 在运行产品里等于没实现。23 条守卫直接 mount(组件) 断言组件自身行为，**从不问「有没有人挂载它」**。与 G7 的「模型声明 column.group、三向守卫 39 例全绿、任何 .vue 零引用 ⇒ 两级表头 0/38 从未渲染」是同一形状：声明齐全 + 单测全绿 + 零渲染宿主。接线时另发现同族缺陷：面板收集的 attachment_ids / review_mode / sheet_name 也从未进入 POST /runs 请求体（后端 ChatRunRequest 早已声明这些字段）。",
+    "guard": "AiRenderHostReachability.spec.ts（组件孤岛通用判据，覆盖 src/components/ai 下全部 Chat*/Platform*/Dsh*，含反向自检 13 条）+ PlatformAiChatRunPayload.spec.ts（真实 mount → 真打 @ → 真点发送 → 读被拦截的请求体，17 条）",
+    "mutations": [
+      "M36",
+      "M37",
+      "M38",
+      "M39",
+      "M40",
+      "M41"
+    ],
+    "pick_command": "python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --pick \"渲染宿主\" --out .kiro/specs/dsh-agent-panel-integration/mutation_results_render_host.json",
+    "verdicts": {
+      "M36": "RED",
+      "M37": "RED",
+      "M38": "RED",
+      "M39": "RED",
+      "M40": "RED",
+      "M41": "RED"
+    },
+    "task_required_mutations": {
+      "删掉某组件的模板标签（保留 import）→ 渲染宿主守卫变红": "M36（另有 M37 同类）"
+    }
+  }
+}

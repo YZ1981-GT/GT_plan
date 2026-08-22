@@ -1198,6 +1198,13 @@ async def note_linkage_one_click_preview(
 #   POST /{project_id}/{year}/batch-ai-fill          —— 一键批量预填充空/草稿章节
 # 两端点均**不落库**（Property 11：绝不写 DisclosureNote.text_content）；采纳走既有
 # /api/ai-chat/adopt 确认流，落库仅写 text_content（substantive），不碰 guidance_text（Req5.2）。
+#
+# 🔴 dsh-agent-panel-integration / Task 7（Req 8.1/8.6）：``/api/ai-chat/adopt`` 不再接受
+# 客户端正文，只按**服务端签发的 message ID** 读库取权威正文。因此单章节 ai-fill 在返回
+# 预览的同时把这份**服务端生成**的草稿登记为一条 completed assistant 消息（写
+# ``ai_chat_message``，仍然**不写** DisclosureNote.text_content ⇒ Property 11 不变），
+# 并回传 ``message_id`` 供采纳引用。若不登记，采纳就只能回到"信任浏览器传来的正文"，
+# 那正是 Task 7 要修掉的缺陷。
 # ---------------------------------------------------------------------------
 
 
@@ -1240,21 +1247,26 @@ async def ai_fill_note_section(
     行为：查该 section 的 section_title/account_name（缺失则用 note_section 兜底），
     调 `NoteKnowledgeEnricher.generate_note_text`（RAG 检索→反幻觉起草 或 reference_only 仅回片段）。
 
-    resp: ``{ text, citations:[{document_name, folder_path, snippet, score, source_id, is_stale}],
-              degraded, skipped_docs }``
+    resp: ``{ text, message_id, citations:[{document_name, folder_path, snippet, score,
+              source_id, is_stale}], degraded, skipped_docs }``
     - skipped_docs：doc_filter 中不存在/已删（无权）被跳过的文档 id；无则空（不 500，Req4.3）。
     - 无命中/检索或 LLM 降级 → degraded=true（前端据此提示"已用通用生成"，Req3.4）。
+    - message_id：服务端为本次草稿签发的 assistant 消息 ID，供 ``/api/ai-chat/adopt``
+      按 ID 读取权威正文（dsh-agent-panel-integration Req 8.1）。章节未实例化或
+      reference_only（无生成正文）时为 ``None``，此时不可采纳。
     """
     from app.models.knowledge_models import KnowledgeDocument
     from app.services.note_knowledge_enricher import NoteKnowledgeEnricher
 
     req = body or NoteAiFillRequest()
 
-    # 查该 section 的 section_title / account_name（缺失则用 note_section 兜底）
+    # 查该 section 的 instance id / section_title / account_name（缺失则用 note_section 兜底）
     row = (
         await db.execute(
             sa.select(
-                DisclosureNote.section_title, DisclosureNote.account_name
+                DisclosureNote.id,
+                DisclosureNote.section_title,
+                DisclosureNote.account_name,
             ).where(
                 DisclosureNote.project_id == project_id,
                 DisclosureNote.year == year,
@@ -1263,8 +1275,9 @@ async def ai_fill_note_section(
             )
         )
     ).one_or_none()
-    section_title = (row[0] if row else None) or note_section
-    account_name = (row[1] if row else None) or ""
+    note_instance_id = row[0] if row else None
+    section_title = (row[1] if row else None) or note_section
+    account_name = (row[2] if row else None) or ""
 
     # 权限跳过文档：doc_filter 中不存在/已删的文档 → skipped_docs（不将其纳入上下文，不 500）
     skipped_docs: list[str] = []
@@ -1291,12 +1304,74 @@ async def ai_fill_note_section(
         doc_filter=req.doc_filter,
         reference_only=req.reference_only,
     )
+    # 服务端签发 assistant 消息（采纳按 ID 引用；仍不写 DisclosureNote.text_content）
+    message_id = await _issue_note_draft_message(
+        db,
+        project_id=project_id,
+        year=year,
+        note_instance_id=note_instance_id,
+        user_id=current_user.id,
+        text=draft.text,
+        reference_only=req.reference_only,
+    )
+
     return {
         "text": draft.text,
+        "message_id": str(message_id) if message_id else None,
         "citations": [_citation_to_dict(c) for c in draft.citations],
         "degraded": draft.degraded,
         "skipped_docs": skipped_docs,
     }
+
+
+async def _issue_note_draft_message(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    year: int,
+    note_instance_id: UUID | None,
+    user_id: UUID,
+    text: str,
+    reference_only: bool,
+) -> UUID | None:
+    """把服务端生成的附注草稿登记为 completed assistant 消息，返回 message ID。
+
+    宿主定位必须与 ``HostContextResolver._locate_note`` 的 canonical 结果一致：
+    ``host_type='note'`` + ``host_id = 附注实例 UUID``（不是 section key）—— 否则采纳时
+    "会话宿主 == 已授权宿主"这一段绑定校验会判 host_context_mismatch。
+
+    返回 ``None`` 的三种情况（此时前端禁用采纳，而不是退回信任客户端正文）：
+    章节未实例化、``reference_only``（只回检索片段、没有生成正文）、正文为空。
+    """
+    if note_instance_id is None or reference_only or not (text or "").strip():
+        return None
+    try:
+        from app.services import doc_chat_persistence
+        from app.services.ai_chat.contracts import HostType
+
+        session = await doc_chat_persistence.get_or_create_session(
+            db,
+            HostType.note.value,
+            str(note_instance_id),
+            user_id,
+            project_id,
+            audit_year=year,
+        )
+        msg = await doc_chat_persistence.append_message(
+            db, session, "assistant", text
+        )
+        message_id = msg.id
+        await db.commit()
+        return message_id
+    except Exception as exc:  # noqa: BLE001
+        # 登记失败不阻断预览返回，但必须记 ERROR 并回传 None（前端据此禁用采纳）——
+        # 绝不因为"没拿到 message_id"就退回让客户端提交正文。
+        await db.rollback()
+        logger.error(
+            "附注草稿消息登记失败（采纳将不可用）note=%s project=%s: %s: %s",
+            note_instance_id, project_id, type(exc).__name__, exc,
+        )
+        return None
 
 
 @router.post("/{project_id}/{year}/batch-ai-fill")

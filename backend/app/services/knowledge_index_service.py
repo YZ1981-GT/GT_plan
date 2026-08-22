@@ -260,9 +260,14 @@ class KnowledgeIndexService:
 
         后续新增索引源只需追加到此列表。
         """
+        from app.services.ai_chat.address_index_source import (
+            AddressCoordinateIndexSource,
+        )
+
         return [
             BusinessDataSource(self._db),
             KnowledgeDocSource(self._db),
+            AddressCoordinateIndexSource(self._db),
         ]
 
     def _get_store(self, project_id: UUID | None = None) -> "PgTextStore":
@@ -425,6 +430,59 @@ class KnowledgeIndexService:
         results = await self._enrich_results(results)
 
         return results
+
+    async def semantic_search_strict(
+        self,
+        project_id: UUID,
+        query: str,
+        top_k: int = 10,
+        *,
+        scope: str = "all",
+        user: Any | None = None,
+    ) -> list[dict[str, Any]]:
+        """**严格**语义检索 — 只走 embedding，失败即抛，绝不 BM25/ILIKE 伪降级。
+
+        与 :meth:`semantic_search` 的唯一区别是**没有词法兜底**：
+        ``semantic_search`` 在向量召回失败时会静默切到 BM25 或 ILIKE，把
+        "语义检索服务坏了"表现成"搜到了几条弱相关结果"或"什么都没搜到"。
+        对 DSH Agent / MCP 这类**机器消费方**这是不可接受的 —— Agent 无法据此
+        判断该不该重试，也无法向审计师如实说明检索没生效
+        （dsh-agent-panel-integration Req 6.6 / Property 16）。
+
+        Args:
+            project_id: 项目 ID
+            query: 查询文本
+            top_k: 返回结果数
+            scope: ``"project_data"`` / ``"knowledge_doc"`` / ``"all"``
+            user: 提供时按权限过滤 knowledge_doc 结果（与 ``semantic_search`` 同一过滤器）
+
+        Returns:
+            命中列表；**空列表 = 真的没有匹配**（不是服务不可用）。
+
+        Raises:
+            EmbeddingUnavailableError: embedding 服务不可用 / 向量召回失败。
+        """
+        from app.services.ai_chat.address_index_source import (
+            EmbeddingUnavailableError,
+        )
+
+        if scope == "cross_year":
+            scope = "all"
+
+        try:
+            results = await self._vector_search(project_id, query, top_k, scope)
+        except Exception as exc:
+            logger.warning(
+                "严格语义检索失败（不降级，向调用方抛 semantic_unavailable）: %s: %s",
+                type(exc).__name__, exc,
+            )
+            raise EmbeddingUnavailableError(
+                f"语义检索不可用：{type(exc).__name__}"
+            ) from exc
+
+        if user is not None:
+            results = await self._filter_by_permission(results, user)
+        return await self._enrich_results(results)
 
     async def _vector_search(
         self,

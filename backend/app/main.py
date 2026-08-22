@@ -93,6 +93,17 @@ async def lifespan(app: FastAPI):
     from app.services.acnr.invalidation_outbox import get_dispatcher as _get_acnr_dispatcher
     _get_acnr_dispatcher().start()
 
+    # AI Chat run 启动恢复（dsh-agent-panel-integration Task 5 / Design 第 7 步）：
+    # 上次进程崩溃/被 kill 时留下的 running run 在租约过期后无人接管 —— 扫描并按
+    # “无外部副作用 + retry limit”重排，否则标 interrupted → error(run_interrupted)，
+    # 让用户看到中文中断原因而不是永远转圈（Req 4.9）。
+    await _recover_ai_chat_runs()
+
+    # AI Chat 启动自检：local-only 验证与服务健康报告
+    # （dsh-agent-panel-integration Task 30 / Req 12.1/12.2/12.4）
+    # 🔴 不阻塞启动：violation 记录审计事件 + WARNING 日志；/capabilities 从缓存读取。
+    await _run_ai_chat_health_check()
+
     # ACNR catalog 快照 GC（P2-1：启动清理无引用旧快照，防无界增长；best-effort 不阻断）
     import logging as _gc_log
     _gc_logger = _gc_log.getLogger("audit_platform")
@@ -155,6 +166,57 @@ async def lifespan(app: FastAPI):
 
     from app.core.database import dispose_engine
     await dispose_engine()
+
+
+async def _run_ai_chat_health_check() -> None:
+    """AI Chat 启动自检（dsh-agent-panel-integration Task 30 / Req 12.1/12.2/12.4）。
+
+    验证 model/embedding/OCR endpoint 为本地，DSH SDK 状态。
+    不阻塞启动：violation 记录 WARNING + 审计事件；结果缓存到模块变量供 /capabilities 读取。
+    """
+    import logging as _hc_log
+
+    log = _hc_log.getLogger("audit_platform")
+    try:
+        from app.services.ai_chat.startup_health import run_ai_chat_startup_health_check
+
+        report = await run_ai_chat_startup_health_check()
+        if report.has_violations:
+            log.warning("[ai-chat] %s", report.summary())
+        else:
+            log.info("[ai-chat] %s", report.summary())
+    except Exception as exc:
+        log.error("[ai-chat] 启动健康检查异常（不阻塞）: %s", exc)
+
+
+async def _recover_ai_chat_runs() -> None:
+    """AI Chat run 启动恢复（dsh-agent-panel-integration Task 5 / Req 4.9）。
+
+    扫描租约已过期的 ``running`` run：无外部副作用且未达 retry limit 的重排回队列并
+    重新执行（重排前会**重新授权** HostContext），其余标 ``interrupted → error``。
+
+    失败记 **ERROR** 而非 WARNING：恢复不生效意味着有一批 run 永久卡在 running，
+    用户侧表现是“一直转圈”。吞成 WARNING 就是典型的 fail-open。
+    """
+    import logging as _rec_log
+
+    log = _rec_log.getLogger("audit_platform")
+    if not settings.AI_CHAT_STARTUP_RECOVERY_ENABLED:
+        log.info("[ai-chat] 启动恢复已按配置关闭")
+        return
+    try:
+        from app.core.database import async_session
+        from app.services.ai_chat.run_coordinator import get_coordinator
+
+        coordinator = get_coordinator()
+        async with async_session() as db:
+            report = await coordinator.recover_lease_expired_runs(db)
+        if report.requeued:
+            await coordinator.redispatch(report.requeued)
+        if report.scanned:
+            log.warning("[ai-chat] run 启动恢复：%s", report.as_dict())
+    except Exception:
+        log.error("[ai-chat] run 启动恢复失败（可能有 run 卡在 running）", exc_info=True)
 
 
 def _check_attachment_security_gates() -> None:

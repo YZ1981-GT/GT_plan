@@ -7,15 +7,19 @@ set "ROOT_DIR=%~dp0"
 if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 set "BACKEND_DIR=%ROOT_DIR%\backend"
 set "FRONTEND_DIR=%ROOT_DIR%\audit-platform\frontend"
+set "DSH_DIR=D:\DeepHorness"
 set "BACKEND_PORT=9980"
 set "FRONTEND_PORT=3030"
+set "DSH_PORT=3080"
 set "BACKEND_TITLE=GT-Backend-9980"
 set "FRONTEND_TITLE=GT-Frontend-3030"
+set "DSH_TITLE=GT-DSH-AI-3080"
 
 :: ─── pre-checks ─────────────────────────────────────────────
 if not exist "%BACKEND_DIR%\app\main.py" ( echo [ERROR] Backend not found & exit /b 1 )
 if not exist "%FRONTEND_DIR%\package.json" ( echo [ERROR] Frontend not found & exit /b 1 )
 if not exist "%FRONTEND_DIR%\node_modules" ( echo [ERROR] Run "npm install" first & exit /b 1 )
+if not exist "%DSH_DIR%\apps\cli\lib\bin.js" ( echo [WARN] DSH not found at %DSH_DIR%, AI panel will be unavailable. )
 
 set "PY="
 if exist "%ROOT_DIR%\.venv\Scripts\python.exe" set "PY=%ROOT_DIR%\.venv\Scripts\python.exe"
@@ -39,8 +43,10 @@ echo.
 echo [1/5] Stopping old processes...
 taskkill /F /FI "WINDOWTITLE eq %BACKEND_TITLE%*" /T >nul 2>nul
 taskkill /F /FI "WINDOWTITLE eq %FRONTEND_TITLE%*" /T >nul 2>nul
+taskkill /F /FI "WINDOWTITLE eq %DSH_TITLE%*" /T >nul 2>nul
 call :kill_port %BACKEND_PORT%
 call :kill_port %FRONTEND_PORT%
+call :kill_port %DSH_PORT%
 timeout /t 1 /nobreak >nul
 echo       Done.
 
@@ -69,10 +75,21 @@ if !READY!==0 (
   echo       [WARN] Backend not responding after 30s.
 )
 
+:: ─── [3.5] DSH SDK runtime check (Task 30: no longer starts Web UI iframe) ───
+:: 🔴 dsh-agent-panel-integration Task 30: 启动脚本不再为 iframe 启动 DSH Web UI。
+:: DSH 多步 Agent 通过平台后端 DshEngine（per-run subprocess）执行，不需要独立 Web UI。
+:: 只检查 SDK vendor 目录存在性作为开发提示。
+if exist "%DSH_DIR%\python\sdk-runtime" (
+  echo [3.5] DSH SDK runtime detected at %DSH_DIR% (vendor read-only).
+  echo       DSH Agent runs via platform backend DshEngine (per-run subprocess).
+) else (
+  echo [3.5] DSH SDK not found at %DSH_DIR% — DSH Agent 不可用 (native engine only).
+)
+
 :: ─── [4/5] start frontend ────────────────────────────────────
 echo [4/5] Starting frontend on :%FRONTEND_PORT% ...
 :: 用 127.0.0.1 而非 localhost：后端仅监听 IPv4，localhost 会先试 IPv6 ::1 → 每请求 +2s
-start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev"
+start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DSH_URL=http://127.0.0.1:%DSH_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev"
 
 :: ─── [5/5] wait for frontend ─────────────────────────────────
 echo [5/5] Waiting for frontend (max 15s)...
@@ -103,6 +120,7 @@ if !READY!==1 if !FE_READY!==1 (
   echo  ^|                                     ^|
   echo  ^|  Backend:  http://localhost:%BACKEND_PORT%   ^|
   echo  ^|  Frontend: http://localhost:%FRONTEND_PORT%   ^|
+  echo  ^|  DSH AI:   http://localhost:%DSH_PORT%   ^|
   echo  +-------------------------------------+
 ) else (
   echo  +-------------------------------------+
@@ -111,6 +129,7 @@ if !READY!==1 if !FE_READY!==1 (
   echo  ^|                                     ^|
   echo  ^|  Backend:  http://localhost:%BACKEND_PORT%   ^|
   echo  ^|  Frontend: http://localhost:%FRONTEND_PORT%   ^|
+  echo  ^|  DSH AI:   http://localhost:%DSH_PORT%   ^|
   echo  +-------------------------------------+
 )
 echo.

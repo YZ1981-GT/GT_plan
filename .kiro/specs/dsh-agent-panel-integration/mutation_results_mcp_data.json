@@ -1,0 +1,85 @@
+[
+  {
+    "name": "[MCP取数] wp_list 回到空占位（M28）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「test_wp_list_returns_real_workpapers」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_wp_list_returns_real_workpapers",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_wp_list_excludes_workpapers_outside_token_cycle_scope"
+    ]
+  },
+  {
+    "name": "[MCP取数] wp_read 回到空 content（M29）",
+    "verdict": "RED",
+    "detail": "新增失败 8 条，含预期「test_wp_read_returns_real_parsed_data」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestNoPlaceholderRemains::test_runtime_results_carry_no_placeholder_status",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_wp_read_returns_real_parsed_data",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_cross_project_token_cannot_read_workpaper",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_out_of_scope_cycle_workpaper_is_denied",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_wp_read_denied_when_cycle_outside_token_cycle_scope",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_endpoint_maps_tool_error_code_verbatim",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_invalid_arguments_are_rejected_distinctly",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_missing_resource_is_not_found_not_empty"
+    ]
+  },
+  {
+    "name": "[MCP取数] tb_query 回到空 rows（M30）",
+    "verdict": "RED",
+    "detail": "新增失败 6 条，含预期「test_tb_query_leaf_mode_aggregates_only_leaves」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_tb_query_leaf_mode_aggregates_only_leaves",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_tb_query_top_level_mode_returns_rows",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_manager_gets_range_description_not_raw_amount",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_strict_and_none_role_results_differ",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_sub_threshold_amounts_keep_numeric_type",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_tb_query_denied_for_non_member"
+    ]
+  },
+  {
+    "name": "[MCP取数] note_read 回到 placeholder（M31）",
+    "verdict": "RED",
+    "detail": "新增失败 5 条，含预期「test_note_read_returns_rows_from_table_data」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestNoPlaceholderRemains::test_runtime_results_carry_no_placeholder_status",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestNoPlaceholderRemains::test_tool_dispatchers_contain_no_placeholder_literal",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRealDataNonEmpty::test_note_read_returns_rows_from_table_data",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_note_read_cross_project_note_is_denied",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_invalid_arguments_are_rejected_distinctly"
+    ]
+  },
+  {
+    "name": "[MCP取数] 放宽工具内 ResourceAccessResolver 判定（M32）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「test_out_of_scope_cycle_workpaper_is_denied」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_out_of_scope_cycle_workpaper_is_denied",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_tb_query_denied_for_non_member"
+    ]
+  },
+  {
+    "name": "[MCP取数] token cycle_scope 裁剪恒放行（M33）",
+    "verdict": "RED",
+    "detail": "新增失败 1 条，含预期「test_wp_read_denied_when_cycle_outside_token_cycle_scope」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestToolAuthorization::test_wp_read_denied_when_cycle_outside_token_cycle_scope"
+    ]
+  },
+  {
+    "name": "[MCP取数] mask_tool_result 跳过金额脱敏（M34）",
+    "verdict": "RED",
+    "detail": "新增失败 2 条，含预期「test_strict_and_none_role_results_differ」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_manager_gets_range_description_not_raw_amount",
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestRoleMasking::test_strict_and_none_role_results_differ"
+    ]
+  },
+  {
+    "name": "[MCP取数] semantic_search_strict 恢复词法伪降级（M35）",
+    "verdict": "RED",
+    "detail": "新增失败 1 条，含预期「test_kb_search_embedding_down_returns_semantic_unavailable」",
+    "new_fails": [
+      "backend\\tests\\test_ai_chat_mcp_tools_data.py::TestTypedErrorSeparation::test_kb_search_embedding_down_returns_semantic_unavailable"
+    ]
+  }
+]

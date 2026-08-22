@@ -22,6 +22,10 @@ from app.models.knowledge_models import (
     KnowledgeDocument,
     KnowledgeFolder,
 )
+from app.services.knowledge_access_policy import (
+    KnowledgeAccessPolicy,
+    KnowledgeAccessSubject,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -93,11 +97,15 @@ class KnowledgeFolderService:
 
     async def list_folders(
         self,
+        subject: KnowledgeAccessSubject,
         parent_id: UUID | None = None,
-        user_project_ids: list[UUID] | None = None,
-        user_id: UUID | None = None,
     ) -> list[KnowledgeFolder]:
-        """列出文件夹（含权限过滤）"""
+        """列出文件夹（权限过滤走公共 ``KnowledgeAccessPolicy``）。
+
+        ``subject`` 为必填：调用方必须显式传入 current user + project scope
+        （Feature dsh-agent-panel-integration Req 2.1/2.2）。旧签名允许"两个参数都不传
+        就不过滤"，等价于匿名可读全部文件夹 —— 该旁路已删除。
+        """
         query = sa.select(KnowledgeFolder).where(
             KnowledgeFolder.is_deleted == sa.false(),
         )
@@ -108,38 +116,25 @@ class KnowledgeFolderService:
 
         result = await self.db.execute(query.order_by(KnowledgeFolder.name))
         folders = list(result.scalars().all())
+        return KnowledgeAccessPolicy.filter_folders(subject, folders)
 
-        # 权限过滤
-        if user_project_ids is not None or user_id is not None:
-            filtered = []
-            for f in folders:
-                if f.access_level == KnowledgeAccessLevel.public:
-                    filtered.append(f)
-                elif f.access_level == KnowledgeAccessLevel.project_group:
-                    if user_project_ids and f.project_ids and any(str(pid) in [str(x) for x in f.project_ids] for pid in user_project_ids):
-                        filtered.append(f)
-                elif f.access_level == KnowledgeAccessLevel.private:
-                    if user_id and f.created_by == user_id:
-                        filtered.append(f)
-            return filtered
-
-        return folders
-
-    async def get_folder_tree(self, user_project_ids: list[UUID] | None = None) -> list[dict]:
-        """获取完整文件夹树（递归）"""
-        top_folders = await self.list_folders(parent_id=None, user_project_ids=user_project_ids)
+    async def get_folder_tree(self, subject: KnowledgeAccessSubject) -> list[dict]:
+        """获取完整文件夹树（递归；每层都经同一 policy 过滤）"""
+        top_folders = await self.list_folders(subject, parent_id=None)
         tree = []
         for folder in top_folders:
-            node = await self._build_tree_node(folder, user_project_ids)
+            node = await self._build_tree_node(folder, subject)
             tree.append(node)
         return tree
 
-    async def _build_tree_node(self, folder: KnowledgeFolder, user_project_ids: list[UUID] | None) -> dict:
+    async def _build_tree_node(
+        self, folder: KnowledgeFolder, subject: KnowledgeAccessSubject
+    ) -> dict:
         """递归构建树节点"""
-        children = await self.list_folders(parent_id=folder.id, user_project_ids=user_project_ids)
+        children = await self.list_folders(subject, parent_id=folder.id)
         child_nodes = []
         for child in children:
-            child_nodes.append(await self._build_tree_node(child, user_project_ids))
+            child_nodes.append(await self._build_tree_node(child, subject))
 
         # 统计文档数
         doc_count_q = await self.db.execute(
@@ -340,9 +335,18 @@ class KnowledgeDocumentService:
     async def list_documents(
         self,
         folder_id: UUID,
-        user_project_ids: list[UUID] | None = None,
+        subject: KnowledgeAccessSubject,
     ) -> list[KnowledgeDocument]:
-        """列出文件夹下的文档（含权限过滤）"""
+        """列出文件夹下的文档（权限过滤走公共 ``KnowledgeAccessPolicy``）。
+
+        先判定父文件夹是否可见：不可见（含不存在）直接返回空列表，不读任何文档 name/正文
+        （Feature dsh-agent-panel-integration Req 2.1/2.5：拒绝先于 label/正文读取）。
+        文档自身 access_level 为 None 时完整继承父文件夹三元组，不再依赖"上层已过滤"假设。
+        """
+        folder = await KnowledgeAccessPolicy.load_folder_permission(self.db, folder_id)
+        if folder is None or not KnowledgeAccessPolicy.can_read(subject, folder):
+            return []
+
         result = await self.db.execute(
             sa.select(KnowledgeDocument).where(
                 KnowledgeDocument.folder_id == folder_id,
@@ -350,23 +354,7 @@ class KnowledgeDocumentService:
             ).order_by(KnowledgeDocument.name)
         )
         docs = list(result.scalars().all())
-
-        if user_project_ids is None:
-            return docs
-
-        # 权限过滤：文档自身权限 > 继承文件夹权限
-        filtered = []
-        for doc in docs:
-            doc_access = doc.access_level
-            if doc_access is None:
-                # 继承文件夹权限 — 已在 list_folders 中过滤
-                filtered.append(doc)
-            elif doc_access == KnowledgeAccessLevel.public:
-                filtered.append(doc)
-            elif doc_access == KnowledgeAccessLevel.project_group:
-                if doc.project_ids and any(str(pid) in [str(x) for x in doc.project_ids] for pid in user_project_ids):
-                    filtered.append(doc)
-        return filtered
+        return KnowledgeAccessPolicy.filter_documents(subject, docs, folder)
 
     async def delete_document(self, doc_id: UUID) -> None:
         """软删除文档"""

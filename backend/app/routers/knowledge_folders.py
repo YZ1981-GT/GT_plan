@@ -14,12 +14,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.knowledge_access_policy import KnowledgeAccessPolicy
 from app.services.knowledge_folder_service import (
     KnowledgeDocumentService,
     KnowledgeFolderService,
 )
+from app.services.wp_visibility.denial import ExternalNotFound
 
 _logger = logging.getLogger(__name__)
+
+
+async def _authorize_folder_create(
+    db: AsyncSession, current_user: User, folder_id: UUID
+) -> None:
+    """创建类入口的知识资产写权限门（Feature dsh-agent-panel-integration Req 2.1/2.5）。
+
+    只取判权三元组 → 判定 → 拒绝；不存在与无权对外同构为不可枚举 404，
+    绝不在拒绝前读取文件夹 name / 文档正文。
+    """
+    subject = await KnowledgeAccessPolicy.resolve_subject(db, current_user)
+    folder = await KnowledgeAccessPolicy.load_folder_permission(db, folder_id)
+    if folder is None or not KnowledgeAccessPolicy.can_create_in_folder(subject, folder):
+        raise ExternalNotFound()
 
 router = APIRouter(prefix="/api/knowledge-library", tags=["知识库管理"])
 
@@ -128,9 +144,10 @@ async def get_folder_tree(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取知识库完整文件夹树（含权限过滤）"""
+    """获取知识库完整文件夹树（权限过滤；显式传入 current user + project scope）"""
+    subject = await KnowledgeAccessPolicy.resolve_subject(db, current_user)
     svc = KnowledgeFolderService(db)
-    tree = await svc.get_folder_tree()
+    tree = await svc.get_folder_tree(subject)
     return tree
 
 
@@ -140,7 +157,9 @@ async def create_folder(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """创建文件夹"""
+    """创建文件夹（子文件夹须先通过父文件夹的知识资产写权限门）"""
+    if data.parent_id:
+        await _authorize_folder_create(db, current_user, UUID(data.parent_id))
     svc = KnowledgeFolderService(db)
     folder = await svc.create_folder(
         name=data.name,
@@ -159,9 +178,10 @@ async def list_documents(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """列出文件夹下的文档"""
+    """列出文件夹下的文档（权限过滤；显式传入 current user + project scope）"""
+    subject = await KnowledgeAccessPolicy.resolve_subject(db, current_user)
     svc = KnowledgeDocumentService(db)
-    docs = await svc.list_documents(folder_id)
+    docs = await svc.list_documents(folder_id, subject)
     return [
         {
             "id": str(d.id),
@@ -183,7 +203,8 @@ async def create_document(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """创建文档（文本内容）"""
+    """创建文档（文本内容；先过知识资产写权限门）"""
+    await _authorize_folder_create(db, current_user, folder_id)
     svc = KnowledgeDocumentService(db)
     doc = await svc.create_document(
         folder_id=folder_id,
@@ -209,37 +230,70 @@ async def _extract_text_with_ocr(
     """提取文档全文 → Markdown 文本
 
     多级降级链：
-      1. **MarkItDown**（本地纯 Python，覆盖 PDF/Word/Excel/PPT/HTML/CSV/JSON/EPub）—— 主路径
-      2. **MinerU OCR**（PDF 扫描件兜底，复杂排版/表格识别）—— PDF 专用
-      3. **PyPDF2 / python-docx** —— 最后兜底
+      1. **anydoc**（Rust，毫秒级，含旧格式 .doc/.xls/.ppt）—— 主路径
+      2. **MarkItDown**（纯 Python，补 anydoc 不覆盖的 HTML/JSON/XML）
+      3. **MinerU OCR**（扫描件 PDF；由 anydoc 的 needs_ocr 信号**精准触发**）
+      4. **PyPDF2 / python-docx** —— 最后兜底
 
-    设计：
-      - 文本类（.pdf/.docx/.xlsx/.pptx/.html/.csv/.json/...）优先 markitdown，输出就是 Markdown
-        天然适合 LLM 上下文 + 向量索引。
-      - 扫描件 PDF（markitdown 输出空或全是图片 placeholder）自动降级到 MinerU OCR。
+    设计要点：
+      - anydoc 对图片型 PDF 明确回 "no extractable text ... OCR is required"，
+        据此**跳过无意义的 markitdown 尝试直接进 OCR**，而不是盲目走完整条链。
+      - anydoc 报 permanent（Encrypted / 真正不支持的格式）时同样不再往下试。
       - 其它扩展名（.txt/.md）由调用方直读，不进本函数。
     """
     import logging
 
     _log = logging.getLogger(__name__)
+    needs_ocr = False
 
-    # ── 主路径：MarkItDown ──
+    # ── 主路径：anydoc（Rust，快且覆盖旧二进制格式） ──
     try:
-        from app.services.markitdown_service import convert_bytes_to_markdown
+        from app.services.anydoc_service import convert_bytes_detailed
 
-        md_text = convert_bytes_to_markdown(content, filename_lower)
-        if md_text:
+        res = convert_bytes_detailed(content, filename_lower)
+        if res.ok and res.text:
             _log.info(
-                "[KB Extract] MarkItDown extracted %d chars from %s",
-                len(md_text),
-                file_path,
+                "[KB Extract] anydoc extracted %d chars from %s", len(res.text), file_path
             )
-            return md_text
-        _log.info("[KB Extract] MarkItDown empty/unsupported, trying fallback for %s", file_path)
-    except Exception as exc:
-        _log.warning("[KB Extract] MarkItDown failed (%s), trying fallback for %s", exc, file_path)
+            return res.text
 
-    # ── 降级 1：MinerU OCR（仅 PDF，扫描件兜底） ──
+        needs_ocr = res.needs_ocr
+        if res.needs_ocr:
+            # 扫描件：markitdown 同样无文本层可提，直接进 OCR 分支
+            _log.info("[KB Extract] anydoc says OCR required for %s", file_path)
+        elif res.permanent:
+            # 加密 / 格式确实不支持：记录后不再重试其他引擎
+            _log.info(
+                "[KB Extract] anydoc permanent failure (%s) for %s: %s",
+                res.error_code, file_path, res.message[:160],
+            )
+            return None
+        else:
+            _log.info(
+                "[KB Extract] anydoc miss (%s), trying MarkItDown for %s",
+                res.error_code, file_path,
+            )
+    except Exception as exc:
+        _log.warning("[KB Extract] anydoc failed (%s), trying MarkItDown for %s", exc, file_path)
+
+    # ── 降级 1：MarkItDown（补 anydoc 不支持的格式；扫描件跳过） ──
+    if not needs_ocr:
+        try:
+            from app.services.markitdown_service import convert_bytes_to_markdown
+
+            md_text = convert_bytes_to_markdown(content, filename_lower)
+            if md_text:
+                _log.info(
+                    "[KB Extract] MarkItDown extracted %d chars from %s",
+                    len(md_text),
+                    file_path,
+                )
+                return md_text
+            _log.info("[KB Extract] MarkItDown empty/unsupported, trying fallback for %s", file_path)
+        except Exception as exc:
+            _log.warning("[KB Extract] MarkItDown failed (%s), trying fallback for %s", exc, file_path)
+
+    # ── 降级 2：MinerU OCR（扫描件 PDF） ──
     if filename_lower.endswith(".pdf"):
         try:
             from app.services.mineru_service import MinerUService
@@ -256,6 +310,17 @@ async def _extract_text_with_ocr(
                     )
                     return text[:50000]
                 _log.warning("[KB Extract] MinerU returned empty text, falling back for %s", file_path)
+            elif needs_ocr:
+                # 已确知是扫描件却没有可用 OCR 引擎：显式记录 ERROR，
+                # 别让调用方把「抽取为空」误当成「文档本身没内容」
+                from app.core.config import settings as _settings
+
+                _log.error(
+                    "[KB Extract] %s 是扫描件但 MinerU 不可用（MINERU_ENABLED=%s），"
+                    "文本抽取为空并非文档本身无内容",
+                    file_path,
+                    getattr(_settings, "MINERU_ENABLED", "?"),
+                )
         except Exception as exc:
             _log.warning("[KB Extract] MinerU failed (%s), falling back for %s", exc, file_path)
 
@@ -299,11 +364,12 @@ async def upload_documents(
     current_user: User = Depends(get_current_user),
     background_tasks: BackgroundTasks = None,
 ):
-    """批量上传文档文件"""
+    """批量上传文档文件（先过知识资产写权限门）"""
     from app.core.config import settings
     from pathlib import Path
     import shutil
 
+    await _authorize_folder_create(db, current_user, folder_id)
     svc = KnowledgeDocumentService(db)
     storage_root = Path(settings.STORAGE_ROOT)
     if not storage_root.is_absolute():

@@ -9,16 +9,19 @@ import DOMPurify from 'dompurify'
 // ─── 允许的安全标签 ─────────────────────────────────────────────────────────────
 
 const ALLOWED_TAGS = [
-  'h3', 'h4',
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
   'ul', 'ol', 'li',
   'table', 'thead', 'tbody', 'tr', 'td', 'th',
   'strong', 'em', 'br', 'p',
+  'pre', 'code', 'blockquote',
+  'a', 'del', 'hr', 'dl', 'dt', 'dd',
 ]
 
 // ─── 允许的属性（仅结构性属性，禁止所有 on* 事件） ────────────────────────────────
 
 const ALLOWED_ATTR = [
   'colspan', 'rowspan', 'class', 'style',
+  'href', 'target', 'rel',
 ]
 
 // ─── 核心函数 ────────────────────────────────────────────────────────────────────

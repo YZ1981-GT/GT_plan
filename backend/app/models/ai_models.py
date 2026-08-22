@@ -186,6 +186,7 @@ class KnowledgeSourceType(str, enum.Enum):
     review_comment = "review_comment"
     prior_year_summary = "prior_year_summary"
     knowledge_doc = "knowledge_doc"
+    address_coordinate = "address_coordinate"  # Task 22 / V148
 
 
 class ChatRole(str, enum.Enum):
@@ -748,16 +749,116 @@ class SessionType(str, enum.Enum):
     confirmation = "confirmation"
 
 
+# ---------------------------------------------------------------------------
+# AI Chat 持久化取值域（dsh-agent-panel-integration Task 3）
+#
+# 🔴 这些是**列取值域的单一真源**。V147 迁移里的 CHECK 约束是它们的投影，
+#    守卫 test_task3_chat_persistence 对 `pg_get_constraintdef` 与本组枚举做
+#    **双向**比对（DB ⊆ Python 且 Python ⊆ DB），任一侧漂移即打红。
+#
+# 为什么用 VARCHAR + CHECK 而不是 PG enum：MigrationRunner 把整个迁移文件放在
+# 一个事务里跑，PG 不允许在同一事务内 `ALTER TYPE ... ADD VALUE` 后立即使用新值，
+# 于是"加枚举值 + 写该值"必然失败。VARCHAR + CHECK 从根上避开该约束。
+# ---------------------------------------------------------------------------
+
+
+class ChatRunStatus(str, enum.Enum):
+    """Chat Run 状态机（design "4. Typed Chat Run" 的状态图）。
+
+    queued → running → done | error | cancelled
+    queued → cancelled
+    running（lease 过期）→ interrupted → queued | error
+    """
+
+    queued = "queued"
+    running = "running"
+    done = "done"
+    error = "error"
+    cancelled = "cancelled"
+    interrupted = "interrupted"
+
+
+#: 终态集合：进入其一后不得再追加业务事件或 completed assistant 消息（Req 4.5）。
+CHAT_RUN_TERMINAL_STATUSES: frozenset[ChatRunStatus] = frozenset(
+    {ChatRunStatus.done, ChatRunStatus.error, ChatRunStatus.cancelled}
+)
+
+
+class ChatEngineName(str, enum.Enum):
+    """engine 取值；只由服务端 config/feature flag 选择，请求字段不可覆盖（Req 10.1）。"""
+
+    native = "native"
+    dsh = "dsh"
+
+
+class ChatMessageStatus(str, enum.Enum):
+    """消息状态；只有 ``completed`` 的 assistant 消息可被复制/转存/采纳（Req 8.1）。"""
+
+    draft = "draft"
+    completed = "completed"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class ChatToolCallStatus(str, enum.Enum):
+    """工具调用状态（每次调用 started + finished/failed 各一条哈希链记录，Req 11.10）。"""
+
+    started = "started"
+    finished = "finished"
+    failed = "failed"
+    cancelled = "cancelled"
+
+
+class AttachmentOcrStatus(str, enum.Enum):
+    """附件 OCR 状态机（Req 7.5/7.6，Property 19 的五态互斥落在此处）。
+
+    ``empty`` 是**成功但无文字**（不得当失败或静默丢弃）；``unavailable`` /
+    ``failed`` / ``timeout`` 三者互斥且各有独立 error code。
+    """
+
+    pending = "pending"
+    running = "running"
+    succeeded = "succeeded"
+    empty = "empty"
+    failed = "failed"
+    unavailable = "unavailable"
+    timeout = "timeout"
+    cancelled = "cancelled"
+
+
+class ActionReceiptType(str, enum.Enum):
+    """幂等收据覆盖的动作（与 AiChatAction 的写类动作对应）。"""
+
+    note_create = "note-create"
+    adopt = "adopt"
+
+
+class ActionReceiptStatus(str, enum.Enum):
+    """幂等收据状态；失败收据可被安全重试（Req 8.9）。"""
+
+    pending = "pending"
+    succeeded = "succeeded"
+    failed = "failed"
+
+
 class AIChatSession(Base):
-    """AI问答会话（会话维度聚合）"""
+    """AI问答会话（会话维度聚合）
+
+    Task 3 扩展：服务端生成的 ``session_key``（唯一定位）+ host type/id + audit year
+    + review mode + last_message_at。唯一约束 ``uq_ai_chat_session_user_key``
+    由 V147 拥有（部分唯一索引，带 ``WHERE user_id IS NOT NULL AND session_key IS NOT NULL``
+    谓词，ORM 不重复声明以免 SQLite create_all 与 PG 方言差异）。
+    """
 
     __tablename__ = "ai_chat_session"
 
     id: Mapped[uuid.UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("projects.id"), nullable=False
+    # 无项目的受限全局知识模式为 NULL；V147 的 ck_ai_chat_session_project_required
+    # 保证只有 host_type='global_knowledge' 才允许 NULL（禁止空 UUID 伪装项目）。
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
     )
     session_type: Mapped[SessionType] = mapped_column(
         sa.Enum(SessionType, name="session_type_enum", create_type=False),
@@ -767,6 +868,20 @@ class AIChatSession(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("users.id"), nullable=True
+    )
+    #: 服务端规范化定位 hash；唯一真源 = ai_chat.persistence.build_session_key。
+    session_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    #: 取值域 = app.services.ai_chat.contracts.HostType（V147 CHECK 锁死）。
+    host_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    #: 全局知识模式使用 GLOBAL_KNOWLEDGE_HOST_ID sentinel，不用空字符串。
+    host_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    audit_year: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    engine_preference: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    review_mode: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False, default=False
+    )
+    last_message_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime, nullable=True
     )
     total_messages: Mapped[int] = mapped_column(
         sa.Integer, server_default=text("0"), nullable=False
@@ -787,7 +902,12 @@ class AIChatSession(Base):
 
 
 class AIChatMessage(Base):
-    """AI问答消息（详细消息记录）"""
+    """AI问答消息（详细消息记录）
+
+    Task 3 扩展：run 关联、状态、content hash、context manifest 与单调 ``seq``。
+    🔴 citations 复用既有 ``referenced_sources``，**不新增 citations 列**；
+       model/token/latency 复用 ``model_used`` / ``tokens_used`` / ``latency_ms``。
+    """
 
     __tablename__ = "ai_chat_message"
 
@@ -797,19 +917,237 @@ class AIChatMessage(Base):
     session_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("ai_chat_session.id"), nullable=False
     )
+    #: 单调插入序。PG 侧由 V147 的 BIGSERIAL 默认值填充（真源在 DB）。
+    #: 🔴 必须声明 `server_default=FetchedValue()`：否则 ORM insert 会把未赋值的列
+    #:    当 NULL 一起写进 INSERT 列表，PG 的 BIGSERIAL 默认值永远不生效
+    #:    ⇒ NotNullViolationError（实测踩过）。
+    #: 🔴 且必须 `nullable=True`：SQLite `create_all` 不支持 Identity/SERIAL，
+    #:    声明 NOT NULL 会让全部 sqlite 集成测试插入 ai_chat_message 时炸 NOT NULL。
+    seq: Mapped[int | None] = mapped_column(
+        sa.BigInteger, sa.FetchedValue(), nullable=True
+    )
     role: Mapped[ChatRole] = mapped_column(
         sa.Enum(ChatRole, name="chat_role_enum", create_type=False),
         nullable=False,
     )
     message_text: Mapped[str] = mapped_column(Text, nullable=False)
+    #: citations 的唯一存放位置（勿新增 citations 列）。
     referenced_sources: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     model_used: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tokens_used: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
     latency_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ai_chat_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(16),
+        server_default=text("'completed'"),
+        nullable=False,
+        default=ChatMessageStatus.completed.value,
+    )
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    context_manifest: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
         Index("ix_ai_chat_message_session", "session_id"),
+    )
+
+
+class AIChatRun(Base):
+    """Chat Run —— 一次模型/Agent 执行的持久化摘要。
+
+    Requirements 4.6/4.11 · Property 6：并发幂等由数据库唯一约束
+    ``uq_ai_chat_runs_idempotency (actor_id, session_id, idempotency_key)`` 保证，
+    **不允许**"先查后建"。状态更新由 Task 4 的 compare-and-set 使用本表的
+    ``status`` 列完成（terminal event 恰好一个）。
+
+    Req 4.12：数据库只保存 run/message/tool **摘要**，逐 token 的 delta 走 Redis。
+    """
+
+    __tablename__ = "ai_chat_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_chat_session.id", ondelete="CASCADE"), nullable=False
+    )
+    request_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=False, default=uuid.uuid4
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
+    host_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    host_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    engine: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        server_default=text("'queued'"),
+        nullable=False,
+        default=ChatRunStatus.queued.value,
+    )
+    capability_snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    queued_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    started_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    usage: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    latency_ms: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    retry_count: Mapped[int] = mapped_column(
+        sa.Integer, server_default=text("0"), nullable=False, default=0
+    )
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
+
+class AIChatToolCall(Base):
+    """工具调用摘要（Req 11.10：每次调用产生 started + finished/failed 记录）。
+
+    🔴 ``arg_hash`` 是入参哈希；**不得**保存 scoped token 或完整工具入参正文
+    （Req 11.9/12.7）。``result_bytes`` 只记字节数，不记返回正文。
+    """
+
+    __tablename__ = "ai_chat_tool_calls"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_chat_runs.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_call_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ai_chat_tool_calls.id", ondelete="SET NULL"), nullable=True
+    )
+    tool_call_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    arg_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    result_bytes: Mapped[int | None] = mapped_column(sa.Integer, nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        server_default=text("'started'"),
+        nullable=False,
+        default=ChatToolCallStatus.started.value,
+    )
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    started_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
+
+class AIChatAttachment(Base):
+    """会话附件 metadata（Req 7.3）。
+
+    独立 ``storage/ai_chat/`` 空间，**不写业务证据附件表**（Req 7.8）。上传只返回
+    attachment ID 与状态，不返回服务器物理路径；聊天请求只提交 attachment ID。
+    ``ocr_text_protected`` 对应 design 的 ``ocr_text_encrypted_or_protected``。
+    """
+
+    __tablename__ = "ai_chat_attachments"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("projects.id"), nullable=True
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_chat_session.id", ondelete="CASCADE"), nullable=False
+    )
+    run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("ai_chat_runs.id", ondelete="SET NULL"), nullable=True
+    )
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    original_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    storage_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(128), nullable=False)
+    size_bytes: Mapped[int] = mapped_column(sa.BigInteger, nullable=False)
+    ocr_status: Mapped[str] = mapped_column(
+        String(16),
+        server_default=text("'pending'"),
+        nullable=False,
+        default=AttachmentOcrStatus.pending.value,
+    )
+    ocr_text_protected: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    expires_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+    legal_hold: Mapped[bool] = mapped_column(
+        sa.Boolean, server_default=text("false"), nullable=False, default=False
+    )
+    deleted_at: Mapped[datetime | None] = mapped_column(
+        sa.DateTime(timezone=True), nullable=True
+    )
+
+
+class AIChatActionReceipt(Base):
+    """note save / adopt 的通用幂等收据（Req 8.2/8.3 · Property 21）。
+
+    唯一约束 ``uq_ai_chat_action_receipts_idempotency
+    (action_type, actor_id, session_id, idempotency_key)``：并发重复请求只有一个
+    插入成功，其余读回同一收据 ⇒ 不创建重复文件夹/文档。
+    ``source_message_hash`` / ``result_resource_id`` 只存哈希与引用 ID，
+    不重复存储完整敏感正文（Req 8.9）。
+    """
+
+    __tablename__ = "ai_chat_action_receipts"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    action_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    actor_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"), nullable=False
+    )
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("ai_chat_session.id", ondelete="CASCADE"), nullable=False
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_message_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    result_resource_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
+    status: Mapped[str] = mapped_column(
+        String(16),
+        server_default=text("'pending'"),
+        nullable=False,
+        default=ActionReceiptStatus.pending.value,
+    )
+    error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 

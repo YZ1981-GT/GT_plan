@@ -127,6 +127,23 @@
         <!-- EQCR 独立复核工作台入口（partner/admin 可见，Round 5） -->
         <slot name="nav-eqcr" />
 
+        <!-- AI 助手快捷入口 -->
+        <el-tooltip :content="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'" placement="bottom">
+          <el-badge :value="dshUnreadCount" :hidden="dshUnreadCount === 0 || showDshPanel" :max="99" class="gt-dsh-badge">
+            <button
+              class="gt-topbar-btn"
+              :class="{ 'gt-topbar-btn--active': showDshPanel }"
+              type="button"
+              :aria-label="showDshPanel ? '关闭 AI 助手' : '打开 AI 助手'"
+              :aria-expanded="showDshPanel"
+              aria-controls="dsh-panel-region"
+              @click="showDshPanel = !showDshPanel"
+            >
+              <el-icon :size="18"><ChatDotSquare /></el-icon>
+            </button>
+          </el-badge>
+        </el-tooltip>
+
         <!-- Phase 3 F4: 暗色模式切换按钮 -->
         <el-tooltip :content="isDark ? '切换到浅色模式' : '切换到暗色模式'" placement="bottom">
           <div class="gt-topbar-btn gt-theme-toggle" @click="toggleTheme">
@@ -274,6 +291,9 @@
           <router-view name="detail" />
         </slot>
       </section>
+
+      <!-- AI 助手面板（dsh） -->
+      <DshPanel v-model="showDshPanel" @message-count="onDshMessageCount" />
     </div>
 
     <!-- 全局公式管理弹窗 -->
@@ -327,6 +347,7 @@ import FormulaManagerDialog from '@/components/formula/FormulaManagerDialog.vue'
 import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
+import DshPanel from '@/components/ai/DshPanel.vue'
 import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
@@ -462,6 +483,12 @@ const sidebarCollapsed = ref(false)
 const sidebarWidth = ref(220)
 const middleWidth = ref(340)
 const middleCollapsed = ref(false)
+const showDshPanel = ref(false)
+const dshUnreadCount = ref(0)
+
+function onDshMessageCount(count: number) {
+  dshUnreadCount.value = count
+}
 const catalogWidth = ref(280)
 const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
@@ -946,11 +973,17 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-family: inherit;
   color: rgba(255, 255, 255, 0.9);
   font-size: var(--gt-font-size-sm);
   transition: background 0.15s ease;
 }
 .gt-topbar-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.gt-topbar-btn--active { background: rgba(255, 255, 255, 0.2); color: #fff; }
+.gt-dsh-badge :deep(.el-badge__content) { top: 2px; right: 4px; }
 .gt-theme-toggle {
   font-size: 16px;
 }

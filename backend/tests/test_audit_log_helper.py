@@ -492,5 +492,12 @@ class TestEventTypeValidation:
             "formula_changed",
             "report_config_changed",
             "onlyoffice_callback_rejected",
+            # AI Chat Run 审计事件（dsh-agent-panel-integration Task 12）
+            "ai_chat_run_lifecycle",
+            "ai_chat_access_denied",
+            "ai_chat_note_saved",
+            "ai_chat_adopt_requested",
+            "ai_chat_attachment_cleanup",
+            "ai_chat_tool_lifecycle",
         }
         assert set(EVENT_TYPE_SCHEMAS.keys()) == expected_types

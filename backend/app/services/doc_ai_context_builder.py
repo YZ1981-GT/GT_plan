@@ -1,7 +1,7 @@
 """文档级 AI 对话上下文构建器
 
 ContextBuilder 负责组装文档级 AI 对话的 RAG 上下文：
-① 当前文档内容（parsed_data / content_text）
+① 当前文档内容（每宿主专属业务 loader）
 ② semantic_search 关联知识
 ③ 项目摘要
 ④ 用户自定义范围（extra_scopes）
@@ -11,22 +11,50 @@ ContextBuilder 负责组装文档级 AI 对话的 RAG 上下文：
 token 预算管理：chunk + 相关性排序 + 截断（top_k 最相关段落，非全文）— 属性 D1。
 
 需求: 1.2, 2.1, 2.3, 2.4
+
+Feature: dsh-agent-panel-integration（Task 2 / Req 3.6, 3.7）
+  ``build`` 只接受已授权的 ``AuthorizedHostContext``，不再依据未经验证的
+  ``doc_type/doc_id/project_id`` 自行猜测资源类型。每种宿主钉在自己的业务模型上：
+
+  ================  ==========================================
+  宿主              正文来源
+  ================  ==========================================
+  workpaper         ``working_paper JOIN wp_index``（绑定 project）
+  note              ``disclosure_notes``（**不**回退到 WorkingPaper）
+  report            ``financial_report``（**不**回退到 WorkingPaper）
+  knowledge_doc     ``knowledge_documents.content_text``
+  knowledge_folder  文件夹下文档摘要
+  global_knowledge  无宿主正文（受限全局知识模式）
+  ================  ==========================================
+
+  旧实现把 note/report 转给 ``_get_workpaper_content`` —— 附注/报表 ID 在
+  ``working_paper`` 里查不到，正文恒空而 AI 照常作答。该回退分支已删除。
 """
 
 from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.core import Project, ProjectUser
-from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder, KnowledgeAccessLevel
+from app.models.core import Project
+from app.models.knowledge_models import KnowledgeDocument, KnowledgeFolder
+from app.models.report_models import DisclosureNote, FinancialReport
 from app.models.workpaper_models import WorkingPaper, WpIndex
+from app.services.ai_chat.contracts import HostType
+from app.services.ai_chat.host_context import AuthorizedHostContext
+from app.services.knowledge_access_policy import (
+    KnowledgeAccessPolicy,
+    KnowledgeAccessSubject,
+    KnowledgeResource,
+)
 from app.services.knowledge_index_service import KnowledgeIndexService
 
 logger = logging.getLogger(__name__)
@@ -110,14 +138,25 @@ class ContextBuilder:
         self._db = db
         self._knowledge_svc = KnowledgeIndexService(db)
         self._token_budget = token_budget or self._load_token_budget()
+        # 宿主 → 专属正文 loader（Property 5：唯一映射，无 default 回退到 WorkingPaper）。
+        self._doc_loaders: dict[
+            HostType, Callable[[AuthorizedHostContext], Awaitable[str]]
+        ] = {
+            HostType.workpaper: self._get_workpaper_content,
+            HostType.note: self._get_note_content,
+            HostType.report: self._get_report_content,
+            HostType.knowledge_doc: self._get_knowledge_doc_content,
+            HostType.knowledge_folder: self._get_knowledge_folder_content,
+            HostType.global_knowledge: self._get_global_knowledge_content,
+        }
+        assert set(self._doc_loaders) == set(HostType), (
+            "每个 HostType 必须有专属正文 loader（Req 3.7）"
+        )
 
     async def build(
         self,
         *,
-        doc_type: str,
-        doc_id: str,
-        project_id: UUID,
-        year: int,
+        host: AuthorizedHostContext,
         query: str,
         user: Any,
         extra_scopes: list[str] | None = None,
@@ -125,30 +164,31 @@ class ContextBuilder:
         """组装文档级 AI 对话上下文。
 
         Args:
-            doc_type: 文档类型（workpaper / note / report / knowledge_doc / knowledge_folder）
-            doc_id: 文档 ID
-            project_id: 项目 ID
-            year: 审计年度
+            host: 已授权的可信宿主上下文（唯一资源类型/项目/年度真源，Req 3.6）
             query: 用户提问
-            user: 当前用户（用于权限过滤）
+            user: 当前用户（用于知识库权限过滤）
             extra_scopes: 用户自定义额外知识范围（文件夹 ID 列表）
 
         Returns:
             ChatContext 包含文档内容、关联知识、项目摘要、引用来源、token 估算
         """
-        # ① 当前文档内容
-        doc_excerpt = await self._get_doc_content(doc_type, doc_id, project_id)
+        # ① 当前文档内容（按宿主类型分派到专属 loader）
+        doc_excerpt = await self._get_doc_content(host)
 
         # ② semantic_search 关联知识
         knowledge_hits = await self._search_related_knowledge(
-            project_id=project_id,
+            project_id=host.project_id,
             query=query,
             user=user,
             extra_scopes=extra_scopes,
         )
 
-        # ③ 项目摘要
-        project_summary = await self._get_project_summary(project_id)
+        # ③ 项目摘要（受限全局知识模式无项目绑定 → 无摘要，不猜测最近项目）
+        project_summary = (
+            await self._get_project_summary(host.project_id)
+            if host.project_id is not None
+            else ""
+        )
 
         # ④ token 预算管理：chunk + 相关性排序 + 截断（D1 属性）
         doc_excerpt, knowledge_hits, project_summary = self._enforce_token_budget(
@@ -301,32 +341,22 @@ class ContextBuilder:
     # 内部方法
     # -------------------------------------------------------------------------
 
-    async def _get_doc_content(
-        self, doc_type: str, doc_id: str, project_id: UUID
-    ) -> str:
-        """获取当前文档内容（parsed_data / content_text）"""
-        doc_uuid = UUID(doc_id)
+    async def _get_doc_content(self, host: AuthorizedHostContext) -> str:
+        """获取当前宿主正文（按 ``host.resource_type`` 分派到专属 loader）。
 
-        if doc_type == "workpaper":
-            return await self._get_workpaper_content(doc_uuid, project_id)
-        elif doc_type == "knowledge_doc":
-            return await self._get_knowledge_doc_content(doc_uuid)
-        elif doc_type == "knowledge_folder":
-            return await self._get_knowledge_folder_content(doc_uuid)
-        elif doc_type in ("note", "report"):
-            # 附注/报表：从 parsed_data 获取（结构类似底稿）
-            return await self._get_workpaper_content(doc_uuid, project_id)
-        else:
-            logger.warning(f"未知文档类型: {doc_type}, doc_id={doc_id}")
-            return ""
+        分派表 ``self._doc_loaders`` 覆盖全部 ``HostType`` 且**没有 default 分支** ——
+        新增宿主类型时构造期 assert 立即失败，不会静默落到底稿 loader（Req 3.7）。
+        """
+        return await self._doc_loaders[host.resource_type](host)
 
-    async def _get_workpaper_content(self, doc_id: UUID, project_id: UUID) -> str:
-        """从底稿 parsed_data 提取文本内容"""
+    async def _get_workpaper_content(self, host: AuthorizedHostContext) -> str:
+        """底稿正文：``working_paper JOIN wp_index``，**绑定权威 project_id**。"""
         result = await self._db.execute(
             sa.select(WorkingPaper.parsed_data, WpIndex.wp_code, WpIndex.wp_name)
             .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
             .where(
-                WorkingPaper.id == doc_id,
+                WorkingPaper.id == UUID(host.resource_id),
+                WorkingPaper.project_id == host.project_id,
                 WorkingPaper.is_deleted == sa.false(),
             )
         )
@@ -341,12 +371,87 @@ class ContextBuilder:
         # 从 parsed_data 提取可读文本
         return self._extract_text_from_parsed_data(parsed_data, wp_code, wp_name)
 
-    async def _get_knowledge_doc_content(self, doc_id: UUID) -> str:
+    async def _get_note_content(self, host: AuthorizedHostContext) -> str:
+        """附注正文：``disclosure_notes`` 的 ``text_content`` + ``table_data``。
+
+        绝不调用底稿 loader —— 附注实例 ID 在 ``working_paper`` 里查不到，旧回退分支会让
+        正文恒空（Req 3.2/3.7）。
+        """
+        row = (
+            await self._db.execute(
+                sa.select(
+                    DisclosureNote.note_section,
+                    DisclosureNote.section_title,
+                    DisclosureNote.text_content,
+                    DisclosureNote.table_data,
+                    DisclosureNote.is_stale,
+                ).where(
+                    DisclosureNote.id == UUID(host.resource_id),
+                    DisclosureNote.project_id == host.project_id,
+                    DisclosureNote.is_deleted == sa.false(),
+                )
+            )
+        ).first()
+        if row is None:
+            return ""
+
+        section, title, text_content, table_data, is_stale = row
+        parts: list[str] = [f"[附注 {section} {title}]"]
+        if is_stale:
+            parts.append("[提示：本章节数据已标记为过期，需刷新后引用]")
+        if text_content:
+            parts.append(text_content)
+        table_text = _extract_text_from_note_table(table_data)
+        if table_text:
+            parts.append(table_text)
+        if len(parts) == 1:
+            parts.append(f"[附注 {section}：暂无内容]")
+        return "\n\n".join(parts)
+
+    async def _get_report_content(self, host: AuthorizedHostContext) -> str:
+        """报表正文：``financial_report`` 的行次 + 本期/上期金额。
+
+        报表宿主的稳定 ID 是 report type，实例由 ``(project, year, report_type)`` 确定。
+        绝不调用底稿 loader。
+        """
+        rows = (
+            await self._db.execute(
+                sa.select(
+                    FinancialReport.row_code,
+                    FinancialReport.row_name,
+                    FinancialReport.current_period_amount,
+                    FinancialReport.prior_period_amount,
+                    FinancialReport.is_stale,
+                )
+                .where(
+                    FinancialReport.project_id == host.project_id,
+                    FinancialReport.year == host.year,
+                    FinancialReport.report_type == host.resource_id,
+                    FinancialReport.is_deleted == sa.false(),
+                )
+                .order_by(FinancialReport.row_code)
+                .limit(_REPORT_ROW_LIMIT)
+            )
+        ).all()
+        if not rows:
+            return ""
+
+        parts: list[str] = [f"[{host.display_label} {host.year} 年度]"]
+        if any(r[4] for r in rows):
+            parts.append("[提示：本报表存在已标记过期的行次，需刷新后引用]")
+        lines = [
+            f"{row_code} {row_name or ''} | 本期 {_fmt_amount(cur)} | 上期 {_fmt_amount(prior)}"
+            for row_code, row_name, cur, prior, _stale in rows
+        ]
+        parts.append("\n".join(lines))
+        return "\n".join(parts)
+
+    async def _get_knowledge_doc_content(self, host: AuthorizedHostContext) -> str:
         """从知识库文档获取 content_text"""
         result = await self._db.execute(
             sa.select(KnowledgeDocument.content_text, KnowledgeDocument.name)
             .where(
-                KnowledgeDocument.id == doc_id,
+                KnowledgeDocument.id == UUID(host.resource_id),
                 KnowledgeDocument.is_deleted == sa.false(),
             )
         )
@@ -359,12 +464,12 @@ class ContextBuilder:
             return f"[知识文档 {name}：暂无文本内容]"
         return content_text
 
-    async def _get_knowledge_folder_content(self, folder_id: UUID) -> str:
+    async def _get_knowledge_folder_content(self, host: AuthorizedHostContext) -> str:
         """获取文件夹下所有文档的内容摘要（文件夹级对话）"""
         result = await self._db.execute(
             sa.select(KnowledgeDocument.name, KnowledgeDocument.content_text, KnowledgeDocument.content_summary)
             .where(
-                KnowledgeDocument.folder_id == folder_id,
+                KnowledgeDocument.folder_id == UUID(host.resource_id),
                 KnowledgeDocument.is_deleted == sa.false(),
             )
             .limit(20)  # 限制文档数量避免超 token
@@ -381,27 +486,37 @@ class ContextBuilder:
                 parts.append(f"【{name}】\n{text}")
         return "\n\n".join(parts) if parts else "[文件夹下文档暂无文本内容]"
 
+    async def _get_global_knowledge_content(self, host: AuthorizedHostContext) -> str:
+        """受限全局知识模式：没有宿主文档，正文为空（不伪造项目上下文）。"""
+        return ""
+
     async def _search_related_knowledge(
         self,
         *,
-        project_id: UUID,
+        project_id: UUID | None,
         query: str,
         user: Any,
         extra_scopes: list[str] | None = None,
     ) -> list[SearchHit]:
-        """调用 semantic_search 检索关联知识（D2：只含 user 有权访问的知识文件）"""
+        """调用 semantic_search 检索关联知识（D2：只含 user 有权访问的知识文件）
+
+        ``project_id is None``（受限全局知识模式）时跳过项目级语义检索：
+        项目工具关闭，不用空/猜测的 project 去查索引（Req 3.4）。
+        """
         if not query.strip():
             return []
 
-        try:
-            raw_results = await self._knowledge_svc.semantic_search(
-                project_id=project_id,
-                query=query,
-                top_k=10,
-            )
-        except Exception as e:
-            logger.warning(f"semantic_search 失败: {e}")
-            raw_results = []
+        raw_results: list[dict] = []
+        if project_id is not None:
+            try:
+                raw_results = await self._knowledge_svc.semantic_search(
+                    project_id=project_id,
+                    query=query,
+                    top_k=10,
+                )
+            except Exception as e:
+                logger.warning(f"semantic_search 失败: {e}")
+                raw_results = []
 
         # 转换为 SearchHit（确保每条都有可定位 source — D3）
         hits: list[SearchHit] = []
@@ -436,14 +551,13 @@ class ContextBuilder:
     async def _search_extra_scopes(
         self,
         *,
-        project_id: UUID,
+        project_id: UUID | None,
         query: str,
         folder_ids: list[str],
         user: Any,
     ) -> list[SearchHit]:
-        """检索额外指定文件夹范围的知识文档（D2：权限过滤）"""
-        # 获取用户有权访问的项目 ID 列表
-        user_project_ids = await self._get_user_project_ids(user)
+        """检索额外指定文件夹范围的知识文档（D2：权限过滤走公共 policy）"""
+        subject = await self._knowledge_subject(user)
 
         hits: list[SearchHit] = []
         for folder_id_str in folder_ids:
@@ -452,19 +566,9 @@ class ContextBuilder:
             except (ValueError, TypeError):
                 continue
 
-            # 先检查文件夹权限
-            folder_result = await self._db.execute(
-                sa.select(KnowledgeFolder).where(
-                    KnowledgeFolder.id == folder_id,
-                    KnowledgeFolder.is_deleted == sa.false(),
-                )
-            )
-            folder = folder_result.scalars().first()
-            if not folder:
-                continue
-
-            # D2: 检查用户是否有权访问该文件夹
-            if not self._check_folder_access(folder, user, user_project_ids):
+            # D2: 先判文件夹权限（只取判权三元组，不读 name/正文）
+            folder = await KnowledgeAccessPolicy.load_folder_permission(self._db, folder_id)
+            if folder is None or not KnowledgeAccessPolicy.can_read(subject, folder):
                 continue
 
             result = await self._db.execute(
@@ -485,10 +589,11 @@ class ContextBuilder:
             )
             rows = result.all()
             for doc_id, doc_name, content_text, doc_access_level, doc_project_ids, doc_created_by in rows:
-                # D2: 检查文档级权限
-                if not self._check_doc_access(
-                    doc_access_level, doc_project_ids, doc_created_by,
-                    user, user_project_ids,
+                # D2: 文档级权限（access_level 为 None 时继承已判定的文件夹）
+                if not KnowledgeAccessPolicy.can_read_document(
+                    subject,
+                    KnowledgeResource.of_row(doc_access_level, doc_project_ids, doc_created_by),
+                    folder,
                 ):
                     continue
 
@@ -505,20 +610,21 @@ class ContextBuilder:
 
     # -------------------------------------------------------------------------
     # 权限过滤（D2 属性：对话上下文只含 user 有权访问的知识文件）
+    #
+    # 判定逻辑本身不在此处实现 —— 唯一真源是公共
+    # ``app.services.knowledge_access_policy.KnowledgeAccessPolicy``
+    # （Feature dsh-agent-panel-integration Req 2.1/2.2：私有 ContextBuilder 方法
+    # 不得充当跨路由授权 API）。本类只负责取数与编排。
     # -------------------------------------------------------------------------
 
-    async def _get_user_project_ids(self, user: Any) -> list[UUID]:
-        """获取用户所属的项目 ID 列表"""
-        if not user or not getattr(user, "id", None):
-            return []
-
-        result = await self._db.execute(
-            sa.select(ProjectUser.project_id).where(
-                ProjectUser.user_id == user.id,
-                ProjectUser.is_deleted == sa.false(),
-            )
-        )
-        return [row[0] for row in result.all()]
+    async def _knowledge_subject(self, user: Any) -> KnowledgeAccessSubject:
+        """解析知识库判定主体（current user + project scope），逐次调用只查一次成员关系。"""
+        cached = getattr(self, "_subject_cache", None)
+        if cached is not None and cached[0] is user:
+            return cached[1]
+        subject = await KnowledgeAccessPolicy.resolve_subject(self._db, user)
+        self._subject_cache = (user, subject)
+        return subject
 
     async def _filter_hits_by_permission(
         self, hits: list[SearchHit], user: Any
@@ -570,11 +676,9 @@ class ContextBuilder:
         )
         doc_permissions = {row[0]: row for row in result.all()}
 
-        # 获取用户项目 ID 列表
-        user_project_ids = await self._get_user_project_ids(user)
-        user_id = getattr(user, "id", None)
+        subject = await self._knowledge_subject(user)
 
-        # 过滤
+        # 过滤（判定唯一走公共 KnowledgeAccessPolicy）
         allowed_hits: list[SearchHit] = []
         for hit in knowledge_hits:
             try:
@@ -588,76 +692,14 @@ class ContextBuilder:
 
             _doc_id, doc_access, doc_proj_ids, doc_created_by, folder_access, folder_proj_ids, folder_created_by = perm
 
-            # 文档自身权限优先，None 则继承文件夹权限
-            effective_access = doc_access if doc_access is not None else folder_access
-            effective_proj_ids = doc_proj_ids if doc_access is not None else folder_proj_ids
-            effective_created_by = doc_created_by if doc_access is not None else folder_created_by
-
-            if self._user_has_access(
-                effective_access, effective_proj_ids, effective_created_by,
-                user_id, user_project_ids,
+            if KnowledgeAccessPolicy.can_read_document(
+                subject,
+                KnowledgeResource.of_row(doc_access, doc_proj_ids, doc_created_by),
+                KnowledgeResource.of_row(folder_access, folder_proj_ids, folder_created_by),
             ):
                 allowed_hits.append(hit)
 
         return other_hits + allowed_hits
-
-    @staticmethod
-    def _check_folder_access(
-        folder: KnowledgeFolder, user: Any, user_project_ids: list[UUID]
-    ) -> bool:
-        """检查用户是否有权访问指定文件夹"""
-        user_id = getattr(user, "id", None)
-        if folder.access_level == KnowledgeAccessLevel.public:
-            return True
-        elif folder.access_level == KnowledgeAccessLevel.project_group:
-            if user_project_ids and folder.project_ids:
-                return any(
-                    str(pid) in [str(x) for x in folder.project_ids]
-                    for pid in user_project_ids
-                )
-            return False
-        elif folder.access_level == KnowledgeAccessLevel.private:
-            return user_id is not None and folder.created_by == user_id
-        return False
-
-    @staticmethod
-    def _check_doc_access(
-        doc_access_level: KnowledgeAccessLevel | None,
-        doc_project_ids: list | None,
-        doc_created_by: UUID | None,
-        user: Any,
-        user_project_ids: list[UUID],
-    ) -> bool:
-        """检查用户是否有权访问指定文档（文档级权限）"""
-        if doc_access_level is None:
-            # 继承文件夹权限 — 文件夹已在上层检查通过
-            return True
-        return ContextBuilder._user_has_access(
-            doc_access_level, doc_project_ids, doc_created_by,
-            getattr(user, "id", None), user_project_ids,
-        )
-
-    @staticmethod
-    def _user_has_access(
-        access_level: KnowledgeAccessLevel | None,
-        project_ids: list | None,
-        created_by: UUID | None,
-        user_id: UUID | None,
-        user_project_ids: list[UUID],
-    ) -> bool:
-        """通用权限判断：用户是否有权访问指定资源"""
-        if access_level is None or access_level == KnowledgeAccessLevel.public:
-            return True
-        elif access_level == KnowledgeAccessLevel.project_group:
-            if user_project_ids and project_ids:
-                return any(
-                    str(pid) in [str(x) for x in project_ids]
-                    for pid in user_project_ids
-                )
-            return False
-        elif access_level == KnowledgeAccessLevel.private:
-            return user_id is not None and created_by == user_id
-        return False
 
     async def _get_project_summary(self, project_id: UUID) -> str:
         """获取项目摘要信息"""
@@ -748,6 +790,67 @@ class ContextBuilder:
 # ---------------------------------------------------------------------------
 # 辅助函数
 # ---------------------------------------------------------------------------
+
+
+#: 报表宿主单次纳入的最大行次数（超出由 token 预算再裁剪）。
+_REPORT_ROW_LIMIT = 200
+
+#: 附注 table_data 单表纳入的最大行数。
+_NOTE_TABLE_ROW_LIMIT = 60
+
+
+def _fmt_amount(value: Decimal | float | None) -> str:
+    """报表金额的上下文文本形态（缺失用 ``-``，不伪造 0）。"""
+    if value is None:
+        return "-"
+    return f"{value:,.2f}"
+
+
+def _extract_text_from_note_table(table_data: Any) -> str:
+    """从附注 ``table_data`` 提取可读文本。
+
+    附注子表的规范形态是 ``{key: [{label, values...}]}`` 或
+    ``{rows: [{label, values}]}``（见 memory §sub_table_data）。此处只做**读取**，
+    不重新实现投影逻辑，也不假设固定列数。
+    """
+    if not isinstance(table_data, dict):
+        return ""
+
+    def _rows_text(rows: Any) -> list[str]:
+        out: list[str] = []
+        if not isinstance(rows, list):
+            return out
+        for row in rows[:_NOTE_TABLE_ROW_LIMIT]:
+            if isinstance(row, dict):
+                label = row.get("label") or row.get("name") or ""
+                values = row.get("values")
+                if isinstance(values, list):
+                    cells = " | ".join("" if v is None else str(v) for v in values)
+                else:
+                    cells = " | ".join(
+                        f"{k}={v}" for k, v in row.items() if k not in ("label", "name")
+                    )
+                line = f"{label} | {cells}".strip(" |")
+                if line:
+                    out.append(line)
+            elif isinstance(row, list):
+                line = " | ".join("" if c is None else str(c) for c in row)
+                if line.strip(" |"):
+                    out.append(line)
+        return out
+
+    parts: list[str] = []
+    if isinstance(table_data.get("rows"), list):
+        lines = _rows_text(table_data["rows"])
+        if lines:
+            parts.append("\n".join(lines))
+    for key, value in table_data.items():
+        if key in ("rows", "_column_groups", "_cell_meta", "_cell_modes"):
+            continue
+        lines = _rows_text(value)
+        if lines:
+            parts.append(f"【{key}】\n" + "\n".join(lines))
+    return "\n\n".join(parts)
 
 
 def _strip_html_tags(html: str) -> str:

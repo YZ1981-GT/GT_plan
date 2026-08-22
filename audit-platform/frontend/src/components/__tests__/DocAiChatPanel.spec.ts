@@ -35,12 +35,20 @@ const mockFetch = vi.fn()
 global.fetch = mockFetch
 
 import DocAiChatPanel from '../DocAiChatPanel.vue'
+import {
+  buildKnowledgeFolderHost,
+  buildNoteHost,
+  buildReportHost,
+  buildWorkpaperHost,
+} from '@/composables/useAiHostContext'
+
+// Task 2 起面板只接受一个 host prop（由宿主 adapter 构造），不再拼四个松散标量。
+const WP_ID = '11111111-1111-4111-8111-111111111111'
+const PROJECT_ID = '22222222-2222-4222-8222-222222222222'
+const FOLDER_ID = '33333333-3333-4333-8333-333333333333'
 
 const defaultProps = {
-  docType: 'workpaper',
-  docId: 'wp-001',
-  projectId: 'proj-123',
-  year: 2025,
+  host: buildWorkpaperHost({ wpId: WP_ID, projectId: PROJECT_ID, auditYear: 2025 }),
   visible: true,
 }
 
@@ -77,7 +85,7 @@ describe('DocAiChatPanel', () => {
     const wrapper = mountPanel()
     await flushPromises()
     expect(wrapper.text()).toContain('底稿')
-    expect(wrapper.text()).toContain('wp-001')
+    expect(wrapper.text()).toContain(WP_ID)
   })
 
   it('空消息时显示空状态提示', async () => {
@@ -123,13 +131,17 @@ describe('DocAiChatPanel', () => {
     expect(wrapper.text()).toContain('§3')
   })
 
+  // dsh-agent-panel-integration / Task 7：采纳只引用**服务端签发**的 message ID（UUID），
+  // 本地占位 ID 会在发请求前被拒 ⇒ 这里必须用服务端形态的 ID。
+  const SERVER_MESSAGE_ID = '7c9e6679-7425-40de-944b-e07fc1f90ae7'
+
   it('采纳按钮 emit adopt 事件', async () => {
     const wrapper = mountPanel()
     await flushPromises()
 
     const vm = wrapper.vm as any
     vm.messages = [
-      { id: 'msg-1', role: 'assistant', text: 'AI 建议内容', citations: [] },
+      { id: SERVER_MESSAGE_ID, role: 'assistant', text: 'AI 建议内容', citations: [] },
     ]
     await flushPromises()
 
@@ -137,11 +149,30 @@ describe('DocAiChatPanel', () => {
     const adoptBtn = wrapper.find('.message-actions button')
     expect(adoptBtn.exists()).toBe(true)
     await adoptBtn.trigger('click')
+    await flushPromises()
 
     expect(wrapper.emitted('adopt')).toBeTruthy()
     expect(wrapper.emitted('adopt')![0]).toEqual([
-      { content: 'AI 建议内容', messageId: 'msg-1' },
+      { content: 'AI 建议内容', messageId: SERVER_MESSAGE_ID },
     ])
+  })
+
+  it('采纳：本地占位 ID 不 emit adopt（Task 7 / Req 8.1）', async () => {
+    const wrapper = mountPanel()
+    await flushPromises()
+
+    const vm = wrapper.vm as any
+    vm.messages = [
+      { id: 'ai_1712345678', role: 'assistant', text: '流式刚生成的回复', citations: [] },
+    ]
+    await flushPromises()
+
+    const adoptBtn = wrapper.find('.message-actions button')
+    await adoptBtn.trigger('click')
+    await flushPromises()
+
+    // 确认流未建立 ⇒ 不得 emit adopt（否则父组件会以为内容已被接受）
+    expect(wrapper.emitted('adopt')).toBeFalsy()
   })
 
   it('@mention 按钮切换 scope 选择器', async () => {
@@ -173,15 +204,25 @@ describe('DocAiChatPanel', () => {
   })
 
   it('文档类型映射正确', async () => {
-    const noteWrapper = mountPanel({ docType: 'note' })
+    const noteWrapper = mountPanel({
+      host: buildNoteHost({ noteSection: '五、7', projectId: PROJECT_ID, year: 2025 }),
+    })
     await flushPromises()
     expect(noteWrapper.text()).toContain('附注')
 
-    const reportWrapper = mountPanel({ docType: 'report' })
+    const reportWrapper = mountPanel({
+      host: buildReportHost({
+        reportType: 'balance_sheet',
+        projectId: PROJECT_ID,
+        year: 2025,
+      }),
+    })
     await flushPromises()
     expect(reportWrapper.text()).toContain('报表')
 
-    const folderWrapper = mountPanel({ docType: 'knowledge_folder' })
+    const folderWrapper = mountPanel({
+      host: buildKnowledgeFolderHost({ folderId: FOLDER_ID }),
+    })
     await flushPromises()
     expect(folderWrapper.text()).toContain('知识库文件夹')
   })

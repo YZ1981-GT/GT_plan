@@ -248,15 +248,10 @@
       </template>
     </el-dialog>
 
-    <!-- AI 文档对话面板（文件夹级） -->
-    <DocAiChatPanel
-      :doc-type="'knowledge_folder'"
-      :doc-id="selectedFolder?.id || ''"
-      :project-id="''"
-      :year="new Date().getFullYear()"
+    <!-- AI 对话面板（统一内核；文件夹级宿主契约由 useAiHostContext 的知识库 adapter 构造） -->
+    <PlatformAiChatPanel
+      :host="aiHost"
       :visible="showDocAiChat"
-      @update:visible="showDocAiChat = $event"
-      @close="showDocAiChat = false"
       @adopt="onDocAiAdopt"
     />
   </div>
@@ -276,7 +271,8 @@ import { knowledgeLibrary as P_kl } from '@/services/apiPaths'
 import { downloadFile } from '@/utils/http'
 import { handleApiError } from '@/utils/errorHandler'
 import { rules } from '@/utils/formRules'
-import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
+import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
+import { buildKnowledgeFolderHost } from '@/composables/useAiHostContext'
 
 const router = useRouter()
 const route = useRoute()
@@ -291,6 +287,17 @@ const currentWpContext = computed(() => {
 function goHome() {
   router.push('/projects')
 }
+
+// ─── AI 宿主上下文（dsh-agent-panel-integration Req 3.3/3.4/3.5） ──────────────
+// 知识库是全局页面：没有项目上下文时 projectId 传 **null**（旧实现传 `''` 伪装有效项目 ID，
+// 年度还用 `new Date().getFullYear()` 猜）。从项目内跳转进来时才带 project 断言。
+// 搜索结果视图的 selectedFolder 没有 id → adapter 返回显式不可用 + 中文原因。
+const aiHost = computed(() =>
+  buildKnowledgeFolderHost({
+    folderId: selectedFolder.value?.id,
+    projectId: route.query.project_id,
+  }),
+)
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(_payload: { content: string; messageId: string }) {

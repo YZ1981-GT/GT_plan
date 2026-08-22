@@ -14,6 +14,7 @@ Spec: .kiro/specs/disclosure-note-knowledge-ai-enrichment/ Task 7
 from __future__ import annotations
 
 import asyncio
+from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
@@ -45,7 +46,28 @@ def _user() -> User:
 
 
 class _Row(tuple):
-    """模拟 db.execute(...).one_or_none() 返回的 (section_title, account_name) 行。"""
+    """模拟 db.execute(...).one_or_none() 返回的 (id, section_title, account_name) 行。"""
+
+
+#: 夹具附注实例 ID（Task 7 起 ai-fill 需要它来签发可采纳的 assistant 消息）。
+NOTE_INSTANCE_ID = uuid4()
+
+
+@contextmanager
+def _stub_draft_message(issued=NOTE_INSTANCE_ID):
+    """替身掉"服务端签发草稿消息"这一步（dsh-agent-panel-integration Task 7）。
+
+    本文件的判据是 ai-fill **预览**逻辑（兜底、degraded、skipped_docs、reference_only），
+    用的是 MagicMock 数据库；消息签发是真正 DB 绑定的能力，其判据落在
+    ``backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py`` 的真实 PostgreSQL
+    上（签发 → 采纳整条链）。函数名耦合：``_issue_note_draft_message`` 改名即让本文件
+    响亮失败，而不是静默放行。
+    """
+    with patch(
+        "app.routers.disclosure_notes._issue_note_draft_message",
+        new=AsyncMock(return_value=issued),
+    ) as stub:
+        yield stub
 
 
 class _OneOrNoneResult:
@@ -91,7 +113,9 @@ class TestAiFillEndpoint:
     def _db_with_section(self, *, doc_active=None):
         """db.execute 依次返回：section 行 → (可选) doc_filter 活跃文档。"""
         db = MagicMock()
-        results = [_OneOrNoneResult(("应收账款", "应收账款"))]
+        results = [
+            _OneOrNoneResult((NOTE_INSTANCE_ID, "应收账款", "应收账款"))
+        ]
         if doc_active is not None:
             results.append(_ScalarsResult(doc_active))
         db.execute = AsyncMock(side_effect=results)
@@ -99,12 +123,17 @@ class TestAiFillEndpoint:
         db.flush = AsyncMock()
         return db
 
-    def test_p11_ai_fill_does_not_write_db(self):
-        """P11：ai-fill 只返回预览，绝不写库（无 commit/flush，enricher 不落库）。"""
+    def test_p11_ai_fill_does_not_write_note_text_content(self):
+        """P11：ai-fill 只返回预览，绝不写 ``DisclosureNote.text_content``。
+
+        Task 7 后端点会额外**签发一条 assistant 消息**（写 ai_chat_message，供采纳按 ID
+        引用）。这与 P11 不冲突：P11 约束的是附注正文列。因此判据从"完全没有 commit"
+        收紧为"没有任何针对 disclosure_notes 的写语句"，并把消息签发单独替身出去。
+        """
         db = self._db_with_section()
         draft = GroundedDraft(text="生成的附注正文", citations=[_citation()], degraded=False)
 
-        with patch(
+        with _stub_draft_message() as issue, patch(
             "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.generate_note_text",
             new=AsyncMock(return_value=draft),
         ):
@@ -122,16 +151,49 @@ class TestAiFillEndpoint:
         assert len(result["citations"]) == 1
         assert result["citations"][0]["document_name"] == "上年审计报告及附注.pdf"
         assert result["citations"][0]["is_stale"] is False
-        # 不落库：无写操作
+        # 端点自身零写入：唯一 SELECT 之外没有 UPDATE/INSERT，也没有 commit/flush
         db.commit.assert_not_awaited()
         db.flush.assert_not_awaited()
+        for call in db.execute.await_args_list:
+            stmt = str(call.args[0]).upper()
+            assert not stmt.startswith(("UPDATE", "INSERT", "DELETE")), (
+                f"ai-fill 竟发出写语句：{stmt[:80]}"
+            )
+        # 服务端签发消息（供采纳按 ID 引用），且用的是附注**实例 ID** 而非 section key
+        issue.assert_awaited_once()
+        assert issue.await_args.kwargs["note_instance_id"] == NOTE_INSTANCE_ID
+        assert issue.await_args.kwargs["text"] == "生成的附注正文"
+        assert result["message_id"] == str(NOTE_INSTANCE_ID)
+
+    def test_ai_fill_message_id_is_none_when_not_issued(self):
+        """签发失败/不适用时 ``message_id`` 为 None（前端据此禁用采纳）。
+
+        dsh-agent-panel-integration Req 8.1：宁可让采纳不可用，也不退回让客户端提交正文。
+        """
+        db = self._db_with_section()
+        draft = GroundedDraft(text="生成的附注正文", citations=[], degraded=False)
+
+        with _stub_draft_message(issued=None), patch(
+            "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.generate_note_text",
+            new=AsyncMock(return_value=draft),
+        ):
+            result = _run(
+                notes_router.ai_fill_note_section(
+                    PROJECT_ID, 2025, "五、3",
+                    notes_router.NoteAiFillRequest(),
+                    db, _user(),
+                )
+            )
+
+        assert result["text"] == "生成的附注正文"
+        assert result["message_id"] is None
 
     def test_degraded_flag_passthrough(self):
         """enricher 返回 degraded=True（无 RAG 依据/降级）→ resp.degraded True。"""
         db = self._db_with_section()
         draft = GroundedDraft(text=None, citations=[], degraded=True)
 
-        with patch(
+        with _stub_draft_message(), patch(
             "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.generate_note_text",
             new=AsyncMock(return_value=draft),
         ):
@@ -155,7 +217,7 @@ class TestAiFillEndpoint:
         db = self._db_with_section(doc_active=[valid])
         draft = GroundedDraft(text="正文", citations=[], degraded=False)
 
-        with patch(
+        with _stub_draft_message(), patch(
             "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.generate_note_text",
             new=AsyncMock(return_value=draft),
         ):
@@ -176,7 +238,7 @@ class TestAiFillEndpoint:
         draft = GroundedDraft(text=None, citations=[_citation()], degraded=True)
         gen = AsyncMock(return_value=draft)
 
-        with patch(
+        with _stub_draft_message() as issue, patch(
             "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.generate_note_text",
             new=gen,
         ):
@@ -193,6 +255,8 @@ class TestAiFillEndpoint:
         # reference_only 只回片段：text=None + citations 非空
         assert result["text"] is None
         assert len(result["citations"]) == 1
+        # reference_only 透传到签发层（由它判定"没有生成正文 ⇒ 不签发"）
+        assert issue.await_args.kwargs["reference_only"] is True
 
     def test_section_title_fallback_to_note_section(self):
         """章节记录缺失时 section_title 用 note_section 兜底，仍能生成。"""
@@ -202,7 +266,7 @@ class TestAiFillEndpoint:
         draft = GroundedDraft(text="兜底生成", citations=[], degraded=False)
         gen = AsyncMock(return_value=draft)
 
-        with patch(
+        with _stub_draft_message(issued=None) as issue, patch(
             "app.services.note_knowledge_enricher.NoteKnowledgeEnricher.generate_note_text",
             new=gen,
         ):
@@ -217,6 +281,9 @@ class TestAiFillEndpoint:
         # section_title 兜底为 note_section
         assert gen.await_args.args[3] == "五、99"
         assert result["text"] == "兜底生成"
+        # 章节未实例化 ⇒ 没有可寻址的附注实例 ID ⇒ 不签发消息、采纳不可用
+        assert issue.await_args.kwargs["note_instance_id"] is None
+        assert result["message_id"] is None
 
 
 # ===========================================================================

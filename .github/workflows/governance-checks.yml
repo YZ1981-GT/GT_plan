@@ -5290,3 +5290,235 @@ jobs:
         run: |
           python backend/scripts/diagnose/mutate_mutation_kit_guards.py --check-anchors
           python backend/scripts/diagnose/mutate_e1_variant_recalc_guards.py --check-anchors
+
+  dsh-agent-panel-backend:
+    # DSH Agent Panel Integration — 后端跨阶段守卫
+    # Spec: dsh-agent-panel-integration / Task 32
+    # 覆盖 Properties 1–33, 38（access/host/run/context/attachment/note/review/MCP/DSH）
+    # 697 tests across 21 files（backend/tests/dsh_agent_panel/ 508 + 其余 6 个文件 189）
+    #
+    # 🔴 postgres service 是**必需项**而非优化项 —— 实测数据（2026-08-16，本地同一工作树）：
+    #     DATABASE_URL=postgresql+asyncpg://…  → 508 passed /   0 skipped / exit 0
+    #     DATABASE_URL=sqlite+aiosqlite:///…   → 325 passed / 183 skipped / exit 0
+    # `backend/tests/dsh_agent_panel/_fixtures.py` 的
+    # `IS_PG = app_settings.DATABASE_URL.startswith("postgresql")` 让 183 条 PG 依赖守卫
+    # 在非 PG 环境下被 `pytest.mark.skipif` 跳过，**而 job 仍以 0 退出** ⇒ 静默 skip 假绿：
+    # 「测试存在且 CI 绿」不等于「测试真跑过」。此前本 job 无 service，那 183 条从未在 CI 执行。
+    # 其余 6 个文件（189 tests）实测 PG 无关（sqlite 下 189 passed / 0 skipped），
+    # 但仍在同一 job 内复用该 service，无需分拆。
+    #
+    # 🔴 只读，不写业务库：夹具在独立连接 + 独立事务内插入并整体回滚（见 `_fixtures.py`
+    # 的 `run_with_fixture`）。末尾另有硬断言防静默 skip 复发。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # 🔴 必须 pgvector 镜像，不能用裸 postgres:16 —— `Base.metadata.create_all` 里有
+        # `VECTOR(1024)` 列（knowledge 索引），裸镜像上报 `type "vector" does not exist`
+        # 而整个建表步骤失败（实测）。与本地 dev 的 pgvector/pgvector:pg16 保持一致。
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      # 🔴 挡住 init_tables.py 的 seed 端点回调（CI 无后端时它本就跳过，这里显式钉死，
+      # 避免将来 runner 上恰好有服务监听 9980 时把种子写进别人的库）。
+      API_BASE_URL: http://127.0.0.1:9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt -q
+      # ---------------------------------------------------------------------
+      # 🔴 空库引导顺序是实测出来的，三步都不能省也不能换序（2026-08-16 在本地
+      # 全新库 audit_platform_ci_probe2 上验证，最终 508 passed / 0 skipped）：
+      #
+      # ① `CREATE EXTENSION vector` —— create_all 需要 VECTOR 类型。
+      # ② `init_tables.py`（= `Base.metadata.create_all`，278 张表）—— 平台的基础
+      #    schema **由 ORM 建、不由迁移建**；`backend/migrations/V*.sql` 绝大多数是
+      #    `ALTER TABLE` 增量。空库直接跑迁移会有 124 个失败
+      #    （`relation "projects" does not exist`）**而 run_pending() 仍返回成功**。
+      # ③ DROP V147 拥有的 4 张 ai_chat_* 表，再跑迁移。
+      #    原因：V147 用 `CREATE TABLE IF NOT EXISTS` 建这 4 张表，并把 CHECK 约束与
+      #    `ON DELETE RESTRICT` 外键**写在建表语句内**（ORM 故意不重复声明，见
+      #    `app/models/ai_models.py` 注释）。create_all 先建出 ORM 形态后，V147 的
+      #    CREATE TABLE 整段被跳过 ⇒ 约束永远加不上 ⇒
+      #    `test_task3_chat_persistence.py` 10 条打红（实测）。
+      #    V147 又 `ALTER TABLE ai_chat_message / ai_chat_session`，所以它也不能在
+      #    create_all **之前**跑（那两张表还不存在）⇒ 只能「建完再删这 4 张、让 V147
+      #    自己建」。这是 CI 引导层的处理，不改任何生产迁移。
+      # ---------------------------------------------------------------------
+      - name: Bootstrap schema (create_all → drop V147-owned tables → migrations)
+        working-directory: backend
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed])"
+      - name: Assert V147 constraints actually landed
+        # 🔴 上一步的 DROP+迁移若被将来的改动打乱顺序，V147 会静默变成 no-op，
+        # 表面上只是 test_task3 打红、根因很难查。这里直接对 DB 断言。
+        env:
+          PGPASSWORD: postgres
+        run: >-
+          psql -h localhost -U postgres -d audit_platform -tAc
+          "SELECT count(*) FROM pg_constraint WHERE conname IN
+          ('ck_ai_chat_runs_status','ck_ai_chat_runs_engine','ck_ai_chat_runs_host_type',
+          'ck_ai_chat_tool_calls_status','ck_ai_chat_attachments_ocr_status',
+          'ck_ai_chat_action_receipts_action','ck_ai_chat_action_receipts_status');"
+          | tee /tmp/v147_constraints.txt
+          && test "$(cat /tmp/v147_constraints.txt)" = "7"
+      - name: Phase A 守卫 (access/host/run/persistence/coordinator/engine/adopt)
+        # `-rs` 让「PG 不可达 ⇒ skip」的原因出现在日志里，不再无声通过
+        run: python -m pytest backend/tests/dsh_agent_panel/ -v --tb=short -rs
+      - name: MCP REST gates + scoped token
+        run: python -m pytest backend/tests/test_ai_chat_mcp_router.py backend/tests/test_ai_chat_mcp_token.py -v --tb=short -rs
+      - name: Audit metrics + rate limiting
+        run: python -m pytest backend/tests/test_ai_chat_task12_audit_metrics.py -v --tb=short -rs
+      - name: DSH masking + injection boundary + tool audit
+        run: python -m pytest backend/tests/test_ai_chat_task29_dsh_masking.py -v --tb=short -rs
+      - name: audit-data MCP server (tool catalog / zero-DB / budget)
+        run: python -m pytest backend/tests/test_audit_data_mcp_server.py -v --tb=short -rs
+      - name: DSH SDK discovery + Cordis smoke
+        run: python -m pytest backend/tests/test_dsh_discovery_task27.py -v --tb=short -rs
+      - name: Assert PG-dependent guards actually ran (anti silent-skip)
+        # 🔴 上面第一步在 PG 不可达时会把 183 条 PG 依赖守卫整体 skip 并仍以 0 退出。
+        # 这一步用 `-q -rs` 复跑并解析摘要：passed 低于实测基线 508 或出现任何 skipped 即打红。
+        # 判据用 python 做数值比较（>=508 的 grep 正则不可维护），形态与
+        # `dsh-agent-panel-mcp-data` 的同名步骤一致。
+        run: >-
+          python -m pytest backend/tests/dsh_agent_panel/ -q -rs --tb=no
+          | tee /tmp/dsh_backend_phase_a.txt
+          && python -c "import re,sys; t=open('/tmp/dsh_backend_phase_a.txt',encoding='utf-8',errors='replace').read(); p=sum(map(int,re.findall(r'(\d+) passed',t))); s=sum(map(int,re.findall(r'(\d+) skipped',t))); print('phase_a passed=%d skipped=%d floor=508'%(p,s)); sys.exit(0 if (p>=508 and s==0) else 1)"
+      - name: Assert non-PG guards actually ran (anti silent-skip)
+        # 其余 6 个文件实测基线 189 passed / 0 skipped（PG 与 sqlite 下同值）。
+        run: >-
+          python -m pytest
+          backend/tests/test_ai_chat_mcp_router.py
+          backend/tests/test_ai_chat_mcp_token.py
+          backend/tests/test_ai_chat_task12_audit_metrics.py
+          backend/tests/test_ai_chat_task29_dsh_masking.py
+          backend/tests/test_audit_data_mcp_server.py
+          backend/tests/test_dsh_discovery_task27.py
+          -q -rs --tb=no
+          | tee /tmp/dsh_backend_rest.txt
+          && python -c "import re,sys; t=open('/tmp/dsh_backend_rest.txt',encoding='utf-8',errors='replace').read(); p=sum(map(int,re.findall(r'(\d+) passed',t))); s=sum(map(int,re.findall(r'(\d+) skipped',t))); print('rest passed=%d skipped=%d floor=189'%(p,s)); sys.exit(0 if (p>=189 and s==0) else 1)"
+
+  dsh-agent-panel-frontend:
+    # DSH Agent Panel Integration — 前端跨阶段守卫
+    # Spec: dsh-agent-panel-integration / Task 32
+    # 覆盖 Properties 9, 13, 19–24, 34–39（transport/core/sanitize/a11y/mention/OCR/note/review/capability）
+    # 242 tests across 14 files（2026-08-16 实测；含同目录的 AiContent* 三个 spec）
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend deps
+        run: npm ci
+        working-directory: audit-platform/frontend
+      - name: AI Chat Panel guards (Phase A/B/C)
+        run: npx vitest run src/components/ai/__tests__/ --reporter=verbose
+        working-directory: audit-platform/frontend
+      - name: chatRunState store (Property 9, 39)
+        run: npx vitest run src/stores/__tests__/chatRunState.spec.ts --reporter=verbose
+        working-directory: audit-platform/frontend
+      - name: SSE typed contract (Property 9)
+        run: npx vitest run src/__tests__/sseEventTypes.spec.ts --reporter=verbose
+        working-directory: audit-platform/frontend
+      - name: useAiChat composable (Property 9, 39)
+        run: npx vitest run src/__tests__/useAiChat.spec.ts --reporter=verbose
+        working-directory: audit-platform/frontend
+
+  dsh-agent-panel-mcp-data:
+    # DSH Agent Panel Integration — MCP 7 个只读工具的**取数数据流**守卫
+    # Spec: dsh-agent-panel-integration / 补 Task 25/26 责任真空
+    # 覆盖 Properties 16, 26, 28, 30（返回值非空 / 禁占位 / 越权拒绝 / 五角色脱敏）
+    # 25 tests in backend/tests/test_ai_chat_mcp_tools_data.py
+    #
+    # 背景：7 个 `_tool_*` dispatcher 上线时全是空占位（`{"items": []}` /
+    # `{"status": "placeholder"}`）。三层管道（REST → stdio server → DshEngine）全通、
+    # Phase C 207 测试全绿 —— 因为没有一条测试断言过返回值。Task 25 拥有安全边界、
+    # Task 26 拥有调用方，取数实现**谁都不拥有** ⇒ 责任真空。
+    #
+    # 🔴 为什么单开一个 job 而不并入 `dsh-agent-panel-backend`：
+    # 这批判据的核心是「给定真实数据，工具返回非空」，依赖 migrations 后的四表 schema
+    # （叶子聚合 / JSONB parsed_data / 可见集 UNION ALL 在 sqlite 上给假绿），
+    # 且失败面与 Phase A/B/C 守卫互相独立，分开更易定位。
+    # （`dsh-agent-panel-backend` 现已同样带 postgres service —— 见该 job 的实测数据。）
+    #
+    # 🔴 只读，不写业务库：夹具在独立连接 + 独立事务内插入并整体回滚。
+    # `-rs` 让「PG 不可达」的 skip 原因出现在日志里；末尾另有硬断言防静默 skip。
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # 🔴 pgvector 镜像（裸 postgres:16 上 create_all 因 VECTOR 类型缺失而失败，实测）
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      API_BASE_URL: http://127.0.0.1:9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt -q
+      # 引导顺序与 `dsh-agent-panel-backend` 完全一致（原因见该 job 的长注释：
+      # 空库直接跑迁移会有 124 个失败而 run_pending() 仍返回成功；基础 schema 由
+      # ORM create_all 建；V147 拥有的 4 张 ai_chat_* 表必须先 DROP 再让迁移建，
+      # 否则其 CHECK / RESTRICT 外键永远加不上）。
+      - name: Bootstrap schema (create_all → drop V147-owned tables → migrations)
+        working-directory: backend
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
+          python -c "import asyncio; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed])"
+      - name: MCP tool data-flow guards (non-empty / no-placeholder / authz / masking)
+        run: >-
+          python -m pytest
+          backend/tests/test_ai_chat_mcp_tools_data.py
+          -v --tb=short -rs
+      - name: Assert guards actually ran (anti silent-skip)
+        # 🔴 上一步在 PG 不可达时会整文件 skip 并仍以 0 退出 —— 那是本 spec 明令禁止的
+        # 假绿形态。这一步用 `-q` 复跑并解析摘要，passed < 25 或出现 skipped 即打红。
+        run: >-
+          python -m pytest backend/tests/test_ai_chat_mcp_tools_data.py -q -rs
+          | tee /tmp/mcp_data_summary.txt
+          && grep -qE "2[5-9] passed|[3-9][0-9] passed" /tmp/mcp_data_summary.txt
+          && ! grep -qE "[0-9]+ skipped" /tmp/mcp_data_summary.txt
+      - name: Mutation anchors static self-check (M01-M35)
+        run: python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --check-anchors

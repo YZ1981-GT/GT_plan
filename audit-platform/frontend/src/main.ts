@@ -22,11 +22,15 @@ import { vPermission } from './directives/permission'
 import { registerServiceWorker } from './composables/useOfflineCache'
 import vTabWheel from './directives/vTabWheel'
 import { installCrossWpEventBridge } from './utils/crossWpEventBridge'
+import { clearOnUpgrade } from './utils/aiChatCacheCleanup'
 
 // 跨底稿事件传输桥（P0）：统一 window CustomEvent ⇄ mitt eventBus，
 // 归一 substantive:adjudicated / disclosure:note-text-updated payload。
 // 必须在任何组件挂载前安装，确保所有生产者/消费者互通。
 installCrossWpEventBridge()
+
+// Task 10: 首次升级时清理遗留 AI 聊天敏感缓存（doc_ai_chat_*）
+clearOnUpgrade()
 
 const app = createApp(App)
 

@@ -911,15 +911,10 @@
   <!-- V3 Req 10.4: 可解释状态机面板 -->
   <StatusMachinePanel ref="smPanelRef" module="report" :instance-id="reportInstanceId" />
 
-  <!-- AI 文档对话面板 -->
-  <DocAiChatPanel
-    :doc-type="'report'"
-    :doc-id="projectId"
-    :project-id="projectId"
-    :year="year"
+  <!-- AI 对话面板（统一内核；宿主契约由 useAiHostContext 的报表 adapter 构造） -->
+  <PlatformAiChatPanel
+    :host="aiHost"
     :visible="showDocAiChat"
-    @update:visible="showDocAiChat = $event"
-    @close="showDocAiChat = false"
     @adopt="onDocAiAdopt"
   />
 </template>
@@ -973,7 +968,8 @@ import { useReportData } from './composables/useReportData'
 import { useReportExport } from './composables/useReportExport'
 import { useReportMapping } from './composables/useReportMapping'
 import { useReportCellActions } from './composables/useReportCellActions'
-import DocAiChatPanel from '@/components/DocAiChatPanel.vue'
+import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
+import { buildReportHost } from '@/composables/useAiHostContext'
 
 const route = useRoute()
 const router = useRouter()
@@ -1013,6 +1009,18 @@ const conflictPanelVisible = ref(false)
 function onConflictResolved(_id: string, _resolution: string) {
   // 调解后 banner 自动从列表移除；此处保留 hook 供后续扩展（如局部 reload）
 }
+
+// ─── AI 宿主上下文（dsh-agent-panel-integration Req 3.2/3.5） ─────────────────
+// 报表宿主的稳定标识是 **report type**（当前 tab），不是项目 ID。
+// 旧实现传 `:doc-id="projectId"` —— 项目 ID 当文档 ID，服务端只能查空。
+// 跨表核对 / 多年度对比 / 报表分析这些 tab 不是单张报表 → adapter 返回显式不可用 + 中文原因。
+const aiHost = computed(() =>
+  buildReportHost({
+    reportType: activeTab.value,
+    projectId: projectId.value,
+    year: year.value,
+  }),
+)
 
 // ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
 function onDocAiAdopt(_payload: { content: string; messageId: string }) {

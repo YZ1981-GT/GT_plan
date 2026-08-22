@@ -129,6 +129,53 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE: float = 0.3
     LLM_MAX_TOKENS: int = 4096
     LLM_ENABLE_THINKING: bool = False  # Qwen3.5 thinking 模式，审计场景默认关闭
+    # AI 对话引擎（dsh-agent-panel-integration Req 10.1）：取值域 = ChatEngineName。
+    # 🔴 只由服务端配置决定，客户端请求体**没有** engine 字段（ChatRunRequest 会拒绝）。
+    # 非法取值由 ai_chat.run_contract.resolve_engine_name 回落 native（fail-safe）。
+    AI_CHAT_ENGINE: str = "native"
+    # --- DSH experimental 门（dsh-agent-panel-integration Task 6 / Req 10.6）---
+    # 🔴 即使 AI_CHAT_ENGINE=dsh，这两道门任一不满足也一律使用 native
+    # （ai_chat.engine.resolve_engine）。DSH 必须先通过 custom Cordis smoke、双用户隔离、
+    # 取消传播与无出网验证（Task 27/28/31）才允许打开 —— Req 10.6 明令不得对全部项目开放。
+    # 注意：这是**配置门**（本次执行从一开始就是 native，run 如实记 native）；
+    # Req 10.5 禁止的"静默回落"指的是选定 DSH 后运行期失败偷偷改用 native，那条路不存在。
+    AI_DSH_ENABLED: bool = False
+    # 逗号分隔的 project UUID；空 = 任何项目都不启用（fail-safe）。
+    AI_DSH_PROJECT_ALLOWLIST: str = ""
+    # --- Chat Run coordinator（dsh-agent-panel-integration Task 5 / Req 4.7/4.9/4.12）---
+    # 🔴 容量边界的单一真源（NFR-4）。6000 用户目标 ≠ 允许 6000 个并发 run：
+    # active 与 queue 都有硬上界，超限返回 typed quota error 而不是无界堆积。
+    AI_CHAT_MAX_ACTIVE_RUNS: int = Field(default=8, ge=1)
+    AI_CHAT_QUEUE_LIMIT: int = Field(default=32, ge=1)
+    # 单个 run 的墙钟上限；超时按 typed error 终止并释放 worker（不许无限挂）。
+    AI_CHAT_RUN_TIMEOUT_SECONDS: int = Field(default=180, ge=5)
+    # 执行租约 TTL；executor 每 TTL/3 续租，进程崩溃后由启动恢复扫描接管。
+    AI_CHAT_LEASE_TTL_SECONDS: int = Field(default=60, ge=5)
+    # 事件回放缓冲：Redis Stream 的 MAXLEN / TTL，以及等价本地镜像的 run 数上限。
+    AI_CHAT_EVENT_STREAM_TTL_SECONDS: int = Field(default=900, ge=30)
+    AI_CHAT_EVENT_STREAM_MAXLEN: int = Field(default=2000, ge=16)
+    AI_CHAT_EVENT_MIRROR_MAX_RUNS: int = Field(default=512, ge=8)
+    # SSE 心跳间隔与单连接墙钟上限（连接不许永久驻留）。
+    AI_CHAT_SSE_HEARTBEAT_SECONDS: int = Field(default=15, ge=1)
+    AI_CHAT_SSE_MAX_SECONDS: int = Field(default=1800, ge=30)
+    # assistant 草稿节流窗口（秒）：delta 走 Redis，DB 只按窗口更新草稿，不逐 token 写行。
+    AI_CHAT_DRAFT_FLUSH_SECONDS: float = Field(default=1.5, ge=0.1)
+    # lease 过期 run 的重排上限（超过即标 interrupted → error，不无限重跑）。
+    AI_CHAT_RUN_MAX_RETRIES: int = Field(default=1, ge=0)
+    AI_CHAT_STARTUP_RECOVERY_ENABLED: bool = True
+    # quota 事件里回给前端的 retry_after（秒）；前端按它显示中文倒计时。
+    AI_CHAT_QUOTA_RETRY_AFTER_SECONDS: int = Field(default=5, ge=1)
+    # --- AI Chat 附件/上下文/MCP 配额（Task 12 / Req 13.7 单一真源）---
+    # 单个 run 允许提交的附件数上限。
+    AI_CHAT_MAX_ATTACHMENTS_PER_RUN: int = Field(default=5, ge=1)
+    # 单个 run 允许的上下文 token 总预算（宿主+mention+OCR+RAG 共享此上限）。
+    AI_CHAT_MAX_CONTEXT_TOKENS: int = Field(default=32000, ge=1024)
+    # MCP 配额（Phase C / DSH Agent 路径，Req 11.8）
+    AI_MCP_MAX_CALLS_PER_RUN: int = Field(default=50, ge=1)
+    AI_MCP_MAX_BYTES_PER_CALL: int = Field(default=65536, ge=1024)
+    # DSH 配额（Phase C 并发与排队，Req 11.12）
+    AI_DSH_MAX_ACTIVE_RUNS: int = Field(default=4, ge=1)
+    AI_DSH_QUEUE_LIMIT: int = Field(default=16, ge=1)
     # Ollama 配置（备用，当 vLLM 不可用时降级）
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     # ChromaDB 向量数据库
@@ -141,6 +188,9 @@ class Settings(BaseSettings):
     ENCRYPTION_KEY: str = ""
     # LLM 限流配置
     LLM_RATE_LIMIT_PER_MINUTE: int = 10  # 每用户每分钟最大 LLM 调用次数
+    # AI Chat Run 独立限流（dsh-agent-panel-integration Task 12 / Req 13.5–13.7）
+    # 🔴 单一真源：前端展示值也来自此配置（通过 quota 事件下发），不复制常量。
+    AI_CHAT_RATE_LIMIT_PER_MINUTE: int = Field(default=20, ge=1)
     # bcrypt cost factor（OWASP 推荐 12，可通过环境变量调整）
     BCRYPT_ROUNDS: int = 12
 

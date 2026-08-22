@@ -29,9 +29,24 @@ from app.routers.doc_ai_chat import (
     adopt_ai_content,
     get_chat_history,
     DocChatRequest,
+    AdoptHostRef,
     AdoptRequest,
     _build_messages,
 )
+
+# Task 1 起端点先过 ResourceAccessResolver；宿主放行替身的唯一真源见该模块 docstring。
+from ._ai_chat_host_stub import allow_ai_host  # noqa: F401
+
+
+def _adopt_request(**overrides) -> AdoptRequest:
+    """Task 7 契约的最小合法 adopt 请求（**没有** content / confidence 可传）。"""
+    payload = {
+        "message_id": uuid.uuid4(),
+        "host": AdoptHostRef(type="workpaper", id=str(uuid.uuid4())),
+        "idempotency_key": uuid.uuid4(),
+    }
+    payload.update(overrides)
+    return AdoptRequest(**payload)
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +93,7 @@ class TestFullChainIntegration:
     """
 
     @pytest.mark.asyncio
-    async def test_full_chain_context_to_chat_to_adopt(self, mock_db, mock_user):
+    async def test_full_chain_context_to_chat_to_adopt(self, mock_db, mock_user, allow_ai_host):
         """全链路：ContextBuilder 构建上下文 → 对话端点 streaming → 采纳走确认流
 
         D4: AI 生成内容回写前必经 AIContentMustBeConfirmedRule（pending 状态）
@@ -135,49 +150,50 @@ class TestFullChainIntegration:
             assert response.media_type == "text/event-stream"
 
         # ── Step 3: 采纳 AI 内容 → 走确认流（D4 核心验证）──
-        ai_generated_content = "经核查，银行存款期末余额变动合理，与银行对账单一致。"
+        # Task 7：端点只提交服务端 message ID + 宿主 + 幂等键，正文由服务层读库。
+        from app.services.ai_chat.adopt import ADOPT_CONFIRM_FLOW_MESSAGE, AdoptOutcome
 
-        adopt_req = AdoptRequest(
-            content=ai_generated_content,
-            project_id=str(project_id),
-            doc_type="workpaper",
-            doc_id=str(doc_id),
+        message_id = uuid.uuid4()
+        log_id = uuid.uuid4()
+        adopt_req = _adopt_request(
+            message_id=message_id,
+            host=AdoptHostRef(
+                type="workpaper", id=str(doc_id), project_id=str(project_id)
+            ),
             target_cell="E5",
-            confidence=0.9,
+        )
+        outcome = AdoptOutcome(
+            ai_content_log_id=log_id,
+            content_hash="abc123" * 10 + "abcd",
+            message_id=message_id,
+            receipt_id=uuid.uuid4(),
+            idempotent_replay=False,
         )
 
-        mock_wrap_result = {
-            "id": str(uuid.uuid4()),
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "abc123" * 10 + "abcd",
-            "content": ai_generated_content,
-        }
-
         with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
+            "app.routers.doc_ai_chat.adopt_message",
             new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ) as mock_wrap:
+            return_value=outcome,
+        ) as adopt_service:
             result = await adopt_ai_content(adopt_req, db=mock_db, current_user=mock_user)
 
-            # D4 断言：wrap_ai_output_with_log 被调用
-            mock_wrap.assert_called_once()
+            # D4 断言：采纳只走 server-authoritative 服务层
+            adopt_service.assert_called_once()
 
             # D4 断言：返回 pending 状态（未直接写入文档）
             assert result["success"] is True
             assert result["confirm_action"] == "pending"
-            assert result["ai_content_log_id"] is not None
+            assert result["ai_content_log_id"] == str(log_id)
+            assert result["message"] == ADOPT_CONFIRM_FLOW_MESSAGE
 
-            # D4 断言：传递了正确的参数
-            call_kwargs = mock_wrap.call_args.kwargs
-            assert call_kwargs["content"] == ai_generated_content
-            assert call_kwargs["project_id"] == project_id
-            assert call_kwargs["user_id"] == mock_user.id
-            assert call_kwargs["instance_type"] == "workpaper"
-            assert call_kwargs["instance_id"] == doc_id
+            # D4 断言：服务层收到的是服务端 ID 与已授权宿主，没有任何客户端正文
+            call_kwargs = adopt_service.call_args.kwargs
+            assert call_kwargs["message_id"] == message_id
+            assert call_kwargs["actor_id"] == mock_user.id
+            assert call_kwargs["host"].project_id == project_id
+            assert call_kwargs["host"].resource_id == str(doc_id)
             assert call_kwargs["target_cell"] == "E5"
-            assert call_kwargs["confidence"] == 0.9
+            assert "content" not in call_kwargs and "confidence" not in call_kwargs
 
     @pytest.mark.asyncio
     async def test_context_builder_feeds_chat_endpoint(self, mock_db, mock_user):
@@ -211,50 +227,44 @@ class TestFullChainIntegration:
         assert messages[-1]["content"] == "折旧政策是否合规？"
 
     @pytest.mark.asyncio
-    async def test_adopt_never_writes_directly_to_document(self, mock_db, mock_user):
-        """D4 核心：adopt 端点永远不直接写入文档，只写 ai_content_log（pending）
+    async def test_adopt_never_writes_directly_to_document(self, mock_db, mock_user, allow_ai_host):
+        """D4 核心：adopt 端点永远不直接写入文档，只经确认流服务层（pending）
 
-        验证：wrap_ai_output_with_log 被调用时传入 db + 5 参齐全 → 写 ai_content_log
-        而非直接修改底稿/附注表。
+        Task 7：端点自己不再持有任何写入语句 —— 唯一出口是
+        ``adopt_message``（内部写 ``ai_content_log`` pending + 收据 + 哈希链审计）。
+        本判据断言"端点在服务层被替身掉之后对数据库零写入"，即不存在第二条旁路。
         """
-        project_id = uuid.uuid4()
-        doc_id = uuid.uuid4()
+        from app.services.ai_chat.adopt import AdoptOutcome
 
-        adopt_req = AdoptRequest(
-            content="AI 建议：应补提折旧 50,000 元",
-            project_id=str(project_id),
-            doc_type="note",
-            doc_id=str(doc_id),
+        message_id = uuid.uuid4()
+        doc_id = uuid.uuid4()
+        adopt_req = _adopt_request(
+            message_id=message_id,
+            host=AdoptHostRef(type="note", id=str(doc_id)),
             target_field="depreciation_adjustment",
-            confidence=0.85,
+        )
+        outcome = AdoptOutcome(
+            ai_content_log_id=uuid.uuid4(),
+            content_hash="x" * 64,
+            message_id=message_id,
+            receipt_id=uuid.uuid4(),
+            idempotent_replay=False,
         )
 
-        mock_wrap_result = {
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "x" * 64,
-        }
-
+        mock_db.add = MagicMock()
         with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
+            "app.routers.doc_ai_chat.adopt_message",
             new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ) as mock_wrap:
+            return_value=outcome,
+        ) as adopt_service:
             result = await adopt_ai_content(adopt_req, db=mock_db, current_user=mock_user)
 
-            # D4: 确认走了 wrap_ai_output_with_log（写 ai_content_log 表）
-            mock_wrap.assert_called_once()
-            call_kwargs = mock_wrap.call_args.kwargs
-
-            # 5 参齐全 → 触发写 ai_content_log
-            assert call_kwargs["db"] is mock_db
-            assert call_kwargs["project_id"] == project_id
-            assert call_kwargs["user_id"] == mock_user.id
-            assert call_kwargs["instance_type"] == "note"
-            assert call_kwargs["instance_id"] == doc_id
-
-            # 返回 pending（未确认，不直接写文档）
-            assert result["confirm_action"] == "pending"
+        adopt_service.assert_called_once()
+        assert result["confirm_action"] == "pending"
+        # 端点自身零写入：既不 add ORM 对象，也不 execute 任何语句、也不 commit
+        mock_db.add.assert_not_called()
+        mock_db.execute.assert_not_called()
+        mock_db.commit.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_chat_streaming_produces_sse_events(self, mock_db, mock_user):
@@ -320,7 +330,7 @@ class TestFullChainIntegration:
         assert last_data["type"] == "done"
 
     @pytest.mark.asyncio
-    async def test_chat_history_persists_after_streaming(self, mock_db, mock_user):
+    async def test_chat_history_persists_after_streaming(self, mock_db, mock_user, allow_ai_host):
         """对话后历史记录持久化（可通过 history 端点查询）"""
         from app.routers.doc_ai_chat import _stream_chat
 
@@ -384,123 +394,68 @@ class TestFullChainIntegration:
 class TestD4EndToEnd:
     """D4 属性端到端：AI 内容必经确认流，永远不直接写入文档
 
-    验证完整流程中 D4 门禁不可绕过。
+    Task 7 后 D4 的成立依据从"端点把客户端 content 送进 wrap"改成"端点把**服务端
+    message ID** 交给 server-authoritative 服务层"。写入侧行为（真实 ``ai_content_log``
+    行、pending 状态、失败回滚）在
+    ``backend/tests/dsh_agent_panel/test_task7_adopt_fail_closed.py`` 的真实 PostgreSQL
+    上守卫；本类只验证**端点这一层**在各宿主类型下都不存在绕过确认流的旁路。
     """
 
     @pytest.mark.asyncio
-    async def test_d4_multiple_adopt_all_pending(self, mock_db, mock_user):
-        """D4: 多次采纳操作全部返回 pending（确认流不可绕过）"""
-        project_id = uuid.uuid4()
+    async def test_d4_all_host_types_go_through_server_authoritative_service(
+        self, mock_db, mock_user, allow_ai_host
+    ):
+        """D4: 四类宿主的采纳都必须经 ``adopt_message``，且端点不接受任何正文。"""
+        from app.services.ai_chat.adopt import AdoptOutcome
 
-        contents = [
-            "AI 结论 1：余额合理",
-            "AI 结论 2：需补提减值",
-            "AI 结论 3：关联交易已披露",
-        ]
-
-        for content in contents:
+        for doc_type in ("workpaper", "note", "report", "knowledge_doc"):
+            message_id = uuid.uuid4()
             doc_id = uuid.uuid4()
-            req = AdoptRequest(
-                content=content,
-                project_id=str(project_id),
-                doc_type="workpaper",
-                doc_id=str(doc_id),
-                confidence=0.85,
+            req = _adopt_request(
+                message_id=message_id,
+                host=AdoptHostRef(type=doc_type, id=str(doc_id)),
             )
-
-            mock_wrap_result = {
-                "ai_content_log_id": str(uuid.uuid4()),
-                "confirm_action": "pending",
-                "content_hash": "h" * 64,
-            }
-
+            outcome = AdoptOutcome(
+                ai_content_log_id=uuid.uuid4(),
+                content_hash="h" * 64,
+                message_id=message_id,
+                receipt_id=uuid.uuid4(),
+                idempotent_replay=False,
+            )
             with patch(
-                "app.services.wp_ai_service.wrap_ai_output_with_log",
+                "app.routers.doc_ai_chat.adopt_message",
                 new_callable=AsyncMock,
-                return_value=mock_wrap_result,
-            ):
-                result = await adopt_ai_content(req, db=mock_db, current_user=mock_user)
+                return_value=outcome,
+            ) as adopt_service:
+                result = await adopt_ai_content(
+                    req, db=mock_db, current_user=mock_user
+                )
 
-                # D4: 每次都是 pending
-                assert result["confirm_action"] == "pending"
-                assert result["success"] is True
+            # D4: 每个宿主都以 pending 进入确认流，且没有第二条写入路径
+            assert result["confirm_action"] == "pending"
+            assert result["success"] is True
+            adopt_service.assert_called_once()
+            kwargs = adopt_service.call_args.kwargs
+            assert kwargs["message_id"] == message_id
+            assert kwargs["host"].resource_type.value == doc_type
+            assert "content" not in kwargs, "端点仍在向服务层传正文"
 
     @pytest.mark.asyncio
-    async def test_d4_adopt_with_different_doc_types(self, mock_db, mock_user):
-        """D4: 不同文档类型的采纳都走确认流"""
-        project_id = uuid.uuid4()
-        doc_types = ["workpaper", "note", "report", "knowledge_doc"]
-
-        for doc_type in doc_types:
-            doc_id = uuid.uuid4()
-            req = AdoptRequest(
-                content=f"AI 内容 for {doc_type}",
-                project_id=str(project_id),
-                doc_type=doc_type,
-                doc_id=str(doc_id),
-                confidence=0.8,
-            )
-
-            mock_wrap_result = {
-                "ai_content_log_id": str(uuid.uuid4()),
-                "confirm_action": "pending",
-                "content_hash": "z" * 64,
-            }
-
-            with patch(
-                "app.services.wp_ai_service.wrap_ai_output_with_log",
-                new_callable=AsyncMock,
-                return_value=mock_wrap_result,
-            ) as mock_wrap:
-                result = await adopt_ai_content(req, db=mock_db, current_user=mock_user)
-
-                # D4: 所有文档类型都走确认流
-                assert result["confirm_action"] == "pending"
-                mock_wrap.assert_called_once()
-
-                # 验证 instance_type 正确传递
-                assert mock_wrap.call_args.kwargs["instance_type"] == doc_type
-
-    @pytest.mark.asyncio
-    async def test_d4_wrap_receives_all_five_mandatory_params(self, mock_db, mock_user):
-        """D4: wrap_ai_output_with_log 必须收到 5 个强制参数（触发写 ai_content_log）"""
-        project_id = uuid.uuid4()
-        doc_id = uuid.uuid4()
-
-        req = AdoptRequest(
-            content="AI 生成内容",
-            project_id=str(project_id),
-            doc_type="workpaper",
-            doc_id=str(doc_id),
-            target_cell="F10",
-            target_field="amount",
-            confidence=0.92,
-        )
-
-        mock_wrap_result = {
-            "ai_content_log_id": str(uuid.uuid4()),
-            "confirm_action": "pending",
-            "content_hash": "m" * 64,
-        }
+    async def test_d4_typed_failure_never_reports_success(
+        self, mock_db, mock_user, allow_ai_host
+    ):
+        """D4 + Property 33: 确认流写入失败时端点不得返回成功。"""
+        from fastapi import HTTPException
+        from app.services.ai_chat.adopt import ADOPT_LOG_FAILED, AdoptFailed
 
         with patch(
-            "app.services.wp_ai_service.wrap_ai_output_with_log",
+            "app.routers.doc_ai_chat.adopt_message",
             new_callable=AsyncMock,
-            return_value=mock_wrap_result,
-        ) as mock_wrap:
-            await adopt_ai_content(req, db=mock_db, current_user=mock_user)
-
-            call_kwargs = mock_wrap.call_args.kwargs
-
-            # 5 个强制参数（齐全时写 ai_content_log 表）
-            assert call_kwargs["db"] is not None, "D4: db 参数缺失"
-            assert call_kwargs["project_id"] is not None, "D4: project_id 参数缺失"
-            assert call_kwargs["user_id"] is not None, "D4: user_id 参数缺失"
-            assert call_kwargs["instance_type"] is not None, "D4: instance_type 参数缺失"
-            assert call_kwargs["instance_id"] is not None, "D4: instance_id 参数缺失"
-
-            # 额外参数也正确传递
-            assert call_kwargs["content"] == "AI 生成内容"
-            assert call_kwargs["target_cell"] == "F10"
-            assert call_kwargs["target_field"] == "amount"
-            assert call_kwargs["confidence"] == 0.92
+            side_effect=AdoptFailed(ADOPT_LOG_FAILED, "注入：确认流记录未写入"),
+        ):
+            with pytest.raises(HTTPException) as exc_info:
+                await adopt_ai_content(
+                    _adopt_request(), db=mock_db, current_user=mock_user
+                )
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail["code"] == ADOPT_LOG_FAILED
