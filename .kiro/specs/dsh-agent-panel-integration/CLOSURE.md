@@ -13,8 +13,9 @@
 | 守卫实测 | backend **722 passed** / frontend **324 passed / 18 files**（2026-08-22；289/16 + 引用完整性 15 + 工时深链 10） |
 | Playwright 实跑 | **37 passed / 4 failed / 19 skipped**（4 failed 中 **3 条是本 spec 自己的 AC**，归因已更正 → 「未完成项 §8」） |
 | Clean-DB CI 引导实测 | 全新空库上 508 / 25 / 189 passed，0 skipped |
-| 最新迁移号 | V149（V147 + V149 为本 spec 新增） |
-| 迁移幂等性 | 两个迁移均使用 IF NOT EXISTS |
+| 最新迁移号 | **V150**（V147 + V149 + **V150** 为本 spec 新增） |
+| 迁移幂等性 | 三个迁移均幂等；V150 已连续应用三次实测无报错 |
+| **干净环境端到端** | ✅ 干净 venv + 全新空库：三步引导全通（147 executed / 仅 V106 失败），189 + 25 passed / 0 skipped |
 | **产物入库** | ✅ commit `55c5e0fe`（154 files），已推 origin |
 | **AC↔Property 覆盖** | 🔴 Task 引用 120/120 但 **Property 仅覆盖 94/120** → 「未完成项 §10」 |
 | tmp_*/wip_* 清理 | 已删 2 个，余 7 个属他人 |
@@ -568,6 +569,163 @@ CI：`dsh-agent-panel-frontend` job 追加两步（守卫实跑 + 锚点静态�
 
 ---
 
+### 7. 干净环境端到端复现：挖出 3 层依赖缺口 + 1 个真实生产缺陷（2026-08-22）
+
+#### 方法
+
+不再用 CI 迭代（一轮 10+ 分钟、只暴露一层）。改为本地建**干净 venv**
+（只装 `backend/requirements.txt`）+ **全新空库** `audit_platform_dep_probe`
+（`pgvector/pgvector:pg16`，与 CI service 同镜像），逐字复现 CI 的三步引导。
+一轮 30 秒。
+
+#### 挖出的 3 层依赖缺口
+
+| 层 | 报错 | 根因 | 修法 |
+|---|---|---|---|
+| 1 | `TypeError: 'NoneType' object is not callable` @ `mapped_column(Vector(1024))` | `pgvector` 不在 requirements，而 `ai_models.py` 有 `except ImportError: Vector = None` 的 fail-open ⇒ 缺包被伪装成看不懂的 TypeError | `pgvector==0.4.2` |
+| 2 | `ModuleNotFoundError: No module named 'psycopg2'` | `init_tables.py:31` 把 URL 的 `+asyncpg` 换成 `+psycopg2` 用同步 `create_engine`，而 requirements 只有 `asyncpg` | `psycopg2-binary==2.9.11` |
+| 3 | `ModuleNotFoundError: No module named 'mcp'` → 装上后变 `No module named 'mcp.server.fastmcp'` | ① CI job 只装 `backend/requirements.txt`，漏了 `tools/audit-data-mcp/requirements.txt`（`test_audit_data_mcp_server.py` 的 17 条靠它）② 该文件写 `mcp>=1.14.0` **无上界**，clean checkout 装到 `mcp 2.0.0`，而 FastMCP 在 2.0 里被移出 `mcp.server` 命名空间 | CI 补装该文件 + 约束改 `mcp>=1.14.0,<2` |
+
+> 🔴 **第 3 层是时间炸弹的教科书案例**：代码一行没改，上游发 2.0 就崩。
+> 实测对比 —— 主环境 `mcp 1.28.1`（`import mcp.server.fastmcp` OK）
+> vs 干净 venv 装最新 `mcp 2.0.0`（ModuleNotFoundError）。
+> 这正是 memory 铁律「添加依赖用精确或固定版本，不用开放范围」要防的。
+>
+> 🔴 **静态扫描对第 2 层结构性失效**：我写脚本扫了引导路径 86 个文件的第三方顶层
+> import 与 requirements 对账，`psycopg2` **一次都没出现** —— SQLAlchemy 是
+> **按方言动态 import** 驱动的（`postgresql/psycopg2.py::import_dbapi`），
+> 源码里没有任何一处直接 `import psycopg2`。
+> ⇒ 「扫 import 对账」这类检查抓不到驱动类依赖，只有真在干净环境跑一次才暴露。
+
+#### 挖出的真实生产缺陷：`ai_chat_message.seq` 的 BIGSERIAL 永不落地
+
+**实证（两库 schema 逐列对比，`ai_chat_*` 全部列）**：
+
+| 库 | `seq` 的 `column_default` | `is_nullable` |
+|---|---|---|
+| dev `audit_platform` | `nextval('ai_chat_message_seq_seq'::regclass)` | **NO** |
+| 干净库 | **（无）** | **YES** |
+
+且这是**唯一一处**「dev 有而 clean 无」的高危差异（范围收敛，不是一批）。
+
+**根因**：V147:284 写的是
+
+```sql
+ALTER TABLE ai_chat_message ADD COLUMN IF NOT EXISTS seq BIGSERIAL;
+```
+
+`BIGSERIAL` 展开为「BIGINT + 建序列 + SET DEFAULT nextval + NOT NULL」，
+但 `ADD COLUMN IF NOT EXISTS` 的语义是**整句跳过**。而 `seq` 在 ORM 里也声明了
+⇒ 全新环境的标准引导顺序下：
+
+```
+① create_all()      ← 按 ORM 建出 nullable、无 default 的 seq 列
+② run_pending()     ← V147 那句被 IF NOT EXISTS 跳过
+⇒ 序列永不创建，seq 恒 NULL
+```
+
+**后果（已实测打红，不是理论）**：`load_recent_history()`（Req 4.10 / Property 10）
+排序键是 `ORDER BY created_at DESC, seq DESC`。`created_at` 默认 `now()` =
+**事务开始时刻**，同一事务内多条消息时间完全相同，全靠 `seq` 定序。
+seq 恒 NULL ⇒ 二级排序失效 ⇒ **同一时间戳的消息返回顺序不确定**。
+干净库上 `test_task3_chat_persistence.py` 的「全量取回顺序仍是插入序（含第 6/7 条
+同一时间，靠 seq 定序）」打红（第 7 条排到第 6 条前面）；同一测试在 dev 库上是绿的。
+
+> 🔴 **这是「已修复项 §3b」那个坑的第二种形态**。§3b 处理的是
+> `CREATE TABLE IF NOT EXISTS`（解法：引导时 DROP 那 4 张表让 V147 自己建），
+> 但 `ai_chat_message` 是**既有表**、V147 只 `ALTER` 它、不在 DROP 列表里
+> ⇒ `ADD COLUMN IF NOT EXISTS` 这一类完全没被覆盖，同一个坑第二次生效。
+>
+> 更一般的形态：**ORM 声明追平了迁移 ⇒ 迁移变 no-op ⇒ 迁移独有的属性
+> （序列 / DEFAULT / NOT NULL / CHECK）静默丢失**。凡是「ORM 与迁移同时声明同一列」
+> 的地方都要问一句：迁移侧有没有 ORM 侧表达不了的属性？
+
+**修法 —— 新增 V150 而不是改 V147**：V147 已在 dev/生产应用过，改它会触发
+`MigrationRunner.detect_checksum_drift` 报漂移。V150 幂等补齐：
+建序列 → 绑定 OWNED BY → setval 推游标 → SET DEFAULT → 回填历史 NULL 行
+（按 `(created_at, id)` 定序，不能只按 created_at 也不能无 ORDER BY，
+否则回填结果本身不确定）→ 再推游标 → 补 NOT NULL。
+
+**验证**：
+- 干净库应用 V150 → `executed: ['150']`，schema 与 dev 库**逐字一致**
+- **幂等**：连续再应用两次无报错，schema 保持
+- 打红的那条测试**转绿**
+
+#### 干净环境的三个测试集实测
+
+| 集合 | 结果 | 与声称值对比 |
+|---|---|---|
+| 其余 6 个后端文件 | **189 passed / 0 skipped** | ✅ 与 GUARD_MANIFEST 的 189 一致 |
+| `test_ai_chat_mcp_tools_data.py` | **25 passed / 0 skipped** | ✅ 与声称的 25 一致 |
+| `backend/tests/dsh_agent_panel/` | **520 passed / 1 failed** | 数字已增长（508 → 520）；那 1 条见下 |
+
+**那 1 条 failed 已精确归因到并发会话的在途改动，不属本 spec 本次改动**：
+`test_task23_address_mention.py::test_search_address_returns_proper_fields`
+mock 的是 `address_registry.search`，而**工作树版本**的
+`mention_service._search_address` 已被改成调 `address_registry.get_domain`
+（该文件 `git diff` 为 **+598/−310**，属并发会话正在进行的 mention 域重构）。
+**HEAD 版本用的是 `search`**，即该测试在 HEAD 上是绿的。
+⇒ 需要那个会话同步测试的 mock 目标。本次遵守「同一文件禁与并发会话并行编辑」，只登记不改。
+
+#### 附带发现（登记，不修）
+
+1. **dev 库缺 V149 的全部产物** —— 干净库有 `ai_chat_mcp_call_log`（11 列）、
+   `ai_chat_mcp_token_revocations`（5 列）、`ai_chat_runs.mcp_calls_used / mcp_token_issued /
+   mcp_total_bytes`，dev 库**一个都没有** ⇒ V149 在 dev 库上从未成功应用
+   （很可能是加了迁移后没重启后端）。含义：本 spec 的 MCP token 相关测试在 dev 库上
+   跑的时候，那些表/列并不存在。建议重启后端让 V149 应用后复跑一次。
+2. **`httpx>=0.27.0`** 在 `tools/audit-data-mcp/requirements.txt` 里同样无上界，
+   属同类风险（本次只修了有实证的 `mcp`）。
+
+---
+
+### 8. 仓库级发现：106/160 failure job 的分类（挖 CI 时的副产品）
+
+`gh run view 32575246116 --log-failed` 全量日志（158539 行）按 job 分组统计：
+
+| 分类 | job 数 | 说明 |
+|---|---|---|
+| **pgvector 缺失同源** | **38** | 横跨 D/E/F/G/H/K/L/N 全部循环 + ACNR/报表/公式/x3/wp-import-export |
+| **fakeredis 缺失** | **41** | 见下 |
+| 断言失败 | 3 | 各自的业务问题 |
+| baseline/门禁超限 | 2 | — |
+| 未匹配特征 | 20 | 需逐个看 |
+
+#### pgvector 那 38 个：本次修复对**全部**生效（已验证，不夸大）
+
+先按「pip install 命令里有没有 `backend/requirements.txt`」分类，得出「14 个只装部分包
+⇒ 修复无效」。**这个判据是错的** —— 复核发现那 14 个写的是
+`pip install -r requirements.txt`（无 `backend/` 前缀）但配了
+`defaults: working-directory: backend`，指的是同一个文件。修正判据后：
+
+```
+24 个  显式 -r backend/requirements.txt
+ 7 个  -r requirements.txt + defaults.working-directory: backend
+ 7 个  -r requirements.txt（step 无 wd，但既然挂在 pgvector 上说明 requirements 装成功了）
+———
+38 个  全部装完整 requirements ⇒ 修复全部生效
+```
+
+> 教训：判影响面时「命令字面量」不是判据，要把 `working-directory` /
+> `defaults` 一起算进去。我第一版脚本就低估了 14 个。
+
+#### fakeredis 那 41 个：**从写好起从未执行过任何测试断言**
+
+`backend/tests/conftest.py:40` 有**顶层无兜底**的 `import fakeredis.aioredis`
+（对比同文件里 hypothesis 那段是 `try/except`）。conftest 由 pytest 自动加载
+⇒ 任何在 `backend/tests/` 下跑 pytest 的 job 都必须有 fakeredis。
+而这 41 个 job 装的是 `pip install pytest==8.4.2`（或 `pytest hypothesis` 之类）
+⇒ **在 collection 阶段就挂，一条断言都没跑过**。
+
+同一文件紧接着还 import 了 `httpx` / `sqlalchemy` / `app.core.database` /
+`app.models.base` —— 即「只装 pytest 就能跑纯静态测试」这个假设从一开始就不成立。
+
+**不在本 spec 范围内修**（41 个 job 分属多个 spec，且让它们开始真跑会暴露各自积压的
+真实失败，需要各负责人处理）。**移交建议**：把这些 job 的 install 步骤统一改成
+`-r backend/requirements.txt`，并预期会暴露一批此前从未被执行的断言。
+
+---
+
 ## 🔴 未完成 / 未验证项（诚实记录）
 
 ### 1. 产物未入版本控制 — ✅ **已解除**（2026-08-22）
@@ -661,15 +819,17 @@ ModuleNotFoundError: No module named 'psycopg2'
 > ⇒ 「扫 import 与 requirements 对账」这类检查对**驱动类依赖结构性失效**。
 > 唯一可靠判据是**在干净环境真跑一次**。
 
-#### 仍未证明
+**第三层 `mcp>=1.14.0,<2`（加上界）** —— 见下「已修复项 §7」。
 
-`dsh-agent-panel-backend` / `-mcp-data` 在 runner 上的**实际测试结论**
-（508 / 189 / 25 passed、0 skipped）以及「已修复项 §3b」那套三步空库引导，
-仍需下一轮 CI 确认。已推进两层，但因为依赖是逐层暴露的，不排除还有第三层。
+#### 已在干净环境跑到底（不再依赖 CI 迭代）
 
-**根治建议**：在本地建一个干净 venv 只装 `backend/requirements.txt`，
-指向一个临时空库真跑一遍 CI 的三步引导。这比「push → 等 10 分钟 → 看下一层报错」
-的迭代快得多，也是唯一能一次性证明 requirements 完备的手段。
+按上面写的根治建议真做了：建干净 venv 只装 `backend/requirements.txt`，
+指向全新空库 `audit_platform_dep_probe` 跑完整三步引导。结论见「已修复项 §7」——
+**三步全通，`migrations executed: 147, failed: ['106']`**（V106 是早已登记的证据治理域问题），
+V147 的 13 个 CHECK 约束全部落地，三个测试集在干净环境的实测数字也拿到了。
+
+这个办法比「push → 等 10 分钟 → 看下一层报错」快一个数量级：
+CI 一轮 10+ 分钟且只暴露一层，本地一轮 30 秒。
 
 #### 通用教训
 

@@ -1,2 +1,19 @@
-mcp>=1.14.0
+# audit-data MCP stdio server 的运行依赖
+#
+# 🔴 mcp 必须加上界。原写法是无上界的 `mcp>=1.14.0`，属时间炸弹：
+#    `server.py:30` 用的是 `from mcp.server.fastmcp import FastMCP`，
+#    而 FastMCP 在 **mcp 2.0 里被移出该命名空间**（独立成 `fastmcp` 包）。
+#    ⇒ 写的时候最新是 1.x 所以能跑，上游发 2.0 后 clean checkout 装到 2.0.0
+#      就报 `ModuleNotFoundError: No module named 'mcp.server.fastmcp'`，
+#      而**代码一行没改**。
+#
+#    2026-08-22 在干净 venv 里实测复现：
+#      主环境（既有）      mcp 1.28.1  → import mcp.server.fastmcp  OK
+#      干净 venv（装最新） mcp 2.0.0   → ModuleNotFoundError
+#    连带 backend/tests/test_audit_data_mcp_server.py 的 17 条测试全挂。
+#
+#    留 `>=1.14.0` 下界以保留 1.x 内的补丁，`<2` 挡住 breaking 变更。
+#    升到 2.x 需要同步把 server.py 的 import 改成 `from fastmcp import FastMCP`
+#    并重跑 Task 26/27 的 handshake 验收，属独立任务。
+mcp>=1.14.0,<2
 httpx>=0.27.0

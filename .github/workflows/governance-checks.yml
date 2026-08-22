@@ -5339,6 +5339,13 @@ jobs:
           cache: pip
       - name: Install backend deps
         run: python -m pip install -r backend/requirements.txt -q
+      # 🔴 test_audit_data_mcp_server.py（17 tests）import tools/audit-data-mcp/server.py，
+      # 后者需要 `mcp` SDK —— 它在 tools/audit-data-mcp/requirements.txt 里，
+      # **不在** backend/requirements.txt 里。少装这一个文件 ⇒ 那 17 条必挂
+      # （`ModuleNotFoundError: No module named 'mcp'`）。
+      # 2026-08-22 在干净 venv 上实测：补装后该批从 17 failed 变 189 passed / 0 skipped。
+      - name: Install audit-data MCP server deps
+        run: python -m pip install -r tools/audit-data-mcp/requirements.txt -q
       # ---------------------------------------------------------------------
       # 🔴 空库引导顺序是实测出来的，三步都不能省也不能换序（2026-08-16 在本地
       # 全新库 audit_platform_ci_probe2 上验证，最终 508 passed / 0 skipped）：
