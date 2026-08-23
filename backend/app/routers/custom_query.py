@@ -2785,9 +2785,8 @@ async def cross_sheet_trace(
     - 引用目标缺失标 missing=True 不阻塞其它分支
     - 敏感操作不参与审计节流（每次必记）
     """
-    from app.services.custom_query.cross_sheet_resolver import (
-        cross_sheet_resolver,
-        RefChainResponse,
+    from app.services.custom_query.cross_sheet_trace_orchestrator import (
+        cross_sheet_trace_orchestrator,
     )
 
     # ─── OwnershipGuard 单点准入（BEFORE 任何数据读取）R9.1/R9.2/R9.5 ─────────
@@ -2820,11 +2819,19 @@ async def cross_sheet_trace(
         except (json.JSONDecodeError, TypeError):
             parsed_data = {}
 
-    # 执行 BFS 追溯
-    trace_result = cross_sheet_resolver.resolve(
-        parsed_data=parsed_data,
-        sheet_name=sheet_name,
-        cell_ref=cell_ref,
+    # 执行溯源：同步纯 BFS + async ACNR addr_id 解析（经 orchestrator，R4.2/R4.4/R8.4）
+    #
+    # 为什么不能直接调 cross_sheet_resolver.resolve()：本端点是 async，调用时事件循环
+    # 正在运行，而同步 BFS 内部的 `_sync_resolve` 一探测到 running loop 就返回 None
+    # 降级 → 每个链节点的 addr_id 恒为 None，溯源结果无法跳转、审计日志也拿不到真
+    # addr_id。异步 IO 由 orchestrator 上浮：BFS 仍是同步纯函数，addr_id 经
+    # AddressingService 一次性并发解析后合并回链。
+    trace_result = await cross_sheet_trace_orchestrator.trace(
+        parsed_data,
+        sheet_name,
+        cell_ref,
+        project_id=project_id,
+        db=db,
         max_depth=max_depth,
     )
 
@@ -2833,11 +2840,10 @@ async def cross_sheet_trace(
     try:
         from app.services.custom_query.audit_helper import record_cross_sheet_trace
 
-        # 目标 addr_id 集合：根目标 + 溯源链节点（best-effort，本端点走同步 BFS 无 orchestrator addr_id）
+        # 目标 addr_id 集合：根目标 + 溯源链节点的**真** addr_id（经 orchestrator 解析）。
+        # 未能解析的节点（addr_id=None，优雅降级）退回 uri 形态占位，保证审计留痕完整。
         trace_addr_ids = [f"{wp_code}/{sheet_name}/{cell_ref}"]
-        trace_addr_ids.extend(
-            getattr(node, "uri", None) for node in trace_result.chain
-        )
+        trace_addr_ids.extend(node.addr_id or node.uri for node in trace_result.chain)
 
         await record_cross_sheet_trace(
             user_id=current_user.id,
