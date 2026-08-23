@@ -64,6 +64,6 @@
       "user_id_non_null": 166
     }
   },
-  "expected_min_passed_note": "按实测值锚定（2026-08-23 实测 SPEC_GUARD_FILES 合计 302 passed / 0 failed；PBT 按域拆两文件并纳入清单后的口径）。低于此值即意味着测试被删、被改名或被 skip —— 那是假绿的常见入口，故用数值硬断言而非只看 exit code。",
-  "expected_min_passed": 302
+  "expected_min_passed_note": "按实测值锚定（2026-08-23 首次实测 302 passed；同日收口遗留项①「param_sql_builder 零引用」接线后新增 8 条『值→谓词层单一真源』守卫 ⇒ 310）。低于此值即意味着测试被删、被改名或被 skip —— 那是假绿的常见入口，故用数值硬断言而非只看 exit code。",
+  "expected_min_passed": 310
 }

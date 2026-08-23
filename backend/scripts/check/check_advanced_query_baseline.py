@@ -63,6 +63,7 @@ SPEC_GUARD_FILES: tuple[str, ...] = (
     "backend/tests/test_custom_query_template_scope_hardening.py",
     "backend/tests/test_custom_query_templates.py",
     "backend/tests/test_advanced_query_scope_budget_tiers.py",
+    "backend/tests/test_advanced_query_param_sql_builder_wiring.py",
     "backend/tests/test_advanced_query_indicators_lazy.py",
     "backend/tests/test_advanced_query_ddl_cross_lock.py",
     "backend/tests/test_advanced_query_hardening_properties.py",

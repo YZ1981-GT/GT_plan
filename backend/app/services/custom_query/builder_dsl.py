@@ -23,10 +23,17 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, Select, and_, asc, desc, func, or_, select
+from sqlalchemy import Column, Select, and_, asc, desc, false, func, select, true
 from sqlalchemy.sql.elements import ColumnElement
 
 from app.services.custom_query.builder_scope import apply_scope_to_select
+from app.services.custom_query.param_sql_builder import (
+    ParamSQLBuilder as _ParamSQLBuilder,
+    build_filter as _psb_build_filter,
+    coerce_value as _psb_coerce_value,
+)
+
+_psb_build_where = _ParamSQLBuilder.build_where
 from app.services.custom_query.table_whitelist import (
     AGGREGATE_WHITELIST,
     JOIN_WHITELIST,
@@ -133,180 +140,49 @@ def _resolve_field_ref(
 
 
 def _coerce_value(col: Column, value: Any) -> Any:
-    """按列的 SQLAlchemy 类型把 user-supplied value 转为正确 Python 类型。
+    """按列的 SQLAlchemy 类型把用户值转为正确 Python 类型（薄委托）。
 
-    修复生产 bug：UUID 列绑定 str value 时 SQLAlchemy 会调 `value.hex` 抛
-    `AttributeError: 'str' object has no attribute 'hex'`。同理 Date/DateTime/
-    Decimal 列也需要从 ISO 字符串/数字 coerce。
-
-    支持类型：
-    - UUID（PG_UUID / sa.Uuid）
-    - Decimal / Numeric
-    - Date / DateTime（ISO 8601 字符串）
-    - Bool（接受 "true"/"false" 字符串）
-    - 其他类型保持原值
+    实现在 ``param_sql_builder.coerce_value`` —— 该模块是「值 → 参数化谓词」的
+    单一真源。此前两处各有一份几乎相同的实现（本文件与 param_sql_builder），
+    而 param_sql_builder 那份从未被生产调用（router 引用数 0）。保留本函数名是因为
+    ``_build_select`` 与既有测试都引用它。
     """
-    import datetime as _dt
-    import decimal as _dec
-    import uuid as _uuid
-
-    if value is None:
-        return None
-
-    # 取列的 Python type（通过 SQLAlchemy type 解析）
-    try:
-        col_type = col.type
-        py_type = col_type.python_type
-    except (NotImplementedError, AttributeError):
-        # Enum / 复合类型可能不支持 python_type，原值传回
-        return value
-
-    # 已是正确类型 → 直接返回
-    if isinstance(value, py_type):
-        return value
-
-    # UUID
-    if py_type is _uuid.UUID:
-        if isinstance(value, str):
-            try:
-                return _uuid.UUID(value)
-            except (ValueError, AttributeError) as e:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error_code": "INVALID_UUID",
-                        "message": f"无法解析为 UUID: {value!r} ({e})",
-                    },
-                )
-        return value
-
-    # Decimal
-    if py_type is _dec.Decimal:
-        try:
-            return _dec.Decimal(str(value))
-        except _dec.InvalidOperation:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error_code": "INVALID_DECIMAL",
-                    "message": f"无法解析为 Decimal: {value!r}",
-                },
-            )
-
-    # Date / DateTime
-    if py_type is _dt.date:
-        if isinstance(value, str):
-            try:
-                return _dt.date.fromisoformat(value)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail={"error_code": "INVALID_DATE", "message": f"无法解析为 date: {value!r}"},
-                )
-        return value
-    if py_type is _dt.datetime:
-        if isinstance(value, str):
-            try:
-                return _dt.datetime.fromisoformat(value)
-            except ValueError:
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error_code": "INVALID_DATETIME",
-                        "message": f"无法解析为 datetime: {value!r}",
-                    },
-                )
-        return value
-
-    # Bool 字符串
-    if py_type is bool and isinstance(value, str):
-        lower = value.lower()
-        if lower in ("true", "1", "yes"):
-            return True
-        if lower in ("false", "0", "no"):
-            return False
-
-    # int 字符串
-    if py_type is int and isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return value  # 保持原值，让 SQLAlchemy 报更精确的错
-
-    # float 字符串
-    if py_type is float and isinstance(value, str):
-        try:
-            return float(value)
-        except ValueError:
-            return value
-
-    return value
+    return _psb_coerce_value(col, value)
 
 
 def _build_filter(col: Column, op: str, value: Any) -> ColumnElement:
-    if op not in OPERATOR_WHITELIST:
-        raise HTTPException(
-            status_code=400,
-            detail={"error_code": "OP_NOT_ALLOWED",
-                    "message": f"操作符 '{op}' 不在白名单中",
-                    "allowed_ops": sorted(OPERATOR_WHITELIST)},
-        )
-    # 类型 coerce：UUID/Decimal/Date/DateTime/Bool 自动从 str 转
-    if op in ("in", "not_in"):
-        if not isinstance(value, list) or not value:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "INVALID_IN_VALUE",
-                        "message": f"{op} 操作符要求 value 为非空数组"},
-            )
-        coerced_value: Any = [_coerce_value(col, v) for v in value]
-    elif op == "between":
-        if not isinstance(value, list) or len(value) != 2:
-            raise HTTPException(
-                status_code=400,
-                detail={"error_code": "INVALID_BETWEEN_VALUE",
-                        "message": "between 操作符要求 value 为 [lo, hi] 长度=2 数组"},
-            )
-        coerced_value = [_coerce_value(col, v) for v in value]
-    elif op in ("is_null", "is_not_null"):
-        coerced_value = None  # 忽略
-    elif op in ("like", "not_like"):
-        # LIKE 强制字符串语义，不 coerce
-        coerced_value = value
-    else:
-        coerced_value = _coerce_value(col, value)
+    """把 (列, 操作符, 用户值) 构造为参数化谓词。
 
-    if op == "eq":
-        return col == coerced_value
-    if op == "neq":
-        return col != coerced_value
-    if op == "gt":
-        return col > coerced_value
-    if op == "gte":
-        return col >= coerced_value
-    if op == "lt":
-        return col < coerced_value
-    if op == "lte":
-        return col <= coerced_value
-    if op == "like":
-        return col.like(f"%{coerced_value}%")
-    if op == "not_like":
-        return col.notlike(f"%{coerced_value}%")
-    if op == "in":
-        return col.in_(coerced_value)
-    if op == "not_in":
-        return col.notin_(coerced_value)
-    if op == "is_null":
-        return col.is_(None)
-    if op == "is_not_null":
-        return col.isnot(None)
-    if op == "between":
-        return col.between(coerced_value[0], coerced_value[1])
-    # 不会到此（OPERATOR_WHITELIST 已穷举）
-    raise HTTPException(
-        status_code=400,
-        detail={"error_code": "OP_NOT_IMPLEMENTED", "message": f"操作符 {op} 未实现"},
-    )
+    值 coerce 与除 ``in`` / ``not_in`` 外的算子全部委托
+    ``param_sql_builder``（值 → 谓词的单一真源），消除此前两份几乎相同的实现。
+
+    ``in`` / ``not_in`` **不**委托，原因是方言：``param_sql_builder`` 用
+    ``col == any_(list)``（PG 专用，其契约测试固定以 postgresql 方言**编译**、不
+    执行），而构建器的端点测试在 SQLite 上**真实执行** —— SQLite 无 ``ANY``
+    函数，会直接 ``OperationalError: no such function: ANY``。故此处用方言中立的
+    ``in_`` / ``notin_``（SQLAlchemy 2.x 以 expanding bindparam 展开，asyncpg 下
+    同样是参数化的，不存在旧式「IN 传 tuple」的问题）。
+
+    但 R10.3 的**实质**照样落地：原实现对空数组抛 400「要求非空数组」，现在
+    ``in`` 空集合 → 恒假谓词（0 行）、``not_in`` 空集合 → 恒真谓词（全部行），
+    均不报错。空候选集在真实使用中很常见（上游过滤后为空），报错会让用户以为
+    查询坏了。
+    """
+    if op in ("in", "not_in"):
+        if not isinstance(value, (list, tuple)):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error_code": "INVALID_IN_VALUE",
+                    "message": f"{op} 操作符要求 value 为数组",
+                },
+            )
+        coerced = [_coerce_value(col, v) for v in value]
+        if not coerced:
+            # R10.3：空集合返回空结果集 / 全部行，不报错
+            return false() if op == "in" else true()
+        return col.in_(coerced) if op == "in" else col.notin_(coerced)
+    return _psb_build_filter(col, op, value)
 
 
 def _build_select(
@@ -471,16 +347,17 @@ def _build_select(
             stmt = stmt.join(target_model, on_expr)
 
     # ── WHERE ──
-    where_clauses: list[ColumnElement] = []
-    for cond in dsl.filters:
-        col = _resolve_field_ref(dsl.table, cond.field, join_tables)
-        where_clauses.append(_build_filter(col, cond.op, cond.value))
-
-    if where_clauses:
-        if dsl.filter_logic == "or":
-            stmt = stmt.where(or_(*where_clauses))
-        else:
-            stmt = stmt.where(and_(*where_clauses))
+    # 组合逻辑（and / or / 单条直返 / 空集合不追加 WHERE）委托
+    # ``ParamSQLBuilder.build_where``，单条谓词构造传本模块的方言中立版本。
+    conditions = [
+        (_resolve_field_ref(dsl.table, cond.field, join_tables), cond.op, cond.value)
+        for cond in dsl.filters
+    ]
+    where_clause = _psb_build_where(
+        conditions, logic=dsl.filter_logic, filter_builder=_build_filter
+    )
+    if where_clause is not None:
+        stmt = stmt.where(where_clause)
 
     # ── 项目作用域（R2.1）：必须是 WHERE 组装的最后一步 ──
     # 追加语义（AND），用户 DSL 里自写的 project_id 过滤只能与之取交集、无法放宽。

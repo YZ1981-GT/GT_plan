@@ -17,21 +17,17 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
-from dataclasses import dataclass
-from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[3]
+import mutate_advanced_query_param_sql_builder as psb_group
+from mutate_common import (
+    REPO,
+    Mutation,
+    read_source as _read,
+    run_named_guard as _run_named_guard,
+    write_source as _write,
+)
+
 GUARD = "backend/tests/test_advanced_query_scope_budget_tiers.py"
-
-
-@dataclass(frozen=True)
-class Mutation:
-    mid: str
-    path: str
-    old: str
-    new: str
-    expect_test: str
-    why: str
 
 
 MUTATIONS: tuple[Mutation, ...] = (
@@ -252,14 +248,6 @@ MUTATIONS: tuple[Mutation, ...] = (
 )
 
 
-def _read(path: str) -> str:
-    return (REPO / path).read_text(encoding="utf-8")
-
-
-def _write(path: str, text: str) -> None:
-    (REPO / path).write_text(text, encoding="utf-8")
-
-
 def check_anchors() -> int:
     """只读校验每个锚点在目标文件中恰好命中一次。"""
     bad = 0
@@ -339,9 +327,11 @@ def run_mutations() -> int:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check-anchors", action="store_true", help="只校验锚点，不改文件")
-    parser.add_argument("--group", choices=("all", "scope", "lazy", "pbt"), default="all")
+    parser.add_argument("--group", choices=("all", "scope", "lazy", "pbt", "psb"), default="all")
     args = parser.parse_args()
     if args.check_anchors:
+        # 锚点校验必须覆盖**全部**变异组：漏掉一组，"已归档 spec 是否还可复现"
+        # 这个最便宜判据就会给出假绿（该组锚点早已漂移却无人知）。
         rc = check_anchors()
         print("\n── 指标树组锚点 ──")
         for m in LAZY_MUTATIONS:
@@ -349,6 +339,21 @@ def main() -> int:
             print(f"{m.mid}  {'OK' if hits == 1 else f'ANCHOR-MISS({hits})'}  {m.why}")
             if hits != 1:
                 rc = 1
+        print("\n── PBT 组锚点 ──")
+        for m, _guard in PBT_MUTATIONS:
+            hits = _read(m.path).count(m.old)
+            print(f"{m.mid}  {'OK' if hits == 1 else f'ANCHOR-MISS({hits})'}  {m.why}")
+            if hits != 1:
+                rc = 1
+        print()
+        rc = psb_group.check_group_anchors(psb_group.PSB_MUTATIONS, psb_group.LABEL) or rc
+        total = (
+            len(MUTATIONS)
+            + len(LAZY_MUTATIONS)
+            + len(PBT_MUTATIONS)
+            + len(psb_group.PSB_MUTATIONS)
+        )
+        print(f"\n全组锚点合计：{total} 条")
         return rc
     if args.group == "scope":
         return run_mutations()
@@ -356,7 +361,14 @@ def main() -> int:
         return run_lazy_mutations()
     if args.group == "pbt":
         return run_pbt_mutations()
-    return run_mutations() or run_lazy_mutations() or run_pbt_mutations()
+    if args.group == "psb":
+        return psb_group.run_group(psb_group.PSB_MUTATIONS, psb_group.LABEL)
+    return (
+        run_mutations()
+        or run_lazy_mutations()
+        or run_pbt_mutations()
+        or psb_group.run_group(psb_group.PSB_MUTATIONS, psb_group.LABEL)
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -431,22 +443,6 @@ LAZY_MUTATIONS: tuple[Mutation, ...] = (
         "节点不再标 lazy（前端无从判断是否需要按需加载）",
     ),
 )
-
-
-def _run_named_guard(guard: str, expect_test: str) -> tuple[bool, bool]:
-    proc = subprocess.run(
-        [sys.executable, "-m", "pytest", guard, "-q", "--tb=no", "-p", "no:cacheprovider"],
-        cwd=REPO,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    out = (proc.stdout or "") + (proc.stderr or "")
-    expected_failed = any(
-        line.startswith("FAILED") and expect_test in line for line in out.splitlines()
-    )
-    return proc.returncode != 0, expected_failed
 
 
 def run_lazy_mutations() -> int:
