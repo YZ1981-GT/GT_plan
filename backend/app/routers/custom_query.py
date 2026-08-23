@@ -2723,12 +2723,18 @@ async def cell_writeback(
         except Exception as audit_e:
             logger.warning("audit_log for cell_writeback failed: %s", audit_e)
 
-    return {
+    response: dict = {
         "success": True,
         "updated_at": write_result.get("updated_at"),
         "addr_id": write_result.get("addr_id"),
         "column_metadata": write_result.get("column_metadata"),
     }
+    # 下游联动（file_version / prefill_stale / WORKPAPER_SAVED → cross_ref·stale·SSE）
+    # 未触发时必须透传给调用方 —— 数据写回了但联动没跑，静默返回 success 会让用户
+    # 以为一切正常，而其实别处的取数不会刷新。
+    if write_result.get("warnings"):
+        response["warnings"] = write_result["warnings"]
+    return response
 
 
 # ─── GIN Index Health Endpoint ───────────────────────────────────────────────

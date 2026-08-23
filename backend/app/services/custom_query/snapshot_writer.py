@@ -32,7 +32,6 @@ ACNR 集成 (M2, R15.1, R15.2, R15.4):
 import asyncio
 import json
 import logging
-import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -41,110 +40,26 @@ from uuid import UUID
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.custom_query import snapshot_writer_addr_id as _addr
+from app.services.custom_query import snapshot_writer_modules as _mod
+
+# 共享定义（错误码 / 异常 / cell_ref 解析）实现在 snapshot_writer_shared —— 伴生模块
+# 也要用它们，放在本文件会造成循环导入。此处 re-export：既有
+# `from ...snapshot_writer import WritebackConflict` 的调用方与测试不受影响
+# （同一对象，isinstance / except 判定不变）。
+from app.services.custom_query.snapshot_writer_shared import (  # noqa: F401  (re-export)
+    ERR_CODE_AUDIT_WRITE_FAILED,
+    ERR_CODE_RESOLVE_UNAVAILABLE,
+    ERR_CODE_TARGET_UNRESOLVABLE,
+    AuditWriteFailed,
+    WritebackConflict,
+    WritebackPermissionDenied,
+    WritebackResolveUnavailable,
+    WritebackTargetUnresolvable,
+    parse_cell_ref as _parse_cell_ref,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# ─── 错误码（与 design.md Error Handling 表 / addressing_service 对齐）─────────
-
-# 回写目标无法解析为有效 addr_id → 中止、不改数据（R3.4）
-ERR_CODE_TARGET_UNRESOLVABLE = "TARGET_UNRESOLVABLE"
-# resolve 不可用/5s 无响应 → 中止、数据不变（R3.5）
-ERR_CODE_RESOLVE_UNAVAILABLE = "RESOLVE_UNAVAILABLE"
-# 审计写入失败 → 回滚回写改动（R14.8「无审计不回写」）
-ERR_CODE_AUDIT_WRITE_FAILED = "AUDIT_WRITE_FAILED"
-
-
-# ─── Exceptions ──────────────────────────────────────────────────────────────
-
-
-class WritebackConflict(Exception):
-    """乐观锁冲突：opened_at < updated_at"""
-
-    def __init__(self, latest_updated_at: datetime, latest_editor: str):
-        self.latest_updated_at = latest_updated_at
-        self.latest_editor = latest_editor
-        super().__init__(
-            f"Conflict: data updated at {latest_updated_at} by {latest_editor}"
-        )
-
-
-class WritebackPermissionDenied(Exception):
-    """无写权限或非 workpaper 源"""
-
-    def __init__(self, reason: str):
-        self.reason = reason
-        super().__init__(reason)
-
-
-class WritebackTargetUnresolvable(Exception):
-    """回写目标无法被 Resolve_Service 解析为有效 addr_id（R3.4）。
-
-    字段缺失 / 格式非法 / 目标格不存在 → 中止回写、不修改任何数据。
-    携带 `error_code=TARGET_UNRESOLVABLE` 供 router 转 HTTP 400。
-    """
-
-    error_code = ERR_CODE_TARGET_UNRESOLVABLE
-
-    def __init__(self, target_hint: str, message: str | None = None):
-        self.target_hint = target_hint
-        self.message = message or f"回写目标无法解析为有效 addr_id：{target_hint}"
-        super().__init__(self.message)
-
-
-class WritebackResolveUnavailable(Exception):
-    """Resolve_Service 不可用或 5 秒内无响应（R3.5）。
-
-    中止回写、保持数据不变。携带 `error_code=RESOLVE_UNAVAILABLE` 供 router 转 HTTP 503。
-    """
-
-    error_code = ERR_CODE_RESOLVE_UNAVAILABLE
-
-    def __init__(self, target_hint: str, message: str | None = None):
-        self.target_hint = target_hint
-        self.message = message or f"解析服务不可用或超时，回写已中止：{target_hint}"
-        super().__init__(self.message)
-
-
-class AuditWriteFailed(Exception):
-    """回写成功但审计写入失败（R14.8「无审计不回写」）。
-
-    把 `log_action` 纳入回写事务成功判定 —— 审计失败即回滚回写改动。
-    携带 `error_code=AUDIT_WRITE_FAILED` 供 router 转 HTTP 500 并回滚。
-    """
-
-    error_code = ERR_CODE_AUDIT_WRITE_FAILED
-
-    def __init__(self, message: str | None = None):
-        self.message = message or "审计日志写入失败，回写已回滚（无审计不回写）。"
-        super().__init__(self.message)
-
-
-# ─── Cell reference parsing ──────────────────────────────────────────────────
-
-
-def _parse_cell_ref(cell_ref: str) -> tuple[int, int]:
-    """解析 cell_ref (e.g. 'B7') 为 (row_0indexed, col_0indexed)。
-
-    cell_ref 是 1-indexed (Excel 风格)，snapshot 用 0-indexed key (Univer 约定)。
-    B7 → row=6, col=1
-    """
-    m = re.match(r"^([A-Z]+)(\d+)$", cell_ref.upper().strip())
-    if not m:
-        raise ValueError(f"Invalid cell_ref: {cell_ref}")
-
-    col_letters = m.group(1)
-    row_num = int(m.group(2))
-
-    # 列字母转 0-indexed
-    col = 0
-    for ch in col_letters:
-        col = col * 26 + (ord(ch) - 64)
-    col -= 1  # 转为 0-indexed
-
-    # 行号转 0-indexed
-    row = row_num - 1
-
-    return row, col
 
 
 # ─── SnapshotWriter ──────────────────────────────────────────────────────────
@@ -312,18 +227,15 @@ class SnapshotWriter:
 
         # 查找目标 sheet（按 name 匹配）
         target_sheet = None
-        target_sheet_key = None
         if isinstance(sheets, dict):
-            for key, sheet_data in sheets.items():
+            for sheet_data in sheets.values():
                 if isinstance(sheet_data, dict) and sheet_data.get("name") == sheet_name:
                     target_sheet = sheet_data
-                    target_sheet_key = key
                     break
         elif isinstance(sheets, list):
             for i, sheet_data in enumerate(sheets):
                 if isinstance(sheet_data, dict) and sheet_data.get("name") == sheet_name:
                     target_sheet = sheet_data
-                    target_sheet_key = i
                     break
 
         if target_sheet is None:
@@ -363,6 +275,12 @@ class SnapshotWriter:
 
         # Step 8: 统一后处理 — 使用 orchestrator 替代孤立本地 EventBus
         # orchestrator 负责: file_version++, prefill_stale, updated_at, event_bus.publish
+        #
+        # 非致命，但**不能静默**：这里挂掉意味着 file_version 没++、prefill_stale 没标、
+        # WORKPAPER_SAVED 没发 —— 下游 cross_ref / stale / SSE 全不触发，而用户看到的
+        # 是「保存成功」。原实现把整块（含 ORM select）吞成一条 WARNING，正是最贵的那类
+        # fail-open：接线错了也表现为「静默成功」。故改为记 ERROR 并在返回体带 warnings。
+        downstream_warnings: list[str] = []
         try:
             from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
 
@@ -373,7 +291,16 @@ class SnapshotWriter:
                 sa.select(WorkingPaper).where(WorkingPaper.id == wp_id)
             )
             wp_obj = wp_result.scalar_one_or_none()
-            if wp_obj:
+            if wp_obj is None:
+                # 我们刚刚 SELECT ... FOR UPDATE 过这一行，此处取不到属真实异常，
+                # 不是「正常情况」——原实现连这条都不记，联动静默失效无从发现。
+                logger.error(
+                    "orchestrator 前置取 ORM 实例失败：working_paper %s 存在但 ORM 查不到，"
+                    "下游联动（cross_ref/stale/SSE）未触发",
+                    wp_id,
+                )
+                downstream_warnings.append("下游联动未触发：底稿 ORM 实例不可用")
+            else:
                 await save_orchestrator.after_save(
                     db, wp_obj, user,
                     trigger="custom_query_writeback",
@@ -386,7 +313,12 @@ class SnapshotWriter:
                 )
                 now = wp_obj.updated_at  # 使用 orchestrator 设置的 updated_at
         except Exception as exc:
-            logger.warning("orchestrator.after_save failed (non-fatal): %s", exc)
+            logger.error(
+                "orchestrator.after_save 失败（回写已落库，但下游联动未触发）: %s",
+                exc,
+                exc_info=True,
+            )
+            downstream_warnings.append(f"下游联动未触发：{exc}")
 
         # Step 9: 落 advanced_query_writeback（回写身份 addr_id 存储，R3.1/R14.3）
         # 以 canonical addr_id 作为回写身份，取代裸 (wp_id, sheet_name, cell_ref)
@@ -425,7 +357,7 @@ class SnapshotWriter:
             project_id=project_id,
         )
 
-        return {
+        payload: dict = {
             "success": True,
             "updated_at": now.isoformat(),
             "old_value": old_value,
@@ -434,8 +366,14 @@ class SnapshotWriter:
             # audit 已在事务内记录（R14.8），告知 router 勿重复记审计
             "audit_logged": True,
         }
-
-    # ─── report 模块写回 ─────────────────────────────────────────────────
+        # 下游联动没跑起来时必须让调用方看得见（Step 8 非致命但不静默）
+        if downstream_warnings:
+            payload["warnings"] = downstream_warnings
+        return payload
+    # ─── 非 workpaper 模块写回（实现在 snapshot_writer_modules）──────────
+    # 四个模块写回都是「SELECT FOR UPDATE → 乐观锁 → 定位虚拟 sheet 列 → UPDATE」的
+    # 同构流程，与 workpaper 的 11 步事务无关，故下沉到伴生模块。类上保留同名薄委托：
+    # 既有测试用 hasattr 检查模块分派、并用实例赋值做替身，搬走会让两者失效。
 
     async def _write_report_cell(
         self,
@@ -447,61 +385,11 @@ class SnapshotWriter:
         new_value: Any,
         opened_at: datetime,
     ) -> dict:
-        """写回 report_snapshot.data JSONB。
-
-        虚拟 sheet 列映射：A=row_code, B=row_name, C=current_period_amount, D=prior_period_amount, E=formula
-        """
-        from app.services.custom_query.module_cell_resolver import _REPORT_COLUMNS
-
-        # wp_id 在 report 模块中是 report_snapshot.id
-        result = await db.execute(
-            text("""
-                SELECT id, data, updated_at FROM report_snapshot
-                WHERE id = :rid
-                FOR UPDATE
-            """),
-            {"rid": wp_id},
+        """写回 report_snapshot.data JSONB（委托 snapshot_writer_modules）。"""
+        return await _mod.write_report_cell(
+            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
+            check_lock=self._check_optimistic_lock,
         )
-        row = result.first()
-        if not row:
-            raise ValueError(f"Report snapshot not found: {wp_id}")
-
-        current_updated_at = row[2]
-        data = row[1] or {}
-
-        # 乐观锁
-        self._check_optimistic_lock(opened_at, current_updated_at, user)
-
-        # 解析 cell_ref 定位虚拟 sheet 行列
-        row_idx, col_idx = _parse_cell_ref(cell_ref)
-        rows_arr = data.get("rows", [])
-
-        # 虚拟 sheet: 第 1 行是表头，第 2 行起是数据
-        data_row_idx = row_idx - 1  # 第 2 行 = rows[0]
-        if data_row_idx < 0 or data_row_idx >= len(rows_arr):
-            raise ValueError(f"Row index out of range: {cell_ref}")
-
-        col_name = _REPORT_COLUMNS[col_idx] if col_idx < len(_REPORT_COLUMNS) else None
-        if not col_name:
-            raise ValueError(f"Column index out of range: {cell_ref}")
-
-        old_value = rows_arr[data_row_idx].get(col_name)
-        rows_arr[data_row_idx][col_name] = new_value
-
-        now = datetime.now(timezone.utc)
-        await db.execute(
-            text("""
-                UPDATE report_snapshot
-                SET data = :new_data, updated_at = :now
-                WHERE id = :rid
-            """),
-            {"new_data": json.dumps(data, ensure_ascii=False), "rid": wp_id, "now": now},
-        )
-
-        return {"success": True, "updated_at": now.isoformat(), "old_value": old_value}
-
-    # ─── note 模块写回 ───────────────────────────────────────────────────
-
     async def _write_note_cell(
         self,
         db: AsyncSession,
@@ -512,57 +400,11 @@ class SnapshotWriter:
         new_value: Any,
         opened_at: datetime,
     ) -> dict:
-        """写回 consol_note_data.data JSONB。
-
-        虚拟 sheet 列映射：A=code, B=name, C=year_end, D=year_begin, E=formula
-        """
-        from app.services.custom_query.module_cell_resolver import _NOTE_COLUMNS
-
-        result = await db.execute(
-            text("""
-                SELECT id, data, updated_at FROM consol_note_data
-                WHERE id = :nid
-                FOR UPDATE
-            """),
-            {"nid": wp_id},
+        """写回 consol_note_data.data JSONB（委托 snapshot_writer_modules）。"""
+        return await _mod.write_note_cell(
+            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
+            check_lock=self._check_optimistic_lock,
         )
-        row = result.first()
-        if not row:
-            raise ValueError(f"Note data not found: {wp_id}")
-
-        current_updated_at = row[2]
-        data = row[1] or {}
-
-        self._check_optimistic_lock(opened_at, current_updated_at, user)
-
-        row_idx, col_idx = _parse_cell_ref(cell_ref)
-        rows_arr = data.get("rows", [])
-
-        data_row_idx = row_idx - 1
-        if data_row_idx < 0 or data_row_idx >= len(rows_arr):
-            raise ValueError(f"Row index out of range: {cell_ref}")
-
-        col_name = _NOTE_COLUMNS[col_idx] if col_idx < len(_NOTE_COLUMNS) else None
-        if not col_name:
-            raise ValueError(f"Column index out of range: {cell_ref}")
-
-        old_value = rows_arr[data_row_idx].get(col_name)
-        rows_arr[data_row_idx][col_name] = new_value
-
-        now = datetime.now(timezone.utc)
-        await db.execute(
-            text("""
-                UPDATE consol_note_data
-                SET data = :new_data, updated_at = :now
-                WHERE id = :nid
-            """),
-            {"new_data": json.dumps(data, ensure_ascii=False), "nid": wp_id, "now": now},
-        )
-
-        return {"success": True, "updated_at": now.isoformat(), "old_value": old_value}
-
-    # ─── adj 模块写回 ────────────────────────────────────────────────────
-
     async def _write_adj_cell(
         self,
         db: AsyncSession,
@@ -573,43 +415,11 @@ class SnapshotWriter:
         new_value: Any,
         opened_at: datetime,
     ) -> dict:
-        """写回 adjustments 表 UPDATE。
-
-        虚拟 sheet 列映射：A=entry_no, B=account_code, C=account_name, D=debit_amount, E=credit_amount, F=description
-        wp_id 在 adj 模块中是 adjustment 记录的 id。
-        """
-        from app.services.custom_query.module_cell_resolver import _ADJ_COLUMNS
-
-        result = await db.execute(
-            text("SELECT id, updated_at FROM adjustments WHERE id = :aid FOR UPDATE"),
-            {"aid": wp_id},
+        """写回 adjustments 表（委托 snapshot_writer_modules）。"""
+        return await _mod.write_adj_cell(
+            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
+            check_lock=self._check_optimistic_lock,
         )
-        row = result.first()
-        if not row:
-            raise ValueError(f"Adjustment not found: {wp_id}")
-
-        current_updated_at = row[1]
-        self._check_optimistic_lock(opened_at, current_updated_at, user)
-
-        _, col_idx = _parse_cell_ref(cell_ref)
-        col_name = _ADJ_COLUMNS[col_idx] if col_idx < len(_ADJ_COLUMNS) else None
-        if not col_name:
-            raise ValueError(f"Column index out of range: {cell_ref}")
-
-        now = datetime.now(timezone.utc)
-        await db.execute(
-            text(f"""
-                UPDATE adjustments
-                SET {col_name} = :new_val, updated_at = :now
-                WHERE id = :aid
-            """),
-            {"new_val": new_value, "now": now, "aid": wp_id},
-        )
-
-        return {"success": True, "updated_at": now.isoformat(), "old_value": None}
-
-    # ─── tb 模块写回 ─────────────────────────────────────────────────────
-
     async def _write_tb_cell(
         self,
         db: AsyncSession,
@@ -620,40 +430,11 @@ class SnapshotWriter:
         new_value: Any,
         opened_at: datetime,
     ) -> dict:
-        """写回 trial_balance.audited_amount UPDATE。
-
-        虚拟 sheet 列映射：A=account_code, B=account_name, C=opening_balance, D=debit_amount, E=credit_amount, F=closing_balance, G=audited_amount
-        wp_id 在 tb 模块中是 trial_balance 记录的 id。
-        """
-        result = await db.execute(
-            text("SELECT id, updated_at FROM trial_balance WHERE id = :tid FOR UPDATE"),
-            {"tid": wp_id},
+        """写回 trial_balance.audited_amount（委托 snapshot_writer_modules）。"""
+        return await _mod.write_tb_cell(
+            db, user, wp_id, sheet_name, cell_ref, new_value, opened_at,
+            check_lock=self._check_optimistic_lock,
         )
-        row = result.first()
-        if not row:
-            raise ValueError(f"Trial balance record not found: {wp_id}")
-
-        current_updated_at = row[1]
-        self._check_optimistic_lock(opened_at, current_updated_at, user)
-
-        _, col_idx = _parse_cell_ref(cell_ref)
-        # 只允许写 audited_amount (G 列, col_idx=6)
-        if col_idx != 6:
-            raise WritebackPermissionDenied(
-                "Only audited_amount (column G) is writable in trial_balance"
-            )
-
-        now = datetime.now(timezone.utc)
-        await db.execute(
-            text("""
-                UPDATE trial_balance
-                SET audited_amount = :new_val, updated_at = :now
-                WHERE id = :tid
-            """),
-            {"new_val": new_value, "now": now, "tid": wp_id},
-        )
-
-        return {"success": True, "updated_at": now.isoformat(), "old_value": None}
 
     # ─── 辅助方法 ────────────────────────────────────────────────────────
 
@@ -881,8 +662,9 @@ class SnapshotWriter:
             logger.debug("column_metadata enrich skipped: %s", exc)
 
         return metadata
-
     # ─── ACNR addr_id 解析（M2, R15.1, R15.2, R15.4）────────────────────
+    # 实现在 snapshot_writer_addr_id（纯查 catalog、不碰 self），类上留薄委托：
+    # 既有测试直接调 writer._resolve_addr_id(...) 并做实例赋值替身。
 
     def _resolve_addr_id(
         self,
@@ -891,126 +673,8 @@ class SnapshotWriter:
         cell_ref: str,
         project_id: str | None = None,
     ) -> dict | None:
-        """通过 ACNR 解析 (wp_code, sheet_name, cell_ref) 为 canonical addr_id。
-
-        携带 project context 进行解析（R15.4），使回写身份从裸坐标升级为 addr_id（R15.1）。
-        返回包含 addr_id + column_metadata 的 dict，chip 可下钻到格（R15.2）。
-
-        Args:
-            wp_code: 底稿编码（如 D2）
-            sheet_name: sheet 名称（如 明细表D2-2）
-            cell_ref: cell 引用（如 E100）
-            project_id: 项目 ID（project context，R15.4）
-
-        Returns:
-            dict with {addr_id, uri, formula_ref, entry_type, jump_route} or None on miss
-        """
-        try:
-            from app.services.acnr.catalog import get_catalog, lookup
-
-            # 尝试通过 catalog lookup 获取 sheet → addr_id
-            # 1. 先确定 sheet_code：从 sheet_name 反查（别名机制）
-            cat = get_catalog()
-
-            # 构建 sheet-level addr_id：通过 wp_code + sheet_name 反查
-            sheet_entry = None
-
-            # 尝试通过 sheet_name 在别名索引中查找
-            alias_matches = cat.sheets_by_alias.get(sheet_name, [])
-            if wp_code and alias_matches:
-                filtered = [m for m in alias_matches if m.get("parent_wp_code") == wp_code]
-                if len(filtered) == 1:
-                    sheet_entry = filtered[0]
-                elif not filtered and len(alias_matches) == 1:
-                    sheet_entry = alias_matches[0]
-
-            # 如果别名反查未命中，尝试 sheet_code 索引
-            if not sheet_entry:
-                code_matches = cat.sheets_by_code.get(sheet_name, [])
-                if wp_code and code_matches:
-                    code_matches = [m for m in code_matches if m.get("parent_wp_code") == wp_code]
-                if len(code_matches) == 1:
-                    sheet_entry = code_matches[0]
-
-            if not sheet_entry:
-                # catalog miss — 降级返回 None（不阻塞写回主流程）
-                logger.debug(
-                    "ACNR addr_id resolve miss: wp_code=%s sheet_name=%s",
-                    wp_code, sheet_name,
-                )
-                return None
-
-            sheet_addr_id = sheet_entry.get("addr_id", "")
-
-            # 2. 如果有 cell_ref，构造 cell-level addr_id
-            if cell_ref:
-                # canonical addr_id = {parent}/{sheet_code}/{cell_address}
-                cell_addr_id = f"{sheet_addr_id}/{cell_ref}"
-
-                # 尝试精确 cell 命中
-                cell_entry = cat.cells_by_addr_id.get(cell_addr_id)
-                if cell_entry:
-                    return {
-                        "addr_id": cell_entry.get("addr_id"),
-                        "uri": cell_entry.get("uri"),
-                        "formula_ref": cell_entry.get("formula_ref"),
-                        "entry_type": "cell",
-                        "semantic_label": cell_entry.get("semantic_label"),
-                        "parent_addr_id": cell_entry.get("parent_addr_id"),
-                        "jump_route": sheet_entry.get("jump_route_template"),
-                        "column_metadata": {
-                            "addr_id": cell_entry.get("addr_id"),
-                            "display_label": (
-                                cell_entry.get("semantic_label")
-                                or cell_entry.get("addr_id")
-                            ),
-                            "cell_address": cell_ref,
-                            "sheet_addr_id": sheet_addr_id,
-                            "drilldown_enabled": True,
-                        },
-                    }
-
-                # Cell 未在 L1 种子中注册：构造 runtime addr_id
-                # 仍返回可用的 addr_id（格式正确但非 L1 注册）
-                return {
-                    "addr_id": cell_addr_id,
-                    "uri": None,
-                    "formula_ref": None,
-                    "entry_type": "cell",
-                    "semantic_label": None,
-                    "parent_addr_id": sheet_addr_id,
-                    "jump_route": sheet_entry.get("jump_route_template"),
-                    "column_metadata": {
-                        "addr_id": cell_addr_id,
-                        "display_label": cell_addr_id,
-                        "cell_address": cell_ref,
-                        "sheet_addr_id": sheet_addr_id,
-                        "drilldown_enabled": True,
-                    },
-                }
-
-            # 3. 仅 sheet 级
-            return {
-                "addr_id": sheet_addr_id,
-                "uri": None,
-                "formula_ref": None,
-                "entry_type": "sheet",
-                "semantic_label": None,
-                "parent_addr_id": None,
-                "jump_route": sheet_entry.get("jump_route_template"),
-                "column_metadata": {
-                    "addr_id": sheet_addr_id,
-                    "display_label": sheet_entry.get("display_label") or sheet_addr_id,
-                    "cell_address": None,
-                    "sheet_addr_id": sheet_addr_id,
-                    "drilldown_enabled": False,
-                },
-            }
-
-        except Exception as e:
-            # ACNR 解析失败不阻塞写回主流程（降级策略）
-            logger.warning("ACNR addr_id resolve error (non-fatal): %s", e)
-            return None
+        """(wp_code, sheet_name, cell_ref) → canonical addr_id（委托伴生模块）。"""
+        return _addr.resolve_addr_id(wp_code, sheet_name, cell_ref, project_id)
 
 
 # ─── 模块级辅助 ──────────────────────────────────────────────────────────────
