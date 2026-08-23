@@ -23,7 +23,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
+from app.deps import assert_project_permission, get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
 from app.models.core import User
 from app.models.report_models import DisclosureNote, NoteStatus
 from app.models.report_schemas import (
@@ -41,6 +41,83 @@ router = APIRouter(
     prefix="/api/disclosure-notes",
     tags=["disclosure-notes"],
 )
+
+
+async def _assert_object_project_access(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    id_column,
+    project_column,
+    object_id: UUID,
+    not_found_detail: str,
+    min_permission: str = "readonly",
+    missing_ok: bool = False,
+) -> UUID | None:
+    """按对象主键反查所属项目并鉴权，返回 project_id。
+
+    用于路径里**只有对象 id**（note_id / validation_id）、拿不到 project_id 的端点：
+    ``require_project_access`` 这个依赖从**路径/查询参数**取 project_id，对它们要么完全
+    不生效，要么更糟 —— 把 ``project_id`` 变成一个**查询参数**，于是调用方可以传一个
+    自己有权的项目，却对另一个项目的对象动手（门禁校验了无关对象）。
+
+    顺序固定为「**最小反查 → 鉴权 → 才读业务数据**」：只 SELECT 一列 project_id，
+    鉴权不过直接 403，不触达任何业务内容。
+
+    ``missing_ok=True`` 时对象不存在返回 ``None`` 而不抛 404 —— 给那些**契约上恒返回
+    200 + error 字段**的端点用（如 ``trace_cell`` 的 ``note_not_found``，是刻意的前端
+    友好降级）。对象不存在意味着没有任何项目数据可泄露，跳过门禁是安全的。
+    """
+    project_id = (
+        await db.execute(sa.select(project_column).where(id_column == object_id))
+    ).scalar_one_or_none()
+    if project_id is None:
+        if missing_ok:
+            return None
+        raise HTTPException(status_code=404, detail=not_found_detail)
+    await assert_project_permission(db, current_user, project_id, min_permission)
+    return project_id
+
+
+async def _assert_note_project_access(
+    db: AsyncSession,
+    current_user: User,
+    note_id: UUID,
+    min_permission: str = "readonly",
+    *,
+    missing_ok: bool = False,
+) -> UUID | None:
+    """按 note_id 反查所属项目并鉴权。"""
+    return await _assert_object_project_access(
+        db,
+        current_user,
+        id_column=DisclosureNote.id,
+        project_column=DisclosureNote.project_id,
+        object_id=note_id,
+        not_found_detail="附注章节不存在",
+        min_permission=min_permission,
+        missing_ok=missing_ok,
+    )
+
+
+async def _assert_validation_project_access(
+    db: AsyncSession,
+    current_user: User,
+    validation_id: UUID,
+    min_permission: str = "edit",
+) -> UUID:
+    """按 validation_id 反查所属项目并鉴权。"""
+    from app.models.report_models import NoteValidationResult
+
+    return await _assert_object_project_access(
+        db,
+        current_user,
+        id_column=NoteValidationResult.id,
+        project_column=NoteValidationResult.project_id,
+        object_id=validation_id,
+        not_found_detail="校验结果不存在",
+        min_permission=min_permission,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +172,12 @@ async def generate_notes(
 ):
     """生成附注初稿"""
     from app.services.prerequisite_checker import PrerequisiteChecker
+
+    # ── 项目编辑权门禁（防 IDOR）：必须在锁检查/前置校验/生成之前 ──────────
+    # project_id 在**请求体**里，require_project_access 这个依赖取不到（它读路径/查询
+    # 参数），故在函数体首句显式调用同一实现。此前无任何门禁：任何登录用户都能为
+    # 任意项目生成附注初稿（写操作）。
+    await assert_project_permission(db, current_user, data.project_id, "edit")
 
     # 合并锁定检查（project_id 在 body）— Phase 1 Task 5
     await check_consol_lock(project_id=data.project_id, db=db)
@@ -255,7 +338,7 @@ async def get_linkage_gaps(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """只读诊断：列出「有报表↔附注勾稽但无写值 linkage」的章节（spec R5 / Task 5.1）。
 
@@ -292,7 +375,7 @@ async def pull_from_workpapers(
     year: int,
     note_section: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """附注主动从底稿拉取最新数据（刷新/生成时调用）。
 
@@ -305,6 +388,10 @@ async def pull_from_workpapers(
     返回 { synced: int, skipped: int }
     """
     from datetime import datetime, timezone
+
+    # Project 此前漏导入 —— 下面 db.get(Project, ...) 一调即 NameError → 该端点自写成
+    # 起就是 500，从未成功执行过（ruff F821 可查，但本文件此前未纳入 lint 门禁）。
+    from app.models.core import Project
     from app.services.note_readiness_service import _load_registry_entries
 
     # 确定项目变体
@@ -504,6 +591,18 @@ async def trace_cell(
       - ``no_binding``               — cell_meta 缺 binding_id
       - ``binding_not_found``        — 反查 binding 失败
     """
+    # ── 项目归属门禁（防 IDOR）─────────────────────────────────────────────
+    # 本端点只给 note_id，路径里没有 project_id，故 require_project_access 这个依赖
+    # 用不上（它从路径/查询参数取 project_id）—— 改为**先最小反查所属项目、再鉴权、
+    # 最后才读业务数据**。此前无任何门禁：拿到任意 note_id 即可读别的项目的溯源链
+    # （含试算表证据行采样）。
+    #
+    # missing_ok=True：本端点契约是「恒 200 + error 字段」（见上方 note_not_found），
+    # note 不存在时不能改成 404，交给 engine 返回 error dict —— 不存在也就无数据可泄露。
+    await _assert_note_project_access(
+        db, current_user, note_id, "readonly", missing_ok=True
+    )
+
     engine = DisclosureEngine(db)
     return await engine.trace_cell(note_id, row_idx, col_idx)
 
@@ -635,6 +734,14 @@ async def update_note(
     _lock_check=Depends(check_consol_lock),
 ):
     """更新附注章节内容"""
+    # ── 项目编辑权门禁（防 IDOR）：必须在任何写动作之前 ─────────────────────
+    # 上面的 require_operation 是**操作级**门禁，其 project_id 从路径/查询参数取；
+    # 本端点路径只有 note_id ⇒ project_id=None ⇒ 它只按 system_role 判断
+    # （见 deps.require_operation docstring：「无 project_id 的全局端点仅按 system_role
+    # 判断」）。于是任何系统角色能 note:edit 的用户都可改**任意项目**的附注章节。
+    # 补一层按 note_id 反查所属项目的项目级门禁；两者互补，不替代。
+    await _assert_note_project_access(db, current_user, note_id, "edit")
+
     engine = DisclosureEngine(db)
     note = await engine.update_note(
         note_id,
@@ -850,9 +957,16 @@ async def confirm_finding(
     finding_index: int,
     data: NoteValidationFindingConfirm,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
     """确认校验发现为"已确认-无需修改" """
+    # ── 项目编辑权门禁（防 IDOR）─────────────────────────────────────────────
+    # 原来挂的是 Depends(require_project_access("edit"))，但本端点路径里**没有**
+    # project_id ⇒ FastAPI 把它变成一个**必填查询参数**，调用方可以传一个自己有权的
+    # 项目，却去确认**另一个项目**的校验发现 —— 门禁校验了无关对象。
+    # 改为按 validation_id 反查真实所属项目再鉴权。
+    await _assert_validation_project_access(db, current_user, validation_id, "edit")
+
     engine = NoteValidationEngine(db)
     success = await engine.confirm_finding(
         validation_id, finding_index, data.reason,
@@ -913,7 +1027,6 @@ async def upload_history(
     current_user: User = Depends(require_project_access("edit")),
 ):
     """上传历史附注文件（Word/PDF）并解析"""
-    from fastapi import UploadFile, File
     # 简化实现：返回解析结果结构
     # 实际需要接收文件上传，保存到临时目录，调用 HistoryNoteParser
     return {
@@ -1003,7 +1116,7 @@ async def get_auto_pull(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取附注章节的 cross_ref auto_pull 只读联动值.
 

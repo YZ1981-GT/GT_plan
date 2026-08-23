@@ -26,6 +26,15 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[3]
 
+# Windows 控制台/重定向默认走 GBK，变异说明里的中文标点与箭头（→ ⇒ ✔）会
+# UnicodeEncodeError，把脚本打断在半路 —— 表现为「某几条锚点没输出」，极易误判成
+# ANCHOR-MISS。统一把标准流切到 UTF-8（errors=replace 兜底，绝不因文案打断判定）。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+    except (AttributeError, ValueError):  # pragma: no cover - 老版本/已重定向
+        pass
+
 
 @dataclass(frozen=True)
 class Mutation:
