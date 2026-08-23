@@ -65,3 +65,18 @@ backend/tests/_test_x3_keyfamily_property_criteria.py  808
 #     services/custom_query/fetchers/ 子包，属独立任务（改动面大、需逐取数器回归）。
 #     spec: advanced-query-hardening-wiring-closure
 backend/app/routers/custom_query.py  2966
+
+#   disclosure_notes.py（1454 行）/ wp_editor_router.py（1120 行）——
+#     **两者改动前即已超限**；本次每个文件只改了 1 处**字面量**：
+#     require_project_access("editor"|"member") → ("edit")。
+#     那两个级别名不在 PERMISSION_HIERARCHY 里，会被 .get(..., 0) 静默降级为 0，
+#     使 4 个写端点对任何项目成员（含 readonly）放行 —— 属真实授权缺陷，
+#     根因已在 app/deps.py 修为「工厂调用期 fail-closed」。
+#     baseline 取当前真实行数（比改动前少 6 个字符、行数不变），门禁继续拦膨胀。
+#     为一处 4 字符的安全修复去拆 1454 行 router 属过度扩张，且会把安全修复的 diff
+#     淹没在搬迁噪声里、无法评审。拆分方向另立任务：
+#       · disclosure_notes.py —— 按关注点分 3 组（章节 CRUD / 公式与校验 / AI 填充与导出）
+#       · wp_editor_router.py —— 把 word-template 签署与 A16 子版本逻辑抽为伴生模块
+#     spec: advanced-query-hardening-wiring-closure（收口顺带修复）
+backend/app/routers/disclosure_notes.py  1454
+backend/app/routers/wp_editor_router.py  1120

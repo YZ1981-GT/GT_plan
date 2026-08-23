@@ -672,7 +672,7 @@ async def delete_section(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("editor")),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """软删除指定附注章节。"""
     result = await db.execute(
@@ -699,7 +699,7 @@ async def patch_section(
     note_section: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("editor")),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """部分更新附注章节字段（如 status → 用 is_empty 标记排除导出）。"""
     result = await db.execute(
@@ -753,7 +753,7 @@ async def restore_section(
     year: int,
     note_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("editor")),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """恢复已删除的附注章节。"""
     result = await db.execute(
