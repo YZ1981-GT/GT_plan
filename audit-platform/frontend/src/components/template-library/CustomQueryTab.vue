@@ -49,6 +49,7 @@
             filterable
             placeholder="选择项目"
             style="width: 240px"
+            @change="onProjectChange"
           >
             <el-option
               v-for="p in projectList"
@@ -266,8 +267,17 @@
         <div class="gt-cqt-result-body">
           <el-empty
             v-if="!executing && result.rows.length === 0 && !result.error"
-            description="点击 [执行查询] 开始检索"
-          />
+            :description="emptyHint || '点击 [执行查询] 开始检索'"
+          >
+            <template v-if="emptyHint" #default>
+              <div class="gt-cqt-empty-hint">
+                {{ emptyHint }}
+                <div class="gt-cqt-empty-tip">
+                  四表数据按年度存放。若确认条件无误，请检查左上「年度」是否为该项目的审计年度。
+                </div>
+              </div>
+            </template>
+          </el-empty>
           <el-alert
             v-if="result.error"
             type="error"
@@ -539,6 +549,11 @@ interface ProjectItem {
   name?: string
   /** 当前用户对该项目是否有编辑权限（决定能否作为模板分享目标） */
   can_edit?: boolean
+  /**
+   * 项目审计年度（`GET /api/projects` 由 `resolve_project_audit_year` 派生下发）。
+   * 用于把「年度」输入框默认到**有数据的那一年**，而不是日历当年。
+   */
+  audit_year?: number | null
 }
 interface TemplateItem {
   id: string
@@ -556,9 +571,14 @@ interface TemplateItem {
 // ─── 状态 ───
 const indicatorTree = ref<IndicatorGroup[]>([])
 const projectList = ref<ProjectItem[]>([])
+/** 审计年度兜底：审计做上一年度报表，日历当年在四表里通常没有数据。 */
+function defaultAuditYear(): number {
+  return new Date().getFullYear() - 1
+}
+
 const formCtx = ref({
   project_id: '',
-  year: new Date().getFullYear(),
+  year: defaultAuditYear(),
   source: '',
   condition_logic: 'AND' as 'AND' | 'OR',
 })
@@ -569,6 +589,8 @@ const availableColumns = ref<string[]>([])
 const acnrFieldIds = ref<string[]>([])
 const result = ref<QueryResult>({ rows: [], columns: [], total: 0 })
 const executing = ref(false)
+/** 0 行时的空态说明（含实际使用的年度，便于自查年度是否选错） */
+const emptyHint = ref('')
 // 分页状态（R11.4）：total 现在是后端在分页前算的真实行数，可据此翻页
 const page = ref(1)
 const pageSize = ref(100)
@@ -752,10 +774,32 @@ async function loadProjects() {
       can_edit: p.can_edit ?? p.canEdit ?? false,
       code: p.code || p.project_code,
       name: p.name || p.project_name,
+      audit_year: p.audit_year ?? p.auditYear ?? null,
     }))
+    // 已选项目（如从模板恢复）也要把年度对齐到该项目的审计年度
+    if (formCtx.value.project_id) syncYearToProject(formCtx.value.project_id)
   } catch (e: any) {
     handleApiError(e, '加载项目列表')
   }
+}
+
+/**
+ * 把「年度」对齐到所选项目的审计年度。
+ *
+ * 为什么需要：年度输入框原来固定初始化为 `new Date().getFullYear()`（日历当年），
+ * 而审计做的是**上一年度**报表 —— 2026 年打开页面默认查 2026，四表里只有 2025 的
+ * 数据，于是任何查询都返回 0 行，且页面不提示原因，看起来像功能坏了。
+ *
+ * 真源是后端 `resolve_project_audit_year`（`GET /api/projects` 下发 `audit_year`），
+ * 拿不到时退回 `当年 - 1`（与平台其余十余处视图同一约定），不再用日历当年。
+ */
+function syncYearToProject(projectId: string) {
+  const proj = projectList.value.find((p) => String(p.id) === String(projectId))
+  formCtx.value.year = proj?.audit_year ?? defaultAuditYear()
+}
+
+function onProjectChange(projectId: string) {
+  syncYearToProject(projectId)
 }
 
 function onSourceChange() {
@@ -866,7 +910,13 @@ async function onExecute(keepPage = false) {
       result.value = data
       if (data.error) {
         ElMessage.warning('查询执行返回错误')
+      } else if ((data.total ?? 0) === 0) {
+        // 0 行必须可诊断：年度对不上是最常见原因（四表按年度分区存），
+        // 静默返回空结果会让人以为功能坏了。把实际用的年度写进提示。
+        emptyHint.value = `年度 ${formCtx.value.year} 下没有匹配数据`
+        ElMessage.info(`查询完成，0 条 —— 当前年度为 ${formCtx.value.year}，请确认年度是否正确`)
       } else {
+        emptyHint.value = ''
         ElMessage.success(`查询完成，本页 ${data.rows?.length || 0} 条 / 共 ${data.total ?? 0} 条`)
       }
     }
@@ -1159,6 +1209,16 @@ onMounted(() => {
   padding: 8px;
   min-height: 0;
   overflow: auto;
+}
+.gt-cqt-empty-hint {
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
+  text-align: center;
+}
+.gt-cqt-empty-tip {
+  margin-top: 6px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 .gt-cqt-table { font-size: var(--gt-font-size-xs); }
 .gt-cqt-error {
