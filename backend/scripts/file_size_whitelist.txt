@@ -70,12 +70,19 @@ backend/app/routers/custom_query.py  2966
 #     **两者改动前即已超限**。
 #     wp_editor_router.py：本次只改 1 处字面量（require_project_access("member") →
 #       ("edit")），行数不变。
-#     disclosure_notes.py：1454 → 1567（+113），全部是**项目级归属门禁**：
-#       · 两个反查型门禁 helper（按 note_id / validation_id 反查所属项目再鉴权）
-#       · 7 个端点补门禁：generate（project_id 在 body）/ update_note（原只按
-#         system_role 判）/ confirm_finding（原门禁校验无关项目）/ trace_cell /
-#         linkage-gaps / pull-from-workpapers / auto-pull
-#       · 顺带修 pull_from_workpapers 漏导入 Project（一调即 NameError 500）
+#     disclosure_notes.py：1454 → 1809（+355），两批安全/正确性改动，无新增业务功能：
+#       (1) 项目级归属门禁（+113）
+#         · 两个反查型门禁 helper（按 note_id / validation_id 反查所属项目再鉴权）
+#         · 7 个端点补门禁：generate（project_id 在 body）/ update_note（原只按
+#           system_role 判）/ confirm_finding（原门禁校验无关项目）/ trace_cell /
+#           linkage-gaps / pull-from-workpapers / auto-pull
+#         · 顺带修 pull_from_workpapers 漏导入 Project（一调即 NameError 500）
+#       (2) mutation 协调器接线（+242）
+#         · 统一编辑门禁 _assert_project_edit（项目 → 操作 → 合并锁，五个写端点共用）
+#         · DisclosureMutationCoordinator 接进 generate/update/delete/restore/patch：
+#           幂等（X-Mutation-Id）+ 单一事务边界 + commit 成功后才发事件 +
+#           事件发布失败进 warnings（此前是 except: pass 静默吞）
+#         · upload-history 从「假成功 200」改为 501 + 新增 /capabilities 能力清单
 #     那两个级别名（"editor"/"member"）不在 PERMISSION_HIERARCHY 里，会被
 #     .get(..., 0) 静默降级为 0，使写端点对任何项目成员（含 readonly）放行 ——
 #     根因已在 app/deps.py 修为「工厂调用期 fail-closed」。
@@ -84,5 +91,5 @@ backend/app/routers/custom_query.py  2966
 #       · disclosure_notes.py —— 按关注点分 3 组（章节 CRUD / 公式与校验 / AI 填充与导出）
 #       · wp_editor_router.py —— 把 word-template 签署与 A16 子版本逻辑抽为伴生模块
 #     spec: advanced-query-hardening-wiring-closure（收口顺带修复）
-backend/app/routers/disclosure_notes.py  1567
+backend/app/routers/disclosure_notes.py  1809
 backend/app/routers/wp_editor_router.py  1120

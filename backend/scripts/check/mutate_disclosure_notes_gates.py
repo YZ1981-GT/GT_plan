@@ -27,7 +27,9 @@ GATE_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
         Mutation(
             "D01",
             NOTES,
-            '    await assert_project_permission(db, current_user, data.project_id, "edit")',
+            """    await _assert_project_edit(
+        project_id=data.project_id, current_user=current_user, db=db
+    )""",
             "    pass  # 变异：generate 去掉项目门禁",
             "test_all_endpoints_gated",
             "generate 无门禁（任何登录用户可为任意项目生成附注）",
@@ -38,10 +40,20 @@ GATE_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
         Mutation(
             "D02",
             NOTES,
-            '    await _assert_note_project_access(db, current_user, note_id, "edit")',
-            "    pass  # 变异：update_note 去掉项目门禁",
+            """    await _assert_project_edit(
+        project_id=project_id, current_user=current_user, db=db
+    )
+
+    holder: dict[str, Any] = {}
+
+    async def _mutate() -> dict[str, Any]:
+        engine = DisclosureEngine(db)""",
+            """    holder: dict[str, Any] = {}
+
+    async def _mutate() -> dict[str, Any]:
+        engine = DisclosureEngine(db)  # 变异：update_note 去掉统一编辑门禁""",
             "test_uses_body_gate",
-            "update_note 退回仅 require_operation（可改任意项目的附注）",
+            "update_note 退回仅反查不鉴权（可改任意项目的附注）",
         ),
         GUARD,
     ),
@@ -60,10 +72,10 @@ GATE_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
         Mutation(
             "D04",
             NOTES,
-            """    await _assert_note_project_access(
-        db, current_user, note_id, "readonly", missing_ok=True
+            """    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=project_id, db=db
     )""",
-            "    pass  # 变异：trace_cell 去掉项目门禁",
+            "    pass  # 变异：trace_cell 去掉归属门禁",
             "test_all_endpoints_gated",
             "trace_cell 无门禁（可读别的项目的溯源链与试算表证据）",
         ),
@@ -135,6 +147,96 @@ GATE_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
     ),
 )
 
+#: 第二组：mutation 协调器接线（幂等 / 单一事务边界 / commit 后才发事件）
+HARDENING_GUARD = "backend/tests/test_disclosure_notes_hardening.py"
+
+COORDINATOR_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
+    (
+        Mutation(
+            "D09",
+            NOTES,
+            "    return supplied or str(uuid4())",
+            "    return str(uuid4())  # 变异：忽略客户端传的 mutation_id",
+            "test_mutation_id_accepts_header_or_generates_uuid",
+            "忽略客户端 mutation_id（重试不再幂等，每次都当新请求）",
+        ),
+        HARDENING_GUARD,
+    ),
+    (
+        Mutation(
+            "D10",
+            NOTES,
+            """    await require_operation("note:edit")(
+        current_user=current_user, project_id=project_id, db=db
+    )""",
+            "    pass  # 变异：统一门禁漏掉操作级检查",
+            "test_p2_unified_edit_gate_orders_project_then_operation_then_lock",
+            "统一门禁漏掉 note:edit 操作级检查（三段变两段）",
+        ),
+        HARDENING_GUARD,
+    ),
+    (
+        Mutation(
+            "D11",
+            NOTES,
+            "    await check_consol_lock(project_id=project_id, db=db)",
+            "    pass  # 变异：统一门禁漏掉合并锁检查",
+            "test_assert_project_edit_completes_before_any_db_write",
+            "统一门禁漏掉合并锁（合并期间仍可改附注）",
+        ),
+        HARDENING_GUARD,
+    ),
+    (
+        Mutation(
+            "D12",
+            NOTES,
+            """    result["validation"] = await _run_validation_isolated(
+        data.project_id, data.year, data.template_type,
+    )""",
+            """    result["validation"] = await _run_validation_best_effort(
+        db, data.project_id, data.year, data.template_type,
+    )  # 变异：旁路校验复用请求 session""",
+            "test_generate_success_invokes_coordinator_and_returns_committed",
+            "旁路校验复用请求 session（一次 mutation 两次 commit，单一事务边界被破坏）",
+        ),
+        HARDENING_GUARD,
+    ),
+    (
+        Mutation(
+            "D13",
+            NOTES,
+            """    raise HTTPException(
+        status_code=501,
+        detail={
+            "error_code": "HISTORICAL_UPLOAD_NOT_IMPLEMENTED",
+            "message": "历史 Word/PDF 解析尚未实现，请勿依赖该入口导入历史附注",
+            "project_id": str(project_id),
+            "year": year,
+        },
+    )""",
+            """    return {  # 变异：退回假成功
+        "message": "历史附注上传接口已就绪",
+        "project_id": str(project_id),
+        "year": year,
+    }""",
+            "test_upload_history_returns_501_no_db_dependency",
+            "历史上传退回「假成功」200（用户以为导入了，其实什么都没做）",
+        ),
+        HARDENING_GUARD,
+    ),
+    (
+        Mutation(
+            "D14",
+            NOTES,
+            '        "historical_upload": False,',
+            '        "historical_upload": True,  # 变异：能力清单谎称可用',
+            "test_capabilities_report_historical_upload_disabled_in_chinese",
+            "能力清单谎称历史上传可用（前端会把入口开着）",
+        ),
+        HARDENING_GUARD,
+    ),
+)
+
 LABEL = "附注端点门禁"
 
 
@@ -143,8 +245,12 @@ def main() -> int:
     parser.add_argument("--check-anchors", action="store_true", help="只校验锚点，不改文件")
     args = parser.parse_args()
     if args.check_anchors:
-        return check_group_anchors(GATE_MUTATIONS, LABEL)
-    return run_group(GATE_MUTATIONS, LABEL)
+        rc = check_group_anchors(GATE_MUTATIONS, LABEL)
+        print()
+        return check_group_anchors(COORDINATOR_MUTATIONS, "mutation 协调器接线") or rc
+    return run_group(GATE_MUTATIONS, LABEL) or run_group(
+        COORDINATOR_MUTATIONS, "mutation 协调器接线"
+    )
 
 
 if __name__ == "__main__":

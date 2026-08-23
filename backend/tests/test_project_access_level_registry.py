@@ -89,7 +89,15 @@ class TestNoUnregisteredLevelInCallSites:
 
 
 class TestMutationEndpointsRequireEdit:
-    """曾被降级的 4 个写端点必须要求 edit（不是 readonly / review）。"""
+    """曾被降级的写端点必须要求 edit（不是 readonly / review）。
+
+    判据接受两种等价形态 —— 直接挂 ``require_project_access("edit")``，或走附注模块的
+    统一编辑门禁 ``_assert_project_edit``（其内部第一步就是 ``require_project_access
+    ("edit")``，见下方 ``test_unified_note_gate_requires_edit``）。锁的是「要求 edit」这个
+    不变量，不是某一种拼写。
+    """
+
+    UNIFIED_GATES = {"_assert_project_edit"}
 
     CASES = (
         ("backend/app/routers/disclosure_notes.py", "delete_section"),
@@ -119,6 +127,35 @@ class TestMutationEndpointsRequireEdit:
                 continue
             seg = ast.get_source_segment(src, node) or ""
             levels = CALL_RE.findall(seg)
-            if "edit" not in levels:
-                problems.append(f"{rel}::{func} 的 require_project_access 级别为 {levels}")
+            called = {
+                getattr(c.func, "id", None) or getattr(c.func, "attr", None)
+                for c in ast.walk(ast.parse(seg.lstrip()))
+                if isinstance(c, ast.Call)
+            }
+            if "edit" not in levels and not (called & self.UNIFIED_GATES):
+                problems.append(
+                    f"{rel}::{func} 既没有 require_project_access(\"edit\")，"
+                    f"也没走统一编辑门禁（实测级别 {levels}）"
+                )
         assert not problems, "\n".join(problems)
+
+    def test_unified_note_gate_requires_edit(self):
+        """统一门禁自身必须要求 edit —— 否则上一条会把「走了统一门禁」当成足够。"""
+        import ast
+        import inspect
+
+        from app.routers import disclosure_notes as notes
+
+        src = inspect.getsource(notes._assert_project_edit)
+        levels = CALL_RE.findall(src)
+        assert levels == ["edit"], (
+            f"_assert_project_edit 的项目权限级别为 {levels}，应为 ['edit']"
+        )
+        # 三段检查都必须在（漏一段就不是「统一」门禁）
+        called = {
+            getattr(c.func, "id", None) or getattr(c.func, "attr", None)
+            for c in ast.walk(ast.parse(src.lstrip()))
+            if isinstance(c, ast.Call)
+        }
+        for required in ("require_project_access", "require_operation", "check_consol_lock"):
+            assert required in called, f"_assert_project_edit 缺少 {required}"

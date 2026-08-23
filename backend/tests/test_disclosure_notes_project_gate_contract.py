@@ -50,10 +50,25 @@ ROUTER_PATH = (
 
 #: 函数体内显式调用的门禁（用于 project_id 不在路径上的端点）
 BODY_GATES = {
+    "_assert_project_edit",  # 五个写端点的统一编辑门禁（项目 → 操作 → 合并锁）
     "assert_project_permission",
+    "assert_target_accessible",  # OwnershipGuard（读路径）
     "_assert_note_project_access",
     "_assert_validation_project_access",
     "_assert_object_project_access",
+}
+
+#: 业务动作调用名 —— 门禁必须早于它们全部。
+#: 不含 ``execute``：``db.execute``（最小投影反查）与
+#: ``DisclosureMutationCoordinator.execute`` 同名，会互相误判；coordinator 用
+#: ``_coordinator`` 工厂名识别。
+BUSINESS_CALLS = {
+    "generate_notes",
+    "update_note",
+    "trace_cell",
+    "check",  # PrerequisiteChecker.check
+    "_coordinator",  # mutation 协调器（内部 commit）
+    "confirm_finding",
 }
 
 #: 依赖注入型门禁
@@ -63,6 +78,11 @@ DEPENDS_GATES = {"require_project_access", "require_role", "require_wp_edit_perm
 NO_PROJECT_DATA = {
     # 致同附注 Word 排版规范常量（21 项），全平台同一份，不含任何项目数据
     "get_format_config",
+    # 恒抛 501（历史 Word/PDF 解析未实现）：不声明 DB 依赖、不执行任何业务动作，
+    # 无数据可读可写。加门禁反而会为一个未实现能力占用连接池。
+    "upload_history",
+    # 附注模块能力清单（哪些入口可用 + 中文原因），全平台同一份，不含项目数据
+    "get_capabilities",
 }
 
 
@@ -150,10 +170,10 @@ class TestBodyProjectIdEndpointsUseExplicitGate:
     """
 
     CASES = (
-        ("generate_notes", "assert_project_permission"),
-        ("update_note", "_assert_note_project_access"),
+        ("generate_notes", "_assert_project_edit"),
+        ("update_note", "_assert_project_edit"),
         ("confirm_finding", "_assert_validation_project_access"),
-        ("trace_cell", "_assert_note_project_access"),
+        ("trace_cell", "assert_target_accessible"),
     )
 
     @pytest.mark.parametrize("func_name,expected_gate", CASES)
@@ -184,24 +204,50 @@ class TestBodyProjectIdEndpointsUseExplicitGate:
 
 
 class TestGateRunsBeforeBusinessRead:
-    """反查型门禁必须是函数体的**第一条** await（先鉴权、再读业务数据）。"""
+    """门禁必须早于一切业务动作。
+
+    不能简单要求「门禁是第一条 await」—— 路径上只有 note_id / validation_id 的端点必须
+    **先最小反查所属项目**才知道该鉴权哪个项目，那条 SELECT 合法地排在门禁之前。
+    故判据是：
+      1. 门禁出现在所有业务调用（engine / checker / coordinator）之前；
+      2. 门禁之前最多只允许一条 ``db.execute``（即那条最小投影反查），不得有第二次读。
+    """
 
     FUNCS = ("generate_notes", "update_note", "confirm_finding", "trace_cell")
 
+    @staticmethod
+    def _call_lines(node: ast.AST) -> list[tuple[int, str]]:
+        out = []
+        for c in ast.walk(node):
+            if isinstance(c, ast.Call):
+                name = getattr(c.func, "id", None) or getattr(c.func, "attr", None)
+                if name:
+                    out.append((c.lineno, name))
+        return sorted(out)
+
     @pytest.mark.parametrize("func_name", FUNCS)
-    def test_gate_is_first_await(self, func_name):
-        node = _func_nodes()[func_name]
-        awaits = [n for n in ast.walk(node) if isinstance(n, ast.Await)]
-        assert awaits, f"{func_name} 没有任何 await，判据失效"
-        first = awaits[0]
-        called = {
-            getattr(c.func, "id", None) or getattr(c.func, "attr", None)
-            for c in ast.walk(first)
-            if isinstance(c, ast.Call)
-        }
-        assert called & BODY_GATES, (
-            f"{func_name} 的第一条 await 不是项目门禁（实际调用：{sorted(x for x in called if x)}）"
-            " —— 鉴权必须先于任何业务读写，否则 403 之前就已经读到/改到别人项目的数据"
+    def test_gate_precedes_all_business_calls(self, func_name):
+        calls = self._call_lines(_func_nodes()[func_name])
+        gate_lines = [ln for ln, n in calls if n in BODY_GATES]
+        assert gate_lines, f"{func_name} 没有任何项目门禁调用"
+        gate_at = min(gate_lines)
+        business = [(ln, n) for ln, n in calls if n in BUSINESS_CALLS and ln > 0]
+        # 端点函数自身的名字也会出现在 BUSINESS_CALLS 里（如 update_note 调 engine.update_note），
+        # 只看晚于门禁的即可；早于门禁的才是违规。
+        violations = [(ln, n) for ln, n in business if ln < gate_at]
+        assert not violations, (
+            f"{func_name} 在门禁（第 {gate_at} 行）之前就调了业务动作：{violations}"
+            " —— 403 之前不得读到/改到别人项目的数据"
+        )
+
+    @pytest.mark.parametrize("func_name", FUNCS)
+    def test_at_most_one_read_before_gate(self, func_name):
+        calls = self._call_lines(_func_nodes()[func_name])
+        gate_at = min(ln for ln, n in calls if n in BODY_GATES)
+        reads_before = [ln for ln, n in calls if n == "execute" and ln < gate_at]
+        assert len(reads_before) <= 1, (
+            f"{func_name} 在门禁前有 {len(reads_before)} 次 db.execute —— "
+            "只允许一条『最小投影反查 project_id』，多出来的就是未鉴权的业务读"
         )
 
 
