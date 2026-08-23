@@ -46,3 +46,22 @@ backend/app/services/doc_ai_context_builder.py  898
 #     每组 property 含 source 期望值 + 结构校验 + 反空转，拆分会让单组的三段分离。
 #     spec: x3-adjustment-entry-import-export
 backend/tests/_test_x3_keyfamily_property_criteria.py  808
+
+#   custom_query.py —— **改动前即 2621 行已远超上限**（单文件承担 router + 14 个
+#     裸 SQL 取数器约 900 行）。本次净增 +255：新增 indicators 认证/归属校验、
+#     execute 收敛到 ExecuteCompatibilityAdapter、异常分类与 correlation_id、
+#     取数器 limit 保护、模板 CRUD 委托 TemplateService、execute_template 端点。
+#     已按行数门禁指引先抽两块伴生模块（各自本就是独立关注点，不是为凑行数）：
+#       · routers/custom_query_writeback.py（257 行）—— 回写预览/确认端点组
+#       · services/custom_query/template_scope_guard.py（94 行）—— 模板 scope 归一 + 逐项目鉴权
+#     同批还把 query_builder 的 DSL→SQL 抽到 services/custom_query/builder_dsl.py，
+#     使该 router 从 776 → 439 行**脱离本表**（不把欠账固化）。
+#     🔴 抽取受一条硬约束限制：**依赖可 monkeypatch 符号的 helper 不能搬走**。
+#     `_assert_writeback_authorized`（读 get_visible_project_ids）与
+#     `_assert_template_scope_edit`（读 require_project_access）搬到伴生模块后会读
+#     那边的全局名，契约测试的替身完全失效（实测 6 条红）⇒ 已搬回本模块。
+#     接线约定优先于行数，不为凑行数扭曲结构。
+#     custom_query.py 的剩余拆分方向：14 个 _query_* 取数器（约 900 行）下沉为
+#     services/custom_query/fetchers/ 子包，属独立任务（改动面大、需逐取数器回归）。
+#     spec: advanced-query-hardening-wiring-closure
+backend/app/routers/custom_query.py  2966

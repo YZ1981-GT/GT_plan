@@ -1,0 +1,69 @@
+{
+  "spec": "advanced-query-hardening-wiring-closure",
+  "captured_at": "2026-08-23",
+  "note": "立项时的红基线。全部为 HEAD 已入库状态（git status --porcelain 当时为 0 条），非并发会话在途。",
+  "head_at_capture": "121939f3",
+  "initial_red": {
+    "backend_total": 75,
+    "backend_by_file": {
+      "backend/tests/test_advanced_query_hardening_wave012.py": 60,
+      "backend/tests/test_custom_query_template_scope_hardening.py": 7,
+      "backend/tests/test_custom_query_templates.py": 8
+    },
+    "frontend_total": 5,
+    "frontend_by_file": {
+      "src/components/custom-query/__tests__/advancedQueryFrontend.spec.ts": 2,
+      "src/components/custom-query/__tests__/advancedQueryFrontend-p7.spec.ts": 3
+    }
+  },
+  "pre_existing_red_not_in_scope": {
+    "note": "同域但非本 spec 引入的红，改造前后均存在；本 spec 顺带修掉了 test_template_config 的 6 条（ORM 数组列缺方言变体）。",
+    "backend/tests/test_disclosure_notes_hardening.py": 33,
+    "backend/tests/test_workpaper_save_orchestrator_integration.py": 1
+  },
+  "root_causes": [
+    {
+      "id": "zero-wired-services",
+      "desc": "services/custom_query 下 7 个模块在 backend/app 全域 router 引用数为 0（query_orchestrator / execute_compatibility / export_service / writeback_preview / param_sql_builder / template_service / template_scope_adapter），属 additive 注入即死代码"
+    },
+    {
+      "id": "dataclass-adapter-mismatch",
+      "desc": "execute_compatibility 已读 result.limit / result.offset / column.source，而 QueryResult 无 limit/offset、ColumnMeta 无 source ⇒ 该路径自交付起必 AttributeError"
+    },
+    {
+      "id": "missing-ensure-script",
+      "desc": "backend/scripts/_ensure_custom_query_tables.py 不存在，TestEnsureCustomQueryTables 8 条全红"
+    },
+    {
+      "id": "stale-frontend-mock",
+      "desc": "advancedQueryFrontend.spec.ts 的 usePermissionMatrix mock 只返回 currentRole，而组件已改用 canDo ⇒ canDo is not a function（测试陈旧，非生产 bug）；但暴露了前后端权限判据不同源的真问题"
+    }
+  ],
+  "browser_and_db_evidence": {
+    "unauthenticated_readonly_endpoints_returned_200": [
+      "/api/custom-query/indicators",
+      "/api/custom-query/wp-id-by-code",
+      "/api/custom-query/wp-sheet-preview"
+    ],
+    "builder_rows_spanned_projects": 9,
+    "builder_sql_had_no_project_filter": true,
+    "pg_statement_timeout": "0",
+    "tb_ledger_rows": 6971441,
+    "indicators_payload_chars": 578057,
+    "indicators_nodes": 3089,
+    "indicators_slow_request_ms": 3391,
+    "cartesian_join_explain_rows": {
+      "trial_balance_join_wp_index_on_project_id": 163961,
+      "trial_balance_join_account_chart_with_business_key": 1505,
+      "base_table_rows": 1210
+    },
+    "staff_members_pii_fill": {
+      "rows": 166,
+      "email_non_null": 0,
+      "phone_non_null": 0,
+      "user_id_non_null": 166
+    }
+  },
+  "expected_min_passed_note": "按实测值锚定（2026-08-23 实测 SPEC_GUARD_FILES 合计 302 passed / 0 failed；PBT 按域拆两文件并纳入清单后的口径）。低于此值即意味着测试被删、被改名或被 skip —— 那是假绿的常见入口，故用数值硬断言而非只看 exit code。",
+  "expected_min_passed": 302
+}

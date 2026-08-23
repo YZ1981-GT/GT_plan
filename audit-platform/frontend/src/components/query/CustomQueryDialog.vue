@@ -870,19 +870,33 @@ function _indicatorCacheKey(pid: string | undefined, schemaVersion: string | num
 async function loadIndicators(pid: string | undefined) {
   // 用 http(axios) 而非裸 fetch：自动附带鉴权、401 自动刷新，并可读响应头拿 schema version
   const url = pid ? `/api/custom-query/indicators?project_id=${encodeURIComponent(pid)}` : '/api/custom-query/indicators'
+  const sep = url.includes('?') ? '&' : '?'
   try {
-    // _silent：拉取失败由本函数兜底重建，不弹全局 toast
-    const resp = await http.get(url, { _silent: true } as any)
-    const schemaVersion = (resp.headers?.[INDICATOR_SCHEMA_HEADER] as string) || 'unknown'
-    const cacheKey = _indicatorCacheKey(pid, schemaVersion)
-    // 命中缓存优先（同 schema_version 下结构稳定）
+    // 🔴 先用 **depth=1 骨架** 请求探测 schema version，再决定是否需要全量（R12.4）。
+    //
+    // 改造前这里是「先发全量请求拿 header，再查缓存」—— 命中缓存时那次全量请求
+    // （实测约 578,057 字符 / 3,391ms）**早就付出去了**，这个缓存从未节省过网络，
+    // 只省掉了一次赋值。现在骨架体积远小于全量，命中缓存即完全跳过全量拉取。
+    //
+    // 骨架探测单独 try：它只是缓存优化，失败不应把整体拖进静态树兜底分支
+    // （_silent：不弹全局 toast）
+    let schemaVersion = 'unknown'
     try {
+      const probe = await http.get(`${url}${sep}depth=1`, { _silent: true } as any)
+      schemaVersion = (probe?.headers?.[INDICATOR_SCHEMA_HEADER] as string) || 'unknown'
+      const cacheKey = _indicatorCacheKey(pid, schemaVersion)
       const cached = sessionStorage.getItem(cacheKey)
       if (cached) {
         indicatorTree.value = JSON.parse(cached)
         return
       }
-    } catch { /* ignore */ }
+    } catch { /* 探测失败 → 继续走全量拉取 */ }
+    const cacheKey = _indicatorCacheKey(pid, schemaVersion)
+    // 未命中 → 拉全量树。
+    // 此处不改用 el-tree 的 lazy 模式：本组件依赖 `treeRef.getNode(key)` 从右侧
+    // 下拉反向定位并展开祖先（见 onSourceChange / 选区器联动），lazy 下未加载的
+    // 分支不存在于树中、getNode 返回 undefined，会破坏该交互。
+    const resp = await http.get(url, { _silent: true } as any)
     // 响应拦截器已解包 {code,data} 信封 → resp.data 即树数组（兜底再解一层）
     const body: any = resp.data
     const tree = Array.isArray(body) ? body : (body?.data ?? body ?? [])

@@ -46,6 +46,12 @@ from app.services.custom_query.addressing_service import (
     addressing_service,
 )
 from app.services.custom_query.ownership_guard import OwnershipGuard, ownership_guard
+from app.services.custom_query.pagination import (
+    apply_pagination,
+    collect_available_columns,
+    resolve_sort,
+    validate_pagination,
+)
 from app.services.custom_query.query_cache import QueryCache, query_cache
 
 logger = logging.getLogger(__name__)
@@ -58,6 +64,9 @@ _VALID_ENTRIES = (ENTRY_BUSINESS, ENTRY_BUILDER)
 # 分页默认
 DEFAULT_PAGE = 1
 DEFAULT_PAGE_SIZE = 100
+
+#: 透视结果中承载「行维度组合标签」的列键（见 _grid_to_rows_columns）
+PIVOT_ROW_LABEL_KEY = "row_label"
 
 
 # ─── 结果列元数据（task 8.2：addr_id 挂载逻辑落地）────────────────────────────
@@ -81,6 +90,13 @@ class ColumnMeta:
     drillable: bool = False
     dtype: str = "text"  # number/text/date
     semantic_label: Optional[str] = None  # 可读名（导出数据来源标识列用，R7.4）
+    #: 列值来源元数据（advanced-query-hardening-wiring-closure R3.6），形如
+    #: ``{"manual": bool, "provenance": [...], "trace": [...]}``：
+    #: ``manual`` 标识该列是否含手工录入值、``provenance`` 记取数出处、
+    #: ``trace`` 记跨表追溯路径。
+    #: ``ExecuteCompatibilityAdapter.to_legacy_response`` 据此判定该列是否需要
+    #: 以完整 dict 形态下发（而非退化为列名字符串），故必须参与 payload 往返。
+    source: Optional[dict] = None
 
     def __post_init__(self) -> None:
         # 不变式：drillable ⇔ addr_id 非空（R4.1 单源可下钻 / R4.5 多源/无源不可下钻）
@@ -117,6 +133,7 @@ def build_column_meta(
     source_addr_ids: Iterable[Optional[str]] = (),
     dtype: str = "text",
     semantic_label: Optional[str] = None,
+    source: Optional[dict] = None,
 ) -> ColumnMeta:
     """由列的**源 addr_id 集合**构造 :class:`ColumnMeta`，自动裁定单源挂载。
 
@@ -132,6 +149,7 @@ def build_column_meta(
         addr_id=resolve_single_source_addr_id(source_addr_ids),
         dtype=dtype,
         semantic_label=semantic_label,
+        source=source,
     )
 
 
@@ -194,9 +212,24 @@ class QueryRequest:
     pivot: Optional[PivotConfig] = None
     page: int = DEFAULT_PAGE
     page_size: int = DEFAULT_PAGE_SIZE
+    # ── 业务视图 legacy 请求体字段（R3.4）───────────────────────────────────
+    # `custom_query.QueryRequest`（pydantic）与本 dataclass 经
+    # `ExecuteCompatibilityAdapter.to_orchestrator_request` 一一对应；缺任一字段
+    # 该 adapter 即 TypeError，故这些字段是「唯一执行路径」成立的前提而非可选增强。
+    source: Optional[str] = None
+    year: Optional[int] = None
+    filters: dict = field(default_factory=dict)
+    columns: list[str] = field(default_factory=list)
+    #: 排序项 [{"field": str, "direction": "asc"|"desc"}]，由 StablePagination 消费
+    sort: list[dict] = field(default_factory=list)
+    limit: int = DEFAULT_PAGE_SIZE
+    offset: int = 0
 
     def cache_def(self) -> dict:
-        """稳定序列化的查询定义（用于缓存键，design Data Models §4）。"""
+        """稳定序列化的查询定义（用于缓存键，design Data Models §4）。
+
+        分页与排序必须纳入键：否则第 1 页与第 2 页、升序与降序会命中同一缓存条目。
+        """
         return {
             "entry": self.entry,
             "targets": list(self.targets),
@@ -206,6 +239,13 @@ class QueryRequest:
             "pivot": asdict(self.pivot) if self.pivot else None,
             "page": self.page,
             "page_size": self.page_size,
+            "source": self.source,
+            "year": self.year,
+            "filters": self.filters,
+            "columns": list(self.columns),
+            "sort": [dict(s) for s in self.sort],
+            "limit": self.limit,
+            "offset": self.offset,
         }
 
 
@@ -218,6 +258,11 @@ class QueryResult:
     total: int = 0
     cache_hit: bool = False
     warnings: list[str] = field(default_factory=list)
+    #: 本次实际生效的分页窗口（R3.5）。`ExecuteCompatibilityAdapter.to_legacy_response`
+    #: 直接读取这两个字段，缺失即 AttributeError —— 该 adapter 自交付起从未被
+    #: router 调用，故此缺陷此前不可见。
+    limit: int = 0
+    offset: int = 0
 
     def to_payload(self) -> dict:
         """转为 JSON 可序列化 dict（供 QueryCache 存储）。"""
@@ -226,11 +271,17 @@ class QueryResult:
             "rows": self.rows,
             "total": self.total,
             "warnings": self.warnings,
+            "limit": self.limit,
+            "offset": self.offset,
         }
 
     @classmethod
     def from_payload(cls, payload: dict, *, cache_hit: bool) -> "QueryResult":
-        """从缓存 payload 重建（还原 ColumnMeta）。"""
+        """从缓存 payload 重建（还原 ColumnMeta）。
+
+        往返必须无损：``source`` 漏还原会让 adapter 把带 source 的列降级成列名
+        字符串，缓存命中与未命中的响应形态就此分叉（R3.5 / R3.6）。
+        """
         cols = [
             ColumnMeta(
                 key=c.get("key", ""),
@@ -238,6 +289,7 @@ class QueryResult:
                 addr_id=c.get("addr_id"),
                 dtype=c.get("dtype", "text"),
                 semantic_label=c.get("semantic_label"),
+                source=c.get("source"),
             )
             for c in payload.get("columns", [])
         ]
@@ -247,6 +299,8 @@ class QueryResult:
             total=int(payload.get("total", 0)),
             cache_hit=cache_hit,
             warnings=list(payload.get("warnings", [])),
+            limit=int(payload.get("limit", 0)),
+            offset=int(payload.get("offset", 0)),
         )
 
 
@@ -311,9 +365,17 @@ class QueryOrchestrator:
             )
 
         # ── step1: Ownership_Check（数据读写前，单点强制 R9.5）──
+        # 授权恒先于一切：分页越界校验也排在其后，避免向无权用户回传「参数不合法」
+        # 这类可用于探测的信息差。
         await self._guard.assert_target_accessible(
             user=user, project_id=req.project_id, db=db
         )
+
+        # ── step1.5: 分页边界校验（R4.6）──
+        # router 的 pydantic 层已有 ge/le，这里是防绕过 router 直调编排器的第二道；
+        # 归一后写回 req，使其参与后续缓存键计算（否则 limit 的字符串/整数两种形态
+        # 会算出两个键）。
+        req.limit, req.offset = validate_pagination(req.limit, req.offset)
 
         # ── step2: resolve（业务视图统一寻址 R1.6；全有或全无 R1.4）──
         resolved = await self._resolve_targets(req, db)
@@ -388,13 +450,24 @@ class QueryOrchestrator:
             rows, columns = self._apply_pivot(req, rows, columns, warnings)
             collapsed = True  # 透视交叉列由列维度聚合产生（多源，不可下钻）
 
-        # step7: serialize —— 单点收敛列的 addr_id 挂载（R4.1 单源可下钻 / R4.5 多源不可下钻）
+        # step7: paginate —— 排序 → total → 切片（R4.1~R4.5）
+        # 顺序不可调换：total 必须反映 group/pivot **之后**的行数，且必须在切片
+        # 之前计算，否则 total 退化为「当前页行数」，前端无从判断是否还有下一页。
+        available = collect_available_columns(rows, [c.key for c in columns])
+        sort_keys = resolve_sort(req.source, req.sort, available)
+        paged = apply_pagination(
+            rows, sort=sort_keys, limit=req.limit, offset=req.offset
+        )
+
+        # step8: serialize —— 单点收敛列的 addr_id 挂载（R4.1 单源可下钻 / R4.5 多源不可下钻）
         columns = self._finalize_columns(columns, collapsed=collapsed)
 
         return QueryResult(
             columns=columns,
-            rows=rows,
-            total=len(rows),
+            rows=paged.rows,
+            total=paged.total,
+            limit=paged.limit,
+            offset=paged.offset,
             cache_hit=False,
             warnings=warnings,
         )
@@ -518,12 +591,11 @@ class QueryOrchestrator:
                 req.pivot,
                 max_cols=req.pivot.max_cols if req.pivot else 512,
             )
-            # Grid → rows/columns 序列化由 task 10.x 落地；防御式提取
-            new_rows = getattr(grid, "rows", None)
-            new_cols = getattr(grid, "columns", None)
-            if new_rows is None or new_cols is None:
-                return rows, columns
-            return list(new_rows), list(new_cols)
+            # Grid（row_labels / col_labels / cells）→ rows / columns。
+            # 改造前此处是 `getattr(grid, "rows", None)` 的防御式提取，而 Grid 从来
+            # 没有 `rows` / `columns` 属性 ⇒ 恒回退原始行、透视静默不生效（total 仍是
+            # 原始行数）。防御式回退在契约不匹配时掩盖了缺陷，故改为显式转换。
+            return self._grid_to_rows_columns(grid, req.pivot)
         except HTTPException:
             raise  # 透视校验类错误（PIVOT_COL_LIMIT）上抛
         except Exception as exc:  # noqa: BLE001 — 集成钩子容错
@@ -532,6 +604,55 @@ class QueryOrchestrator:
             return rows, columns
 
     # ── 辅助 ─────────────────────────────────────────────────────────────
+    @staticmethod
+    def _grid_to_rows_columns(
+        grid: Any, pivot_cfg: Any
+    ) -> tuple[list[dict], list[ColumnMeta]]:
+        """透视网格 ``Grid`` → 统一 ``rows`` / ``columns`` 契约。
+
+        行维度组合合成**一列**（多维度时列名为各维度以 " / " 连接，与
+        ``PivotEngine._combo_label`` 的行标签构造保持一致）；列维度的每个唯一组合
+        各成一列。交叉单元格取 ``Cell.value``；``Cell.addr_id`` 属 cell 级溯源，
+        不上升为列级 ``addr_id``（透视值由多源聚合产生，列级恒不可下钻，R4.5）。
+        """
+        # 行维度组合合成的列固定命名为 `row_label`：行标签本身已是各维度值以
+        # " / " 连接的组合串（PivotEngine._combo_label），用维度名作列名在多维度时
+        # 会得到 "region / quarter" 这种既非列名也非值的混合物，且下游按固定键取值
+        # 更稳定（契约 test_p5_pivot_happens_before_total_and_pagination 断言键集
+        # 恰为 {"row_label", <列标签...>}）。
+        row_key = PIVOT_ROW_LABEL_KEY
+
+        col_labels = [str(c) for c in (getattr(grid, "col_labels", None) or [])]
+        # 列名去重：行维度列与某个列维度标签同名时会在 dict 中互相覆盖，
+        # 静默丢一列比报错更难排查，故显式加后缀区分。
+        seen = {row_key}
+        resolved_labels: list[str] = []
+        for label in col_labels:
+            candidate = label
+            suffix = 2
+            while candidate in seen:
+                candidate = f"{label}_{suffix}"
+                suffix += 1
+            seen.add(candidate)
+            resolved_labels.append(candidate)
+
+        columns = [ColumnMeta(key=row_key, title=row_key)]
+        columns.extend(
+            ColumnMeta(key=label, title=label, dtype="number")
+            for label in resolved_labels
+        )
+
+        cells = getattr(grid, "cells", None) or []
+        rows: list[dict] = []
+        for r_idx, r_label in enumerate(getattr(grid, "row_labels", None) or []):
+            row: dict = {row_key: r_label}
+            row_cells = cells[r_idx] if r_idx < len(cells) else []
+            for c_idx, label in enumerate(resolved_labels):
+                cell = row_cells[c_idx] if c_idx < len(row_cells) else None
+                row[label] = getattr(cell, "value", None)
+            rows.append(row)
+        return rows, columns
+
     @staticmethod
     def _scope_signature(user: Any, req: QueryRequest) -> str:
         """当前用户可访问范围的稳定签名（缓存键隔离 R12.5）。

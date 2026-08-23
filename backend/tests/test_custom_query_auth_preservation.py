@@ -175,11 +175,29 @@ async def test_cache_hit_returns_cached_data(project_id, source):
     **Validates: Requirements 3.2**
 
     EXPECTED: This test PASSES on both unfixed and fixed code.
+
+    🔴 2026-08-23（advanced-query-hardening-wiring-closure R3.1）缓存**位置**变更：
+    改造前 router 自己做一层 Redis 缓存（`query_cache.compute_cache_key` +
+    `get_cached_result`），与编排器内部的缓存构成**两条并行缓存路径**。执行链收敛到
+    `ExecuteCompatibilityAdapter` 后，缓存统一由 `QueryOrchestrator` 经
+    `CanonicalRedisQueryCache` 负责，router 只依据结果的 `cache_hit` 落 X-Cache 头。
+
+    故本测试改为 mock **新位置**的缓存层；断言的行为不变 ——
+    命中缓存时返回缓存数据、且响应带 `X-Cache: HIT`。
     """
     from app.routers.custom_query import execute_query
+    from app.services.query_cache import CanonicalRedisQueryCache
 
     user = _make_user(role="admin")
-    cached_data = {"rows": [{"col1": "val1"}], "columns": ["col1"], "total": 1}
+    # 缓存里存的是 QueryResult.to_payload() 形态
+    cached_payload = {
+        "rows": [{"col1": "val1"}],
+        "columns": [{"key": "col1", "title": "col1"}],
+        "total": 1,
+        "limit": 100,
+        "offset": 0,
+        "warnings": [],
+    }
 
     body = MagicMock()
     body.project_id = project_id
@@ -194,16 +212,18 @@ async def test_cache_hit_returns_cached_data(project_id, source):
     db = _mock_db_for_admin(project_id)
 
     with patch("app.services.gin_index_monitor.is_index_building", return_value=False), \
-         patch("app.services.query_cache.compute_cache_key", return_value="test_key"), \
-         patch("app.services.query_cache.get_cached_result", new_callable=AsyncMock, return_value=cached_data), \
-         patch("app.services.query_cache.set_cached_result", new_callable=AsyncMock):
-
+         patch.object(
+             CanonicalRedisQueryCache, "get_or_compute",
+             new_callable=AsyncMock, return_value=cached_payload,
+         ):
         result = await execute_query(body=body, response=response, db=db, current_user=user)
 
-        # Cache hit should return cached data and set X-Cache header
-        assert result == cached_data, (
-            f"Cache hit should return cached data. Got: {result}"
+        # 命中缓存 → 返回缓存中的行与总数（不触达取数层）
+        assert result["rows"] == cached_payload["rows"], (
+            f"Cache hit should return cached rows. Got: {result}"
         )
+        assert result["total"] == 1, f"Cache hit should return cached total. Got: {result}"
+        assert result["cache_hit"] is True, f"cache_hit 应为 True。Got: {result}"
         assert response.headers.get("X-Cache") == "HIT", (
             f"Cache hit should set X-Cache: HIT header. Got: {response.headers}"
         )
