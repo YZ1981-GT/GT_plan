@@ -5,9 +5,16 @@
 
 ``SnapshotWriter._resolve_addr_id`` 保留为薄委托：既有测试直接调它并做实例赋值替身。
 
-已知遗留（非本次拆分引入，仅原样保留）：``project_id`` 参数被接收但**未使用** ——
-docstring 声称「携带 project context 进行解析（R15.4）」，而 ``get_catalog()`` 是全局
-单例、解析结果与项目无关。要真正落地 R15.4 需确认 catalog 是否分项目，属独立任务。
+**本函数不接受 project_id，这是有意的**：ACNR catalog 是与项目无关的**模板级**索引
+（``get_catalog()`` 全局单例，addr_id 形如 ``{wp_code}/{sheet_code}/{cell}``），解析结果
+不因项目而异。原签名收了一个 ``project_id`` 却从不使用，docstring 还声称「携带 project
+context 进行解析（R15.4）」—— 而且有一条测试专门断言「调用时传了 project_id」，那条断言
+对被调方忽略该参数的事实一无所知，属典型假绿判据。
+
+R15.4 的项目上下文真正生效的地方是**身份解析**那条链：
+``SnapshotWriter._resolve_writeback_identity`` → ``AddressingService.resolve``
+（它确实吃 ``project_id`` + ``db``）。本函数只在身份确定之后做**语义标签增强**
+（display_label / drilldown），不参与身份判定。
 """
 
 from __future__ import annotations
@@ -21,18 +28,17 @@ def resolve_addr_id(
     wp_code: str,
     sheet_name: str,
     cell_ref: str,
-    project_id: str | None = None,
 ) -> dict | None:
-    """通过 ACNR 解析 (wp_code, sheet_name, cell_ref) 为 canonical addr_id。
+    """通过 ACNR catalog 解析 (wp_code, sheet_name, cell_ref) 为 canonical addr_id。
 
-    携带 project context 进行解析（R15.4），使回写身份从裸坐标升级为 addr_id（R15.1）。
-    返回包含 addr_id + column_metadata 的 dict，chip 可下钻到格（R15.2）。
+    供**语义标签增强**使用（display_label / drilldown，R15.2）；回写**身份**由
+    ``AddressingService`` 那条链确定，见模块 docstring。catalog 是模板级索引、与项目无关，
+    故不收 project_id。
 
     Args:
         wp_code: 底稿编码（如 D2）
         sheet_name: sheet 名称（如 明细表D2-2）
         cell_ref: cell 引用（如 E100）
-        project_id: 项目 ID（project context，R15.4）
 
     Returns:
         dict with {addr_id, uri, formula_ref, entry_type, jump_route} or None on miss

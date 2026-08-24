@@ -650,7 +650,6 @@ class SnapshotWriter:
                 wp_code=wp_code,
                 sheet_name=sheet_name,
                 cell_ref=cell_ref,
-                project_id=project_id,
             )
             if enrich and enrich.get("column_metadata"):
                 cm = enrich["column_metadata"]
@@ -662,19 +661,22 @@ class SnapshotWriter:
             logger.debug("column_metadata enrich skipped: %s", exc)
 
         return metadata
-    # ─── ACNR addr_id 解析（M2, R15.1, R15.2, R15.4）────────────────────
+    # ─── ACNR catalog 语义标签增强（R15.2）──────────────────────────────
     # 实现在 snapshot_writer_addr_id（纯查 catalog、不碰 self），类上留薄委托：
     # 既有测试直接调 writer._resolve_addr_id(...) 并做实例赋值替身。
+    #
+    # 注意：**不收 project_id**。catalog 是模板级索引（addr_id = {wp_code}/{sheet}/{cell}），
+    # 与项目无关；原签名收了却从不使用，还在 docstring 里声称「携带 project context
+    # （R15.4）」。R15.4 真正生效在 _resolve_writeback_identity → AddressingService 那条链。
 
     def _resolve_addr_id(
         self,
         wp_code: str,
         sheet_name: str,
         cell_ref: str,
-        project_id: str | None = None,
     ) -> dict | None:
         """(wp_code, sheet_name, cell_ref) → canonical addr_id（委托伴生模块）。"""
-        return _addr.resolve_addr_id(wp_code, sheet_name, cell_ref, project_id)
+        return _addr.resolve_addr_id(wp_code, sheet_name, cell_ref)
 
 
 # ─── 模块级辅助 ──────────────────────────────────────────────────────────────

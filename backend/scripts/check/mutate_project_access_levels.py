@@ -54,10 +54,14 @@ ACCESS_MUTATIONS: tuple[tuple[Mutation, str], ...] = (
         Mutation(
             "A03",
             NOTES,
-            'current_user: User = Depends(require_project_access("edit")),\n):\n    """软删除指定附注章节。"""',
-            'current_user: User = Depends(require_project_access("editor")),\n):\n    """软删除指定附注章节。"""',
+            """    await require_project_access("edit")(
+        project_id=project_id, current_user=current_user, db=db
+    )""",
+            """    await require_project_access("editor")(
+        project_id=project_id, current_user=current_user, db=db
+    )""",
             "test_all_call_sites_use_registered_levels",
-            "删除章节端点写回 editor（readonly 成员即可删章节）",
+            "附注统一编辑门禁写成 editor（未登记级别；五个写端点一起降级）",
         ),
         GUARD,
     ),

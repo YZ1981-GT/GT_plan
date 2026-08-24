@@ -65,6 +65,8 @@ SPEC_GUARD_FILES: tuple[str, ...] = (
     "backend/tests/test_advanced_query_scope_budget_tiers.py",
     "backend/tests/test_advanced_query_param_sql_builder_wiring.py",
     "backend/tests/test_cross_sheet_trace_wiring.py",
+    "backend/tests/test_disclosure_notes_project_gate_contract.py",
+    "backend/tests/test_project_access_level_registry.py",
     "backend/tests/test_advanced_query_indicators_lazy.py",
     "backend/tests/test_advanced_query_ddl_cross_lock.py",
     "backend/tests/test_advanced_query_hardening_properties.py",

@@ -64,6 +64,6 @@
       "user_id_non_null": 166
     }
   },
-  "expected_min_passed_note": "按实测值锚定（2026-08-23 首次实测 302 passed；同日收口遗留项①「param_sql_builder 零引用」接线 +8 条『值→谓词层单一真源』⇒ 310；遗留项②「cross-sheet-trace 端点 addr_id 静默降级」接线 +6 条 ⇒ 316）。低于此值即意味着测试被删、被改名或被 skip —— 那是假绿的常见入口，故用数值硬断言而非只看 exit code。",
-  "expected_min_passed": 316
+  "expected_min_passed_note": "按实测值锚定（2026-08-23 首次实测 302 passed；同日收口遗留项①「param_sql_builder 零引用」接线 +8 条『值→谓词层单一真源』⇒ 310；遗留项②「cross-sheet-trace addr_id 静默降级」+6 ⇒ 316；顺带发现的两处授权缺陷纳入清单 —— 附注端点归属门禁契约 test_disclosure_notes_project_gate_contract（22 条，含 OwnershipGuard 单例 shadow 防护）+ 项目权限级别 fail-closed test_project_access_level_registry（7 条）⇒ 345）。低于此值即意味着测试被删、被改名或被 skip —— 那是假绿的常见入口，故用数值硬断言而非只看 exit code。",
+  "expected_min_passed": 345
 }

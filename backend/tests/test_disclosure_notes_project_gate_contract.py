@@ -273,3 +273,51 @@ def test_helper_resolves_project_before_permission_check():
     assert names.index("select") < names.index("assert_project_permission"), (
         f"反查与鉴权顺序颠倒：{seq}"
     )
+
+
+class TestOwnershipGuardPatchabilityNotShadowed:
+    """归属守卫单例上不得残留实例属性 —— 它会让类级替身静默失效。
+
+    实测踩过：``test_advanced_query_hardening_properties_scope`` 用「读出原绑定方法 →
+    ``finally`` 再赋回**实例**」的写法做替身恢复。哪怕赋回的值就是原绑定方法，实例
+    ``__dict__`` 里也**永久**多了一个 ``assert_target_accessible``，它遮蔽类属性 ⇒ 之后任何
+    ``patch("...OwnershipGuard.assert_target_accessible")`` 都打不上 ⇒ 本文件与
+    ``test_disclosure_notes_hardening`` 的 trace 越权用例在**合跑**时莫名变红，而单跑全绿。
+
+    这类「跨文件污染」最难查，故用一条结构判据钉住：单例不得自带该属性。
+    """
+
+    def test_singleton_has_no_instance_level_override(self):
+        from app.services.custom_query.ownership_guard import (
+            OwnershipGuard,
+            ownership_guard,
+        )
+
+        leaked = set(vars(ownership_guard)) & {"assert_target_accessible"}
+        assert not leaked, (
+            "ownership_guard 单例上残留了实例属性 "
+            f"{sorted(leaked)} —— 它会遮蔽类属性，使类级 patch 失效。"
+            "测试替身请 patch 类（或用 monkeypatch），恢复时删实例属性而不是赋回绑定方法。"
+        )
+        # 反向自检：类上确实有这个方法，否则上一条恒绿
+        assert callable(getattr(OwnershipGuard, "assert_target_accessible", None))
+
+    def test_class_level_patch_is_observable(self, monkeypatch):
+        """行为判据：类级替身必须真的被实例调用观测到。"""
+        from app.services.custom_query.ownership_guard import (
+            OwnershipGuard,
+            ownership_guard,
+        )
+
+        seen: list[str] = []
+
+        async def _fake(self, *, user, project_id, db):  # noqa: ANN001
+            seen.append(str(project_id))
+
+        monkeypatch.setattr(OwnershipGuard, "assert_target_accessible", _fake)
+        import asyncio
+
+        asyncio.run(
+            ownership_guard.assert_target_accessible(user=None, project_id="p-1", db=None)
+        )
+        assert seen == ["p-1"], "类级替身未被单例观测到（说明实例上有 shadow 属性）"

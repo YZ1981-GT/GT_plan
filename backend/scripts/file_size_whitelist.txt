@@ -93,3 +93,16 @@ backend/app/routers/custom_query.py  2966
 #     spec: advanced-query-hardening-wiring-closure（收口顺带修复）
 backend/app/routers/disclosure_notes.py  1809
 backend/app/routers/wp_editor_router.py  1120
+
+#   test_snapshot_writer.py —— **改动前即约 1300 行已远超上限**（单文件承载回写服务的
+#     Property 3/4/5 + E2E + ACNR addr_id + 身份与审计六组用例）。本次仅为小幅正确性修正：
+#       · 删掉 resolve_addr_id 的空转 project_id 参数（收了不用；catalog 与项目无关），
+#         R15.4 判据改指真正带项目上下文的 _resolve_writeback_identity → AddressingService
+#       · 修两条空转测试（`assert module in (...)` 断言自己的输入；events_emitted 捕获却
+#         从不断言）
+#       · 新增一条反向守卫（签名不得再收 project_id）
+#     baseline 取当前真实行数，门禁继续拦膨胀。拆分方向：按 Property 分组拆为
+#     test_snapshot_writer_transaction.py / _addr_id.py / _audit.py 三个文件，属独立任务 ——
+#     与一次删参同批会把 diff 淹没在搬迁噪声里。
+#     spec: advanced-query-hardening-wiring-closure（收口遗留项）
+backend/tests/test_snapshot_writer.py  1325

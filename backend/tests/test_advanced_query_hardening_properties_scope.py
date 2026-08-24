@@ -66,6 +66,23 @@ def test_p4_scope_filter_always_present_for_scopable_table(pids):
     assert "project_id" in sql
 
 
+
+def _drop_guard_shadow() -> None:
+    """删掉 ``ownership_guard`` 实例上的 ``assert_target_accessible`` 覆盖。
+
+    为什么不能用「读出原绑定方法、finally 再赋回实例」的写法恢复：那样实例上会**永久**
+    留下一个属性（哪怕值就是原绑定方法），它会遮蔽类属性 —— 之后任何
+    ``patch("....OwnershipGuard.assert_target_accessible")``（类级替身）都打不上，
+    表现为「另一个文件里的越权用例莫名变红」，而单跑那个文件却是绿的。
+    实测就是这样让 test_disclosure_notes_hardening 的 5 条 trace 用例在合跑时变红。
+
+    正确恢复 = 把实例属性删掉，回落到类属性。
+    """
+    from app.services.custom_query.ownership_guard import ownership_guard
+
+    ownership_guard.__dict__.pop("assert_target_accessible", None)
+
+
 @PBT
 @given(
     a=st.lists(st.uuids(), min_size=1, max_size=5, unique=True),
@@ -368,7 +385,6 @@ def test_p21_any_inaccessible_target_blocks_all_writes(n_ok, bad_index):
             )
 
     orig_visible = rm.get_visible_project_ids
-    orig_assert = ownership_guard.assert_target_accessible
     rm.get_visible_project_ids = _visible  # type: ignore[assignment]
     ownership_guard.assert_target_accessible = _assert  # type: ignore[assignment]
     try:
@@ -388,7 +404,7 @@ def test_p21_any_inaccessible_target_blocks_all_writes(n_ok, bad_index):
         assert writes["n"] == 0
     finally:
         rm.get_visible_project_ids = orig_visible  # type: ignore[assignment]
-        ownership_guard.assert_target_accessible = orig_assert  # type: ignore[assignment]
+        _drop_guard_shadow()
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -459,7 +475,6 @@ def test_p2_indicators_gate_precedes_all_domain_reads(project_id):
         return None
 
     originals = (
-        ownership_guard.assert_target_accessible,
         rm._resolve_project_template_type,
         rm._build_disclosure_tree,
         rm._build_workpaper_tree,
@@ -484,12 +499,12 @@ def test_p2_indicators_gate_precedes_all_domain_reads(project_id):
         )
     finally:
         (
-            ownership_guard.assert_target_accessible,
             rm._resolve_project_template_type,
             rm._build_disclosure_tree,
             rm._build_workpaper_tree,
             rm._build_consol_units_tree,
         ) = originals
+        _drop_guard_shadow()
 
 
 @PBT
@@ -509,7 +524,6 @@ def test_p3_sheet_preview_denied_never_touches_template_init(project_id, wp_code
             init_calls["n"] += 1  # 连库查询也不该发生
             raise AssertionError("403 后不应查询数据库")
 
-    original = ownership_guard.assert_target_accessible
     ownership_guard.assert_target_accessible = _deny  # type: ignore[assignment]
     try:
         with pytest.raises(HTTPException) as exc:
@@ -522,7 +536,7 @@ def test_p3_sheet_preview_denied_never_touches_template_init(project_id, wp_code
         assert exc.value.status_code == 403
         assert init_calls["n"] == 0
     finally:
-        ownership_guard.assert_target_accessible = original  # type: ignore[assignment]
+        _drop_guard_shadow()
 
 
 @PBT
@@ -542,7 +556,6 @@ def test_p1_wp_id_by_code_requires_ownership(project_id, wp_code):
         async def execute(self, *a, **k):
             raise AssertionError("403 后不应查询数据库")
 
-    original = ownership_guard.assert_target_accessible
     ownership_guard.assert_target_accessible = _deny  # type: ignore[assignment]
     try:
         with pytest.raises(HTTPException) as exc:
@@ -555,7 +568,7 @@ def test_p1_wp_id_by_code_requires_ownership(project_id, wp_code):
         assert exc.value.status_code == 403
         assert seen == [project_id]
     finally:
-        ownership_guard.assert_target_accessible = original  # type: ignore[assignment]
+        _drop_guard_shadow()
 
 
 # ════════════════════════════════════════════════════════════════════════════
