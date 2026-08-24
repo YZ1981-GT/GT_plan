@@ -46,3 +46,63 @@ backend/app/services/doc_ai_context_builder.py  898
 #     每组 property 含 source 期望值 + 结构校验 + 反空转，拆分会让单组的三段分离。
 #     spec: x3-adjustment-entry-import-export
 backend/tests/_test_x3_keyfamily_property_criteria.py  808
+
+#   custom_query.py —— **改动前即 2621 行已远超上限**（单文件承担 router + 14 个
+#     裸 SQL 取数器约 900 行）。本次净增 +255：新增 indicators 认证/归属校验、
+#     execute 收敛到 ExecuteCompatibilityAdapter、异常分类与 correlation_id、
+#     取数器 limit 保护、模板 CRUD 委托 TemplateService、execute_template 端点。
+#     已按行数门禁指引先抽两块伴生模块（各自本就是独立关注点，不是为凑行数）：
+#       · routers/custom_query_writeback.py（257 行）—— 回写预览/确认端点组
+#       · services/custom_query/template_scope_guard.py（94 行）—— 模板 scope 归一 + 逐项目鉴权
+#     同批还把 query_builder 的 DSL→SQL 抽到 services/custom_query/builder_dsl.py，
+#     使该 router 从 776 → 439 行**脱离本表**（不把欠账固化）。
+#     🔴 抽取受一条硬约束限制：**依赖可 monkeypatch 符号的 helper 不能搬走**。
+#     `_assert_writeback_authorized`（读 get_visible_project_ids）与
+#     `_assert_template_scope_edit`（读 require_project_access）搬到伴生模块后会读
+#     那边的全局名，契约测试的替身完全失效（实测 6 条红）⇒ 已搬回本模块。
+#     接线约定优先于行数，不为凑行数扭曲结构。
+#     custom_query.py 的剩余拆分方向：14 个 _query_* 取数器（约 900 行）下沉为
+#     services/custom_query/fetchers/ 子包，属独立任务（改动面大、需逐取数器回归）。
+#     spec: advanced-query-hardening-wiring-closure
+backend/app/routers/custom_query.py  2966
+
+#   disclosure_notes.py（改动前 1454 行）/ wp_editor_router.py（1120 行）——
+#     **两者改动前即已超限**。
+#     wp_editor_router.py：本次只改 1 处字面量（require_project_access("member") →
+#       ("edit")），行数不变。
+#     disclosure_notes.py：1454 → 1809（+355），两批安全/正确性改动，无新增业务功能：
+#       (1) 项目级归属门禁（+113）
+#         · 两个反查型门禁 helper（按 note_id / validation_id 反查所属项目再鉴权）
+#         · 7 个端点补门禁：generate（project_id 在 body）/ update_note（原只按
+#           system_role 判）/ confirm_finding（原门禁校验无关项目）/ trace_cell /
+#           linkage-gaps / pull-from-workpapers / auto-pull
+#         · 顺带修 pull_from_workpapers 漏导入 Project（一调即 NameError 500）
+#       (2) mutation 协调器接线（+242）
+#         · 统一编辑门禁 _assert_project_edit（项目 → 操作 → 合并锁，五个写端点共用）
+#         · DisclosureMutationCoordinator 接进 generate/update/delete/restore/patch：
+#           幂等（X-Mutation-Id）+ 单一事务边界 + commit 成功后才发事件 +
+#           事件发布失败进 warnings（此前是 except: pass 静默吞）
+#         · upload-history 从「假成功 200」改为 501 + 新增 /capabilities 能力清单
+#     那两个级别名（"editor"/"member"）不在 PERMISSION_HIERARCHY 里，会被
+#     .get(..., 0) 静默降级为 0，使写端点对任何项目成员（含 readonly）放行 ——
+#     根因已在 app/deps.py 修为「工厂调用期 fail-closed」。
+#     baseline 取当前真实行数，门禁继续拦膨胀。安全修复不宜与大搬迁同批（diff 会被
+#     搬迁噪声淹没、无法评审），拆分方向另立任务：
+#       · disclosure_notes.py —— 按关注点分 3 组（章节 CRUD / 公式与校验 / AI 填充与导出）
+#       · wp_editor_router.py —— 把 word-template 签署与 A16 子版本逻辑抽为伴生模块
+#     spec: advanced-query-hardening-wiring-closure（收口顺带修复）
+backend/app/routers/disclosure_notes.py  1809
+backend/app/routers/wp_editor_router.py  1120
+
+#   test_snapshot_writer.py —— **改动前即约 1300 行已远超上限**（单文件承载回写服务的
+#     Property 3/4/5 + E2E + ACNR addr_id + 身份与审计六组用例）。本次仅为小幅正确性修正：
+#       · 删掉 resolve_addr_id 的空转 project_id 参数（收了不用；catalog 与项目无关），
+#         R15.4 判据改指真正带项目上下文的 _resolve_writeback_identity → AddressingService
+#       · 修两条空转测试（`assert module in (...)` 断言自己的输入；events_emitted 捕获却
+#         从不断言）
+#       · 新增一条反向守卫（签名不得再收 project_id）
+#     baseline 取当前真实行数，门禁继续拦膨胀。拆分方向：按 Property 分组拆为
+#     test_snapshot_writer_transaction.py / _addr_id.py / _audit.py 三个文件，属独立任务 ——
+#     与一次删参同批会把 diff 淹没在搬迁噪声里。
+#     spec: advanced-query-hardening-wiring-closure（收口遗留项）
+backend/tests/test_snapshot_writer.py  1325

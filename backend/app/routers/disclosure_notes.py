@@ -15,15 +15,17 @@ Validates: Requirements 4.1-4.11, 5.1-5.5
 from __future__ import annotations
 
 import logging
-from uuid import UUID
+from typing import Any
+from uuid import UUID, uuid4
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
+from app.deps import assert_project_permission, get_current_user, require_project_access, require_operation, get_user_scope_cycles, check_consol_lock, require_role
+from app.models.audit_platform_schemas import EventPayload, EventType
 from app.models.core import User
 from app.models.report_models import DisclosureNote, NoteStatus
 from app.models.report_schemas import (
@@ -32,7 +34,20 @@ from app.models.report_schemas import (
     DisclosureNoteUpdate,
     NoteValidationFindingConfirm,
 )
+from app.services.custom_query.ownership_guard import (  # noqa: F401  (见下)
+    OwnershipGuard,
+    ownership_guard,
+)
+
+# ``OwnershipGuard`` 看似未使用（实际调用走单例 ``ownership_guard``），但**必须**留在本模块
+# 命名空间里：归属守卫的测试替身是 patch 类方法
+# （``app.routers.disclosure_notes.OwnershipGuard.assert_target_accessible``）。
+# 删掉这个名字，替身就打不上，越权用例会静默变成「真去查库」。
 from app.services.disclosure_engine import DisclosureEngine
+from app.services.disclosure_mutation_coordinator import (
+    DisclosureMutationCoordinator,
+    mutation_fingerprint,
+)
 from app.services.note_validation_engine import NoteValidationEngine
 
 logger = logging.getLogger(__name__)
@@ -41,6 +56,147 @@ router = APIRouter(
     prefix="/api/disclosure-notes",
     tags=["disclosure-notes"],
 )
+
+
+#: 请求头名：客户端可传稳定 mutation_id 实现重试幂等
+MUTATION_ID_HEADER = "X-Mutation-Id"
+
+
+def _mutation_id(supplied: str | None) -> str:
+    """取客户端提供的 mutation_id，缺省则生成一个 UUID4。
+
+    幂等键。客户端重试时带同一个值 → 同一份最终响应，业务只执行一次
+    （见 ``DisclosureMutationCoordinator``）。不传则每次都是新请求。
+    """
+    return supplied or str(uuid4())
+
+
+async def _assert_project_edit(
+    *,
+    project_id: UUID,
+    current_user: User,
+    db: AsyncSession,
+) -> None:
+    """附注 mutation 的**统一**编辑门禁，顺序固定为项目 → 操作 → 合并锁。
+
+    为什么要有这个函数而不是各端点各挂 ``Depends``：
+
+    - ``require_project_access`` / ``require_operation`` 的内部依赖从**路径/查询参数**取
+      ``project_id``。附注的写端点里有的把 project_id 放在**请求体**（generate）、有的
+      路径上只有 ``note_id``（update）—— 那两种情况下依赖要么拿不到 project_id
+      （退化为仅按 system_role 判定），要么更糟：FastAPI 把 ``project_id`` 变成一个
+      **查询参数**，于是调用方可以传一个自己有权的项目，却对另一个项目的对象动手。
+    - 五个写端点各写一遍三段检查必然漂移（顺序、级别、漏一段）。收敛到单点后，
+      「readonly 用户在任何 mutation 上都被拦住」是结构性成立的，不靠逐端点自觉。
+
+    顺序有意义：先判项目级权限（最便宜、最常见的拒绝原因），再判操作级权限，最后才判
+    合并锁（锁是状态而非权限，403 优先于 423）。
+    """
+    await require_project_access("edit")(
+        project_id=project_id, current_user=current_user, db=db
+    )
+    await require_operation("note:edit")(
+        current_user=current_user, project_id=project_id, db=db
+    )
+    await check_consol_lock(project_id=project_id, db=db)
+
+
+def _coordinator(
+    db: AsyncSession,
+    *,
+    project_id: UUID,
+    mutation_id: str | None,
+    operation: str,
+    payload: Any,
+) -> DisclosureMutationCoordinator:
+    """构造 mutation 协调器（五个写端点共用一处，避免各写一遍指纹/幂等键）。
+
+    ``fingerprint`` 把「同一 mutation_id 被不同请求复用」变成 409 而不是静默返回上一次
+    的响应 —— 否则客户端换了内容却拿到旧结果，看起来像保存成功了。
+    """
+    return DisclosureMutationCoordinator(
+        db,
+        project_id=project_id,
+        mutation_id=_mutation_id(mutation_id),
+        fingerprint=mutation_fingerprint(operation, payload),
+    )
+
+
+async def _assert_object_project_access(
+    db: AsyncSession,
+    current_user: User,
+    *,
+    id_column,
+    project_column,
+    object_id: UUID,
+    not_found_detail: str,
+    min_permission: str = "readonly",
+    missing_ok: bool = False,
+) -> UUID | None:
+    """按对象主键反查所属项目并鉴权，返回 project_id。
+
+    用于路径里**只有对象 id**（note_id / validation_id）、拿不到 project_id 的端点：
+    ``require_project_access`` 这个依赖从**路径/查询参数**取 project_id，对它们要么完全
+    不生效，要么更糟 —— 把 ``project_id`` 变成一个**查询参数**，于是调用方可以传一个
+    自己有权的项目，却对另一个项目的对象动手（门禁校验了无关对象）。
+
+    顺序固定为「**最小反查 → 鉴权 → 才读业务数据**」：只 SELECT 一列 project_id，
+    鉴权不过直接 403，不触达任何业务内容。
+
+    ``missing_ok=True`` 时对象不存在返回 ``None`` 而不抛 404 —— 给那些**契约上恒返回
+    200 + error 字段**的端点用（如 ``trace_cell`` 的 ``note_not_found``，是刻意的前端
+    友好降级）。对象不存在意味着没有任何项目数据可泄露，跳过门禁是安全的。
+    """
+    project_id = (
+        await db.execute(sa.select(project_column).where(id_column == object_id))
+    ).scalar_one_or_none()
+    if project_id is None:
+        if missing_ok:
+            return None
+        raise HTTPException(status_code=404, detail=not_found_detail)
+    await assert_project_permission(db, current_user, project_id, min_permission)
+    return project_id
+
+
+async def _assert_note_project_access(
+    db: AsyncSession,
+    current_user: User,
+    note_id: UUID,
+    min_permission: str = "readonly",
+    *,
+    missing_ok: bool = False,
+) -> UUID | None:
+    """按 note_id 反查所属项目并鉴权。"""
+    return await _assert_object_project_access(
+        db,
+        current_user,
+        id_column=DisclosureNote.id,
+        project_column=DisclosureNote.project_id,
+        object_id=note_id,
+        not_found_detail="附注章节不存在",
+        min_permission=min_permission,
+        missing_ok=missing_ok,
+    )
+
+
+async def _assert_validation_project_access(
+    db: AsyncSession,
+    current_user: User,
+    validation_id: UUID,
+    min_permission: str = "edit",
+) -> UUID:
+    """按 validation_id 反查所属项目并鉴权。"""
+    from app.models.report_models import NoteValidationResult
+
+    return await _assert_object_project_access(
+        db,
+        current_user,
+        id_column=NoteValidationResult.id,
+        project_column=NoteValidationResult.project_id,
+        object_id=validation_id,
+        not_found_detail="校验结果不存在",
+        min_permission=min_permission,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -87,44 +243,98 @@ async def _run_validation_best_effort(
     return await run_validation_best_effort(db, project_id, year, template_type)
 
 
+async def _run_validation_isolated(
+    project_id: UUID,
+    year: int,
+    template_type: str | None = None,
+) -> dict | None:
+    """在**独立 session** 上跑 best-effort 校验（不碰请求事务）。
+
+    ``run_validation_best_effort`` 自己会 commit。若让它复用请求 session，一次 mutation
+    就会产生两次 commit —— ``DisclosureMutationCoordinator`` 的「一次 mutation 一次事务
+    边界」被破坏（主操作提前落库，后续失败再也回滚不了）。附带的旁路校验本就不该占用
+    主事务，故给它自己的 session。
+
+    fail-open：拿不到 session / 校验失败一律返回 None，不影响已提交的主操作。
+    """
+    try:
+        from app.core.database import async_session
+
+        async with async_session() as session:
+            return await _run_validation_best_effort(
+                session, project_id, year, template_type
+            )
+    except Exception as err:  # pragma: no cover - 旁路能力，不阻断主流程
+        logger.warning("独立事务补跑附注校验失败（不影响主操作）: %s", err)
+        return None
+
+
 @router.post("/generate")
 async def generate_notes(
     data: DisclosureNoteGenerateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
-    """生成附注初稿"""
+    """生成附注初稿。
+
+    project_id 在请求体里 ⇒ 门禁走 ``_assert_project_edit``（依赖注入取不到 body）。
+    事务边界、幂等与「commit 成功后才发事件」由 ``DisclosureMutationCoordinator`` 统一保证。
+    """
     from app.services.prerequisite_checker import PrerequisiteChecker
 
-    # 合并锁定检查（project_id 在 body）— Phase 1 Task 5
-    await check_consol_lock(project_id=data.project_id, db=db)
+    await _assert_project_edit(
+        project_id=data.project_id, current_user=current_user, db=db
+    )
 
-    check = await PrerequisiteChecker().check(db, data.project_id, data.year, "generate_notes")
-    if not check["ok"]:
-        raise HTTPException(status_code=400, detail=check)
-    engine = DisclosureEngine(db)
-    try:
-        results = await engine.generate_notes(
-            data.project_id, data.year, data.template_type,
+    async def _mutate() -> dict[str, Any]:
+        check = await PrerequisiteChecker().check(
+            db, data.project_id, data.year, "generate_notes"
         )
-        await db.commit()
-        # P0-4（附注联动复盘）：生成后自动跑一次校验并落库，让 findings 在附注树上
-        # 可见（历史 note_validation_results 长期 0 行 = 校验能力空转）。fail-open。
-        validation = await _run_validation_best_effort(
-            db, data.project_id, data.year, data.template_type,
-        )
+        if not check["ok"]:
+            raise HTTPException(status_code=400, detail=check)
+        engine = DisclosureEngine(db)
+        try:
+            results = await engine.generate_notes(
+                data.project_id, data.year, data.template_type,
+            )
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"附注生成失败: {str(e)}")
         return {
             "message": "附注生成成功",
             "note_count": len(results),
             "notes": results,
-            "validation": validation,
         }
-    except HTTPException:
-        await db.rollback()
-        raise
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(status_code=500, detail=f"附注生成失败: {str(e)}")
+
+    def _event(_response: dict[str, Any]) -> EventPayload:
+        return EventPayload(
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=data.project_id,
+            year=data.year,
+            extra={"action": "generate", "template_type": data.template_type},
+        )
+
+    result = await _coordinator(
+        db,
+        project_id=data.project_id,
+        mutation_id=mutation_id,
+        operation="disclosure.generate",
+        payload=data,
+    ).execute(_mutate, _event)
+
+    # P0-4（附注联动复盘）：生成成功后补跑一次校验并落库，让 findings 在附注树上可见
+    # （历史 note_validation_results 长期 0 行 = 校验能力空转）。fail-open。
+    #
+    # 必须在 coordinator 提交**之后**、且在**独立 session** 上跑：它自身会 commit，
+    # 放进 _mutate 或复用请求 session 都会让一次 mutation 出现两次提交 —— 单一事务边界
+    # 被破坏，后续失败再也回滚不了已生成的附注。
+    # validation 也不进 coordinator 缓存的幂等响应（重放时重新跑，属期望行为）。
+    result["validation"] = await _run_validation_isolated(
+        data.project_id, data.year, data.template_type,
+    )
+    return result
 
 
 @router.get("/{project_id}/{year}")
@@ -255,7 +465,7 @@ async def get_linkage_gaps(
     project_id: UUID,
     year: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """只读诊断：列出「有报表↔附注勾稽但无写值 linkage」的章节（spec R5 / Task 5.1）。
 
@@ -292,7 +502,7 @@ async def pull_from_workpapers(
     year: int,
     note_section: str | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("edit")),
 ):
     """附注主动从底稿拉取最新数据（刷新/生成时调用）。
 
@@ -305,6 +515,10 @@ async def pull_from_workpapers(
     返回 { synced: int, skipped: int }
     """
     from datetime import datetime, timezone
+
+    # Project 此前漏导入 —— 下面 db.get(Project, ...) 一调即 NameError → 该端点自写成
+    # 起就是 500，从未成功执行过（ruff F821 可查，但本文件此前未纳入 lint 门禁）。
+    from app.models.core import Project
     from app.services.note_readiness_service import _load_registry_entries
 
     # 确定项目变体
@@ -504,6 +718,25 @@ async def trace_cell(
       - ``no_binding``               — cell_meta 缺 binding_id
       - ``binding_not_found``        — 反查 binding 失败
     """
+    # ── 项目归属门禁（防 IDOR）─────────────────────────────────────────────
+    # 本端点只给 note_id，路径里没有 project_id，故 require_project_access 这个依赖
+    # 用不上（它从路径/查询参数取 project_id）。改为「**最小反查 → 鉴权 → 才读业务
+    # 数据**」：只 SELECT 一列 project_id，403 之前不触达任何附注内容或试算表证据。
+    # 此前无任何门禁：拿到任意 note_id 即可读别的项目的溯源链（含证据行采样）。
+    project_id = (
+        await db.execute(
+            sa.select(DisclosureNote.project_id).where(DisclosureNote.id == note_id)
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        # 契约是「恒 200 + error 字段」的前端友好降级，不能改成 404；
+        # note 不存在也就没有任何项目数据可泄露。
+        return {"error": "note_not_found", "note_id": str(note_id)}
+
+    await ownership_guard.assert_target_accessible(
+        user=current_user, project_id=project_id, db=db
+    )
+
     engine = DisclosureEngine(db)
     return await engine.trace_cell(note_id, row_idx, col_idx)
 
@@ -631,39 +864,62 @@ async def update_note(
     note_id: UUID,
     data: DisclosureNoteUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operation("note:edit")),
-    _lock_check=Depends(check_consol_lock),
+    current_user: User = Depends(get_current_user),
+    mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
-    """更新附注章节内容"""
-    engine = DisclosureEngine(db)
-    note = await engine.update_note(
-        note_id,
-        table_data=data.table_data,
-        text_content=data.text_content,
-        guidance_text=data.guidance_text,
-        status=data.status,
-    )
-    if note is None:
+    """更新附注章节内容。
+
+    路径上只有 note_id ⇒ 先**最小反查**所属项目（只 SELECT 一列），再过统一编辑门禁，
+    最后才进 mutation。此前只挂 ``require_operation``，而它在没有 project_id 时**只按
+    system_role 判定** ⇒ 任何能 note:edit 的角色都可改任意项目的附注章节。
+    """
+    project_id = (
+        await db.execute(
+            sa.select(DisclosureNote.project_id).where(DisclosureNote.id == note_id)
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
         raise HTTPException(status_code=404, detail="附注章节不存在")
-    await db.commit()
 
-    # Publish NOTE_SECTION_SAVED event
-    try:
-        from app.models.audit_platform_schemas import EventPayload, EventType
-        from app.services.event_bus import event_bus
+    await _assert_project_edit(
+        project_id=project_id, current_user=current_user, db=db
+    )
 
-        await event_bus.publish(EventPayload(
+    holder: dict[str, Any] = {}
+
+    async def _mutate() -> dict[str, Any]:
+        engine = DisclosureEngine(db)
+        note = await engine.update_note(
+            note_id,
+            table_data=data.table_data,
+            text_content=data.text_content,
+            guidance_text=data.guidance_text,
+            status=data.status,
+        )
+        if note is None:
+            raise HTTPException(status_code=404, detail="附注章节不存在")
+        holder["note"] = note
+        return DisclosureNoteDetail.model_validate(note).model_dump()
+
+    def _event(_response: dict[str, Any]) -> EventPayload:
+        note = holder["note"]
+        return EventPayload(
             event_type=EventType.NOTE_SECTION_SAVED,
             project_id=note.project_id,
             year=note.year,
             extra={
-                "section_code": note.section_code if hasattr(note, "section_code") else str(note_id),
+                "section_code": getattr(note, "section_code", None) or str(note_id),
+                "action": "update",
             },
-        ))
-    except Exception:
-        pass  # Never block main operation
+        )
 
-    return DisclosureNoteDetail.model_validate(note)
+    return await _coordinator(
+        db,
+        project_id=project_id,
+        mutation_id=mutation_id,
+        operation="disclosure.update",
+        payload=data,
+    ).execute(_mutate, _event)
 
 
 @router.delete("/{project_id}/{year}/sections/{note_section:path}")
@@ -672,24 +928,44 @@ async def delete_section(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("editor")),
+    current_user: User = Depends(get_current_user),
+    mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     """软删除指定附注章节。"""
-    result = await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.note_section == note_section,
-            DisclosureNote.is_deleted == sa.false(),
-        )
+    await _assert_project_edit(
+        project_id=project_id, current_user=current_user, db=db
     )
-    note = result.scalar_one_or_none()
-    if not note:
-        raise HTTPException(status_code=404, detail="章节不存在")
-    note.is_deleted = True
-    # get_db 不自动 commit：只 flush 会在会话关闭时回滚，删除从不落库（刷新后章节复现）
-    await db.commit()
-    return {"ok": True}
+
+    async def _mutate() -> dict[str, Any]:
+        result = await db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.note_section == note_section,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        note = result.scalar_one_or_none()
+        if not note:
+            raise HTTPException(status_code=404, detail="章节不存在")
+        note.is_deleted = True
+        return {"ok": True}
+
+    def _event(_response: dict[str, Any]) -> EventPayload:
+        return EventPayload(
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=project_id,
+            year=year,
+            extra={"section_code": note_section, "action": "delete"},
+        )
+
+    return await _coordinator(
+        db,
+        project_id=project_id,
+        mutation_id=mutation_id,
+        operation="disclosure.delete_section",
+        payload={"year": year, "note_section": note_section},
+    ).execute(_mutate, _event)
 
 
 @router.patch("/{project_id}/{year}/sections/{note_section:path}")
@@ -699,30 +975,55 @@ async def patch_section(
     note_section: str,
     body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("editor")),
+    current_user: User = Depends(get_current_user),
+    mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     """部分更新附注章节字段（如 status → 用 is_empty 标记排除导出）。"""
-    result = await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.note_section == note_section,
-            DisclosureNote.is_deleted == sa.false(),
-        )
+    await _assert_project_edit(
+        project_id=project_id, current_user=current_user, db=db
     )
-    note = result.scalar_one_or_none()
-    if not note:
-        raise HTTPException(status_code=404, detail="章节不存在")
-    # 用 is_empty 标记"不导出"（Word export 已有 skip empty 逻辑）
-    if "status" in body:
-        if body["status"] == "not_applicable":
-            note.is_empty = True
-        else:
-            note.is_empty = False
-    # get_db 不自动 commit：只 flush 会在会话关闭时回滚，状态变更从不落库
-    await db.commit()
-    status_val = "not_applicable" if note.is_empty else (note.status.value if note.status else "draft")
-    return {"ok": True, "status": status_val}
+
+    async def _mutate() -> dict[str, Any]:
+        result = await db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.note_section == note_section,
+                DisclosureNote.is_deleted == sa.false(),
+            )
+        )
+        note = result.scalar_one_or_none()
+        if not note:
+            raise HTTPException(status_code=404, detail="章节不存在")
+        # 用 is_empty 标记"不导出"（Word export 已有 skip empty 逻辑）
+        if "status" in body:
+            note.is_empty = body["status"] == "not_applicable"
+        status_val = (
+            "not_applicable"
+            if note.is_empty
+            else (note.status.value if note.status else "draft")
+        )
+        return {"ok": True, "status": status_val}
+
+    def _event(response: dict[str, Any]) -> EventPayload:
+        return EventPayload(
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=project_id,
+            year=year,
+            extra={
+                "section_code": note_section,
+                "action": "patch_status",
+                "status": response.get("status"),
+            },
+        )
+
+    return await _coordinator(
+        db,
+        project_id=project_id,
+        mutation_id=mutation_id,
+        operation="disclosure.patch_section",
+        payload={"year": year, "note_section": note_section, "body": body},
+    ).execute(_mutate, _event)
 
 
 @router.get("/{project_id}/{year}/deleted")
@@ -753,24 +1054,50 @@ async def restore_section(
     year: int,
     note_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("editor")),
+    current_user: User = Depends(get_current_user),
+    mutation_id: str | None = Header(default=None, alias=MUTATION_ID_HEADER),
 ):
     """恢复已删除的附注章节。"""
-    result = await db.execute(
-        sa.select(DisclosureNote).where(
-            DisclosureNote.id == note_id,
-            DisclosureNote.project_id == project_id,
-            DisclosureNote.year == year,
-            DisclosureNote.is_deleted == sa.true(),
-        )
+    await _assert_project_edit(
+        project_id=project_id, current_user=current_user, db=db
     )
-    note = result.scalar_one_or_none()
-    if not note:
-        raise HTTPException(status_code=404, detail="章节不存在或未被删除")
-    note.is_deleted = False
-    # get_db 不自动 commit：只 flush 会在会话关闭时回滚，恢复从不落库
-    await db.commit()
-    return {"ok": True}
+
+    holder: dict[str, Any] = {}
+
+    async def _mutate() -> dict[str, Any]:
+        result = await db.execute(
+            sa.select(DisclosureNote).where(
+                DisclosureNote.id == note_id,
+                DisclosureNote.project_id == project_id,
+                DisclosureNote.year == year,
+                DisclosureNote.is_deleted == sa.true(),
+            )
+        )
+        note = result.scalar_one_or_none()
+        if not note:
+            raise HTTPException(status_code=404, detail="章节不存在或未被删除")
+        note.is_deleted = False
+        holder["note_section"] = getattr(note, "note_section", None)
+        return {"ok": True}
+
+    def _event(_response: dict[str, Any]) -> EventPayload:
+        return EventPayload(
+            event_type=EventType.NOTE_SECTION_SAVED,
+            project_id=project_id,
+            year=year,
+            extra={
+                "section_code": holder.get("note_section") or str(note_id),
+                "action": "restore",
+            },
+        )
+
+    return await _coordinator(
+        db,
+        project_id=project_id,
+        mutation_id=mutation_id,
+        operation="disclosure.restore_section",
+        payload={"year": year, "note_id": str(note_id)},
+    ).execute(_mutate, _event)
 
 
 @router.post("/{project_id}/{year}/validate")
@@ -850,9 +1177,16 @@ async def confirm_finding(
     finding_index: int,
     data: NoteValidationFindingConfirm,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
+    current_user: User = Depends(get_current_user),
 ):
     """确认校验发现为"已确认-无需修改" """
+    # ── 项目编辑权门禁（防 IDOR）─────────────────────────────────────────────
+    # 原来挂的是 Depends(require_project_access("edit"))，但本端点路径里**没有**
+    # project_id ⇒ FastAPI 把它变成一个**必填查询参数**，调用方可以传一个自己有权的
+    # 项目，却去确认**另一个项目**的校验发现 —— 门禁校验了无关对象。
+    # 改为按 validation_id 反查真实所属项目再鉴权。
+    await _assert_validation_project_access(db, current_user, validation_id, "edit")
+
     engine = NoteValidationEngine(db)
     success = await engine.confirm_finding(
         validation_id, finding_index, data.reason,
@@ -904,23 +1238,44 @@ async def export_word(
         raise HTTPException(status_code=500, detail=f"导出失败: {str(e)}")
 
 
-# Phase 9 Task 9.28: 历史附注上传与解析
 @router.post("/{project_id}/upload-history")
 async def upload_history(
     project_id: UUID,
     year: int = 2025,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_project_access("edit")),
 ):
-    """上传历史附注文件（Word/PDF）并解析"""
-    from fastapi import UploadFile, File
-    # 简化实现：返回解析结果结构
-    # 实际需要接收文件上传，保存到临时目录，调用 HistoryNoteParser
+    """历史附注文件（Word/PDF）上传与解析 —— **尚未实现**，恒返回机器可读 501。
+
+    原实现既不接收文件、也不解析，却返回 ``{"message": "历史附注上传接口已就绪"}``
+    —— 调用方（含前端与集成测试）会把它当成成功，实际什么都没发生。这种「假成功」比
+    明确的未实现更难排查：用户以为历史附注已导入，之后所有对比都基于空数据。
+
+    故改为 501 + ``error_code``，让前端可据此禁用入口并给出中文原因（见
+    ``GET /capabilities``）。端点**不声明 DB / 文件 / 后台任务依赖** —— 未实现的能力不
+    应该占用连接池，也不该因为依赖注入而产生副作用。
+    """
+    raise HTTPException(
+        status_code=501,
+        detail={
+            "error_code": "HISTORICAL_UPLOAD_NOT_IMPLEMENTED",
+            "message": "历史 Word/PDF 解析尚未实现，请勿依赖该入口导入历史附注",
+            "project_id": str(project_id),
+            "year": year,
+        },
+    )
+
+
+@router.get("/capabilities")
+async def get_capabilities(
+    current_user: User = Depends(get_current_user),
+):
+    """附注模块能力清单（供前端按真实能力决定入口是否可用）。
+
+    此前前端无从判断「历史附注上传」是否可用 —— 端点返回 200 且文案写着「已就绪」，
+    于是入口一直开着。能力开关与原因（中文）在此单点声明，前端读它而不是猜。
+    """
     return {
-        "message": "历史附注上传接口已就绪",
-        "project_id": str(project_id),
-        "year": year,
-        "note": "请通过 multipart/form-data 上传 .docx 或 .pdf 文件",
+        "historical_upload": False,
+        "historical_upload_reason": "历史 Word/PDF 解析尚未实现",
     }
 
 
@@ -1003,7 +1358,7 @@ async def get_auto_pull(
     year: int,
     note_section: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_project_access("readonly")),
 ):
     """获取附注章节的 cross_ref auto_pull 只读联动值.
 

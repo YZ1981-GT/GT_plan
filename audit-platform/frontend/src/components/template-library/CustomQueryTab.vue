@@ -49,6 +49,7 @@
             filterable
             placeholder="选择项目"
             style="width: 240px"
+            @change="onProjectChange"
           >
             <el-option
               v-for="p in projectList"
@@ -248,7 +249,7 @@
               round
               style="margin-left: 8px"
             >
-              {{ result.rows.length }} 条
+              本页 {{ result.rows.length }} 条 / 共 {{ result.total ?? result.rows.length }} 条
             </el-tag>
           </span>
           <div class="gt-cqt-result-actions">
@@ -266,8 +267,17 @@
         <div class="gt-cqt-result-body">
           <el-empty
             v-if="!executing && result.rows.length === 0 && !result.error"
-            description="点击 [执行查询] 开始检索"
-          />
+            :description="emptyHint || '点击 [执行查询] 开始检索'"
+          >
+            <template v-if="emptyHint" #default>
+              <div class="gt-cqt-empty-hint">
+                {{ emptyHint }}
+                <div class="gt-cqt-empty-tip">
+                  四表数据按年度存放。若确认条件无误，请检查左上「年度」是否为该项目的审计年度。
+                </div>
+              </div>
+            </template>
+          </el-empty>
           <el-alert
             v-if="result.error"
             type="error"
@@ -324,6 +334,33 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <!-- 真实分页（R11.4）：total 由后端在分页前计算，不再是「本页行数」 -->
+          <div v-if="showPagination" class="gt-cqt-pagination">
+            <!-- v-model 双向绑定而非单向 :current-page：查询期间 result 被重置会让
+                 showPagination 短暂为 false、组件销毁重建，单向 prop 下内部 currentPage
+                 会回落到 1 —— 浏览器实测表现为「数据已是第 2 页而页码高亮第 1 页」。 -->
+            <el-pagination
+              v-model:current-page="page"
+              v-model:page-size="pageSize"
+              :total="result.total"
+              :page-sizes="[50, 100, 200, 500]"
+              layout="total, sizes, prev, pager, next, jumper"
+              size="small"
+              background
+              @current-change="onPageChange"
+              @size-change="onPageSizeChange"
+            />
+          </div>
+          <el-alert
+            v-for="w in result.warnings || []"
+            :key="w"
+            :title="w"
+            type="warning"
+            :closable="false"
+            show-icon
+            class="gt-cqt-warning"
+          />
         </div>
       </el-col>
     </el-row>
@@ -339,13 +376,14 @@
         <el-table-column prop="data_source" label="数据源" width="140" />
         <el-table-column label="可见范围" width="100" align="center">
           <template #default="{ row }">
+            <!-- legacy `global` 归一显示为 canonical「公开」（R11.5） -->
             <el-tag
-              :type="row.scope === 'global' ? 'warning' : 'info'"
+              :type="normalizeTemplateScope(row.scope) === 'private' ? 'info' : 'warning'"
               size="small"
               effect="plain"
               round
             >
-              {{ row.scope === 'global' ? '全局共享' : '私有' }}
+              {{ templateScopeLabel(row.scope) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -397,9 +435,33 @@
         </el-form-item>
         <el-form-item label="可见范围">
           <el-radio-group v-model="saveForm.scope">
-            <el-radio label="private">仅我可见</el-radio>
-            <el-radio label="global">全局共享</el-radio>
+            <el-radio label="private">{{ templateScopeLabel('private') }}</el-radio>
+            <el-radio label="project" :disabled="!canShareTemplates">
+              {{ templateScopeLabel('project') }}
+            </el-radio>
+            <el-radio label="public" :disabled="!canShareTemplates">
+              {{ templateScopeLabel('public') }}
+            </el-radio>
           </el-radio-group>
+          <div v-if="!canShareTemplates" class="gt-cqt-scope-hint">
+            当前无可编辑项目，仅可保存为「{{ templateScopeLabel('private') }}」
+          </div>
+        </el-form-item>
+        <el-form-item v-if="saveForm.scope === 'project'" label="分享项目">
+          <el-select
+            v-model="saveForm.shared_project_ids"
+            multiple
+            filterable
+            placeholder="选择可编辑的项目"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="p in projectList.filter((item) => item.can_edit)"
+              :key="p.id"
+              :label="`${p.code || ''} ${p.name || p.id}`"
+              :value="p.id"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -408,7 +470,7 @@
           type="primary"
           size="small"
           :loading="savingTemplate"
-          :disabled="!saveForm.name.trim()"
+          :disabled="!canSaveTemplate"
           @click="onConfirmSaveTemplate"
         >
           保存
@@ -435,11 +497,13 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { Search, Plus, Delete, Download, Folder, DocumentAdd, MagicStick } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
+// http（axios 实例）而非 api 代理：需要读 X-Indicators-Schema-Version 响应头做缓存键
+import http from '@/utils/http'
 import { customQuery as P_cq, projects as P_proj } from '@/services/apiPaths'
 import { handleApiError } from '@/utils/errorHandler'
 import { resolveColumnLabel } from '@/components/query/queryColumnLabels'
 import { exportQueryResultToXlsx } from '@/components/query/queryExport'
-import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { useQueryBuilderAccess } from '@/composables/useQueryBuilderAccess'
 import CustomQueryFieldPicker from '@/components/custom-query/CustomQueryFieldPicker.vue'
 import AdvancedQueryBuilder from '@/views/AdvancedQueryBuilder.vue'
 import GtIndexChip from '@/components/workpaper/GtIndexChip.vue'
@@ -471,13 +535,25 @@ interface QueryResult {
   rows: any[]
   // 后端可能返回 ColumnMeta[]（含 addr_id/drillable）或 legacy string[]，统一由 normalizeColumns 归一
   columns: Array<string | Record<string, any>>
+  /** 分页前的真实总行数（R4.1）；改造前它等于本页行数，无法据此翻页 */
   total: number
+  limit?: number
+  offset?: number
+  /** 非致命提示（取数达上限、全局配置表未按项目过滤等） */
+  warnings?: string[]
   error?: string
 }
 interface ProjectItem {
   id: string
   code?: string
   name?: string
+  /** 当前用户对该项目是否有编辑权限（决定能否作为模板分享目标） */
+  can_edit?: boolean
+  /**
+   * 项目审计年度（`GET /api/projects` 由 `resolve_project_audit_year` 派生下发）。
+   * 用于把「年度」输入框默认到**有数据的那一年**，而不是日历当年。
+   */
+  audit_year?: number | null
 }
 interface TemplateItem {
   id: string
@@ -495,9 +571,14 @@ interface TemplateItem {
 // ─── 状态 ───
 const indicatorTree = ref<IndicatorGroup[]>([])
 const projectList = ref<ProjectItem[]>([])
+/** 审计年度兜底：审计做上一年度报表，日历当年在四表里通常没有数据。 */
+function defaultAuditYear(): number {
+  return new Date().getFullYear() - 1
+}
+
 const formCtx = ref({
   project_id: '',
-  year: new Date().getFullYear(),
+  year: defaultAuditYear(),
   source: '',
   condition_logic: 'AND' as 'AND' | 'OR',
 })
@@ -508,13 +589,21 @@ const availableColumns = ref<string[]>([])
 const acnrFieldIds = ref<string[]>([])
 const result = ref<QueryResult>({ rows: [], columns: [], total: 0 })
 const executing = ref(false)
+/** 0 行时的空态说明（含实际使用的年度，便于自查年度是否选错） */
+const emptyHint = ref('')
+// 分页状态（R11.4）：total 现在是后端在分页前算的真实行数，可据此翻页
+const page = ref(1)
+const pageSize = ref(100)
+// 仅当确有多页时才显示分页条，避免单页结果下多出一排无用控件
+const showPagination = computed(
+  () => (result.value.total ?? 0) > pageSize.value || page.value > 1
+)
 
-// ─── 高级构建器入口权限门禁（R11.5/R11.6，与后端 query_builder.py RBAC 一致） ───
-// 复用统一权限矩阵 canDo（P2 Req7：替换分散的 BUILDER_ROLES 判断）
-const { currentRole, canDo } = usePermissionMatrix()
-// 构建器需要对 project_settings 有 edit 权限（assistant/qc_partner/eqcr 无此权限）
-const canUseBuilder = computed(() => canDo('edit', 'project_settings'))
-const builderDisabledReason = '高级构建器仅限管理员 / 经理 / 合伙人'
+// ─── 高级构建器入口权限门禁（R11.1/R11.2，与后端 query_builder.py RBAC 一致） ───
+// 判据收敛到 useQueryBuilderAccess（与后端 _QUERY_BUILDER_ROLES 同源）。
+// 此前用 canDo('edit','project_settings') 是资源级矩阵判据，与后端的角色白名单
+// 判据不同源，两侧会漂移成「按钮可点但必 403」或「按钮禁用而其实有权」。
+const { currentRole, canUseBuilder, builderDisabledReason } = useQueryBuilderAccess()
 const builderDialogVisible = ref(false)
 
 function onOpenBuilder() {
@@ -529,15 +618,73 @@ const templatesDialogVisible = ref(false)
 const saveDialogVisible = ref(false)
 const loadingTemplates = ref(false)
 const savingTemplate = ref(false)
+type TemplateScope = 'private' | 'team' | 'project' | 'public'
+
 const saveForm = ref({
   name: '',
   description: '',
-  scope: 'private' as 'private' | 'global',
+  scope: 'private' as TemplateScope,
+  shared_project_ids: [] as string[],
 })
 
 const saveRules = {
   name: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
 }
+
+// ─── 模板作用域治理（R11.5 / R11.6）─────────────────────────────────────────
+// 与后端 `TemplateScopeAdapter` 同源：legacy `global` / `personal` 只作为**输入**
+// 接受，展示恒为 canonical。前端不再各自维护别名表。
+const TEMPLATE_SCOPE_ALIASES: Record<string, TemplateScope> = {
+  global: 'public',
+  personal: 'private',
+}
+const TEMPLATE_SCOPE_LABELS: Record<TemplateScope, string> = {
+  private: '仅我可见',
+  team: '团队共享',
+  project: '指定项目共享',
+  public: '公开',
+}
+/** 需要分享授权的 scope（后端会对每个目标项目逐个鉴权） */
+const SHARE_REQUIRED_SCOPES: TemplateScope[] = ['team', 'project', 'public']
+
+function normalizeTemplateScope(scope?: string | null): string {
+  const raw = String(scope ?? '').trim().toLowerCase()
+  return TEMPLATE_SCOPE_ALIASES[raw] ?? raw
+}
+
+function templateScopeLabel(scope?: string | null): string {
+  const canonical = normalizeTemplateScope(scope) as TemplateScope
+  return TEMPLATE_SCOPE_LABELS[canonical] ?? '未知'
+}
+
+/** 可作为分享目标的项目 —— 判据与后端 `require_project_access("edit")` 同源 */
+const editableProjectIds = computed(
+  () => new Set(projectList.value.filter((p) => p.can_edit).map((p) => String(p.id)))
+)
+
+/** 是否具备分享能力：存在至少一个可编辑项目（无则 fail-closed 只能存私人模板） */
+const canShareTemplates = computed(() => editableProjectIds.value.size > 0)
+
+/** 提交用的分享目标：去重 + 仅保留可编辑项目（越权目标在提交前就被剔除） */
+function resolveSharedProjectIds(): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of saveForm.value.shared_project_ids || []) {
+    const id = String(raw)
+    if (seen.has(id) || !editableProjectIds.value.has(id)) continue
+    seen.add(id)
+    out.push(id)
+  }
+  return out
+}
+
+const canSaveTemplate = computed(() => {
+  if (!saveForm.value.name.trim()) return false
+  const scope = normalizeTemplateScope(saveForm.value.scope) as TemplateScope
+  if (SHARE_REQUIRED_SCOPES.includes(scope) && !canShareTemplates.value) return false
+  if (scope === 'project' && resolveSharedProjectIds().length === 0) return false
+  return true
+})
 
 const operatorOptions = [
   { label: '等于 (=)', value: 'eq' },
@@ -585,11 +732,33 @@ function formatCellValue(v: any): string {
 }
 
 // ─── 数据加载 ───
+// 指标树缓存（R12.4）：与 CustomQueryDialog 同一套键规则，两处共享同一份缓存。
+// 改造前本组件**完全无缓存**，每次 onMounted 都全量拉取（实测约 578,057 字符 /
+// 3,391ms），而本 Tab 每次切回都会重新挂载。
+const INDICATOR_CACHE_KEY_PREFIX = 'gt:custom-query:indicators:'
+const INDICATOR_SCHEMA_HEADER = 'x-indicators-schema-version'
+
 async function loadIndicators() {
   try {
+    // 骨架探测单独 try：它只是缓存优化，失败不应阻断指标树加载
+    let schemaVersion = 'unknown'
+    try {
+      const probe = await http.get(`${P_cq.indicators}?depth=1`, { _silent: true } as any)
+      schemaVersion = (probe?.headers?.[INDICATOR_SCHEMA_HEADER] as string) || 'unknown'
+      const cached = sessionStorage.getItem(
+        `${INDICATOR_CACHE_KEY_PREFIX}${schemaVersion}:no-project`
+      )
+      if (cached) {
+        indicatorTree.value = JSON.parse(cached)
+        return
+      }
+    } catch { /* 探测失败 → 继续走全量拉取 */ }
+    const cacheKey = `${INDICATOR_CACHE_KEY_PREFIX}${schemaVersion}:no-project`
+    // 未命中 → 拉全量：本组件用 el-select + el-option-group 呈现，需要完整叶子集合
     const data = await api.get<IndicatorGroup[]>(P_cq.indicators)
     if (Array.isArray(data)) {
       indicatorTree.value = data
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(data)) } catch { /* ignore */ }
     }
   } catch (e: any) {
     handleApiError(e, '加载查询指标库')
@@ -602,12 +771,35 @@ async function loadProjects() {
     const list = Array.isArray(data) ? data : (data?.items || [])
     projectList.value = list.map((p: any) => ({
       id: p.id,
+      can_edit: p.can_edit ?? p.canEdit ?? false,
       code: p.code || p.project_code,
       name: p.name || p.project_name,
+      audit_year: p.audit_year ?? p.auditYear ?? null,
     }))
+    // 已选项目（如从模板恢复）也要把年度对齐到该项目的审计年度
+    if (formCtx.value.project_id) syncYearToProject(formCtx.value.project_id)
   } catch (e: any) {
     handleApiError(e, '加载项目列表')
   }
+}
+
+/**
+ * 把「年度」对齐到所选项目的审计年度。
+ *
+ * 为什么需要：年度输入框原来固定初始化为 `new Date().getFullYear()`（日历当年），
+ * 而审计做的是**上一年度**报表 —— 2026 年打开页面默认查 2026，四表里只有 2025 的
+ * 数据，于是任何查询都返回 0 行，且页面不提示原因，看起来像功能坏了。
+ *
+ * 真源是后端 `resolve_project_audit_year`（`GET /api/projects` 下发 `audit_year`），
+ * 拿不到时退回 `当年 - 1`（与平台其余十余处视图同一约定），不再用日历当年。
+ */
+function syncYearToProject(projectId: string) {
+  const proj = projectList.value.find((p) => String(p.id) === String(projectId))
+  formCtx.value.year = proj?.audit_year ?? defaultAuditYear()
+}
+
+function onProjectChange(projectId: string) {
+  syncYearToProject(projectId)
 }
 
 function onSourceChange() {
@@ -680,7 +872,7 @@ function buildFilters(): Record<string, any> {
   return out
 }
 
-async function onExecute() {
+async function onExecute(keepPage = false) {
   if (!formCtx.value.source) {
     ElMessage.warning('请先选择数据源')
     return
@@ -689,8 +881,17 @@ async function onExecute() {
     ElMessage.warning('请先选择项目')
     return
   }
+  // 新条件从第 1 页开始；翻页时由 onPageChange 保持页码
+  if (!keepPage) page.value = 1
   executing.value = true
-  result.value = { rows: [], columns: [], total: 0 }
+  if (keepPage) {
+    // 翻页：保留 total（分页条据此渲染），只清当前页行。
+    // 若此处把 total 归零，showPagination 会瞬间变 false 使分页条销毁重建 ——
+    // 既有视觉闪烁，也会丢掉组件内部页码状态。
+    result.value = { ...result.value, rows: [] }
+  } else {
+    result.value = { rows: [], columns: [], total: 0 }
+  }
   try {
     const data = await api.post<QueryResult>(P_cq.execute, {
       project_id: formCtx.value.project_id,
@@ -700,15 +901,23 @@ async function onExecute() {
       columns: selectedColumns.value,
       // ACNR 选字段：以 addr_id 作为跨模块查询字段标识（R2.4）
       acnr_targets: acnrFieldIds.value,
-      limit: 500,
-      offset: 0,
+      limit: pageSize.value,
+      // 真实分页（R11.4）：改造前这里恒传 0 且后端把 offset 声明后从不使用，
+      // 业务视图实际只有第 1 页。
+      offset: (page.value - 1) * pageSize.value,
     })
     if (data) {
       result.value = data
       if (data.error) {
         ElMessage.warning('查询执行返回错误')
+      } else if ((data.total ?? 0) === 0) {
+        // 0 行必须可诊断：年度对不上是最常见原因（四表按年度分区存），
+        // 静默返回空结果会让人以为功能坏了。把实际用的年度写进提示。
+        emptyHint.value = `年度 ${formCtx.value.year} 下没有匹配数据`
+        ElMessage.info(`查询完成，0 条 —— 当前年度为 ${formCtx.value.year}，请确认年度是否正确`)
       } else {
-        ElMessage.success(`查询完成，返回 ${data.rows?.length || 0} 条记录`)
+        emptyHint.value = ''
+        ElMessage.success(`查询完成，本页 ${data.rows?.length || 0} 条 / 共 ${data.total ?? 0} 条`)
       }
     }
   } catch (e: any) {
@@ -717,6 +926,18 @@ async function onExecute() {
   } finally {
     executing.value = false
   }
+}
+
+// ─── 分页（R11.4）─────────────────────────────────────────────────────────
+function onPageChange(next: number) {
+  page.value = next
+  void onExecute(true)
+}
+
+function onPageSizeChange(size: number) {
+  pageSize.value = size
+  page.value = 1
+  void onExecute(true)
 }
 
 // ─── 导出 Excel（前端 xlsx） ───
@@ -762,6 +983,7 @@ function onSaveTemplate() {
   saveForm.value.name = ''
   saveForm.value.description = ''
   saveForm.value.scope = 'private'
+  saveForm.value.shared_project_ids = []
   saveDialogVisible.value = true
 }
 
@@ -770,6 +992,19 @@ async function onConfirmSaveTemplate() {
     ElMessage.warning('请输入模板名称')
     return
   }
+  // fail-closed：无分享权限时不提交任何分享型 scope（R11.6）。
+  // 后端仍会逐项目鉴权，此处提前拦截只为避免用户填完一屏才被 403。
+  if (!canSaveTemplate.value) {
+    const scope = normalizeTemplateScope(saveForm.value.scope) as TemplateScope
+    ElMessage.warning(
+      SHARE_REQUIRED_SCOPES.includes(scope) && !canShareTemplates.value
+        ? '当前无可编辑项目，仅可保存为「仅我可见」'
+        : '请选择至少一个可编辑的分享项目'
+    )
+    return
+  }
+  const scope = normalizeTemplateScope(saveForm.value.scope) as TemplateScope
+  const sharedProjectIds = scope === 'project' ? resolveSharedProjectIds() : []
   savingTemplate.value = true
   try {
     await api.post(P_cq.templates, {
@@ -785,7 +1020,8 @@ async function onConfirmSaveTemplate() {
         available_columns: availableColumns.value,
         acnr_targets: acnrFieldIds.value,
       },
-      scope: saveForm.value.scope,
+      scope,
+      shared_project_ids: sharedProjectIds,
     })
     ElMessage.success('模板已保存')
     saveDialogVisible.value = false
@@ -959,6 +1195,12 @@ onMounted(() => {
   color: var(--gt-color-text-primary);
 }
 .gt-cqt-result-actions { display: flex; gap: 8px; }
+.gt-cqt-pagination {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 4px 0;
+}
+.gt-cqt-warning { margin-top: 8px; }
 .gt-cqt-result-body {
   flex: 1;
   background: var(--gt-color-bg-white);
@@ -967,6 +1209,16 @@ onMounted(() => {
   padding: 8px;
   min-height: 0;
   overflow: auto;
+}
+.gt-cqt-empty-hint {
+  font-size: var(--gt-font-size-sm);
+  color: var(--gt-color-text-regular);
+  text-align: center;
+}
+.gt-cqt-empty-tip {
+  margin-top: 6px;
+  font-size: var(--gt-font-size-xs);
+  color: var(--gt-color-text-secondary);
 }
 .gt-cqt-table { font-size: var(--gt-font-size-xs); }
 .gt-cqt-error {
