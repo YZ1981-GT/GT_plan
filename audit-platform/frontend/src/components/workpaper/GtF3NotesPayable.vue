@@ -30,6 +30,7 @@
 
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
 
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f3-notes-payable" />
       </div>
 
 
@@ -308,6 +309,7 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 
 

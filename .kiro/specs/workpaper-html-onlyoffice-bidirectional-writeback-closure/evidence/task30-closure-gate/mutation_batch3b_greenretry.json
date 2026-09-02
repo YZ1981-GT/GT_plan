@@ -1,0 +1,111 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 4
+  },
+  "mutations": [
+    {
+      "id": "M15",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_quarantined_incoming_is_refused_at_the_application_entry",
+      "why": "库层那道 quarantine 门短路：`state != durable` 那条兜底仍会拒，但错误类型漂成`IncomingNotDurableError` ⇒ 「隔离永不解除」这条判据本身不可达（本 spec 已为「两分支共享异常类型」形态付过代价，此处正是它的反面验证）。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 48.41s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_quarantined_incoming_is_refused_at_the_application_entry"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_quarantined_incoming_is_refused_at_the_application_entry"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.7
+    },
+    {
+      "id": "M17",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_leader_revoked_before_promotion_yields_a_legitimate_successor",
+      "why": "撤权不再使 leader 失格 ⇒ 已被撤权的用户仍能被提升为 close leader 并发出 forcesave，`authorization_stale` 审计一条都不写。",
+      "verdict": "RED",
+      "summary": "2 failed, 321 passed, 1 warning in 48.02s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_leader_revoked_before_promotion_yields_a_legitimate_successor",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_leader_revoked_before_promotion_yields_a_legitimate_successor"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.4
+    },
+    {
+      "id": "M18",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_a_non_closing_participant_is_not_a_leader_candidate",
+      "why": "closing 仍计 active：不再要求 participant 处于 `closing` ⇒ 一个又回到 `active` 的编辑者的 intent 也算合格候选，close barrier 的语义塌掉。对应场景（`not_closing`）**只**触发这一条失格判据（未撤权、未过期），否则三条判据共享结果时删任一条都抓不到（M17 首轮实测 GREEN 正是这个形态）。",
+      "verdict": "RED",
+      "summary": "2 failed, 321 passed, 1 warning in 48.04s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_a_non_closing_participant_is_not_a_leader_candidate",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_a_non_closing_participant_is_not_a_leader_candidate",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.3
+    },
+    {
+      "id": "M30",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture",
+      "why": "lease 过期不再使候选失格 —— 三条失格判据的第三条。对应场景（`no_successor`）只把 `expires_at` 拨到过去，不动 state、不置 revoked_at。",
+      "verdict": "RED",
+      "summary": "2 failed, 321 passed, 1 warning in 48.25s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection",
+        "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection",
+        "test_task30_closure_gate_pg.py::test_no_successor_lands_recovery_required_with_zero_capture"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.6
+    }
+  ]
+}

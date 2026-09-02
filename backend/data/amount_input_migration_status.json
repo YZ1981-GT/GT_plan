@@ -11491,7 +11491,7 @@
     },
     {
       "file": "e1/E1TabDisclosure.vue",
-      "line": 1557,
+      "line": 1556,
       "label": "openingLabel",
       "full_label": "openingLabel",
       "control": "WpAmountInput",
@@ -11504,7 +11504,7 @@
     },
     {
       "file": "e1/E1TabDisclosure.vue",
-      "line": 1568,
+      "line": 1567,
       "label": "endingLabel",
       "full_label": "endingLabel",
       "control": "WpAmountInput",

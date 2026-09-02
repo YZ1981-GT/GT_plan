@@ -1,0 +1,1316 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries",
+    "why": "关掉压缩体积预算 ⇒ 50 MiB 以上的 OOXML 与流式 staging 都不再有界，Requirement 14.11 的『超限必须 fail visible』失效",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 10.57s",
+    "added": [
+      "test_task11_artifact_repository.py::test_gate_order_is_cheapest_first",
+      "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries[max_compressed_bytes-assert_compressed_size]",
+      "test_task11_artifact_repository.py::test_property_60_streaming_stage_aborts_at_cap_without_partial_residue"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries[max_compressed_bytes-assert_compressed_size]",
+      "test_task11_artifact_repository.py::test_property_60_streaming_stage_aborts_at_cap_without_partial_residue"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries",
+    "why": "off-by-one：把 `>` 改成 `>=` ⇒ 恰好 N（20000）个 entry 的合法文件被拒。只测 N+1 的守卫看不见这条，必须有 N-1/N/N+1 三点才抓得到",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.06s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries[max_zip_entries-assert_zip_entries]",
+      "test_task11_artifact_repository.py::test_property_60_zip_entry_boundaries_end_to_end"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries[max_zip_entries-assert_zip_entries]",
+      "test_task11_artifact_repository.py::test_property_60_zip_entry_boundaries_end_to_end"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_compression_ratio_boundaries",
+    "why": "关掉压缩比预算 ⇒ 高压缩比 zip bomb 只剩总量一道门，单 entry 的比值不再受限",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.33s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_60_compression_ratio_boundaries",
+      "test_task11_artifact_repository.py::test_property_60_expanded_and_ratio_gates_end_to_end"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_60_compression_ratio_boundaries",
+      "test_task11_artifact_repository.py::test_property_60_expanded_and_ratio_gates_end_to_end"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries",
+    "why": "关掉展开总量预算 ⇒ zip bomb 会被完整展开，Requirement 10.8『不得直接交给解析器无限展开』失效",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 10.33s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory",
+      "test_task11_artifact_repository.py::test_property_60_expanded_and_ratio_gates_end_to_end",
+      "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries[max_expanded_bytes-assert_expanded_size]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory",
+      "test_task11_artifact_repository.py::test_property_60_expanded_and_ratio_gates_end_to_end",
+      "test_task11_artifact_repository.py::test_property_60_scalar_budget_boundaries[max_expanded_bytes-assert_expanded_size]"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_table_rows_and_projection_fields_boundaries",
+    "why": "关掉单表行数预算（Requirement 14.11 的 100000 行）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.25s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_60_table_rows_and_projection_fields_boundaries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_60_table_rows_and_projection_fields_boundaries"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.2
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_table_rows_and_projection_fields_boundaries",
+    "why": "关掉单 projection field 数预算（Requirement 14.11 的 200000 fields）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.30s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_60_table_rows_and_projection_fields_boundaries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_60_table_rows_and_projection_fields_boundaries"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.2
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_limits_config_missing_or_invalid_fails_instead_of_falling_back",
+    "why": "给缺失配置加一个静默内置默认值 ⇒ 配置被删/写坏时按看不见的默认值继续跑，Requirement 14.11 的『单一配置锁死预算』变成两个真源",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.30s",
+    "added": [
+      "test_task11_artifact_repository.py::test_limits_config_missing_or_invalid_fails_instead_of_falling_back"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_limits_config_missing_or_invalid_fails_instead_of_falling_back"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.2
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_limits_config_matches_requirement_14_11_exactly",
+    "why": "改配置里的 entry 预算 ⇒ 与 Requirement 14.11 不符必须打红。若边界测试也随之飘（因为它们从配置取值）而契约测试不红，说明缺少『配置 ↔ AC』这条锁",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.32s",
+    "added": [
+      "test_task11_artifact_repository.py::test_limits_config_matches_requirement_14_11_exactly"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_limits_config_matches_requirement_14_11_exactly"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "策略层放开宏 ⇒ 带 `vbaProject.bin` 的 incoming 变成 durable。证明宏拒绝是**配置驱动**的真实行为，而不是代码里写死的分支",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.29s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00%b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00%b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_retention_policy_declares_every_class_used_by_production_code",
+    "why": "让删除审计自身可被 GC 删 ⇒ 下一轮 GC 会抹掉上一轮的删除记录，Requirement 5.11 的『删除结果证据』自我消解",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.38s",
+    "added": [
+      "test_task11_artifact_repository.py::test_retention_policy_declares_every_class_used_by_production_code"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_retention_policy_declares_every_class_used_by_production_code"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_retention_policy_declares_every_class_used_by_production_code",
+    "why": "把不变式声明改成 false ⇒ 策略解析必须 fail closed。这些不变式不是可选项（Requirement 5.11），配置里写 false 就该拒绝加载",
+    "verdict": "RED",
+    "summary": "2 failed, 45 passed, 12 errors in 9.03s",
+    "added": [
+      "test_task11_artifact_repository.py::test_retention_contract_retain_reasons_are_declared",
+      "test_task11_artifact_repository.py::test_retention_policy_declares_every_class_used_by_production_code",
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit",
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_dry_run_never_deletes_and_reports_grace",
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks",
+      "test_task11_retention_orphan_pg.py::test_property_5_publish_then_db_rollback_leaves_invisible_orphan",
+      "test_task11_retention_orphan_pg.py::test_reference_sources_all_execute_against_real_schema",
+      "test_task11_retention_orphan_pg.py::test_resolver_returns_only_current_published_artifact",
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+      "test_task11_retention_orphan_pg.py::test_retention_service_only_flushes",
+      "test_task11_retention_orphan_pg.py::test_scratch_schema_isolated_and_migration_applied",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears",
+      "test_task11_retention_orphan_pg.py::test_v151_rejects_representation_referencing_candidate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_retention_policy_declares_every_class_used_by_production_code",
+      "test_task11_retention_orphan_pg.py::test_dry_run_never_deletes_and_reports_grace"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py",
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "删掉 magic bytes 门 ⇒ **polyglot（前置 EXE stub 的自解压包）会通过**。🔴 首版守卫只测『非 ZIP 文件』，那与 zipfile 自己的 BadZipFile 完全重合，本条会判 GREEN；补 polyglot 用例后该门才有独立判据",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.39s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[polyglot_prefix-MZMZMZMZMZMZMZMZPK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x009b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[polyglot_prefix-MZMZMZMZMZMZMZMZPK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x009b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "放开绝对路径 entry 名（`/etc/passwd`、`C:\\evil`）⇒ 解压到 ZIP 外任意位置",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.75s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[absolute_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00Bb\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[absolute_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00Bb\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "放开 `..` 等禁止片段 ⇒ 目录穿越 entry 名进入 incoming",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.96s",
+    "added": [
+      "test_task11_artifact_repository.py::test_gate_order_is_cheapest_first",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[traversal_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00Ib\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_gate_order_is_cheapest_first",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[traversal_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00Ib\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_60_zip_entry_boundaries_end_to_end",
+    "why": "不再调用 entry 数预算门 ⇒ 20001 个 entry 的文件通过。这条与 M02 配对：M02 证明门本身有效，本条证明它真的被调用了",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.00s",
+    "added": [
+      "test_task11_artifact_repository.py::test_gate_order_is_cheapest_first",
+      "test_task11_artifact_repository.py::test_property_60_zip_entry_boundaries_end_to_end"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_gate_order_is_cheapest_first",
+      "test_task11_artifact_repository.py::test_property_60_zip_entry_boundaries_end_to_end"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory",
+    "why": "去掉**循环内**的展开量判定 ⇒ 变成『先解完再看总数』，zip bomb 赢了",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.99s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory",
+      "test_task11_artifact_repository.py::test_property_60_expanded_and_ratio_gates_end_to_end"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory",
+      "test_task11_artifact_repository.py::test_property_60_expanded_and_ratio_gates_end_to_end"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory",
+    "why": "把流式分块读改成整包读 ⇒ 64 MiB 的 entry 一次进内存，tracemalloc 峰值突破16 MiB 预算。**这是唯一能证明『流式』本身的判据** —— 只断言『被拒绝』的守卫看不见整包读（拒绝仍然发生，只是先 OOM 风险）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.93s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "放开必需部件缺失（`[Content_Types].xml`）⇒ 不完整 OOXML 进入 durable",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.99s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[missing_content_types-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00gb\\x19]\\xc4\\xec\\xc7\\xfa`\\x00\\x00\\x00v\\x00\\x00\\x00\\x0f\\x00\\x00\\x00xl/workbook.xml\\xb3\\xb1\\xaf\\xc8\\xcdQ(K-*\\xce\\xcc\\xcf\\xb3U2\\xd43PRH\\xcdK\\xceO\\xc9\\xccK\\xb7U\\n\\rq\\xd3\\xb5P\\xb2\\xb7\\xb3)\\xcf/\\xcaN\\xca\\xcf\\xcf\\xb6\\xb3)\\xceHM-)\\x86\\xd2\\ny\\x89\\xb9\\xa9\\xb6J\\xee\\xe6J\\n`\\xbeg\\n\\xd0\\x08%\\x85\"\\xabL"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[missing_content_types-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00gb\\x19]\\xc4\\xec\\xc7\\xfa`\\x00\\x00\\x00v\\x00\\x00\\x00\\x0f\\x00\\x00\\x00xl/workbook.xml\\xb3\\xb1\\xaf\\xc8\\xcdQ(K-*\\xce\\xcc\\xcf\\xb3U2\\xd43PRH\\xcdK\\xceO\\xc9\\xccK\\xb7U\\n\\rq\\xd3\\xb5P\\xb2\\xb7\\xb3)\\xcf/\\xcaN\\xca\\xcf\\xcf\\xb6\\xb3)\\xceHM-)\\x86\\xd2\\ny\\x89\\xb9\\xa9\\xb6J\\xee\\xe6J\\n`\\xbeg\\n\\xd0\\x08%\\x85\"\\xabL"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade",
+    "why": "放开扩展名伪装（xlsx 字节声明成 docx）⇒ 走错 adapter engine 解析",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.85s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[masquerade-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00nb\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[masquerade-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00nb\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "放开外部关系 ⇒ OOXML 可引用外部 URL（Requirement 10.8 明令拒绝或隔离）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.94s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[external_relationship-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00ub\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[external_relationship-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00ub\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "放开宏 ⇒ 带 VBA 的文档进入 durable 并可被下发给编辑器",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00|b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00|b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "放开嵌入对象（OLE）⇒ Requirement 10.8 的『嵌入对象按策略拒绝或隔离』失效",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.85s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[embedded_object-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\x86b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[embedded_object-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\x86b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade",
+    "why": "漏记一个门 ⇒ `report.gates` 与 `GATE_ORDER` 不等。守卫用**实际顺序序列**作判据（而不是『某个门存在』），这条证明该判据真的在比较序列",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_validation_gate_order_and_masquerade"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.4
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_path_safety_cases_all_rejected",
+    "why": "关掉项目根归属判定 ⇒ 8 类逃逸全部放行（Property 42 归零）",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.26s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_path_safety_cases_all_rejected",
+      "test_task11_artifact_repository.py::test_property_42_resolution_never_escapes_project_root"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_path_safety_cases_all_rejected",
+      "test_task11_artifact_repository.py::test_property_42_resolution_never_escapes_project_root"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_path_safety_cases_all_rejected",
+    "why": "把 realpath 换成纯字符串拼接 ⇒ `..` 不被规范化、软链接不被解析，Task 7 fs7 的 symlink_escape 与 traversal 全部通过。『仅字符串前缀比较拦不住软链接越界』这条实测结论就是这么来的",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.88s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_path_safety_cases_all_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_path_safety_cases_all_rejected"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_finalize_rejects_tampered_candidate_bytes",
+    "why": "关掉 finalize **前**的 digest 校验 ⇒ 被 kill 截断的半成品与被篡改的 candidate 都能进 publish（Requirement 3.4 要求反读校验通过才允许 pointer 指向）",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.91s",
+    "added": [
+      "test_task11_artifact_repository.py::test_publish_rejects_declared_digest_mismatch_and_post_publish_drift",
+      "test_task11_artifact_repository.py::test_staging_residue_is_invisible_to_resolver_and_refused_by_publish_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_publish_rejects_declared_digest_mismatch_and_post_publish_drift",
+      "test_task11_artifact_repository.py::test_staging_residue_is_invisible_to_resolver_and_refused_by_publish_gate"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_publish_rejects_declared_digest_mismatch_and_post_publish_drift",
+    "why": "关掉 finalize **后**的 digest 校验 ⇒ replace 之后目标内容漂移无人发现。任务正文明确要求『finalize 前后都校验』，两条各有独立变异",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.99s",
+    "added": [
+      "test_task11_artifact_repository.py::test_publish_rejects_declared_digest_mismatch_and_post_publish_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_publish_rejects_declared_digest_mismatch_and_post_publish_drift"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_cross_volume_publish_fails_visible",
+    "why": "去掉 publish 的同卷前置 ⇒ 跨卷 publish 依赖底层 OSError 才失败，错误信息不再指出『staging 必须与发布目录同卷』这条架构结论（Task 7 fs4）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.69s",
+    "added": [
+      "test_task11_artifact_repository.py::test_cross_volume_publish_fails_visible"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_cross_volume_publish_fails_visible"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 15.0
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_diagnostic_mapping_matches_classifier",
+    "why": "把『源被占用』（WinError 32）从 FILE_IN_USE 里摘掉 ⇒ 与 Task 7 fs5 实测的诊断映射不符，Requirement 9.7 的可诊断性缺一半",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.98s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_diagnostic_mapping_matches_classifier",
+      "test_task11_artifact_repository.py::test_file_in_use_diagnostics_for_target_and_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_diagnostic_mapping_matches_classifier",
+      "test_task11_artifact_repository.py::test_file_in_use_diagnostics_for_target_and_source"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_diagnostic_mapping_matches_classifier",
+    "why": "去掉跨卷诊断码 ⇒ WinError 17 被误诊成通用 IO 错误",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_diagnostic_mapping_matches_classifier",
+      "test_task11_artifact_repository.py::test_cross_volume_publish_fails_visible"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_diagnostic_mapping_matches_classifier",
+      "test_task11_artifact_repository.py::test_cross_volume_publish_fails_visible"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_file_in_use_diagnostics_for_target_and_source",
+    "why": "把『源被占用』误报成『目标被占用』⇒ 运维按错的方向排查。只断言『抛了 FILE_IN_USE』的守卫看不见这条",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.99s",
+    "added": [
+      "test_task11_artifact_repository.py::test_file_in_use_diagnostics_for_target_and_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_file_in_use_diagnostics_for_target_and_source"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_target_name_pattern_and_idempotency_scope",
+    "why": "去掉『目标已存在且内容相同 ⇒ 幂等复用』⇒ 重复 publish 会去覆盖已存在目标，而 Task 7 fs5 实测目标被任何 share 模式占用都报 WinError 5",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 10.84s",
+    "added": [
+      "test_task11_artifact_repository.py::test_content_addressed_publish_survives_held_current_artifact",
+      "test_task11_artifact_repository.py::test_contract_target_name_pattern_and_idempotency_scope",
+      "test_task11_artifact_repository.py::test_definition_bundle_and_marker_use_content_addressed_immutable_publish"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_content_addressed_publish_survives_held_current_artifact",
+      "test_task11_artifact_repository.py::test_contract_target_name_pattern_and_idempotency_scope"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "让 sealing 恒走 durable 分支 ⇒ 恶意文件直接成为 application substrate，Requirement 5.6 的『校验通过才可 durable』彻底失效",
+    "verdict": "RED",
+    "summary": "11 failed, 48 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[absolute_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[embedded_object-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[external_relationship-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[masquerade-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[missing_content_types-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xc4\\xec\\xc7\\xfa`\\x00\\x00\\x00v\\x00\\x00\\x00\\x0f\\x00\\x00\\x00xl/workbook.xml\\xb3\\xb1\\xaf\\xc8\\xcdQ(K-*\\xce\\xcc\\xcf\\xb3U2\\xd43PRH\\xcdK\\xceO\\xc9\\xccK\\xb7U\\n\\rq\\xd3\\xb5P\\xb2\\xb7\\xb3)\\xcf/\\xcaN\\xca\\xcf\\xcf\\xb6\\xb3)\\xceHM-)\\x86\\xd2\\ny\\x89\\xb9\\xa9\\xb6J\\xee\\xe6J\\n`\\xbeg\\n\\xd0\\x08%\\x85\"\\xabL",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[non_zip-<html/>-xlsx-ooxml_structure_invalid]",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[polyglot_prefix-MZMZMZMZMZMZMZMZPK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[traversal_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only",
+      "test_task11_artifact_repository.py::test_property_17_zip_bomb_is_quarantined_with_bounded_memory"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[absolute_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[embedded_object-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[external_relationship-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[masquerade-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[missing_content_types-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xc4\\xec\\xc7\\xfa`\\x00\\x00\\x00v\\x00\\x00\\x00\\x0f\\x00\\x00\\x00xl/workbook.xml\\xb3\\xb1\\xaf\\xc8\\xcdQ(K-*\\xce\\xcc\\xcf\\xb3U2\\xd43PRH\\xcdK\\xceO\\xc9\\xccK\\xb7U\\n\\rq\\xd3\\xb5P\\xb2\\xb7\\xb3)\\xcf/\\xcaN\\xca\\xcf\\xcf\\xb6\\xb3)\\xceHM-)\\x86\\xd2\\ny\\x89\\xb9\\xa9\\xb6J\\xee\\xe6J\\n`\\xbeg\\n\\xd0\\x08%\\x85\"\\xabL",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[non_zip-<html/>-xlsx-ooxml_structure_invalid]",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[polyglot_prefix-MZMZMZMZMZMZMZMZPK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[traversal_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xd8b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable",
+    "why": "把安全异常吞成 None ⇒ 经典 fail-open：`except` 抓到了却当成通过。与 M33 的区别是这条只吞 OOXML 安全/结构异常，预算异常仍会隔离 ——证明守卫对**每一类**拒绝都有独立判据",
+    "verdict": "RED",
+    "summary": "10 failed, 49 passed in 11.18s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[absolute_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[embedded_object-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[external_relationship-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[masquerade-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[missing_content_types-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xc4\\xec\\xc7\\xfa`\\x00\\x00\\x00v\\x00\\x00\\x00\\x0f\\x00\\x00\\x00xl/workbook.xml\\xb3\\xb1\\xaf\\xc8\\xcdQ(K-*\\xce\\xcc\\xcf\\xb3U2\\xd43PRH\\xcdK\\xceO\\xc9\\xccK\\xb7U\\n\\rq\\xd3\\xb5P\\xb2\\xb7\\xb3)\\xcf/\\xcaN\\xca\\xcf\\xcf\\xb6\\xb3)\\xceHM-)\\x86\\xd2\\ny\\x89\\xb9\\xa9\\xb6J\\xee\\xe6J\\n`\\xbeg\\n\\xd0\\x08%\\x85\"\\xabL",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[non_zip-<html/>-xlsx-ooxml_structure_invalid]",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[polyglot_prefix-MZMZMZMZMZMZMZMZPK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[traversal_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[absolute_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[embedded_object-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[external_relationship-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[macro_part-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[masquerade-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[missing_content_types-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xc4\\xec\\xc7\\xfa`\\x00\\x00\\x00v\\x00\\x00\\x00\\x0f\\x00\\x00\\x00xl/workbook.xml\\xb3\\xb1\\xaf\\xc8\\xcdQ(K-*\\xce\\xcc\\xcf\\xb3U2\\xd43PRH\\xcdK\\xceO\\xc9\\xccK\\xb7U\\n\\rq\\xd3\\xb5P\\xb2\\xb7\\xb3)\\xcf/\\xcaN\\xca\\xcf\\xcf\\xb6\\xb3)\\xceHM-)\\x86\\xd2\\ny\\x89\\xb9\\xa9\\xb6J\\xee\\xe6J\\n`\\xbeg\\n\\xd0\\x08%\\x85\"\\xabL",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[non_zip-<html/>-xlsx-ooxml_structure_invalid]",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[polyglot_prefix-MZMZMZMZMZMZMZMZPK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc",
+      "test_task11_artifact_repository.py::test_property_17_malicious_incoming_is_quarantined_never_durable[traversal_entry-PK\\x03\\x04\\x14\\x00\\x00\\x00\\x08\\x00\\xe2b\\x19]\\xbf\\xec\\xea\\xa1\\x90\\x00\\x00\\x00\\xb2\\x00\\x00\\x00\\x13\\x00\\x00\\x00[Content_Types].xml%\\x8eK\\x0e\\xc20\\x0cD\\xaf\\x12y\\xdf\\xba\\xb0@\\x08%\\xe9\\xa2\\xc0\\t\\xca\\x01\\xac\\xe0~D\\x9bD\\x8dA\\xe5\\xf6\\xa4t\\xe9y3\\x9e\\xd1\\xf5:O\\xea\\xc3K\\x1a\\x837p(+P\\xec]x\\x8e\\xbe7\\xf0h\\xef\\xc5\\x19j\\xab\\xdbo\\xe4\\xa4\\xb2\\xd5'\\x03\\x83H\\xbc"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.5
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only",
+    "why": "短路 `raise_if_not_durable` 的隔离分支 ⇒ quarantined 会抛`IncomingNotDurableError`（暂态）而不是 `QuarantinedIncomingError`（终态）。🔴 这正是 Task 10 记录过的遮蔽形态：两个异常类型共用时本条判 GREEN",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.03s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only",
+    "why": "把『隔离永不 release』的恒抛方法改成静默成功 ⇒ 禁令消失。把禁令写成恒抛方法（而不是『不提供该方法』）正是为了让这条可被变异检验",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.82s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only",
+    "why": "把『incoming 永不 published』的恒抛方法改成静默成功 ⇒ incoming 可被原地晋升",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.90s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_authorization_precedes_any_resource_read",
+    "why": "把『资源存在性检查』插到授权判定**之前** ⇒ 违反 Requirement 10.6 的不可交换顺序（认证 → scope → … → 业务资源读取）。这条只能被『文件不存在 + 未授权 ⇒ 仍抛授权错误』这种顺序判据抓到，看代码或断言异常类型都抓不到",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_authorization_precedes_any_resource_read"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_authorization_precedes_any_resource_read"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only",
+    "why": "放开 action ⇒ 拿着 `action='extract'` 的授权也能读 quarantined 文件，『只允许 download-only』失效",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.05s",
+    "added": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_property_17_quarantine_is_permanent_and_download_only"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan",
+    "why": "去掉 incoming 的专属可见性禁令 ⇒ 退化成通用 `ArtifactNotPublishedError`，Requirement 5.12 要求的 error code 定位失效",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan",
+    "why": "去掉 candidate 的专属可见性禁令 ⇒ candidate 与『未发布』无法区分",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.95s",
+    "added": [
+      "test_task11_artifact_repository.py::test_candidate_is_non_current_and_outside_resolver_namespace",
+      "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_candidate_is_non_current_and_outside_resolver_namespace",
+      "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan",
+    "why": "把通用 state 门插到 kind 专属禁令**之前** ⇒ incoming/candidate 的专属异常成为永久不可达分支。这是任务正文点名的两类高频遮蔽之一（校验顺序），只有『逐类断言异常类型』的守卫才抓得到",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.93s",
+    "added": [
+      "test_task11_artifact_repository.py::test_candidate_is_non_current_and_outside_resolver_namespace",
+      "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_contract_resolver_predicate_rejects_candidate_incoming_orphan"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+    "why": "关掉 legal hold ⇒ 法务冻结对象会被 GC 删除（Requirement 5.11 的 legal hold 例外）",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.93s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+    "why": "关掉 `deletable=false` ⇒ definition blob / evidence manifest / 删除审计自身都能被回收。🔴 只看审计产物测不到这条（它同时带 legal hold，先命中 legal_hold），必须再断言 definition 类才可达",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.23s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+    "why": "关掉『orphan 必须有 orphaned_at 才可删』⇒ 未经对账的 canonical 文件被当 orphan 删",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.86s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_dry_run_never_deletes_and_reports_grace",
+    "why": "关掉 grace ⇒ TTL 一到就删，Task 7 db5『grace 过后才删』的分支消失",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.92s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_dry_run_never_deletes_and_reports_grace"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_dry_run_never_deletes_and_reports_grace"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+    "why": "关掉 in-flight operation 检查 ⇒ 正在 merging 的 operation 产出的 artifact 被删",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.88s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears",
+    "why": "关掉引用判定 ⇒ 计划与执行之间新出现的引用被无视，直接删掉在用文件，形成 Requirement 5.9 禁止的『pointer 指向缺失 artifact』半成功态",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 11.13s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit",
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.4
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears",
+    "why": "apply 直接沿用 dry-run 的判定、不做二次复核 ⇒ 『dry-run + 二次复核』变成『只 dry-run』。这条与 M48 配对：M48 打引用判定本身，本条打**第二次调用**",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 10.87s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit",
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears",
+    "why": "漏查引用来源清单的第一项（definition blob）⇒ 被 definition 引用的 blob 会被删。这条模拟『新迁移加了 FK 但忘了登记』的真实事故形态",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 10.86s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit",
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_reference_sources_match_v151_ddl_bidirectionally",
+    "why": "把一条引用来源改成另一张表的重复项 ⇒ 声明清单与 V151 DDL 不再相等。SQL 仍然合法（不会连带打红 PG 守卫），因此这条精确证明『双向比对』这一条判据",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.92s",
+    "added": [
+      "test_task11_artifact_repository.py::test_reference_sources_match_v151_ddl_bidirectionally"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_reference_sources_match_v151_ddl_bidirectionally"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit",
+    "why": "删了文件却不把行标 deleted ⇒ DB 与磁盘再次分叉，下一轮 GC 会重复处理",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.09s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M53",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+    "why": "把『无策略』的保留原因换成别的 ⇒ 告警集合不再包含它，『不确定即保留**并告警**』退化成静默保留",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.90s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+    "why": "把告警位恒置 False ⇒ 保留了但没人知道，Requirement 5.11 的告警要求失效",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.86s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+    "why": "审计产物落错 retention class ⇒ 它不再受 `retention_audit` 规则保护",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.85s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M56",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+    "why": "审计产物不再 legal hold ⇒ 少一层保护（与 M55 是两条独立防线）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.00s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M57",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks",
+    "why": "不再登记『磁盘有文件、DB 无 row』的 orphan ⇒ DB rollback 留下的文件永远无人回收（Task 7 db4 的形态一）",
+    "verdict": "RED",
+    "summary": "47 passed, 12 errors in 10.29s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_apply_deletes_only_after_unreferenced_and_writes_audit",
+      "test_task11_retention_orphan_pg.py::test_audit_is_per_object_persisted_and_itself_not_deletable",
+      "test_task11_retention_orphan_pg.py::test_dry_run_never_deletes_and_reports_grace",
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks",
+      "test_task11_retention_orphan_pg.py::test_property_5_publish_then_db_rollback_leaves_invisible_orphan",
+      "test_task11_retention_orphan_pg.py::test_reference_sources_all_execute_against_real_schema",
+      "test_task11_retention_orphan_pg.py::test_resolver_returns_only_current_published_artifact",
+      "test_task11_retention_orphan_pg.py::test_retain_reason_matrix_covers_every_uncertainty_branch",
+      "test_task11_retention_orphan_pg.py::test_retention_service_only_flushes",
+      "test_task11_retention_orphan_pg.py::test_scratch_schema_isolated_and_migration_applied",
+      "test_task11_retention_orphan_pg.py::test_second_reference_recheck_retains_when_reference_reappears",
+      "test_task11_retention_orphan_pg.py::test_v151_rejects_representation_referencing_candidate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M58",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks",
+    "why": "不再把『无引用的 published row』标 orphan ⇒ Task 7 db4 的形态二失效，RetentionPolicy 也就永远等不到 orphaned_at",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.84s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M60",
+    "side": "be",
+    "want": "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks",
+    "why": "标记 orphan 时不同步 retention class ⇒ 这批 orphan 永远停在 `default` 类，而 `default.applies_to_states` 只含 `published` ⇒ RetentionPolicy 恒判 `class_scope_mismatch`（保留 + 告警）：既回收不了也持续刷屏。这条对应的生产缺陷正是首轮变异（M58 判 GREEN）追查出来的",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.64s",
+    "added": [
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_retention_orphan_pg.py::test_orphan_reconciliation_registers_and_marks"
+    ],
+    "added_files": [
+      "test_task11_retention_orphan_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task11_artifact_repository.py::test_property_17_incoming_sealing_is_delivery_scoped_and_durable",
+    "why": "把 resolver 命名空间从 `.versions` 扩到整个项目根 ⇒ `.staging` 半成品、`.incoming` 与 `.upgrade-candidates` 都变成『可解析』。Task 7 fs6 的三重理由之一（命名空间隔离）就此消失",
+    "verdict": "RED",
+    "summary": "6 failed, 53 passed in 10.37s",
+    "added": [
+      "test_task11_artifact_repository.py::test_candidate_is_non_current_and_outside_resolver_namespace",
+      "test_task11_artifact_repository.py::test_cross_volume_publish_fails_visible",
+      "test_task11_artifact_repository.py::test_finalize_candidate_copies_and_verifies_digest_before_and_after",
+      "test_task11_artifact_repository.py::test_finalize_rejects_tampered_candidate_bytes",
+      "test_task11_artifact_repository.py::test_property_17_incoming_sealing_is_delivery_scoped_and_durable",
+      "test_task11_artifact_repository.py::test_staging_residue_is_invisible_to_resolver_and_refused_by_publish_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task11_artifact_repository.py::test_candidate_is_non_current_and_outside_resolver_namespace",
+      "test_task11_artifact_repository.py::test_finalize_candidate_copies_and_verifies_digest_before_and_after",
+      "test_task11_artifact_repository.py::test_property_17_incoming_sealing_is_delivery_scoped_and_durable"
+    ],
+    "added_files": [
+      "test_task11_artifact_repository.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  }
+]

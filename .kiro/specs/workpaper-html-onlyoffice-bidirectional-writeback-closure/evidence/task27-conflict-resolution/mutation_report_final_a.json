@@ -1,0 +1,463 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py",
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 14
+  },
+  "mutations": [
+    {
+      "id": "A01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+      "why": "把折叠退回 `merge.merged` —— 这**正是** Task 26 收口审计抓到的静默错值路径：`merged` 对每个冲突字段保留 current 侧值，于是「审计师点了取 incoming，落库的是 current」。真库侧同时红：落库 projection digest 变成 merged 的那个。还会连带打红 Task 15 的独立重算（重算结果与提交值不再相等）",
+      "verdict": "RED",
+      "summary": "25 failed, 403 passed in 65.37s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_coordinator_really_imports_and_calls_apply_resolutions",
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_retirement_registration_is_complete",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_settle_function_is_the_wiring_point",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_is_folded_not_discarded",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 68.7
+    },
+    {
+      "id": "A02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_conflict_is_refused",
+      "why": "零冲突却带裁决时静默忽略 ⇒ 一次 resolve 请求被当成普通 apply 处理，审计师看到「裁决成功」而他选的字段根本没参与本次发布（conflict set 已被 rebase/supersede）。与 A03 分两条：两者共用类型时靠前的永久不可达",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 65.84s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_conflict_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_conflict_is_refused"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 69.2
+    },
+    {
+      "id": "A03",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_unresolved_conflict_never_settles",
+      "why": "有冲突却零裁决时回落到 `merge.merged` = **自动选 current**（AC 4.6 明令禁止）。判据复用冲突域既有类型而不是本模块再造一个同义类",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 65.80s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_unresolved_conflict_never_settles"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_unresolved_conflict_never_settles"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 69.1
+    },
+    {
+      "id": "A04",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_contract_is_refused",
+      "why": "缺 contract 时无法按行身份/保护策略折叠（「整行删除」与「受保护字段只许 keep_current」都判不出来），静默继续会让 `apply_resolutions` 拿 None 崩在更深处",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 66.22s (0:01:06)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_contract_is_refused"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_adjudication_without_contract_is_refused"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 69.6
+    },
+    {
+      "id": "A05",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+      "why": "绕过唯一决策点直接取未收敛快照。与 A01 分层：A01 打的是**判据体**、本条打的是**调用点**。形态判据（发布分支不得出现 `merge.merged`）与行为判据各自可证伪 —— 只有行为判据时，把决策点搬走再原地算一次同样的东西也算通过",
+      "verdict": "RED",
+      "summary": "22 failed, 406 passed in 65.71s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_settle_branches_are_the_single_decision_point",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 69.0
+    },
+    {
+      "id": "A06",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+      "why": "分派不再看裁决 ⇒ 带裁决的调用被登记成「仍有冲突」并冻结指针，resolve 端点整条失效（审计师提交裁决后什么都没发生，而返回的是 conflict）。真库侧同时红：resolve 的 decision 是 proceed 但 revision 不动",
+      "verdict": "RED",
+      "summary": "22 failed, 406 passed in 65.10s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_entry_dispatch_routes_adjudication_away_from_conflict_branch",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 68.4
+    },
+    {
+      "id": "A07",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary",
+      "why": "裁决不再交到唯一 commit 边界 ⇒ Task 15 的**独立重算**恒不触发（它只在 `resolution_choices` 非空时校验折叠）。行为完全不变 —— 这正是「第二把锁被悄悄摘掉」的形态，只有形态判据会红",
+      "verdict": "RED",
+      "summary": "22 failed, 406 passed in 65.58s (0:01:05)",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationIsWired::test_resolutions_reach_the_commit_boundary"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 68.8
+    },
+    {
+      "id": "A08",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage",
+      "why": "唯一 commit 边界的独立重算退化成「拿 merged 跟自己比」= 重言式 ⇒ 任何调用方提交未折叠 projection 都能过关。这是「把错值当基线锁死」的镜像形态：判据在、但比的是同一个错值",
+      "verdict": "RED",
+      "summary": "23 failed, 405 passed in 65.53s (0:01:05)",
+      "added": [
+        "test_task15_content_mutation.py::TestConflictGate::test_resolved_merge_passes",
+        "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_call_with_resolutions_succeeds",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_conflict_resolution_is_its_own_source_bucket",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_pointers_advanced_exactly_once",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsAppliedOnRealDb::test_the_published_projection_is_the_folded_one_not_merge_merged",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task15_content_mutation.py::TestConflictGate::test_unfolded_projection_is_rejected_even_with_full_coverage"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "774908886940a61798892aba406a400d1f73d5579a2d1ecce2fd43737d2e265f",
+      "seconds": 68.8
+    },
+    {
+      "id": "A09",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "*",
+      "why": "对照项：只改共享登记表里一条 capability 文案的**措辞**（不改状态、不改接线），应当**不**打红。它证明本轮判定不是「只要碰了文件就红」——没有这条对照，全红的矩阵无法排除「判定过于敏感」这一解释",
+      "verdict": "RED",
+      "summary": "428 passed in 64.01s (0:01:04)",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "df8f55c9e72a28cef3e5e1a1f14126bf808464f96662548b9e54e73f57e5f704",
+      "seconds": 67.2
+    },
+    {
+      "id": "B01",
+      "path": "backend/app/services/workpaper_sync/content_mutation.py",
+      "want": "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_refresh_verdict_no_longer_reads_merge_merged",
+      "why": "refresh 判据退回读 `merge.merged`。带裁决时两者不同：`merged` 与 incoming 等值 ⇒ 判「不必重载」⇒ client-confirmed 基线被推进到客户端**从未见过**的内容上（AC 8.12 末句明令禁止）。行为在零冲突路径上完全不变，所以判据必须是形态",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 62.05s (0:01:02)",
+      "added": [
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_refresh_verdict_no_longer_reads_merge_merged"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_the_refresh_verdict_no_longer_reads_merge_merged"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "774908886940a61798892aba406a400d1f73d5579a2d1ecce2fd43737d2e265f",
+      "seconds": 65.1
+    },
+    {
+      "id": "B02",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not",
+      "why": "把「要不要重载」写死成 False ⇒ merged≠incoming 时 client-confirmed 仍然推进，room 不进 refresh_required，下一次 forcesave 带着错基线继续。本条打的是 merge 域的委托口径，与 B01 的调用侧分层",
+      "verdict": "RED",
+      "summary": "5 failed, 423 passed in 62.56s (0:01:02)",
+      "added": [
+        "test_task15_content_mutation.py::TestConflictGate::test_merge_outcome_drives_client_refresh_judgement",
+        "test_task26_oo_to_html.py::TestSettlementDigestPair::test_managed_difference_reports_inequality",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_room_is_refresh_required_and_superseded",
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not",
+        "test_task27_conflict_resolution.py::TestTask26DebtIsSettled::test_merge_outcome_helper_delegates_to_the_same_pure_function"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html_pg.py::TestRefreshRequired::test_server_last_applied_advances_but_client_confirmed_does_not"
+      ],
+      "added_files": [
+        "test_task15_content_mutation.py",
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py",
+        "test_task27_conflict_resolution.py"
+      ],
+      "restored": true,
+      "restored_sha256": "8e0c6a9601951ea1c964ff9fa1b37c0ddda7ff762e67ae50e526d3cb65afe29d",
+      "seconds": 65.6
+    },
+    {
+      "id": "C01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+      "why": "frozen 侧 fence 写死成 0 ⇒ 与 room 现值恒不相等，所有 resolve 一律被拒（resolve 端点整条失效）。反向的危险形态由 C02 覆盖",
+      "verdict": "RED",
+      "summary": "20 failed, 408 passed in 61.34s (0:01:01)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_current_revision_change_rebases_and_rebuilds_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_newer_different_application_supersedes",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_same_application_higher_sequence_only_folds",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_entry_pointer_and_room_baseline_moved",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_no_second_operation_or_application",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_revision_advanced_exactly_once",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_published_projection_is_the_folded_one",
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_the_resolution_trail_was_written",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_project_invisibility_is_a_separate_refusal",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_review_lock_or_archive_blocks_the_adjudication",
+        "test_task27_conflict_resolution_pg.py::TestWhoMaySubmitAdjudications::test_the_refused_application_is_left_in_a_non_retryable_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveProceeds::test_decision_is_proceed_and_maps_to_200"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "2258121e748d5b2f6dab1d03ab7ccd82b31413dc6bd3c5a86f62eeec562f74e1",
+      "seconds": 64.6
+    },
+    {
+      "id": "C02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve",
+      "why": "把「当下仍然合法的发起人 epoch」退化成**读 request 上那个冻结值** ⇒ 观测侧与冻结侧永远相等 = 重言式，无论谁被撤销 fence 都判「授权仍有效」，撤销后的裁决照样落库（AC 10.10 明令禁止）。这与 Task 26 的 `_observed_contributor_digest` 吃过的教训是同一形态。🔴 首版把哨兵 -1 改成 0（再改成 client_edit_epoch）都实测判 GREEN —— 因为那两个值仍然不等于冻结的 5，fence 照样拒绝。真正要证伪的是「观测口径」而不是「哨兵值」",
+      "verdict": "RED",
+      "summary": "1 failed, 427 passed in 65.24s (0:01:05)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "2258121e748d5b2f6dab1d03ab7ccd82b31413dc6bd3c5a86f62eeec562f74e1",
+      "seconds": 68.5
+    },
+    {
+      "id": "C05",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+      "why": "rejected 判定不再抛 ⇒ generation 已轮转/write fence 已提升/权限 epoch 已变的请求继续往下跑并真的发布内容。三条拒绝出口各自一条变异（C05/C06/C07），因为它们共用一个 `if` 链时靠前的失败会遮蔽靠后的",
+      "verdict": "RED",
+      "summary": "3 failed, 425 passed in 66.62s (0:01:06)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_rejection_has_zero_side_effects",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_revoked_initiator_blocks_the_resolve"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_generation_change_is_rejected_with_its_own_reason",
+        "test_task27_conflict_resolution_pg.py::TestResolveFenceRejections::test_rejection_has_zero_side_effects"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "2258121e748d5b2f6dab1d03ab7ccd82b31413dc6bd3c5a86f62eeec562f74e1",
+      "seconds": 69.9
+    }
+  ]
+}

@@ -1,0 +1,195 @@
+[
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+    "why": "双向锁死的一半：复核过的取值域与源码推导值必须逐条相等。短路后 overlay 变成一段无人核对的说明文字（AC 1.2 明禁自由文本决定 profile）",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 60.79s (0:01:00)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 63.7
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+    "why": "双向锁死的另一半：复核过但已无人派生的取值必须打红，否则 overlay 会攒下一堆描述早已不存在的源码形态的「批准」",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 62.64s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.8
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+    "why": "这条是 `editability=unreachable` 唯一的独立复核：源码入边为 0 ↔ overlay unreachable_rule 必须同时成立。短路后 Requirement 1.7 的裁决无人交叉验证",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 61.93s (0:01:01)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 64.6
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+    "why": "RG-15 只需 manifest 自身字段，是唯一**无条件**能跑在全量真实 entry 上的交叉判据。不跑它，registry 报告对真实数据又退回零覆盖",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 62.54s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.5
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+    "why": "这正是本任务要修的欠账形态：RG-16/17 只在手搓 fixture 上跑，对真实 manifest 结构性不可达（假绿第①源）",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 62.83s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.7
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+    "why": "算出来了却不上报 = 闭合门永远看不到，Requirement 1.8「可见且阻断」失效",
+    "verdict": "RED",
+    "summary": "3 failed, 286 passed in 63.45s (0:01:03)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 66.4
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+    "why": "未登记的事实会被 `evaluate_closure` 判成 unregistered 或干脆不计入阻断总数 ⇒ 142 条真实漂移静默消失",
+    "verdict": "RED",
+    "summary": "3 failed, 286 passed in 63.60s (0:01:03)",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_participates_in_the_blocking_total"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py",
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 66.6
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+    "why": "唯一的生产消费方不传观察器 ⇒ RG-16/17 在生产路径上仍然是死代码，漂移条数从 142 掉到 5（只剩 RG-15）",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 63.31s (0:01:03)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 66.3
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+    "why": "47 条 entry 的宿主没有传 readonly，其 editability 完全由组件 prop 默认值决定。翻掉它必须让 manifest 与复核期望同时打红 —— 否则 editability 只是个手填值",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 64.06s (0:01:04)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py",
+      "test_workpaper_sync_manifest_contract.py"
+    ],
+    "restored": true,
+    "seconds": 67.0
+  }
+]

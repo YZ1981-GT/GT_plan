@@ -29,7 +29,14 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       port: devPort,
-      strictPort: false,
+      // 🔴 必须 true：strictPort=false 时 vite 在 3030 被占用时会**静默漂移**到 3031
+      //    （只在 stdout 打一行 "Port 3030 is in use, trying another one..."，退出码 0）。
+      //    而 start-dev.bat 的 [5/5] 只探测 http://localhost:3030，用户也只会打开 3030 —— 
+      //    于是「前端其实在 3031 跑得很好」被呈现为「[WARN] Frontend not responding /
+      //    前端未能启动」，排查方向被彻底带偏（后端日志正常，前端窗口也没有报错）。
+      //    3030 还是后端 CORS_ORIGINS 白名单里的固定值，漂移端口属于约定被破坏。
+      //    改成 true 后端口冲突会明确失败并打印占用信息，失败可见 > 静默降级。
+      strictPort: true,
       proxy: {
         '/api': {
           target: apiTarget,

@@ -1,0 +1,798 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_bytes_are_unchanged",
+    "why": "模板字节哨兵改一位后仍绿 ⇒ 「backend/wp_templates 运行时只读」这条无人把守，而后面每个 definition digest 都会对着一份错模板算出来",
+    "verdict": "RED",
+    "summary": "29 failed, 54 passed in 8.11s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_bytes_are_unchanged",
+      "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_mutated_contract_payload_is_rejected",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_declares_no_disproved_anchor",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_payload_references_template_only",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_sheet_key_matches_the_contract",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_template_payload_has_no_self_or_forward_reference",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_bytes_are_unchanged",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.3
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook",
+    "why": "哨兵比对被短路 ⇒ 模板被运行时改写不再抛，静默按新字节继续发布（fail-open 掩盖接线错误的形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.26s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestAuthoritativeTemplate::test_template_sentinel_rejects_a_mutated_workbook"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_entry_is_frozen_from_the_source_backed_manifest",
+    "why": "pilot 类边界改成 d2 后 entry 不在候选里却仍绿 ⇒ 「类边界由 harness 判定」退化成本模块自己声明（Property 49 的分母失守）",
+    "verdict": "RED",
+    "summary": "4 failed, 79 passed in 10.36s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_entry_is_frozen_from_the_source_backed_manifest",
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate",
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift",
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_no_template_wp_code_matches"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_entry_is_frozen_from_the_source_backed_manifest"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate",
+    "why": "parent_duplicate 不再被拒 ⇒ 44 条重复入口都能拿到自己的 adapter，同一 OO room 会被两个 adapter 各写一遍（AC 12.1「每个独立 entry」）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.43s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_parent_duplicate"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift",
+    "why": "matcher 域与 entry 的 wp_code 不再双向锁死 ⇒ 宿主新增/删掉一个 wp_code 后matcher 会漏匹配或越界匹配，而 registry 的重叠判据看不出来",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.42s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_on_wp_code_drift"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_no_template_wp_code_matches",
+    "why": "零回退判据被短路 ⇒ 允许给一个只能回退到父级程序表的 entry 发契约，source_ref 会指向另一份底稿的单元格（本 spec 已付两次学费的形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.41s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_no_template_wp_code_matches"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestFrozenEntrySelection::test_selection_fails_closed_when_no_template_wp_code_matches"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "源侧 payload 变了而磁盘契约没跟着变仍绿 ⇒ 双向锁失效，契约里的 digest 可以与真实 definition payload 悄悄脱钩",
+    "verdict": "RED",
+    "summary": "21 failed, 62 passed in 8.08s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "磁盘契约的 source_ref 被改到别的单元格仍绿 ⇒ 「逐字段有来源」可被事后篡改",
+    "verdict": "RED",
+    "summary": "21 failed, 62 passed in 8.24s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text",
+    "why": "表头依据被改到空格（A6）仍绿 ⇒ 表头比对不是对着权威模板真读，而是自证式同义反复",
+    "verdict": "RED",
+    "summary": "22 failed, 61 passed in 8.03s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "顶层 semantic_version 被改仍绿 ⇒ 磁盘契约与源侧脱钩（另一侧的同一条锁）",
+    "verdict": "RED",
+    "summary": "21 failed, 62 passed in 8.18s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text",
+    "why": "登记的表头文本与权威模板实测不符仍绿 ⇒ 期望值不是从源侧推导的",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.52s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_column_is_really_a_formula_in_the_template",
+    "why": "把真公式列声明成 editable 仍绿 ⇒ 受保护格篡改分类（Property 24）在这个 entry 上整条不生效，OO 侧改 F 列会覆盖公式结果而无人报冲突",
+    "verdict": "RED",
+    "summary": "23 failed, 60 passed in 8.03s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_mutated_contract_payload_is_rejected",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_marker_is_the_real_cell_text",
+    "why": "footer 标记与权威模板 A24 实测文本不符仍绿 ⇒ footer 定位会找不到锚点，而 contract 层的形态校验（只查非空）看不出来",
+    "verdict": "RED",
+    "summary": "22 failed, 61 passed in 8.19s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_marker_is_the_real_cell_text",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_footer_marker_is_the_real_cell_text"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+    "why": "隐藏 UUID 列落到受管业务列内仍绿 ⇒ 注入会覆盖可见业务单元格（Requirement 6.13）",
+    "verdict": "RED",
+    "summary": "28 failed, 55 passed in 7.97s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_mutated_contract_payload_is_rejected",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_declares_no_disproved_anchor",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_payload_references_template_only",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_instrumentation_sheet_key_matches_the_contract",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_template_payload_has_no_self_or_forward_reference",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.3
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+    "why": "数据区末行少一行仍绿 ⇒ 模板留的可增行（第 23 行）被排除在受管区域外，OO 在那里录入的值永远读不回来",
+    "verdict": "RED",
+    "summary": "25 failed, 58 passed in 8.06s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_column_is_really_a_formula_in_the_template",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_mask_covers_the_formula_column",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_contract_payload_references_both_and_no_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_formula_column_is_really_a_formula_in_the_template",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_uuid_column_sits_right_of_the_managed_business_columns"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_authority_model_is_projection_contract",
+    "why": "authority model 换成 opaque 后仍绿 ⇒ AC 12.12 的「字段级两场景替换」会被悄悄触发，Property 25/26 直接从 required set 里消失",
+    "verdict": "RED",
+    "summary": "9 failed, 74 passed in 10.48s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestPropertyOracleLanding::test_every_property_lands_on_a_registered_oracle",
+      "test_task40_simple_checklist_pilot.py::TestPropertyOracleLanding::test_field_level_properties_are_not_substituted_away",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_authority_model_is_projection_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestPropertyOracleLanding::test_field_level_properties_are_not_substituted_away",
+      "test_task40_simple_checklist_pilot.py::TestPublishDagIsOneWay::test_authority_model_is_projection_contract"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "契约里的 template digest 不再是真实 payload 的 canonical digest 仍绿 ⇒ `assert_contract_identity_frozen` 只是在比两个都错的值（单向引用断裂）",
+    "verdict": "RED",
+    "summary": "21 failed, 62 passed in 8.14s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py",
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize",
+    "why": "capability 启用门被短路 ⇒ 可以在没有 published representation 时宣称双向可用，前端显示不可兑现的切换（Requirement 1.5）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.39s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_resolve_published_definitions_never_returns_none",
+    "why": "找不到载体时返回 None 而不抛 ⇒ 上游把「缺观测器」当成「这个 entry 没有身份」，一路静默走到注册一个没有 identity binding 的 adapter（本 spec 最贵的一类缺陷）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.48s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_resolve_published_definitions_never_returns_none"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_resolve_published_definitions_never_returns_none"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet",
+    "why": "登记表声称 adapter 已注册而实际没有仍绿 ⇒ 交付登记与事实脱钩，「契约孤儿」这条可见欠账被账面抹平",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.92s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger",
+    "why": "登记 id 与磁盘契约文件名不符仍绿 ⇒ 契约目录 ↔ 登记表的双向等值失效，未登记的生产契约可以溜进目录",
+    "verdict": "RED",
+    "summary": "3 failed, 80 passed in 10.37s",
+    "added": [
+      "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_contract_directory_matches_the_delivery_ledger",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger",
+      "test_task40_simple_checklist_pilot.py::TestOrderingGate::test_ledger_records_adapter_not_registered_yet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_contract_directory_matches_the_delivery_ledger",
+      "test_task40_simple_checklist_pilot.py::TestContractIsGroundedInTheTemplate::test_contract_is_registered_in_the_delivery_ledger"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py",
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_registration_helper_awaits_the_attach",
+    "why": "HTML→OO 的解析入口不再 await 接线 ⇒ pilot adapter 永远不进 registry，而「函数存在」的判据照样通过（additive 死代码）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.33s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_registration_helper_awaits_the_attach"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_registration_helper_awaits_the_attach"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_router_calls_attach_pilot_adapters_on_both_paths",
+    "why": "callback 之后的 apply 入口不再接线 ⇒ 「能打开 OO、回写找不到 adapter」的半接线",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.44s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_router_calls_attach_pilot_adapters_on_both_paths"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_router_calls_attach_pilot_adapters_on_both_paths"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+    "why": "bundle canonical payload 里的 authority 绑定被换成别的 digest 仍绿 ⇒ bundle 与它实际指向的 authority definition 脱钩，历史 operation 的身份解析会取到另一个模型",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.67s",
+    "added": [
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+    "why": "contract child 以 candidate 状态进 bundle 仍绿 ⇒ 未经人工审核的候选契约可以被 representation 引用（AC 6.19 明令禁止）",
+    "verdict": "RED",
+    "summary": "20 failed, 63 passed in 8.22s",
+    "added": [
+      "test_task40_simple_checklist_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task40_simple_checklist_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task40_simple_checklist_pilot_pg.py::test_field_level_oracles_really_ran_the_merge",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task40_simple_checklist_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task40_simple_checklist_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task40_simple_checklist_pilot_pg.py::test_plan_uses_the_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task40_simple_checklist_pilot_pg.py::test_property25_different_field_merge_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_property26_same_field_conflict_passes_on_the_pilot_contract",
+      "test_task40_simple_checklist_pilot_pg.py::test_required_set_covers_every_unconditional_family",
+      "test_task40_simple_checklist_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task40_simple_checklist_pilot_pg.py::test_run_row_freezes_the_pilot_identity",
+      "test_task40_simple_checklist_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task40_simple_checklist_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task40_simple_checklist_pilot_pg.py::test_no_phase_crashed_during_collection"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock",
+    "why": "发布路径改成只读磁盘契约（不比对源侧）⇒ 一份被手改过的契约可以直接发布，而双向锁只在守卫里被调用（判据与生产路径脱钩）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.53s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  }
+]

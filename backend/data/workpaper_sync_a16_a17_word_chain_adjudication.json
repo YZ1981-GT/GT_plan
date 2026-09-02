@@ -1,0 +1,1360 @@
+{
+  "a17_projection_ownership": {
+    "a16_a17_component_entries": {
+      "docx/gt-a16-bundle": {
+        "capability": "single_html",
+        "document_type": "docx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue",
+        "wp_code_patterns": [
+          "A16B"
+        ]
+      },
+      "docx/gt-a17-bundle": {
+        "capability": "single_html",
+        "document_type": "docx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
+        "wp_code_patterns": [
+          "A17B"
+        ]
+      },
+      "xlsx/gt-a171-audit-summary": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA171AuditSummary.vue",
+        "wp_code_patterns": [
+          "A17-1",
+          "A171A"
+        ]
+      },
+      "xlsx/gt-a1721-kam": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA1721Kam.vue",
+        "wp_code_patterns": [
+          "A17-2-1",
+          "A1721K"
+        ]
+      },
+      "xlsx/gt-a173-consultation-record": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA173ConsultationRecord.vue",
+        "wp_code_patterns": [
+          "A17-3",
+          "A173C"
+        ]
+      },
+      "xlsx/gt-a1731-consultation-execution": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA1731ConsultationExecution.vue",
+        "wp_code_patterns": [
+          "A17-3-1",
+          "A1731C"
+        ]
+      },
+      "xlsx/gt-a174-disagreement-record": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA174DisagreementRecord.vue",
+        "wp_code_patterns": [
+          "A17-4",
+          "A174D"
+        ]
+      },
+      "xlsx/gt-a176-closing-meeting": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA176ClosingMeeting.vue",
+        "wp_code_patterns": [
+          "A17-6",
+          "A176C"
+        ]
+      },
+      "xlsx/gt-a177-independence-declaration": {
+        "capability": "single_onlyoffice",
+        "document_type": "xlsx",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
+        "wp_code_patterns": [
+          "A177I"
+        ]
+      }
+    },
+    "a17_render_strategies": {
+      "_a171_audit_summary.py": {
+        "exact_item_ids": [],
+        "like_prefixes": [
+          "a171-"
+        ],
+        "startswith_prefixes": [
+          "a171-ch",
+          "a171-signature-"
+        ]
+      },
+      "_a1721_kam.py": {
+        "exact_item_ids": [
+          "a1721-applicability",
+          "a1721-candidates"
+        ],
+        "like_prefixes": [
+          "a1721-"
+        ],
+        "startswith_prefixes": []
+      },
+      "_a1731_consultation_execution.py": {
+        "exact_item_ids": [
+          "a173-sec1-background",
+          "a173-sec1-overview",
+          "a173-sec3-reply",
+          "a1731-sec1-supplementary",
+          "a1731-sec2-execution_details",
+          "a1731-sec3-results",
+          "a1731-sec3-yn_state",
+          "a1731-sec4-follow_up"
+        ],
+        "like_prefixes": [
+          "a1731-"
+        ],
+        "startswith_prefixes": [
+          "a1731-meta-"
+        ]
+      },
+      "_a173_consultation_record.py": {
+        "exact_item_ids": [
+          "a173-sec1-background",
+          "a173-sec1-files",
+          "a173-sec1-overview",
+          "a173-sec2-opinion",
+          "a173-sec3-reply",
+          "a173-sec3-standards",
+          "a173-sec4-opinion"
+        ],
+        "like_prefixes": [
+          "a173-"
+        ],
+        "startswith_prefixes": [
+          "a173-meta-"
+        ]
+      },
+      "_a174_disagreement_record.py": {
+        "exact_item_ids": [
+          "a174-meta-not_applicable",
+          "a174-personnel",
+          "a174-sec1-parties",
+          "a174-sec2-cause",
+          "a174-sec3-procedures",
+          "a174-sec4-opinions",
+          "a174-sec5-considerations",
+          "a174-sec6-conclusion",
+          "a174-signature-date",
+          "a174-signature-preparer",
+          "a174-signature-reviewer"
+        ],
+        "like_prefixes": [
+          "a174-"
+        ],
+        "startswith_prefixes": []
+      },
+      "_a176_closing_meeting.py": {
+        "exact_item_ids": [],
+        "like_prefixes": [
+          "a176-"
+        ],
+        "startswith_prefixes": [
+          "a176-agenda-",
+          "a176-meta-"
+        ]
+      },
+      "_a177_independence_declaration.py": {
+        "exact_item_ids": [],
+        "like_prefixes": [],
+        "startswith_prefixes": []
+      }
+    },
+    "conflict_summary": "Task 58 清册把这些子码裁为 `resolved_docx`（各有自己的 DOCX 载体、owner_task=64），但 entry manifest 里它们的独立 entry 全是 `document_type=xlsx`（存量 `legacy_bridge_takes_over=true` 走父级 A17 程序表 XLSX）⇒ 「A16/A17 专用 Word 链」的迁移对象与 manifest 的 entry document_type 不在同一坐标系。改 manifest 是 Task 67 的 structural pre-reconcile，本任务只如实登记（BP-22），不自行扩权改写。",
+    "subcode_ownership_conflict": [
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-1 重大事项概要汇总.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-1"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-2-1 重大事项概要—关键审计事项.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-2-1"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-3 业务咨询记录-XX公司-XXX事项.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-3"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-3-1 业务咨询结果执行情况记录.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-3-1"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-4 重大专业分歧事项记录.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-4"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-6  总结会会议记要.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-6"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-7"
+      },
+      {
+        "ledger_legacy_bridge_takes_over": true,
+        "ledger_legacy_verdict": "parent_workbook",
+        "ledger_owner_task": "64",
+        "ledger_unified_relative_path": "A/A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.docx",
+        "ledger_unified_verdict": "resolved_docx",
+        "wp_code": "A17-7A"
+      }
+    ]
+  },
+  "a17_tab_vocabulary": {
+    "kind_type_union_declared": [
+      "a17-summary",
+      "checklist",
+      "closing-meeting",
+      "consultation",
+      "consultation-exec",
+      "disagreement",
+      "independence",
+      "kam",
+      "program",
+      "word"
+    ],
+    "kinds_declared_but_never_used": [
+      "word"
+    ],
+    "kinds_used_in_TABS": [
+      "a17-summary",
+      "checklist",
+      "closing-meeting",
+      "consultation",
+      "consultation-exec",
+      "disagreement",
+      "independence",
+      "kam",
+      "program"
+    ],
+    "tab_wp_codes": [
+      "A17-1",
+      "A17-2-1",
+      "A17-3",
+      "A17-3-1",
+      "A17-4",
+      "A17-5",
+      "A17-6",
+      "A17-7",
+      "A17-7A"
+    ]
+  },
+  "authoritative_templates": {
+    "A16-1": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 202,
+      "part_count": 27,
+      "relative_path": "A/A16-1 管理层声明书-财务报表审计（企业会计准则）.docx",
+      "size_bytes": 46789,
+      "template_sha256": "1160845fec82578e2ed07e2bf719f1b1b312fb0d1a58fd28911769539c11b506",
+      "w_tbl_count": 3,
+      "w_tr_count": 14
+    },
+    "A16-2": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 248,
+      "part_count": 36,
+      "relative_path": "A/A16-2 管理层声明书-整合审计.docx",
+      "size_bytes": 53556,
+      "template_sha256": "abbb274dc74ac74b57ca66d0b4e3ffe8261ef953e79cc9559fa32b73c5378d4e",
+      "w_tbl_count": 4,
+      "w_tr_count": 18
+    },
+    "A16-3": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 182,
+      "part_count": 27,
+      "relative_path": "A/A16-3 管理层声明书-财务报表审计（IPO申报报表审计）.docx",
+      "size_bytes": 48252,
+      "template_sha256": "83ce8cc54db35275ebadbf4909ae32a7ec7b35b858f34a523d28c496d2decb71",
+      "w_tbl_count": 3,
+      "w_tr_count": 14
+    },
+    "A16-4": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 147,
+      "part_count": 14,
+      "relative_path": "A/A16-4 管理层声明书（IPO季度财务报表审阅）20170206.docx",
+      "size_bytes": 29446,
+      "template_sha256": "e6be02b4eb31a9da0d5bb2b0ce3d7e17d806b56d1f84d5a4db1a737dccbecc6d",
+      "w_tbl_count": 3,
+      "w_tr_count": 14
+    },
+    "A16-5": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 173,
+      "part_count": 24,
+      "relative_path": "A/A16-5 管理层声明书-财务报表审计（新三板申报报表审计）.docx",
+      "size_bytes": 45217,
+      "template_sha256": "e61da001ba6924f0c57f28d4eb31e834cfb1b242a4afa386f12ba3147587489e",
+      "w_tbl_count": 3,
+      "w_tr_count": 14
+    },
+    "A16-6": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 185,
+      "part_count": 21,
+      "relative_path": "A/A16-6 管理层声明书-财务报表审计（企业债：会计准则）.docx",
+      "size_bytes": 44323,
+      "template_sha256": "0564eeaca87be522d1bb8aea1c09eaba8bddc16281fc999c1e29fbc7219daaaa",
+      "w_tbl_count": 3,
+      "w_tr_count": 14
+    },
+    "A16-7": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 588,
+      "part_count": 16,
+      "relative_path": "A/A16-7 管理层关联交易声明书201910.docx",
+      "size_bytes": 39387,
+      "template_sha256": "7a8036cc7bfce7dddf659ae2356e9a2c3c2eac625d2f23b7e876f9da3765875b",
+      "w_tbl_count": 19,
+      "w_tr_count": 73
+    },
+    "A17-1": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": true,
+      "paragraph_count": 774,
+      "part_count": 27,
+      "relative_path": "A/A17-1 重大事项概要汇总.docx",
+      "size_bytes": 70602,
+      "template_sha256": "72ad0f94e39a6a9877f616499b9519bc3a180f9992c03e9a88ebd86e21edd9f8",
+      "w_tbl_count": 13,
+      "w_tr_count": 114
+    },
+    "A17-2-1": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 188,
+      "part_count": 18,
+      "relative_path": "A/A17-2-1 重大事项概要—关键审计事项.docx",
+      "size_bytes": 37395,
+      "template_sha256": "028820c97815bcae0ba636d45ca056ef1a363a1c0b89c620ea3080493af7616b",
+      "w_tbl_count": 5,
+      "w_tr_count": 30
+    },
+    "A17-3": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 76,
+      "part_count": 24,
+      "relative_path": "A/A17-3 业务咨询记录-XX公司-XXX事项.docx",
+      "size_bytes": 29617,
+      "template_sha256": "162a89249cdf29e4955794ceb04a9bc7ac6c37babb4c9d0be40120e519d34234",
+      "w_tbl_count": 8,
+      "w_tr_count": 13
+    },
+    "A17-3-1": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 66,
+      "part_count": 17,
+      "relative_path": "A/A17-3-1 业务咨询结果执行情况记录.docx",
+      "size_bytes": 19748,
+      "template_sha256": "4aac6f1cc3e211490bf02a7d7c99248b1ed4496f68d3710e0e84e63f35068c09",
+      "w_tbl_count": 2,
+      "w_tr_count": 15
+    },
+    "A17-4": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 89,
+      "part_count": 13,
+      "relative_path": "A/A17-4 重大专业分歧事项记录.docx",
+      "size_bytes": 17207,
+      "template_sha256": "a65f7f8acfc940a138022f1471702af1d93066dc8be8b8592089ed0453d2605f",
+      "w_tbl_count": 4,
+      "w_tr_count": 16
+    },
+    "A17-6": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 38,
+      "part_count": 15,
+      "relative_path": "A/A17-6  总结会会议记要.docx",
+      "size_bytes": 19027,
+      "template_sha256": "cffaa7132a928034614bbddbe4a9d8741f7cffcbf64c8d8542f9b76d0aa8d763",
+      "w_tbl_count": 2,
+      "w_tr_count": 12
+    },
+    "A17-7": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 214,
+      "part_count": 18,
+      "relative_path": "A/A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx",
+      "size_bytes": 30050,
+      "template_sha256": "84bc70d908a0a527d0c4d6b777e7bf86b4538d315ff26626483d50c1bcb1f8c5",
+      "w_tbl_count": 27,
+      "w_tr_count": 37
+    },
+    "A17-7A": {
+      "dollar_tokens": [],
+      "existing_w_sdt_count": 0,
+      "existing_w_tag_count": 0,
+      "has_comments_part": false,
+      "has_media": false,
+      "paragraph_count": 165,
+      "part_count": 18,
+      "relative_path": "A/A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.docx",
+      "size_bytes": 26799,
+      "template_sha256": "1ac16278b70be1f02970c6b0857f0939000a01b5c8757c5ecc19050ea0bc99fc",
+      "w_tbl_count": 23,
+      "w_tr_count": 28
+    }
+  },
+  "blocking_preconditions": [
+    {
+      "blocks": [
+        "per_entry_contract",
+        "definition_bundle",
+        "capability_verdict"
+      ],
+      "id": "BP-16",
+      "must_fix_before": "把 A16 链的 capability 从 single_html 改成 bidirectional",
+      "numbering_note": "编号续接 Task 60 发布记录 `workpaper_sync_f2_word_lane_publication.json` 的 BP-10..BP-15（本记录消费它们、不改它们）；BP-16 起为 A16/A17 链新查出的阻断项。",
+      "observable_consequences": [
+        "`parse_template` 对 A16-1..A16-7 返回 0 个 placeholder（本记录 `html_projection_surface` 逐 wp_code 现算）",
+        "`registry.assert_authority_model_contract_pairing` 对 opaque + SyncContract 直接抛 AuthorityModelMismatchError ⇒ 「裁 opaque 却发 contract」在 impl 层矛盾",
+        "结构化视图（`useWordTemplateStructured`）在 A16 上无字段可渲染，`isA16Mode` 因此走 OO 弹窗而非结构化视图"
+      ],
+      "source_refs": [
+        "backend/app/routers/wp_render_strategies/_word_template.py",
+        "backend/app/services/wp_docx_template_parser.py",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ],
+      "status": "open",
+      "what": "A16 链七份权威 DOCX 的生产 HTML 侧字段面实测全为 0（零 placeholder 的是 ['A16-1', 'A16-2', 'A16-3', 'A16-4', 'A16-5', 'A16-6', 'A16-7']）⇒ `projection_contract` 没有对端可投影。给没有消费方的投影建 SDT 与契约就是 additive 死代码（本 spec 的假绿第①源）。"
+    },
+    {
+      "blocks": [
+        "per_entry_contract",
+        "runtime_anchor"
+      ],
+      "correction_note": "🔴 本项**不**等于「造不出锚点」。`WordFieldInjection(literal_anchor=True)` 允许字面文本作一次性迁移线索（Task 6 对 B30-11-2 用的就是字面标题），`WordRowInjection` 允许一次性单元格坐标，且 15/15 模板都有 `w:tbl`。本记录 `impl_probes.literal_anchor_constructible` 真跑构造成功。阻断点是**运行态**仍靠禁用锚点，以及 BP-16 的「投影无对端」。",
+      "id": "BP-17",
+      "must_fix_before": "任何 A16/A17 entry 进入 tagged-SDT 运行态",
+      "observable_consequences": [
+        "`wp_docx_template_parser._LEGACY_PATTERNS` 用 `××公司`/`202X年`/`××` 等中文字面量作字段身份，Requirement 7.1 明禁中文 label 作定位/身份",
+        "`_dedupe_field_id` 按出现顺序编号 ⇒ 审计师改掉第一处 `××公司` 后，`entity_name` 与 `entity_name_2` 整体错位串值",
+        "`PlaceholderDef.position` 是 `{paragraph_index}`，Task 6 对段落绝对索引的 probe_verdict 已裁 failed（文首插 2 段即整体位移）"
+      ],
+      "source_refs": [
+        "backend/app/services/wp_docx_template_parser.py",
+        "backend/app/services/workpaper_sync/word_entry_gate.py"
+      ],
+      "status": "open",
+      "what": "生产字段定位今天靠 Task 77 明禁的三种锚点：legacy 中文正则 14 处、`paragraph_index` 绝对索引 14 处、按出现顺序追加 `_2`/`_3` 的 field_id 9 处；可用的 `${}` 声明式 token 共 0 个。"
+    },
+    {
+      "blocks": [
+        "entry_retention",
+        "manifest_scanner_fidelity"
+      ],
+      "id": "BP-18",
+      "must_fix_before": "Task 67 重新生成 manifest 时把外层门控链纳入 mount 事实",
+      "observable_consequences": [
+        "manifest 该 entry 的 `capability=single_html`、`host_reachable=true`，但真实渲染路径不可达 ⇒ 计数把一条死 entry 当活的",
+        "`scenario_profile.mount_count=1` 与「运行时渲染 0 次」并存",
+        "删除动作归 Task 66 计划 + Task 72 Stage B；本任务只裁决与登记"
+      ],
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
+        "backend/data/workpaper_sync_entry_manifest.json",
+        "backend/scripts/gen/generate_workpaper_sync_manifest.py"
+      ],
+      "status": "open",
+      "what": "`docx/gt-a17-bundle` 的 `WorkpaperWordEditor` 挂载点外层门控是 `v-else-if=\"tab.kind === 'word'\"`，而静态 TABS 无任何 `kind: 'word'` ⇒ 运行时恒假、mount 永不渲染（unreachable，Requirement 1.7）。entry manifest 的 `mounts[].condition` 只记内层 `v-if=\"getTabWpId(tab)\"`，**外层 kind 门控整条缺失** ⇒ 扫描器口径看不见这类死代码。"
+    },
+    {
+      "blocks": [
+        "parent_duplicate_resolution",
+        "descriptor_bridge"
+      ],
+      "id": "BP-19",
+      "must_fix_before": "为该宿主接 descriptor/bridge 或裁决其独立性",
+      "observable_consequences": [
+        "manifest `parent_reason` 写「A16 modal 是 A16 entry 的实现子件」，但同一组件同时是 A10B/A12B 的宿主 ⇒ 父指向是四选一的任意选择",
+        "该宿主与 `OnlyOfficeWordDialog` 都不是 descriptor consumer（无 `descriptor` prop、无 `defineExpose`、不 import `sync/*`）⇒ AC 11.5 要求的可 await `forceSave()` 与 durable ack 无承载者"
+      ],
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "audit-platform/frontend/src/components/workpaper/OnlyOfficeWordDialog.vue",
+        "backend/data/workpaper_sync_entry_manifest.json"
+      ],
+      "status": "open",
+      "what": "`docx/workpaper-word-editor` 是 `parent_duplicate`（父 = `docx/gt-a16-bundle`），但 `WorkpaperWordEditor.vue` 的 inbound 实测 5 个，跨 A10/A12/A16/A17 bundle 与 registry 派发 ⇒ 「跟随单一父 entry 裁决」在它身上不成立：A10/A12 归 Task 62，A16 归本任务。"
+    },
+    {
+      "blocks": [
+        "authority_model_publication",
+        "definition_bundle"
+      ],
+      "id": "BP-20",
+      "must_fix_before": "把 A16 链与 popup 多路复用器接入统一 room/durable ack",
+      "observable_consequences": [
+        "本记录只给可复算的裁决与 slot 计划，`db_published` 恒 false",
+        "`models.validate_bundle_slot` 对 slot_ref=None 的 definition slot 抛 BundleIntegrityError",
+        "Task 65 未交付前这些 entry 的 capability 保持现状、verification_state 保持 UNVERIFIABLE"
+      ],
+      "source_refs": [
+        "backend/app/services/workpaper_sync/writer_migration.py",
+        "backend/app/services/workpaper_sync/models.py",
+        ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md"
+      ],
+      "status": "open",
+      "what": "本任务裁决的 `opaque_single_onlyoffice` authority model 只能经 `writer_migration.OpaqueAuthorityProvisioner` 落库，而该通道的收敛归 Task 65（「收敛 custom/user-upload xlsx 单一权威 bundle 协议」）；且 approved bundle 需要 DB 侧 definition 行（typed slot 的 slot_ref 形如 `definition:<uuid>`），离线产不出（同 Task 60 的 BP-11）。"
+    },
+    {
+      "blocks": [
+        "per_entry_contract",
+        "contract_model_expressiveness"
+      ],
+      "id": "BP-21",
+      "must_fix_before": "该宿主进入逐 entry 契约验收",
+      "observable_consequences": [
+        "popup 配置按 Task 58 清册 owner_task 分桶跨三家：{'absent_from_ledger': 57, '62': 18, '64': 13, '63': 9} ⇒ 单条 entry 的契约无论挂谁都越界",
+        "`contracts.TemplateRef` 只有一组 `relative_path`/`sha256`/`structure_hash`",
+        "部分 popup 配置的 templatePath 在模板库里不存在：[]（该清单随并发方推进而变，以 `popup_source_digests` 为观测锚）"
+      ],
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/wpPopupDocxConfigs.ts",
+        "backend/app/services/workpaper_sync/contracts.py",
+        "backend/app/services/workpaper_sync/projection_provisioning.py"
+      ],
+      "status": "open",
+      "what": "`docx/wp-popup-docx-editor` 一条 entry 复用给 97 个 popup 配置（三个 `wpPopupDocxConfigs*.ts` 顶层 key 现算，观测值附 `denominator.popup_source_digests`），而 `SyncContract.template` 是**单个** `TemplateRef`、`load_projection_supply` 要求「一个独立 entry 唯一 per-entry 契约」（登记表出现 >1 次即 fail closed）⇒ 一对多在契约模型里无法表达。"
+    },
+    {
+      "blocks": [
+        "migration_target_coordinates",
+        "owner_task_boundary"
+      ],
+      "id": "BP-22",
+      "must_fix_before": "对 A17 子码执行 Word 链迁移或改判其载体归属",
+      "observable_consequences": [
+        "同一 wp_code 在清册里是 docx、在 manifest entry 里是 xlsx ⇒ 按 manifest 迁移会漏掉整条 A17 Word 链；按清册迁移会与 Task 57 的 Excel entry 撞车",
+        "`A17-5` 出现在 GtA17Bundle 的静态 TABS，但 Task 58 清册无该 wp_code 行（只有 A17-5-1..A17-5-5）⇒ `getTabWpId` 用首个可用子码顶替",
+        "改 manifest 属 Task 67 structural pre-reconcile，本任务无权改写"
+      ],
+      "source_refs": [
+        "backend/data/workpaper_word_template_adjudication.json",
+        "backend/data/workpaper_sync_entry_manifest.json",
+        "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue"
+      ],
+      "status": "open",
+      "what": "A17 的七个 docx 子码有真实 HTML 对端（a171-/a1721-/a173-/a1731-/a174-/a176-/a177- 七套 item_id 字段集）与自己的 DOCX 载体（清册裁 `resolved_docx`、owner_task=64），但它们在 entry manifest 里的独立 entry 全是 `document_type=xlsx`（存量 `legacy_bridge_takes_over=true` 走父级 A17 程序表 XLSX）⇒ 「A16/A17 专用 Word 链」的迁移对象与 manifest 坐标系不一致。"
+    }
+  ],
+  "counters": {
+    "adapters_registered": 0,
+    "authoritative_templates_read": 15,
+    "blocking_preconditions_open": 7,
+    "definition_bundles_published": 0,
+    "docx_entries_adjudicated": 4,
+    "docx_entries_in_manifest_total": 7,
+    "entries_by_verdict": {
+      "opaque_ooxml_authority": 1,
+      "parent_duplicate_follows_parent": 1,
+      "shared_room_opaque_multiplexer": 1,
+      "unreachable_stub": 1
+    },
+    "html_placeholder_dollar_total": 0,
+    "html_placeholder_legacy_cjk_total": 14,
+    "html_placeholder_total": 14,
+    "per_entry_contracts_published": 0,
+    "popup_config_total_observed": 97,
+    "popup_owned_by_task_64_count": 13,
+    "templates_with_dollar_tokens": 0,
+    "templates_with_existing_sdt": 0,
+    "templates_with_tables": 15,
+    "wp_codes_with_zero_html_surface": [
+      "A16-1",
+      "A16-2",
+      "A16-3",
+      "A16-4",
+      "A16-5",
+      "A16-6",
+      "A16-7",
+      "A17-2-1",
+      "A17-3",
+      "A17-3-1",
+      "A17-4",
+      "A17-6"
+    ]
+  },
+  "cross_entry_isolation": {
+    "assertions": [
+      "四条 entry 的 `verdict` 各自独立推导：A16 由 HTML 字段面 0 得 opaque；A17 bundle 由外层 kind 门控恒假得 unreachable；word-editor 由 manifest `independent_entry=false` 得 parent_duplicate；popup 由 98 配置对单 TemplateRef 得 multiplexer",
+      "三条 `profile_id` 逐字相同（docx.editable.exclusive.single.room_service_wired.v1）⇒ scenario **不得**按 profile_id 去重，必须按 entry_id",
+      "本任务发布 0 份契约、0 份 bundle、0 个 adapter ⇒ 不存在可被复用的产物"
+    ],
+    "delivered_contract_rows_added": 0,
+    "production_contract_dir_untouched": true,
+    "provider_modules_added": 0,
+    "rule": "四条 entry 的裁决、mount 门控链、模板事实与 blocked_by 逐项独享，不交叉复用（Task 64 正文「不得跨 entry 复用 contract/bundle/scenario」）。"
+  },
+  "denominator": {
+    "a16_tab_wp_codes": [
+      "A16-1",
+      "A16-2",
+      "A16-3",
+      "A16-4",
+      "A16-5",
+      "A16-6",
+      "A16-7"
+    ],
+    "a17_tab_wp_codes": [
+      "A17-1",
+      "A17-2-1",
+      "A17-3",
+      "A17-3-1",
+      "A17-4",
+      "A17-5",
+      "A17-6",
+      "A17-7",
+      "A17-7A"
+    ],
+    "docx_entries_in_manifest": [
+      "docx/gt-a10-bundle",
+      "docx/gt-a12-bundle",
+      "docx/gt-a16-bundle",
+      "docx/gt-a17-bundle",
+      "docx/gt-wp-renderer",
+      "docx/workpaper-word-editor",
+      "docx/wp-popup-docx-editor"
+    ],
+    "docx_entries_owned_by_other_tasks": [
+      "docx/gt-a10-bundle",
+      "docx/gt-a12-bundle",
+      "docx/gt-wp-renderer"
+    ],
+    "docx_entries_owned_by_task_64": [
+      "docx/gt-a16-bundle",
+      "docx/gt-a17-bundle",
+      "docx/workpaper-word-editor",
+      "docx/wp-popup-docx-editor"
+    ],
+    "how_counted": "全部现算：manifest 按 `document_type == 'docx'` 过滤；popup 分母按三个 `wpPopupDocxConfigs*.ts` 的**顶层 key**（不是 relatedLinks[].wpCode）；tab wp_code 按静态 TABS 的 `wpCode:` 字面量。禁手数（BP-15 教训：「没有承载者所以通过」是假绿，分母必须现算）。",
+    "ledger_rows_owned_by_64": 22,
+    "ledger_wp_codes_owned_by_64": [
+      "A16",
+      "A16-1",
+      "A16-2",
+      "A16-3",
+      "A16-4",
+      "A16-5",
+      "A16-6",
+      "A16-7",
+      "A17",
+      "A17-1",
+      "A17-2-1",
+      "A17-3",
+      "A17-3-1",
+      "A17-4",
+      "A17-5-1",
+      "A17-5-2",
+      "A17-5-3",
+      "A17-5-4",
+      "A17-5-5",
+      "A17-6",
+      "A17-7",
+      "A17-7A"
+    ],
+    "popup_config_total_observed": 97,
+    "popup_missing_template_files": [],
+    "popup_owned_by_task_64": [
+      "A16-1",
+      "A16-2",
+      "A16-3",
+      "A16-4",
+      "A16-5",
+      "A16-6",
+      "A16-7",
+      "A17-1",
+      "A17-2-1",
+      "A17-3",
+      "A17-3-1",
+      "A17-4",
+      "A17-6"
+    ],
+    "popup_owner_task_counts": {
+      "62": 18,
+      "63": 9,
+      "64": 13,
+      "absent_from_ledger": 57
+    },
+    "popup_source_digests": {
+      "wpPopupDocxConfigs.ts": "825c495c65b1af6ead0a6bf3ed340ca67c00fbfe89073cef75b2499979ae10fe",
+      "wpPopupDocxConfigsB.ts": "156e8fc9871eccec6348f69453c08ae511daf90b738ac18f485ac0ae0dcaf05d",
+      "wpPopupDocxConfigsS.ts": "864d36f0b12bc76871d39a18d575cb129462d04cc3d92d245fdb10d75207a906"
+    },
+    "popup_total_is_an_observation_not_a_baseline": "🔴 `popup_config_total_observed` 是**带 digest 的观测值**，不是被锁死的基线：三个 popup 配置文件是并发在改的活文件。本任务实测过一次漂移 —— `wpPopupDocxConfigsS.ts` 的 `S33-REV` 配置在两次现算之间被删掉（3 个顶层 key → 2 个），而 `S33-REV` 正是 Task 63 正文点名处理的对象，该文件在 git 里也是 ` M`。故 digest 变化应触发重跑 `--write` 并复核 diff，把并发方的正常推进判成本任务打红是假红。Task 64 的**稳定**分母是 `popup_owned_by_task_64`（A16/A17 侧），它不随 B/S 文件漂移。"
+  },
+  "description": "A16/A17 专用 Word 链与全部 Word editor 宿主的 source-backed 裁决记录。本任务**不**发布 per-entry tagged-SDT 契约 —— 四条 docx entry 逐条现算后没有一条同时满足「保留」与「projection 有对端」，故按 Task 63 同款条款裁决并如实登记，不为满足数字伪造 contract/bundle/finalize。",
+  "entries": [
+    {
+      "adapter_id": null,
+      "authority_model": "opaque_single_onlyoffice",
+      "blocked_by": [
+        "BP-16",
+        "BP-19",
+        "BP-20"
+      ],
+      "capability_current": "single_html",
+      "capability_verdict_stage": "adjudicated_no_contract_by_design",
+      "definition_bundle": null,
+      "entry_id": "docx/gt-a16-bundle",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue",
+      "manifest_facts": {
+        "adapter_id": null,
+        "canonical_resolver": "legacy_word_onlyoffice_router",
+        "capability": "single_html",
+        "doc_key_defects": [
+          "frontend_endpoint_without_backend_route",
+          "client_local_doc_key_fallback"
+        ],
+        "editability": "editable",
+        "evidence_browser_case": null,
+        "evidence_contract_test": null,
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA16Bundle.vue",
+        "independent_entry": true,
+        "migration_state": "legacy_fake_bidirectional",
+        "mount_conditions": [
+          null
+        ],
+        "parent_entry_id": null,
+        "room_model": "exclusive",
+        "scenario_profile_id": "docx.editable.exclusive.single.room_service_wired.v1",
+        "wp_code_patterns": [
+          "A16B"
+        ]
+      },
+      "mount_gate_chain": [
+        {
+          "component": "WorkpaperWordEditor",
+          "inner_condition": null,
+          "mount_line": 103,
+          "outer_gate": "el-tab-pane v-for over visibleTabs",
+          "outer_gate_line": 96
+        }
+      ],
+      "per_entry_contract": null,
+      "published_representation": null,
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verdict": "opaque_ooxml_authority",
+      "verification_state": "UNVERIFIABLE",
+      "why": "宿主 mount 真实可达（`el-tab-pane` v-for over visibleTabs，无外层 kind 门控），承载 A16-1..A16-7 七个 wp_code 的真实 DOCX。但生产 HTML 侧字段面实测为 0：`_word_template.py` 经 `wp_docx_template_parser.parse_template` 对七份模板全部返回 0 个 placeholder ⇒ `wt-{wp_code}-` 前缀下无任何字段可投影。审计师是在 Word 里写整篇管理层声明书（`isA16Mode` 走 OO 弹窗，不走结构化视图）⇒ docx 本体即业务权威，authority model 只能是 opaque，不得发 SyncContract（RG-8/RG-9 对非 projection 传 contract 直接抛 AuthorityModelMismatchError）。"
+    },
+    {
+      "adapter_id": null,
+      "authority_model": null,
+      "blocked_by": [
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_current": "single_html",
+      "capability_verdict_stage": "adjudicated_no_contract_by_design",
+      "definition_bundle": null,
+      "entry_id": "docx/gt-a17-bundle",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
+      "manifest_facts": {
+        "adapter_id": null,
+        "canonical_resolver": "legacy_word_onlyoffice_router",
+        "capability": "single_html",
+        "doc_key_defects": [
+          "frontend_endpoint_without_backend_route",
+          "client_local_doc_key_fallback"
+        ],
+        "editability": "editable",
+        "evidence_browser_case": null,
+        "evidence_contract_test": null,
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
+        "independent_entry": true,
+        "migration_state": "legacy_fake_bidirectional",
+        "mount_conditions": [
+          "v-if=\"getTabWpId(tab)\""
+        ],
+        "parent_entry_id": null,
+        "room_model": "exclusive",
+        "scenario_profile_id": "docx.editable.exclusive.single.room_service_wired.v1",
+        "wp_code_patterns": [
+          "A17B"
+        ]
+      },
+      "mount_gate_chain": [
+        {
+          "component": "WorkpaperWordEditor",
+          "inner_condition": "v-if=\"getTabWpId(tab)\"",
+          "mount_line": 696,
+          "outer_gate": "v-else-if=\"tab.kind === 'word'\"",
+          "outer_gate_line": 695
+        }
+      ],
+      "per_entry_contract": null,
+      "published_representation": null,
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verdict": "unreachable_stub",
+      "verification_state": "UNVERIFIABLE",
+      "why": "`WorkpaperWordEditor` 挂载点的**外层**门控是 `v-else-if=\"tab.kind === 'word'\"`，而静态 TABS 十条里没有一条 `kind: 'word'`（`word` 只出现在 TabDef 的类型联合声明里，从未被任何 tab 使用）⇒ 该分支运行时恒假、mount 永不渲染。A17 的每个子码都有自己的专属 HTML 组件与渲染策略（a171-/a1721-/a173-/a1731-/a174-/a176-/a177- 七套 item_id 字段集），没有任何子码需要走通用 Word 编辑器。按 Requirement 1.7 裁决 unreachable：不可达旧桩应删除，不得注册 adapter、不得发契约。删除归 Task 66 计划 + Task 72 Stage B 执行。"
+    },
+    {
+      "adapter_id": null,
+      "authority_model": null,
+      "blocked_by": [
+        "BP-19"
+      ],
+      "capability_current": "single_onlyoffice",
+      "capability_verdict_stage": "adjudicated_no_contract_by_design",
+      "definition_bundle": null,
+      "entry_id": "docx/workpaper-word-editor",
+      "host_path": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+      "manifest_facts": {
+        "adapter_id": null,
+        "canonical_resolver": "legacy_word_onlyoffice_router",
+        "capability": "single_onlyoffice",
+        "doc_key_defects": [
+          "frontend_endpoint_without_backend_route",
+          "client_local_doc_key_fallback"
+        ],
+        "editability": "editable",
+        "evidence_browser_case": null,
+        "evidence_contract_test": null,
+        "host_path": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "independent_entry": false,
+        "migration_state": "parent_duplicate",
+        "mount_conditions": [
+          "v-if=\"editorVisible\""
+        ],
+        "parent_entry_id": "docx/gt-a16-bundle",
+        "room_model": "exclusive",
+        "scenario_profile_id": "docx.editable.exclusive.single.room_service_wired.v1",
+        "wp_code_patterns": []
+      },
+      "mount_gate_chain": [
+        {
+          "component": "OnlyOfficeWordDialog",
+          "inner_condition": "v-if=\"editorVisible\"",
+          "mount_line": 274,
+          "outer_gate": "v-if=\"onlyofficeAvailable\"",
+          "outer_gate_line": 251
+        }
+      ],
+      "per_entry_contract": null,
+      "published_representation": null,
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verdict": "parent_duplicate_follows_parent",
+      "verification_state": "UNVERIFIABLE",
+      "why": "manifest 实测 `independent_entry=false` / `parent_entry_id=docx/gt-a16-bundle` ⇒ `registry.build_manifest_registration_plan` 已有 blocked 分支「parent 重复入口 —— 只能复用其独立 entry 的 adapter」（Requirement 1.6 / 12.4）。它承载的 `OnlyOfficeWordDialog` 是 A16 弹窗的实现子件，裁决跟随父 entry（opaque），本任务不为它单独发 contract/bundle/scenario。🔴 但它的 inbound 实测 5 个（A10/A12/A16/A17 bundle + registry 派发），跨 Task 62/64 归属 ⇒ 「父裁决单一来源」在它身上不成立，登记 BP-19。"
+    },
+    {
+      "adapter_id": null,
+      "authority_model": "opaque_single_onlyoffice",
+      "blocked_by": [
+        "BP-20",
+        "BP-21"
+      ],
+      "capability_current": "single_onlyoffice",
+      "capability_verdict_stage": "adjudicated_no_contract_by_design",
+      "definition_bundle": null,
+      "entry_id": "docx/wp-popup-docx-editor",
+      "host_path": "audit-platform/frontend/src/components/workpaper/WpPopupDocxEditor.vue",
+      "manifest_facts": {
+        "adapter_id": null,
+        "canonical_resolver": "legacy_word_onlyoffice_router",
+        "capability": "single_onlyoffice",
+        "doc_key_defects": [],
+        "editability": "editable",
+        "evidence_browser_case": null,
+        "evidence_contract_test": null,
+        "host_path": "audit-platform/frontend/src/components/workpaper/WpPopupDocxEditor.vue",
+        "independent_entry": true,
+        "migration_state": "legacy_fake_bidirectional",
+        "mount_conditions": [
+          "v-if=\"editorVisible\""
+        ],
+        "parent_entry_id": null,
+        "room_model": "shared",
+        "scenario_profile_id": "docx.editable.shared.single.room_service_wired.v1",
+        "wp_code_patterns": []
+      },
+      "mount_gate_chain": [
+        {
+          "component": "OnlyOfficeWordDialog",
+          "inner_condition": "v-if=\"editorVisible\"",
+          "mount_line": 264,
+          "outer_gate": null,
+          "outer_gate_line": null
+        }
+      ],
+      "per_entry_contract": null,
+      "published_representation": null,
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verdict": "shared_room_opaque_multiplexer",
+      "verification_state": "UNVERIFIABLE",
+      "why": "唯一 `room_model=shared` 的 docx entry，且是**一个宿主复用给 N 个 wp_code** 的弹窗多路复用器：popup 配置真源（三个 `wpPopupDocxConfigs*.ts` 的顶层 key）现算 98 条，按 Task 58 清册 owner_task 分桶跨 Task 62/63/64 三家。SyncContract 的 `template` 是**单个** TemplateRef，而 `load_projection_supply` 要求「一个独立 entry 唯一 per-entry 契约」⇒ 一条 entry 对 98 个模板在契约模型里无法表达。这些 docx 又各自是本体权威（弹窗直接编辑整份文档，无 HTML 字段对端）⇒ 裁 opaque。契约模型的表达力缺口登记 BP-21。"
+    }
+  ],
+  "html_projection_surface": {
+    "A16-1": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-1-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 125,
+      "parsed_table_count": 3,
+      "placeholder_count": 0
+    },
+    "A16-2": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-2-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 113,
+      "parsed_table_count": 4,
+      "placeholder_count": 0
+    },
+    "A16-3": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-3-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 106,
+      "parsed_table_count": 3,
+      "placeholder_count": 0
+    },
+    "A16-4": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-4-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 70,
+      "parsed_table_count": 3,
+      "placeholder_count": 0
+    },
+    "A16-5": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-5-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 97,
+      "parsed_table_count": 3,
+      "placeholder_count": 0
+    },
+    "A16-6": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-6-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 108,
+      "parsed_table_count": 3,
+      "placeholder_count": 0
+    },
+    "A16-7": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A16-7-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 78,
+      "parsed_table_count": 19,
+      "placeholder_count": 0
+    },
+    "A17-1": {
+      "by_pattern_kind": {
+        "legacy_cjk_marker": 4
+      },
+      "by_position_kind": {
+        "paragraph_index": 4
+      },
+      "html_store_prefix": "wt-A17-1-",
+      "ordinal_suffixed_field_ids": 3,
+      "parsed_paragraph_count": 242,
+      "parsed_table_count": 13,
+      "placeholder_count": 4
+    },
+    "A17-2-1": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A17-2-1-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 31,
+      "parsed_table_count": 5,
+      "placeholder_count": 0
+    },
+    "A17-3": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A17-3-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 21,
+      "parsed_table_count": 8,
+      "placeholder_count": 0
+    },
+    "A17-3-1": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A17-3-1-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 4,
+      "parsed_table_count": 1,
+      "placeholder_count": 0
+    },
+    "A17-4": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A17-4-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 46,
+      "parsed_table_count": 4,
+      "placeholder_count": 0
+    },
+    "A17-6": {
+      "by_pattern_kind": {},
+      "by_position_kind": {},
+      "html_store_prefix": "wt-A17-6-",
+      "ordinal_suffixed_field_ids": 0,
+      "parsed_paragraph_count": 4,
+      "parsed_table_count": 2,
+      "placeholder_count": 0
+    },
+    "A17-7": {
+      "by_pattern_kind": {
+        "legacy_cjk_marker": 5
+      },
+      "by_position_kind": {
+        "paragraph_index": 5
+      },
+      "html_store_prefix": "wt-A17-7-",
+      "ordinal_suffixed_field_ids": 3,
+      "parsed_paragraph_count": 99,
+      "parsed_table_count": 27,
+      "placeholder_count": 5
+    },
+    "A17-7A": {
+      "by_pattern_kind": {
+        "legacy_cjk_marker": 5
+      },
+      "by_position_kind": {
+        "paragraph_index": 5
+      },
+      "html_store_prefix": "wt-A17-7A-",
+      "ordinal_suffixed_field_ids": 3,
+      "parsed_paragraph_count": 81,
+      "parsed_table_count": 23,
+      "placeholder_count": 5
+    }
+  },
+  "impl_probes": {
+    "A16_1_child_resolve": {
+      "outcome": "resolved",
+      "relative_path": "A/A16-1 管理层声明书-财务报表审计（企业会计准则）.docx"
+    },
+    "A16_parent_resolve": {
+      "error_code": "document_type_mismatch",
+      "error_type": "DocumentTypeMismatchError",
+      "outcome": "rejected"
+    },
+    "A17_parent_resolve": {
+      "error_code": "document_type_mismatch",
+      "error_type": "DocumentTypeMismatchError",
+      "outcome": "rejected"
+    },
+    "empty_spec_rejected": {
+      "error_type": "WordInstrumentationError",
+      "outcome": "rejected"
+    },
+    "literal_anchor_constructible": {
+      "locator_kind": "one_time_literal_text",
+      "note": "字面文本可作**一次性**迁移线索（Task 6 对 B30-11-2 用的就是字面标题），安全性来自 expected_token_occurrences 的 fail-closed 计数。故本任务不发契约的理由是「投影无对端」，不是「造不出锚点」。",
+      "outcome": "constructed"
+    },
+    "phantom_token_rejected": {
+      "error_type": "WordTokenAnchorError",
+      "mentions_hit_count_zero": true,
+      "outcome": "rejected"
+    },
+    "probe_gate_identity": {
+      "browser": "Chrome/151.0.0.0 (Playwright Chromium, Windows NT 10.0 x64)",
+      "carrier_contract_sha256": "be4d11dde4e92110d8da74c8da6de849c62f2ea58233f54e5ab6632466d67acc",
+      "carrier_gate_digest": "ec469dc7722cde207db52992a36628f2b2119a863cc165399a75b9f0d288ab3a",
+      "identity_schema_version": "1.0.0",
+      "instrumentation_version": "1.0.0",
+      "lock_policy": "no_w_lock_injected",
+      "onlyoffice_build": "9.4.0-129",
+      "runner": "backend/scripts/diagnose/probe_oo94_word_sdt.py",
+      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c"
+    }
+  },
+  "mount_gate_chains": {
+    "GtA16Bundle.vue": [
+      {
+        "component": "WorkpaperWordEditor",
+        "inner_condition": null,
+        "mount_line": 103,
+        "outer_gate": "el-tab-pane v-for over visibleTabs",
+        "outer_gate_line": 96
+      }
+    ],
+    "GtA17Bundle.vue": [
+      {
+        "component": "WorkpaperWordEditor",
+        "inner_condition": "v-if=\"getTabWpId(tab)\"",
+        "mount_line": 696,
+        "outer_gate": "v-else-if=\"tab.kind === 'word'\"",
+        "outer_gate_line": 695
+      }
+    ],
+    "WorkpaperWordEditor.vue": [
+      {
+        "component": "OnlyOfficeWordDialog",
+        "inner_condition": "v-if=\"editorVisible\"",
+        "mount_line": 274,
+        "outer_gate": "v-if=\"onlyofficeAvailable\"",
+        "outer_gate_line": 251
+      }
+    ],
+    "WpPopupDocxEditor.vue": [
+      {
+        "component": "OnlyOfficeWordDialog",
+        "inner_condition": "v-if=\"editorVisible\"",
+        "mount_line": 264,
+        "outer_gate": null,
+        "outer_gate_line": null
+      }
+    ]
+  },
+  "paradigm_ref": "backend/data/workpaper_sync_f2_word_lane_publication.json",
+  "properties_verified": {
+    "Property 30": {
+      "claim": "NOT_CLAIMED_NO_TAGGED_SDT_ENTRY_IN_THIS_LANE",
+      "denominator": 0,
+      "why": "本 lane 未发布任何 tagged-SDT per-entry contract（裁决见 `why_no_per_entry_contract`）⇒ 「tag 是唯一锚点」这条在本 lane 上没有承载者。分母现算为 0 并如实标注，不宣称通过。"
+    },
+    "Property 31": {
+      "claim": "NOT_CLAIMED_NO_MATERIALIZE_IN_THIS_LANE",
+      "denominator": 0,
+      "why": "Word-only 区域保留需要一次真实 materialize/往返；本 lane 无契约、无 binding、无 candidate ⇒ 无从执行。不借离线 engine 宣称通过。"
+    },
+    "Property 47": {
+      "claim": "NOT_CLAIMED_CARRIERS_ARE_COUNTEREXAMPLES",
+      "denominator": 2,
+      "why": "本 lane 有 2 个 OO 宿主承载者（`WorkpaperWordEditor` 与 `OnlyOfficeWordDialog`，现算），但两者都**不是** descriptor consumer：无 `descriptor` prop、无 `defineExpose`、不 import `sync/*`，`OnlyOfficeWordDialog` 的「保存」判据是 `onDocumentStateChange` 取反（非 durable ack）⇒ 它们是 Property 47 的**反例**而非通过项（BP-19）。分母不是 0：承载者存在且形态相反。"
+    },
+    "Property 69": {
+      "claim": "NOT_CLAIMED_NO_SCENARIO_EVIDENCE",
+      "denominator": 0,
+      "why": "逐 entry sync test run / scenario evidence 一条都没有（`sync_test_run_id` 与 `required_scenario_set_digest` 全 null）⇒ 不宣称通过。真实 OO 场景刷新归 Task 70。"
+    },
+    "Property 70": {
+      "claim": "PASS",
+      "denominator": 4,
+      "how": "跨 entry 隔离：四条 entry 的 verdict 各自从**不同**的现算事实推导（HTML 字段面 / 外层门控链 / manifest independent_entry / popup 配置数），且本任务 0 产物可复用。守卫按 entry_id 逐条断言推导依据互不相同，并断言三条同 profile_id 的 entry 没有被按 profile 去重。"
+    }
+  },
+  "property_denominators": {
+    "authoritative_templates": 15,
+    "docx_entries": 4,
+    "oo_host_components": 2,
+    "popup_configs_observed": 97,
+    "popup_configs_owned_by_task_64": 13,
+    "published_bundles": 0,
+    "published_contracts": 0,
+    "registered_adapters": 0
+  },
+  "registry_facts": {
+    "allowed_provider_modules": [
+      "app.services.workpaper_sync.pilot_d2_large_json",
+      "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
+      "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
+      "app.services.workpaper_sync.pilot_simple_checklist"
+    ],
+    "available_contract_ids": [
+      "b60.hour_budget",
+      "d2.receivable_detail",
+      "g7.soe_subsidiary_disclosure",
+      "h1.disposal_check"
+    ],
+    "delivered_per_entry_contract_count": 4,
+    "delivered_per_entry_contracts": [
+      {
+        "adapter_registered": false,
+        "contract_id": "b60.hour_budget",
+        "delivered_by_task": "40",
+        "entry_id": "xlsx/b60/gt-b60-bundle"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "d2.receivable_detail",
+        "delivered_by_task": "41",
+        "entry_id": "xlsx/gt-d2-accounts-receivable"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "h1.disposal_check",
+        "delivered_by_task": "42",
+        "entry_id": "xlsx/gt-h1-fixed-assets"
+      },
+      {
+        "adapter_registered": false,
+        "contract_id": "g7.soe_subsidiary_disclosure",
+        "delivered_by_task": "43",
+        "entry_id": "xlsx/gt-g7-long-term-equity-main"
+      }
+    ],
+    "pending_docx_adapter_forbidden_paths": [
+      "app/services/workpaper_sync/adapters/word.py",
+      "app/services/workpaper_sync/adapters/word"
+    ],
+    "pending_docx_blocking_task": [
+      "59,60,61"
+    ],
+    "task64_added_contract_rows": 0,
+    "task64_added_provider_modules": 0
+  },
+  "requirements_covered": [
+    "7.1",
+    "7.3",
+    "11.4",
+    "11.5",
+    "11.12",
+    "12.1",
+    "12.5",
+    "12.10",
+    "12.11",
+    "12.12"
+  ],
+  "schema_version": "a16-a17-word-chain-adjudication:v1",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "64",
+  "task61_gate_compliance": {
+    "forbidden_paths_still_absent": true,
+    "gate": "word_bulk",
+    "gate_tasks": [
+      "61"
+    ],
+    "task61_state": "[-] UNVERIFIABLE（真实 OnlyOffice 9.4 F2 Word gate 未通过）",
+    "what_this_task_did_not_do": [
+      "未建 `adapters/word.py`（`PENDING_ENGINE_ADAPTERS.forbidden_paths` 明禁）",
+      "未往 `DELIVERED_PER_ENTRY_CONTRACTS` / `_ALLOWED_PROVIDER_MODULES` 加行",
+      "未改 entry manifest（重生成归 Task 67）",
+      "未改 `backend/wp_templates/` 任何字节（Task 59 第 4 步源文件只读）",
+      "未把任何 candidate 带入 resolver/room/current/evidence",
+      "未改 capability 为 bidirectional，未宣称任何真实 OO probe 通过"
+    ]
+  },
+  "unreachable_findings": [
+    {
+      "deletion_owner": "Task 66 计划 + Task 72 Stage B",
+      "entry_id": "docx/gt-a17-bundle",
+      "gate_kind_never_used": [
+        "word"
+      ],
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
+      "mount_line": 696,
+      "outer_gate": "v-else-if=\"tab.kind === 'word'\"",
+      "verdict": "unreachable_stub"
+    }
+  ],
+  "why_no_per_entry_contract": {
+    "actual_reason": "`projection_contract` 的语义是「HTML 结构化数据是权威、docx 是其投影」。A16 链反向：生产 HTML 侧字段面实测 0（`parse_template` 对 A16-1..A16-7 全返 0 个 placeholder），审计师在 Word 里写整篇声明书 ⇒ docx 本体即权威。给无消费方的投影建 SDT/契约 = additive 死代码（假绿第①源）；而 `assert_authority_model_contract_pairing` 对非 projection 传 SyncContract 直接抛 AuthorityModelMismatchError ⇒ 「裁 opaque 却发 contract」是 impl 级矛盾。",
+    "impl_single_points_delegated": [
+      "app.services.wp_docx_template_parser.parse_template",
+      "app.services.workpaper_sync.word_resolution.resolve_word_template",
+      "app.services.workpaper_sync.word_instrumentation.WordSdtCarrierGate.load",
+      "app.services.workpaper_sync.word_instrumentation.instrument_docx_bytes",
+      "app.services.workpaper_sync.adapters.registry.DELIVERED_PER_ENTRY_CONTRACTS"
+    ],
+    "wrong_reason_rejected": "「A16/A17 模板零 `${}` token 所以造不出锚点」—— 这个说法本记录用 impl 真跑证伪：`WordFieldInjection(literal_anchor=True)` 可构造（`impl_probes.literal_anchor_constructible`），Task 6 对 B30-11-2 的注入用的就是字面标题；`WordRowInjection` 支持一次性单元格坐标，且本任务 15/15 份模板都有 `w:tbl`。"
+  }
+}

@@ -1,0 +1,451 @@
+{
+  "schema_version": "h-cycle-deletion-plan:v1",
+  "task": "Task 50",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "H 循环（除 H1）Excel 独立 entry 的 legacy dual-mode composable 删除清册。裁决字段逐条与 backend/data/workpaper_sync_h_cycle_manifest_slice.json 同源（capability 全为 null、html_counterpart_verdict 全为 exists），理由按 AC 12.8 的真判据（有无 HTML 对端）写，不得出现「无 adapter / 无 contract / 无 bundle」这类循环论证。删除动作本身归 Task 66（生成计划）/ Task 72（执行删除）—— 本计划只是清册，不在 Task 50 内执行删除。🔴 H 循环有两处与 D/F/G 都不同、直接决定删除动作能否安全执行的事实：① 5 个 entry 的 legacy 载体在生产里**零消费或错位消费**（宿主内联了第二份实现），删它们不改变任何运行行为，但反过来说「删了并改了宿主」也不代表接线成功 —— 真载体是宿主内联那份；② H4 的 composable 被 2 个 parent_duplicate 子 Tab 消费、H8 的 composable **只**被 1 个子 Tab 消费而父宿主不用，按「删 composable + 改宿主」的常规套路走会打断子入口。两条都在 entries[].legacy_composables_to_delete[].consumers 里逐条落到文件级。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_h_cycle_manifest_slice.json#independent_entries",
+  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+  "pilot_already_migrated": {
+    "entry_id": "xlsx/gt-h1-fixed-assets",
+    "pilot_class": "h1_grouped_dynamic",
+    "task": "Task 42（pilot）/ Task 45（legacy 删除已按 legacy_deletion_paradigm 七步执行）",
+    "note": "H1 是同循环的 pilot，其 legacy 删除归 Task 45 的 workpaper_sync_pilot_deletion_plan.json，不在本清册内。本清册的 9 条 entry 与它无交集，也不复用它的 contract（h1.disposal_check）。"
+  },
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "reason": "共享基类被大量非 H 模块使用（B22A/B22B/B22C/B50/N2 五个宿主 + D1/D3/D4/D5/D6/D7 + G2 + J1/J2/J3 + K9 + M1..M10 + N2 共 21 个 wrapper composable + J1 宿主 + legacy baseline 生成物 + 3 个 spec），按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+    "remaining_consumers_after_h_cycle": 30,
+    "remaining_consumers_counting_rule": "口径 = 「import 路径字面量里含 useWorkpaperEntryDualMode 的文件数（排除它自身）」，实测 30 个：5 个宿主（B22A/B22B×2/B22C/B50）+ J1 宿主 + 21 个 wrapper composable（D1/D3..D7 / G2 / J2 / J3 / M1..M10 / N2）+ legacy baseline 生成物 + 3 个 spec。🔴 换成「全文出现该标识符」的宽口径会得到 32（多出 GtN2TaxesPayable.vue 与 useK9DualMode.ts 两处只在注释/文案里提到它的文件）—— 判据取窄口径（真 import 边），因为删除安全性只关心真依赖。",
+    "h_cycle_does_not_consume_it": "🔴 实测 H 循环 9 个 dual-mode composable **无一** import useWorkpaperEntryDualMode（wraps_shared_base 全为 false）—— 它们是 9 份各自独立的实现（98~157 行），localStorage 前缀分别是 h2-dual-mode: .. h10-dual-mode:。故删除 H 循环的 9 个 composable 不会触及共享基类，也不会与 D/M/J 那些 wrapper 撞车。"
+  },
+  "host_inlined_second_implementation": {
+    "why_this_key_exists": "本循环 4 个宿主（H5/H7/H8/H9）没有消费自己的 dual-mode composable，而是在宿主里内联了等价实现。执行删除时若只删 composable、不动宿主，界面行为完全不变（因为 composable 本来就没被用）——「删了、测试全绿」于是不能证明任何事。这一节把真载体逐条落到行号，让 Task 72 的验收判据必须落在宿主内联那份上。",
+    "hosts": [
+      {
+        "entry_id": "xlsx/gt-h5-oil-gas-assets",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
+        "inline_mode_state": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L381",
+        "inline_switch_fn": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L405",
+        "inline_health_probe": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L395",
+        "inline_config_prefetch": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L414",
+        "persists_mode_to_localstorage": false
+      },
+      {
+        "entry_id": "xlsx/gt-h7-biological-assets",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
+        "inline_mode_state": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L471",
+        "inline_switch_fn": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L508",
+        "inline_health_probe": null,
+        "inline_config_prefetch": null,
+        "persists_mode_to_localstorage": false
+      },
+      {
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+        "inline_mode_state": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L491",
+        "inline_switch_fn": null,
+        "inline_health_probe": null,
+        "inline_config_prefetch": null,
+        "persists_mode_to_localstorage": false
+      },
+      {
+        "entry_id": "xlsx/gt-h9-lease-liabilities",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+        "inline_mode_state": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L265",
+        "inline_switch_fn": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L289",
+        "inline_health_probe": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L278",
+        "inline_config_prefetch": null,
+        "persists_mode_to_localstorage": false
+      }
+    ],
+    "consequence_for_task_72": "对这 4 条 entry，验收判据必须是「宿主里内联的 currentMode / switchMode 真的不在了、且改走 bridge adapter」，不能是「composable 文件已删除」。后者对它们恒真（本来就没人用）。"
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-h2-construction-in-progress",
+      "wp_code_pattern": "H2C",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses（primary managed table `H2-2-rows` 存 JSON 行数组，owner 常量 ROWS_KEY 在 useH2Detail.ts#L204，行身份 rowId 由 #L260 生成），写入点是宿主内联的 `http.put`(#L520)，读走父级 render-config 快照(#L461)；模板依据 `H/H2 在建工程.xlsx!明细表H2-2!A9` = '工程项目名称' ⇒ html_counterpart_verdict = exists ⇒ **不得**标 single_onlyoffice。同时 AC 12.1 的六件前置未交付 ⇒ 也不得标 bidirectional，capability 终态未定（见 slice 的 blocking_preconditions BP-1..BP-4，本 entry 另叠加 BP-6）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L313",
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L522",
+        "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h2_construction_in_progress.py",
+        "backend/wp_templates/H/H2 在建工程.xlsx!明细表H2-2!A9 = '工程项目名称'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH2DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 157,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h2-dual-mode:",
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-h3-investment-property",
+      "wp_code_pattern": "H3I",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `H3-2-cost-rows` 存 JSON 行数组，owner 常量 ITEM_ID 在 useH3DetailCost.ts#L73），载体是 useH3FormData（`api` GET#L324 / PUT#L150）；模板依据 `H/H3 投资性房地产.xlsx!明细表（成本模式）H3-2!A9` = '投资性房地产类别' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4）。本 entry 是双计量模式，contract 必须按 (measurement_model, sheet_code) 两维声明。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue#L322",
+        "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h3_investment_property.py",
+        "backend/wp_templates/H/H3 投资性房地产.xlsx!明细表（成本模式）H3-2!A9 = '投资性房地产类别'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH3DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 114,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h3-dual-mode:",
+      "action": "delete_entry_composable_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-h4-engineering-materials",
+      "wp_code_pattern": "H4E",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `H4-2-rows` 存 JSON 行数组，owner 常量 ROWS_KEY 在 useH4Detail.ts#L111），载体是 useH4FormData（`api` GET#L281 / PUT#L188）；模板依据 `H/H4 工程物资.xlsx!明细表H4-2!A8` = '序号' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4，另叠加 BP-6）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue#L212",
+        "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/h4DetailPrefill.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h4_engineering_materials.py",
+        "backend/wp_templates/H/H4 工程物资.xlsx!明细表H4-2!A8 = '序号'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH4DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 110,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
+            "audit-platform/frontend/src/components/workpaper/h4/impairment/H4TabImpairment.vue",
+            "audit-platform/frontend/src/components/workpaper/h4/impairment/H4TabRecoverable.vue"
+          ],
+          "consumers_note": "🔴 后两个消费方是本 entry 的 parent_duplicate 子入口（wp_code_pattern H4T）。删 composable 必须同时改这两个子 Tab，否则子入口直接编译失败。另有一个 spec 消费方 composables/__tests__/useH4DualMode.spec.ts，删除时一并处理。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h4-dual-mode:",
+      "action": "delete_entry_composable_and_update_host_and_two_child_tabs"
+    },
+    {
+      "entry_id": "xlsx/gt-h5-oil-gas-assets",
+      "wp_code_pattern": "H5O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table 由 useH5Detail.ts#L53 的 ITEM_PREFIX 拼成 `${ITEM_PREFIX}-rows` = H5-2-rows，存 JSON 行数组），载体是各子 Tab 各自实例化的 useH5FormData（`api` GET#L303 / PUT#L128）；模板依据 `H/H5 油气资产.xlsx!明细表H5-2!A9` = '油气资产类别' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4，另叠加 BP-8）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L305",
+        "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts",
+        "audit-platform/frontend/src/components/workpaper/h5/core/H5TabDetail.vue",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h5_oil_gas_assets.py",
+        "backend/wp_templates/H/H5 油气资产.xlsx!明细表H5-2!A9 = '油气资产类别'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH5DualMode.ts",
+          "type": "orphan_standalone_dual_mode_implementation",
+          "lines": 122,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "consumers_note": "🔴 零消费方（全前端 src 实扫）。删它不改变任何运行行为 ⇒ Task 72 的验收判据不能是「文件已删」，必须落在宿主内联的 currentMode/switchMode 上（见 host_inlined_second_implementation）。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h5-dual-mode:",
+      "orphan_formdata_composable_to_delete": {
+        "file": null,
+        "note": "H5 的 useH5FormData **不是**孤儿（34 个消费方，是真载体），不得删除。本 entry 只有 dual-mode 侧是孤儿。"
+      },
+      "action": "delete_orphan_composable_and_replace_host_inline_implementation"
+    },
+    {
+      "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+      "wp_code_pattern": "H6A",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `H6-2-rows` 存 JSON 行数组，owner 常量 ROWS_KEY 在 useH6Detail.ts#L119），写入点是宿主内联的 `http.put`(#L240 与 #L268 两处)，读走父级 render-config 快照(#L320)；模板依据 `H/H6 固定资产清理.xlsx!明细表H6-2!A9` = '项目' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4，另叠加 BP-8）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L167",
+        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L242",
+        "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h6_asset_disposal_clearing.py",
+        "backend/wp_templates/H/H6 固定资产清理.xlsx!明细表H6-2!A9 = '项目'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH6DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 115,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue"
+          ]
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH6FormData.ts",
+          "type": "orphan_formdata_composable",
+          "lines": 427,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "test_only_consumers": [
+            "audit-platform/frontend/src/components/workpaper/__tests__/h6Integration.spec.ts"
+          ],
+          "consumers_note": "🔴 生产零消费，唯一引用者是一个 spec。真正写库的是宿主内联的 http.put。删它要连带处理那个 spec（否则 spec 会挂），且**不能**据此宣称「H6 的载体已迁移」——载体是宿主。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h6-dual-mode:",
+      "action": "delete_entry_composable_and_orphan_formdata_and_update_host"
+    },
+    {
+      "entry_id": "xlsx/gt-h7-biological-assets",
+      "wp_code_pattern": "H7B",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses —— primary managed table `H7-2-cost-rows` 由 Tab 组件 h7/core/H7TabDetailCost.vue 自己以 `api` GET(#L250)/PUT(#L268) 读写（键内联在 #L257，useH7DetailCost.ts 只是 26 行取值 stub），宿主另有一条以 `http` 写入的独立路径(#L597/#L517)；模板依据 `H/H7 生产性生物资产.xlsx!明细表（成本模式）H7-2!A9` = '生产性生物资产类别' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4，另叠加 BP-8）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L372",
+        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L599",
+        "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L250",
+        "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L268",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h7_biological_assets.py",
+        "backend/wp_templates/H/H7 生产性生物资产.xlsx!明细表（成本模式）H7-2!A9 = '生产性生物资产类别'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH7DualMode.ts",
+          "type": "orphan_standalone_dual_mode_implementation",
+          "lines": 98,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "consumers_note": "🔴 零消费方。宿主 #L469/#L506 内联了 currentMode + 切换函数。"
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH7FormData.ts",
+          "type": "orphan_formdata_composable",
+          "lines": 205,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "consumers_note": "🔴 全仓零消费，且用的是 `api.post`(#L141) 而非 put —— 与平台其余 8 条 entry 的写法都不同，说明它从未跟着接口演进走。"
+        }
+      ],
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH7DetailCost.ts",
+          "reason": "26 行取值 stub（getNum / getString），被 H7TabDetailCost.vue 真实消费，不是 dual-mode 也不是持久化载体 ⇒ 不在本清册的删除范围。"
+        }
+      ],
+      "localStorage_prefix": "h7-dual-mode:",
+      "action": "delete_two_orphan_composables_and_replace_host_inline_implementation"
+    },
+    {
+      "entry_id": "xlsx/gt-h8-right-of-use-assets",
+      "wp_code_pattern": "H8R",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `H8-2-rows` 存 JSON 行数组，owner 常量 ROWS_KEY 在 useH8Detail.ts#L148），写入点是宿主内联的 `http.put`(#L627)，读走宿主 fetchResponsesFromServer() 的 render-config 强制刷新(#L533)；模板依据 `H/H8 使用权资产.xlsx!明细表H8-2!A8` = '使用权资产类别' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4，另叠加 BP-5/BP-6/BP-7/BP-8 四条形态缺陷，是全 slice 最多的一条）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L341",
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L535",
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L629",
+        "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h8_right_of_use_assets.py",
+        "backend/wp_templates/H/H8 使用权资产.xlsx!明细表H8-2!A8 = '使用权资产类别'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH8DualMode.ts",
+          "type": "misrouted_standalone_dual_mode_implementation",
+          "lines": 114,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/h8/impairment/H8TabRecoverable.vue"
+          ],
+          "consumers_note": "🔴 唯一消费方是 parent_duplicate 子入口 H8TabRecoverable.vue，**父宿主不用它**（宿主 #L489 内联了自己的 currentMode）。按「删 composable + 改宿主」的常规套路走会完全漏掉这个子 Tab（宿主里根本没有它的 import）⇒ 删除必须以子 Tab 为对象。"
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH8FormData.ts",
+          "type": "orphan_formdata_composable",
+          "lines": 505,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "consumers_note": "🔴 全仓零消费。真正写库的是宿主内联的 http.put(#L627)。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h8-dual-mode:",
+      "action": "delete_misrouted_and_orphan_composables_update_child_tab_and_replace_host_inline_implementation"
+    },
+    {
+      "entry_id": "xlsx/gt-h9-lease-liabilities",
+      "wp_code_pattern": "H9L",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `H9-2-rows` 存 JSON 行数组，owner 常量 ROWS_KEY 在 useH9Detail.ts#L84），写入点是宿主内联的 `http.put`(#L392)，读走宿主 fetchResponsesFromServer() 的 render-config 强制刷新(#L327)；模板依据 `H/H9 租赁负债.xlsx!租赁负债明细表H9-2!A7` = '出租方名称' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4，另叠加 BP-8）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L198",
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L329",
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L394",
+        "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h9_lease_liabilities.py",
+        "backend/wp_templates/H/H9 租赁负债.xlsx!租赁负债明细表H9-2!A7 = '出租方名称'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH9DualMode.ts",
+          "type": "orphan_standalone_dual_mode_implementation",
+          "lines": 114,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "consumers_note": "🔴 零消费方。宿主 #L187 的注释还写着「useH9DualMode composable 后续创建」，而文件早已存在 —— 注释与实况脱节，宿主 #L263/#L287 内联了自己的实现。"
+        },
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH9FormData.ts",
+          "type": "orphan_formdata_composable",
+          "lines": 496,
+          "wraps_shared_base": false,
+          "consumers": [],
+          "consumers_note": "🔴 全仓零消费。真正写库的是宿主内联的 http.put(#L392)。"
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h9-dual-mode:",
+      "action": "delete_two_orphan_composables_and_replace_host_inline_implementation"
+    },
+    {
+      "entry_id": "xlsx/gt-h10-asset-disposal-income",
+      "wp_code_pattern": "H10A",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据实测：业务内容真实存在于 checklist_responses（primary managed table `H10-detail-rows` 存 JSON 行数组，owner 常量 ITEM_ID_ROWS 在 useH10Detail.ts#L45，身份字段是 `id` 而非 rowId），载体是 useH10FormData（`api` GET#L44 / PUT#L92），另有 localStorage 草稿回退(#L105)；模板依据 `H/H10 资产处置损益.xlsx!明细表H10-2!A7` = '项目' ⇒ verdict = exists ⇒ 不得标 single_onlyoffice。AC 12.1 六件前置未交付 ⇒ 也不得标 bidirectional（BP-1..BP-4）。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L150",
+        "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH10Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h10_asset_disposal_income.py",
+        "backend/wp_templates/H/H10 资产处置损益.xlsx!明细表H10-2!A7 = '项目'"
+      ],
+      "legacy_composables_to_delete": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useH10DualMode.ts",
+          "type": "standalone_dual_mode_implementation",
+          "lines": 112,
+          "wraps_shared_base": false,
+          "consumers": [
+            "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue"
+          ]
+        }
+      ],
+      "legacy_composables_preserved": [],
+      "localStorage_prefix": "h10-dual-mode:",
+      "action": "delete_entry_composable_and_update_host"
+    }
+  ],
+  "excluded_from_plan": [
+    {
+      "what": "H1 的 legacy dual-mode composable 与宿主改线",
+      "reason": "H1 是 Task 42 的 pilot，其 legacy 删除归 Task 45 的 workpaper_sync_pilot_deletion_plan.json，任务正文明令本任务排除 H1。"
+    },
+    {
+      "what": "5 条 parent_duplicate 子入口本身的 entry 级删除",
+      "reason": "按 AC 1.6 它们复用父 entry 的 adapter，不是独立 entry ⇒ 不单列删除条目。但其中 3 个（H4 的两个 + H8 的 H8TabRecoverable）**消费父 entry 的 legacy composable**，已登记在对应父 entry 的 legacy_composables_to_delete[].consumers 里，删除时必须一并改。"
+    },
+    {
+      "what": "宿主内联的第二份 dual-mode 实现（H5/H7/H8/H9）",
+      "reason": "它们是这 4 条 entry 当下**唯一真实生效**的模式切换载体 —— 不能在有 bridge adapter 之前删掉（删了界面就没有模式切换了）。本清册把它们的行号登记在 host_inlined_second_implementation，供 Task 72 把验收判据落到正确对象上；替换动作本身依赖 step 9 的 adapter。"
+    },
+    {
+      "what": "useWorkpaperEntryDualMode.ts（共享基类）",
+      "reason": "见 shared_base_preserved。H 循环 9 个 composable 无一 wraps 它。"
+    }
+  ],
+  "properties_verified": [
+    22,
+    23,
+    69,
+    70
+  ],
+  "requirements_covered": [
+    "1.4",
+    "1.6",
+    "6.4",
+    "6.5",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ]
+}

@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g14-credit-impairment-loss" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -133,6 +134,7 @@ import { G14_ACCOUNT_CODE } from './composables/g14Constants'
 import { parseNum } from './composables/useG14FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G14TabProcedure = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabProcedure.vue'))
 const G14TabAdjudication = defineAsyncComponent(() => import('./g14-credit-impairment-loss/G14TabAdjudication.vue'))

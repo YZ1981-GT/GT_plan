@@ -1,0 +1,24 @@
+[
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate",
+    "why": "真值判定与顺序门给出相反结论仍绿 ⇒ 「接线路径放行、顺序门仍红」的不一致可以悄悄发生：manifest 说单向、接线却往下走到注册",
+    "verdict": "RED",
+    "summary": "2 failed, 150 passed in 33.91s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises",
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_attach_is_a_no_op_before_enablement_and_never_raises",
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_predicate_agrees_with_the_ordering_gate"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  }
+]

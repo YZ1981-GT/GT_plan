@@ -1,0 +1,156 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 6
+  },
+  "mutations": [
+    {
+      "id": "M07",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_fold_keeps_origin_immutable_and_never_self_supersedes",
+      "why": "origin 可变：`origin_request_sequence` 本是 immutable 的 application 身份，跟着 fold 一起动之后「这个 application 由哪个 request 发起」不可追。",
+      "verdict": "RED",
+      "summary": "6 failed, 316 passed, 1 warning in 47.94s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_fold_keeps_origin_immutable_and_never_self_supersedes",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection",
+        "test_task30_closure_gate_pg.py::test_the_convergence_race_really_contended",
+        "test_task30_closure_gate_pg.py::test_the_fold_path_actually_executed",
+        "test_task30_closure_gate_pg.py::test_the_race_leaves_no_stranded_chained_or_cyclic_shell",
+        "test_task30_closure_gate_pg.py::test_the_race_yields_one_primary_and_n_minus_one_direct_terminal_duplicates"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_fold_keeps_origin_immutable_and_never_self_supersedes",
+        "test_task30_closure_gate_pg.py::test_no_phase_crashed_during_collection"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.2
+    },
+    {
+      "id": "M08",
+      "path": "backend/app/services/workpaper_sync/models.py",
+      "want": "test_task30_closure_gate_pg.py::test_application_key_is_the_frozen_identity_digest",
+      "why": "application key 丢掉 incoming digest ⇒ 两次内容不同的 durable incoming 撞同一 key，第二次被当成重放丢弃。判据侧的期望 key 由测试自己 sha256 重算，故不会随生产函数一起变（否则这条变异会自证成 GREEN）。",
+      "verdict": "RED",
+      "summary": "1 failed, 321 passed, 1 warning in 47.74s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_application_key_is_the_frozen_identity_digest"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_application_key_is_the_frozen_identity_digest"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6f9111a619da00ab005ef5782526e3c0210d49ba12c6601b9dd9041d038e5dff",
+      "seconds": 51.1
+    },
+    {
+      "id": "M09",
+      "path": "backend/app/services/workpaper_sync/models.py",
+      "want": "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[payload_differs]",
+      "why": "fingerprint 丢掉 client edit epoch ⇒ 同 Idempotency-Key 但 payload 不同的请求变成cache hit，用户第二次编辑被静默当成第一次的重放。",
+      "verdict": "RED",
+      "summary": "1 failed, 321 passed, 1 warning in 47.74s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[payload_differs]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[payload_differs]"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6f9111a619da00ab005ef5782526e3c0210d49ba12c6601b9dd9041d038e5dff",
+      "seconds": 51.0
+    },
+    {
+      "id": "M10",
+      "path": "backend/app/services/workpaper_sync/models.py",
+      "want": "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[contributors_differ]",
+      "why": "fingerprint 丢掉 contributor 快照 ⇒ 换了协作者集合仍算等值重放，聚合内容作者归属错。",
+      "verdict": "RED",
+      "summary": "1 failed, 321 passed, 1 warning in 47.62s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[contributors_differ]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[contributors_differ]"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "6f9111a619da00ab005ef5782526e3c0210d49ba12c6601b9dd9041d038e5dff",
+      "seconds": 51.0
+    },
+    {
+      "id": "M11",
+      "path": "backend/app/services/workpaper_sync/repository.py",
+      "want": "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[cross_participant]",
+      "why": "跨 participant 冲突时把旧 request id 写进错误文案 ⇒ 别人的 operation 标识泄露给第二个 participant，AC 4.1「不得返回旧标识」被违反。",
+      "verdict": "RED",
+      "summary": "1 failed, 321 passed, 1 warning in 47.66s",
+      "added": [
+        "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[cross_participant]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate_pg.py::test_reusing_one_idempotency_key_conflicts_without_leaking_prior_ids[cross_participant]"
+      ],
+      "added_files": [
+        "test_task30_closure_gate_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "bb0200a36ccea2019667414520c74853332956e54bf57403ba5b0ce765f6a444",
+      "seconds": 51.0
+    },
+    {
+      "id": "M12",
+      "path": "backend/app/services/workpaper_sync/callback_delivery.py",
+      "want": "test_task30_closure_gate.py::test_delivery_ownership_is_decided_by_durable_at_not_by_terminal_state",
+      "why": "把 delivery gate 改回按 terminal state 判 owner：`durable_at` 未置但 state 已是 `durable` 的那一行（pre-durable 失败）会被当成合法 owner ⇒ 文件还没耐久就宣布内容已归属某个 application。",
+      "verdict": "RED",
+      "summary": "2 failed, 320 passed, 1 warning in 48.30s",
+      "added": [
+        "test_task22_callback_claim.py::test_every_truth_table_row_is_individually_reachable",
+        "test_task30_closure_gate.py::test_delivery_ownership_is_decided_by_durable_at_not_by_terminal_state"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_delivery_ownership_is_decided_by_durable_at_not_by_terminal_state"
+      ],
+      "added_files": [
+        "test_task22_callback_claim.py",
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5e8e8c71c09fcd45bee1591320c6391bb76a968e1009da74c8a4cc1da31022b0",
+      "seconds": 51.7
+    }
+  ]
+}

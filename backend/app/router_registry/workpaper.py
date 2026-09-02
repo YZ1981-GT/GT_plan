@@ -325,6 +325,8 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_render_registry import router as wp_render_registry
     from app.routers.wp_onlyoffice_router import router as wp_onlyoffice
     from app.routers.wp_onlyoffice_router import public_router as wp_onlyoffice_public
+    from app.routers.wp_sync_router import router as wp_sync
+    from app.routers.wp_sync_router import public_router as wp_sync_public
     from app.routers.cutoff_sampling import router as cutoff_sampling
     from app.routers.voucher_sampling import router as voucher_sampling
     from app.routers.formula_scope_query import router as formula_scope_query
@@ -376,3 +378,18 @@ def register_workpaper_routers(app: FastAPI) -> None:
     # Bearer。若经 dedicated_wp_gate 的 get_current_user 会恒 401 → 文档下载/保存失败（-4）。
     # 虽含 {wp_id} 路由（router_has_wp_id_route=True），也必须无 gate 注册。端点自身 JWT 校验完整。
     app.include_router(wp_onlyoffice_public, tags=["渲染"])
+
+    # 🔴 spec workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 28
+    #
+    # 显式 scope sync router 同样**必须**脱离上面的自动加 gate 循环，理由与
+    # `wp_onlyoffice_public` 不同、更硬：
+    #
+    # AC 10.6 规定的 guard 顺序是「认证 → 显式 route scope → **只查 scope index** →
+    # visibility → action」。`dedicated_wp_gate` 是 router-level 依赖，会在 handler
+    # **之前**跑完 visibility —— 那就把 scope index 与 visibility 的先后调换了，
+    # 而这条顺序是不可交换的（`SyncEndpointGuard` 的阶段链与它的 AST/时序判据都锁着它）。
+    # 本 router 内部通过 `WpGateVisibilityProbe` 调用**同一个** `enforce_wp_gate`，
+    # 因此可见性判据一份不少，只是被放在协议要求的位置上。
+    app.include_router(wp_sync, tags=["渲染"])
+    # DocServer 回调：不发用户 Bearer，自带 room/generation/doc_key 服务凭证。
+    app.include_router(wp_sync_public, tags=["渲染"])

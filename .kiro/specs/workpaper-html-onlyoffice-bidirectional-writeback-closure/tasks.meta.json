@@ -1,0 +1,2270 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "3. 生成 writer/resolver/version domain 迁移清册": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581778992
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581821692
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787586355863
+      }
+    ],
+    "4. 固化 callback/Command Service 生命周期、JWT、下载安全与真实多人语义真值表": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779076
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581822468
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787586357345
+      }
+    ],
+    "5. 真实 OnlyOffice 9.4 Excel identity instrumentation 黑盒 probe": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779126
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787586378190
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787592711859
+      }
+    ],
+    "6. 真实 OnlyOffice 9.4 Word tagged SDT 载体黑盒 probe": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779176
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787592723767
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241034
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617252430
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787619434091
+      }
+    ],
+    "7. 验证 Windows staged artifact、DB rollback 与 orphan GC 边界": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779212
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787586379491
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787592661554
+      }
+    ],
+    "8. 建三件套覆盖矩阵、变异骨架与 migration 只读基线": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779247
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787586380713
+      },
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787592662920
+      }
+    ],
+    "9. 新增 content/representation/application/definition bundle、candidate、room/request/recovery、scope index 与 evidence 迁移": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779295
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477099
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612504394
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241093
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617253775
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787619435660
+      }
+    ],
+    "10. 建 ORM、repository、允许状态边与数据库并发/不可变约束": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779332
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477155
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241154
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787619474298
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787626721511
+      }
+    ],
+    "11. 建 CanonicalArtifactRepository、安全校验、candidate 隔离、RetentionPolicy 与 orphan reconciliation": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779370
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477202
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241210
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787626727173
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787632968880
+      }
+    ],
+    "12. 统一 canonical resolver、immutable definition/bundle store 与 writer/resolver 迁移矩阵": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779408
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477265
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241268
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787632981087
+      },
+      {
+        "executionId": "c0eb831f-78f7-4280-8753-8f1d12a40407",
+        "chatSessionId": "sess_ed1b9460-81c2-4fa5-b71c-7c9bf5780094",
+        "timestamp": 1787645131635
+      }
+    ],
+    "13. 建通用 adapter protocol、canonical contract/bundle schema 与 fail-closed registry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779456
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477303
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241335
+      },
+      {
+        "executionId": "c0eb831f-78f7-4280-8753-8f1d12a40407",
+        "chatSessionId": "sess_ed1b9460-81c2-4fa5-b71c-7c9bf5780094",
+        "timestamp": 1787645644044
+      },
+      {
+        "executionId": "c0eb831f-78f7-4280-8753-8f1d12a40407",
+        "chatSessionId": "sess_ed1b9460-81c2-4fa5-b71c-7c9bf5780094",
+        "timestamp": 1787649636570
+      }
+    ],
+    "14. 建 stable-field 三方 merge 与冲突 domain": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779502
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477349
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241385
+      },
+      {
+        "executionId": "c0eb831f-78f7-4280-8753-8f1d12a40407",
+        "chatSessionId": "sess_ed1b9460-81c2-4fa5-b71c-7c9bf5780094",
+        "timestamp": 1787649647316
+      },
+      {
+        "executionId": "a042f68d-5281-400c-8e30-eca420a470aa",
+        "chatSessionId": "sess_ed1b9460-81c2-4fa5-b71c-7c9bf5780094",
+        "timestamp": 1787656748030
+      }
+    ],
+    "15. 建唯一 `ContentMutationService.commit(...)` 与独立 `RepresentationService`": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779553
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477398
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241439
+      },
+      {
+        "executionId": "a042f68d-5281-400c-8e30-eca420a470aa",
+        "chatSessionId": "sess_ed1b9460-81c2-4fa5-b71c-7c9bf5780094",
+        "timestamp": 1787656754458
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506158
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661534452
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787666123353
+      }
+    ],
+    "16. 复用 durable outbox 并把 after-save 改成可重放副作用": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779603
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477450
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241489
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506219
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787666167599
+      },
+      {
+        "executionId": "ed41e9f6-836b-4b0a-b171-14ccf1b844b2",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787675495794
+      }
+    ],
+    "17. 建 Excel instrumentation definition 与 non-current upgrade candidate 生成器": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779641
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477505
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241542
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506278
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787666172578
+      },
+      {
+        "executionId": "ed41e9f6-836b-4b0a-b171-14ccf1b844b2",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787675496963
+      }
+    ],
+    "18. 迁移普通 HTML save 与 orchestrator 到统一 revision": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779678
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477554
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241599
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506336
+      },
+      {
+        "executionId": "ed41e9f6-836b-4b0a-b171-14ccf1b844b2",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787675525650
+      },
+      {
+        "executionId": "6ab48e52-f549-4b22-a335-449c46809231",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787706109974
+      }
+    ],
+    "19. 迁移上传、WOPI、custom、F2、rollback 与历史恢复 writer": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779712
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477599
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241655
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506381
+      },
+      {
+        "executionId": "6ab48e52-f549-4b22-a335-449c46809231",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787706430802
+      },
+      {
+        "executionId": "ed17be0a-9cca-4b57-b188-a5bdbf5b4131",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787709539232
+      },
+      {
+        "executionId": "ac49af01-1646-429f-99df-79af4c091748",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787720184454
+      }
+    ],
+    "20. 关闭 writer/version domain gate": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779759
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477639
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241704
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506435
+      },
+      {
+        "executionId": "ac49af01-1646-429f-99df-79af4c091748",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787720200136
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787822023993
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009418754
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009450314
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788010050105
+      }
+    ],
+    "21. 建 shared room、participant lease、frozen bundle 双基线与 generation write fence": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779820
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477700
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241755
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506502
+      },
+      {
+        "executionId": "ac49af01-1646-429f-99df-79af4c091748",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787728249762
+      },
+      {
+        "executionId": "ac49af01-1646-429f-99df-79af4c091748",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787738608867
+      }
+    ],
+    "22. 建 room callback claim、流式下载、delivery 去重、request-first correlation 与 recovery case": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779863
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477747
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241798
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506552
+      },
+      {
+        "executionId": "ac49af01-1646-429f-99df-79af4c091748",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787738619839
+      },
+      {
+        "executionId": "5e71499f-a127-4394-89d7-66de3c3f81e7",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787749118323
+      }
+    ],
+    "23. 建 frozen forcesave/close/recovery request、content application 去重与 sequence 收敛": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779913
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477785
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241854
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506599
+      },
+      {
+        "executionId": "5e71499f-a127-4394-89d7-66de3c3f81e7",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787749135917
+      },
+      {
+        "executionId": "5e71499f-a127-4394-89d7-66de3c3f81e7",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787755039128
+      }
+    ],
+    "24. 建 OnlyOffice Command Service forcesave 与 close-intent exactly-one client": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779948
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477832
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241930
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506649
+      },
+      {
+        "executionId": "5e71499f-a127-4394-89d7-66de3c3f81e7",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787755056978
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787802511254
+      }
+    ],
+    "25. 建 HTML→OO coordinator 与唯一 launch descriptor": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581779987
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477896
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617241975
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506706
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787802555704
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787812287736
+      }
+    ],
+    "26. 建 OO→HTML coordinator、最终授权 fence 与 canonical rematerialization": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780032
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612477966
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242021
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506766
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787802556860
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787834397177
+      }
+    ],
+    "27. 建冲突预览 API、revision+incoming-sequence resolve fence、recovery-aware retry 与 rollback": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780070
+      }
+    ],
+    "28. 建完整显式 scope sync router、兼容委派与 authorization-before-resource/cache 端点门": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780113
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478049
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242122
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506867
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787864729562
+      },
+      {
+        "executionId": "b6efb1cb-a4e4-4c92-89c2-bcd4c1edab6b",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787869662845
+      },
+      {
+        "executionId": "b6efb1cb-a4e4-4c92-89c2-bcd4c1edab6b",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787878355709
+      }
+    ],
+    "29. 建 append-only timeline、source-profile-derived test-run/scenario evidence、脱敏与告警": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780148
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478089
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242171
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506919
+      },
+      {
+        "executionId": "b6efb1cb-a4e4-4c92-89c2-bcd4c1edab6b",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787878379386
+      }
+    ],
+    "30. 关闭 durable protocol、application/scope、close exactly-one 与 recovery 生命周期 gate": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780188
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478151
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242223
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506984
+      }
+    ],
+    "31. 建前端 DTO/API、generated manifest、recovery client 与 `EditorLaunchDescriptor`": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780225
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478188
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242284
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507031
+      }
+    ],
+    "32. 建统一 `useWorkpaperSyncBridge` 与 recovery 状态机": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780264
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478235
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242340
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507086
+      }
+    ],
+    "33. 升级 Excel/Word editor 为 descriptor consumer 与可 await/recovery-aware bridge": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780300
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478278
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242387
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507145
+      }
+    ],
+    "34. 建状态条、冲突对话框、recovery panel 与详情 timeline": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780341
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478334
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242437
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507194
+      }
+    ],
+    "35. 接通 commit 后 content event 与前端刷新": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780377
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478370
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242485
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507244
+      }
+    ],
+    "36. 建 Excel per-entry contract/bundle loader 与 candidate finalize gate": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780421
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478415
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242537
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507299
+      }
+    ],
+    "37. 建 Excel identity-aware extractor 与 shared roundtrip/unmanaged verifier": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780455
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478456
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242583
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507352
+      }
+    ],
+    "38. 建 Excel identity-aware materializer/rematerializer": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780495
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478498
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242635
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507403
+      }
+    ],
+    "39. 建 pilot harness、source-profile-derived sync test-run/逐 scenario evidence 与 freshness guard": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780719
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478547
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242688
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507456
+      }
+    ],
+    "40. 简单 checklist Excel pilot": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780855
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478603
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242735
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507504
+      }
+    ],
+    "41. D2 大 JSON 子表 Excel pilot": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780918
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478640
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242790
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507552
+      }
+    ],
+    "42. H1 分组/动态结构 Excel pilot": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581780974
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478681
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242837
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507601
+      }
+    ],
+    "43. G7 两级动态表 Excel pilot": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781011
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478720
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242887
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507685
+      }
+    ],
+    "44. 真实 OnlyOffice 9.4 Excel pilot gate": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781050
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478767
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242937
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507737
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419011
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788010076402
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788010879910
+      }
+    ],
+    "45. 删除四个 pilot 宿主 legacy，执行 post-delete 全场景重验并冻结迁移范式": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781087
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478805
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243019
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507787
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419118
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788010890244
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788011890487
+      }
+    ],
+    "46. 逐一迁移 D 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781129
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478848
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243083
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507834
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419209
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788011937946
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788012452488
+      }
+    ],
+    "47. 逐一迁移 E 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781172
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478903
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243133
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507883
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419285
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788012464496
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505310
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012632194
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788015729940
+      }
+    ],
+    "48. 逐一迁移 F 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781211
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478973
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243183
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507936
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419354
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505369
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788015740564
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788046498977
+      }
+    ],
+    "49. 逐一迁移 G 循环除 G7 外 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781249
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479021
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243238
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661507988
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419412
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505429
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788046503099
+      }
+    ],
+    "50. 逐一迁移 H 循环除 H1 外 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781290
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479071
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243287
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508037
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419459
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505486
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788046516371
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788057057038
+      }
+    ],
+    "51. 逐一迁移 I 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781332
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479113
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243335
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508096
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419509
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505547
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788057064013
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788066916741
+      }
+    ],
+    "52. 逐一迁移 J 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781371
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479153
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243391
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508150
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419571
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505603
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788066924575
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788078358438
+      }
+    ],
+    "53. 逐一迁移 K 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781416
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479197
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243458
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508201
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419623
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505654
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788078363964
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788084546814
+      }
+    ],
+    "54. 逐一迁移 L 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781453
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479240
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243508
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508252
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419674
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505708
+      },
+      {
+        "executionId": "0681d2ee-f24d-4190-a2ae-d06f9549a529",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788084639366
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788094907627
+      }
+    ],
+    "55. 逐一迁移 M 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781497
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479282
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243555
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508303
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419728
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505759
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788094928712
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788102861085
+      }
+    ],
+    "56. 逐一迁移 N 循环 Excel 独立 entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781540
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479333
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243605
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508386
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419792
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505809
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788102866424
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788108792549
+      }
+    ],
+    "57. 逐一迁移 A/B/C/S 与跨循环共享 Excel entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781577
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479371
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243656
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508438
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419845
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505856
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788108800917
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788117033279
+      }
+    ],
+    "58. 统一 Word canonical resolver 与完整模板裁决清册": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781653
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479413
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243707
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508487
+      }
+    ],
+    "59. 建 Word definition/instrumentation candidate upgrader 与 tagged-SDT engine": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781730
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479455
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243755
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508535
+      }
+    ],
+    "60. 把 F2-22/F2-23 迁成统一 Word adapter并 finalize published representation": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781769
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479499
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243806
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508585
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419893
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505921
+      },
+      {
+        "executionId": "52bd4e81-78f6-4bab-a002-a825d9451abd",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788117176170
+      },
+      {
+        "executionId": "e07ed39e-cfc7-4c05-bbb0-53e979ce0dda",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788133619516
+      },
+      {
+        "executionId": "e07ed39e-cfc7-4c05-bbb0-53e979ce0dda",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788135918856
+      },
+      {
+        "executionId": "e07ed39e-cfc7-4c05-bbb0-53e979ce0dda",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788137619063
+      }
+    ],
+    "61. 真实 OnlyOffice 9.4 F2 Word gate": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781826
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479547
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243853
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508639
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009419971
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012505974
+      },
+      {
+        "executionId": "76d15bcb-e386-4db5-a3d5-2586550b8243",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788188959677
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788204964120
+      }
+    ],
+    "62. 逐一迁移 18 个 generic DOCX entry": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781870
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479585
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243904
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508689
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420023
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506028
+      }
+    ],
+    "63. 逐一处理 9 个 B 子码错型与 `S33-REV`": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581781915
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479633
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617243955
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508738
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420076
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506087
+      }
+    ],
+    "64. 迁移 A16/A17 专用 Word 链与全部 Word editor 宿主": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782264
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479680
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244008
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508788
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420131
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506162
+      }
+    ],
+    "65. 收敛 custom/user-upload xlsx 单一权威 bundle 协议": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782305
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479759
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244056
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508836
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420182
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506213
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788197038363
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788200208574
+      }
+    ],
+    "66. 建 legacy 删前清册、逐 entry replacement map 与 rollback 隔离门（只生成计划，不改源码）": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782345
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479805
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244122
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508889
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420226
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506259
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788207749726
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788215875346
+      }
+    ],
+    "67. structural pre-reconcile manifest/registry/definition/bundle/candidate/deletion-plan": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782392
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479847
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244191
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508937
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420279
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506309
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788215883580
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788225836270
+      }
+    ],
+    "68. 后端全链、bundle/candidate/recovery 与辐射面独立回归": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782434
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479889
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244250
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661508991
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420327
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506357
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788225853538
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788243310167
+      }
+    ],
+    "69. 前端状态机、recovery、descriptor、宿主与 DOM 独立回归": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782491
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479931
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244300
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661509057
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420381
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506412
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788243330709
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788253470118
+      }
+    ],
+    "70. 在 Task 67 structural report 后按 source profile 运行真实 OO 9.4 全 entry required scenarios并刷新 evidence": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782530
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612479969
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244358
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661509112
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420433
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506461
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788253508183
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788261261968
+      }
+    ],
+    "71. 变异、容量、故障恢复、retention/脱敏/告警与数据复原验收": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782569
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612480014
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244406
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661509168
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420488
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506506
+      },
+      {
+        "executionId": "910bce09-6578-45cf-a232-c79ed465ab1f",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788261275124
+      }
+    ],
+    "72. 执行真正 pre-delete eligibility、删除全局 legacy、post-delete 全场景重验与归档": [
+      {
+        "executionId": "48652edc-2c34-49d8-91b8-7916497780b5",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787581782622
+      },
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612480053
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617244459
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661509217
+      },
+      {
+        "executionId": "4c3bc545-4aaa-4f40-9c8f-c0ffc5f64fe7",
+        "chatSessionId": "sess_f707fce8-be88-41cb-b2cf-985653a43db0",
+        "timestamp": 1788009420541
+      },
+      {
+        "executionId": "b5d4baf4-6c4e-47cb-96db-50f68f3cf07e",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788012506557
+      },
+      {
+        "executionId": "c7c18c96-19e5-461d-a6c1-232d5d3d8c75",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788279842744
+      }
+    ],
+    "27. 建冲突预览 API、canonical-application/effective-sequence resolve fence、recovery-aware retry 与 opaque-version rollback": [
+      {
+        "executionId": "2e89fecb-a3cc-431e-98c2-8c32341a6735",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787612478005
+      },
+      {
+        "executionId": "2bdf16dd-cc68-43b6-b6de-75076e2a5ddf",
+        "chatSessionId": "sess_52f5acca-f2b5-4c2d-a930-1e5a5cf023a6",
+        "timestamp": 1787617242069
+      },
+      {
+        "executionId": "fced0748-fca5-48a3-ac63-449ce2b9bb33",
+        "chatSessionId": "sess_cdf8a164-7f20-44c0-ade0-987971a6deaa",
+        "timestamp": 1787661506814
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787834409521
+      },
+      {
+        "executionId": "ed5a95cc-de3a-453e-a9bb-4cafde49cf83",
+        "chatSessionId": "sess_32739100-acb6-4d1e-825e-d6586007a8b7",
+        "timestamp": 1787864710123
+      }
+    ],
+    "75. 建 published-representation → frozen entry definitions 公共观测器并按 manifest 真实注册 adapter": [
+      {
+        "executionId": "e07ed39e-cfc7-4c05-bbb0-53e979ce0dda",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788139366857
+      },
+      {
+        "executionId": "9d3a4462-2d24-4977-8e94-b318463f6dd1",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788171286620
+      }
+    ],
+    "76. 建生产侧 `projection_contract` definition 链 provisioner 与 candidate bundle 受控 attach 入口": [
+      {
+        "executionId": "9d3a4462-2d24-4977-8e94-b318463f6dd1",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788171299521
+      },
+      {
+        "executionId": "76d15bcb-e386-4db5-a3d5-2586550b8243",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788188931366
+      }
+    ],
+    "77. 建 Word per-entry entry gate 与 candidate finalize gate": [
+      {
+        "executionId": "76d15bcb-e386-4db5-a3d5-2586550b8243",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788188937487
+      }
+    ],
+    "74. 清零 writer/version domain 的 236 未裁决与 261 绕过统一 commit": [
+      {
+        "executionId": "c7c18c96-19e5-461d-a6c1-232d5d3d8c75",
+        "chatSessionId": "sess_c4474481-e2f7-4b06-b909-9f9189c05b0c",
+        "timestamp": 1788303087785
+      }
+    ]
+  }
+}

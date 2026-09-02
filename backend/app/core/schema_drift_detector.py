@@ -98,13 +98,39 @@ class SchemaDriftDetector:
         "checklist_responses",
         # custom_account_packages: 裸 SQL 迁移建表
         "custom_account_packages",
+        # ── V149 MCP scoped token（dsh-agent-panel-integration Task 25）────────────
+        # 🔴 这两张表当前是**未接通的结构**，不是历史残留：
+        #    V149 注释写「持久化，跨进程可见」，而实现 `services/ai_chat/mcp_token.py`
+        #    的撤销集与 `mcp_budget.py` 的配额都是**进程内 dict**（docstring 自述
+        #    「撤销通过 revocation set（内存，进程级）」）。全后端对这两张表零读写。
+        #    → 屏蔽 drift 噪音，但接通持久化（或回滚 V149）仍是待办；届时应删本条并
+        #      补 ORM 模型，而不是让它长期停留在 allowlist 里。
+        "ai_chat_mcp_call_log",
+        "ai_chat_mcp_token_revocations",
     })
 
-    # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用）
+    # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用 / 有意只走裸 SQL）
     KNOWN_COLUMN_ALLOWLIST: frozenset[tuple[str, str]] = frozenset({
         ("cell_annotations", "sheet_name"),       # 旧版列，已被 sheet_id 取代
         ("adjustments", "status"),                # 旧 status 列，业务改用 review_status
         ("projects", "template_version_id"),      # 旧关联列，不再 ORM 映射
+        # ── V151 workpaper-sync business content revision（有意不做 ORM 映射）──────
+        # 🔴 `content_revision` 的推进必须走 CAS
+        #    （`UPDATE working_paper SET content_revision = content_revision + 1
+        #      WHERE id = :wp AND content_revision = :expected RETURNING content_revision`，
+        #    见 services/workpaper_sync/repository.bump_content_revision），
+        #    并且只允许经 `RevisionLockedRepository` 门面调用 —— 纯表示升级路径上
+        #    `bump_content_revision` / `set_current_content_version` 在构造上不可达
+        #    （变异检验 M21/M23 依赖这条）。一旦把两列映射进 `WorkingPaper` ORM，
+        #    任何 `wp.content_revision = x` 都能绕过 CAS 与门面，Requirement 2.1 /
+        #    Property 4「纯定义升级不推进 business revision」就失去可执行判据。
+        #    → 因此这两列**有意**只走裸 SQL，不是漏映射。
+        ("working_paper", "content_revision"),
+        ("working_paper", "current_content_version_id"),
+        # ── V149 ai_chat_runs 的 MCP 计量列（与上面两张 MCP 表同因，未接通）────────
+        ("ai_chat_runs", "mcp_token_issued"),
+        ("ai_chat_runs", "mcp_calls_used"),
+        ("ai_chat_runs", "mcp_total_bytes"),
     })
 
     # ORM 定义但 DB 可能不存在的列（graceful 降级场景，如 pgvector 扩展未安装）

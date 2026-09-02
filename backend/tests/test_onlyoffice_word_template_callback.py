@@ -1,11 +1,28 @@
 """OnlyOffice 回调持久化测试 — word-template (docx) 场景
 
 验证 task 9.1：
-- callback status=2/6 时下载文档内容到 storage/{project_id}/workpapers/{wp_code}.docx
+- callback status=2/6 时下载文档内容到 **canonical 运行态路径**
+  `{STORAGE_ROOT}/projects/{project_id}/workpapers/onlyoffice/{wp_code}.docx`
 - 更新 workpaper.updated_at 时间戳
 - 错误时返回 {"error": 1} 触发 DocServer 重试
 
 Validates: Requirements 6.2
+
+🔴 落盘路径已按 Task 58 / Requirement 9.3 归位（spec
+`workpaper-html-onlyoffice-bidirectional-writeback-closure`）。
+
+原本 docx 分支断言的是 `storage/{project_id}/workpapers/{wp_code}.docx` —— 缺
+`projects/` 与 `onlyoffice/` 两段、且**相对 CWD**，与同文件里 xlsx 分支断言的
+`tmp_path/projects/{pid}/workpapers/onlyoffice/{code}.xlsx`（= config/download 真正
+读取的位置）不是同一条路径。2026-08-29 磁盘实测这条分叉的后果：孤儿根下共 159 份
+docx 落在读侧永不查看的位置，而 canonical 目录下只有 16 份。
+
+现在读写两侧统一走 `workpaper_sync.canonical_paths.onlyoffice_canonical_*`，故 docx
+与 xlsx 两个分支的期望路径**形态一致**。
+
+⚠️ 本文件当前另有一处**与本次改动无关的既存红**：它只 `include_router(router)`，
+而 callback 端点自 HEAD 起就注册在 `public_router` 上（`@public_router.post(...)`），
+因此全部用例在到达路径断言之前就拿到 404。修 404 属路由装配问题，不在 Task 58 范围。
 """
 
 from __future__ import annotations
@@ -25,7 +42,8 @@ from app.routers.wp_onlyoffice_router import router
 
 @pytest.mark.asyncio
 async def test_word_template_callback_saves_docx(tmp_path, monkeypatch):
-    """word-template 底稿 status=2 回调：保存到 storage/{project_id}/workpapers/{wp_code}.docx"""
+    """word-template 底稿 status=2 回调：保存到 canonical 运行态路径
+    `{STORAGE_ROOT}/projects/{pid}/workpapers/onlyoffice/{wp_code}.docx`"""
     monkeypatch.setattr(app_settings, "STORAGE_ROOT", str(tmp_path))
     monkeypatch.setattr(app_settings, "ONLYOFFICE_URL", "http://onlyoffice:8080")
     monkeypatch.setattr(app_settings, "ONLYOFFICE_JWT_SECRET", "")
@@ -90,7 +108,10 @@ async def test_word_template_callback_saves_docx(tmp_path, monkeypatch):
         assert resp.json() == {"error": 0}
 
     # 验证文件保存到正确路径
-    expected_path = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
+    expected_path = (
+        tmp_path / "projects" / str(project_id) / "workpapers" / "onlyoffice"
+        / f"{wp_code}.docx"
+    )
     assert expected_path.exists()
     assert expected_path.read_bytes() == new_content
 
@@ -165,7 +186,10 @@ async def test_word_template_callback_status_6_force_save(tmp_path, monkeypatch)
         assert resp.json() == {"error": 0}
 
     # 验证文件保存到 docx 路径
-    expected_path = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
+    expected_path = (
+        tmp_path / "projects" / str(project_id) / "workpapers" / "onlyoffice"
+        / f"{wp_code}.docx"
+    )
     assert expected_path.exists()
     assert expected_path.read_bytes() == new_content
 
@@ -331,7 +355,8 @@ async def test_property_13_callback_persistence(status, wp_code):
 
     Property 13: OnlyOffice 回调持久化
     For any valid OnlyOffice save callback (status=2 or status=6), the system SHALL:
-    - persist the document content to storage/{project_id}/workpapers/{wp_code}.docx
+    - persist the document content to the canonical runtime path
+      {STORAGE_ROOT}/projects/{project_id}/workpapers/onlyoffice/{wp_code}.docx
     - update the workpaper's last_modified timestamp to a value ≥ the callback reception time
     """
     import tempfile
@@ -412,7 +437,10 @@ async def test_property_13_callback_persistence(status, wp_code):
                 assert resp.json() == {"error": 0}
 
             # Property assertion 1: snapshot file exists at expected path
-            expected_path = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
+            expected_path = (
+                tmp_path / "projects" / str(project_id) / "workpapers" / "onlyoffice"
+                / f"{wp_code}.docx"
+            )
             assert expected_path.exists(), (
                 f"Snapshot file should exist at {expected_path} after callback status={status}"
             )

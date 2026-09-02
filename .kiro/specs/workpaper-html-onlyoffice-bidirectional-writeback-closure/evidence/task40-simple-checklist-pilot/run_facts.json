@@ -1,0 +1,817 @@
+{
+  "schema": "tmp_task40_pilot_3f9c0a0ea364",
+  "apply_errors": [],
+  "harness_errors": {},
+  "phases": {
+    "publish": {
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "adapter_id": "b60.hour_budget",
+      "authority_model": "projection_contract",
+      "authority_model_definition_id": "3e7f5b26-24b4-4476-b5b8-42677179baed",
+      "authority_model_definition_sha256": "de0a8376ff8c89cceb8b9e9fead6cb849a692cd9c9359bc44a558222721b460c",
+      "template_definition_id": "b8156c76-0505-49d6-b93b-ed74cb9a1049",
+      "template_definition_sha256": "3dc00385534a85211da311ce68579ddcd77f8a3ef55f3c312d96b8ec3cbdfb1f",
+      "instrumentation_definition_id": "bda45df1-37f1-482b-946a-5062673b4a23",
+      "instrumentation_definition_sha256": "8a1319384f807f35a868cb66647bf8c0d88f678684992e2017ead6669642df21",
+      "contract_definition_id": "486d6d6b-f1b8-4612-9b13-a31de208887c",
+      "contract_definition_sha256": "527e6e38ba3aaf6763867fd0b442821615940e3c5c7ab5fa2130bc000635cd0b",
+      "definition_bundle_id": "fb705703-f5d1-495d-9e94-4014c20004e1",
+      "definition_bundle_sha256": "98289fd059c8ccb76fe8e92bd85448597611ddd71972541091b69ab7fcf24eda"
+    },
+    "publish_order": {
+      "rejected": true,
+      "message": "发布 DAG 违规：contract 的前置阶段 ['template', 'instrumentation'] 尚未 approved（固定顺序 template → instrumentation → contract → bundle → representation）"
+    },
+    "bundle_row": {
+      "state": "approved",
+      "canonical_payload_sha256": "98289fd059c8ccb76fe8e92bd85448597611ddd71972541091b69ab7fcf24eda",
+      "authority_model_definition_sha256": "de0a8376ff8c89cceb8b9e9fead6cb849a692cd9c9359bc44a558222721b460c",
+      "slots": {
+        "template": [
+          "definition",
+          "3dc00385534a85211da311ce68579ddcd77f8a3ef55f3c312d96b8ec3cbdfb1f"
+        ],
+        "instrumentation": [
+          "definition",
+          "8a1319384f807f35a868cb66647bf8c0d88f678684992e2017ead6669642df21"
+        ],
+        "contract": [
+          "definition",
+          "527e6e38ba3aaf6763867fd0b442821615940e3c5c7ab5fa2130bc000635cd0b"
+        ]
+      },
+      "children": [
+        {
+          "kind": "authority_model",
+          "state": "approved",
+          "sha256": "de0a8376ff8c89cceb8b9e9fead6cb849a692cd9c9359bc44a558222721b460c",
+          "logical_id": "b60.hour_budget.authority-model"
+        },
+        {
+          "kind": "template",
+          "state": "approved",
+          "sha256": "3dc00385534a85211da311ce68579ddcd77f8a3ef55f3c312d96b8ec3cbdfb1f",
+          "logical_id": "b60.hour_budget.template"
+        },
+        {
+          "kind": "instrumentation",
+          "state": "approved",
+          "sha256": "8a1319384f807f35a868cb66647bf8c0d88f678684992e2017ead6669642df21",
+          "logical_id": "b60.hour_budget.instrumentation"
+        },
+        {
+          "kind": "contract",
+          "state": "approved",
+          "sha256": "527e6e38ba3aaf6763867fd0b442821615940e3c5c7ab5fa2130bc000635cd0b",
+          "logical_id": "b60.hour_budget"
+        }
+      ]
+    },
+    "plan": {
+      "scenario_count": 24,
+      "scenario_ids": [
+        "html_to_oo",
+        "oo_to_html",
+        "identity_retention",
+        "different_field_merge",
+        "same_field_conflict_resolve",
+        "frozen_base_status_6_2_dedupe",
+        "same_application_higher_sequence_fold",
+        "cross_participant_idempotency_409",
+        "quarantined_rejects_application_and_engine",
+        "opaque_version_rollback_no_numeric_collision",
+        "browser_crash_no_userdata_recovery_case",
+        "authorization_first_recovery_claim",
+        "wrong_prior_confirmation_bundle_fence_contributor_rejected",
+        "download_only_zero_three_entities",
+        "refresh_required_reopen",
+        "rollback",
+        "single_participant_close",
+        "two_user_close_order_a_then_b",
+        "two_user_close_order_b_then_a",
+        "b_close_before_a_forcesave_terminal",
+        "b_close_after_a_forcesave_terminal",
+        "close_leader_revoked_successor_exactly_one",
+        "close_leader_revoked_no_successor_recovery_required",
+        "close_reconciler_reentrant_exactly_one_capture"
+      ],
+      "authority_model": "projection_contract",
+      "capability": "single_onlyoffice",
+      "close_required": true,
+      "substituted": false,
+      "black_box": [
+        "html_to_oo",
+        "oo_to_html",
+        "identity_retention",
+        "frozen_base_status_6_2_dedupe",
+        "browser_crash_no_userdata_recovery_case",
+        "refresh_required_reopen",
+        "two_user_close_order_a_then_b",
+        "two_user_close_order_b_then_a",
+        "b_close_before_a_forcesave_terminal",
+        "b_close_after_a_forcesave_terminal"
+      ],
+      "upstream_debt": [
+        "same_application_higher_sequence_fold",
+        "wrong_prior_confirmation_bundle_fence_contributor_rejected"
+      ],
+      "bundle_digest": "98289fd059c8ccb76fe8e92bd85448597611ddd71972541091b69ab7fcf24eda",
+      "typed_child_digest": "172959c4ecd1e71c3c60647d31f529612302ef55eab67330b19d0019351e74f2",
+      "required_digest": "984681c2c537d0ec064889de625323f79152f6a7c8a27794961de2f46a796ce6"
+    },
+    "open_run": {
+      "run_id": "220b2488-fe79-4261-aef5-5b5bbf2305ba",
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "aggregate_result": "unverified",
+      "finished_at": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "definition_bundle_sha256": "98289fd059c8ccb76fe8e92bd85448597611ddd71972541091b69ab7fcf24eda",
+      "authority_model_definition_sha256": "de0a8376ff8c89cceb8b9e9fead6cb849a692cd9c9359bc44a558222721b460c",
+      "required_scenario_set_digest": "984681c2c537d0ec064889de625323f79152f6a7c8a27794961de2f46a796ce6",
+      "derived_digest_matches": true
+    },
+    "scenarios": {
+      "html_to_oo": {
+        "operation_ids": [
+          "d6f99c73-e00a-4c64-8caf-42af91985f28"
+        ],
+        "application_ids": [
+          "4bd41971-ac85-4b72-8f2d-5bcb4406f67a"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "standard",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 1,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "d6f99c73-e00a-4c64-8caf-42af91985f28",
+          "4bd41971-ac85-4b72-8f2d-5bcb4406f67a"
+        ],
+        "trace_sha256": "e64a441f1a3da27bd86eb976f8383a4ab5027c8de454702fe132dc434adb7b8a",
+        "notes": [
+          "['browser_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "oo_to_html": {
+        "operation_ids": [
+          "3b970658-75fe-4916-a0b6-b85f3777dea3"
+        ],
+        "application_ids": [
+          "2b6bba48-2969-494a-9429-f3975b695390"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "standard",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 2,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "3b970658-75fe-4916-a0b6-b85f3777dea3",
+          "2b6bba48-2969-494a-9429-f3975b695390"
+        ],
+        "trace_sha256": "965d7fc6453d800dce4c386988f1484a1940c4e6e4d8caf8072a9894d5068c16",
+        "notes": [
+          "['onlyoffice_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "identity_retention": {
+        "operation_ids": [
+          "78af9bf5-dc1b-4dd5-bccd-27eec93e63f4"
+        ],
+        "application_ids": [
+          "841ae2d9-a6bf-4c2a-82ae-8b59c7682e41"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "standard",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 3,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "78af9bf5-dc1b-4dd5-bccd-27eec93e63f4",
+          "841ae2d9-a6bf-4c2a-82ae-8b59c7682e41"
+        ],
+        "trace_sha256": "c6be3e352cf7150e199b0e08e287b578ed3b070e98047b3aa693a397e4afd5bf",
+        "notes": [
+          "['onlyoffice_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "different_field_merge": {
+        "operation_ids": [
+          "e242d2ac-d92e-4d54-91ba-157e08ff901a"
+        ],
+        "application_ids": [
+          "c3e632e7-b405-4828-af71-4edde4dd10e1"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "standard",
+        "error_code": null,
+        "ordinal": 4,
+        "decision_result": "passed",
+        "entity_ids": [
+          "e242d2ac-d92e-4d54-91ba-157e08ff901a",
+          "c3e632e7-b405-4828-af71-4edde4dd10e1"
+        ],
+        "trace_sha256": "a0d8937864f71e81f8044bee5d5dcce8873f50cdf40733985ad59c99f97b3c64",
+        "notes": [
+          "conflict_count=0"
+        ]
+      },
+      "same_field_conflict_resolve": {
+        "operation_ids": [
+          "76db5a7e-076e-4b4a-bce2-b76de0f5b60a"
+        ],
+        "application_ids": [
+          "3c34353d-6bc5-4a4b-bd03-135ab5b3d4e5"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "standard",
+        "error_code": null,
+        "ordinal": 5,
+        "decision_result": "passed",
+        "entity_ids": [
+          "76db5a7e-076e-4b4a-bce2-b76de0f5b60a",
+          "3c34353d-6bc5-4a4b-bd03-135ab5b3d4e5"
+        ],
+        "trace_sha256": "0e342eff2d10f57738bb65a332fd210e94a3c76616dc11118a2659d26fcead44",
+        "notes": [
+          "conflict_count=1"
+        ]
+      },
+      "frozen_base_status_6_2_dedupe": {
+        "operation_ids": [
+          "15391347-c2be-4757-be08-1391420469b7"
+        ],
+        "application_ids": [
+          "a5beaf43-828c-4f92-a278-55d87f5ba2f5"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "standard",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 6,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "15391347-c2be-4757-be08-1391420469b7",
+          "a5beaf43-828c-4f92-a278-55d87f5ba2f5"
+        ],
+        "trace_sha256": "35eaad718b7316228c537e511dd92e1baa3c85e079b7229c58861e4381db5e23",
+        "notes": [
+          "['onlyoffice_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "same_application_higher_sequence_fold": {
+        "operation_ids": [
+          "62a62a37-154c-4dc6-b5c4-f018d18e7a17"
+        ],
+        "application_ids": [
+          "c6ae8c4b-4095-450e-9da9-cd4400461d99"
+        ],
+        "recovery_case_ids": [],
+        "result": "failed",
+        "scenario_kind": "standard",
+        "error_code": "upstream_gap",
+        "ordinal": 7,
+        "decision_result": "failed",
+        "entity_ids": [
+          "62a62a37-154c-4dc6-b5c4-f018d18e7a17",
+          "c6ae8c4b-4095-450e-9da9-cd4400461d99"
+        ],
+        "trace_sha256": "58df2d833b1aaaf21ce5975a95cbfae806efe02b47d3346a9dbf8fc3a5a90e9c",
+        "notes": [
+          "Task 32 欠账：`room_latest_durable_application_id/_sequence` 无读路由 ⇒ 「same-application higher-sequence fold 不 self-stale」的结果无从观测。写侧已由 Task 23 实现，缺的是可观测的读路由"
+        ]
+      },
+      "cross_participant_idempotency_409": {
+        "operation_ids": [
+          "62d724c7-2d2f-4e68-ab4d-9091a8f1f0a8"
+        ],
+        "application_ids": [
+          "cb09db82-de56-4065-bd72-96825f554cfe"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "standard",
+        "error_code": null,
+        "ordinal": 8,
+        "decision_result": "passed",
+        "entity_ids": [
+          "62d724c7-2d2f-4e68-ab4d-9091a8f1f0a8",
+          "cb09db82-de56-4065-bd72-96825f554cfe"
+        ],
+        "trace_sha256": "fc87a6cbf4add1001208f61bb76d9c37ab87b558778f81332e5bfc1537a57bca",
+        "notes": [
+          "stages=['forcesave_request_frozen', 'command_accepted', 'incoming_durable', 'terminal', 'reload']"
+        ]
+      },
+      "quarantined_rejects_application_and_engine": {
+        "operation_ids": [],
+        "application_ids": [],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "standard",
+        "error_code": "scenario_kind_unrepresentable",
+        "ordinal": 9,
+        "decision_result": "unverifiable",
+        "entity_ids": [],
+        "trace_sha256": "6708e96004d6232942be5ee1548a9d51c559ef1b2900a7f1d8e75eca23df9f2b",
+        "notes": [
+          "AC 5.6 要求 quarantined incoming 永不创建 application（application_ids 恒空），而 V151 的 ck_wpees_standard_requires_entities 要求非 download_only/recovery_reject 的 passed 行 application_ids>=1；两者当前不可同时满足。owner: evidence schema（V151 需要一个 authorization_reject kind）"
+        ]
+      },
+      "opaque_version_rollback_no_numeric_collision": {
+        "operation_ids": [
+          "7ecd19e6-4591-472e-bb95-d8e731781b27"
+        ],
+        "application_ids": [
+          "1adb32f7-be2e-42cc-b91a-e32f9c03a59b"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "standard",
+        "error_code": null,
+        "ordinal": 10,
+        "decision_result": "passed",
+        "entity_ids": [
+          "7ecd19e6-4591-472e-bb95-d8e731781b27",
+          "1adb32f7-be2e-42cc-b91a-e32f9c03a59b"
+        ],
+        "trace_sha256": "a5337e6f8166cffdb21a116e8849d2390fbe6a5962cff440ce5886ca0eb11f12",
+        "notes": [
+          "结构判据全部满足（无需时序/merge 的场景）"
+        ]
+      },
+      "browser_crash_no_userdata_recovery_case": {
+        "operation_ids": [],
+        "application_ids": [],
+        "recovery_case_ids": [
+          "b1f4ffea-87d0-438a-8582-99551076eeab"
+        ],
+        "result": "unverifiable",
+        "scenario_kind": "recovery_reject",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 11,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "b1f4ffea-87d0-438a-8582-99551076eeab"
+        ],
+        "trace_sha256": "cf1d380a24a3cd40f696fc22b2479a97f193e8e6591ff481e48a1dc7fc66ec7a",
+        "notes": [
+          "['browser_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "authorization_first_recovery_claim": {
+        "operation_ids": [
+          "d5b86f73-a550-4f8b-ad3f-c12a359ba9b1"
+        ],
+        "application_ids": [
+          "7098134d-b8d0-4f5b-ab81-26a2e9ce3ec3"
+        ],
+        "recovery_case_ids": [
+          "819c226c-b002-4e2f-926f-47e41d23bb84"
+        ],
+        "result": "passed",
+        "scenario_kind": "recovery_claim",
+        "error_code": null,
+        "ordinal": 12,
+        "decision_result": "passed",
+        "entity_ids": [
+          "d5b86f73-a550-4f8b-ad3f-c12a359ba9b1",
+          "7098134d-b8d0-4f5b-ab81-26a2e9ce3ec3",
+          "819c226c-b002-4e2f-926f-47e41d23bb84"
+        ],
+        "trace_sha256": "d195b734af25c12746618c3c924e828cab4c7e2bf0b3a2eb11c8dec12c3eb4a4",
+        "notes": [
+          "stages=['incoming_durable', 'recovery_case_created', 'claim_or_download_only']"
+        ]
+      },
+      "wrong_prior_confirmation_bundle_fence_contributor_rejected": {
+        "operation_ids": [],
+        "application_ids": [],
+        "recovery_case_ids": [
+          "23651ec6-d31a-43b9-86e7-78c833d18cfc"
+        ],
+        "result": "failed",
+        "scenario_kind": "recovery_reject",
+        "error_code": "upstream_gap",
+        "ordinal": 13,
+        "decision_result": "failed",
+        "entity_ids": [
+          "23651ec6-d31a-43b9-86e7-78c833d18cfc"
+        ],
+        "trace_sha256": "d4b502085df63145e77d3465850c3fbe5ccc26fc24ad4e98f3a59520666885fb",
+        "notes": [
+          "Task 32 欠账：`recovery.claim_recovery_case()` 从不校验 expected_generation / expected_write_fence / expected_definition_bundle_sha256 ⇒ 「错误 prior confirmation/bundle/fence/contributor 拒绝」在生产路径上不可达。本场景因此只能落 failed（不是 unverifiable：缺口是**实现缺失**而不是环境缺失）"
+        ]
+      },
+      "download_only_zero_three_entities": {
+        "operation_ids": [],
+        "application_ids": [],
+        "recovery_case_ids": [
+          "cf0684b0-ecec-47da-82dd-6c5609f8f714"
+        ],
+        "result": "passed",
+        "scenario_kind": "download_only",
+        "error_code": null,
+        "ordinal": 14,
+        "decision_result": "passed",
+        "entity_ids": [
+          "cf0684b0-ecec-47da-82dd-6c5609f8f714"
+        ],
+        "trace_sha256": "ee030618b4360786d37b3d1ae4166d166db0c538b8fd00993dcf9c4a03640a6d",
+        "notes": [
+          "结构判据全部满足（无需时序/merge 的场景）"
+        ]
+      },
+      "refresh_required_reopen": {
+        "operation_ids": [
+          "d2485918-bbda-4f6a-a61d-836df2f39c20"
+        ],
+        "application_ids": [
+          "6bbbdc49-8307-44ae-950c-c8d3dc243a46"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "standard",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 15,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "d2485918-bbda-4f6a-a61d-836df2f39c20",
+          "6bbbdc49-8307-44ae-950c-c8d3dc243a46"
+        ],
+        "trace_sha256": "40537e82b90191330a0292ef16cde65870b82427e9aabb523bb9ad1f84df3bba",
+        "notes": [
+          "['onlyoffice_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "rollback": {
+        "operation_ids": [
+          "62e47609-9baa-4c64-b62e-b6a15b130e00"
+        ],
+        "application_ids": [
+          "1f2b9f2e-decd-44dc-9562-1bb0f675979b"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "standard",
+        "error_code": null,
+        "ordinal": 16,
+        "decision_result": "passed",
+        "entity_ids": [
+          "62e47609-9baa-4c64-b62e-b6a15b130e00",
+          "1f2b9f2e-decd-44dc-9562-1bb0f675979b"
+        ],
+        "trace_sha256": "46ada5548f0095da75c3eb04f73708b777fa025d14853c93157ea0c4adafbeda",
+        "notes": [
+          "stages=['forcesave_request_frozen', 'command_accepted', 'incoming_durable', 'terminal', 'reload']"
+        ]
+      },
+      "single_participant_close": {
+        "operation_ids": [
+          "4c240fec-e202-44af-b284-8ed388b040ee"
+        ],
+        "application_ids": [
+          "c6536aec-ac5e-4df4-90cf-0efe318c0269"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "close_capture",
+        "error_code": null,
+        "ordinal": 17,
+        "decision_result": "passed",
+        "entity_ids": [
+          "4c240fec-e202-44af-b284-8ed388b040ee",
+          "c6536aec-ac5e-4df4-90cf-0efe318c0269"
+        ],
+        "trace_sha256": "a8bb8d0db7f64d70c9485c961a84535a2421a219e32eba83fa7ffaa11cf4e313",
+        "notes": [
+          "stages=['forcesave_request_frozen', 'command_accepted', 'incoming_durable', 'terminal', 'reload']"
+        ]
+      },
+      "two_user_close_order_a_then_b": {
+        "operation_ids": [
+          "91ec1b1b-06b1-42c7-9cd3-2ce8811eb45a"
+        ],
+        "application_ids": [
+          "992f289c-a257-464b-8fb4-b1fe8f72cdd2"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "close_capture",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 18,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "91ec1b1b-06b1-42c7-9cd3-2ce8811eb45a",
+          "992f289c-a257-464b-8fb4-b1fe8f72cdd2"
+        ],
+        "trace_sha256": "18376ad3be970d9c18b057ee8b2c25fcc8d0b3d56be05d16bb87de48e6453b34",
+        "notes": [
+          "['browser_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "two_user_close_order_b_then_a": {
+        "operation_ids": [
+          "3b9d2de2-ace4-4e1f-8303-441d0f5e8809"
+        ],
+        "application_ids": [
+          "5a5228ed-3991-463d-8dd6-5e7e46caf524"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "close_capture",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 19,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "3b9d2de2-ace4-4e1f-8303-441d0f5e8809",
+          "5a5228ed-3991-463d-8dd6-5e7e46caf524"
+        ],
+        "trace_sha256": "d11b86bd851264e1888d643f99247f29b154d0cb77a41f83bc177300170986e9",
+        "notes": [
+          "['browser_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "b_close_before_a_forcesave_terminal": {
+        "operation_ids": [
+          "1018d8ce-52a7-4f09-9320-4908f97f8883"
+        ],
+        "application_ids": [
+          "40989660-faed-46dc-9415-8de18d84cd3f"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "close_capture",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 20,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "1018d8ce-52a7-4f09-9320-4908f97f8883",
+          "40989660-faed-46dc-9415-8de18d84cd3f"
+        ],
+        "trace_sha256": "7154baa6d489154ceb775a97b829d318ef3a1aea2135ef7f3fc5d7c06db35966",
+        "notes": [
+          "['onlyoffice_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "b_close_after_a_forcesave_terminal": {
+        "operation_ids": [
+          "d9da9611-f2da-41ff-a0fe-4b5d38e26a12"
+        ],
+        "application_ids": [
+          "dfd30e77-2e2d-4218-8853-6e63f9d73bd0"
+        ],
+        "recovery_case_ids": [],
+        "result": "unverifiable",
+        "scenario_kind": "close_capture",
+        "error_code": "real_onlyoffice_not_executed",
+        "ordinal": 21,
+        "decision_result": "unverifiable",
+        "entity_ids": [
+          "d9da9611-f2da-41ff-a0fe-4b5d38e26a12",
+          "dfd30e77-2e2d-4218-8853-6e63f9d73bd0"
+        ],
+        "trace_sha256": "f8b6a7b8d8d15800398679f0e046ab63267e1d2d4ed44c6fcbbcd033d3b6252c",
+        "notes": [
+          "['onlyoffice_build'] 仍是 NOT-EXECUTED 哨兵 —— Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+        ]
+      },
+      "close_leader_revoked_successor_exactly_one": {
+        "operation_ids": [
+          "1da60624-3d1a-4584-9f40-3cac9fc4dfb0"
+        ],
+        "application_ids": [
+          "5389566e-3cc2-408a-9366-2c8790b0dcab"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "close_capture",
+        "error_code": null,
+        "ordinal": 22,
+        "decision_result": "passed",
+        "entity_ids": [
+          "1da60624-3d1a-4584-9f40-3cac9fc4dfb0",
+          "5389566e-3cc2-408a-9366-2c8790b0dcab"
+        ],
+        "trace_sha256": "dc355e2992949c5112a0150e39e61bce3b1382ed0c1a223782b2aee0cadee4b4",
+        "notes": [
+          "stages=['forcesave_request_frozen', 'command_accepted', 'incoming_durable', 'terminal', 'reload']"
+        ]
+      },
+      "close_leader_revoked_no_successor_recovery_required": {
+        "operation_ids": [
+          "8fb5e423-064e-4055-adf8-b9fdaea7c55e"
+        ],
+        "application_ids": [
+          "ab402373-73e6-4b6c-9fa8-2444435e0746"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "close_capture",
+        "error_code": null,
+        "ordinal": 23,
+        "decision_result": "passed",
+        "entity_ids": [
+          "8fb5e423-064e-4055-adf8-b9fdaea7c55e",
+          "ab402373-73e6-4b6c-9fa8-2444435e0746"
+        ],
+        "trace_sha256": "2c4457b4c46d4131726119ef75a7fa50c4e5c78fa5ca745b05d40c0f2c23d702",
+        "notes": [
+          "stages=['forcesave_request_frozen', 'command_accepted', 'incoming_durable', 'terminal', 'reload']"
+        ]
+      },
+      "close_reconciler_reentrant_exactly_one_capture": {
+        "operation_ids": [
+          "aeb73446-7c1f-43d2-8663-eadb5054d69c"
+        ],
+        "application_ids": [
+          "cc2545ea-50fd-436f-8f66-58a6bad38422"
+        ],
+        "recovery_case_ids": [],
+        "result": "passed",
+        "scenario_kind": "close_capture",
+        "error_code": null,
+        "ordinal": 24,
+        "decision_result": "passed",
+        "entity_ids": [
+          "aeb73446-7c1f-43d2-8663-eadb5054d69c",
+          "cc2545ea-50fd-436f-8f66-58a6bad38422"
+        ],
+        "trace_sha256": "4be345d2152e6c08960f89891fc48672628096fcea1f79e6fd36b52585dfcf5f",
+        "notes": [
+          "结构判据全部满足（无需时序/merge 的场景）"
+        ]
+      }
+    },
+    "entity_reuse": {
+      "total": 44,
+      "distinct": 44
+    },
+    "finalize": {
+      "aggregate_result": "failed",
+      "finished_at_set": true,
+      "verdict": {
+        "entry_id": "xlsx/b60/gt-b60-bundle",
+        "run_id": "220b2488-fe79-4261-aef5-5b5bbf2305ba",
+        "required_scenario_ids": [
+          "html_to_oo",
+          "oo_to_html",
+          "identity_retention",
+          "different_field_merge",
+          "same_field_conflict_resolve",
+          "frozen_base_status_6_2_dedupe",
+          "same_application_higher_sequence_fold",
+          "cross_participant_idempotency_409",
+          "quarantined_rejects_application_and_engine",
+          "opaque_version_rollback_no_numeric_collision",
+          "browser_crash_no_userdata_recovery_case",
+          "authorization_first_recovery_claim",
+          "wrong_prior_confirmation_bundle_fence_contributor_rejected",
+          "download_only_zero_three_entities",
+          "refresh_required_reopen",
+          "rollback",
+          "single_participant_close",
+          "two_user_close_order_a_then_b",
+          "two_user_close_order_b_then_a",
+          "b_close_before_a_forcesave_terminal",
+          "b_close_after_a_forcesave_terminal",
+          "close_leader_revoked_successor_exactly_one",
+          "close_leader_revoked_no_successor_recovery_required",
+          "close_reconciler_reentrant_exactly_one_capture"
+        ],
+        "observed_scenario_ids": [
+          "html_to_oo",
+          "oo_to_html",
+          "identity_retention",
+          "different_field_merge",
+          "same_field_conflict_resolve",
+          "frozen_base_status_6_2_dedupe",
+          "same_application_higher_sequence_fold",
+          "cross_participant_idempotency_409",
+          "quarantined_rejects_application_and_engine",
+          "opaque_version_rollback_no_numeric_collision",
+          "browser_crash_no_userdata_recovery_case",
+          "authorization_first_recovery_claim",
+          "wrong_prior_confirmation_bundle_fence_contributor_rejected",
+          "download_only_zero_three_entities",
+          "refresh_required_reopen",
+          "rollback",
+          "single_participant_close",
+          "two_user_close_order_a_then_b",
+          "two_user_close_order_b_then_a",
+          "b_close_before_a_forcesave_terminal",
+          "b_close_after_a_forcesave_terminal",
+          "close_leader_revoked_successor_exactly_one",
+          "close_leader_revoked_no_successor_recovery_required",
+          "close_reconciler_reentrant_exactly_one_capture"
+        ],
+        "defects": [
+          "scenario_kind_unrepresentable",
+          "scenario_not_passed",
+          "dangling_operation_fk",
+          "dangling_application_fk",
+          "dangling_recovery_case_fk"
+        ],
+        "stale_reasons": [],
+        "notes": [
+          "quarantined_rejects_application_and_engine: 当前 evidence schema 无法记成 passed —— AC 5.6 要求 quarantined incoming 永不创建 application（application_ids 恒空），而 V151 的 ck_wpees_standard_requires_entities 要求非 download_only/recovery_reject 的 passed 行 application_ids>=1；两者当前不可同时满足。owner: evidence schema（V151 需要一个 authorization_reject kind）",
+          "未通过/UNVERIFIABLE 场景 ['b_close_after_a_forcesave_terminal', 'b_close_before_a_forcesave_terminal', 'browser_crash_no_userdata_recovery_case', 'frozen_base_status_6_2_dedupe', 'html_to_oo', 'identity_retention', 'oo_to_html', 'refresh_required_reopen', 'same_application_higher_sequence_fold', 'two_user_close_order_a_then_b', 'two_user_close_order_b_then_a', 'wrong_prior_confirmation_bundle_fence_contributor_rejected']",
+          "scenario html_to_oo: operation 外键悬挂",
+          "scenario html_to_oo: application 外键悬挂",
+          "scenario oo_to_html: operation 外键悬挂",
+          "scenario oo_to_html: application 外键悬挂",
+          "scenario identity_retention: operation 外键悬挂",
+          "scenario identity_retention: application 外键悬挂",
+          "scenario different_field_merge: operation 外键悬挂",
+          "scenario different_field_merge: application 外键悬挂",
+          "scenario same_field_conflict_resolve: operation 外键悬挂",
+          "scenario same_field_conflict_resolve: application 外键悬挂",
+          "scenario frozen_base_status_6_2_dedupe: operation 外键悬挂",
+          "scenario frozen_base_status_6_2_dedupe: application 外键悬挂",
+          "scenario same_application_higher_sequence_fold: operation 外键悬挂",
+          "scenario same_application_higher_sequence_fold: application 外键悬挂",
+          "scenario cross_participant_idempotency_409: operation 外键悬挂",
+          "scenario cross_participant_idempotency_409: application 外键悬挂",
+          "scenario opaque_version_rollback_no_numeric_collision: operation 外键悬挂",
+          "scenario opaque_version_rollback_no_numeric_collision: application 外键悬挂",
+          "scenario browser_crash_no_userdata_recovery_case: recovery case 外键悬挂",
+          "scenario authorization_first_recovery_claim: operation 外键悬挂",
+          "scenario authorization_first_recovery_claim: application 外键悬挂",
+          "scenario authorization_first_recovery_claim: recovery case 外键悬挂",
+          "scenario wrong_prior_confirmation_bundle_fence_contributor_rejected: recovery case 外键悬挂",
+          "scenario download_only_zero_three_entities: recovery case 外键悬挂",
+          "scenario refresh_required_reopen: operation 外键悬挂",
+          "scenario refresh_required_reopen: application 外键悬挂",
+          "scenario rollback: operation 外键悬挂",
+          "scenario rollback: application 外键悬挂",
+          "scenario single_participant_close: operation 外键悬挂",
+          "scenario single_participant_close: application 外键悬挂",
+          "scenario two_user_close_order_a_then_b: operation 外键悬挂",
+          "scenario two_user_close_order_a_then_b: application 外键悬挂",
+          "scenario two_user_close_order_b_then_a: operation 外键悬挂",
+          "scenario two_user_close_order_b_then_a: application 外键悬挂",
+          "scenario b_close_before_a_forcesave_terminal: operation 外键悬挂",
+          "scenario b_close_before_a_forcesave_terminal: application 外键悬挂",
+          "scenario b_close_after_a_forcesave_terminal: operation 外键悬挂",
+          "scenario b_close_after_a_forcesave_terminal: application 外键悬挂",
+          "scenario close_leader_revoked_successor_exactly_one: operation 外键悬挂",
+          "scenario close_leader_revoked_successor_exactly_one: application 外键悬挂",
+          "scenario close_leader_revoked_no_successor_recovery_required: operation 外键悬挂",
+          "scenario close_leader_revoked_no_successor_recovery_required: application 外键悬挂",
+          "scenario close_reconciler_reentrant_exactly_one_capture: operation 外键悬挂",
+          "scenario close_reconciler_reentrant_exactly_one_capture: application 外键悬挂"
+        ],
+        "result": "unverified"
+      }
+    },
+    "run_id": "220b2488-fe79-4261-aef5-5b5bbf2305ba",
+    "entity_reuse_refused": {
+      "pair": [
+        "html_to_oo",
+        "oo_to_html"
+      ],
+      "outcome": [
+        {
+          "scenario_id": "html_to_oo",
+          "rejected": false
+        },
+        {
+          "scenario_id": "oo_to_html",
+          "rejected": true,
+          "kind": "entity_reused_within_run"
+        }
+      ]
+    },
+    "persisted_rows": {
+      "html_to_oo": "unverifiable",
+      "oo_to_html": "unverifiable",
+      "identity_retention": "unverifiable",
+      "different_field_merge": "passed",
+      "same_field_conflict_resolve": "passed",
+      "frozen_base_status_6_2_dedupe": "unverifiable",
+      "same_application_higher_sequence_fold": "failed",
+      "cross_participant_idempotency_409": "passed",
+      "quarantined_rejects_application_and_engine": "unverifiable",
+      "opaque_version_rollback_no_numeric_collision": "passed",
+      "browser_crash_no_userdata_recovery_case": "unverifiable",
+      "authorization_first_recovery_claim": "passed",
+      "wrong_prior_confirmation_bundle_fence_contributor_rejected": "failed",
+      "download_only_zero_three_entities": "passed",
+      "refresh_required_reopen": "unverifiable",
+      "rollback": "passed",
+      "single_participant_close": "passed",
+      "two_user_close_order_a_then_b": "unverifiable",
+      "two_user_close_order_b_then_a": "unverifiable",
+      "b_close_before_a_forcesave_terminal": "unverifiable",
+      "b_close_after_a_forcesave_terminal": "unverifiable",
+      "close_leader_revoked_successor_exactly_one": "passed",
+      "close_leader_revoked_no_successor_recovery_required": "passed",
+      "close_reconciler_reentrant_exactly_one_capture": "passed"
+    }
+  }
+}

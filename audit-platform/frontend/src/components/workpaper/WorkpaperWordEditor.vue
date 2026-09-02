@@ -175,8 +175,26 @@
     <!-- ═══ 通用模式：直接加载 OnlyOffice editor ═══ -->
     <template v-else>
       <section class="gt-wp-word-editor__generic-section">
+        <!--
+          无可用 Word 载体（Task 63）：**结构上**不渲染任何编辑入口。
+
+          用 v-if 而不是 CSS 隐藏或 disabled：原实现对零载体底稿（如 S33-REV）先落
+          「模板解析失败，请使用在线编辑模式」，而在线编辑同样无模板可开 ⇒ 把审计师
+          指向一条不存在的路。判据由后端 `html_data.word_carrier` 下发，见 script 段。
+        -->
+        <div v-if="hasNoUsableCarrier" class="gt-wp-word-editor__no-carrier">
+          <el-alert type="warning" :closable="false" show-icon>
+            <template #title>本底稿暂无 Word 模板，无法在线编辑</template>
+            <p style="margin: 4px 0 0">{{ carrierAbsenceReason }}（{{ wpCode }}）。</p>
+            <p style="margin: 4px 0 0">
+              在模板库补齐该底稿的 Word 模板前，本页不提供结构化视图与在线编辑；
+              如需记录内容，请联系底稿模板管理员确认该底稿的模板归属。
+            </p>
+          </el-alert>
+        </div>
+
         <!-- 双模式切换 (Task 5.1 + 5.4: tooltip when OO unavailable) -->
-        <div class="gt-wp-word-editor__mode-switch">
+        <div v-else class="gt-wp-word-editor__mode-switch">
           <el-tooltip
             :content="'OnlyOffice 不可用'"
             :disabled="onlyofficeAvailable"
@@ -195,7 +213,10 @@
         </div>
 
         <!-- 结构化视图 -->
-        <div v-if="genericViewMode === '结构化视图'" class="gt-wp-word-editor__structured-area">
+        <div
+          v-if="!hasNoUsableCarrier && genericViewMode === '结构化视图'"
+          class="gt-wp-word-editor__structured-area"
+        >
           <!-- 导出/导入工具栏 (Task 8.1, 8.2, 8.3) -->
           <div class="gt-wp-word-editor__structured-toolbar">
             <el-button size="small" :icon="Download" @click="onExportWord" :loading="exportingWord">
@@ -222,7 +243,11 @@
         </div>
 
         <!-- 在线编辑 -->
-        <div v-else ref="ooContainerRef" class="gt-wp-word-editor__editor-area">
+        <div
+          v-else-if="!hasNoUsableCarrier"
+          ref="ooContainerRef"
+          class="gt-wp-word-editor__editor-area"
+        >
           <template v-if="onlyofficeAvailable">
             <div class="gt-wp-word-editor__oo-toolbar">
               <el-button size="small" @click="toggleFullscreen">
@@ -347,6 +372,45 @@ const wpCode = computed(() => props.wpCode || '')
 
 // ─── Mode Detection ───
 const isA16Mode = computed(() => wpCode.value === 'A16')
+
+/**
+ * 后端下发的 DOCX 载体裁决（Task 63）。
+ *
+ * spec: workpaper-html-onlyoffice-bidirectional-writeback-closure / Wave 6 Task 63
+ * 真源 = `word_resolution.word_carrier_verdict()` 现算，经 `_word_template.render()`
+ * 放进 render-config 的 `html_data.word_carrier`。
+ *
+ * 🔴 这里**不得**改成 `wpCode.value === 'S33-REV'` 之类的字面量判断：
+ *   ① 下一个零载体 wp_code 出现时它静默失效（前端不会知道模板库变了）；
+ *   ② 裁决权会从后端清册搬进组件，变成第二真源；
+ *   ③ 「有没有载体」是磁盘事实，组件无从得知 —— 只能由后端回答。
+ */
+const wordCarrierVerdict = computed<string | null>(() => {
+  const v = props.htmlData?.word_carrier?.verdict
+  return typeof v === 'string' && v ? v : null
+})
+
+/**
+ * 该底稿是否**确证**没有可用 DOCX 载体。
+ *
+ * 判据是「后端明确说了 has_usable_carrier === false」，而不是「读不到载体信息」：
+ * 字段缺失（老 render 路径、A16 bundle 宿主内嵌等）一律按原行为处理，
+ * 不因为拿不到裁决就把切换器藏掉。
+ */
+const hasNoUsableCarrier = computed(
+  () => props.htmlData?.word_carrier?.has_usable_carrier === false,
+)
+
+/** 缺失原因文案（值域与后端 `WordCarrierVerdict` 封闭三值对齐）。 */
+const carrierAbsenceReason = computed(() => {
+  if (wordCarrierVerdict.value === 'template_missing') {
+    return '模板库中没有登记本底稿的 Word 模板'
+  }
+  if (wordCarrierVerdict.value === 'document_type_mismatch') {
+    return '本底稿在模板库中只有工作簿（xlsx）载体，没有 Word 模板'
+  }
+  return '本底稿当前没有可用的 Word 模板载体'
+})
 
 // ─── Generic Mode: Dual-mode switch (Task 5.1) ───
 const genericViewMode = ref<'结构化视图' | '在线编辑'>('结构化视图')
@@ -1063,6 +1127,9 @@ function onDocumentSaved() {
 /** Initialize OnlyOffice inline editor for generic mode */
 async function initGenericEditor() {
   if (isA16Mode.value || !onlyofficeAvailable.value) return
+  // Task 63: 无可用 DOCX 载体时不拉起 OO —— UI 入口已按同一判据门控，这里是第二道
+  // 结构门（防止 watch/外部调用绕过 UI 触发一次注定 404 的 onlyoffice-config 请求）。
+  if (hasNoUsableCarrier.value) return
 
   // word-template 底稿使用 GtOnlyOfficeSheet 相同的端点格式：
   // /api/workpapers/{wpId}/sheets/{sheetName}/onlyoffice-config
@@ -1157,7 +1224,9 @@ onMounted(async () => {
   }
 
   // Generic mode: init inline editor + load structured data
-  if (!isA16Mode.value) {
+  // Task 63: 零载体底稿不发这两个注定失败的请求 —— 它们的失败会被降级成
+  // 「模板解析失败，请使用在线编辑模式」，而在线编辑对这类底稿同样无模板可开。
+  if (!isA16Mode.value && !hasNoUsableCarrier.value) {
     await nextTick()
     loadStructuredData()
     initGenericEditor()

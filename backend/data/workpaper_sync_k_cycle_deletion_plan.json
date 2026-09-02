@@ -1,0 +1,1070 @@
+{
+  "schema_version": "k-cycle-deletion-plan:v1",
+  "task": "Task 53",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "K 循环的 legacy dual-mode 删除清册。🔴 八轮里 orphan 规模最大的一份：**7 个一阶 orphan composable**（useK1DualMode..useK7DualMode，共 838 行）加 **7 处宿主内联 IIFE**（K1~K7）加 **6 个在用 composable**（K8~K13，须先改线再删）。与 J 循环那份最大的不同：J 的删除对象**不属于任何 entry**（orphan 挂在非 entry 宿主 J2/J3 上），K 的删除对象**逐一对应本 slice 的 13 条 entry** —— 每条 entry 都既有 orphan 孪生（K1~K7）或在用 composable（K8~K13），也有自己的宿主改线动作。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_k_cycle_manifest_slice.json#independent_entries",
+  "orphan_source_of_truth": "backend/data/workpaper_sync_k_cycle_manifest_slice.json#orphan_dual_mode_inventory",
+  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+  "pilot_already_migrated": null,
+  "pilot_already_migrated_note": "🔴 K 循环**没有** pilot，故本键为 null 而不是像 H 那样填一条。实证：四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），逐文件读 `backend/data/workpaper_sync_contracts/*.json` 顶层 `review.entry_id` 得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 K。",
+  "why_this_plan_has_two_deletion_object_classes": {
+    "statement": "🔴 本清册的删除对象分两类且**都在 entry 范围内**：① K1~K7 的 orphan composable（7 个文件，直接删，零副作用）；② K8~K13 的在用 composable（6 个文件，须先改线）。外加 ③ K1~K7 宿主里的 7 段内联 IIFE（不是文件，是代码块）。",
+    "why": "K 循环的 dual-mode 承载分裂成两种形态（KD-1 / KD-2）：K1~K7 的宿主内联了实现而把 composable 变成死桩；K8~K13 的宿主真 import composable。两类的删除前置完全不同 —— 前者删了行为不变，后者删了会让模式切换失效 ⇒ 必须分两个容器登记，混在一起会让「哪些能立刻删」说不清。",
+    "why_step_5_applies_here_unlike_j": "🔴 J 循环那份写「step 5 不适用」（共享基类 localStorage 命中 0）。K 循环**适用**：13 个 composable 各声明一份 `k{n}-dual-mode:` 前缀，其中 K4/K5/K6 三处在宿主内联实现里**又声明一份同值前缀**（现算 `inline_localStorage_prefix == localStorage_prefix` 的条数 == 3），K1/K2/K3/K7 的内联实现**无**持久化（现算 None 的条数 == 4）。step 5 的「统一键前缀 workpaper-sync-mode:」在 K 循环有 13 + 3 = 16 处待收敛。",
+    "verification_recipe": "① 对 7 个 orphan 断言 statement-position 生产边与测试边各为 0；② 对 6 个在用 composable 断言各恰 1 条生产边且指向声明的宿主；③ 对 K1~K7 断言宿主里 `const dualMode = (() => ` 命中各 1 处、`import { useK{n}DualMode }` 命中各 0 处；K8~K13 反向；④ 现算 16 处 localStorage 前缀声明点。四项都验，任一不符即红。"
+  },
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "lines": 65,
+    "reason": "共享基类被大量非 K 模块使用，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+    "statement_position_consumers": 29,
+    "k_cycle_consumers": 0,
+    "remaining_after_this_plan": 29,
+    "remaining_after_this_plan_recipe": "🔴 29 − 0 = 29 —— K 循环对共享基类**一条边都不贡献**（KD-3），故本清册执行前后该计数**不变**。这与 J 循环（29 → 26）形成对照：判据不得照抄 J 那条「删完还剩 26」，否则 K 必假红。计数口径必须是**窄口径（真语句边）**：宽口径会把 `useK9DualMode.ts` 的注释提及与生成文件的 JSON snippet 算进来得 33。",
+    "verification_recipe": "两侧都验：① 现算窄口径 statement 边总数 == 29 且其中 K 路径条数 == 0；② 现算宽口径 token 文件数 == 33，差集恰含 `composables/useK9DualMode.ts`（注释提及）与 `sync/workpaperSyncLegacyBaseline.generated.ts`（JSON snippet）。"
+  },
+  "host_inlined_second_implementation": {
+    "why_this_key_exists": "H 循环有 4 个宿主没有消费自己的 dual-mode composable、而在宿主里内联了等价实现，于是「删了 composable、测试全绿」不能证明任何事。本任务对 K 循环做同一项实测。",
+    "result": "applicable_and_the_largest_so_far",
+    "measured": "7 个宿主（K1~K7）内联了等价 IIFE 实现，6 个宿主（K8~K13）真消费自己的 composable。7 + 6 == 13 ✓（两集合互斥）。",
+    "why_worse_than_h": "🔴 H 的问题是「宿主自己有一份、composable 那份是死的」（4 处）；K 是**同一问题的 7 倍规模**，且多一层：K4/K5/K6 的内联实现与死 composable 声明**同值** localStorage 前缀（改线时只改一处 ⇒ 分裂状态），K1/K2/K3/K7 的内联实现**无**持久化而死 composable 有（删 composable 不会改变行为，但「本该持久化」这个意图也随之丢失）。",
+    "invariant": "对 K1~K7：宿主里 `dualMode` 的来源必须是内联 IIFE，且宿主直调 `/api/workpapers/onlyoffice/health`（现算各 1 处）。对 K8~K13：宿主里 `dualMode` 的来源必须是 `useK{n}DualMode(...)`，且宿主自身**不**直调 legacy 端点（现算各 0 处，端点直调在 composable 里）。",
+    "hosts": {
+      "K1": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L9",
+        "second_level_gate_sites": [
+          11
+        ]
+      },
+      "K2": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L9",
+        "second_level_gate_sites": [
+          11
+        ]
+      },
+      "K3": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L8",
+        "second_level_gate_sites": [
+          10
+        ]
+      },
+      "K4": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267",
+        "inline_localStorage_prefix": "k4-dual-mode:",
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L8",
+        "second_level_gate_sites": [
+          10
+        ]
+      },
+      "K5": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257",
+        "inline_localStorage_prefix": "k5-dual-mode:",
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L8",
+        "second_level_gate_sites": [
+          10
+        ]
+      },
+      "K6": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247",
+        "inline_localStorage_prefix": "k6-dual-mode:",
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L8",
+        "second_level_gate_sites": [
+          10
+        ]
+      },
+      "K7": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue",
+        "carrier_kind": "host_inlined_iife",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L8",
+        "second_level_gate_sites": [
+          10
+        ]
+      },
+      "K8": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
+        "carrier_kind": "dedicated_composable",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L250",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L8",
+        "second_level_gate_sites": []
+      },
+      "K9": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
+        "carrier_kind": "dedicated_composable",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L218",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L8",
+        "second_level_gate_sites": []
+      },
+      "K10": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue",
+        "carrier_kind": "dedicated_composable",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L176",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L8",
+        "second_level_gate_sites": [
+          11
+        ]
+      },
+      "K11": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
+        "carrier_kind": "dedicated_composable",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L143",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L8",
+        "second_level_gate_sites": [
+          11
+        ]
+      },
+      "K12": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
+        "carrier_kind": "dedicated_composable",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L157",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L8",
+        "second_level_gate_sites": [
+          11
+        ]
+      },
+      "K13": {
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
+        "carrier_kind": "dedicated_composable",
+        "carrier_site": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L156",
+        "inline_localStorage_prefix": null,
+        "legacy_endpoints_called_from_host": [],
+        "toolbar_gate_anchor": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L8",
+        "second_level_gate_sites": [
+          11
+        ]
+      }
+    }
+  },
+  "orphan_dual_mode_to_delete": {
+    "why_this_key_exists": "🔴 按 AC 1.7「不可达旧桩 SHALL 删除；不得以豁免或 DEPRECATED 注释长期保留」。这 7 个文件生产边与测试边各为 0，删除零副作用，**不需要**等 step 9。",
+    "in_scope_of_this_deletion_plan": true,
+    "ac_reference": "1.7",
+    "can_delete_before_step_9": true,
+    "can_delete_before_step_9_why": "生产边与测试边都为 0 ⇒ 删除不改变任何运行时行为，也不需要先改任何消费方。这与 K8~K13 的在用 composable 不同（后者必须先改线）。",
+    "modules": [
+      {
+        "id": "OD-1",
+        "wp_code": "K1",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts",
+        "lines": 115,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k1-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-2",
+        "wp_code": "K2",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK2DualMode.ts",
+        "lines": 115,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k2-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-3",
+        "wp_code": "K3",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK3DualMode.ts",
+        "lines": 115,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k3-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-4",
+        "wp_code": "K4",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK4DualMode.ts",
+        "lines": 126,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k4-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267",
+        "twin_localStorage_prefix": "k4-dual-mode:",
+        "prefix_collision_with_twin": true,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-5",
+        "wp_code": "K5",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK5DualMode.ts",
+        "lines": 126,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k5-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257",
+        "twin_localStorage_prefix": "k5-dual-mode:",
+        "prefix_collision_with_twin": true,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-6",
+        "wp_code": "K6",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK6DualMode.ts",
+        "lines": 125,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k6-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247",
+        "twin_localStorage_prefix": "k6-dual-mode:",
+        "prefix_collision_with_twin": true,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-7",
+        "wp_code": "K7",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK7DualMode.ts",
+        "lines": 116,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k7-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      }
+    ],
+    "orphan_barrels": [],
+    "orphan_barrels_note": "🔴 空数组是**实测结论**不是省略：`components/workpaper/composables/index.ts` 不存在（现算 `os.path.exists` == False）⇒ 该目录下的模块没有 barrel 可躲，故 K 循环没有二阶 orphan、也没有需要摘 re-export 的 barrel。J 循环那轮有 2 个 orphan barrel，判据不得照抄。",
+    "counters": {
+      "modules_to_delete": 7,
+      "first_order": 7,
+      "second_order": 0,
+      "total_lines_to_delete": 838,
+      "barrel_reexports_to_drop": 0,
+      "spec_files_requiring_sync_change": 0,
+      "modules_with_zero_side_effect_deletion": 7,
+      "modules_with_legacy_endpoint_direct_call": 7,
+      "modules_with_prefix_collision_with_host_twin": 3,
+      "modules_whose_twin_has_no_persistence": 4,
+      "counting_recipe": "守卫从 modules[] 现算全部计数并与本键等值比对：modules_to_delete = len(modules)；first_order / second_order 按 orphan_order 现算；total_lines_to_delete = Σ lines；modules_with_legacy_endpoint_direct_call 按 legacy_endpoints_called 非空现算；prefix_collision 按 prefix_collision_with_twin == True 现算（3 = K4/K5/K6）；twin_has_no_persistence 按 twin_localStorage_prefix is None 现算（4 = K1/K2/K3/K7）；3 + 4 == 7 == modules_to_delete ✓。spec_files_requiring_sync_change = 0（7 个 orphan 的测试边各为 0 ⇒ 没有任何 .spec.ts 需要跟着改）。"
+    }
+  },
+  "live_dual_mode_to_rewire_then_delete": {
+    "why_this_key_exists": "K8~K13 六个 composable 各有 1 条真实生产边 ⇒ 它们**不是** orphan，不能按 AC 1.7 直接删。必须先 step 9 改线，再删。与 orphan 分开登记，否则「哪些能立刻删」说不清。",
+    "in_scope_of_this_deletion_plan": true,
+    "can_delete_before_step_9": false,
+    "modules": [
+      {
+        "id": "LD-1",
+        "wp_code": "K8",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK8DualMode.ts",
+        "lines": 189,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L250"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k8-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-2",
+        "wp_code": "K9",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
+        "lines": 182,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L218"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k9-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-3",
+        "wp_code": "K10",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK10DualMode.ts",
+        "lines": 155,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L176"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k10-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-4",
+        "wp_code": "K11",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK11DualMode.ts",
+        "lines": 154,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L143"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k11-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-5",
+        "wp_code": "K12",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK12DualMode.ts",
+        "lines": 158,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L157"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k12-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-6",
+        "wp_code": "K13",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK13DualMode.ts",
+        "lines": 158,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L156"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k13-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      }
+    ],
+    "counters": {
+      "modules_to_rewire_then_delete": 6,
+      "total_lines": 996,
+      "modules_calling_legacy_health_endpoint": 6,
+      "modules_calling_legacy_config_endpoint": 6,
+      "counting_recipe": "守卫从 live_modules[] 现算：len == 6；Σ lines；两个端点计数各按 legacy_endpoints_called 现算（各 6 —— K8~K13 六个都同时调 health 与 config）。🔴 与 orphan 侧的端点计数分开：orphan 侧只调 health（config 计数 0）。"
+    },
+    "registered_as": "BP-6"
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-k1-other-receivables",
+      "wp_code_pattern": "K1O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K1 实测**有** HTML 对端（checklist_responses + `K1-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K1 其他应收款.xlsx`（17 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L9",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K1 的 per-entry composable `useK1DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k1-dual-mode:",
+      "localStorage_prefix_note": "🔴 K1 的宿主内联实现**完全没有** localStorage 持久化，而它的 orphan composable 声明了 `k1-dual-mode:` ⇒ 「模式偏好是否持久化」在 K 循环内不一致（BP-5 的第二条可观察后果）。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK1DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L9）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k2-other-current-assets",
+      "wp_code_pattern": "K2O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K2 实测**有** HTML 对端（checklist_responses + `K2-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K2 其他流动资产.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L9",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K2 的 per-entry composable `useK2DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k2-dual-mode:",
+      "localStorage_prefix_note": "🔴 K2 的宿主内联实现**完全没有** localStorage 持久化，而它的 orphan composable 声明了 `k2-dual-mode:` ⇒ 「模式偏好是否持久化」在 K 循环内不一致（BP-5 的第二条可观察后果）。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK2DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK2DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L9）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k3-other-payables",
+      "wp_code_pattern": "K3O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K3 实测**有** HTML 对端（checklist_responses + `K3-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K3 其他应付款.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K3 的 per-entry composable `useK3DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k3-dual-mode:",
+      "localStorage_prefix_note": "🔴 K3 的宿主内联实现**完全没有** localStorage 持久化，而它的 orphan composable 声明了 `k3-dual-mode:` ⇒ 「模式偏好是否持久化」在 K 循环内不一致（BP-5 的第二条可观察后果）。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK3DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK3DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k4-other-current-liabilities",
+      "wp_code_pattern": "K4O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K4 实测**有** HTML 对端（checklist_responses + `K4-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K4 其他流动负债.xlsx`（8 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K4 的 per-entry composable `useK4DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k4-dual-mode:",
+      "localStorage_prefix_note": "🔴 K4 的宿主内联实现与 orphan composable **同前缀** (`k4-dual-mode:`) ⇒ 改线时若只改一处会留下读写不同键的分裂状态。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK4DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK4DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k5-provisions",
+      "wp_code_pattern": "K5P",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K5 实测**有** HTML 对端（checklist_responses + `K5-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K5 预计负债.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K5 的 per-entry composable `useK5DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k5-dual-mode:",
+      "localStorage_prefix_note": "🔴 K5 的宿主内联实现与 orphan composable **同前缀** (`k5-dual-mode:`) ⇒ 改线时若只改一处会留下读写不同键的分裂状态。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK5DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK5DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k6-held-for-sale",
+      "wp_code_pattern": "K6H",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K6 实测**有** HTML 对端（checklist_responses + `K6-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K6 持有待售资产和负债.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K6 的 per-entry composable `useK6DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k6-dual-mode:",
+      "localStorage_prefix_note": "🔴 K6 的宿主内联实现与 orphan composable **同前缀** (`k6-dual-mode:`) ⇒ 改线时若只改一处会留下读写不同键的分裂状态。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK6DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK6DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k7-deferred-income",
+      "wp_code_pattern": "K7D",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K7 实测**有** HTML 对端（checklist_responses + `K7-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K7 递延收益.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 K7 的 per-entry composable `useK7DualMode.ts` **是一阶 orphan**（生产边与测试边各 0）⇒ 它不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是宿主内联 IIFE（audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229），改线时删的是**宿主里的那段代码**而不是一个文件。",
+      "host_inlined_block_to_remove": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229",
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k7-dual-mode:",
+      "localStorage_prefix_note": "🔴 K7 的宿主内联实现**完全没有** localStorage 持久化，而它的 orphan composable 声明了 `k7-dual-mode:` ⇒ 「模式偏好是否持久化」在 K 循环内不一致（BP-5 的第二条可观察后果）。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK7DualMode.ts"
+      ],
+      "must_not_wire_to_why": "🔴 useK7DualMode.ts 是 orphan（无人 import）**但内容完整**，改线时最容易误接：它有 `currentMode` / `isOoAvailable` / `modeOptions` / `onModeChange` 三态齐全，看上去正是宿主需要的。接了它等于把一个从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它，宿主改线到 sync bridge。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k8-selling-expenses",
+      "wp_code_pattern": "K8S",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K8 实测**有** HTML 对端（checklist_responses + `K8-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K8 销售费用.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK8DualMode.ts"
+      ],
+      "legacy_composables_to_delete_note": "K8 的宿主真消费 `useK8DualMode.ts`（1 条生产边，audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L250）⇒ 必须先把宿主改线到 sync bridge（step 9），然后才能删该文件。删除前它是唯一承载本 entry 模式切换的模块。",
+      "host_inlined_block_to_remove": null,
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k8-dual-mode:",
+      "localStorage_prefix_note": "K8 的前缀由在用 composable 声明；step 5 unify_mode_values 未做 ⇒ 尚未收敛到平台统一前缀 `workpaper-sync-mode:`。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [],
+      "must_not_wire_to_why": "本 entry 无 orphan 孪生（它的 composable 是在用的），无误接对象。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k9-admin-expenses",
+      "wp_code_pattern": "K9A",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K9 实测**有** HTML 对端（checklist_responses + `K9-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K9 管理费用.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts"
+      ],
+      "legacy_composables_to_delete_note": "K9 的宿主真消费 `useK9DualMode.ts`（1 条生产边，audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L218）⇒ 必须先把宿主改线到 sync bridge（step 9），然后才能删该文件。删除前它是唯一承载本 entry 模式切换的模块。",
+      "host_inlined_block_to_remove": null,
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k9-dual-mode:",
+      "localStorage_prefix_note": "K9 的前缀由在用 composable 声明；step 5 unify_mode_values 未做 ⇒ 尚未收敛到平台统一前缀 `workpaper-sync-mode:`。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [],
+      "must_not_wire_to_why": "本 entry 无 orphan 孪生（它的 composable 是在用的），无误接对象。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k10-other-income",
+      "wp_code_pattern": "K10O",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K10 实测**有** HTML 对端（checklist_responses + `K10-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K10 其他收益.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK10DualMode.ts"
+      ],
+      "legacy_composables_to_delete_note": "K10 的宿主真消费 `useK10DualMode.ts`（1 条生产边，audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L176）⇒ 必须先把宿主改线到 sync bridge（step 9），然后才能删该文件。删除前它是唯一承载本 entry 模式切换的模块。",
+      "host_inlined_block_to_remove": null,
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k10-dual-mode:",
+      "localStorage_prefix_note": "K10 的前缀由在用 composable 声明；step 5 unify_mode_values 未做 ⇒ 尚未收敛到平台统一前缀 `workpaper-sync-mode:`。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-9"
+      ],
+      "must_not_wire_to": [],
+      "must_not_wire_to_why": "本 entry 无 orphan 孪生（它的 composable 是在用的），无误接对象。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+      "wp_code_pattern": "K11A",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K11 实测**有** HTML 对端（checklist_responses + `K11-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K11 资产减值损失.xlsx`（7 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK11DualMode.ts"
+      ],
+      "legacy_composables_to_delete_note": "K11 的宿主真消费 `useK11DualMode.ts`（1 条生产边，audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L143）⇒ 必须先把宿主改线到 sync bridge（step 9），然后才能删该文件。删除前它是唯一承载本 entry 模式切换的模块。",
+      "host_inlined_block_to_remove": null,
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k11-dual-mode:",
+      "localStorage_prefix_note": "K11 的前缀由在用 composable 声明；step 5 unify_mode_values 未做 ⇒ 尚未收敛到平台统一前缀 `workpaper-sync-mode:`。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [],
+      "must_not_wire_to_why": "本 entry 无 orphan 孪生（它的 composable 是在用的），无误接对象。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k12-non-operating-income",
+      "wp_code_pattern": "K12N",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K12 实测**有** HTML 对端（checklist_responses + `K12-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K12 营业外收入.xlsx`（9 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK12DualMode.ts"
+      ],
+      "legacy_composables_to_delete_note": "K12 的宿主真消费 `useK12DualMode.ts`（1 条生产边，audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L157）⇒ 必须先把宿主改线到 sync bridge（step 9），然后才能删该文件。删除前它是唯一承载本 entry 模式切换的模块。",
+      "host_inlined_block_to_remove": null,
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k12-dual-mode:",
+      "localStorage_prefix_note": "K12 的前缀由在用 composable 声明；step 5 unify_mode_values 未做 ⇒ 尚未收敛到平台统一前缀 `workpaper-sync-mode:`。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "must_not_wire_to": [],
+      "must_not_wire_to_why": "本 entry 无 orphan 孪生（它的 composable 是在用的），无误接对象。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    },
+    {
+      "entry_id": "xlsx/gt-k13-non-operating-expense",
+      "wp_code_pattern": "K13N",
+      "host_component": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "K13 实测**有** HTML 对端（checklist_responses + `K13-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K13 营业外支出.xlsx`（9 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "legacy_composables_to_delete": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK13DualMode.ts"
+      ],
+      "legacy_composables_to_delete_note": "K13 的宿主真消费 `useK13DualMode.ts`（1 条生产边，audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L156）⇒ 必须先把宿主改线到 sync bridge（step 9），然后才能删该文件。删除前它是唯一承载本 entry 模式切换的模块。",
+      "host_inlined_block_to_remove": null,
+      "legacy_endpoints_to_remove": [
+        "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+        "/api/workpapers/onlyoffice/health"
+      ],
+      "localStorage_prefix": "k13-dual-mode:",
+      "localStorage_prefix_note": "K13 的前缀由在用 composable 声明；step 5 unify_mode_values 未做 ⇒ 尚未收敛到平台统一前缀 `workpaper-sync-mode:`。",
+      "action": "wire_to_bridge_after_unblocking",
+      "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。",
+      "must_fix_before_wiring": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-9"
+      ],
+      "must_not_wire_to": [],
+      "must_not_wire_to_why": "本 entry 无 orphan 孪生（它的 composable 是在用的），无误接对象。",
+      "extra_ui_action_required": "BP-7：在本 entry 声明的 `ui_toolbar_gate` 区块内挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（锚点 audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L8）。🔴 只放 el-tooltip 不算；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+    }
+  ],
+  "excluded_from_plan": [
+    {
+      "what": "K0 管理循环函证（无 manifest entry、无宿主）",
+      "reason": "componentType 为 confirmation-hub，逐 sheet 走跨循环共享的 D0 函证组件族 ⇒ 归 Task 57。",
+      "verified_how": "对 manifest 全量 186 条 entry 现算 `'k0' in entry_id.lower()` 命中数 == 0。"
+    },
+    {
+      "what": "共享基类 useWorkpaperEntryDualMode.ts",
+      "reason": "被 29 个非 K 模块使用，shared_base_preserved 约束不删。",
+      "verified_how": "现算窄口径 statement 边 == 29、其中 K 路径 == 0。"
+    },
+    {
+      "what": "GtKamWorkpaper.vue",
+      "reason": "文件名以 GtK 开头但 wp_code 是 KAM（关键审计事项），不是 K 循环 entry。",
+      "verified_how": "现算 `^GtK` 命中 14 个文件，13 个是本 slice 宿主，剩 1 个无 K+数字 的 wp_code_pattern。"
+    },
+    {
+      "what": "四个 pilot 宿主（B60 / D2 / H1 / G7）的 legacy",
+      "reason": "Task 45 已删除并冻结范式；不重复登记。",
+      "verified_how": "逐文件读四条 pilot 契约的 review.entry_id，无一条属 K。"
+    }
+  ],
+  "counters": {
+    "entries": 13,
+    "composables_to_delete_entry_scoped": 6,
+    "orphan_dual_mode_to_delete": 7,
+    "orphan_dual_mode_lines_total": 838,
+    "live_dual_mode_to_rewire_then_delete": 6,
+    "orphan_barrel_reexports_to_drop": 0,
+    "hosts_with_inlined_second_implementation": 7,
+    "hosts_with_dedicated_composable": 6,
+    "host_inlined_blocks_to_remove": 7,
+    "localStorage_prefix_declaration_sites": 16,
+    "entries_with_extra_ui_action_required": 13,
+    "entries_with_must_fix_before_wiring": 13,
+    "entries_with_must_not_wire_to": 7,
+    "shared_base_consumers_before": 29,
+    "shared_base_consumers_after": 29,
+    "test_files_requiring_sync_change": 0,
+    "counting_recipe": "守卫从各节现算全部计数并与本键等值比对（抄错或凑数即红）：entries = len(entries)；composables_to_delete_entry_scoped = Σ len(entries[].legacy_composables_to_delete) == 6（只有 K8~K13 六条 entry 的 composable 在 entry 范围内删，K1~K7 的走 orphan 节）；orphan_dual_mode_to_delete = len(orphan_dual_mode_to_delete.modules) == 7；live_dual_mode_to_rewire_then_delete = len(live_modules) == 6；host_inlined_blocks_to_remove = 非 null 的 host_inlined_block_to_remove 条数 == 7；hosts_with_inlined_second_implementation + hosts_with_dedicated_composable == 13；localStorage_prefix_declaration_sites = 13 个 composable + 3 处宿主内联 == 16；shared_base_consumers_before == after == 29（K 贡献 0，KD-3）。🔴 `composables_to_delete_entry_scoped`（6）与 `orphan_dual_mode_to_delete`（7）相加 == 13 == 13 个 useK*DualMode.ts 文件总数 ⇒ 两个容器的并集恰覆盖全部、交集为空。"
+  },
+  "properties_verified": [
+    "Property 20（部分真验；contract 维度分母为空的部分不宣称通过 —— 见 property_denominators）",
+    "Property 24（部分真验；双向回写路径不存在故保护判据分母为空 —— 见 property_denominators）",
+    "Property 69（负向真验；正向逐 scenario 闭合待 BP-3）",
+    "Property 70（真验，分母非空：八 slice 28 个配对 + 契约归属 + 模板单射 + 删除路径不相交）"
+  ],
+  "requirements_covered": [
+    "6.1",
+    "6.2",
+    "6.6",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1",
+    "1.4"
+  ]
+}

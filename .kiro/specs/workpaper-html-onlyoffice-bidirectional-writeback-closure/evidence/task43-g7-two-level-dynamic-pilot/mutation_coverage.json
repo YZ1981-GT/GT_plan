@@ -1,0 +1,192 @@
+{
+  "all_executed_are_red": true,
+  "declared_count": 74,
+  "executed_count": 39,
+  "executed_ids": [
+    "M01",
+    "M02",
+    "M03",
+    "M04",
+    "M05",
+    "M06",
+    "M07",
+    "M08",
+    "M09",
+    "M10",
+    "M11",
+    "M12",
+    "M13",
+    "M14",
+    "M15",
+    "M16",
+    "M17",
+    "M18",
+    "M19",
+    "M20",
+    "M21",
+    "M22",
+    "M23",
+    "M24",
+    "M25",
+    "M26",
+    "M27",
+    "M28",
+    "M29",
+    "M30",
+    "M31",
+    "M32",
+    "M33",
+    "M34",
+    "M35",
+    "M36",
+    "M37",
+    "M38",
+    "M39"
+  ],
+  "final_verdicts": {
+    "RED": 39
+  },
+  "four_state_note": "四态判定 RED / GREEN(守卫缺陷) / ANCHOR-MISS(脚本缺陷) / WRONG-TEST。M31 首轮 ERROR（scope_check 误用 JSON 回调 ⇒ pytest 从未执行）、第 4 轮先 GREEN 再 RED，两次都留在 rounds 里",
+  "guard_baseline_passed": 240,
+  "guard_files": [
+    "backend/tests/workpaper_sync/test_task43_g7_two_level_dynamic_pilot.py",
+    "backend/tests/workpaper_sync/test_task43_g7_two_level_dynamic_pilot_pg.py"
+  ],
+  "honest_gap": "声明 74 条、实测 39 条 ⇒ 35 条（['M40', 'M41', 'M42']…）**尚未执行**，覆盖面结论未闭合。本文件如实登记，不以「全 RED」冒充全量",
+  "not_executed_ids": [
+    "M40",
+    "M41",
+    "M42",
+    "M43",
+    "M44",
+    "M45",
+    "M46",
+    "M47",
+    "M48",
+    "M49",
+    "M50",
+    "M51",
+    "M52",
+    "M53",
+    "M54",
+    "M55",
+    "M56",
+    "M57",
+    "M58",
+    "M59",
+    "M60",
+    "M61",
+    "M62",
+    "M63",
+    "M64",
+    "M65",
+    "M66",
+    "M67",
+    "M68",
+    "M69",
+    "M70",
+    "M71",
+    "M72",
+    "M73",
+    "M74"
+  ],
+  "rounds": [
+    {
+      "file": "tmp_task43_mut_a.json",
+      "ids": [
+        "M01",
+        "M02",
+        "M03",
+        "M04",
+        "M05",
+        "M06",
+        "M07",
+        "M08",
+        "M09",
+        "M10",
+        "M11",
+        "M12",
+        "M13",
+        "M14"
+      ],
+      "note": "第 1 轮 M01-M14",
+      "present": true,
+      "verdicts": {
+        "GREEN": 2,
+        "RED": 11,
+        "WRONG-TEST": 1
+      }
+    },
+    {
+      "file": "tmp_task43_mut_b.json",
+      "ids": [
+        "M05",
+        "M06",
+        "M07",
+        "M15",
+        "M16",
+        "M17",
+        "M18",
+        "M19",
+        "M20",
+        "M21",
+        "M22",
+        "M23",
+        "M24",
+        "M25"
+      ],
+      "note": "第 2 轮 M15-M25 + M05/M06/M07 复跑（首轮 GREEN/WRONG-TEST）",
+      "present": true,
+      "verdicts": {
+        "RED": 14
+      }
+    },
+    {
+      "file": "tmp_task43_mut_c.json",
+      "ids": [
+        "M26",
+        "M27",
+        "M28",
+        "M29",
+        "M30",
+        "M31",
+        "M32",
+        "M33",
+        "M34",
+        "M35",
+        "M36",
+        "M37",
+        "M38",
+        "M39"
+      ],
+      "note": "第 3 轮 M26-M39",
+      "present": true,
+      "verdicts": {
+        "ERROR": 1,
+        "RED": 13
+      }
+    },
+    {
+      "file": "tmp_task43_mut_d_probe.json",
+      "ids": [
+        "M31"
+      ],
+      "note": "第 4 轮 M31 诊断跑：修好 scope_check 后判 GREEN —— 证明「identity 是否引用单一真源」这条源码级判据当时并不存在（守卫缺口，不是代码没问题）",
+      "present": true,
+      "verdicts": {
+        "GREEN": 1
+      }
+    },
+    {
+      "file": "tmp_task43_mut_d.json",
+      "ids": [
+        "M31"
+      ],
+      "note": "第 4 轮 M31 复跑：补上 TestProperty22…::test_contract_identity_is_the_imported_constant_never_a_literal 后判 RED",
+      "present": true,
+      "verdicts": {
+        "RED": 1
+      }
+    }
+  ]
+}

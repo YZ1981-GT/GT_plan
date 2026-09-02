@@ -19,6 +19,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g4-bond-investment-sppi" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -93,6 +94,7 @@ import type { AdjustmentEntry } from './composables/useG4MainAdjustment'
 import { persistExceptionDraftsToMainWp } from './composables/g4ExceptionRouting'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G4TabBusinessModel = defineAsyncComponent(

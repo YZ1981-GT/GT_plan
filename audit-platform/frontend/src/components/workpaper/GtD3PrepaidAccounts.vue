@@ -8,6 +8,7 @@
       <div v-if="showModeToolbar" class="d3-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
         <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d3-prepaid-accounts" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -176,6 +177,7 @@ import { useAgingConfig } from '@/composables/useAgingConfig'
 import D3TabIndex from './d3/D3TabIndex.vue'
 import D3TabProcedure from './d3/D3TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const D3TabAdjudication = defineAsyncComponent(() => import('./d3/D3TabAdjudication.vue'))
 const D3TabDetail = defineAsyncComponent(() => import('./d3/D3TabDetail.vue'))

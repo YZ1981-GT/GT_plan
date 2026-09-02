@@ -1,0 +1,146 @@
+[
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_precreated_application_is_refused_before_any_network_call",
+    "why": "跳过凭据自证 ⇒ 「库里已有 application」或「shell 已绑定」时照样出站，AC 4.1「accepted 前不得预建 application」失去执法点。该断言是「已落库」的唯一凭证，跳过它等于回到「先调 OO 再落库」",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 22.71s",
+    "added": [
+      "test_task24_close_intent.py::test_bound_shell_is_refused_before_any_network_call",
+      "test_task24_close_intent.py::test_precreated_application_is_refused_before_any_network_call"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_bound_shell_is_refused_before_any_network_call",
+      "test_task24_close_intent.py::test_precreated_application_is_refused_before_any_network_call"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.8
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_non_credential_argument_is_refused_before_any_network_call",
+    "why": "不再要求 Task 23 的凭据类型 ⇒ 「没落库就调 Command Service」在类型层重新可表达（AC 4.1 的顺序判据）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 22.64s",
+    "added": [
+      "test_task24_close_intent.py::test_non_credential_argument_is_refused_before_any_network_call"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_non_credential_argument_is_refused_before_any_network_call"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.7
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_room]",
+    "why": "doc_key 与凭据里 request 的 room/generation 不再校验 ⇒ 用 A 的 request id 配 B 的 doc_key 会强存 B 的文档却记在 A 的 request 上（两个值单看都合法，DB 层也拦不住）",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 22.86s",
+    "added": [
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_generation]",
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_room]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_generation]",
+      "test_task24_close_intent.py::test_target_must_belong_to_the_frozen_request_generation[other_room]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 26.0
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_null_initiator_is_refused_before_the_command_service_call",
+    "why": "null initiator 不再在出站前被拒 ⇒ system/route identity 可以冒充用户授权（AC 10.10 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 21.79s",
+    "added": [
+      "test_task24_close_intent.py::test_null_initiator_is_refused_before_the_command_service_call"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_null_initiator_is_refused_before_the_command_service_call"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 24.7
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_non_200_is_a_transport_failure_not_a_return_code",
+    "why": "非 200 不再归传输层异常 ⇒ 网关/反代返回的 502 会被送进 JSON 解析并按「返回码」处理，诊断方向完全错（契约实测 OO 9.4 恒返 200）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 21.20s",
+    "added": [
+      "test_task24_close_intent.py::test_non_200_is_a_transport_failure_not_a_return_code"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_non_200_is_a_transport_failure_not_a_return_code"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 24.0
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[missing_error_key]",
+    "why": "body 缺 `error` 不再拒 ⇒ 变成 `rule_for(None)`，抛的是「未知返回码」而不是「读不出 error」。两种未知的诊断动作不同（查网关 vs 补契约行），所以它们必须分型",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 21.37s",
+    "added": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[missing_error_key]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[missing_error_key]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 24.2
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[error_is_bool]",
+    "why": "`bool` 不再被拒 ⇒ `{'error': true}` 因 `True == 1` 被读成 error 1，「doc 不在线」的语义凭空出现。契约禁止按最近似码猜处理",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 20.98s",
+    "added": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[error_is_bool]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_unreadable_or_unknown_return_code_fails_visible[error_is_bool]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.6
+  }
+]

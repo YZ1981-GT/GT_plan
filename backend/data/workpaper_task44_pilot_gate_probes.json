@@ -1,0 +1,1022 @@
+{
+  "declared_properties": [
+    "P18",
+    "P25",
+    "P26",
+    "P29",
+    "P43",
+    "P44",
+    "P49",
+    "P55",
+    "P56",
+    "P58",
+    "P62",
+    "P63",
+    "P64",
+    "P65",
+    "P66",
+    "P69"
+  ],
+  "gate_probe_count": 5,
+  "gate_script": "backend/scripts/check/check_task44_oo94_excel_pilot_gate.py",
+  "gate_version": "task44-gate/1",
+  "per_pilot_probe_count": 42,
+  "pilots": [
+    {
+      "module": "app.services.workpaper_sync.pilot_simple_checklist",
+      "owner_task": 40,
+      "pilot_class": "simple_checklist"
+    },
+    {
+      "module": "app.services.workpaper_sync.pilot_d2_large_json",
+      "owner_task": 41,
+      "pilot_class": "d2_large_json"
+    },
+    {
+      "module": "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
+      "owner_task": 42,
+      "pilot_class": "h1_grouped_dynamic"
+    },
+    {
+      "module": "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
+      "owner_task": 43,
+      "pilot_class": "g7_two_level_dynamic"
+    }
+  ],
+  "probes": [
+    {
+      "anchor": "已按 Task 36 finalize",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities"
+      ],
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.task36_finalized",
+      "production_refs": [
+        "app.services.workpaper_sync.excel_entry_gate:ExcelEntryDefinitionLoader",
+        "app.services.workpaper_sync.excel_entry_gate:FrozenEntryDefinitions"
+      ],
+      "properties": [
+        "P49"
+      ],
+      "requirements": [
+        "12.2"
+      ],
+      "scenario_id": null,
+      "why": "Task 36 finalize（candidate → published representation）之后方可注册 adapter / 启用 capability；三个信号（capability / adapter 注册 / published identity 观测器）任一不成立即不得测试该 entry"
+    },
+    {
+      "anchor": "resolver返回 published representation",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities"
+      ],
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.resolver_published_representation",
+      "production_refs": [
+        "app.services.workpaper_sync.resolution:CanonicalResolutionService"
+      ],
+      "properties": [
+        "P49",
+        "P65"
+      ],
+      "requirements": [
+        "12.2",
+        "8.10"
+      ],
+      "scenario_id": null,
+      "why": "生产接线点 `attach_pilot_adapters()` 必须能从 entry_state 取到 published representation 才返回 adapter_id；返回空元组即「今天还没 finalize」"
+    },
+    {
+      "anchor": "approved per-entry bundle",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities",
+        "artifact_digests"
+      ],
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.approved_per_entry_bundle",
+      "production_refs": [
+        "app.services.workpaper_sync.definitions:build_bundle_canonical_payload",
+        "app.services.workpaper_sync.representations:assert_bundle_snapshot_finalizable"
+      ],
+      "properties": [
+        "P64"
+      ],
+      "requirements": [
+        "12.10",
+        "14.16"
+      ],
+      "scenario_id": null,
+      "why": "representation 必须绑定本 entry 自己的 approved non-null definition bundle （authority model + template + instrumentation + contract 四个 typed child）"
+    },
+    {
+      "anchor": "candidate、unapproved/missing-contract bundle",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities"
+      ],
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.no_candidate_or_unapproved_substrate",
+      "production_refs": [
+        "app.services.workpaper_sync.resolution:CanonicalResolutionService"
+      ],
+      "properties": [
+        "P65"
+      ],
+      "requirements": [
+        "8.10",
+        "12.10"
+      ],
+      "scenario_id": null,
+      "why": "candidate / unapproved / 缺契约的 bundle 不得进入 resolver/room/current/evidence；🔴 今天无 substrate 可查 ⇒ 判据**空转**，空转不算通过（零场景全过是本 spec 反复点名的假绿形态）"
+    },
+    {
+      "anchor": "HTML→OO",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.html_to_oo",
+      "production_refs": [],
+      "properties": [
+        "P29",
+        "P55"
+      ],
+      "requirements": [
+        "14.2"
+      ],
+      "scenario_id": "html_to_oo",
+      "why": "HTML 提交后 canonical artifact 在 OO 侧可见"
+    },
+    {
+      "anchor": "OO→HTML",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.oo_to_html",
+      "production_refs": [],
+      "properties": [
+        "P29",
+        "P55"
+      ],
+      "requirements": [
+        "14.2"
+      ],
+      "scenario_id": "oo_to_html",
+      "why": "durable callback 后结构化内容在 HTML 侧可见且 revision 递增"
+    },
+    {
+      "anchor": "、identity、",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.identity_retention",
+      "production_refs": [],
+      "properties": [
+        "P66"
+      ],
+      "requirements": [
+        "6.16",
+        "14.5"
+      ],
+      "scenario_id": "identity_retention",
+      "why": "identity 载体经真实 OO 打开/编辑/插删/排序/复制/forcesave/重开后仍保留"
+    },
+    {
+      "anchor": "different-field merge",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.different_field_merge",
+      "production_refs": [],
+      "properties": [
+        "P25"
+      ],
+      "requirements": [
+        "6.8",
+        "14.2"
+      ],
+      "scenario_id": "different_field_merge",
+      "why": "不同字段并行修改自动合并且 conflict_count=0"
+    },
+    {
+      "anchor": "same-field conflict/resolve",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.same_field_conflict_resolve",
+      "production_refs": [],
+      "properties": [
+        "P26"
+      ],
+      "requirements": [
+        "6.8",
+        "14.2"
+      ],
+      "scenario_id": "same_field_conflict_resolve",
+      "why": "同字段异值必冲突、三值完整、裁决后才落库"
+    },
+    {
+      "anchor": "frozen-base status 6/2 dedupe",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.frozen_base_status_6_2_dedupe",
+      "production_refs": [],
+      "properties": [
+        "P18",
+        "P56",
+        "P64"
+      ],
+      "requirements": [
+        "14.3"
+      ],
+      "scenario_id": "frozen_base_status_6_2_dedupe",
+      "why": "status 6/2 与网络重试命中同一 frozen identity 只应用一次"
+    },
+    {
+      "anchor": "same-application higher-sequence fold不self-stale",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.same_application_higher_sequence_fold",
+      "production_refs": [],
+      "properties": [
+        "P18",
+        "P64"
+      ],
+      "requirements": [
+        "5.5"
+      ],
+      "scenario_id": "same_application_higher_sequence_fold",
+      "why": "同 canonical application 的更高 sequence 只 fold、不 self-stale、origin 不改写"
+    },
+    {
+      "anchor": "跨participant同Idempotency-Key及不同kind/payload均409且不泄露旧ID",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.cross_participant_idempotency_409",
+      "production_refs": [],
+      "properties": [
+        "P18",
+        "P64"
+      ],
+      "requirements": [
+        "5.5"
+      ],
+      "scenario_id": "cross_participant_idempotency_409",
+      "why": "跨 participant 复用同 Idempotency-Key 及不同 kind/payload 均 409 且不返回旧 ID"
+    },
+    {
+      "anchor": "quarantined拒绝application/engine",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.quarantined_rejects_application_and_engine",
+      "production_refs": [],
+      "properties": [
+        "P65"
+      ],
+      "requirements": [
+        "8.10"
+      ],
+      "scenario_id": "quarantined_rejects_application_and_engine",
+      "why": "quarantined incoming 在 application FK / coordinator / engine 三层各自被拒"
+    },
+    {
+      "anchor": "opaque version UUID rollback与跨wp同numeric revision无碰撞",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.opaque_version_rollback_no_numeric_collision",
+      "production_refs": [],
+      "properties": [
+        "P65"
+      ],
+      "requirements": [
+        "14.6"
+      ],
+      "scenario_id": "opaque_version_rollback_no_numeric_collision",
+      "why": "rollback 只接受 opaque version UUID；跨 wp 相同 numeric revision 不碰撞"
+    },
+    {
+      "anchor": "browser crash no-userdata recovery case",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.browser_crash_no_userdata_recovery_case",
+      "production_refs": [],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "14.3",
+        "14.8"
+      ],
+      "scenario_id": "browser_crash_no_userdata_recovery_case",
+      "why": "无 userdata 的 crash close 建 recovery case，claim 前三实体为 0"
+    },
+    {
+      "anchor": "authorization-first claim",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.authorization_first_recovery_claim",
+      "production_refs": [],
+      "properties": [
+        "P43",
+        "P58"
+      ],
+      "requirements": [
+        "10.10"
+      ],
+      "scenario_id": "authorization_first_recovery_claim",
+      "why": "authorization-first claim 在一个事务内建 request+shell 并创建/命中 application"
+    },
+    {
+      "anchor": "错误 prior confirmation/bundle/fence/contributor 拒绝",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.wrong_prior_confirmation_bundle_fence_contributor_rejected",
+      "production_refs": [],
+      "properties": [
+        "P43",
+        "P44"
+      ],
+      "requirements": [
+        "10.10",
+        "10.3"
+      ],
+      "scenario_id": "wrong_prior_confirmation_bundle_fence_contributor_rejected",
+      "why": "错误 prior confirmation / bundle / fence / contributor 一律拒绝且不产生 operation"
+    },
+    {
+      "anchor": "download-only 三实体为 0",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.download_only_zero_three_entities",
+      "production_refs": [],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "14.3"
+      ],
+      "scenario_id": "download_only_zero_three_entities",
+      "why": "download-only 只终结 case 并签下载，request/application/operation 恒为 0"
+    },
+    {
+      "anchor": "merged≠incoming refresh/reopen",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.refresh_required_reopen",
+      "production_refs": [],
+      "properties": [
+        "P62"
+      ],
+      "requirements": [
+        "4.11",
+        "14.2"
+      ],
+      "scenario_id": "refresh_required_reopen",
+      "why": "merged≠incoming ⇒ refresh_required，supersede/reopen 后才接受下一次 request"
+    },
+    {
+      "anchor": "refresh/reopen与 rollback",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.rollback",
+      "production_refs": [],
+      "properties": [
+        "P65"
+      ],
+      "requirements": [
+        "14.2",
+        "14.6"
+      ],
+      "scenario_id": "rollback",
+      "why": "回滚到历史 content version 并重物化，比对 rematerialized representation hash"
+    },
+    {
+      "anchor": "动态能力再跑插删/排序/复制",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.dynamic_row_add_delete_reorder_copy",
+      "production_refs": [],
+      "properties": [
+        "P66"
+      ],
+      "requirements": [
+        "14.5"
+      ],
+      "scenario_id": "dynamic_row_add_delete_reorder_copy",
+      "why": "动态行增删重排复制按 row identity 合并 —— 「在 OO 里插一行」只能真实 OO 做"
+    },
+    {
+      "anchor": "single close",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.single_participant_close",
+      "production_refs": [],
+      "properties": [
+        "P63",
+        "P69"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": "single_participant_close",
+      "why": "单用户 clean close 最终恰一个 close-capture"
+    },
+    {
+      "anchor": "两个用户两种关闭顺序",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.two_user_close_order_a_then_b",
+      "production_refs": [],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": "two_user_close_order_a_then_b",
+      "why": "两用户 A→B 顺序关闭，最终恰一个 close-capture"
+    },
+    {
+      "anchor": "两个用户两种关闭顺序",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.two_user_close_order_b_then_a",
+      "production_refs": [],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": "two_user_close_order_b_then_a",
+      "why": "两用户 B→A 顺序关闭，最终恰一个 close-capture"
+    },
+    {
+      "anchor": "A terminal 前/后 B close",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.b_close_before_a_forcesave_terminal",
+      "production_refs": [],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": "b_close_before_a_forcesave_terminal",
+      "why": "A 的普通 forcesave terminal 之前 B close：barrier 必须等前置 forcesave 安全终结"
+    },
+    {
+      "anchor": "A terminal 前/后 B close",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.b_close_after_a_forcesave_terminal",
+      "production_refs": [],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": "b_close_after_a_forcesave_terminal",
+      "why": "A 的普通 forcesave terminal 之后 B close"
+    },
+    {
+      "anchor": "leader promotion前revoke/expire后的successor",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.close_leader_revoked_successor_exactly_one",
+      "production_refs": [],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "4.10",
+        "10.4"
+      ],
+      "scenario_id": "close_leader_revoked_successor_exactly_one",
+      "why": "leader promotion 前被 revoke/expire、存在合法 successor ⇒ 仍恰一个 capture"
+    },
+    {
+      "anchor": "无successor`recovery_required`",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.close_leader_revoked_no_successor_recovery_required",
+      "production_refs": [],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "4.10",
+        "10.4"
+      ],
+      "scenario_id": "close_leader_revoked_no_successor_recovery_required",
+      "why": "无合法 successor ⇒ 零 capture + generation supersede + 显式 recovery_required"
+    },
+    {
+      "anchor": "`reconcile_close_intents()` 重入",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.close_reconciler_reentrant_exactly_one_capture",
+      "production_refs": [],
+      "properties": [
+        "P63",
+        "P69"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": "close_reconciler_reentrant_exactly_one_capture",
+      "why": "reconcile 重入（同 eligibility snapshot 重放）不换 leader、不产生第二 capture"
+    },
+    {
+      "anchor": "验证适用路径最终 exactly-one close-capture",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "close_barrier",
+        "db_entities"
+      ],
+      "has_validator": true,
+      "probe_class": "close_aspect",
+      "probe_id": "close_aspect.exactly_one_capture_on_applicable_paths",
+      "production_refs": [
+        "app.services.workpaper_sync.close_intent:CloseIntentService",
+        "app.services.workpaper_sync.close_intent:assert_at_most_one_open_capture"
+      ],
+      "properties": [
+        "P63",
+        "P69"
+      ],
+      "requirements": [
+        "4.10"
+      ],
+      "scenario_id": null,
+      "why": "逐条 close 路径的实测 capture 数必须等于生产 CLOSE_SCENARIOS 的声明值"
+    },
+    {
+      "anchor": "核对聚合 artifact",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "close_barrier",
+        "db_entities",
+        "artifact_digests"
+      ],
+      "has_validator": true,
+      "probe_class": "close_aspect",
+      "probe_id": "close_aspect.aggregate_artifact",
+      "production_refs": [
+        "app.services.workpaper_sync.rooms:ContributorSnapshot",
+        "app.services.workpaper_sync.rooms:ContributorRecord"
+      ],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "10.9",
+        "10.2"
+      ],
+      "scenario_id": null,
+      "why": "同 room 两用户可贡献同一 artifact：一个 artifact / ≥2 contributor / initiator 可定位"
+    },
+    {
+      "anchor": "initiator/route/contributors 分离",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "close_barrier",
+        "db_entities"
+      ],
+      "has_validator": true,
+      "probe_class": "close_aspect",
+      "probe_id": "close_aspect.initiator_route_contributors_separated",
+      "production_refs": [
+        "app.services.workpaper_sync.rooms:RouteCredential",
+        "app.services.workpaper_sync.rooms:mint_route_credential"
+      ],
+      "properties": [
+        "P63"
+      ],
+      "requirements": [
+        "10.2",
+        "10.9"
+      ],
+      "scenario_id": null,
+      "why": "initiator、callback route credential 与多 contributor 关系分表记录且互不相等"
+    },
+    {
+      "anchor": "revoke/drop/generation rotation",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "close_barrier",
+        "db_entities",
+        "onlyoffice_forcesave"
+      ],
+      "has_validator": true,
+      "probe_class": "close_aspect",
+      "probe_id": "close_aspect.revoke_drop_generation_rotation",
+      "production_refs": [
+        "app.services.workpaper_sync.rooms:RevokeOutcome",
+        "app.services.workpaper_sync.rooms:revocation_policy"
+      ],
+      "properties": [
+        "P44"
+      ],
+      "requirements": [
+        "10.3",
+        "10.4"
+      ],
+      "scenario_id": null,
+      "why": "撤销写 participant 时以 OO drop 取证；无法取证即提升 write_fence_epoch、取消 outstanding request 并 supersede generation"
+    },
+    {
+      "anchor": "联合 Playwright network/console",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "browser_trace"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.playwright_network_console",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:assert_trace_bundle_published"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "14.8"
+      ],
+      "scenario_id": null,
+      "why": "前端 network + console 证据：network 非空、零 error 级 console、har 内容寻址"
+    },
+    {
+      "anchor": "recovery+application+operation timeline",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "server_timeline",
+        "recovery_lifecycle"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.recovery_application_operation_timeline",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:evaluate_timeline_order",
+        "app.services.workpaper_sync.timeline:SyncTimelineService"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "14.8"
+      ],
+      "scenario_id": null,
+      "why": "两条生产顺序常量逐条成立（委派生产 evaluate_timeline_order）"
+    },
+    {
+      "anchor": "DB timestamps",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "server_timeline",
+        "db_entities"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.db_timestamps",
+      "production_refs": [
+        "app.services.workpaper_sync.timeline:assert_server_clock_only"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "14.8"
+      ],
+      "scenario_id": null,
+      "why": "数据库时间戳必须来自服务端时钟、tz-aware 且单调"
+    },
+    {
+      "anchor": "published result representation",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities",
+        "artifact_digests"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.published_result_representation",
+      "production_refs": [
+        "app.services.workpaper_sync.representations:RepresentationService",
+        "app.services.workpaper_sync.excel_extract:extract_projection"
+      ],
+      "properties": [
+        "P29",
+        "P65"
+      ],
+      "requirements": [
+        "6.11",
+        "8.10",
+        "14.6"
+      ],
+      "scenario_id": null,
+      "why": "结果只能是 published result representation，且 materialize→extract 往返等值"
+    },
+    {
+      "anchor": "authority model",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "artifact_digests"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.authority_model",
+      "production_refs": [
+        "app.services.workpaper_sync.definitions:canonical_digest"
+      ],
+      "properties": [
+        "P64"
+      ],
+      "requirements": [
+        "14.16",
+        "14.6"
+      ],
+      "scenario_id": null,
+      "why": "authority model 枚举与其 definition digest 必须等于本 entry 现算值"
+    },
+    {
+      "anchor": "bundle digest/typed slots",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "artifact_digests"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.bundle_digest_typed_slots",
+      "production_refs": [
+        "app.services.workpaper_sync.definitions:build_bundle_canonical_payload",
+        "app.services.workpaper_sync.evidence_freshness:recompute_bundle_canonical_digest"
+      ],
+      "properties": [
+        "P64"
+      ],
+      "requirements": [
+        "12.10",
+        "14.16"
+      ],
+      "scenario_id": null,
+      "why": "bundle canonical digest + template/instrumentation/contract 三类 typed child 逐个等于现算值，且 slot type 全为 definition（marker 不得冒充）"
+    },
+    {
+      "anchor": "artifact/identity inventory",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "artifact_digests",
+        "onlyoffice_forcesave"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.artifact_identity_inventory",
+      "production_refs": [
+        "app.services.workpaper_sync.excel_instrumentation:read_back_identity",
+        "app.services.workpaper_sync.excel_instrumentation:GT_SYNC_SHEET_NAME"
+      ],
+      "properties": [
+        "P66"
+      ],
+      "requirements": [
+        "6.16",
+        "14.5"
+      ],
+      "scenario_id": null,
+      "why": "artifact 的 identity inventory：metadata sheet 名取自生产常量，defined names / row uuids 非空"
+    },
+    {
+      "anchor": "逐 scenario 记录独立 application IDs并入库",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.per_scenario_distinct_application_ids",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:assert_no_reuse_within_run",
+        "app.services.workpaper_sync.pilot_harness:assert_no_reuse_across_entry"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.10"
+      ],
+      "scenario_id": null,
+      "why": "每条 required scenario 各自持有非空且互不复用的 application id（委派生产 assert_no_reuse_within_run）"
+    },
+    {
+      "anchor": "完整复原数据",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [
+        "db_entities"
+      ],
+      "has_validator": true,
+      "probe_class": "evidence_channel",
+      "probe_id": "channel.full_data_restoration",
+      "production_refs": [
+        "app.services.workpaper_sync.retention:RetentionPolicyService"
+      ],
+      "properties": [
+        "P49"
+      ],
+      "requirements": [
+        "14.9"
+      ],
+      "scenario_id": null,
+      "why": "pilot 前后逐表行数相等 —— 「完整复原」是实测计数比对，不是一句声明"
+    },
+    {
+      "anchor": "不得以文档声明通过",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.no_documentary_pass",
+      "production_refs": [],
+      "properties": [
+        "P49",
+        "P69"
+      ],
+      "requirements": [
+        "14.9",
+        "12.2"
+      ],
+      "scenario_id": null,
+      "why": "把一条带 result 字段的执行记录喂进真正的记录校验器，必须被 DocumentaryClaimRejected 拒绝；拒绝没发生就不给这条 probe 判 passed"
+    },
+    {
+      "anchor": "阻断 Wave 5",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.blocks_wave5",
+      "production_refs": [],
+      "properties": [
+        "P49"
+      ],
+      "requirements": [
+        "12.2"
+      ],
+      "scenario_id": null,
+      "why": "只要有一条 probe 未 passed，本门的退出码必须非零（阻断 Wave 5）"
+    },
+    {
+      "anchor": "任一 probe 未真实执行时标 UNVERIFIABLE",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.ordering_upstream_gap_before_black_box",
+      "production_refs": [],
+      "properties": [
+        "P49"
+      ],
+      "requirements": [
+        "14.9"
+      ],
+      "scenario_id": null,
+      "why": "upstream-gap 判 failed 且排在黑盒判定之前 —— 源码位置 + 反事实行为双侧实测；顺序交换会让缺实现的场景在接上真实 OO 后自动刷绿"
+    },
+    {
+      "anchor": "已按 Task 36 finalize",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.admission_is_state_sensitive",
+      "production_refs": [],
+      "properties": [
+        "P49"
+      ],
+      "requirements": [
+        "12.2"
+      ],
+      "scenario_id": null,
+      "why": "用替身把四个 finalize 信号全部翻成「已就绪」并复跑同一函数，准入判定必须改变 —— 证明本门真实反读状态而不是硬编码 false"
+    },
+    {
+      "anchor": "14.7",
+      "anchor_occurrences_in_task_text": 1,
+      "evidence_inputs": [],
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.mutation_four_state",
+      "production_refs": [],
+      "properties": [
+        "P49"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": null,
+      "why": "变异检验四态：declared==executed 且全部 RED，否则本门不认为守卫成立"
+    }
+  ],
+  "properties_claimed_but_not_declared": [],
+  "properties_without_probe": [],
+  "property_titles": {
+    "P18": "delivery 可多次、frozen application 恰好一次",
+    "P25": "不同字段自动三方合并",
+    "P26": "同字段异值必冲突",
+    "P29": "materialize/extract roundtrip",
+    "P43": "最终 commit 重验权限与 generation write fence",
+    "P44": "只读/被撤销 contributor 零内容版本",
+    "P49": "pilot 四类 Excel 均覆盖",
+    "P55": "真浏览器双向闭环",
+    "P56": "重复 callback 零多版本",
+    "P58": "客户端与服务端联合时序",
+    "P62": "server last-applied 与 client-confirmed base 不混同",
+    "P63": "shared room 聚合 callback 与 participant 撤销安全",
+    "P64": "application identity 使用 frozen bundle 且不含 status",
+    "P65": "business projection 与同 revision representation 等值",
+    "P66": "Excel identity 经真实 OO 往返保留",
+    "P69": "evidence 由逐 scenario 实体与服务端重算闭合"
+  },
+  "registry_digest": "0a5789bc9677afaa3d476ef3c39c183d77d33178615c92c36c9dc3563793259a",
+  "requirements_without_probe": [],
+  "schema_version": "task44-probe-registry:v1",
+  "task_body_sha256": "cee755fdabea3e7dc21b028896c890d67ef9b179ef35963014bcfef35ed9b250",
+  "task_number": 44,
+  "task_requirements": [
+    "10.10",
+    "10.2",
+    "10.3",
+    "10.4",
+    "10.9",
+    "12.10",
+    "12.2",
+    "14.16",
+    "14.2",
+    "14.3",
+    "14.5",
+    "14.6",
+    "14.7",
+    "14.8",
+    "14.9",
+    "4.10",
+    "4.11",
+    "5.5",
+    "6.11",
+    "6.16",
+    "6.8",
+    "8.10"
+  ],
+  "total_probe_rows": 173
+}

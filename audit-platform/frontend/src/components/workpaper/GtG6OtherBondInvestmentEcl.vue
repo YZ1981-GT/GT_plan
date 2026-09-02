@@ -19,6 +19,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g6-other-bond-investment-ecl" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -119,6 +120,7 @@ import { useG6EclDualMode } from './composables/useG6EclDualMode'
 import { useG6EclFormData, type ChecklistResponse } from './composables/useG6EclFormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { matchG6SaveItemsEvent } from './composables/g6CrossHelpers'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── defineAsyncComponent 懒加载所有子组件 ───────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))

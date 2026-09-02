@@ -56,6 +56,11 @@ EXCLUDE_PARTS = {".git", ".venv", "__pycache__", "node_modules", "dist", "build"
                  ".pytest_cache", ".hypothesis", "_archive", "auto-imports.d.ts",
                  "components.d.ts", "alembic"}
 
+# 生成物后缀：与上面 `auto-imports.d.ts` / `components.d.ts` 同一意图 —— 由脚本生成的文件
+# 「请拆分」不可执行（下次重新生成又会变回去），该管的是**生成器**（生成器本身是手写
+# 代码，照常受本门约束）。按后缀而不是按 path part 判，因为文件名前缀各不相同。
+GENERATED_SUFFIXES = (".generated.ts", ".generated.d.ts", "_pb2.py", ".gen.ts")
+
 
 def load_whitelist() -> dict[str, int]:
     """读 whitelist：`path  baseline_lines`（空格分隔，# 注释）。"""
@@ -88,6 +93,8 @@ def check_file(rel_path: str, abs_path: Path, whitelist: dict[str, int]) -> tupl
     suffix = abs_path.suffix
     limit = LIMITS.get(suffix)
     if limit is None:
+        return 0, ""
+    if rel_path.endswith(GENERATED_SUFFIXES):
         return 0, ""
     lines = count_lines(abs_path)
 

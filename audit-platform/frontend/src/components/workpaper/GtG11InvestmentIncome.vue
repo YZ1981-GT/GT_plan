@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g11-investment-income" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -189,6 +190,7 @@ import { offerG11DisclosurePull, G11_OFFER_DISCLOSURE_PULL_EVENT, promptForG11Di
 import GtIndexChip from './GtIndexChip.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G11TabProcedure = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabProcedure.vue'))
 const G11TabAdjudication = defineAsyncComponent(() => import('./g11-investment-income/core/G11TabAdjudication.vue'))

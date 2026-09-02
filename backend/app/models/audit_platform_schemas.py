@@ -848,6 +848,12 @@ class EventType(str, enum.Enum):
     TRIAL_BALANCE_UPDATED = "trial_balance.updated"
     REPORTS_UPDATED = "reports.updated"
     WORKPAPER_SAVED = "workpaper.saved"
+    # workpaper-html-onlyoffice-bidirectional-writeback-closure Task 15 / AC 13.1:
+    # 业务内容 commit 与 representation generation 发布的耐久事件。与 WORKPAPER_SAVED
+    # 分开是刻意的：后者是 HTML 保存的既有语义（含状态/复核变化），本事件只在
+    # ContentMutationService 的唯一业务事务提交后发布，payload 固定携带
+    # content version / representation / definition bundle identity。
+    WORKPAPER_CONTENT_UPDATED = "workpaper.content.updated"
     NOTE_UPDATED = "note.updated"
     # R1 需求 2：复核意见 → 工单补偿联动
     REVIEW_RECORD_CREATED = "review_record.created"

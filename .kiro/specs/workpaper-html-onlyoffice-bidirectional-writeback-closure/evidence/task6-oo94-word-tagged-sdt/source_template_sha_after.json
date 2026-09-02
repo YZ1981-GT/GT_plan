@@ -1,0 +1,19 @@
+{
+  "stage": "after",
+  "checked_at": "2026-08-25T00:10:25.721970+00:00",
+  "templates": {
+    "backend/wp_templates/F/F2-22 存货监盘计划.docx": {
+      "sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+      "bytes": 37539
+    },
+    "backend/wp_templates/F/F2-23 存货监盘小结.docx": {
+      "sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+      "bytes": 37335
+    },
+    "backend/wp_templates/B/B30-11-2 内部控制缺陷汇总与评估.docx": {
+      "sha256": "b4facd6b7d31b1419eb102ede582e7e77b1a5c685a3f9513bb546b9de0bbb247",
+      "bytes": 25736
+    }
+  },
+  "lock_files": []
+}

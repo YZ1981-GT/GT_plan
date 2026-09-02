@@ -19,6 +19,7 @@
           size="small"
           @change="switchMode"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h5-oil-gas-assets" />
         <span v-if="ooHealthStatus" class="h5-oo-tag" :class="'h5-oo-tag--' + ooHealthStatus">
           {{ ooHealthStatus === 'ready' ? 'OnlyOffice 拉取成功' : ooHealthStatus === 'fetching' ? '正在拉取...' : ooHealthStatus === 'checking' ? '检测中...' : '仅结构化视图' }}
         </span>
@@ -309,6 +310,7 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H5TabIndex 非 lazy（底稿目录轻量，首屏必显）

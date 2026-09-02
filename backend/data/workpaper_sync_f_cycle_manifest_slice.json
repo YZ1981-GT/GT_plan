@@ -1,0 +1,1665 @@
+{
+  "schema_version": "manifest-slice:v1",
+  "task": "Task 48",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "F 循环 Excel 独立 entry 的冻结 manifest slice。按 definition_producer_paradigm 的 12 步流水线逐 entry 执行 step 1~4 与 step 11：① 从 source manifest 按可复算 selection_rule 冻结 8 条独立 entry（F 码 xlsx 全部 independent，无 parent_duplicate）；② 冻结 backend/wp_templates/F/ 全 18 个文件的 size + sha256，8 张主模板另冻 normalized_structure_hash；③ 逐 entry 实测 HTML 对端 —— 8/8 都把业务内容落在 checklist_responses（GET/PUT /api/workpapers/{wp_id}/checklist-responses，payload 列 remark），故 html_counterpart_verdict 全为 exists；④ 按 AC 12.8 一条都不得标 single_onlyoffice，按 AC 12.1 也都不得标 bidirectional（六件前置未交付）⇒ capability 记 null 并如实计入 unadjudicated=8；⑪ 8 个宿主的模式工具栏挂 GtEntrySyncCapabilityNotice 兑现 AC 1.4。F 循环的 HTML 对端**不是**单一 item_id 形态：F2 核心组用 `{sheet_code}-rows` 复合键（dataKey()），F2 监盘用 `{sheet_code}-fields` + 统一 commit 的 `opaque:{wp_code}#{sheet_code}` 复合 entry_id，行身份键也分 rowId / id 两族且生成器各不相同 —— 逐 entry 实测后按实际形态登记，不套用 D 循环的「全 rowId」结论。",
+  "frozen_at": "Task 48（2026-08-31）",
+  "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "sibling_slices": [
+    "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_e_cycle_manifest_slice.json"
+  ],
+  "slice_scope": {
+    "cycle": "F",
+    "document_type": "xlsx",
+    "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'F' 开头 ③ independent_entry is True。实算：命中 wp_code 前缀 F 的共 8 条，全部 document_type == 'xlsx'、全部 independent_entry == true ⇒ independent 8 条、parent_duplicate 0 条。全量 manifest 里 7 条 docx entry 无一条命中 F 前缀（A10B/A12B/A16B/A17B 三码 + 两个无 wp_code 的通用 Word 宿主 + WorkpaperWordEditor），故 F2 Word 通道不产生 manifest entry，见 excluded_from_slice 第 1 条。",
+    "independent_entry_count": 8,
+    "parent_duplicate_count": 0,
+    "parent_duplicate_note": "F 循环无 parent_duplicate 子入口：8 条 entry 的 parent_entry_id 全为 null、migration_state 全为 legacy_fake_bidirectional。这与 D 循环（D4 有 31 条 xlsx/d4/... 子入口）形态不同 —— F2 的 5 个宿主是**同级并列**的独立 entry（核心/特殊/计价减值/监盘 + 各自的 componentType），不是一个父宿主的多 sheet 子入口，故 AC 1.6 的「不得重复计为已迁移」在本 slice 无适用对象，但它们共享同一个 wp_code 前缀 F2，模板归属见 authoritative_templates。",
+    "excluded_from_slice": [
+      {
+        "what": "F2-22 存货监盘计划 / F2-23 存货监盘小结的 **Word（docx）通道**",
+        "template_ref": "F/F2-22 存货监盘计划.docx 与 F/F2-23 存货监盘小结.docx",
+        "reason": "任务正文明令「与 F2 Word lane 分开计数」，该通道归 Tasks 60/61。实证边界有三条：① 两个 docx 都**不在** backend/wp_templates/_index.json 里（15 条 F 索引项全是 xlsx），运行时只能经 wp_template_finder._EXPLICIT_TEMPLATE_RELPATHS 的显式映射拿到，与 xlsx 索引链无关；② 它们的读写端点是 POST /api/workpapers/{wp_id}/f2-st/plan-sync-{to,from}-oo 与 summary-sync-{to,from}-oo，与本 slice 8 条 entry 走的 GtOnlyOfficeSheet + legacy_sheet_onlyoffice_router 是两条独立通道；③ 全量 manifest 的 7 条 docx entry 无一条 wp_code 前缀为 F ⇒ Word 通道在 source manifest 里没有 entry，不能进本 slice 的 independent_entries。**但**这两个 docx 的 size+sha256 仍登记在 authoritative_templates（belongs_to_entry=null + excluded_reason），因为它们物理上在 F 权威目录内，漏登会让「登记集合 == 磁盘实况」这条判据失效。"
+      },
+      {
+        "what": "F0 存货循环函证的 9 个 confirmation-* 组件族（F0 / F0-1 ~ F0-8 / F0A）",
+        "template_ref": "F/F0 存货循环函证.xlsx",
+        "reason": "F0 走的是 D0 那套跨循环共享函证模块（wp_code_overrides 里 F0→confirmation-hub、F0-1→confirmation-summary … F0-8→confirmation-fraud-risk，与 D0/E0/G0/H0/K0/L0 同一组 componentType），纯 HTML 无 GtOnlyOfficeSheet 挂载点 ⇒ 不在 source manifest 的 186 条 entry 里，归 Task 57。本 slice 不为它伪造 entry，只把模板文件登记进 authoritative_templates。"
+      },
+      {
+        "what": "F2存货.xlsx —— 74 sheet 的 F2 全循环合册",
+        "template_ref": "F/F2存货.xlsx",
+        "reason": "磁盘上 560,160 字节的合册，sheet 集合是 10 本拆分工作簿的并集（F2A/F2-1…F2-72 全含，另有 8 个「底稿目录 (2)…(8)」重复目录页）。它**不在** _index.json 里 ⇒ find_template_file('F2') 的精确匹配分支（按索引筛 wp_code=='F2'）永不返回它；而 F2 在索引里有 11 条命中，精确分支必然命中 ⇒ 模糊匹配的磁盘 iterdir 分支根本走不到。结论：该文件运行时不可达，不能作为任何 entry 的 template_ref。这与 Task 46 实测的 D4 `D4收入底稿.xlsx` 同型（磁盘有、索引无、finder 永不返回），已登记为 BP-8。"
+      },
+      {
+        "what": "F 循环的 sub-tab 级 dual-mode 桩：useF2InvMaiDualMode.ts / useF2InvSpeDualMode.ts / useF2InvValDualMode.ts / useF3NotPayDualMode.ts",
+        "reason": "这 4 个是 11 行以内的空壳/转发桩，不是宿主真正 import 的 entry 级 composable（宿主实 import 的是 useF2DualMode / useF2SpecialDualMode / useF2ValuationDualMode / useF3DualMode，见 deletion plan）。它们不产生独立 manifest entry；删除归 Task 66（生成清册）/ Task 72（执行删除），本 slice 只登记 entry 级事实。"
+      }
+    ]
+  },
+  "independent_entries": [
+    {
+      "entry_id": "xlsx/gt-f1-prepayment",
+      "wp_code_pattern": "F1P",
+      "document_type": "xlsx",
+      "host": "GtF1Prepayment.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F1 预付账款.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "F1-det-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF1Detail.ts#L84",
+        "row_identity_generator_form": "`row-${crypto.randomUUID() ?? Date.now().toString(36) + Math.random().toString(36).slice(2)}`",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F1-det-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 的宿主目录另有 F1-aje-rows / F1-lt-rows / F1-rp-rows / F1-vc-*-rows / F1-ana-pack / F1-note-listed-* / F1-note-soe-* 等行表与文本键，逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F1-det-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF1Detail.ts",
+          "owner_constant": "ITEM_ID_ROWS",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "预付账款明细（F1-2）整表 —— 债权人名称/公司代码/关联方类型/款项性质/期初三调/期初审定账龄段",
+          "template_relative_path": "F/F1 预付账款.xlsx",
+          "template_sheet": "明细表F1-2",
+          "identity_cell": "A12",
+          "identity_text": "债权人名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF1FormData.ts#L52(GET)/#L113(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue#L19",
+        "audit-platform/frontend/src/components/workpaper/composables/useF1FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF1Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f1_prepayment.py",
+        "backend/wp_templates/F/F1 预付账款.xlsx!明细表F1-2!A12 = '债权人名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 useF1FormData 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 F1-det-rows 整表存成一条 item 的 remark（JSON 行数组），行身份是 rowId（useF1Detail.generateRowId() 生成，优先 crypto.randomUUID，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f1-prepayment → GtF1Prepayment），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated，缺什么逐条写进 blocking_preconditions。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 wp_onlyoffice_router.get_sheet_onlyoffice_config 经 _resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name) **项目存储优先**解析文件，首开才从权威模板复制；② post_sheet_onlyoffice_callback 把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板本身含真实业务 sheet（本 entry 的 primary_table.template_sheet 已逐格核验：明细表F1-2!A12 = '债权人名称'）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-4。workpaper_sync_contracts/ 下无本 entry 的契约文件，adapters/registry.py 的 DELIVERED_PER_ENTRY_CONTRACTS 四条 pilot（b60/d2/h1/g7）无一属 F 循环，真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "v-if=\"showHtmlToolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-inventory-main",
+      "wp_code_pattern": "F2I",
+      "document_type": "xlsx",
+      "host": "GtF2InventoryMain.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5",
+        "BP-7"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "composite_sheet_code_plus_table_role",
+        "transport_key_shape": "`${sheetCode}-rows` / `${sheetCode}-note-pack` / `${sheetCode}-impairment-provision` / `${sheetCode}-audit-conclusion` / `${sheetCode}-sales-ledger-qty`",
+        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts",
+        "transport_key_composition_note": "🔴 本 entry 的持久化键**不是单一 item_id 字面量**：11 张分类明细表（F2-3~F2-13）共用一组由 sheetCode 拼出的键，dataKey(sheetCode) 返回 `${sheetCode}-rows`。同一个 composable 实例按当前 sheet 决定写哪一行 checklist_responses ⇒ 契约里必须按 (sheet_code, table_role) 两维声明字段，不能按单键。primary_table 登记的是这族键的第一张（F2-3 原材料），sheet_codes_in_family 列出全族。",
+        "sheet_codes_in_family": [
+          "F2-3",
+          "F2-4",
+          "F2-5",
+          "F2-6",
+          "F2-7",
+          "F2-8",
+          "F2-9",
+          "F2-10",
+          "F2-11",
+          "F2-12",
+          "F2-13"
+        ],
+        "row_identity_key": "id",
+        "row_identity_generator": "inline String(Date.now())",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L461",
+        "row_identity_generator_form": "const id = String(Date.now())",
+        "row_identity_is_positional": true,
+        "row_identity_positional_defect": "🔴 载入路径 useF2DetailSheet.ts#L235 写的是 `...emptyRow(String(r.id || i + 1), segments)` —— 持久化行缺 id 时用**数组下标 i+1** 补，属 forbidden_row_identity_kinds 的 array_index。已登记 BP-7，本任务不改（改法会动 11 张表的既存持久化数据）。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F2-3-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 F2-2 明细汇总表的 8 个键（F2-2-gross-adj / -imp-adj / -bv-texts / -manual-unaud / -objective / -process / -audit-note / -audit-conclusion，由 useF2DetailSummary.ts 的 PREFIX = 'F2-2-' 拼出，也是复合键形态）、F2-14 调整分录、F2-16 会计政策、F2-18~F2-20 分析类与 F2-29~F2-32 截止测试的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F2-3-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts",
+          "owner_constant": null,
+          "owner_declaration_kind": "composed_from_sheet_code",
+          "owner_composition_expression": "`${sheetCode}-rows`",
+          "what_it_holds": "原材料明细（F2-3）整表 —— 存货编码/名称/规格/单位 + 期初库存·本期购进·本期发出的数量/单价/金额三联 + 库龄分段",
+          "template_relative_path": "F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+          "template_sheet": "一、原材料明细表F2-3",
+          "identity_cell": "A6",
+          "identity_text": "存货编码"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF2FormData.ts#L64(GET)/#L152(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue#L16",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSummary.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_inventory_main.py",
+        "backend/wp_templates/F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx!一、原材料明细表F2-3!A6 = '存货编码'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF2FormData 把 11 张分类明细表（F2-3~F2-13）与 F2-2 汇总表的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，每张表存成一条 item 的 remark（JSON 行数组），持久化键由 sheetCode 拼成（dataKey() 返回 `${sheetCode}-rows`）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f2-inventory-main → GtF2InventoryMain），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另额外背两条形态缺陷：OO 侧整册回落会打开会计政策册（BP-5），载入路径的行身份可退化成数组下标（BP-7）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 wp_onlyoffice_router.get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析文件，首开才从权威模板复制；② post_sheet_onlyoffice_callback 把 OO 编辑落盘进那份项目文件；③ 权威模板含 20 个真实业务 sheet（F2A/F2-1/F2-2/F2-3…F2-13/F2-14 + 上市与国企两份附注披露），本 entry 的 primary_table 已逐格核验（一、原材料明细表F2-3!A6 = '存货编码'）。问题不是「OO 侧空白」，而是两侧互不投影，且回落路径还会打开错工作簿（BP-5）。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。此外本 entry 在具备双向前还必须先修 BP-5（OO sheet 解析回落到 F2-16 会计政策册 —— 若以 OO 侧文件为 materialize 基底会写进错工作簿）与 BP-7（行身份可退化成数组下标 —— stable field key 无法在 roundtrip 中保持）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "oo_sheet_resolution_falls_back_to_the_wrong_workbook"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "v-if=\"showHtmlToolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-inventory-special",
+      "wp_code_pattern": "F2I",
+      "document_type": "xlsx",
+      "host": "GtF2InventorySpecial.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F2-55至F2-58 合同履约成本.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_object_with_products_array",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "F2-55-rows",
+        "row_identity_key": "id",
+        "row_identity_generator": "newContractCostId()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2ContractCostFormulas.ts#L96",
+        "row_identity_generator_form": "`f2cc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F2-55-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 覆盖两组 sheet：合同履约成本组（F2-55A/F2-55~F2-58）与 IPO 组（F2-61A/F2-61~F2-72，仅 IPO/上市/新三板/重组类项目可见）。IPO 组的键形态也含复合形（useF2MasterDetail.ts 的 F2-70-entities / F2-72-entities 等）。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F2-55-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF2ContractCost.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "合同履约成本构成明细（F2-55）整表 —— 项目编码/项目名称/收入合同名称与金额 + 账面期初·本期增加的设备材料/建安分包/人工/其他四类成本",
+          "template_relative_path": "F/F2-55至F2-58 合同履约成本.xlsx",
+          "template_sheet": "合同履约成本构成明细表F2-55",
+          "identity_cell": "A5",
+          "identity_text": "项目编码"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialFormData.ts#L57(GET)/#L111(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue#L26",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2SpecialFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ContractCost.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ContractCostFormulas.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_inventory_special.py",
+        "backend/wp_templates/F/F2-55至F2-58 合同履约成本.xlsx!合同履约成本构成明细表F2-55!A5 = '项目编码'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF2SpecialFormData 把合同履约成本组与 IPO 组的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 F2-55-rows 存成一条 item 的 remark（JSON 对象，products 数组承载行），行身份是 id（newContractCostId() 生成的 f2cc- 前缀串，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f2-inventory-special → GtF2InventorySpecial），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 7 个真实业务 sheet（含 F2-55A 程序表与 F2-55~F2-58 四张表），本 entry 的 primary_table 已逐格核验（合同履约成本构成明细表F2-55!A5 = '项目编码'）。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。本 entry 还叠加 BP-5：宿主传的 sheetName 若提不出 F2-55/F2-61 段的独立子码，OO sheet 解析会回落整册码 F2 并打开 F2-16 会计政策册（与合同履约成本无关的另一本工作簿）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "oo_sheet_resolution_falls_back_to_the_wrong_workbook"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "v-if=\"showHtmlToolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-inventory-valuation",
+      "wp_code_pattern": "F2I",
+      "document_type": "xlsx",
+      "host": "GtF2InventoryValuation.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_object_with_products_array",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "F2-47-rows",
+        "other_key_forms_in_family": [
+          {
+            "form": "composite_sheet_code_plus_table_role",
+            "shape": "`${sheetCode}-rows`",
+            "source": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationDateSheet.ts",
+            "note": "F2-38/F2-39 计价方法测试的日期抽样表用 sheetCode 拼键"
+          },
+          {
+            "form": "composite_sheet_code_plus_table_role",
+            "shape": "`${def.sheetCode}-rows`",
+            "source": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationMonthlySheet.ts",
+            "note": "月度计价表同形，sheetCode 来自 sheet 定义对象"
+          },
+          {
+            "form": "composite_sheet_code_plus_table_role",
+            "shape": "`${def.sheetCode}-rows`",
+            "source": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationTestSheet.ts",
+            "note": "计价测试表同形"
+          }
+        ],
+        "other_key_forms_note": "🔴 primary managed table（F2-47-rows）是字面量键，但本 entry 覆盖的 14 个 sheet 里另有三组由 sheetCode 拼出的复合键。契约按 (sheet_code, table_role) 两维声明这一点对本 entry 同样成立 —— 只看 primary 的形态会漏掉这三组。",
+        "row_identity_key": "id",
+        "row_identity_generator": "newImpairmentProductId()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF2ImpairmentTestFormulas.ts#L111",
+        "row_identity_generator_form": "`f2imp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F2-47-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 覆盖 F2-33~F2-35 检查类尾段、F2-38~F2-44 计价测试与 F2-47~F2-49/F2-52 跌价与关联交易共 14 个 sheet，各自另有 -sampling / -conclusion / -audit-note 键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F2-47-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF2ImpairmentTest.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "存货跌价准备测试（F2-47）整表 —— 存货类别/编码/名称/单位/结存数量/账面成本/账面单位成本/库龄分段/品质状况 + 可变现净值测算列",
+          "template_relative_path": "F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+          "template_sheet": "跌价准备测试表F2-47",
+          "identity_cell": "A18",
+          "identity_text": "存货类别"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationFormData.ts#L46(GET)/#L111(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue#L16",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ImpairmentTest.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2ImpairmentTestFormulas.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_inventory_valuation_impairment.py",
+        "backend/wp_templates/F/F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx!跌价准备测试表F2-47!A18 = '存货类别'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF2ValuationFormData 把计价测试与跌价准备各 sheet 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 F2-47-rows 存成一条 item 的 remark（JSON 对象，products 数组承载行），行身份是 id（newImpairmentProductId() 生成的 f2imp- 前缀串，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f2-inventory-valuation-impairment → GtF2InventoryValuation），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 F2-47/F2-48/F2-49 三张真实业务表（另有一张 G2-9-3-删除 的历史遗留 sheet，已被 _should_skip_historical_sheet 过滤），本 entry 的 primary_table 已逐格核验（跌价准备测试表F2-47!A18 = '存货类别'）。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。本 entry 还叠加 BP-5：它覆盖的 14 个 sheet 分散在三本工作簿（检查类/计价测试/跌价准备），整册码回落到 F2 时会打开第四本（F2-16 会计政策册）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "oo_sheet_resolution_falls_back_to_the_wrong_workbook"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "v-if=\"showHtmlToolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f2-stocktake-bundle",
+      "wp_code_pattern": "F2S",
+      "document_type": "xlsx",
+      "host": "GtF2StocktakeBundle.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5",
+        "BP-9"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。🔴 本 entry 是全 slice 唯一「已有部分统一 commit 接线」的条目（见 partially_wired_word_lane），但那条 lane 走的是 docx 且归 Tasks 60/61，不能拿来支撑 xlsx entry 的 bidirectional 裁决。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_object_with_locations_and_personnel_arrays",
+        "transport_key_kind": "per_sheet_literal_injected_into_generic_composable",
+        "transport_key_shape": "每个 sheet 一组字面量键（`F2-21-fields` / `F2-21-rows` / `F2-21-note` / `F2-22-fields` / `F2-23-fields` / `F2-24-rows` / `F2-24-count-rows` / `F2-25-rows` / `F2-25-floor-rows` / `F2-26-rows` / `F2-26-after-rows` …），由各 Tab 组件以 props 注入通用 sheet composable",
+        "transport_key_injection_source": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeSheet.ts（通用消费方，读 opts.fieldsKey / opts.rowsKey / opts.noteKey）；注入点在 audit-platform/frontend/src/components/workpaper/f2/stocktake/F2TabStocktakePlan.vue#L203 等各 Tab",
+        "transport_key_composition_note": "🔴 实测更正：本 entry 的前端键**不是**由 sheetCode 模板串拼出来的（那是 F2 核心组与 F2 计价减值组的形态），而是每个 Tab 组件写死自己那组字面量键、再作为 props 注入通用 composable `useF2StocktakeSheet`。所以「键面按 sheet 分片」这件事在代码里的载体是**注入**而非**拼接** —— 契约按 (sheet_code, table_role) 两维声明这个结论不变，但源码判据要落在注入点上，不能去找 `${sheetCode}-` 表达式（找不到）。**真正的复合键在 commit 侧**，见 composite_commit_entry_id 与 slice 顶层的 composite_transport_keys。",
+        "composite_commit_entry_id": {
+          "expression": "opaque_entry_id(wp_code=f\"{wp_code or wp_id}#{_SHEET_CODE}\", wp_id=wp_id)",
+          "materialized_form": "opaque:{wp_code}#F2-22 / opaque:{wp_code}#F2-23",
+          "source": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py 与 backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+          "why_sheet_code_must_be_in_it": "F2-22 与 F2-23 是同一底稿的两份不同文档；共用一个 entry_id 会让两者互相顶掉对方的 entry pointer / representation generation，历史读取会拿到另一张表的 docx（两个 writer 的注释逐字记着这件事）。"
+        },
+        "sheet_codes_in_family": [
+          "F2-21A",
+          "F2-21",
+          "F2-22",
+          "F2-23",
+          "F2-24",
+          "F2-25",
+          "F2-26"
+        ],
+        "row_identity_key": "id",
+        "row_identity_generator": "genId(prefix)",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/f2/stocktake/f2StocktakeQuestionnaire.ts#L175",
+        "row_identity_generator_form": "`${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`（locations 用 loc-、personnel 用 per-）",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F2-21-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。F2-22/F2-23 的 -fields 键由 Word 通道的后端常量拥有（Tasks 60/61），本 slice 只登记其存在与复合 entry_id 形态，不接管其契约。F2-24~F2-26 的行表由 useF2StocktakeSheet.ts 的通用 sheet composable 承载（genId() 生成 st- 前缀 id）。",
+        "primary_table": {
+          "item_id": "F2-21-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeQuestionnaire.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "盘点计划问卷（F2-21）的两张动态行表 —— 存放地点表（地点/存货类型/占存货总额比例/盘点时间）与盘点人员分工表（人员/地点/职责/胜任能力/电话），外加 20 余条问卷答案",
+          "template_relative_path": "F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+          "template_sheet": "盘点计划问卷F2-21",
+          "identity_cell": "A7",
+          "identity_text": "地点"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeFormData.ts#L29(GET)/#L68(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue#L23",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeQuestionnaire.ts",
+        "audit-platform/frontend/src/components/workpaper/f2/stocktake/f2StocktakeQuestionnaire.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f2_stocktake.py",
+        "backend/wp_templates/F/F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx!盘点计划问卷F2-21!A7 = '地点'"
+      ],
+      "partially_wired_word_lane": {
+        "why_this_key_exists": "任务正文要求核实「f2_stocktake_plan_sync / f2_stocktake_summary_sync 已接统一 commit 这件事对裁决的实际影响」。实证结论要写清楚，否则后来者会以为本 entry 已具双向、或反过来以为它与其他 7 条完全同型。",
+        "wired_writers": [
+          {
+            "module": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+            "save_function": "_save_fields",
+            "sheet_code": "F2-22",
+            "fields_item_id": "F2-22-fields",
+            "unified_commit_call": "build_content_mutation_service_writer(db).commit_bytes(...)",
+            "authority_model_used": "AuthorityModel.opaque_single_onlyoffice",
+            "commit_entry_id_expression": "opaque_entry_id(wp_code=f\"{wp_code or wp_id}#{_SHEET_CODE}\", wp_id=wp_id)",
+            "document_type": "docx",
+            "reason_tag": "f2_st_plan_sync_from_oo"
+          },
+          {
+            "module": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+            "save_function": "_save_fields",
+            "sheet_code": "F2-23",
+            "fields_item_id": "F2-23-fields",
+            "unified_commit_call": "build_content_mutation_service_writer(db).commit_bytes(...)",
+            "authority_model_used": "AuthorityModel.opaque_single_onlyoffice",
+            "commit_entry_id_expression": "opaque_entry_id(wp_code=f\"{wp_code or wp_id}#{_SHEET_CODE}\", wp_id=wp_id)",
+            "document_type": "docx",
+            "reason_tag": "f2_st_summary_sync_from_oo"
+          }
+        ],
+        "platform_context": "全仓实扫：生产代码里调用 build_content_mutation_service_writer 的模块共 7 个（custom_workpaper_cells / _f2_stocktake_plan_sync / _f2_stocktake_summary_sync / version_trail_service / wopi_service / wp_download_service / wp_migration_service），本 entry 独占其中 2 个。",
+        "impact_on_adjudication_1_does_not_make_it_bidirectional": "这两条 lane 的 document_type 是 **docx**，走的是 POST /f2-st/{plan,summary}-sync-{to,from}-oo 两对端点，与本 entry 的 xlsx OO 通道（GtOnlyOfficeSheet + legacy_sheet_onlyoffice_router + GET /workpapers/{id}/onlyoffice-config）**没有任何共用**。AC 12.1 的六件事是逐 entry 且逐 representation 的：authority model 已有（opaque_single_onlyoffice）但 per-entry contract / non-null approved bundle / Task 36 finalize 的 published representation / 注册 adapter / 逐 scenario evidence 五件仍缺 ⇒ 不满足 bidirectional。",
+        "impact_on_adjudication_2_does_not_make_it_single_onlyoffice": "这两条 lane 恰恰**加强**了 html_counterpart_verdict == exists 的结论：它们在同一个业务事务里既提交 docx 本体，也把抽出的字段写进 checklist_responses 的 F2-22-fields / F2-23-fields。HTML 对端不是推测，是这两个 writer 自己的 INSERT ... ON CONFLICT 语句。",
+        "impact_on_adjudication_3_authority_model_is_not_free_to_copy": "两个 writer 的 docstring 都把「走 authoritative-bytes lane 而不是 projection lane」的理由写成「manifest 里 F2 entry 的 capability=single_onlyoffice」。而该 capability 是 workpaper_sync_entry_overlay.json 的组件级默认值（BP-6），不是逐 entry 裁决 ⇒ 该 lane 选择建立在一个**默认值**而非结论上。本 slice 把 capability 重裁为 null 后，这个前提失效，故登记 BP-9：Tasks 60/61 收 Word 通道时必须重新论证 lane 选择，不能沿用「capability 是 single_onlyoffice 所以走 opaque」。",
+        "impact_on_adjudication_4_composite_key_is_a_precedent": "该 lane 的 entry_id 复合形态（`{wp_code}#{sheet_code}`）是平台上唯一已落地的「一个 wp 多个 representation entry」范式，本 slice 把它登记下来，供 step 5~8 为 F2 五个 entry 设计 representation 身份时复用（F2 的 5 个宿主同享 wp_code 前缀 F2，若 representation entry_id 只用 wp_code 会五者互相顶掉）。"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF2StocktakeFormData 把 7 个监盘 sheet 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses；主表 F2-21-rows / F2-21-fields 存问卷与两张动态行表，行身份是 id（f2StocktakeQuestionnaire.genId() 生成 loc-/per- 前缀串，非数组下标）；F2-22/F2-23 的 -fields 键则由后端两个 sync writer 直接 INSERT ... ON CONFLICT 写入。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f2-stocktake-bundle → GtF2StocktakeBundle），故不是 unreachable。而 AC 12.1 要求的六件事只落地了 authority model 一项（且只在 docx lane 上），其余五件未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据），且本 entry 的证据比其余 7 条更强：① xlsx 侧经 get_sheet_onlyoffice_config → _resolve_wp_file 项目存储优先解析，callback 落盘；② 权威模板含 7 个真实业务 sheet（F2-21A 程序表 + F2-21~F2-26），primary_table 已逐格核验（盘点计划问卷F2-21!A7 = '地点'）；③ docx 侧的 F2-22/F2-23 已有真实的 from-OO 写回并把 docx 本体作为权威内容提交（partially_wired_word_lane）。所以问题不是「OO 侧空白」，而是 xlsx 两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 六件事只有 authority model 一项存在，且它挂在 docx lane 上而非本 entry 的 xlsx representation：per-entry contract（workpaper_sync_contracts/ 下无 F 循环文件）、non-null approved definition bundle、Task 36 finalize 出的 published representation、注册 adapter（DELIVERED_PER_ENTRY_CONTRACTS 四条 pilot 无 F）、逐 scenario evidence 五件全缺 ⇒ 见 BP-1..BP-4。另叠加 BP-5（sheet 解析回落）与 BP-9（docx lane 的 authority model 选择建立在 overlay 默认值上）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "word_lane_authority_model_premise_rests_on_an_overlay_default"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"toolbar\"",
+      "ui_toolbar_gate_note": "本宿主的工具栏**没有** v-if 门控（`<div class=\"toolbar\">`），与其余 6 条 `v-if=\"showHtmlToolbar\"` 和 F5 的 `class=\"f5-cost-of-sales-toolbar\"` 都不同。守卫按本字段声明的锚点逐 entry 定位工具栏区块，不假设全 slice 同形 —— 假设同形会让某个宿主改了门控形态后判据静默失效。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f3-notes-payable",
+      "wp_code_pattern": "F3N",
+      "document_type": "xlsx",
+      "host": "GtF3NotesPayable.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F3 应付票据.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "F3-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF3Detail.ts#L135",
+        "row_identity_generator_form": "`f3d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F3-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 F3-3-rows（调整分录，由 f3AdjustmentInject.ts 的 F3_3_KEY 拥有）、F3-4 利息测算、F3-5 逾期检查、F3-6 关联方、F3-7 检查表与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F3-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF3Detail.ts",
+          "owner_constant": "STORAGE_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "期末应付票据明细（F3-2）整表 —— 票据号/票据类别/关联方类型/票据关系人（出票人·承兑人·收款人）/票据期限（出票日·到期日·期限）/票面利率/是否承兑/期初期末余额",
+          "template_relative_path": "F/F3 应付票据.xlsx",
+          "template_sheet": "明细表F3-2",
+          "identity_cell": "A13",
+          "identity_text": "票据号"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF3FormData.ts#L52(GET)/#L143(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue#L39",
+        "audit-platform/frontend/src/components/workpaper/composables/useF3FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF3Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f3_notes_payable.py",
+        "backend/wp_templates/F/F3 应付票据.xlsx!明细表F3-2!A13 = '票据号'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF3FormData 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 F3-2-rows 整表存成一条 item 的 remark（JSON 行数组），行身份是 rowId（useF3Detail.generateRowId() 生成的 f3d- 前缀串，非数组下标；载入路径 `raw.rowId || raw.id || generateRowId()` 只回退到旧 id 字段与新生成，不用下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f3-notes-payable → GtF3NotesPayable），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 12 个 sheet（F3A 程序表 + 审定表F3-1 + 明细表F3-2 + F3-3~F3-7 + 上市与国企两份附注披露），本 entry 的 primary_table 已逐格核验（明细表F3-2!A13 = '票据号'）。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。workpaper_sync_contracts/ 下无本 entry 的契约文件，registry 的四条 pilot 无 F 循环，真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "v-if=\"showHtmlToolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f4-accounts-payable",
+      "wp_code_pattern": "F4A",
+      "document_type": "xlsx",
+      "host": "GtF4AccountsPayable.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F4 应付账款.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "F4-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "generateRowId()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF4Detail.ts#L259",
+        "row_identity_generator_form": "`f4d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F4-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 F4-1 审定表、F4-3 调整分录、F4-4 实质性分析、F4-5 长期挂账、F4-6 关联方、F4-7 未入账、F4-8 检查表、F4-9 供应商融资与两份附注披露的各自键（含 `F4-附注披露信息(上市公司)` / `F4-附注披露信息(国企)` 两个中文 wp_code）。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F4-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF4Detail.ts",
+          "owner_constant": "STORAGE_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "应付账款明细（F4-2）整表 —— 债权人名称/公司代码/关联方类型/款项性质/期初三调/借贷方发生/期末余额/被审计单位重分类调整 + 期初期末账龄分段",
+          "template_relative_path": "F/F4 应付账款.xlsx",
+          "template_sheet": "明细表F4-2",
+          "identity_cell": "A9",
+          "identity_text": "债权人名称"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF4FormData.ts#L51(GET)/#L134(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue#L38",
+        "audit-platform/frontend/src/components/workpaper/composables/useF4FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF4Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f4_accounts_payable.py",
+        "backend/wp_templates/F/F4 应付账款.xlsx!明细表F4-2!A9 = '债权人名称'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF4FormData 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses，主表 F4-2-rows 整表存成一条 item 的 remark（JSON 行数组），行身份是 rowId（useF4Detail.generateRowId() 生成的 f4d- 前缀串，非数组下标）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f4-accounts-payable → GtF4AccountsPayable），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 15 个 sheet（修订说明 + 底稿目录 + F4A 程序表 + 审定表F4-1 + 明细表F4-2 + F4-3~F4-9 + 两份附注披露 + GT_Custom），本 entry 的 primary_table 已逐格核验（明细表F4-2!A9 = '债权人名称'）。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。workpaper_sync_contracts/ 下无本 entry 的契约文件，registry 的四条 pilot 无 F 循环，真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "v-if=\"showHtmlToolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-f5-cost-of-sales",
+      "wp_code_pattern": "F5C",
+      "document_type": "xlsx",
+      "host": "GtF5CostOfSales.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-7"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "F/F5 营业成本.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id_with_legacy_alias",
+        "transport_key_shape": "F5-2-monthly-rows（现行）/ F5-2-rows（LEGACY_STORAGE_KEY，读时回退）",
+        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts",
+        "transport_key_composition_note": "🔴 本 entry 的主表键有**两个**：写只写 F5-2-monthly-rows，读则先试新键再回退旧键 F5-2-rows。契约必须把两个键都声明（否则 roundtrip 会漏掉存量数据），且要写清「哪个是权威写入目标」。同族形态还有 F5-3（OTHER_COST_KEY = F5-3-other-cost-rows + OTHER_COST_LEGACY_KEY = F5-3-rows）。",
+        "row_identity_key": "id",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts#L106",
+        "row_identity_generator_form": "`m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`",
+        "row_identity_is_positional": true,
+        "row_identity_positional_defect": "🔴 载入路径 useF5MonthlyDetail.ts#L133 写的是 `id: String(r?.id ?? r?.rowId ?? \\`m-${Date.now()}-${i}\\`)` —— 两个既有键都缺时用**数组下标 i** 拼 id，属 forbidden_row_identity_kinds 的 array_index。已登记 BP-7，本任务不改。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "F5-2-monthly-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 F5-1 审定表的 6 个键（F5-1-adj-main-rows / -adj-other-rows / -adj-tb-6401 / -adj-tb-6401-prior / -adj-note / -adj-conclusion）、F5-3~F5-8 的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "F5-2-monthly-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts",
+          "owner_constant": "STORAGE_KEY",
+          "owner_declaration_kind": "module_constant",
+          "what_it_holds": "主营业务成本月度明细（F5-2）整表 —— 品种行 × 12 个月分月成本 + 本期/上期 AJE·RJE + 备注",
+          "template_relative_path": "F/F5 营业成本.xlsx",
+          "template_sheet": "主营业务成本月度明细表F5-2",
+          "identity_cell": "A9",
+          "identity_text": "项目 月份"
+        },
+        "html_persistence_composable": "audit-platform/frontend/src/components/workpaper/composables/useF5CosSalFormData.ts#L22(GET)/#L72(PUT)"
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue#L29",
+        "audit-platform/frontend/src/components/workpaper/composables/useF5CosSalFormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF5Adjudication.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_f5_cost_of_sales.py",
+        "backend/wp_templates/F/F5 营业成本.xlsx!主营业务成本月度明细表F5-2!A9 = '项目 月份'"
+      ],
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-6"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useF5CosSalFormData 把结构化 Tab 的录入 PUT 到 /api/workpapers/{wp_id}/checklist-responses（两处 PUT，L72 与 L97），主表 F5-2-monthly-rows 整表存成一条 item 的 remark（JSON 行数组），行身份是 id（`m-` 前缀的时间戳+随机串）。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType f5-cost-of-sales → GtF5CostOfSales），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背两条形态债务：主表键有新旧双键（读回退），载入路径的行身份可退化成数组下标（BP-7）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 11 个 sheet（F5A 程序表 + 审定表F5-1 + F5-2~F5-8 + 底稿目录 + GT_Custom），本 entry 的 primary_table 已逐格核验（主营业务成本月度明细表F5-2!A9 = '项目 月份'）。另注：本宿主的 OO 挂载带 `isHtmlSheet &&` 前置门控（与其余 7 条不同），未迁移的 sheet 走的是「兜底 → OnlyOffice」分支，也不是空白模板。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。此外本 entry 在具备双向前必须先修 BP-7（载入路径行身份可退化成数组下标）与新旧双键并存这两件事 —— 否则 stable field key 在 roundtrip 中无法保持。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "primary_table_row_identity_can_degrade_to_array_index"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"f5-cost-of-sales-toolbar\"",
+      "ui_toolbar_gate_note": "本宿主的工具栏也没有 v-if 门控，模式切换器自己带 `v-if=\"isHtmlSheet\"`。守卫按本字段声明的锚点定位工具栏区块。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility"
+    }
+  ],
+  "authoritative_templates": {
+    "root": "backend/wp_templates/F",
+    "reference_copy_status": "absent_from_working_tree",
+    "reference_copy_note": "工作树根下没有 `基础数据/致同通用审计程序及底稿模板（2025年修订）/` 目录（Task 46 / Task 47 各自实测过一次，本任务第三次实测确认仍不存在）⇒ 无法做「权威 vs 参考副本」的双处比对，本 slice 只冻结运行时权威目录的字节。这不是豁免：真源就是 backend/wp_templates/（wp_template_init_service 生成底稿时从这里复制、wp_template_finder 以 _index.json 索引）。",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件（用户可能开着 WPS/Excel）。本次枚举时目录内无锁文件，18 个文件全部登记。",
+    "runtime_index_note": "in_runtime_index 由 backend/wp_templates/_index.json 现算：`F/{name}` 是否出现在 files[].relative_path 里（分隔符归一为 /）。15 个 xlsx 在索引里，3 个不在（两个 docx 属 Word 通道、F2存货.xlsx 是不可达合册，见 BP-8）。",
+    "files": [
+      {
+        "name": "F0 存货循环函证.xlsx",
+        "size": 915398,
+        "sha256": "0c78ae6f5f88e6ed4f1acced01f48bce9a73ada58154c84ae7c1cf509f9905dd",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "F0 存货循环函证归跨循环共享的 confirmation-* 组件族（Task 57），在 source manifest 里没有 entry —— 见 slice_scope.excluded_from_slice 第 2 条"
+      },
+      {
+        "name": "F1 预付账款.xlsx",
+        "size": 261608,
+        "sha256": "f30055cbebc7daedec6d073e983e7ada5375c3edf50b49880c7aa571846510dd",
+        "normalized_structure_hash": "f1457eb9334a3b97229643079b9c1fe0d1c277622d872d8f9f5afa8342ffc0a1",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f1-prepayment"
+      },
+      {
+        "name": "F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx",
+        "size": 14532,
+        "sha256": "ab2db1115926cc5e540ef1d6ae135a61a85a3c45d338bd25cb985cdfc051c69f",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2-16 会计政策单 sheet 册，wp_code_overrides 归 f2-inventory-main，但它不是该 entry 的 template_ref（审定明细表类才是）。🔴 它同时是 BP-5 的受害对象：find_template_file_any('F2') 因为「文件名含常规程序 + 在索引里排最前」把它当成 F2 整册的主模板返回"
+      },
+      {
+        "name": "F2-18至F2-20 存货及跌价准备-分析类（Leap应对措施-分析程序）.xlsx",
+        "size": 58050,
+        "sha256": "ed99116207b8675b6821cd4af67e6146b26d41c621312bbdda3a4a658901da6d",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2-18~F2-20 分析类，wp_code_overrides 归 f2-inventory-main，但不是该 entry 的 template_ref（一个 entry 只能有一个 template_ref，本 slice 取覆盖其 primary managed table 的那本）"
+      },
+      {
+        "name": "F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+        "size": 180630,
+        "sha256": "9e57efd242b47171423e61f63a35be6ae5b46889baa14c246595ea95591fd0d8",
+        "normalized_structure_hash": "4a31280cf3517d1c216c40712c1c5549dababa01c3acd9108ae6b1b5e1f452da",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f2-inventory-main"
+      },
+      {
+        "name": "F2-21至F2-26 存货及跌价准备 - 盘点类（Leap应对措施- 存货监盘）.xlsx",
+        "size": 81418,
+        "sha256": "bdfdcf8a804aab1c11db1cc2cd2deaac4f5bbf94c6a60e43a04108f178079bc7",
+        "normalized_structure_hash": "3a4fcf12672810d78f24d6f3f84bb2912de15530c52efffcb66e77fc9b880070",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f2-stocktake-bundle"
+      },
+      {
+        "name": "F2-22 存货监盘计划.docx",
+        "size": 37539,
+        "sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+        "in_runtime_index": false,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2 Word 通道（Tasks 60/61），不在本 slice 的 xlsx 计数内。运行时经 wp_template_finder._EXPLICIT_TEMPLATE_RELPATHS['F2-22'] 显式命中，故不在 _index.json 里也可达 —— 与 F2存货.xlsx 的不可达形态不同"
+      },
+      {
+        "name": "F2-23 存货监盘小结.docx",
+        "size": 37335,
+        "sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+        "in_runtime_index": false,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2 Word 通道（Tasks 60/61），同上。运行时经 _EXPLICIT_TEMPLATE_RELPATHS['F2-23'] 显式命中"
+      },
+      {
+        "name": "F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+        "size": 63455,
+        "sha256": "81532ad5ebe30f1913ea390232b77b539d656e0c8da43d5f4d75b80e1408a835",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "🔴 这本工作簿**跨两个 entry**：F2-29~F2-32 截止测试归 f2-inventory-main，F2-33~F2-35 检查表归 f2-inventory-valuation-impairment（按 wp_code_overrides 逐 sheet 实算 4:3）。belongs_to_entry 是单值字段，无法诚实表达 1:N ⇒ 记 null 并在此写明双归属，不硬塞给某一方"
+      },
+      {
+        "name": "F2-38至F2-44  存货及跌价准备 -计价测试（Leap-存货程序）.xlsx",
+        "size": 114865,
+        "sha256": "fa6ea027095a4f2449ac572fbe6e6a9aec79234fc84bdbab0f1b46529f7a3db3",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2-38~F2-44 计价测试，wp_code_overrides 归 f2-inventory-valuation-impairment，但不是该 entry 的 template_ref（跌价准备测试册才是，它承载 primary managed table F2-47-rows）"
+      },
+      {
+        "name": "F2-47至F2-49 存货及跌价准备 -跌价准备测试（Leap应对措施-会计估计）.xlsx",
+        "size": 443368,
+        "sha256": "bab0abc099cfed3efdde3095bed510b3bbe7422ce32431054811034f6e6d5cd5",
+        "normalized_structure_hash": "6d476123b9f891d3f5ec56ac33bd6da2254a66810e3dd15a06e16ed187d6b567",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f2-inventory-valuation"
+      },
+      {
+        "name": "F2-52 存货及跌价准备 -关联交易（Leap-常规程序）.xlsx",
+        "size": 104179,
+        "sha256": "a3182f1244d3e96aae268358151372cf16745a976813c36696b577bcc5b849b0",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2-52 关联采购分析，wp_code_overrides 归 f2-inventory-valuation-impairment，但不是该 entry 的 template_ref"
+      },
+      {
+        "name": "F2-55至F2-58 合同履约成本.xlsx",
+        "size": 100429,
+        "sha256": "b9ea248198217827a7b3d142dccca9ab5769c17867d1454ffd9105eaa9cb6c21",
+        "normalized_structure_hash": "8750eee8f4efcf805fb07e4f3f6d49befe5a4639639fd65d5ea15edba2e770a1",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f2-inventory-special"
+      },
+      {
+        "name": "F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+        "size": 182901,
+        "sha256": "8be7b7c01322daa93ea0a29621b6292bcbdd19806deb142492915d43638289b6",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "F2-61~F2-72 IPO/上市/新三板/重组组，wp_code_overrides 归 f2-inventory-special，但不是该 entry 的 template_ref（合同履约成本册才是，它承载 primary managed table F2-55-rows）。该组只在 business_category ∈ {IPO, 上市公司年审, 新三板, 重大资产重组} 时可见（_f2_inventory_special.py 的 IPO_CATEGORIES）"
+      },
+      {
+        "name": "F2存货.xlsx",
+        "size": 560160,
+        "sha256": "afc762843ffee1c32087848d6401500b53d5f3fb59d32c1098acfff6f1b2ef0d",
+        "in_runtime_index": false,
+        "belongs_to_entry": null,
+        "excluded_reason": "🔴 74 sheet 的 F2 全循环合册，磁盘上有但**不在 _index.json 里** ⇒ find_template_file('F2') 的精确匹配分支（按索引筛 wp_code=='F2'，F2 有 11 条命中）必然先命中，模糊匹配的磁盘 iterdir 分支走不到 ⇒ 该文件运行时不可达，不能作为任何 entry 的 template_ref。与 Task 46 实测的 D4 `D4收入底稿.xlsx` 同型，已登记 BP-8"
+      },
+      {
+        "name": "F3 应付票据.xlsx",
+        "size": 79616,
+        "sha256": "06de707ba4d4f8d91534e872c7d135b9576cc3a012e3877b1f60db59ce6b3a6b",
+        "normalized_structure_hash": "fdff274c6a2bd39361dbfeeb5a1429f283aa33d8516a3a8e305108eb135b79cc",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f3-notes-payable"
+      },
+      {
+        "name": "F4 应付账款.xlsx",
+        "size": 108329,
+        "sha256": "e20e62725c209b716eab4977231f21c627ab92346a72b58c20acdc7a6f1711fd",
+        "normalized_structure_hash": "cfa1710ea202191f7bc813d158434e7d98f1856fe853d0743bedd58e23504b21",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f4-accounts-payable"
+      },
+      {
+        "name": "F5 营业成本.xlsx",
+        "size": 187721,
+        "sha256": "417e5ae7453528725f3ae5eb06f70d36269b089cd73a00884c835f4586267cb7",
+        "normalized_structure_hash": "d8b13c774513ecdb505cb3837c76a6ff11a94e1ab42b2dfa187cf479cc78988d",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-f5-cost-of-sales"
+      }
+    ]
+  },
+  "composite_transport_keys": {
+    "why_this_section_exists": "任务正文要求「核验复合传输键：F 循环有复合键形态（不是单一 item_id），逐 entry 实测真实传输键」。实测结果是**三种不同机制并存**，且它们的源码判据互不通用 —— 写成一个字段会逼作者挑一种写、丢掉其余两种（首轮就把监盘的注入式误当成拼接式，被守卫 test_composite_transport_key_composition_is_in_the_source 当场打红）。这里逐机制登记，每条带可复核的源码判据。",
+    "mechanisms": [
+      {
+        "id": "CK-1",
+        "name": "template_literal_composed_from_sheet_code",
+        "shape": "`${sheetCode}-rows` / `${sheetCode}-note-pack` / `${sheetCode}-impairment-provision` / `${sheetCode}-audit-conclusion` / `${sheetCode}-sales-ledger-qty`",
+        "how_to_verify": "源码里存在 `${sheetCode}-` 或 `${def.sheetCode}-` 的模板串拼接",
+        "sources": [
+          "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationDateSheet.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationMonthlySheet.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useF2ValuationTestSheet.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useF2StdCostMonthlySheet.ts"
+        ],
+        "entries_affected": [
+          "xlsx/gt-f2-inventory-main",
+          "xlsx/gt-f2-inventory-valuation"
+        ],
+        "primary_table_uses_it": [
+          "xlsx/gt-f2-inventory-main"
+        ]
+      },
+      {
+        "id": "CK-2",
+        "name": "per_sheet_literal_injected_into_generic_composable",
+        "shape": "各 Tab 组件写死自己那组字面量键（`F2-2{1..6}-fields` / `-rows` / `-note` / `-count-rows` / `-floor-rows` / `-after-rows`），以 props 注入通用 sheet composable",
+        "how_to_verify": "通用消费方 useF2StocktakeSheet.ts 读 `opts.fieldsKey` / `opts.rowsKey` / `opts.noteKey`（不含任何字面量键），注入点在各 Tab 组件里写死",
+        "sources": [
+          "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeSheet.ts",
+          "audit-platform/frontend/src/components/workpaper/f2/stocktake/F2TabStocktakePlan.vue",
+          "audit-platform/frontend/src/components/workpaper/f2/stocktake/F2TabStocktakeSummary.vue",
+          "audit-platform/frontend/src/components/workpaper/f2/stocktake/F2TabStocktakeReconcile.vue",
+          "audit-platform/frontend/src/components/workpaper/f2/stocktake/F2TabStocktakeSampleResult.vue",
+          "audit-platform/frontend/src/components/workpaper/f2/stocktake/F2TabStocktakeRollforward.vue"
+        ],
+        "entries_affected": [
+          "xlsx/gt-f2-stocktake-bundle"
+        ],
+        "primary_table_uses_it": [
+          "xlsx/gt-f2-stocktake-bundle"
+        ]
+      },
+      {
+        "id": "CK-3",
+        "name": "composite_commit_entry_id_wp_code_hash_sheet_code",
+        "shape": "opaque_entry_id(wp_code=f\"{wp_code or wp_id}#{_SHEET_CODE}\") ⇒ `opaque:{wp_code}#F2-22` / `opaque:{wp_code}#F2-23`",
+        "how_to_verify": "两个 sync writer 里逐字存在该表达式，且各自的 _SHEET_CODE 常量不同（F2-22 / F2-23）",
+        "sources": [
+          "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+          "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+          "backend/app/services/workpaper_sync/writer_migration.py"
+        ],
+        "entries_affected": [
+          "xlsx/gt-f2-stocktake-bundle"
+        ],
+        "primary_table_uses_it": [],
+        "note": "这是平台上唯一已落地的「一个 wp 多个 representation entry」复合身份，step 5~8 为 F2 五个 entry 设计 representation 身份时应复用它（F2 五个宿主同享 wp_code 前缀 F2，若只用 wp_code 会五者互相顶掉）。"
+      },
+      {
+        "id": "CK-4",
+        "name": "literal_item_id_with_legacy_alias",
+        "shape": "写 `F5-2-monthly-rows`，读时回退 `F5-2-rows`（同族还有 F5-3-other-cost-rows / F5-3-rows）",
+        "how_to_verify": "owner 模块里同时存在 STORAGE_KEY 与 LEGACY_STORAGE_KEY 两个常量",
+        "sources": [
+          "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useF5Adjudication.ts"
+        ],
+        "entries_affected": [
+          "xlsx/gt-f5-cost-of-sales"
+        ],
+        "primary_table_uses_it": [
+          "xlsx/gt-f5-cost-of-sales"
+        ]
+      }
+    ],
+    "entries_with_plain_literal_primary_key": [
+      "xlsx/gt-f1-prepayment",
+      "xlsx/gt-f2-inventory-special",
+      "xlsx/gt-f2-inventory-valuation",
+      "xlsx/gt-f3-notes-payable",
+      "xlsx/gt-f4-accounts-payable"
+    ]
+  },
+  "dynamic_row_identity": {
+    "why_this_section_exists": "本 slice 的 8 条 entry 全部含「行数由业务数据决定」的动态行表（明细表 / 测试表 / 问卷地点与人员表），触发 slice_schema.conditional_sections 的 dynamic_row_identity。写下来的直接用途有两条：① F 循环的行身份键**不是**单一形态（rowId 三条 / id 五条，生成器五种），照抄 D 循环的「全 rowId」结论会写出错的契约；② 其中两条（F2 核心组、F5）的载入路径会把行身份退化成数组下标，这是 stable field key 在 roundtrip 中无法保持的直接原因，必须在 step 6 发布契约前修掉。",
+    "source_of_truth": "各 owner composable 的源码（本节每行都带 source_ref 指到具体文件与行号），不是本文件的自述",
+    "forbidden_identity_kinds": [
+      "array_index",
+      "ordinal",
+      "position",
+      "mutable_chinese_label"
+    ],
+    "tables": [
+      {
+        "table_key": "F1-det-rows",
+        "entry_id": "xlsx/gt-f1-prepayment",
+        "persistence_key": "F1-det-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF1Detail.ts#L84"
+        }
+      },
+      {
+        "table_key": "F2-3-rows",
+        "entry_id": "xlsx/gt-f2-inventory-main",
+        "persistence_key": "`${sheetCode}-rows`（F2-3~F2-13）",
+        "row_identity": {
+          "kind": "generated_timestamp_string_with_array_index_fallback",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts#L235"
+        }
+      },
+      {
+        "table_key": "F2-55-rows",
+        "entry_id": "xlsx/gt-f2-inventory-special",
+        "persistence_key": "F2-55-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2ContractCostFormulas.ts#L96"
+        }
+      },
+      {
+        "table_key": "F2-47-rows",
+        "entry_id": "xlsx/gt-f2-inventory-valuation",
+        "persistence_key": "F2-47-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF2ImpairmentTestFormulas.ts#L111"
+        }
+      },
+      {
+        "table_key": "F2-21-rows",
+        "entry_id": "xlsx/gt-f2-stocktake-bundle",
+        "persistence_key": "F2-21-fields（问卷本体，含 locations/personnel 两张动态行表）",
+        "row_identity": {
+          "kind": "generated_prefixed_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/f2/stocktake/f2StocktakeQuestionnaire.ts#L175"
+        }
+      },
+      {
+        "table_key": "F3-2-rows",
+        "entry_id": "xlsx/gt-f3-notes-payable",
+        "persistence_key": "F3-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF3Detail.ts#L135"
+        }
+      },
+      {
+        "table_key": "F4-2-rows",
+        "entry_id": "xlsx/gt-f4-accounts-payable",
+        "persistence_key": "F4-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF4Detail.ts#L259"
+        }
+      },
+      {
+        "table_key": "F5-2-monthly-rows",
+        "entry_id": "xlsx/gt-f5-cost-of-sales",
+        "persistence_key": "F5-2-monthly-rows（写）/ F5-2-rows（读回退）",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_array_index_fallback",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts#L133"
+        }
+      }
+    ]
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-1",
+      "blocks": "bidirectional",
+      "what": "8 个 entry 都没有 Task 17 的 non-current instrumentation candidate",
+      "consequence": "Task 36 的 ExcelEntryFinalizeGate.finalize_candidate 无 candidate 可 finalize ⇒ 不可能产出 published representation ⇒ resolver/room/current/evidence 拿不到身份",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "Task 48 的正文范围是 F 循环 entry 的枚举/裁决/对端调查与 UI 义务，不含跑 Task 17 的 instrumentation 与 Task 36 的 finalize（两者各有自己的任务与门）。伪造 candidate finalize 是范式 step 4 明令禁止的行为（AP-5）。",
+      "must_fix_before": "把任一 F entry 标 bidirectional 或注册 adapter 之前",
+      "owner_task": "Task 17 + Task 36",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/excel_entry_gate.py",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ]
+    },
+    {
+      "id": "BP-2",
+      "blocks": "bidirectional",
+      "what": "8 个 entry 全部没有人工审核的 per-entry contract。workpaper_sync_contracts/ 下 5 个文件（_example.candidate.json / b60.hour_budget / d2.receivable_detail / g7.soe_subsidiary_disclosure / h1.disposal_check）无一条 review.entry_id 属 F 循环。",
+      "consequence": "projection_contract bundle 的 contract slot 必须是 approved definition，缺失即 PerEntryContractUnapprovedError；typed null marker 不得冒充。且 F 循环的复合传输键（F2 核心组 `{sheet_code}-rows`、F2 监盘 `{sheet_code}-fields`、F5 新旧双键）要求契约按两维声明，抄单键形态的契约会漏表。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 6 要求逐 entry 人工审核发布，且 cross_entry_rule 明令不得跨 entry 复用别人的 contract_id —— 8 条 entry 要 8 份独立契约，逐字段带 source_ref（xlsx 还要 cell）。这是独立工作量，且 F2 五个 entry 的字段面横跨 10 本工作簿约 60 个 sheet。",
+      "must_fix_before": "把任一 F entry 标 bidirectional 之前",
+      "owner_task": "Task 48 后续（step 6，逐 entry 人工审核发布）",
+      "source_refs": [
+        "backend/data/workpaper_sync_contracts",
+        "backend/app/services/workpaper_sync/contracts.py"
+      ]
+    },
+    {
+      "id": "BP-3",
+      "blocks": "bidirectional",
+      "what": "8 个 entry 都没有 non-null approved definition bundle；authority model 只有 F2 监盘的 docx lane 有一个（opaque_single_onlyoffice），xlsx 侧 8 条全无",
+      "consequence": "Requirement 2.3：bundle 的 typed slots 不得用 SQL NULL / 空串 / 全零 hash 代替。缺 bundle 时 registry.assert_bundle_usable 会拒绝注册。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 5 / step 7 的活，且顺序不可颠倒（template → instrumentation → contract → bundle → representation），BP-2 未兑现时 bundle 的 contract slot 无处可取。",
+      "must_fix_before": "把任一 F entry 标 bidirectional 之前",
+      "owner_task": "Task 48 后续（step 5 / step 7）",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/adapters/registry.py",
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py"
+      ]
+    },
+    {
+      "id": "BP-4",
+      "blocks": "bidirectional",
+      "what": "没有为任一 F entry 跑过真实 OnlyOffice 9.4 的 required scenario set",
+      "consequence": "AC 12.12：任一缺失、失败、UNVERIFIABLE 均保持未验收；8 条 evidence 只能是 UNVERIFIABLE",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "真实 OO 9.4 探针需要 onlyoffice 容器 + 项目数据 + 逐 scenario 的 operation/application id 回收，属 Task 44 同型的独立 gate；F 循环侧尚未立项。本任务不用「跑不了」当豁免，而是如实把 verification_state 记为 UNVERIFIABLE 并附非空 unverifiable_reasons。",
+      "must_fix_before": "把任一 F entry 从 UNVERIFIABLE 提为 VERIFIED 之前",
+      "owner_task": "待立项（Task 44 同型的 F 循环 OO 9.4 gate）",
+      "source_refs": [
+        "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py"
+      ]
+    },
+    {
+      "id": "BP-5",
+      "blocks": "single_onlyoffice 与 bidirectional 的 sheet 定位可靠性",
+      "what": "F2 的整册码回落会打开错工作簿：`find_template_file('F2')` 在索引里筛出 11 条 wp_code=='F2' 的候选后，按「文件名含『审定表』或『常规程序』」优先，而索引顺序里第一个命中的是 `F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx`（14,532 字节的单 sheet 会计政策册）—— 不是承载审定表与 11 张分类明细表的 `F2-1至F2-14 …审定明细表类（Leap-常规程序）.xlsx`。实测 `find_template_file_any('F2')` 与 `find_template_file('F2')` 都返回会计政策册。",
+      "consequence": "F2 的四个 xlsx entry（核心组 / 特殊组 / 计价减值组 / 监盘组）在 sheet 尾码提不出独立子码而回落整册码 F2 时，OO 侧打开的是会计政策册 ⇒ 该路径上的 OO 通道不可靠，既不能作为 bidirectional 的 materialize 基底，也让「切到在线编辑看到的是本表」这个用户预期在回落时不成立。",
+      "observable_consequences": [
+        "宿主未传 sheetName（或 sheet 名尾码提不出 F2-n）时，OO 侧打开的是「会计政策、核算流程F2-16」那一个 sheet 的册子，与用户当前所在的 F2-1/F2-3/F2-47/F2-55/F2-21 全都无关",
+        "sheet 名尾码能提出独立子码时解析正确（实测 F2-1→审定明细表类、F2-21→盘点类、F2-38→计价测试、F2-47→跌价准备测试、F2-16→会计政策册），故该缺陷只在回落路径暴露 —— 是巧合正确，不是设计正确",
+        "「优先含审定表或常规程序」这条规则在 F2 上被 4 本同时命中的册子稀释：F2-16（会计政策·常规程序）、F2-1至F2-14（审定明细表类·常规程序）、F2-52（关联交易·常规程序）三本都含关键词，胜出者只由索引顺序决定"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "与 Task 46 登记的 D4 BP-5 完全同型（同一个 `_sheet_wp_code` 回落 + 同一个 `find_template_file` 优先级链）。修它要给 F2 的约 60 个 sheet 建一份 sheet→模板映射（或把解析下沉到 render-config 下发的真实 sheets 列表），影响所有走整册码回落的循环（D/E/F/G/…）。任务正文明令「不要顺手修跨循环的解析器」，故只登记不修。",
+      "must_fix_before": "把任一 F2 entry 标 bidirectional 或注册 adapter 之前",
+      "owner_task": "待立项（与 D slice 的 BP-5、E slice 的 G1 sheet 解析缺陷同型，三处应并为一个 spec）",
+      "source_refs": [
+        "backend/app/routers/wp_onlyoffice_router.py",
+        "backend/app/services/wp_template_finder.py",
+        "backend/wp_templates/_index.json"
+      ]
+    },
+    {
+      "id": "BP-6",
+      "blocks": "slice 与 source manifest 的一致性",
+      "what": "source manifest 里 8 条 F entry 的 `capability` 仍是 'single_onlyoffice'、`html_store` 仍是 'unresolved'，与本 slice 重裁后的结论（capability=null / verdict=exists）不一致。这两个值不是逐 entry 裁决，而是 workpaper_sync_entry_overlay.json 的 defaults_by_component.GtOnlyOfficeSheet **组件级默认值**（全 186 条里 180 条 html_store 都是 'unresolved'、capability 都是 'single_onlyoffice'）。",
+      "consequence": "manifest 的 capability 统计当前反映的是 overlay 默认值而非裁决结果；本 slice 的守卫因此断言「两者**必须**不一致且该不一致已登记」，而不是断言相等 —— 后者会把 overlay 默认值当成裁决真源。更严重的下游影响见 BP-9：F2 监盘的两个 Word writer 直接把这个默认值当成 lane 选择依据写进了生产代码的判断理由。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改 overlay 的 defaults_by_component 会同时翻掉 180 条 GtOnlyOfficeSheet entry 的 capability（远超 F 循环），还要改 approved_source_digest 并重生成 manifest —— manifest_digest 变化会波及 Task 73 / closure check / legacy baseline 等多个并发在途的判据。任务正文明令 workpaper_sync_entry_overlay.json / workpaper_sync_entry_manifest.json 只读（source-backed 生成物，手改等于伪造）。",
+      "must_fix_before": "Task 67 的 structural pre-reconcile 消费 manifest capability 统计之前",
+      "owner_task": "待立项（overlay per-entry override + 重生成 manifest），与 D slice 的 BP-6 同一件事",
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_overlay.json",
+        "backend/data/workpaper_sync_entry_manifest.json"
+      ]
+    },
+    {
+      "id": "BP-7",
+      "blocks": "bidirectional 的 stable field key 可保持性",
+      "what": "两条 entry 的主表载入路径会把行身份退化成**数组下标**：① `useF2DetailSheet.ts#L235` 的 `...emptyRow(String(r.id || i + 1), segments)` —— 持久化行缺 id 时用 i+1；② `useF5MonthlyDetail.ts#L133` 的 `id: String(r?.id ?? r?.rowId ?? \\`m-${Date.now()}-${i}\\`)` —— 两个既有键都缺时用 i 拼 id。两者都命中 forbidden_row_identity_kinds 的 array_index。",
+      "consequence": "行身份一旦由位置派生，插入/删除行会让同一业务行在两次载入间拿到不同 id ⇒ stable field key 在 roundtrip 中无法保持 ⇒ Task 36 的 visible-equivalence 与 roundtrip 校验会把「用户没动的行」判成改动，或反过来把改动吞掉。F2 核心组还叠加另一重风险：新增行的 id 是 `String(Date.now())`（无随机后缀），同一毫秒内连加两行会撞 id。",
+      "observable_consequences": [
+        "F2-3~F2-13 任一张表：删中间一行后重载，其后所有缺 id 的历史行的 id 整体前移一位",
+        "F5-2：从 F5-2-rows 旧键迁来的存量行（既无 id 也无 rowId）每次载入都拿到新的 `m-{ts}-{i}`，i 又随数组位置变化"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改行身份派生逻辑会影响既存持久化数据的读取（缺 id 的历史行需要一次性回填稳定 id，且回填规则要保证同一行在回填前后被认定为同一行），属数据迁移而非本任务的枚举/裁决范围。本任务的义务是把它查出来、落成可复核的 source_ref 并阻断 bidirectional。",
+      "must_fix_before": "把 xlsx/gt-f2-inventory-main 或 xlsx/gt-f5-cost-of-sales 标 bidirectional 之前（也在 step 6 为这两条发布 contract 之前）",
+      "owner_task": "待立项（F2/F5 行身份稳定化 + 存量 id 回填）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useF2DetailSheet.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useF5MonthlyDetail.ts"
+      ]
+    },
+    {
+      "id": "BP-8",
+      "blocks": "权威模板集合的完整性",
+      "what": "`backend/wp_templates/F/F2存货.xlsx`（560,160 字节 / 74 sheet，是 10 本 F2 拆分工作簿的并集）在磁盘上，但**不在** `backend/wp_templates/_index.json` 里（15 条 F 索引项全是拆分册）。`find_template_file('F2')` 的精确匹配分支按索引筛 wp_code=='F2' 已有 11 条命中，必然先返回，模糊匹配的磁盘 iterdir 分支走不到 ⇒ 该文件运行时不可达。",
+      "consequence": "两种风险：① 有人误把它当 F2 的权威模板写进 template_ref，而运行时永远拿不到它（Task 46 的 D4 `D4收入底稿.xlsx` 就是这个形态，首轮真的写错了）；② 它与 10 本拆分册内容重叠但字节不同，两处并存意味着「权威只有一份」这条约束在 F 目录内实际被破坏，未来谁改了拆分册而没改合册（或反之）不会有任何守卫发现。",
+      "observable_consequences": [
+        "`find_template_file_any('F2')` 实测返回 `F2-16 存货及跌价准备-会计政策（Leap-常规程序）.xlsx`，从不返回 F2存货.xlsx",
+        "磁盘 18 个文件 vs 索引 15 条，差集恰为 {F2存货.xlsx, F2-22 docx, F2-23 docx}；后两个有 _EXPLICIT_TEMPLATE_RELPATHS 兜底可达，F2存货.xlsx 无任何兜底"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "两条出路都超出本任务范围：删文件属破坏性操作（需确认没有离线流程在读它），补进 _index.json 会让 F2 的候选从 11 条变 12 条并可能改变 find_template_file 的优先级结果（即 BP-5 的行为会变）。本任务的义务是把它登记进 authoritative_templates（带 size+sha256 与 in_runtime_index=false），让「登记集合 == 磁盘实况」这条判据不因漏登而失效，并写明它不可达。",
+      "must_fix_before": "为 F2 任一 entry 发布 authority model / template definition digest 之前（否则「权威模板是哪一份」在 F 目录内有歧义）",
+      "owner_task": "待立项（与 D4 `D4收入底稿.xlsx` 同型，应并为一个「权威目录内不可达冗余模板清理」spec）",
+      "source_refs": [
+        "backend/wp_templates/F/F2存货.xlsx",
+        "backend/wp_templates/_index.json",
+        "backend/app/services/wp_template_finder.py"
+      ]
+    },
+    {
+      "id": "BP-9",
+      "blocks": "F2 监盘 Word lane 的 authority model 选择合法性",
+      "what": "`_f2_stocktake_plan_sync._save_fields` 与 `_f2_stocktake_summary_sync._save_fields` 的 docstring 都把「走 authoritative-bytes lane 而不是 projection lane」的理由写成「manifest 里 F2 的 entry（xlsx/gt-f2-stocktake-bundle）capability=single_onlyoffice」。而该 capability 是 overlay 的组件级默认值（BP-6），不是逐 entry 裁决结果。本 slice 按 AC 12.8 把它重裁为 null（html_counterpart_verdict=exists）后，那条论证的前提不再成立。",
+      "consequence": "两条 lane 目前提交的是 docx 本体 + 派生 fields JSON，运行行为不因本 slice 改变（authority model 是 opaque_single_onlyoffice，OOXML 本体确实是权威载荷）。但「为什么是 opaque 而不是 projection」这个论证从今起没有依据 —— Tasks 60/61 收 Word 通道时若沿用它，就是在用一个 overlay 默认值当设计判据。",
+      "observable_consequences": [
+        "两个 writer 的 docstring 各有一段引用 `capability=single_onlyoffice` 的论证，与本 slice 的 capability=null 直接冲突",
+        "若将来 overlay 支持 per-entry override 并把该 entry 改成 projection 相关能力，这两条 lane 会在 HtmlOnlyCommitPlan.__post_init__ 处被拒，而 docstring 里没有任何提示"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "F2-22/F2-23 的 Word 通道归 Tasks 60/61（任务正文明令与本 slice 分开计数），改它们的实现或 docstring 都属跨任务改动。本任务的义务是把这个论证链的断点查清并登记，让 Tasks 60/61 不必重新发现。",
+      "must_fix_before": "Tasks 60/61 收口 F2 Word 通道之前",
+      "owner_task": "Task 60 / Task 61",
+      "source_refs": [
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+        "backend/data/workpaper_sync_entry_overlay.json"
+      ]
+    },
+    {
+      "id": "BP-10",
+      "blocks": "AC 1.4 / AC 1.5 的 UI 义务完全收口",
+      "what": "本次已兑现 AC 1.4 的「显示可操作原因」（8 个宿主的模式工具栏挂 GtEntrySyncCapabilityNotice，常显一行摘要 + tooltip 完整原因）。仍未删除的是 8 个 entry 级 legacy dual-mode composable 与 4 个 sub-tab 级空壳桩。",
+      "consequence": "AC 1.5 的触发条件是「入口被裁决为纯 OO 或纯 HTML」—— 重裁后这 8 个 entry 都不是 single_*，所以 AC 1.5 不适用，切换按钮也不该被收掉（OO 侧是真实可用的独立编辑通道）。真正待做的是 legacy composable 删除，归 Task 66（生成计划）/ Task 72（执行删除）。另注：F2 监盘宿主已自带 `dualMode.supportsBidirectionalSync()` 门控的「仅预览·无回写」标签，与本次新挂的通知并列 —— 两者不冲突（前者按 sheet 判断当前是否可回写，后者按 entry 判断有没有 adapter），但 Task 66/72 收 legacy 时要一并核对，别把仍有效的那个删掉。",
+      "status": "PARTIALLY_FIXED_AC_1_4_DONE",
+      "why_not_fixed_here": "legacy composable 的删除有专门的任务（Task 66 生成清册 / Task 72 执行删除）与专门的七步范式（legacy_deletion_paradigm）；本任务只按 step 11 兑现「显示可操作原因」并把清册落成 deletion plan。",
+      "must_fix_before": "Task 72 的 Stage B 精确删除",
+      "owner_task": "Task 66 / Task 72",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "backend/data/workpaper_sync_f_cycle_deletion_plan.json"
+      ]
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+    "assertions": [
+      "本 slice 的 8 条 entry 与 D slice 的 7 条、E slice 的 1 条均无交集",
+      "8 条 entry 在 workpaper_sync_contracts/ 下都没有文件 —— 未交付 contract 的 entry 不伪造 contract，也不借用 d2.receivable_detail / b60.hour_budget / g7.soe_subsidiary_disclosure / h1.disposal_check 四条 pilot 中的任何一条",
+      "F2 的五个 entry（核心/特殊/计价减值/监盘 + F1/F3/F4/F5）虽共享 wp_code 前缀 F2 与部分工作簿，但 template_ref 逐条不同、primary managed table 逐条不同、html_counterpart 的 transport_key 逐条不同 —— 不存在「一条 entry 的对端结论被另一条借用」",
+      "F2-22/F2-23 的 Word 通道 authority model 与 commit entry_id 只登记在 xlsx/gt-f2-stocktake-bundle 名下的 partially_wired_word_lane 里，其余 7 条 entry 不出现该字段",
+      "8 条 entry 的 evidence.contract_test 都指向本 Task 48 的守卫文件，sync_test_run_id / required_scenario_set_digest 全为 null，不引用任何 pilot 的 scenario 实体或 evidence id",
+      "authoritative_templates 的 18 条记录里，belongs_to_entry 非 null 的 8 条一一对应 8 个 entry（无一对多、无多对一），其余 10 条全带 excluded_reason"
+    ]
+  },
+  "honest_adjudication_summary": {
+    "total_independent": 8,
+    "pilot_contract_published": 0,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 0,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "capability_verdict_pending": 8,
+    "html_counterpart_exists": 8,
+    "html_counterpart_none": 0,
+    "finalized_published_representations": 0,
+    "entries_left_unverifiable": 8,
+    "entries_with_composite_transport_key": 1,
+    "entries_with_per_sheet_injected_transport_key": 1,
+    "entries_with_legacy_alias_transport_key": 1,
+    "entries_with_plain_literal_transport_key": 5,
+    "composite_transport_key_mechanisms": 4,
+    "entries_with_positional_row_identity_defect": 2,
+    "reason": "8 条 entry 逐条实测都有 HTML 对端（checklist_responses + remark 列 + 逐 entry 各自的传输键形态），按 AC 12.8 一条都不能标 single_onlyoffice；OO 侧有真实业务价值且入口可达（8 个 componentType 在 htmlRendererRegistry 有真实入边），故也不是 single_html / unreachable；AC 12.1 的六件前置在 xlsx 侧一件未交付（F2 监盘的 docx lane 有 authority model，但那条 lane 归 Tasks 60/61 且不是本 entry 的 xlsx representation），故不得标 bidirectional。四个枚举值当下都不成立 ⇒ capability 记 null 并如实计入 unadjudicated=8。**unadjudicated=8 不是欠账新增，而是「本 slice 有 8 条 entry 的 capability 终态尚未确定」的实况**：缺什么已逐条落在 blocking_preconditions（BP-1..BP-4 是共性前置，BP-5/BP-7/BP-8/BP-9 是本次新查出的 F 循环形态缺陷）。",
+    "slice_counters": {
+      "unadjudicated": 8,
+      "fake_bidirectional_claimed_verified": 0,
+      "bidirectional_unverified": 0,
+      "stale_evidence": 0,
+      "note": "unadjudicated=8 的含义是「本 slice 有 8 条 entry 的 capability 终态尚未确定」，缺什么已逐条落在 blocking_preconditions。fake_bidirectional_claimed_verified=0 的分母是真的：8 条 evidence.verification_state 全为 UNVERIFIABLE 且各带非空 unverifiable_reasons，没有一条声称 VERIFIED。bidirectional_unverified=0 的分母也是真的：capability 为 bidirectional 的条目数是 0。stale_evidence=0 同理 —— 没有任何 entry 挂着 sync_test_run_id 或 required_scenario_set_digest，故不存在「evidence 比 definition 旧」的对象。四个 0 都不得解读为「已具备双向能力」。"
+    }
+  },
+  "properties_verified": [
+    21,
+    28,
+    69,
+    70
+  ],
+  "requirements_covered": [
+    "1.4",
+    "6.2",
+    "6.10",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ],
+  "property_denominators": {
+    "why_this_key_exists": "Task 46 首轮把「没有 contract → Property 21 通过 / 没有 bundle → Property 28 通过」写成结论，那是空分母重言式（同 spec 的 Task 20 专门写代码拒绝这种论证：WriterGateError \"...would be evaluated over an empty denominator (a tautology)\"）。本 slice 把每条 Property 的分母是什么、验了什么、哪部分不宣称通过逐条写下来，守卫按同一划分组织断言。",
+    "property_21": {
+      "what_it_asserts": "per-entry contract 的字段完整性（逐字段 stable_field_key / json_pointer / mode / value_type / source_ref，且不得出现 col_[a-z]+ 无语义占位）",
+      "f_cycle_denominator": "空 —— F 循环已发布的 per-entry contract 数 = 0（workpaper_sync_contracts/ 下 4 条生产契约的 review.entry_id 分别属 b60 / D2 / G7 / H1）",
+      "how_handled": "守卫**不宣称 Property 21 通过**。它断言两件可复核的事：① 「F 循环 contract 数 = 0」这个前提本身成立（逐文件读 review.entry_id 判断，不是数文件个数）；② 承载字段级判据的 pilot 守卫文件真存在（test_task13_contract_registry.py / test_task41_d2_large_json_pilot.py）。前提一旦不成立（有人给 F entry 发了契约），守卫立刻打红，要求在此补齐字段级判据。",
+      "not_claimed_passing": true
+    },
+    "property_28": {
+      "what_it_asserts": "immutable definition 漂移 fail closed",
+      "f_cycle_denominator": "非空 —— 18 个权威模板的 size + sha256，其中 8 张主模板另有 normalized_structure_hash（由 app.services.workpaper_sync.excel_instrumentation.normalized_structure_hash 现算），另有 8 组 (template_sheet, identity_cell, identity_text) 三元组由 openpyxl 真读比对",
+      "how_handled": "守卫在真分母上真验：hashlib 现算 18 个文件的 sha256 与 size、excel_instrumentation 现算 8 个 normalized_structure_hash、openpyxl 真读 8 个 sheet!cell 的文本。任一字节漂移即红。这不是「无可漂移 identity 所以通过」。",
+      "not_claimed_passing": false
+    },
+    "property_69": {
+      "what_it_asserts": "evidence 由逐 scenario 实体与服务端重算闭合",
+      "f_cycle_denominator": "非空但全为负向 —— 8 条 evidence 全是 UNVERIFIABLE，分母是「UNVERIFIABLE 必须带非空 unverifiable_reasons」与「声称 VERIFIED 必须有 sync_test_run_id + required_scenario_set_digest」两条蕴含关系，外加 slice_counters 四类计数的现算等值",
+      "how_handled": "守卫按 SR-7 断言 8 条 UNVERIFIABLE 各带非空 reasons；按「VERIFIED ⇒ 有 run id + digest」断言无一条空口声称已验收；把 honest_adjudication_summary 的 11 个计数逐项从 independent_entries 现算并等值比对（抄错或凑数即红）。逐 scenario evidence 实体的正向闭合由 Task 44 同型的 OO 9.4 gate 承载，本文件**不宣称那部分通过**，已登记 BP-4。",
+      "not_claimed_passing_part": "逐 scenario evidence 实体的正向闭合（需真实 OO 9.4 探针）"
+    },
+    "property_70": {
+      "what_it_asserts": "scenario / evidence / contract / bundle / candidate 不得跨 entry 或跨场景复用",
+      "f_cycle_denominator": "非空 —— 8 条 F entry × (D slice 7 条 + E slice 1 条) 的集合不相交判据、8 条 entry 的 contract 归属判据、18 条模板的 belongs_to_entry 单射判据、deletion plan 的 entry / composable 去重判据",
+      "how_handled": "守卫真验：三个 slice 的 entry 集合两两不相交；契约目录里没有任何文件的 review.entry_id 属 F 循环；authoritative_templates 的 belongs_to_entry 非 null 项在 8 个 entry 上是单射；deletion plan 的 entry_id 与 legacy composable 路径全局去重（F2 五个 entry 的 composable 不得互相借用）。",
+      "not_claimed_passing": false
+    }
+  },
+  "paradigm_schema_conflict": {
+    "what": "范式 JSON 的 slice_schema.applies_to_tasks 是 [48..57]，effective_from_task_48 明文把 html_counterpart_verdict / html_counterpart_source_refs 与阻断项的 status / must_fix_before / source_refs 列为 Task 48 起强制 —— 本 slice 全部满足。但 slice_schema.behavioral_rules 的 SR-3 要求「每个 entry 的 capability 必须落在 capability_enum 内」，而本 slice 的 8 条 capability 全为 null（AC 1.3 的四个枚举值当下没有一个成立：有 HTML 对端 ⇒ 不得 single_onlyoffice；OO 有业务价值 ⇒ 不得 single_html；入口可达 ⇒ 不得 unreachable；六件前置未交付 ⇒ 不得 bidirectional）。",
+    "how_resolved_here": "沿用 D slice（Task 46 收口）已确立的诚实形态：capability 记 null + capability_verdict_stage + capability_target + 非空 capability_target_blocked_by，并如实计入 slice_counters.unadjudicated=8。这四个字段合起来表达的是「终态未定，缺什么已逐条登记」，不是「允许留空」。本任务**未**修改范式 JSON、未扩充 capability_enum、未改动 D/E 两个 slice 的字节。",
+    "residual_inconsistency": "✅ 2026-08-31 已由范式 owner 收口（缺口编号 G1），走的是本条当初列的**第 ② 条出路**：`slice_schema.behavioral_rules` 的 SR-3 改成蕴含式「capability 落在 `capability_enum` 内 **或**（为 null 且 `slice_schema.required_pending_verdict_fields` 的三字段按 `pending_verdict_field_semantics` 齐备：`capability_verdict_stage` 非空串 · `capability_target` 落在枚举内 · `capability_target_blocked_by` 非空数组）」，并新增 SR-9「待裁决条目数 == `slice_counters.unadjudicated`」防止右支被当后门（全记待裁决同时报 0）。第 ① 条出路（把 null 写成第五态）**未**采纳：`capability_enum` 逐字派生自 AC 1.3，加第五个值等于改 AC —— 未定态由 null + pending 三字段表达，理由写在 `adjudication_criteria.capability_enum_note`。实测本 slice 经 `slice_schema.validator` 违规数 **0**（此前 8 条 SR-3），D slice 同步归零，E slice 保持 0。",
+    "known_red_it_causes": {
+      "status": "resolved",
+      "resolved_at": "2026-08-31（缺口编号 G1 收口）",
+      "resolved_by": "backend/data/workpaper_sync_migration_paradigm.json#slice_schema.behavioral_rules[SR-3] 改成蕴含式（capability 在 capability_enum 内 **或** 为 null 且 required_pending_verdict_fields 三字段按 pending_verdict_field_semantics 齐备），配套新增 SR-9（待裁决条目数 == slice_counters.unadjudicated）与 adjudication_criteria.capability_enum_note",
+      "failing_test": "",
+      "was_failing_test": "backend/tests/workpaper_sync/test_slice_schema_validator_coverage.py::test_every_slice_passes_the_json_nominated_validator[workpaper_sync_f_cycle_manifest_slice]",
+      "measured_result": "收口前：1 failed, 7 passed, 2 xfailed（2026-08-31 实跑 `.\\.venv\\Scripts\\python.exe -m pytest backend/tests/workpaper_sync/test_slice_schema_validator_coverage.py`），失败信息「通不过范式自己的 slice_schema（8 条）」，8 条全部是 SR-3 的 capability=None。收口后：9 passed, 1 xfailed —— 本 slice 与 D slice 的参数项都变绿（D 的 `_UNJUDGED_SLICES` 登记已删），剩下那 1 个 xfailed 是另一个缺口 G2（AP-1 known_debt_inventory 的哑登记），与本条无关。",
+      "why_this_red_was_expected_and_must_not_have_been_silenced": "该文件的 `_UNJUDGED_SLICES` docstring 明写「新出现的 slice 若没登记又不通过校验，它的参数项没有标记 ⇒ 直接 FAIL。两个方向都咬」—— 那条红是**设计好的绊线**，用来强制把范式层的 SR-3 冲突推到台面上，不是本 slice 的缺陷。当时消掉它的两条路都不合法：① 给 capability 填枚举值 ⇒ 违反 AC 12.8（有 HTML 对端不得 single_onlyoffice）或 AC 12.1 + SR-6（五个身份字段全 null 不得 bidirectional）；② 改范式 JSON ⇒ 那时它是 Task 48 的只读约束。最终收口走的正是 ②，由范式 owner 执行；本 slice 的字节除本登记与 residual_inconsistency 两键外未变。",
+      "who_must_resolve": "已解决 —— 执行方 = 范式 owner（`workpaper_sync_migration_paradigm.json` 的 slice_schema / adjudication_criteria）。",
+      "locked_by": "backend/tests/workpaper_sync/test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_slice_passes_the_paradigm_nominated_validator —— 判据已按新事实重写为「本 slice 经范式点名的校验器违规数为 0」，并带反向自检（抽掉 capability_verdict_stage 后校验器必须点名它，防被短路成恒返回空列表）+ 对本登记 status / resolved_by / failing_test 三项的核对（防自述留着过期的「已知红」）。原判据名 test_the_only_schema_violations_are_the_registered_sr3_gap 断言「违规存在且全部是 SR-3」，按其自身 docstring 的承诺在 SR-3 收口后当场打红，已随本次收口重写。"
+    },
+    "sibling_slice_conflicts": "与 D slice 无字段级冲突（本 slice 是其字段集的超集：多 transport_key_* / row_identity_generator_* / ui_toolbar_gate / partially_wired_word_lane / dynamic_row_identity / property_denominators）。与 E slice 的形态差异是 capability：E slice 填 'single_onlyoffice' 且 html_store 未解，属 AP-1 known_debt_inventory 的第 8 条，owner 是 E 循环回填任务；本任务未改 E slice 字节。"
+  }
+}

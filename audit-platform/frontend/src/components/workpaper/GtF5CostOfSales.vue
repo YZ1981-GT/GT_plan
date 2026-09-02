@@ -23,6 +23,7 @@
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f5-cost-of-sales" />
       </div>
 
       <!-- 双模式：HTML sheet 切到 OnlyOffice -->
@@ -162,6 +163,7 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 const F5TabAdjudication = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabAdjudication.vue'))
 const F5TabMonthlyDetail = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabMonthlyDetail.vue'))
 const F5TabOtherCost = defineAsyncComponent(() => import('./f5-cost-of-sales/F5TabOtherCost.vue'))

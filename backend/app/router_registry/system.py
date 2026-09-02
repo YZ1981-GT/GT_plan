@@ -120,6 +120,16 @@ def register_system_routers(app: FastAPI) -> None:
               crf_router, crb_router, csd_router]:
         app.include_router(r, tags=["合并报表"])
 
+    # ═══ §7.1 高级查询：底稿回写预览 / 确认（custom_query 的伴生 router） ═══
+    # 🔴 custom_query.py 只 re-export 了 writeback_preview / writeback_confirm 两个**函数**
+    #    （给契约测试直调与 monkeypatch 用），并未 include 伴生模块自己的 APIRouter。
+    #    结果 POST /api/custom-query/writeback-preview|writeback-confirm 从未挂上路由树，
+    #    `WritebackPreviewService`（30KB）+ `WritebackConfirmationGate` 对用户仍是 404 —— 
+    #    与该模块 docstring 自称的「本模块是其唯一生产入口」相矛盾。此处补注册。
+    #    tags 保留 router 自身声明的 ["custom-query"]（不套用「合并报表」）。
+    from app.routers.custom_query_writeback import router as cqw_router
+    app.include_router(cqw_router)
+
     # ═══ §8. 系统管理与扩展 ═══
     from app.routers.gt_coding import router as gtc_router
     from app.routers.t_accounts import router as ta_router
@@ -244,6 +254,16 @@ def register_system_routers(app: FastAPI) -> None:
     # ═══ §130. doc-level-ai-chat: 文档级 AI 对话（streaming + 留痕 + 采纳确认流） ═══
     from app.routers.doc_ai_chat import router as doc_ai_chat_router
     app.include_router(doc_ai_chat_router, tags=["文档级AI对话"])
+
+    # ═══ §130.1 MCP scoped REST（dsh-agent-panel-integration Task 25 / Req 11.5~11.9） ═══
+    # 🔴 6 个 /api/ai-chat/mcp/* 端点（tokens / tokens/child / tokens/revoke /
+    #    tools / tools/call / budget/{run_id}）此前从未 include → 整套 MCP scoped token
+    #    能力（ResourceAccessResolver 校验 + ExportMaskService 脱敏 + 预算 + 哈希链审计）
+    #    对调用方是 404。前缀 /api/ai-chat/mcp 与 doc_ai_chat 的静态段/`/doc/{..}` 路径
+    #    不重叠，注册顺序无歧义。全部端点均已带鉴权依赖
+    #    （get_current_user 或 _validate_mcp_token），不新增未认证入口。
+    from app.routers.ai_chat_mcp import router as ai_chat_mcp_router
+    app.include_router(ai_chat_mcp_router, tags=["AI Chat MCP"])
 
     # ═══ §123. V3 Req 7.4: 跨模块冲突调解（list_pending / list / resolve） ═══
     from app.routers.cross_module_conflicts import router as cross_module_conflicts_router

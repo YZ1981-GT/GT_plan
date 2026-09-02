@@ -1,0 +1,22 @@
+{
+  "probe": "task4-oo94-multiuser-callback",
+  "phase": "phase2",
+  "started_at": "2026-08-24T14:53:01.741581+00:00",
+  "oo_url_from_host": "http://localhost:8080",
+  "host_for_oo": "host.docker.internal",
+  "probe_port": 9991,
+  "doc_key": "t4probe1787583181",
+  "seed_template_source": "backend/wp_templates/A/A31 审计标识一览表.xlsx",
+  "seed_sha256": "fd4d5d61b151d9b5e46eb38d632153f0362b49fd3bfa0221c8fe3591acb1e870",
+  "seed_bytes": 12620,
+  "marker_cells": {
+    "alice": "Z90",
+    "bob": "Z92"
+  },
+  "oo_jwt_enabled": true,
+  "oo_secret_ref": "sha256:61babf80965111e647799bc8",
+  "oo_build_endpoints": {
+    "healthcheck": "true",
+    "info": "ERROR HTTPError: HTTP Error 403: Forbidden"
+  }
+}

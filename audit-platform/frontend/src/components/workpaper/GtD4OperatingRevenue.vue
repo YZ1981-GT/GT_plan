@@ -10,6 +10,7 @@
       <div v-if="showModeToolbar" class="d4-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
         <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -145,6 +146,7 @@ import { useD4EntryDualMode, type D4RenderMode } from './composables/useD4EntryD
 import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 

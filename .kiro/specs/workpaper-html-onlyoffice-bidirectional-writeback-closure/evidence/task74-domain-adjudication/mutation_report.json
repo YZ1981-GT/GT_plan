@@ -1,0 +1,158 @@
+[
+  {
+    "id": "N01",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_the_authoring_rules_refuse_an_unmatched_row",
+    "why": "命不中规则时不再抛错而是给一个默认 lane ⇒ 「未裁决伪装成已裁决」：门会显示 0，而那一行从来没有人看过。这是本任务最贵的一种假绿",
+    "verdict": "RED",
+    "summary": "46 passed, 4 warnings, 2 errors in 88.18s (0:01:28)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_the_authoring_rules_refuse_an_unmatched_row",
+      "test_task74_domain_adjudication.py::test_the_rule_table_has_no_catch_all"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_the_authoring_rules_refuse_an_unmatched_row"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py"
+    ],
+    "restored": true,
+    "seconds": 91.4
+  },
+  {
+    "id": "N02",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_the_rule_table_has_no_catch_all",
+    "why": "把最大的一条规则改成恒真 ⇒ 125 行的 lane 判定退化成「凡是没被前面规则接住的都算第二权威存储」，等价于默认 lane，只是伪装成一条具体规则",
+    "verdict": "RED",
+    "summary": "2 failed, 46 passed, 4 warnings in 88.12s (0:01:28)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_the_authoring_rules_refuse_an_unmatched_row",
+      "test_task74_domain_adjudication.py::test_the_rule_table_has_no_catch_all"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_the_rule_table_has_no_catch_all"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py"
+    ],
+    "restored": true,
+    "seconds": 91.4
+  },
+  {
+    "id": "N03",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_every_note_cites_exactly_the_facts_that_row_has",
+    "why": "把一行的注解原样粘到另一行（复制粘贴的**实际形态**）⇒ 被粘的那行注解引用的事实不再属于它自己。三条判据都要红：事实双向核算、身份前缀、两两不同（实测把 `app.routers.a171_ai_generate::a171_sync_from_docx` 的注解粘到 `app.routers.l4_bonds_payable::l4_import_data` 上）",
+    "verdict": "RED",
+    "summary": "4 failed, 44 passed, 4 warnings in 88.31s (0:01:28)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_every_note_cites_exactly_the_facts_that_row_has",
+      "test_task74_domain_adjudication.py::test_every_note_is_anchored_on_its_own_row",
+      "test_task74_domain_adjudication.py::test_notes_are_pairwise_distinct_and_carry_no_placeholder",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_every_note_cites_exactly_the_facts_that_row_has",
+      "test_task74_domain_adjudication.py::test_every_note_is_anchored_on_its_own_row",
+      "test_task74_domain_adjudication.py::test_notes_are_pairwise_distinct_and_carry_no_placeholder"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 91.5
+  },
+  {
+    "id": "N04",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_the_overlay_still_has_no_exemption_field",
+    "why": "往 overlay 里加一个豁免字段（`allow_bypass`）⇒ Task 74 正文四条禁令里的第一条。overlay 只能回答「属于哪条 lane」，多一个字段就多一条「是否允许绕过」的语义入口",
+    "verdict": "RED",
+    "summary": "2 failed, 46 passed, 4 warnings in 89.03s (0:01:29)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_the_overlay_still_has_no_exemption_field",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_the_overlay_still_has_no_exemption_field"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 92.3
+  },
+  {
+    "id": "N05",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria",
+    "why": "归零之后「门不再计算这条准则」与「门算出 0」在报告里逐字相同 —— 这是 fail-open 的教科书形态。判据靠「摘掉裁决必须回到 236 / 34」反向证明门真的在算",
+    "verdict": "RED",
+    "summary": "2 failed, 46 passed, 4 warnings in 88.98s (0:01:28)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria",
+      "test_workpaper_writer_inventory.py::test_a_single_unadjudicated_writer_keeps_the_gate_red"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 92.2
+  },
+  {
+    "id": "N06",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria",
+    "why": "让 `bypasses_unified_commit` 看一眼 `adjudication` ⇒ 裁决 270 行的同时把 261 条绕过全部清掉。这正是「加豁免」的最隐蔽写法：没有豁免列，豁免藏在 verdict 的算式里",
+    "verdict": "RED",
+    "summary": "2 failed, 46 passed, 4 warnings in 88.55s (0:01:28)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 91.8
+  },
+  {
+    "id": "N07",
+    "side": "be",
+    "want": "test_task74_domain_adjudication.py::test_the_required_domains_stay_a_proper_floor",
+    "why": "把本任务新造的 lane 塞进门的 `_REQUIRED_DOMAINS` ⇒ 「必需 domain 是覆盖地板」这层语义被本任务自己的新词污染（与 Task 20 的 M19 同型：不改任何计数，只抹掉一层语义）",
+    "verdict": "RED",
+    "summary": "3 failed, 45 passed, 4 warnings in 87.15s (0:01:27)",
+    "added": [
+      "test_task74_domain_adjudication.py::test_adjudicating_clears_exactly_two_criteria",
+      "test_task74_domain_adjudication.py::test_the_required_domains_stay_a_proper_floor",
+      "test_task74_domain_adjudication.py::test_the_two_new_lanes_buy_nothing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task74_domain_adjudication.py::test_the_required_domains_stay_a_proper_floor"
+    ],
+    "added_files": [
+      "test_task74_domain_adjudication.py"
+    ],
+    "restored": true,
+    "seconds": 90.2
+  }
+]

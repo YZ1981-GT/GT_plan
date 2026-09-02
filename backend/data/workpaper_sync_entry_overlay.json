@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "review_status": "reviewed",
+  "approved_source_digest": "b0fd31f177397d9cba4e17db485f789876b12371b5cc154e4bd55b4f9fc3443c",
+  "review_basis": "2026-08-24 full production mount inventory; includes the newly present CycleStandaloneProcedureShell mount, reproduces 43 parent duplicates, and isolates the G6 unreachable legacy stub",
+  "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
+  "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
+  "defaults_by_component": {
+    "GtOnlyOfficeSheet": {
+      "html_store": "unresolved",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "adapter_id": null,
+      "capability": "single_onlyoffice",
+      "migration_state": "legacy_fake_bidirectional",
+      "expected_profile": {
+        "editability": ["editable"],
+        "room_model": ["shared"],
+        "scenario_profile_ids": [
+          "xlsx.editable.shared.single.room_service_wired.v1"
+        ],
+        "review_note": "source-backed，不是裁决：generator 从宿主 readonly 绑定 + GtOnlyOfficeSheet.vue withDefaults(readonly:false) + /api/workpapers/*/sheets/*/onlyoffice-config 的 wp 维度 doc_key 推导。这里只登记复核过的取值域，任一不符 fail closed —— 永不作为兜底值使用"
+      },
+      "evidence": {
+        "review_status": "source_inventory_reviewed",
+        "contract_test": null,
+        "browser_case": null,
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ]
+      }
+    },
+    "OnlyOfficeWordDialog": {
+      "html_store": "unresolved",
+      "canonical_resolver": "legacy_word_onlyoffice_router",
+      "adapter_id": null,
+      "capability": "single_onlyoffice",
+      "migration_state": "legacy_fake_bidirectional",
+      "expected_profile": {
+        "editability": ["editable"],
+        "room_model": ["shared", "exclusive"],
+        "scenario_profile_ids": [
+          "docx.editable.shared.single.room_service_wired.v1",
+          "docx.editable.exclusive.single.room_service_wired.v1"
+        ],
+        "review_note": "两条 entry 的 doc_key 由各自宿主提供：WpPopupDocxEditor.vue 拿 /api/projects/*/working-papers/*/onlyoffice-config 的服务端 key（shared）；WorkpaperWordEditor.vue 请求的 /api/workpapers/*/onlyoffice-config 后端无此路由并带 Date.now() 兜底（exclusive）。组件本身无 readonly prop，可编辑性来自 props.mode || 'edit'"
+      },
+      "evidence": {
+        "review_status": "source_inventory_reviewed",
+        "contract_test": null,
+        "browser_case": null,
+        "legacy_reasons": [
+          "document_state_is_not_durable_ack",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ]
+      }
+    },
+    "WorkpaperWordEditor": {
+      "html_store": "checklist_responses_or_structured_word_fields",
+      "canonical_resolver": "legacy_word_onlyoffice_router",
+      "adapter_id": null,
+      "capability": "single_html",
+      "migration_state": "legacy_fake_bidirectional",
+      "expected_profile": {
+        "editability": ["editable"],
+        "room_model": ["exclusive"],
+        "scenario_profile_ids": [
+          "docx.editable.exclusive.single.room_service_wired.v1",
+          "docx.editable.exclusive.dynamic.room_service_wired.v1"
+        ],
+        "review_note": "WorkpaperWordEditor.vue#L995 请求 /api/workpapers/*/onlyoffice-config（后端无此路由），#L1000 用 `Date.now()` 兜底 documentKey ⇒ doc_key 不保证跨用户一致，room_model 只能是 exclusive。dynamic 那条是 GtWpRenderer 的 registry dispatcher 挂载。⚠️ 这里的 exclusive 是**实况**不是目标态：Task 21 room service 接线后须重新推导"
+      },
+      "evidence": {
+        "review_status": "source_inventory_reviewed",
+        "contract_test": null,
+        "browser_case": null,
+        "legacy_reasons": [
+          "html_reload_only",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ]
+      }
+    }
+  },
+  "parent_rules": [
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/d4/**/*.vue",
+      "component": "GtOnlyOfficeSheet",
+      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
+      "reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/h4/**/*.vue",
+      "component": "GtOnlyOfficeSheet",
+      "parent_entry_id": "xlsx/gt-h4-engineering-materials",
+      "reason": "H4 nested impairment tabs forward the H4 root persistence identity"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/h8/**/*.vue",
+      "component": "GtOnlyOfficeSheet",
+      "parent_entry_id": "xlsx/gt-h8-right-of-use-assets",
+      "reason": "H8 nested measurement tabs forward the H8 root persistence identity"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/n1/*.vue",
+      "component": "GtOnlyOfficeSheet",
+      "parent_entry_id": "xlsx/gt-n1-deferred-tax-assets",
+      "reason": "N1 nested aggregate/detail/calc hosts forward the N1 aggregate entry"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/j1/inspection/*.vue",
+      "component": "GtOnlyOfficeSheet",
+      "parent_entry_id": "xlsx/j1/gt-j1-employee-compensation",
+      "reason": "J1 nested inspection host forwards the J1 aggregate entry"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+      "component": "OnlyOfficeWordDialog",
+      "parent_entry_id": "docx/gt-a16-bundle",
+      "reason": "The A16 modal is an implementation child of the A16 WorkpaperWordEditor entry"
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue",
+      "component": "GtOnlyOfficeSheet",
+      "parent_entry_id": "xlsx/b60/gt-b60-bundle",
+      "reason": "B60 DOCX pane is a child route of the B60 bundle persistence identity"
+    }
+  ],
+  "unreachable_rules": [
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue",
+      "component": "GtOnlyOfficeSheet",
+      "reason": "Historical simplified stub; htmlRendererRegistry resolves g6-other-bond-investment-ecl to GtG6OtherBondInvestmentEcl.vue",
+      "expected_profile": {
+        "editability": ["unreachable"],
+        "room_model": ["none"],
+        "scenario_profile_ids": [
+          "xlsx.unreachable.none.single.room_service_wired.v1"
+        ],
+        "review_note": "生成器独立复核该裁决：全量生产前端源码里指向该文件的 import/模板标签入边为 0（htmlRendererRegistry.ts#L378 的同名局部变量 import 的是 GtG6OtherBondInvestmentEcl.vue，不是本文件）。入边数与本规则必须一致，否则 fail closed"
+      }
+    }
+  ],
+  "overrides": [
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtCustomWpEditor.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "canonical_xlsx_coordinate_projection",
+      "canonical_resolver": "custom_workpaper_xlsx",
+      "migration_state": "adapter_candidate",
+      "evidence_patch": {
+        "review_status": "existing_same_file_authority_verified",
+        "legacy_reasons": [
+          "no_durable_forcesave_ack",
+          "missing_unified_adapter"
+        ]
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
+      "component": "WorkpaperWordEditor",
+      "html_store": "checklist_responses_or_structured_word_fields",
+      "canonical_resolver": "legacy_word_onlyoffice_router",
+      "capability": "single_html",
+      "migration_state": "legacy_fake_bidirectional",
+      "evidence_patch": {
+        "review_status": "registry_dispatch_reviewed",
+        "legacy_reasons": [
+          "html_reload_only",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ]
+      }
+    }
+  ]
+}

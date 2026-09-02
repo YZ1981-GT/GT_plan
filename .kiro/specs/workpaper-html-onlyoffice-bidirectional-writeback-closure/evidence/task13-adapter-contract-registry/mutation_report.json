@@ -1,0 +1,1457 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected",
+    "why": "让 `col_[a-z]+` 形态不再匹配 ⇒ generated YAML 的无语义列占位可直接注册生产写格契约（Requirement 6.1 / Property 20 的核心反例）",
+    "verdict": "RED",
+    "summary": "8 failed, 229 passed, 1 warning in 1.74s",
+    "added": [
+      "test_task13_contract_registry.py::TestGuardSelfCheck::test_source_ref_only_parser_would_accept_col_placeholder",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_column_key_rejected",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_a]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_b]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_bc]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_zzz]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_table_and_sheet_key_rejected",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_rejected_even_with_full_source_ref"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_column_key_rejected",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_a]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_b]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_bc]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_in_stable_key_rejected[col_zzz]",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_col_placeholder_rejected_even_with_full_source_ref"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_missing_source_ref_is_an_independent_judgement",
+    "why": "关掉 `source_ref` 必填 ⇒ 无来源自造字段可进生产契约。与 M01 必须是两条独立判据：合成一条后删掉 col 检查仍会被 source_ref 挡住 ⇒ 变异 GREEN",
+    "verdict": "RED",
+    "summary": "4 failed, 233 passed, 1 warning in 1.75s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_dynamic_columns_source_ref_required",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_missing_source_ref_is_an_independent_judgement",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_each_missing_facet_is_rejected[source_ref-source_ref]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_missing_facet_messages_are_pairwise_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_dynamic_columns_source_ref_required",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_missing_source_ref_is_an_independent_judgement",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_each_missing_facet_is_rejected[source_ref-source_ref]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_candidate_contract_cannot_register",
+    "why": "让 generator 产的候选骨架直接可注册 ⇒ 「人工审核后的 per-entry contract 发布后才能组 approved bundle」失效",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.62s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_candidate_contract_cannot_register",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_shipped_example_candidate_is_rejected_by_the_real_parser"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_candidate_contract_cannot_register",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_shipped_example_candidate_is_rejected_by_the_real_parser"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_tilde_escape_is_its_own_judgement",
+    "why": "关掉 RFC 6901 的 `~0`/`~1` 转义判据 ⇒ 非法 pointer 进契约，运行时定位到不存在的路径",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.59s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_tilde_escape_is_its_own_judgement"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_tilde_escape_is_its_own_judgement"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_row_scoped_pointer_needs_exactly_one_row_placeholder",
+    "why": "关掉「行域字段 pointer 必须含恰好一个 {row_uuid}」⇒ 行字段未绑定行身份，删除/重排后数据串行（Requirement 6.5）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.61s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_row_scoped_pointer_needs_exactly_one_row_placeholder"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_row_scoped_pointer_needs_exactly_one_row_placeholder"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_non_row_field_must_not_carry_row_placeholder",
+    "why": "关掉「非行域字段不得含 {row_uuid}」—— 与 M05 是两个方向，只测一条时删另一条不会红",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_non_row_field_must_not_carry_row_placeholder"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_non_row_field_must_not_carry_row_placeholder"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_non_ascii_identity_is_rejected",
+    "why": "允许中文 label 作 stable key ⇒ identity 依赖展示文本，改标题即漂移（Requirement 6.14 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.57s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_non_ascii_identity_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_non_ascii_identity_is_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_row_scoped_cell_must_not_hardcode_row_number",
+    "why": "让任何 `row_from` 都被当成 row_identity ⇒ 写死行号与缺失 cell 都被静默接受",
+    "verdict": "RED",
+    "summary": "25 failed, 181 passed, 1 warning, 31 errors in 1.84s",
+    "added": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_extract_carrier_tier_prefers_instrumented_identity",
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_extract_fails_closed_without_any_carrier",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_contract_canonical_digest_is_reproducible_across_key_order",
+      "test_task13_contract_registry.py::TestProperty20GeneratedColumnPlaceholder::test_semantic_column_key_is_accepted",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_duplicate_stable_keys_rejected_within_and_across_tables",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_editable_and_protected_keys_are_partitioned",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_row_scoped_cell_must_not_hardcode_row_number",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_structure_facets_required_by_ac_6_3_are_all_parsed",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_two_level_header_is_expressible",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_valid_xlsx_contract_parses_with_all_six_facets",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_drift_detects_missing_and_extra_fields",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_drift_reports_first_position",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_inventory_carries_no_display_names",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_inventory_is_order_independent",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_missing_contract_file_is_stale",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_on_disk_contract_drift_is_a_separate_judgement",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg13_parent_duplicate_and_unreachable_entries_rejected",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_mode_switch_only_for_bidirectional",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_fake_bidirectional_both_directions",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg3_matcher_overlap",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg5_duplicate_adapter_and_entry",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[adapter]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[manifest]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[matcher]",
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_contract_file_without_adapter_is_surfaced"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_row_scoped_cell_must_not_hardcode_row_number"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_each_missing_facet_is_rejected",
+    "why": "关掉「xlsx 受管字段必须声明 cell（OO 位置）」⇒ Property 21 的六个语义面少一面仍能注册",
+    "verdict": "RED",
+    "summary": "4 failed, 233 passed, 1 warning in 1.77s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_each_missing_facet_is_rejected[cell-cell]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_every_mode_field_still_needs_cell[auto_source]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_every_mode_field_still_needs_cell[editable]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_missing_facet_messages_are_pairwise_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_each_missing_facet_is_rejected[cell-cell]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_every_mode_field_still_needs_cell[auto_source]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_every_mode_field_still_needs_cell[editable]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_duplicate_stable_keys_rejected_within_and_across_tables",
+    "why": "允许 stable_field_key 跨 sheet/table 重复 ⇒ 同一 key 指向两个格，三方 merge 的键索引失去唯一性",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.71s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_duplicate_stable_keys_rejected_within_and_across_tables"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_duplicate_stable_keys_rejected_within_and_across_tables"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain",
+    "why": "关掉两级表头的 header_rows 域判据（Requirement 6.3）⇒ 0/4/布尔值都能进契约",
+    "verdict": "RED",
+    "summary": "4 failed, 233 passed, 1 warning in 1.75s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[0]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[2]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[4]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[True]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[0]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[2]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[4]",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_header_rows_domain[True]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected",
+    "why": "让 `index`/`ordinal`/`position` 等位置身份可作 row identity ⇒ 删行再新增后旧身份被复用、数据串到新行（Requirement 6.5 / Property 23）",
+    "verdict": "RED",
+    "summary": "5 failed, 232 passed, 1 warning in 1.76s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[array_index]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[index]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[ordinal]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[position]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[row_number]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[array_index]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[index]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[ordinal]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[position]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_positional_row_identity_rejected[row_number]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template",
+    "why": "允许任意动态列 identity 模板 ⇒ 可改 label 被当 identity、列数被写死（Requirement 6.4 / 平台 H7 范式）",
+    "verdict": "RED",
+    "summary": "5 failed, 232 passed, 1 warning in 1.75s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[\\u516c\\u53f8{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{label}_{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{slot}-{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{slot}]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[\\u516c\\u53f8{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{label}_{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{slot}-{seq}]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_column_identity_must_be_exact_template[{slot}]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row",
+    "why": "允许 footer_anchor 写死行号 ⇒ 行新增后 footer 下移，公式范围写错位置",
+    "verdict": "RED",
+    "summary": "3 failed, 234 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row[row]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row[row_index]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row[row_number]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row[row]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row[row_index]",
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_footer_anchor_must_not_hardcode_row[row_number]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_formula_field_must_be_covered_by_formula_mask",
+    "why": "让 formula 字段的列不必落在 formula_mask 内 ⇒ 受保护单元格未登记只读，OO 侧修改会覆盖公式结果（Requirement 6.6）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_formula_field_must_be_covered_by_formula_mask"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_formula_field_must_be_covered_by_formula_mask"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_rows_require_delete_policy_and_vice_versa",
+    "why": "动态行表可以不声明 delete_policy ⇒ 删除语义留给运行时猜测（Requirement 6.9 / 6.15）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.59s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_rows_require_delete_policy_and_vice_versa"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_dynamic_rows_require_delete_policy_and_vice_versa"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_document_type_crossover_is_rejected_four_ways",
+    "why": "关掉 xlsx 契约里的 Word `sdt_tag` 拒绝 ⇒ 文档类型串用，Excel adapter 会拿到只有 Word 才有的载体声明",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.61s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_document_type_crossover_is_rejected_four_ways"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_document_type_crossover_is_rejected_four_ways"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_row_scoped_docx_field_tag_must_carry_row_uuid",
+    "why": "行域 Word 字段的 tag 可以不带 {row_uuid} ⇒ 行身份无处承载。row 级 SDT 在 OO 9.4 实测被剥掉，这是唯一可用的行身份载体",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.62s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_row_scoped_docx_field_tag_must_carry_row_uuid"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_row_scoped_docx_field_tag_must_carry_row_uuid"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_contract_id_must_match_adapter_id",
+    "why": "契约身份与 adapter 身份不再双向锁死 ⇒ 一个 adapter 可挂任意契约文件",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.61s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_contract_id_must_match_adapter_id"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_contract_id_must_match_adapter_id"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestContractStructuralRules::test_template_path_traversal_rejected",
+    "why": "契约里的模板相对路径可绝对、可含 `..` ⇒ 目录穿越进模板库之外",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_template_path_traversal_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestContractStructuralRules::test_template_path_traversal_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_word_row_sdt_carrier_is_rejected",
+    "why": "放行 probe blocklist 里的载体 ⇒ 真实 OO 9.4 上 failed 的 `row_sdt` 可进生产契约，engine 会建在一个会被 OO 剥掉的载体上",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_word_row_sdt_carrier_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_word_row_sdt_carrier_is_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_excel_anchors_are_rejected",
+    "why": "放行 blocklist 里的结构锚点 ⇒ `sheet_id` / `sheet_display_name`（OO 9.4 实测 failed）被当 sheet 定位依据",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.86s",
+    "added": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_excel_anchors_are_rejected[sheet_display_name]",
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_excel_anchors_are_rejected[sheet_id]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_excel_anchors_are_rejected[sheet_display_name]",
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_failed_excel_anchors_are_rejected[sheet_id]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.2
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCarrierProbeGate::test_unregistered_carrier_is_rejected",
+    "why": "未在 probe 契约登记的载体也放行 ⇒ gate 形同不存在（与 M21 是两条：「登记过但 failed」与「根本没登记」）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.75s",
+    "added": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_unregistered_carrier_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_unregistered_carrier_is_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCarrierProbeGate::test_extract_fails_closed_without_any_carrier",
+    "why": "两级载体都不存在时不再 fail closed，而是谎报「有原生锚点」⇒ extract 会降级到中文标题/位置猜测（Requirement 6.20 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.77s",
+    "added": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_extract_fails_closed_without_any_carrier"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCarrierProbeGate::test_extract_fails_closed_without_any_carrier"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_drift_reports_first_position",
+    "why": "关掉逐项结构比对 ⇒ 契约声明与实测结构漂移后仍按旧坐标写格（Requirement 6.10 要求指出首个漂移 sheet/field/cell）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.62s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_drift_reports_first_position"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_structure_drift_reports_first_position"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_contract_bundle_slot_digests_are_locked_both_ways",
+    "why": "契约声明的 template digest 不再与 frozen bundle 的 typed slot 比对 ⇒ definition 漂移后历史 identity 与当前契约悄悄错配",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.73s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_contract_bundle_slot_digests_are_locked_both_ways",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_marker_in_template_slot_is_drift_for_projection_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_contract_bundle_slot_digests_are_locked_both_ways",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_marker_in_template_slot_is_drift_for_projection_contract"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_missing_slot_prevents_comparison",
+    "why": "bundle 缺 typed slot 时不再拒绝，而是往下走到 KeyError/None 比较 ⇒ slot omission 的诊断消失",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.74s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_missing_slot_prevents_comparison"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_missing_slot_prevents_comparison"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity",
+    "why": "断掉「字段级校验器委托 payload 级判据」的接线 ⇒ 自引用 artifact UUID/hash、反向 bundle 引用全部放行（Requirement 6.2 / 6.14）",
+    "verdict": "RED",
+    "summary": "10 failed, 227 passed, 1 warning in 1.76s",
+    "added": [
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[artifact_id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[definition_artifact_id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[definition_sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_forward_reference_bundle[bundle_sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_forward_reference_bundle[definition_bundle_id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_forward_reference_bundle[definition_bundle_sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_parse_contract_delegates_payload_level_rules",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_self_identity_is_rejected_even_when_nested"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[artifact_id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[definition_artifact_id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[definition_sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_embed_self_identity[sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_forward_reference_bundle[bundle_sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_forward_reference_bundle[definition_bundle_id]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_contract_payload_must_not_forward_reference_bundle[definition_bundle_sha256]",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_parse_contract_delegates_payload_level_rules",
+      "test_task13_contract_registry.py::TestPublishDagAndReferenceDirection::test_self_identity_is_rejected_even_when_nested"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_contract_payload_goes_through_the_cross_language_gate",
+    "why": "断掉跨语言 canonical 门 ⇒ float/NaN/孤立代理项/超安全整数进 contract payload，Python 与 TypeScript 算出不同 SHA（AC 6.2「同一 semantic payload 同一 SHA」失效）",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_contract_payload_goes_through_the_cross_language_gate",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_float_header_rows_is_rejected_earlier_by_cross_language_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_contract_payload_goes_through_the_cross_language_gate",
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_float_header_rows_is_rejected_earlier_by_cross_language_gate"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes",
+    "why": "关掉 XL-1（NaN/Infinity）⇒ 该分类的可区分文案消失，JS 侧会静默输出 `null`",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.61s",
+    "added": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes",
+    "why": "关掉 XL-2（负零）⇒ 与 XL-6 的通用禁 float 合并，「负零」这条可区分诊断丢失。三条 float 子判据必须各有文案，否则删前两条不改变行为",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_boundary_integers_are_allowed",
+    "why": "关掉 XL-3 ⇒ 超出 `Number.MAX_SAFE_INTEGER` 的整数进 payload，TS 侧丢精度",
+    "verdict": "RED",
+    "summary": "4 failed, 233 passed, 1 warning in 1.75s",
+    "added": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_boundary_integers_are_allowed",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_contract_payload_goes_through_the_cross_language_gate",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_every_registered_reject_kind_is_rejected[unsafe_integer]",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_boundary_integers_are_allowed",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_every_registered_reject_kind_is_rejected[unsafe_integer]",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.0
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_every_registered_reject_kind_is_rejected",
+    "why": "关掉 XL-5（非字符串对象键）⇒ Python 会强转成字符串而 TS 侧无此形态，两侧语义不可对齐",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.73s",
+    "added": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_every_registered_reject_kind_is_rejected[non_string_key]",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_every_registered_reject_kind_is_rejected[non_string_key]",
+      "test_task13_contract_registry.py::TestCrossLanguageCanonicalizer::test_reject_kind_messages_carry_distinct_xl_classes"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_context_rejects_any_mutation_surface",
+    "why": "关掉副作用面守卫 ⇒ adapter 上下文可以携带 session/repository/outbox，adapter 能自己 commit、递增 revision、改 pointer（design §Adapter protocol 第 1 条）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.67s",
+    "added": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_context_rejects_any_mutation_surface"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_context_rejects_any_mutation_surface"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 5.1
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_quarantined_substrate_is_rejected",
+    "why": "quarantined incoming 可进 adapter ⇒ 被隔离的可疑 OOXML 进入 extract/merge/retry/rematerialize",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.61s",
+    "added": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_quarantined_substrate_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_quarantined_substrate_is_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_upgrade_candidate_substrate_is_rejected",
+    "why": "representation upgrade candidate 可作 substrate ⇒ 未经 approved contract/bundle 的 candidate 被 resolver/room/evidence 消费（Requirement 6.18）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_upgrade_candidate_substrate_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_upgrade_candidate_substrate_is_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_incoming_substrate_must_be_durable",
+    "why": "incoming 未 durable 就能被 extract ⇒ 下载/封存还没完成就算 application key",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.55s",
+    "added": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_incoming_substrate_must_be_durable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_incoming_substrate_must_be_durable"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_projection_key_matching_is_not_prefix_only",
+    "why": "projection 键匹配退化成「段数不限」⇒ 同前缀的错误键被放行，D2 那类大表会串数据",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.58s",
+    "added": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_projection_key_matching_is_not_prefix_only",
+      "test_task13_contract_registry.py::TestGuardSelfCheck::test_prefix_only_projection_matching_would_accept_wrong_key"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_projection_key_matching_is_not_prefix_only",
+      "test_task13_contract_registry.py::TestGuardSelfCheck::test_prefix_only_projection_matching_would_accept_wrong_key"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_frozen_identity_consistency",
+    "why": "adapter 执行时不再校验 contract digest == frozen bundle 的 contract slot ⇒ 历史 operation 可以拿当前契约跑旧 bundle（Property 28）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.56s",
+    "added": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_frozen_identity_consistency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestAdapterProtocolSurface::test_frozen_identity_consistency"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_registry_exposes_no_alias_based_history_lookup",
+    "why": "🔴 **注入**：给 registry 加一条按 alias 解析的路径。「不得按 alias 重组历史 bundle」是否定式承诺 —— 源码里本来没有可短路的语句，只能注入反例来证明判据可 falsify（同 Task 12 的 M51）",
+    "verdict": "RED",
+    "summary": "5 failed, 232 passed, 1 warning in 1.65s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_registration_freezes_bundle_object_not_a_lookup",
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_registry_exposes_no_alias_based_history_lookup",
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_full_registration_resolves",
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_adapter_forbids_bidirectional_claim",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_resolution_is_matcher_scoped"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty28DefinitionDriftFailsClosed::test_registry_exposes_no_alias_based_history_lookup"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_no_representation_publish_or_candidate_finalize",
+    "why": "🔴 **注入**：在 Task 13 模块里注入一次 `finalize_candidate(...)` 调用。「本任务不 finalize upgrade candidate、不发布 representation」是否定式承诺，必须靠注入证明判据不是恒真空转",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.52s",
+    "added": [
+      "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_no_representation_publish_or_candidate_finalize"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_no_representation_publish_or_candidate_finalize"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.6
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_no_excel_or_word_engine_dependency",
+    "why": "🔴 **注入**：给 protocol 层加载体库依赖。「本 Wave 不引入 Excel/Word engine」同样是否定式承诺，短路无从下手",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.66s",
+    "added": [
+      "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_no_excel_or_word_engine_dependency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestTask13ScopeBoundary::test_no_excel_or_word_engine_dependency"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+    "why": "断掉 registry 报告的**唯一生产消费方** ⇒ 整个 fail-closed registry 退化成additive 死代码（假绿第①源）。这条正是「新增能力是否真被消费」的判据",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.54s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg1_adapter_shape",
+    "why": "关掉「protocol 五个方法必须可调用」⇒ 把方法全写成 None 的桩也能注册（RG-1；`runtime_checkable` Protocol 只查属性存在性）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.54s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg1_adapter_shape"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg1_adapter_shape"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg2_empty_matcher",
+    "why": "允许空 matcher ⇒ 永远解析不到的死注册被当成「已迁移」（RG-2）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.56s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg2_empty_matcher"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg2_empty_matcher"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg3_matcher_overlap",
+    "why": "关掉 matcher 重叠检测 ⇒ 解析结果取决于注册顺序，同一 wp/sheet 可能命中两个 adapter（RG-3）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.58s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg3_matcher_overlap"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg3_matcher_overlap"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_bundle_approval_forbids_bidirectional_claim",
+    "why": "candidate 态 bundle 可被 registry/room 使用 ⇒ 未批准的 definition 组合进入生产（Property 3 / 28）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.62s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_bundle_approval_forbids_bidirectional_claim"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_bundle_approval_forbids_bidirectional_claim"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_contract_forbids_projection_bundle",
+    "why": "`projection_contract` 缺 approved per-entry contract 也能注册 ⇒ 「缺 contract 的 entry 不得进入 bidirectional 验收」失效（Requirement 12.1 / Property 3）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.56s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_contract_forbids_projection_bundle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_missing_contract_forbids_projection_bundle"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg10_contract_digest_must_equal_bundle_slot_digest",
+    "why": "关掉 RG-10（注册 ↔ frozen bundle 漂移）。与 RG-11 必须分开：合成一条后删掉任一分支都会被另一条遮蔽 ⇒ 变异 GREEN",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.52s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg10_contract_digest_must_equal_bundle_slot_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg10_contract_digest_must_equal_bundle_slot_digest"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_on_disk_contract_drift_is_a_separate_judgement",
+    "why": "关掉 RG-11（注册 ↔ 磁盘真源漂移）⇒ 磁盘契约被改过、adapter 还挂旧 digest 的stale 形态不再被发现",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.50s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_missing_contract_file_is_stale",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_on_disk_contract_drift_is_a_separate_judgement"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_missing_contract_file_is_stale",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg11_on_disk_contract_drift_is_a_separate_judgement"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg13_parent_duplicate_and_unreachable_entries_rejected",
+    "why": "父组件重复入口可单独注册 adapter ⇒ 43 个重复入口被重复计成「已迁移」（Requirement 1.6 / 12.4）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.51s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg13_parent_duplicate_and_unreachable_entries_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg13_parent_duplicate_and_unreachable_entries_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_fake_bidirectional_both_directions",
+    "why": "single entry 可注册 declared_capability=bidirectional 的 adapter ⇒ 「仅能打开 OO」伪装成双向同步（Requirement 1.4 / Property 3 的原始缺陷）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.60s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_fake_bidirectional_both_directions"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_fake_bidirectional_both_directions"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M53",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_declared_capability_is_independent_of_descriptor_mode",
+    "why": "把 `declares_bidirectional` 改成 descriptor 派生 ⇒ 因 RG-16 已要求 `descriptor.mode == manifest capability`，RG-18 变成结构性不可达的死代码（假绿第①源，本任务实测过的形态）",
+    "verdict": "RED",
+    "summary": "2 failed, 235 passed, 1 warning in 1.54s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_declared_capability_is_independent_of_descriptor_mode",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_fake_bidirectional_both_directions"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg18_declared_capability_is_independent_of_descriptor_mode"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources",
+    "why": "adapter/contract/matcher/manifest 的 document_type 不再四方一致 ⇒ 需要 docx 时拿到 xlsx 也放行（Requirement 9.5）",
+    "verdict": "RED",
+    "summary": "4 failed, 233 passed, 1 warning in 1.73s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[adapter]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[contract]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[manifest]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[matcher]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[adapter]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[contract]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[manifest]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg6_document_type_must_agree_across_four_sources[matcher]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg12_entry_not_in_manifest_is_stale",
+    "why": "给未登记 entry 静默补一份默认裁决（典型 fail-open）⇒ adapter 可指向 manifest 里不存在的 entry，源码挂载点已删/改名而 adapter 未同步不再被判 stale（RG-12）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.55s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg12_entry_not_in_manifest_is_stale"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg12_entry_not_in_manifest_is_stale"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M56",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory",
+    "why": "manifest 缺 source-backed profile 三字段也能注册 adapter ⇒ 「要么有完整合法 profile，要么不可能注册」这条不变式失效（Requirement 1.2 的欠账被隐藏）",
+    "verdict": "RED",
+    "summary": "8 failed, 229 passed, 1 warning in 1.72s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty3BidirectionalRequiresAdapter::test_real_manifest_has_no_bidirectional_entry_yet",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_production_registry_starts_empty",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory[editability]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory[room_model]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory[scenario_profile]",
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_entries_missing_profile_cannot_register",
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_report_invariant_holds_on_the_real_manifest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory[editability]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory[room_model]",
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg14_profile_fields_are_mandatory[scenario_profile]",
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_entries_missing_profile_cannot_register",
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_report_invariant_holds_on_the_real_manifest"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.9
+  },
+  {
+    "id": "M57",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg15_profile_must_agree_with_capability",
+    "why": "profile 的 editability 可与 capability 矛盾 ⇒ readonly 宿主被裁决成 bidirectional（required scenarios 随之被降级）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.57s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg15_profile_must_agree_with_capability"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg15_profile_must_agree_with_capability"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M58",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_descriptor_mode_must_agree_with_capability",
+    "why": "服务端 descriptor 可以对前端谎报模式 ⇒ 前端显示「可双向回写」而后端只有单向（Requirement 1.4 / 1.5）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.53s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_descriptor_mode_must_agree_with_capability"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_descriptor_mode_must_agree_with_capability"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_mode_switch_only_for_bidirectional",
+    "why": "非双向入口可暴露模式切换按钮 ⇒ 显示不可兑现的切换（Requirement 1.5）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.50s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_mode_switch_only_for_bidirectional"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg16_mode_switch_only_for_bidirectional"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.5
+  },
+  {
+    "id": "M60",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg17_room_facts_must_agree_and_dockey_must_drop_mtime",
+    "why": "doc_key 仍含文件 mtime 的 room 也能注册 ⇒ 一次 sheet 可见性写盘就轮转 doc_key、打断进行中的协同会话（Property 6；当前生产 `_generate_doc_key` 正是这个形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.50s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg17_room_facts_must_agree_and_dockey_must_drop_mtime"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryFailClosedRules::test_rg17_room_facts_must_agree_and_dockey_must_drop_mtime"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M61",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_registry_facts_participate_in_the_blocking_total",
+    "why": "registry 事实不再进 issue map ⇒ 即使算出来了也不计入阻断总数（Requirement 1.8「只许下降」失去判据）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.56s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_registry_facts_participate_in_the_blocking_total"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_registry_facts_participate_in_the_blocking_total"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M62",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_unregistered_registry_fact_is_rejected",
+    "why": "新增 registry 事实无需登记 ⇒ 会静默不计入阻断总数（下一个人加事实时不会有人提醒）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.55s",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_unregistered_registry_fact_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_unregistered_registry_fact_is_rejected"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M65",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_must_be_rfc6901",
+    "why": "关掉「pointer 必须以 `/` 开头」⇒ 相对路径形态进契约，运行时定位落到根对象",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.56s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_must_be_rfc6901[rows/closingAmount-\\u5fc5\\u987b\\u4ee5]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_must_be_rfc6901[rows/closingAmount-\\u5fc5\\u987b\\u4ee5]"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.7
+  },
+  {
+    "id": "M66",
+    "side": "be",
+    "want": "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_must_be_rfc6901",
+    "why": "关掉空 token 判据 ⇒ `/rows//closingAmount` 这类 pointer 进契约，RFC 6901 下它指向键名为空串的成员（与作者意图不符）",
+    "verdict": "RED",
+    "summary": "1 failed, 236 passed, 1 warning in 1.56s",
+    "added": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_must_be_rfc6901[/rows//closingAmount-\\u7a7a"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestProperty21ContractFieldCompleteness::test_json_pointer_must_be_rfc6901[/rows//closingAmount-\\u7a7a"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py"
+    ],
+    "restored": true,
+    "seconds": 4.8
+  },
+  {
+    "id": "M63",
+    "side": "fe",
+    "want": "canonical 输出把 Ｚ 排在 𝐀 之前",
+    "why": "TS 侧换回默认 `sort()`（UTF-16 code unit 序）⇒ 星平面键的顺序与 Python 的 code point 序相反，两侧 canonical bytes 分叉（AC 6.2「同一 semantic payload 同一 SHA」失效）",
+    "verdict": "RED",
+    "summary": "40/42 passed, numFailedTestSuites=3",
+    "added": [
+      "TS canonicalizer 与后端逐字节一致 golden 用例 astral_key_order",
+      "键序：code point 而非 UTF-16 code unit canonical 输出把 Ｚ 排在 𝐀 之前"
+    ],
+    "gone": [],
+    "hit": [
+      "TS canonicalizer 与后端逐字节一致 golden 用例 astral_key_order",
+      "键序：code point 而非 UTF-16 code unit canonical 输出把 Ｚ 排在 𝐀 之前"
+    ],
+    "added_files": [
+      "canonicalJson.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 1.9
+  },
+  {
+    "id": "M64",
+    "side": "fe",
+    "want": "每条反例的文案带自己的 XL 分类标记",
+    "why": "TS 侧关掉 XL-2（负零）⇒ `-0` 在 JS 序列化成 `0`、Python 为 `-0.0`，两侧 digest 不同。fixture 声明的反例种类必须两侧都真拒",
+    "verdict": "RED",
+    "summary": "40/42 passed, numFailedTestSuites=2",
+    "added": [
+      "跨语言不安全输入一律拒绝（XL-1 ~ XL-6） 拒绝 negative_zero",
+      "跨语言不安全输入一律拒绝（XL-1 ~ XL-6） 每条反例的文案带自己的 XL 分类标记"
+    ],
+    "gone": [],
+    "hit": [
+      "跨语言不安全输入一律拒绝（XL-1 ~ XL-6） 拒绝 negative_zero",
+      "跨语言不安全输入一律拒绝（XL-1 ~ XL-6） 每条反例的文案带自己的 XL 分类标记"
+    ],
+    "added_files": [
+      "canonicalJson.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 1.9
+  }
+]

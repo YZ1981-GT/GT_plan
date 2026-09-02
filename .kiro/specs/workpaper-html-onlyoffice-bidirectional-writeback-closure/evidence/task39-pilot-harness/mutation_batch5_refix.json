@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_reworded_requirement_text_fails_closed_instead_of_silently_skipping",
+    "why": "需求措辞变了、正则抠不到时静默跳过 ⇒ 锁默默失效（fail-open）。首轮 GREEN 的原因是真实 requirements.md 上 7 条正则全命中 ⇒ 该分支在真实数据上不可达 —— 必须用合成副本（改掉数字措辞）让分支可达",
+    "verdict": "RED",
+    "summary": "1 failed, 111 passed in 10.25s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_reworded_requirement_text_fails_closed_instead_of_silently_skipping"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_reworded_requirement_text_fails_closed_instead_of_silently_skipping"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M63",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_p95_over_budget_is_a_shortfall",
+    "why": "延迟预算不再校验 ⇒ p95 超预算也算达标（AC 14.12 的两条 p95 判据空转）。首轮 GREEN 的原因是 want 指向 digest 判据（根本不调 `evaluate_capacity_run`）——负载与延迟是两条独立循环，各需一条直接判据",
+    "verdict": "RED",
+    "summary": "1 failed, 111 passed in 10.40s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_p95_over_budget_is_a_shortfall"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_p95_over_budget_is_a_shortfall"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  }
+]

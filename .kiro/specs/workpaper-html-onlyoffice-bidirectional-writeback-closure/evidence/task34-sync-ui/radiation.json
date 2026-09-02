@@ -1,0 +1,44 @@
+{
+  "frontend": {
+    "graph_nodes": 7183,
+    "closure_size": 11,
+    "closure": [
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncConflictDialog.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncDetailsDrawer.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncRecoveryPanel.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncStatusBar.vue",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncConflictDialog.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncDetailsDrawer.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncRecoveryPanel.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncStatusBar.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/workpaperSyncPresentation.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/workpaperSyncUiHarness.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncPresentation.ts"
+    ],
+    "spec_files": [
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncConflictDialog.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncDetailsDrawer.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncRecoveryPanel.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncStatusBar.spec.ts",
+      "audit-platform/frontend/src/components/workpaper/sync/__tests__/workpaperSyncPresentation.spec.ts"
+    ]
+  },
+  "backend": {
+    "direct_data_referrers": [
+      "backend/scripts/check/mutate_task8_coverage_matrix_guards.py",
+      "backend/scripts/gen/generate_workpaper_ac_coverage_matrix.py"
+    ],
+    "direct_modules": [
+      "scripts.check.mutate_task8_coverage_matrix_guards",
+      "scripts.gen.generate_workpaper_ac_coverage_matrix"
+    ],
+    "bare_module_names": [
+      "generate_workpaper_ac_coverage_matrix",
+      "mutate_task8_coverage_matrix_guards"
+    ],
+    "closure_size": 4,
+    "test_files": [
+      "backend/tests/test_workpaper_ac_coverage_matrix.py"
+    ]
+  }
+}

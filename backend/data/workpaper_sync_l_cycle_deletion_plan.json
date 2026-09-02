@@ -1,0 +1,787 @@
+{
+ "schema_version": "l-cycle-deletion-plan:v1",
+ "task": "Task 54",
+ "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+ "description": "L 循环（债务循环）的 legacy dual-mode 删除清册。🔴 九轮里**删除对象类别最多**的一份：① **5 个一阶 orphan composable**（含 L3 的**两份**互不相同实现，共 931 行）；② **4 个在用 composable**（L5~L8，各 1 条生产边、边在**子 Tab** 而不是宿主）；③ **4 处 inert 开关代码块**（不是文件，是子 Tab 模板里那段 `el-segmented` 加脚本里的 `const dualMode = useL{n}DualMode(...)`）；④ **1 个部分收缩的共享载体**（`useCycleHtmlOoDualMode.ts` 3 条边 → 改线后 1 条，既不是「删」也不是「不变」）。与 K 循环最大的不同：K 的删除对象是「orphan 文件 + 宿主内联块」两类，L 多出「inert 开关」与「部分收缩的共享件」两类，且**没有任何**宿主内联 IIFE（现算 0 处）。",
+ "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+ "adjudication_source_of_truth": "backend/data/workpaper_sync_l_cycle_manifest_slice.json#independent_entries",
+ "orphan_source_of_truth": "backend/data/workpaper_sync_l_cycle_manifest_slice.json#orphan_dual_mode_inventory",
+ "inert_switch_source_of_truth": "backend/data/workpaper_sync_l_cycle_manifest_slice.json#inert_mode_switch_resolution",
+ "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+ "pilot_already_migrated": null,
+ "pilot_already_migrated_note": "🔴 L 循环**没有** pilot，故本键为 null。实证：四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），逐文件读 `backend/data/workpaper_sync_contracts/*.json` 顶层 `review.entry_id` 得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 L。",
+ "why_this_plan_has_four_deletion_object_classes": {
+  "statement": "本清册的删除对象分四类：① orphan composable 5 个文件（直接删，零副作用）；② 在用 composable 4 个文件（须先改线）；③ inert 开关代码块 4 处（不是文件，是子 Tab 里的模板段 + 脚本段）；④ 共享载体 `useCycleHtmlOoDualMode.ts` 的 2 条 L 边（文件本身保留）。",
+  "why": "L 循环的 dual-mode 承载三分（LD-1），删除前置各不相同：orphan 删了行为不变；在用 composable 删了会让开关消失（但那个开关本来就是 inert，所以「消失」正是想要的结果 —— 这与 K 的「删了会让模式切换失效」相反）；inert 开关块删了会**改善** UI 诚实度（AC 1.4/1.5 方向）；共享载体只摘 L 的边、文件保留。混在一起会让「哪些能立刻删」「删了会发生什么」都说不清。",
+  "why_no_host_inlined_class_unlike_k_and_h": "🔴 H 循环有 4 个宿主内联等价实现、K 循环有 7 个。L 循环 **0 个**：现算 8 个 GtL*.vue 里 `const dualMode = (() =>` 与 `const dualMode =` 的命中数各为 0，L1/L2 的 `procedureDualMode` 来自共享 composable 调用而不是内联 IIFE。故本清册**没有** `host_inlined_second_implementation` 节 —— 照抄 H/K 那节会得到一个空容器（additive 死声明）。",
+  "why_step_5_applies_here": "🔴 J 循环那份写「step 5 不适用」（共享基类 localStorage 命中 0）。L 循环**适用**：9 个 dual-mode composable 各声明一份 `l{n}-dual-mode`/`l{n}-dual-mode-` 前缀，L1/L2 的共享载体又用 `l1-proc:`/`l2-proc:` 两个前缀 ⇒ step 5 的「统一键前缀 `workpaper-sync-mode:`」在 L 循环有 9 + 2 = 11 处待收敛。其中 `components/workpaper/composables/useL3DualMode.ts` 那份**不带 wpId**（裸 `'l3-dual-mode'`），收敛时必须一并修掉分区口径（LD-6）。",
+  "verification_recipe": "① 对 5 个 orphan 断言 statement-position 生产边与测试边各为 0；② 对 4 个在用 composable 断言各恰 1 条生产边且指向声明的**子 Tab**（不是宿主 —— 断言宿主边为 0）；③ 对 L1/L2 断言宿主 import 的是共享载体 `useCycleHtmlOoDualMode` 且模板里有以 mode 为条件的 OO 挂点（开关可兑现）；对 L3/L4 断言宿主既无 dual-mode import 也无 `el-segmented`（L4 那处是 bondBranch）；④ 对 L5~L8 断言子 Tab 里 mode 门控的 v-if 数 == 0 且 `GtOnlyOfficeSheet` 命中 == 0；⑤ 现算 11 处 localStorage 前缀声明点。五项都验，任一不符即红。"
+ },
+ "shared_base_preserved": {
+  "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+  "lines": 66,
+  "reason": "共享基类被大量非 L 模块使用，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+  "statement_position_consumers": 29,
+  "l_cycle_consumers": 0,
+  "remaining_after_this_plan": 29,
+  "remaining_after_this_plan_recipe": "🔴 29 − 0 = 29 —— L 循环对共享基类**一条边都不贡献**，故本清册执行前后该计数**不变**。这与 J 循环（29 → 26）形成对照：判据不得照抄 J 那条「删完还剩 26」，否则 L 必假红。计数口径必须是**窄口径（真语句边、排除双引号字符串内命中）**：宽口径按 token 命中文件数得 33。",
+  "verification_recipe": "两侧都验：① 现算窄口径 statement 边总数 == 29（生产 26 + 测试 3）且其中 L 路径条数 == 0；② 现算宽口径 token 文件数 == 33，差集恰为 ['audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue', 'audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts', 'audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts', 'audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts']。"
+ },
+ "shared_cycle_carrier_partially_shrinking": {
+  "why_this_key_exists": "🔴 第三种形态：既不是「orphan 删完剩 0」也不是「共享基类不变」，而是**部分收缩**。前八轮的清册只有前两种容器，把它塞进任一个都会让判据写错方向。",
+  "file": "audit-platform/frontend/src/components/workpaper/composables/useCycleHtmlOoDualMode.ts",
+  "lines": 99,
+  "statement_position_consumers_before": 3,
+  "consumers_before": [
+   "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue#L167",
+   "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L117",
+   "audit-platform/frontend/src/components/workpaper/shared/CycleStandaloneProcedureShell.vue#L8"
+  ],
+  "l_cycle_consumers": 2,
+  "non_l_consumers": 1,
+  "non_l_consumer_paths": [
+   "audit-platform/frontend/src/components/workpaper/shared/CycleStandaloneProcedureShell.vue#L8"
+  ],
+  "statement_position_consumers_after": 1,
+  "action": "drop_the_two_l_edges_keep_the_file",
+  "action_why": "L1/L2 改线到 sync bridge 后这两条边消失，但文件仍被非 L 的 `components/workpaper/shared/CycleStandaloneProcedureShell.vue` 使用 ⇒ 文件保留。它直调 legacy 端点 `/api/workpapers/onlyoffice/health`（违反 step 6），但那条债的 owner 是**独立程序表路由**那一侧，不在本 slice 范围内 —— 如实登记不越界修。",
+  "legacy_endpoints_called": [
+   "/api/workpapers/onlyoffice/health"
+  ],
+  "verification_recipe": "现算窄口径生产边 == 3，按路径分为 L 域 2 条与非 L 域 1 条；断言改线后剩 1 条（不是 0、也不是 3）。"
+ },
+ "inert_switch_blocks_to_remove": {
+  "why_this_key_exists": "🔴 前八轮没有这一类。L5~L8 的删除对象里最重要的**不是**那 4 个 composable 文件，而是子 Tab 模板里那段 `el-segmented` —— 它是用户唯一能看见的东西，且它是死的（BP-4）。只删 composable 而留下 `el-segmented`（改绑到别的 state）会让死开关继续存在。",
+  "in_scope_of_this_deletion_plan": true,
+  "ac_reference": "1.4",
+  "can_delete_before_step_9": true,
+  "can_delete_before_step_9_why": "删掉一个**无任何渲染后果**的开关不改变任何可观察行为（除了少一个骗人的按钮），不需要等 adapter 就位。🔴 这与 K8~K13 的「删了模式切换就失效」相反 —— L5~L8 的开关本来就没有生效过。",
+  "must_also": "删开关的同时必须挂上 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`（真源 `sync/workpaperEntrySyncNotice.ts`，不得在子 Tab 里抄第二份文案），否则「收掉不可兑现的开关」会退化成「什么都不显示」—— AC 1.4 要求**显示可操作原因**。",
+  "blocks": [
+   {
+    "id": "IS-1",
+    "wp_code": "L5",
+    "entry_id": "xlsx/gt-l5-long-term-payables",
+    "template_block": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L16",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L230",
+    "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
+    "localStorage_key_to_drop": "l5-dual-mode",
+    "mode_gated_v_if_count": 0,
+    "onlyoffice_component_count_in_file": 0,
+    "action": "delete_switch_and_mount_ac14_notice",
+    "action_side_effects": "唯一可观察变化是「审定表工具条上少一个点了没反应的 OnlyOffice 按钮、多一条『尚不能双向回写，原因：未注册 adapter』的常显说明」。无数据面影响（该开关从不改变渲染）。"
+   },
+   {
+    "id": "IS-2",
+    "wp_code": "L6",
+    "entry_id": "xlsx/gt-l6-special-payables",
+    "template_block": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L13",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L375",
+    "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
+    "localStorage_key_to_drop": "l6-dual-mode",
+    "mode_gated_v_if_count": 0,
+    "onlyoffice_component_count_in_file": 0,
+    "action": "delete_switch_and_mount_ac14_notice",
+    "action_side_effects": "唯一可观察变化是「审定表工具条上少一个点了没反应的 OnlyOffice 按钮、多一条『尚不能双向回写，原因：未注册 adapter』的常显说明」。无数据面影响（该开关从不改变渲染）。"
+   },
+   {
+    "id": "IS-3",
+    "wp_code": "L7",
+    "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+    "template_block": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L377",
+    "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
+    "localStorage_key_to_drop": "l7-dual-mode",
+    "mode_gated_v_if_count": 0,
+    "onlyoffice_component_count_in_file": 0,
+    "action": "delete_switch_and_mount_ac14_notice",
+    "action_side_effects": "唯一可观察变化是「审定表工具条上少一个点了没反应的 OnlyOffice 按钮、多一条『尚不能双向回写，原因：未注册 adapter』的常显说明」。无数据面影响（该开关从不改变渲染）。"
+   },
+   {
+    "id": "IS-4",
+    "wp_code": "L8",
+    "entry_id": "xlsx/gt-l8-financial-expenses",
+    "template_block": "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L14",
+    "script_block": "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L317",
+    "carrier_module_to_delete_with_it": "audit-platform/frontend/src/components/workpaper/composables/useL8DualMode.ts",
+    "localStorage_key_to_drop": "l8-dual-mode",
+    "mode_gated_v_if_count": 0,
+    "onlyoffice_component_count_in_file": 0,
+    "action": "delete_switch_and_mount_ac14_notice",
+    "action_side_effects": "唯一可观察变化是「审定表工具条上少一个点了没反应的 OnlyOffice 按钮、多一条『尚不能双向回写，原因：未注册 adapter』的常显说明」。无数据面影响（该开关从不改变渲染）。"
+   }
+  ]
+ },
+ "orphan_dual_mode_to_delete": {
+  "why_this_key_exists": "🔴 按 AC 1.7「不可达旧桩 SHALL 删除；不得以豁免或 `DEPRECATED` 注释长期保留」。这 5 个文件生产边与测试边各为 0，删除零副作用，**不需要**等 step 9。",
+  "in_scope_of_this_deletion_plan": true,
+  "ac_reference": "1.7",
+  "can_delete_before_step_9": true,
+  "can_delete_before_step_9_why": "生产边与测试边都为 0 ⇒ 删除不改变任何运行时行为，也不需要先改任何消费方。",
+  "modules": [
+   {
+    "id": "OD-1",
+    "wp_code": "L1",
+    "file": "audit-platform/frontend/src/composables/useL1DualMode.ts",
+    "lines": 184,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'matrix' | 'onlyoffice'",
+    "storage_const": "STORAGE_KEY_PREFIX",
+    "storage_literal": "l1-dual-mode-",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 三值枚举含 `'matrix'` 模式，而 L 域内没有任何以 `'matrix'` 为条件的渲染分支（提及该字面量的 L 域文件只有本文件自己）⇒ 即使误接也有一个恒不可达的分支。口径限定在 L 域：其他循环（C22 / D2 / D4 / N1）真有矩阵视图。"
+   },
+   {
+    "id": "OD-2",
+    "wp_code": "L2",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL2DualMode.ts",
+    "lines": 189,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_const": "STORAGE_KEY_PREFIX",
+    "storage_literal": "l2-dual-mode-",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": null
+   },
+   {
+    "id": "OD-3",
+    "wp_code": "L3",
+    "file": "audit-platform/frontend/src/composables/useL3DualMode.ts",
+    "lines": 184,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'matrix' | 'onlyoffice'",
+    "storage_const": "STORAGE_KEY_PREFIX",
+    "storage_literal": "l3-dual-mode-",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 L3 有**两份**互不相同的 orphan 实现（本条与另一条），模式枚举与 localStorage 键都不同 ⇒ 只删一份会留下另一份继续当死桩。"
+   },
+   {
+    "id": "OD-4",
+    "wp_code": "L3",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL3DualMode.ts",
+    "lines": 185,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_const": "STORAGE_KEY",
+    "storage_literal": "l3-dual-mode",
+    "wp_id_scoped": false,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 L3 有**两份**互不相同的 orphan 实现（本条与另一条），模式枚举与 localStorage 键都不同 ⇒ 只删一份会留下另一份继续当死桩。"
+   },
+   {
+    "id": "OD-5",
+    "wp_code": "L4",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL4DualMode.ts",
+    "lines": 189,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_const": "STORAGE_KEY_PREFIX",
+    "storage_literal": "l4-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": null
+   }
+  ],
+  "counters": {
+   "modules_to_delete": 5,
+   "total_lines": 931,
+   "modules_calling_legacy_health_endpoint": 5,
+   "modules_calling_legacy_config_endpoint": 0,
+   "modules_with_matrix_mode": 2,
+   "modules_not_scoped_to_wp_id": 1,
+   "wp_codes_with_two_orphans": [
+    "L3"
+   ],
+   "counting_recipe": "守卫从 modules[] 现算：len == 5；Σ lines；health 端点计数按逐模块 legacy_endpoints_called 现算；config 端点计数为 0（K 循环那份非 0，照抄必假红）；matrix 模式计数 == 2；未按 wpId 分区计数 == 1；有两份 orphan 的 wp_code == ['L3']。"
+  }
+ },
+ "live_dual_mode_to_rewire_then_delete": {
+  "why_this_key_exists": "L5~L8 的 4 个 composable 各有 1 条真实生产边 ⇒ 它们**不是** orphan，不能按 AC 1.7 直接删。🔴 但与 K8~K13 不同：这里的边在**子 Tab** 而不是宿主，且它承载的开关是 inert（BP-4）⇒ 正确动作是**连开关一起删**（见 `inert_switch_blocks_to_remove`），而不是「先把宿主改线再删」。",
+  "in_scope_of_this_deletion_plan": true,
+  "can_delete_before_step_9": true,
+  "can_delete_before_step_9_why": "🔴 与 K 循环相反。K8~K13 的 composable 是「唯一承载模式切换的模块」，删了功能消失，故必须先改线（`can_delete_before_step_9: false`）。L5~L8 的 composable 承载的开关**从未改变过渲染**（mode 门控 v-if 0 处、文件内 OO 组件 0 个）⇒ 删除不损失任何已有能力。但删除**必须**与挂 AC 1.4 提示组件同批做，否则退化成「什么都不显示」。",
+  "modules": [
+   {
+    "id": "LD-1",
+    "wp_code": "L5",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts",
+    "lines": 189,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L217"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": false,
+    "consumer_is_child_tab": true,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "l5-dual-mode",
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "switch_is_redeemable": false,
+    "action": "delete_with_the_inert_switch",
+    "action_why": "它是 inert 开关的唯一实现方；删开关必删它，否则文件立刻变成新的 orphan。",
+    "registered_as": [
+     "BP-4",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "LD-2",
+    "wp_code": "L6",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts",
+    "lines": 189,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L339"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": false,
+    "consumer_is_child_tab": true,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "l6-dual-mode",
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "switch_is_redeemable": false,
+    "action": "delete_with_the_inert_switch",
+    "action_why": "它是 inert 开关的唯一实现方；删开关必删它，否则文件立刻变成新的 orphan。",
+    "registered_as": [
+     "BP-4",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "LD-3",
+    "wp_code": "L7",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts",
+    "lines": 189,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L323"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": false,
+    "consumer_is_child_tab": true,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "l7-dual-mode",
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "switch_is_redeemable": false,
+    "action": "delete_with_the_inert_switch",
+    "action_why": "它是 inert 开关的唯一实现方；删开关必删它，否则文件立刻变成新的 orphan。",
+    "registered_as": [
+     "BP-4",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "LD-4",
+    "wp_code": "L8",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useL8DualMode.ts",
+    "lines": 189,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L283"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": false,
+    "consumer_is_child_tab": true,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "l8-dual-mode",
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "switch_is_redeemable": false,
+    "action": "delete_with_the_inert_switch",
+    "action_why": "它是 inert 开关的唯一实现方；删开关必删它，否则文件立刻变成新的 orphan。",
+    "registered_as": [
+     "BP-4",
+     "BP-6"
+    ]
+   }
+  ],
+  "counters": {
+   "modules_to_delete": 4,
+   "total_lines": 756,
+   "modules_consumed_by_host": 0,
+   "modules_consumed_by_child_tab": 4,
+   "modules_calling_legacy_health_endpoint": 4,
+   "modules_calling_legacy_config_endpoint": 0,
+   "counting_recipe": "守卫从 modules[] 现算：len == 4；Σ lines；逐模块断言其唯一生产边的路径落在 `components/workpaper/l{n}/core/L{n}TabAdjudication.vue`（子 Tab）而**不是** `GtL*.vue`（宿主）—— 两侧都验。"
+  }
+ },
+ "entries": [
+  {
+   "entry_id": "xlsx/gt-l1-short-term-loans",
+   "wp_code_pattern": "L1S",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L1 实测**有** HTML 对端（checklist_responses + `L1-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L1 短期借款.xlsx`（13 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L179",
+    "audit-platform/frontend/src/composables/useL1FormData.ts#L337",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "shared_cycle_composable",
+   "switch_is_redeemable": true,
+   "legacy_composables_to_delete": [],
+   "legacy_composables_to_delete_note": "🔴 L1 的 per-entry composable ['useL1DualMode.ts'] **是一阶 orphan**（生产边与测试边各 0）⇒ 不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是**共享载体** `useCycleHtmlOoDualMode.ts`（不删，只摘边）。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享载体 useCycleHtmlOoDualMode 间接调用）"
+   ],
+   "localStorage_prefix": "l1-proc:",
+   "localStorage_prefix_note": "L1 的模式偏好键是共享载体的 `l1-proc:` + wpId；同时它的 orphan 孪生 `useL1DualMode.ts` 另声明一份 `l1-dual-mode-` ⇒ 同一 entry 有两个前缀，改线时只改一处会留下读写不同键的分裂状态。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。L1 的开关是**可兑现**的（宿主里有以 mode 为条件的 OO 挂点），所以改线是「把 legacy 开关换成 bridge 开关」，不是「删掉一个假开关」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/composables/useL1DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 ['useL1DualMode.ts'] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。该文件的三值枚举含 `'matrix'`，而 L 域无任何 matrix 渲染分支 ⇒ 接了会多一个恒不可达分支（其他循环有矩阵视图，故口径限定在 L 域）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue#L10`。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l2-interest-payable",
+   "wp_code_pattern": "L2I",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L2 实测**有** HTML 对端（checklist_responses + `L2-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L2 应付利息.xlsx`（8 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L78",
+    "audit-platform/frontend/src/components/workpaper/composables/useL2FormData.ts#L113",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "shared_cycle_composable",
+   "switch_is_redeemable": true,
+   "legacy_composables_to_delete": [],
+   "legacy_composables_to_delete_note": "🔴 L2 的 per-entry composable ['useL2DualMode.ts'] **是一阶 orphan**（生产边与测试边各 0）⇒ 不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry 的 dual-mode 实现是**共享载体** `useCycleHtmlOoDualMode.ts`（不删，只摘边）。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享载体 useCycleHtmlOoDualMode 间接调用）"
+   ],
+   "localStorage_prefix": "l2-proc:",
+   "localStorage_prefix_note": "L2 的模式偏好键是共享载体的 `l2-proc:` + wpId；同时它的 orphan 孪生 `useL2DualMode.ts` 另声明一份 `l2-dual-mode-` ⇒ 同一 entry 有两个前缀，改线时只改一处会留下读写不同键的分裂状态。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么」。L2 的开关是**可兑现**的（宿主里有以 mode 为条件的 OO 挂点），所以改线是「把 legacy 开关换成 bridge 开关」，不是「删掉一个假开关」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL2DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 ['useL2DualMode.ts'] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L10`。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l3-long-term-loans",
+   "wp_code_pattern": "L3L",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL3LongTermLoans.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L3 实测**有** HTML 对端（checklist_responses + `L3-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L3 长期借款.xlsx`（14 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L83",
+    "audit-platform/frontend/src/components/workpaper/composables/useL3FormData.ts#L118",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "none",
+   "switch_is_redeemable": null,
+   "legacy_composables_to_delete": [],
+   "legacy_composables_to_delete_note": "🔴 L3 的 per-entry composable ['useL3DualMode.ts', 'useL3DualMode.ts'] **是一阶 orphan**（生产边与测试边各 0）⇒ 不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry **没有任何** dual-mode 实现在运行。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "legacy_endpoints_to_remove": [],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "L3 宿主**没有任何** dual-mode 载体 ⇒ 无运行中的模式偏好键。它的 orphan 孪生声明了 ['l3-dual-mode-', 'l3-dual-mode']，但无人读写。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线。🔴 本条的特殊性：改线时是**新增**一个模式入口（当前根本没有），而不是替换一个既有入口 —— 判据方向与 L1/L2、L5~L8 都不同。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/composables/useL3DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useL3DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 ['useL3DualMode.ts', 'useL3DualMode.ts'] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。L3 还有第二份实现，两份的模式枚举与 localStorage 键都不同 —— 接哪一份都错。该文件的三值枚举含 `'matrix'`，而 L 域无任何 matrix 渲染分支 ⇒ 接了会多一个恒不可达分支（其他循环有矩阵视图，故口径限定在 L 域）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 本 entry **没有既成锚点**（宿主无模式工具条）⇒ 须与 sync bridge 的编辑宿主一并落位。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l4-bonds-payable",
+   "wp_code_pattern": "L4B",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L4 实测**有** HTML 对端（checklist_responses + `L4-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L4 应付债券.xlsx`（16 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L85",
+    "audit-platform/frontend/src/components/workpaper/composables/useL4FormData.ts#L120",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "none",
+   "switch_is_redeemable": null,
+   "legacy_composables_to_delete": [],
+   "legacy_composables_to_delete_note": "🔴 L4 的 per-entry composable ['useL4DualMode.ts'] **是一阶 orphan**（生产边与测试边各 0）⇒ 不在本 entry 的「改线后随之删除」清单里，而在 `orphan_dual_mode_to_delete` 里按 AC 1.7 独立删除。本 entry **没有任何** dual-mode 实现在运行。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "legacy_endpoints_to_remove": [],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "L4 宿主**没有任何** dual-mode 载体 ⇒ 无运行中的模式偏好键。它的 orphan 孪生声明了 ['l4-dual-mode']，但无人读写。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线。🔴 本条的特殊性：改线时是**新增**一个模式入口（当前根本没有），而不是替换一个既有入口 —— 判据方向与 L1/L2、L5~L8 都不同。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-8",
+    "BP-9"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL4DualMode.ts"
+   ],
+   "must_not_wire_to_why": "🔴 ['useL4DualMode.ts'] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 本 entry **没有既成锚点**（宿主无模式工具条）⇒ 须与 sync bridge 的编辑宿主一并落位。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l5-long-term-payables",
+   "wp_code_pattern": "L5L",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL5LongTermPayables.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L5 实测**有** HTML 对端（checklist_responses + `L5-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L5 长期应付款.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L94",
+    "audit-platform/frontend/src/components/workpaper/composables/useL5FormData.ts#L129",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "child_tab_dedicated_composable",
+   "switch_is_redeemable": false,
+   "legacy_composables_to_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL5DualMode.ts"
+   ],
+   "legacy_composables_to_delete_note": "🔴 L5 的 per-entry composable `useL5DualMode.ts` **有 1 条生产边**（子 Tab audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L217）⇒ 它不在 orphan 节里，而在 `live_dual_mode_to_rewire_then_delete` 里，且必须与 inert 开关块一起删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": "audit-platform/frontend/src/components/workpaper/l5/core/L5TabAdjudication.vue#L16",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health"
+   ],
+   "localStorage_prefix": "l5-dual-mode",
+   "localStorage_prefix_note": "L5 的模式偏好键是 `l5-dual-mode` + wpId，由 inert 开关写入但从不影响渲染 ⇒ 删开关时该键的历史值成为孤儿数据（无需迁移，`workpaperSyncModeStorage.ts` 也不必收它）。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**删除。本条只冻结「删 inert 开关时要一并删什么、必须同时挂什么」。🔴 与 K8~K13 相反：这里可以**先删后接**（开关本就无效），但删除必须与挂 AC 1.4 提示组件同批，否则 UI 从「骗人」退化成「沉默」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-6",
+    "BP-7",
+    "BP-9"
+   ],
+   "must_not_wire_to": [],
+   "must_not_wire_to_why": "🔴 [] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 本 entry **没有既成锚点**（宿主无模式工具条）⇒ 须与 sync bridge 的编辑宿主一并落位。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l6-special-payables",
+   "wp_code_pattern": "L6S",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL6SpecialPayables.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L6 实测**有** HTML 对端（checklist_responses + `L6-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL6FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L6 专项应付款.xlsx`（9 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useL6FormData.ts#L125",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "child_tab_dedicated_composable",
+   "switch_is_redeemable": false,
+   "legacy_composables_to_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL6DualMode.ts"
+   ],
+   "legacy_composables_to_delete_note": "🔴 L6 的 per-entry composable `useL6DualMode.ts` **有 1 条生产边**（子 Tab audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L339）⇒ 它不在 orphan 节里，而在 `live_dual_mode_to_rewire_then_delete` 里，且必须与 inert 开关块一起删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": "audit-platform/frontend/src/components/workpaper/l6/core/L6TabAdjudication.vue#L13",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health"
+   ],
+   "localStorage_prefix": "l6-dual-mode",
+   "localStorage_prefix_note": "L6 的模式偏好键是 `l6-dual-mode` + wpId，由 inert 开关写入但从不影响渲染 ⇒ 删开关时该键的历史值成为孤儿数据（无需迁移，`workpaperSyncModeStorage.ts` 也不必收它）。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**删除。本条只冻结「删 inert 开关时要一并删什么、必须同时挂什么」。🔴 与 K8~K13 相反：这里可以**先删后接**（开关本就无效），但删除必须与挂 AC 1.4 提示组件同批，否则 UI 从「骗人」退化成「沉默」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-6",
+    "BP-7",
+    "BP-9"
+   ],
+   "must_not_wire_to": [],
+   "must_not_wire_to_why": "🔴 [] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 本 entry **没有既成锚点**（宿主无模式工具条）⇒ 须与 sync bridge 的编辑宿主一并落位。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l7-other-noncurrent-liabilities",
+   "wp_code_pattern": "L7O",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL7OtherNoncurrentLiabilities.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L7 实测**有** HTML 对端（checklist_responses + `L7-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL7FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L7 其他非流动负债.xlsx`（8 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useL7FormData.ts#L122",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "child_tab_dedicated_composable",
+   "switch_is_redeemable": false,
+   "legacy_composables_to_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL7DualMode.ts"
+   ],
+   "legacy_composables_to_delete_note": "🔴 L7 的 per-entry composable `useL7DualMode.ts` **有 1 条生产边**（子 Tab audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L323）⇒ 它不在 orphan 节里，而在 `live_dual_mode_to_rewire_then_delete` 里，且必须与 inert 开关块一起删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": "audit-platform/frontend/src/components/workpaper/l7/core/L7TabAdjudication.vue#L13",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health"
+   ],
+   "localStorage_prefix": "l7-dual-mode",
+   "localStorage_prefix_note": "L7 的模式偏好键是 `l7-dual-mode` + wpId，由 inert 开关写入但从不影响渲染 ⇒ 删开关时该键的历史值成为孤儿数据（无需迁移，`workpaperSyncModeStorage.ts` 也不必收它）。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**删除。本条只冻结「删 inert 开关时要一并删什么、必须同时挂什么」。🔴 与 K8~K13 相反：这里可以**先删后接**（开关本就无效），但删除必须与挂 AC 1.4 提示组件同批，否则 UI 从「骗人」退化成「沉默」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-6",
+    "BP-7",
+    "BP-9"
+   ],
+   "must_not_wire_to": [],
+   "must_not_wire_to_why": "🔴 [] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 本 entry **没有既成锚点**（宿主无模式工具条）⇒ 须与 sync bridge 的编辑宿主一并落位。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  },
+  {
+   "entry_id": "xlsx/gt-l8-financial-expenses",
+   "wp_code_pattern": "L8F",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtL8FinancialExpenses.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "L8 实测**有** HTML 对端（checklist_responses + `L8-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useL8FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `L8 财务费用.xlsx`（10 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L106",
+    "audit-platform/frontend/src/components/workpaper/composables/useL8FormData.ts#L181",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "child_tab_dedicated_composable",
+   "switch_is_redeemable": false,
+   "legacy_composables_to_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useL8DualMode.ts"
+   ],
+   "legacy_composables_to_delete_note": "🔴 L8 的 per-entry composable `useL8DualMode.ts` **有 1 条生产边**（子 Tab audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L283）⇒ 它不在 orphan 节里，而在 `live_dual_mode_to_rewire_then_delete` 里，且必须与 inert 开关块一起删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 L 循环**没有**宿主内联 IIFE（现算 8 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": "audit-platform/frontend/src/components/workpaper/l8/core/L8TabAdjudication.vue#L14",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health"
+   ],
+   "localStorage_prefix": "l8-dual-mode",
+   "localStorage_prefix_note": "L8 的模式偏好键是 `l8-dual-mode` + wpId，由 inert 开关写入但从不影响渲染 ⇒ 删开关时该键的历史值成为孤儿数据（无需迁移，`workpaperSyncModeStorage.ts` 也不必收它）。",
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**删除。本条只冻结「删 inert 开关时要一并删什么、必须同时挂什么」。🔴 与 K8~K13 相反：这里可以**先删后接**（开关本就无效），但删除必须与挂 AC 1.4 提示组件同批，否则 UI 从「骗人」退化成「沉默」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-6",
+    "BP-7",
+    "BP-9"
+   ],
+   "must_not_wire_to": [],
+   "must_not_wire_to_why": "🔴 [] 是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode`/`modeOptions`/`switchMode` 三态齐全，看上去正是需要的。接了等于把从未运行过的分支拉进生产，且它直调 legacy 端点（违反 step 6）。正确做法：删除它们，宿主改线到 sync bridge。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 本 entry **没有既成锚点**（宿主无模式工具条）⇒ 须与 sync bridge 的编辑宿主一并落位。🔴 只放 `el-tooltip` 不算（EP teleport + 仅 hover 才进 DOM）；也不得在宿主里抄第二份文案（真源是 `sync/workpaperEntrySyncNotice.ts`）。"
+  }
+ ],
+ "excluded_from_plan": [
+  {
+   "what": "L0 债务循环函证（无 manifest entry、无宿主）",
+   "reason": "逐 sheet 走跨循环共享的 D0 函证组件族（第 2 张 sheet 名为「函证程序表F0A」）⇒ 归 Task 57。",
+   "verified_how": "对 manifest 全量 entry 现算 `'l0' in entry_id.lower()` 命中数 == 0。"
+  },
+  {
+   "what": "共享基类 useWorkpaperEntryDualMode.ts",
+   "reason": "被 29 条非 L 边使用，shared_base_preserved 约束不删。",
+   "verified_how": "现算窄口径 statement 边 == 29、其中 L 路径 == 0。"
+  },
+  {
+   "what": "共享循环载体 useCycleHtmlOoDualMode.ts（文件本身）",
+   "reason": "它被非 L 的 `components/workpaper/shared/CycleStandaloneProcedureShell.vue` 使用 ⇒ 文件保留，只摘 L1/L2 两条边（见 shared_cycle_carrier_partially_shrinking）。",
+   "verified_how": "现算窄口径生产边 == 3，L 域 2 条 + 非 L 域 1 条。"
+  },
+  {
+   "what": "GtOnlyOfficeSheet.vue 里的 onlyoffice-config 端点调用",
+   "reason": "它是**平台共享**的 OO 挂载组件（全平台 100+ entry 共用），不是 L 循环的 legacy 桩。L 域自己的 9 个 dual-mode 模块对该端点的调用数现算为 0。",
+   "verified_how": "现算 L 域全部生产文件里 `onlyoffice-config` 命中数 == 0。"
+  },
+  {
+   "what": "L4 宿主的 bondBranch `el-segmented`",
+   "reason": "🔴 它**不是** HTML↔OO 模式开关，而是「到期一次还本付息 / 分期付息到期一次还本」两个业务分支的选择器（L4-7/L4-8 各两版）。删它会删掉业务功能。",
+   "verified_how": "现读 `GtL4BondsPayable.vue#L143` 那段的 `v-model=\"bondBranch\"` 与 `:options=\"branchOptions\"`，断言它既不绑 `dualMode.*` 也不含 `onlyoffice` 字面量；并断言 L4 宿主对任何 `use*DualMode` 的 import 数 == 0。"
+  },
+  {
+   "what": "四个 pilot 宿主（B60 / D2 / H1 / G7）的 legacy",
+   "reason": "Task 45 已删除并冻结范式；不重复登记。",
+   "verified_how": "逐文件读四条 pilot 契约的 review.entry_id，无一条属 L。"
+  }
+ ],
+ "counters": {
+  "entries": 8,
+  "composables_to_delete_entry_scoped": 4,
+  "orphan_dual_mode_to_delete": 5,
+  "orphan_dual_mode_lines_total": 931,
+  "live_dual_mode_to_delete": 4,
+  "live_dual_mode_lines_total": 756,
+  "dual_mode_module_files_total": 9,
+  "orphan_barrel_reexports_to_drop": 0,
+  "hosts_with_inlined_second_implementation": 0,
+  "host_inlined_blocks_to_remove": 0,
+  "inert_switch_blocks_to_remove": 4,
+  "entries_with_redeemable_switch": 2,
+  "entries_with_inert_switch": 4,
+  "entries_with_no_switch_at_all": 2,
+  "localStorage_prefix_declaration_sites": 11,
+  "entries_with_extra_ui_action_required": 8,
+  "entries_with_must_fix_before_wiring": 8,
+  "entries_with_must_not_wire_to": 4,
+  "entries_without_any_ui_gate_anchor": 6,
+  "shared_base_consumers_before": 29,
+  "shared_base_consumers_after": 29,
+  "shared_cycle_carrier_consumers_before": 3,
+  "shared_cycle_carrier_consumers_after": 1,
+  "test_files_requiring_sync_change": 0,
+  "counting_recipe": "守卫从各节现算全部计数并与本键等值比对（抄错或凑数即红）：entries = len(entries) == 8；composables_to_delete_entry_scoped = Σ len(entries[].legacy_composables_to_delete) == 4（只有 L5~L8 四条 entry 的 composable 在 entry 范围内删，L1~L4 的走 orphan 节）；orphan_dual_mode_to_delete == 5；live_dual_mode_to_delete == 4；两者相加 == 9 == `rglob('useL*DualMode.ts')` 的文件数 ⇒ 并集覆盖全部、交集为空。🔴 **注意 9 ≠ 8**：L3 在两个目录各有一份 orphan，故文件数比 entry 数多 1 —— K 循环那份是 13 == 13，照抄「文件数 == entry 数」必假红。host_inlined_blocks_to_remove == 0（L 循环无宿主内联，与 H/K 不同）；inert_switch_blocks_to_remove == 4；三类开关形态 2 + 4 + 2 == 8；localStorage_prefix_declaration_sites = 9 个 composable + 2 处共享载体前缀（l1-proc: / l2-proc:）== 11；shared_base before == after == 29（L 贡献 0）；shared_cycle_carrier 3 → 1（部分收缩，第三种形态）。"
+ },
+ "properties_verified": [
+  "Property 20（部分真验；见 slice 的 property_denominators）",
+  "Property 28（模板层真验；bundle 层分母为空不宣称通过）",
+  "Property 69（负向真验）",
+  "Property 70（真验：删除路径与其余八份 slice 不相交）"
+ ],
+ "requirements_covered": [
+  "1.4",
+  "1.7",
+  "6.1",
+  "6.10",
+  "12.1",
+  "12.4",
+  "12.8",
+  "12.9",
+  "12.10",
+  "12.11",
+  "12.12",
+  "14.1"
+ ]
+}

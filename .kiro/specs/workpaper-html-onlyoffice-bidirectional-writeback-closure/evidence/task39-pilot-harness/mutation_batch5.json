@@ -1,0 +1,310 @@
+[
+  {
+    "id": "M53",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_authority_change_is_its_own_axis",
+    "why": "🔴 authority model 变化不再 stale ⇒ 该枚举成员回到「声明存在、判据为空」的状态（Task 29 交付时就是这样）",
+    "verdict": "RED",
+    "summary": "3 failed, 106 passed in 10.76s",
+    "added": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_all_three_axes_can_fire_together",
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_authority_change_is_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_authority_change_is_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_bundle_change_is_its_own_axis",
+    "why": "bundle 换了也不 stale ⇒ AC 14.16 明文列出的失效轴不可达",
+    "verdict": "RED",
+    "summary": "3 failed, 106 passed in 10.66s",
+    "added": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_all_three_axes_can_fire_together",
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_bundle_change_is_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_bundle_change_is_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_typed_child_change_is_its_own_axis",
+    "why": "typed child 变化不再单独成轴 ⇒ 「child 被换掉而 bundle digest 未变」（篡改）与「bundle 整体升级」（正常）分不出来",
+    "verdict": "RED",
+    "summary": "3 failed, 106 passed in 10.86s",
+    "added": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_all_three_axes_can_fire_together",
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_typed_child_change_is_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_typed_child_change_is_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M56",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_tampered_child_inventory_fails_closed",
+    "why": "bundle 行的 digest 与 child 现算值不符也不报 ⇒ 绕过发布器直接 UPDATE child 的篡改完全不可见",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.75s",
+    "added": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_tampered_child_inventory_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_tampered_child_inventory_fails_closed"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M57",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_defects_outrank_stale_in_the_composed_verdict",
+    "why": "缺陷不再优先于 stale ⇒ 「既过期又有缺陷」显示成 stale，读者会以为「重跑一次就好了」，而它其实结构上不成立",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.67s",
+    "added": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_defects_outrank_stale_in_the_composed_verdict"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestBundleFreshnessAxes::test_defects_outrank_stale_in_the_composed_verdict"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M58",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_lowering_a_target_is_caught",
+    "why": "🔴 登记的容量目标与需求原文脱钩 ⇒ 把 6000 会话改成 600 不会打红（自证式同义反复的反面判据失效）",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.72s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_lowering_a_target_is_caught"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_lowering_a_target_is_caught"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M59",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_profile_matches_the_requirement_text_verbatim",
+    "why": "需求措辞变了、正则抠不到时静默跳过 ⇒ 锁默默失效（fail-open）",
+    "verdict": "GREEN",
+    "summary": "109 passed in 11.17s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.5
+  },
+  {
+    "id": "M60",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_without_an_adr_is_refused",
+    "why": "未达标且无 ADR 也放行 ⇒ AC 14.12 的「不得静默放宽」空转",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.91s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_without_an_adr_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_without_an_adr_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M61",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_asking_whether_capacity_passed_without_a_run_raises",
+    "why": "🔴 没有执行记录也能宣称容量门已过 ⇒ 直接违反「容量 profile 仅登记待 Task 71 执行，不宣称真实 OO probe/pilot 已通过」",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.58s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_asking_whether_capacity_passed_without_a_run_raises"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_asking_whether_capacity_passed_without_a_run_raises"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M62",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_with_an_adr_is_executed_requires_adr_not_passed",
+    "why": "负载实测低于目标不再记 shortfall ⇒ 1000 个会话也算达标 6000",
+    "verdict": "RED",
+    "summary": "2 failed, 107 passed in 10.68s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_with_an_adr_is_executed_requires_adr_not_passed",
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_without_an_adr_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_with_an_adr_is_executed_requires_adr_not_passed",
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_a_shortfall_without_an_adr_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M63",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_digest_is_reproducible_and_covers_every_number",
+    "why": "延迟预算不再校验 ⇒ p95 超预算也算达标（AC 14.12 的两条 p95 判据空转）。首轮若 WRONG-TEST 说明该分支只被 digest 判据间接覆盖，需要补一条直接判据",
+    "verdict": "GREEN",
+    "summary": "109 passed in 10.71s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M64",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_missing_environment_record_is_refused",
+    "why": "容量实测缺环境记录只构造异常不抛 ⇒ AC 14.12 的「记录硬件/OO build/载荷」空转，结果不可重复（Property 72）",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.80s",
+    "added": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_missing_environment_record_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestCapacityProfileRegisteredOnly::test_missing_environment_record_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M65",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestPilotClassCoverage::test_no_class_is_verified_today_because_there_is_no_bidirectional_entry",
+    "why": "pilot 覆盖不再要求 capability=bidirectional ⇒ 179 个 single_onlyoffice entry 全被算成候选双向入口",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.73s",
+    "added": [
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_no_class_is_verified_today_because_there_is_no_bidirectional_entry"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_no_class_is_verified_today_because_there_is_no_bidirectional_entry"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M66",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestPilotClassCoverage::test_bidirectional_without_a_verified_run_stays_unverifiable",
+    "why": "🔴 只要是 bidirectional 就算 verified（不再要求通过服务端重算）⇒ Property 49 的「probe/pilot 未实际通过时必须保持 UNVERIFIABLE」空转",
+    "verdict": "RED",
+    "summary": "1 failed, 108 passed in 10.73s",
+    "added": [
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_bidirectional_without_a_verified_run_stays_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_bidirectional_without_a_verified_run_stays_unverifiable"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M67",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestPilotClassCoverage::test_no_class_is_verified_today_because_there_is_no_bidirectional_entry",
+    "why": "status 由「有候选 entry」决定而不是「有已重算通过的 entry」⇒ 四类立刻全绿，而真实 OO 一次都没跑过",
+    "verdict": "RED",
+    "summary": "5 failed, 104 passed in 10.78s",
+    "added": [
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_a_verified_entry_flips_only_its_own_class",
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_bidirectional_without_a_verified_run_stays_unverifiable",
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_free_text_evidence_claims_cannot_flip_the_status",
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_no_class_is_verified_today_because_there_is_no_bidirectional_entry",
+      "test_task39_pilot_harness_pg.py::TestPilotAndCapacityStayUnclaimed::test_no_pilot_class_is_verified"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_free_text_evidence_claims_cannot_flip_the_status",
+      "test_task39_pilot_harness.py::TestPilotClassCoverage::test_no_class_is_verified_today_because_there_is_no_bidirectional_entry"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  }
+]

@@ -1,0 +1,92 @@
+{
+  "gate_id": "onlyoffice-word-instrumentation-gate",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "59",
+  "purpose": "Task 59 的 Word instrumentation / tagged-SDT engine 在动手前必须先证明「Task 6 的真实 OO 9.4 载体裁决仍然新鲜」。本文件把 Task 6 契约自己声明的 environment.stale_policy 四项（environment / source_commit / runner / probe 文档模板 sha256）落成机器可比对的 digest 基线；任一项漂移即 fail closed，不得沿用旧裁决继续 instrumentation 或运行 engine（Requirement 14.16 / Property 71）。",
+  "authoritative_notes": [
+    "权威模板源只认 `backend/wp_templates/`；`基础数据/致同通用审计程序及底稿模板…` 是参考副本且已落后，不得据它判断。",
+    "本文件不是第二份载体裁决 —— carrier/anchor 的 probe_verdict 单一真源仍是 `backend/data/onlyoffice_word_sdt_carrier_contract.json`，allowlist/blocklist 由 `contracts.load_word_carrier_gate()` 从那份读。这里只锁「那份契约与它的实证依据有没有变」。",
+    "digest 全部为对应文件的 SHA-256（小写 hex）。Tier A 在运行时无条件强制（`WordSdtCarrierGate.load`），Tier B 只在仓库上下文强制（`assert_evidence_fresh`）。",
+    "`row_sdt` 在 Task 6 裁决为 failed（OO 9.4 首次序列化即剥离 w:tbl 下的 w:sdt），因此 Word engine 里没有 row 级 SDT 代码路径；行身份走探针实测通过的 `cell_level_field_sdt_tag_carrying_row_uuid`。"
+  ],
+  "tier_a_runtime": {
+    "enforced_by": "app.services.workpaper_sync.word_instrumentation.WordSdtCarrierGate.load",
+    "why": "这几项在生产部署里必然存在（全在 backend/ 下），因此运行时可无条件强制。缺文件或 digest 不符一律 fail closed。",
+    "onlyoffice_build": "9.4.0-129",
+    "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+    "runner": "backend/scripts/diagnose/probe_oo94_word_sdt.py",
+    "files": [
+      {
+        "role": "carrier_contract",
+        "path": "backend/data/onlyoffice_word_sdt_carrier_contract.json",
+        "sha256": "be4d11dde4e92110d8da74c8da6de849c62f2ea58233f54e5ab6632466d67acc"
+      },
+      {
+        "role": "fingerprint_module",
+        "path": "backend/app/services/word_sdt_fingerprint.py",
+        "sha256": "b494a3e0c8f89525ea8225a0a74a2077ed080d838b7a1518337a9845f76dc857"
+      }
+    ],
+    "probed_templates": [
+      {
+        "template_id": "F2-22",
+        "path": "backend/wp_templates/F/F2-22 存货监盘计划.docx",
+        "sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+        "role": "Requirement 7.6 指定 Word pilot（field 载体全场景）"
+      },
+      {
+        "template_id": "F2-23",
+        "path": "backend/wp_templates/F/F2-23 存货监盘小结.docx",
+        "sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+        "role": "Requirement 7.6 第二 pilot（证明 field 结论非单文档偶然）"
+      },
+      {
+        "template_id": "B30-11-2",
+        "path": "backend/wp_templates/B/B30-11-2 内部控制缺陷汇总与评估.docx",
+        "sha256": "b4facd6b7d31b1419eb102ede582e7e77b1a5c685a3f9513bb546b9de0bbb247",
+        "role": "行载体取证（F2-22/F2-23 零表格，行身份在 pilot 文档上不可取证）"
+      }
+    ]
+  },
+  "tier_b_evidence": {
+    "enforced_by": "app.services.workpaper_sync.word_instrumentation.WordSdtCarrierGate.assert_evidence_fresh",
+    "why": "probe 脚本与 evidence JSON 位于 `.kiro/specs/**`，生产部署不带；因此只在仓库上下文（守卫测试 / CI）里强制。evidence 文件缺失本身即判 stale —— 不得降级为「跳过」。",
+    "files": [
+      {
+        "role": "probe_script",
+        "path": "backend/scripts/diagnose/probe_oo94_word_sdt.py",
+        "sha256": "5d01ffd61d3993302462734a88350855adfb5c8951b2e87f4cf8c5340c5dd2f5"
+      },
+      {
+        "role": "operation_matrix",
+        "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt/operation_matrix.json",
+        "sha256": "55b9faf5cb0f50a86f8a13d06ca98f0748cec079ca4bb96b82399f265025eabe"
+      },
+      {
+        "role": "instrumentation_report",
+        "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt/instrumentation_report.json",
+        "sha256": "00af03618c2d402a5c2ad9c289fe6ddc800d6c4b477c3818b5955318c7708ea6"
+      },
+      {
+        "role": "independent_recompute",
+        "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt/independent_recompute.json",
+        "sha256": "c84d78ceadb2e30874d1abf94c61d792112b1ee59887a919765491704deb93e2"
+      },
+      {
+        "role": "oo_build",
+        "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt/oo_build.json",
+        "sha256": "1725f2893e6b1da1223316aeb787a88b16d69bf50b10ccca81bf44babd8d219b"
+      }
+    ]
+  },
+  "stale_action": "重跑 `probe_oo94_word_sdt.py` 全流程（verify-source → instrument → serve/mark/command → snapshot → analyze → verify-source）并重新裁决 carrier/anchor 的 probe_verdict，再更新本文件的 digest；在此之前 Word instrumentation 与 tagged-SDT engine 必须拒绝运行。",
+  "maps_to_task6_stale_policy": {
+    "environment（OnlyOffice build 9.4.0-129 / browser）变化": "tier_a_runtime.onlyoffice_build（browser 由契约 environment.browser 一并进 probe_gate_identity）",
+    "source_commit 变化": "tier_a_runtime.source_commit",
+    "runner 变化": "tier_a_runtime.runner + tier_b_evidence.files[probe_script].sha256",
+    "probe 文档模板 sha256 任一变化": "tier_a_runtime.probed_templates[].sha256（与契约 probe_docs[].template_sha256 双向锁死）",
+    "载体裁决契约本体或 fingerprint 模块变化": "tier_a_runtime.files[carrier_contract, fingerprint_module].sha256",
+    "evidence 目录中三份 JSON 变化": "tier_b_evidence.files[operation_matrix, instrumentation_report, independent_recompute].sha256"
+  }
+}

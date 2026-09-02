@@ -1,0 +1,37 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 1
+  },
+  "mutations": [
+    {
+      "id": "M29",
+      "path": "backend/app/services/workpaper_sync/rooms.py",
+      "want": "*",
+      "why": "对照项（预期 GREEN）：往同一个文件加一个与契约数值无关的模块常量。它证明 M26/M27 的判据不是「这个文件一改就红」，而是真的在看「绑的是不是契约数量」。",
+      "verdict": "RED",
+      "summary": "324 passed, 1 warning in 53.49s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "182286d854ef8c5e03c3522ec98094c5bf1a64d128db8e0526a6952d5e2a371e",
+      "seconds": 57.5
+    }
+  ]
+}

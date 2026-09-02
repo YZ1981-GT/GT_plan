@@ -1,0 +1,971 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_missing_claim_version_rejected_before_download",
+    "why": "缺 cbv 直通 ⇒ 生产实况的 claim_version=None 绕过重新出现（P16 的核心）；不能改成 raw.get('cbv') 因为下一行会 KeyError，那是崩而不是绕过",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.38s",
+    "added": [
+      "test_task22_callback_claim.py::test_missing_claim_version_rejected_before_download"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_missing_claim_version_rejected_before_download"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.2
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_claim_version_refuses_coercion",
+    "why": "\"1\"/1.0/True 被当成合法版本 ⇒ 伪造版本猜成已知版本。相对定位消歧：同一行文本在 _require_int 里也出现",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 7.93s",
+    "added": [
+      "test_task22_callback_claim.py::test_claim_version_refuses_coercion[1.0]",
+      "test_task22_callback_claim.py::test_claim_version_refuses_coercion[True]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_claim_version_refuses_coercion[1.0]",
+      "test_task22_callback_claim.py::test_claim_version_refuses_coercion[True]"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 10.9
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_unknown_claim_version_rejected",
+    "why": "未知版本放行 ⇒ 旧版本 claim 可覆盖新协议内容；与 M01/M02 分别对应三段独立判据",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.74s",
+    "added": [
+      "test_task22_callback_claim.py::test_unknown_claim_version_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_unknown_claim_version_rejected"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_missing_secret_fails_closed",
+    "why": "无密钥时不再 fail closed ⇒ 复刻 legacy 的 `if not JWT_SECRET: return True`",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.69s",
+    "added": [
+      "test_task22_callback_claim.py::test_missing_secret_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_missing_secret_fails_closed"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_missing_authorization_header_rejected",
+    "why": "把本轮修掉的真实缺陷插回去：先 strip 再判 `bearer ` ⇒ `\"Bearer   \"` 被 strip 成 `\"Bearer\"` 不再匹配，于是「只有 scheme」那条 raise 不可达，拒绝理由从『缺 token』漂成『签名坏了』",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.56s",
+    "added": [
+      "test_task22_callback_claim.py::test_missing_authorization_header_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_missing_authorization_header_rejected"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_each_url_bound_param_is_checked",
+    "why": "只保留 room_id 一项绑定 ⇒ generation 旋转后旧 URL 仍合法，AC 2.8 的 supersede 形同虚设。刻意留一项而不是整段删：整段删会同时打红 room 那一项，无法证明『逐项』",
+    "verdict": "RED",
+    "summary": "3 failed, 137 passed in 8.47s",
+    "added": [
+      "test_task22_callback_claim.py::test_each_url_bound_param_is_checked[doc_key]",
+      "test_task22_callback_claim.py::test_each_url_bound_param_is_checked[generation]",
+      "test_task22_callback_claim.py::test_each_url_bound_param_is_checked[route_credential_id]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_each_url_bound_param_is_checked[doc_key]",
+      "test_task22_callback_claim.py::test_each_url_bound_param_is_checked[generation]",
+      "test_task22_callback_claim.py::test_each_url_bound_param_is_checked[route_credential_id]"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_payload_key_must_equal_claim_doc_key",
+    "why": "`None` 被 str() 变成 'None' 后又被显式放过 ⇒ 「根本没带 key」变成看起来正常的字符串",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.38s",
+    "added": [
+      "test_task22_callback_claim.py::test_payload_key_must_equal_claim_doc_key"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_payload_key_must_equal_claim_doc_key"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_doc_key_must_derive_from_room_identity",
+    "why": "跨底稿/跨入口的 doc_key 可进入本 room ⇒ 别的底稿的 artifact 被应用到这一份",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.17s",
+    "added": [
+      "test_task22_callback_claim.py::test_doc_key_must_derive_from_room_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_doc_key_must_derive_from_room_identity"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.1
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_superseded_room_and_stale_fence_rejected",
+    "why": "superseded/closed room 仍接受 callback ⇒ 旧代际 artifact 覆盖新内容",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.78s",
+    "added": [
+      "test_task22_callback_claim.py::test_superseded_room_and_stale_fence_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_superseded_room_and_stale_fence_rejected"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_explicit_clock_check_rejects_token_that_jose_accepts",
+    "why": "删掉平台的显式时钟判据。首轮 want 写 test_expired_token_rejected 判 WRONG-TEST：那条用的 token `exp` 早已过期，jose 会先抛同类型异常把显式判据整条遮蔽。改为断言「jose 放行、只有显式判据能拦」的隔离场景，并把两者拆成不同异常类型",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.65s",
+    "added": [
+      "test_task22_callback_claim.py::test_explicit_clock_check_rejects_token_that_jose_accepts"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_explicit_clock_check_rejects_token_that_jose_accepts"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_empty_allowlist_refuses_instead_of_falling_back",
+    "why": "空 allowlist 回退成放行 ⇒ Task 4 实测最严重 gap（ONLYOFFICE_URL 为空时 host 由 payload 决定）复现",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.60s",
+    "added": [
+      "test_task22_callback_claim.py::test_empty_allowlist_refuses_instead_of_falling_back"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_empty_allowlist_refuses_instead_of_falling_back"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_host_not_allowlisted_rejected",
+    "why": "host 不在 allowlist 时退回第一条 ⇒ 等价于生产的『按 netloc 重写后放行』，而 path/query 仍来自 payload",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.92s",
+    "added": [
+      "test_task22_callback_claim.py::test_host_not_allowlisted_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_host_not_allowlisted_rejected"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_path_gate_is_independent_of_host_gate",
+    "why": "path 前缀门失效 ⇒ 同一 host 上的任意路径（含 /admin）可被下载。它与 host 门分属两个异常类型正是为了让这条变异不被 host 门遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.64s",
+    "added": [
+      "test_task22_callback_claim.py::test_path_gate_is_independent_of_host_gate[/admin/settings]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_path_gate_is_independent_of_host_gate[/admin/settings]"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_metadata_addresses_rejected_even_when_private_allowed",
+    "why": "云元数据端点在『放行私网』的条目下变得可达 ⇒ 交出实例角色凭证。它必须独立于私网门：私网门在 localhost 条目下是放行的",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.65s",
+    "added": [
+      "test_task22_callback_claim.py::test_metadata_addresses_rejected_even_when_private_allowed[100.100.100.200]",
+      "test_task22_callback_claim.py::test_metadata_addresses_rejected_even_when_private_allowed[fd00:ec2::254]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_metadata_addresses_rejected_even_when_private_allowed[100.100.100.200]",
+      "test_task22_callback_claim.py::test_metadata_addresses_rejected_even_when_private_allowed[fd00:ec2::254]"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_dns_rebinding_blocked_by_post_resolve_recheck",
+    "why": "解析后逐 IP 复核失效 ⇒ Task 4 实测可行的 DNS rebinding 复现",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.79s",
+    "added": [
+      "test_task22_callback_claim.py::test_dns_rebinding_blocked_by_post_resolve_recheck"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_dns_rebinding_blocked_by_post_resolve_recheck"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_resolved_ip_is_pinned_for_connection",
+    "why": "不固定已验证 IP ⇒ 连接阶段第二次解析，rebinding 又有落脚点。同时打红 PG 端到端那条（真实下载 URL 的 host 不再是 IP 字面量）",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.76s",
+    "added": [
+      "test_task22_callback_claim.py::test_resolved_ip_is_pinned_for_connection",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_resolved_ip_is_pinned_for_connection",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py",
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_redirect_refused_and_body_not_consumed",
+    "why": "3xx 不再拒 ⇒ 重定向 body 被当文件写盘（Task 4 实测：靠 httpx 版本行为隐式挡住，不可依赖）",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.81s",
+    "added": [
+      "test_task22_callback_claim.py::test_redirect_refused_and_body_not_consumed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_redirect_refused_and_body_not_consumed"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_size_cap_aborts_mid_stream",
+    "why": "流式上限失效 ⇒ 回到 `resp.content` 整包入内存的无界形态",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.87s",
+    "added": [
+      "test_task22_callback_claim.py::test_size_cap_aborts_mid_stream"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_size_cap_aborts_mid_stream"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_contract_and_capacity_budget_locked_together",
+    "why": "两份配置不再锁死 ⇒ 下载门与解压门各按一个上限工作，超限错误码指向 OOXML 而真因是下载无界",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.74s",
+    "added": [
+      "test_task22_callback_claim.py::test_contract_and_capacity_budget_locked_together"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_contract_and_capacity_budget_locked_together"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_contract_and_capacity_budget_locked_together",
+    "why": "把契约侧数值改回漂移前的 200 MiB ⇒ 锁死判据必须从**契约侧**也能打红。只有 M19（生产侧）时，契约被改回去不会有任何判据发现",
+    "verdict": "RED",
+    "summary": "48 failed, 81 passed, 11 errors in 7.04s",
+    "added": [
+      "test_task22_callback_claim.py::test_contract_and_capacity_budget_locked_together",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T01]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T02]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T03]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T04]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T05]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T06]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T07]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T08]",
+      "test_task22_callback_claim_pg.py::test_application_key_is_computed_from_the_downloaded_durable_incoming",
+      "test_task22_callback_claim_pg.py::test_application_key_signature_excludes_status_and_request_id",
+      "test_task22_callback_claim_pg.py::test_authorized_claim_creates_request_shell_and_application_atomically",
+      "test_task22_callback_claim_pg.py::test_claim_replay_hits_the_same_three_entities",
+      "test_task22_callback_claim_pg.py::test_correlation_happens_strictly_after_sealed_durable",
+      "test_task22_callback_claim_pg.py::test_cross_slot_or_different_payload_conflicts_without_leaking_old_ids[cross_kind]",
+      "test_task22_callback_claim_pg.py::test_cross_slot_or_different_payload_conflicts_without_leaking_old_ids[cross_participant]",
+      "test_task22_callback_claim_pg.py::test_cross_slot_or_different_payload_conflicts_without_leaking_old_ids[different_payload]",
+      "test_task22_callback_claim_pg.py::test_download_cap_equals_the_capacity_budget",
+      "test_task22_callback_claim_pg.py::test_download_only_keeps_all_three_entities_at_zero",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects",
+      "test_task22_callback_claim_pg.py::test_duplicate_delivery_key_is_refused_by_the_database",
+      "test_task22_callback_claim_pg.py::test_every_truth_table_row_was_probed_against_real_postgres",
+      "test_task22_callback_claim_pg.py::test_failed_ooxml_gate_seals_quarantined_and_returns_non_zero",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T09]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T10]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T11]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T12]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T13]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T14]",
+      "test_task22_callback_claim_pg.py::test_network_retry_folds_but_distinct_deliveries_do_not",
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_no_representation_is_ever_backed_by_an_incoming_artifact",
+      "test_task22_callback_claim_pg.py::test_no_request_callback_creates_only_a_recovery_case",
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T10_durable_zero_owner_rejected_by_ck_wpcd_durable_exactly_one_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T11_durable_state_without_fact_rejected_by_ck_wpcd_durable_state_requires_fact",
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming",
+      "test_task22_callback_claim_pg.py::test_post_durable_error_keeps_its_owner",
+      "test_task22_callback_claim_pg.py::test_pre_durable_failure_returns_non_zero_with_zero_owner",
+      "test_task22_callback_claim_pg.py::test_quarantined_can_never_be_released_and_incoming_never_published",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application",
+      "test_task22_callback_claim_pg.py::test_same_incoming_with_different_frozen_identity_never_folds",
+      "test_task22_callback_claim_pg.py::test_same_slot_equal_fingerprint_replay_returns_the_same_ids",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database",
+      "test_task22_callback_claim_pg.py::test_unauthorized_claim_leaves_all_three_entities_absent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_contract_and_capacity_budget_locked_together",
+      "test_task22_callback_claim_pg.py::test_download_cap_equals_the_capacity_budget"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py",
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.0
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+    "why": "把本轮修掉的真实缺陷插回去：`ipaddress` 把 `::/8` 整段标成 reserved，于是 IPv6 环回 `::1` 被无条件拒，而 localhost 首个解析结果就是它 ⇒ 平台真实部署一次 callback 都下载不下来。只有真库端到端能打红它",
+    "verdict": "RED",
+    "summary": "30 failed, 110 passed in 8.54s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T06]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T07]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T08]",
+      "test_task22_callback_claim_pg.py::test_application_key_is_computed_from_the_downloaded_durable_incoming",
+      "test_task22_callback_claim_pg.py::test_application_key_signature_excludes_status_and_request_id",
+      "test_task22_callback_claim_pg.py::test_authorized_claim_creates_request_shell_and_application_atomically",
+      "test_task22_callback_claim_pg.py::test_claim_replay_hits_the_same_three_entities",
+      "test_task22_callback_claim_pg.py::test_correlation_happens_strictly_after_sealed_durable",
+      "test_task22_callback_claim_pg.py::test_download_only_keeps_all_three_entities_at_zero",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects",
+      "test_task22_callback_claim_pg.py::test_duplicate_delivery_key_is_refused_by_the_database",
+      "test_task22_callback_claim_pg.py::test_failed_ooxml_gate_seals_quarantined_and_returns_non_zero",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T09]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T12]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T13]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T14]",
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_no_representation_is_ever_backed_by_an_incoming_artifact",
+      "test_task22_callback_claim_pg.py::test_no_request_callback_creates_only_a_recovery_case",
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming",
+      "test_task22_callback_claim_pg.py::test_post_durable_error_keeps_its_owner",
+      "test_task22_callback_claim_pg.py::test_quarantined_can_never_be_released_and_incoming_never_published",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application",
+      "test_task22_callback_claim_pg.py::test_same_incoming_with_different_frozen_identity_never_folds",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database",
+      "test_task22_callback_claim_pg.py::test_unauthorized_claim_leaves_all_three_entities_absent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_status_coercion_refused",
+    "why": "`\"6\"` 被强转成 6 ⇒ 契约 unknown_status_policy=fail_visible 被绕过，未知/伪造 status 被猜成最近似 status",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.77s",
+    "added": [
+      "test_task22_callback_claim.py::test_status_coercion_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_status_coercion_refused"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_network_retry_of_same_delivery_dedupes",
+    "why": "body token 进入 discriminator ⇒ OO 重签后同一投递被算成新 delivery（白丢去重），且凭证进入落库 digest（Requirement 10.7）",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.73s",
+    "added": [
+      "test_task22_callback_claim.py::test_network_retry_of_same_delivery_dedupes",
+      "test_task22_callback_claim_pg.py::test_network_retry_folds_but_distinct_deliveries_do_not"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_network_retry_of_same_delivery_dedupes",
+      "test_task22_callback_claim_pg.py::test_network_retry_folds_but_distinct_deliveries_do_not"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py",
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.9
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_discriminator_separates_same_url_with_different_body",
+    "why": "discriminator 丢掉 payload digest ⇒ 『url 复用但 body 其余字段变化』的两次投递折叠成一行，少一行 delivery 就是少一份证据。首轮 want 写的是 test_distinct_deliveries_get_distinct_keys（改的是 url）⇒ url 那一项照样分开两者，判 GREEN；故补了只改 body 的隔离场景。line=411 消歧：1111 行是 payload_sha256 列",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.87s",
+    "added": [
+      "test_task22_callback_claim.py::test_discriminator_separates_same_url_with_different_body"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_discriminator_separates_same_url_with_different_body"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_build_delivery_key_wires_the_payload_status_through",
+    "why": "外层 status 成分被削成常量。它在**值**层面不可观测（`canonical_digest` 摘整个 body，status 就在里面），故判据只能是接线等值 —— 首轮用「status 6 vs 2 的 key 不同」判 GREEN 正是因为 digest 那一项已经把两者分开了。line=424 消歧：1109 行是 record_delivery 的列",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.70s",
+    "added": [
+      "test_task22_callback_claim.py::test_build_delivery_key_wires_the_payload_status_through"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_build_delivery_key_wires_the_payload_status_through"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 11.9
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_every_forbidden_quarantine_operation_rejected",
+    "why": "只挡 release ⇒ application/extract/merge/retry/rematerialize 全部放行。刻意留一项：整段放行会让『允许集恰好三项』那条也红，混在一起无法归因",
+    "verdict": "RED",
+    "summary": "11 failed, 129 passed in 8.82s",
+    "added": [
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[application]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[extract]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[merge]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[promote_durable]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[publish]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[rematerialize]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[resolver_substrate]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[retry]",
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_quarantine_allowed_operations_are_exactly_three",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[application]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[extract]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[merge]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[promote_durable]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[publish]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[rematerialize]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[resolver_substrate]",
+      "test_task22_callback_claim.py::test_every_forbidden_quarantine_operation_rejected[retry]",
+      "test_task22_callback_claim_pg.py::test_quarantine_allowed_operations_are_exactly_three"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py",
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_quarantined_and_staged_incoming_fail_with_distinct_types",
+    "why": "内存第一层失效 ⇒ quarantined 的 sealing 对象可直传 engine（绕过 DB 那两层）",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.97s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_correlation_requires_recorded_durable_fact",
+    "why": "轨迹前置断言失效 ⇒ application key 可以在 sealing 之前算（Requirement 4.3 明禁）",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.78s",
+    "added": [
+      "test_task22_callback_claim.py::test_correlation_requires_recorded_durable_fact"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_correlation_requires_recorded_durable_fact"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_userdata_present_takes_request_first",
+    "why": "有 userdata 也不走 request-first ⇒ 退化成按 incoming 猜 application，绕过不同 frozen base/bundle/fence（Requirement 4.3 的核心禁令）",
+    "verdict": "RED",
+    "summary": "24 failed, 116 passed in 8.74s",
+    "added": [
+      "test_task22_callback_claim.py::test_userdata_present_takes_request_first",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T06]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T07]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T08]",
+      "test_task22_callback_claim_pg.py::test_application_key_is_computed_from_the_downloaded_durable_incoming",
+      "test_task22_callback_claim_pg.py::test_application_key_signature_excludes_status_and_request_id",
+      "test_task22_callback_claim_pg.py::test_correlation_happens_strictly_after_sealed_durable",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects",
+      "test_task22_callback_claim_pg.py::test_duplicate_delivery_key_is_refused_by_the_database",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T09]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T12]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T13]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T14]",
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming",
+      "test_task22_callback_claim_pg.py::test_post_durable_error_keeps_its_owner",
+      "test_task22_callback_claim_pg.py::test_pre_durable_failure_returns_non_zero_with_zero_owner",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application",
+      "test_task22_callback_claim_pg.py::test_same_incoming_with_different_frozen_identity_never_folds",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_userdata_present_takes_request_first"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py",
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_contributor_attribution_refuses_when_no_signal_at_all",
+    "why": "零 contributor 信号也放行 ⇒ 归属无法判定却产生 content application（Requirement 10.3 / P44 要求隔离并旋转 generation）",
+    "verdict": "RED",
+    "summary": "1 failed, 139 passed in 8.88s",
+    "added": [
+      "test_task22_callback_claim.py::test_contributor_attribution_refuses_when_no_signal_at_all"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim.py::test_contributor_attribution_refuses_when_no_signal_at_all"
+    ],
+    "added_files": [
+      "test_task22_callback_claim.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+    "why": "把本轮修掉的真实缺陷插回去：pre-durable delivery 带 operation 指针，correlation 把同一 shell 绑成 primary 后，COMMIT 时 deferred `trg_wpcd_operation_link` 必然回滚整笔 ⇒ 成功路径永远失败。只有真库能打红",
+    "verdict": "RED",
+    "summary": "22 failed, 118 passed in 8.69s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T06]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T07]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T08]",
+      "test_task22_callback_claim_pg.py::test_application_key_is_computed_from_the_downloaded_durable_incoming",
+      "test_task22_callback_claim_pg.py::test_application_key_signature_excludes_status_and_request_id",
+      "test_task22_callback_claim_pg.py::test_correlation_happens_strictly_after_sealed_durable",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects",
+      "test_task22_callback_claim_pg.py::test_duplicate_delivery_key_is_refused_by_the_database",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T09]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T12]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T13]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T14]",
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming",
+      "test_task22_callback_claim_pg.py::test_post_durable_error_keeps_its_owner",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application",
+      "test_task22_callback_claim_pg.py::test_same_incoming_with_different_frozen_identity_never_folds",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.9
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+    "why": "把本轮修掉的真实缺陷插回去：`sa.text` 无类型信息 ⇒ asyncpg 收到 VARCHAR 比 uuid，`operator does not exist` ⇒ 整条 handle_callback 在 PG 上跑不通。离线守卫看不见",
+    "verdict": "RED",
+    "summary": "41 failed, 99 passed in 8.32s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T01]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T02]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T03]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T04]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T05]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T06]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T07]",
+      "test_task22_callback_claim_pg.py::test_allowed_ownership_rows_really_insert[T08]",
+      "test_task22_callback_claim_pg.py::test_application_key_is_computed_from_the_downloaded_durable_incoming",
+      "test_task22_callback_claim_pg.py::test_application_key_signature_excludes_status_and_request_id",
+      "test_task22_callback_claim_pg.py::test_authorized_claim_creates_request_shell_and_application_atomically",
+      "test_task22_callback_claim_pg.py::test_claim_replay_hits_the_same_three_entities",
+      "test_task22_callback_claim_pg.py::test_correlation_happens_strictly_after_sealed_durable",
+      "test_task22_callback_claim_pg.py::test_download_only_keeps_all_three_entities_at_zero",
+      "test_task22_callback_claim_pg.py::test_download_was_pinned_carried_no_credential_and_refused_redirects",
+      "test_task22_callback_claim_pg.py::test_duplicate_delivery_key_is_refused_by_the_database",
+      "test_task22_callback_claim_pg.py::test_every_truth_table_row_was_probed_against_real_postgres",
+      "test_task22_callback_claim_pg.py::test_failed_ooxml_gate_seals_quarantined_and_returns_non_zero",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T09]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T10]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T11]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T12]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T13]",
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T14]",
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection",
+      "test_task22_callback_claim_pg.py::test_no_representation_is_ever_backed_by_an_incoming_artifact",
+      "test_task22_callback_claim_pg.py::test_no_request_callback_creates_only_a_recovery_case",
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T10_durable_zero_owner_rejected_by_ck_wpcd_durable_exactly_one_owner",
+      "test_task22_callback_claim_pg.py::test_ownership_T11_durable_state_without_fact_rejected_by_ck_wpcd_durable_state_requires_fact",
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities",
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming",
+      "test_task22_callback_claim_pg.py::test_post_durable_error_keeps_its_owner",
+      "test_task22_callback_claim_pg.py::test_pre_durable_failure_returns_non_zero_with_zero_owner",
+      "test_task22_callback_claim_pg.py::test_quarantined_can_never_be_released_and_incoming_never_published",
+      "test_task22_callback_claim_pg.py::test_quarantined_cannot_reach_an_application_at_any_of_the_three_layers",
+      "test_task22_callback_claim_pg.py::test_request_first_correlation_produces_one_primary_and_one_application",
+      "test_task22_callback_claim_pg.py::test_same_incoming_with_different_frozen_identity_never_folds",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database",
+      "test_task22_callback_claim_pg.py::test_unauthorized_claim_leaves_all_three_entities_absent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_no_phase_crashed_during_collection"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+    "why": "削成恒真后 T09（任何阶段双 owner）必须变成 accepted。T09 刻意取 pre-durable，故 XOR 那条短路 ⇒ 只有本约束能挡它，归因可证",
+    "verdict": "RED",
+    "summary": "3 failed, 137 passed in 9.91s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T09]",
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_ownership_T09_double_owner_is_rejected_by_ck_wpcd_no_double_owner",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.1
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_ownership_T10_durable_zero_owner_rejected_by_ck_wpcd_durable_exactly_one_owner",
+    "why": "削成恒真后 T10（durable 却零 owner = 无所有者死路）必须变成 accepted",
+    "verdict": "RED",
+    "summary": "3 failed, 137 passed in 8.73s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T10]",
+      "test_task22_callback_claim_pg.py::test_ownership_T10_durable_zero_owner_rejected_by_ck_wpcd_durable_exactly_one_owner",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_ownership_T10_durable_zero_owner_rejected_by_ck_wpcd_durable_exactly_one_owner",
+      "test_task22_callback_claim_pg.py::test_the_three_mandated_ownership_semantics_hold_in_the_database"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.9
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_ownership_T11_durable_state_without_fact_rejected_by_ck_wpcd_durable_state_requires_fact",
+    "why": "削成恒真后 T11（state=durable 但 durable_at 空 = 把泛化 terminal 当 durable）必须 accepted",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.73s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T11]",
+      "test_task22_callback_claim_pg.py::test_ownership_T11_durable_state_without_fact_rejected_by_ck_wpcd_durable_state_requires_fact"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_ownership_T11_durable_state_without_fact_rejected_by_ck_wpcd_durable_state_requires_fact"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities",
+    "why": "削成恒真后 T12（unmatched 却留着 request）必须 accepted。T12 的 correlation_result 取 NULL 以短路 ambiguous 那条，故只有本约束能挡它",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.63s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T12]",
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_ownership_T12_unmatched_with_request_rejected_by_ck_wpcd_unmatched_zero_entities"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities",
+    "why": "削成恒真后 T13（correlation_result=ambiguous 却带 application/request）必须 accepted",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.70s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T13]",
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_ownership_T13_ambiguous_with_entities_rejected_by_ck_wpcd_ambiguous_zero_entities"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming",
+    "why": "削成恒真后 T14（durable 却没绑 incoming = pointer 指向缺失字节）必须 accepted",
+    "verdict": "RED",
+    "summary": "2 failed, 138 passed in 8.63s",
+    "added": [
+      "test_task22_callback_claim_pg.py::test_forbidden_ownership_rows_are_rejected_by_their_declared_constraint[T14]",
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task22_callback_claim_pg.py::test_ownership_T14_durable_without_incoming_rejected_by_ck_wpcd_durable_requires_incoming"
+    ],
+    "added_files": [
+      "test_task22_callback_claim_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  }
+]

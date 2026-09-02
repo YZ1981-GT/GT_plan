@@ -1,0 +1,317 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_an_incomplete_registry_raises_in_both_directions",
+    "why": "声明了场景却没有 oracle 时不再抛 ⇒ 那条场景永远不会被提交，而「跑完全部场景」的计数仍然满分（分母虚高）",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 11.00s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_an_incomplete_registry_raises_in_both_directions"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_an_incomplete_registry_raises_in_both_directions"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.5
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_an_incomplete_registry_raises_in_both_directions",
+    "why": "oracle 表可以追加不对应任何声明的自由项 ⇒ required set 不再只由推导产生",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.45s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_an_incomplete_registry_raises_in_both_directions"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_an_incomplete_registry_raises_in_both_directions"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_renamed_production_symbol_is_caught",
+    "why": "生产符号被改名/删除不再打红 ⇒ 场景声明还在、被测的东西早已不在（死代码型假绿）",
+    "verdict": "RED",
+    "summary": "5 failed, 113 passed in 10.29s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught",
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_renamed_production_symbol_is_caught",
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_renamed_production_symbol_is_caught"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught",
+    "why": "`module:attr` 形态不再校验 ⇒ 缺 `:` 的 ref 会掉到 `hasattr(module, \"\")` 那条分支上报同一个 kind，形态校验变成不可达。首轮 GREEN 的原因正是判据只断 kind ——改成同时断诊断文案后才能 falsify（共享错误码的经典形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.32s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_missing_module_and_a_malformed_ref_are_both_caught"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_module_that_fails_to_import_for_a_non_import_reason_still_fails_closed",
+    "why": "import 失败只捕 ImportError ⇒ 模块内语法错/依赖缺失原样穿透，调用侧看到的不是可归因的 oracle_unresolvable。首轮 GREEN 的原因是三个样例全落 ModuleNotFoundError（ImportError 子类）—— 必须用真放盘的语法错模块才可 falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.38s",
+    "added": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_module_that_fails_to_import_for_a_non_import_reason_still_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestOracleRegistryTwoWayLock::test_a_module_that_fails_to_import_for_a_non_import_reason_still_fails_closed"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.4
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRequiredSetDerivationOnRealManifest::test_unreachable_entry_yields_zero_scenarios_and_must_fail_closed",
+    "why": "🔴 零场景不再 fail closed ⇒ 「0/0 全部通过」被当成通过，unreachable 入口可以被记为已验收",
+    "verdict": "RED",
+    "summary": "3 failed, 115 passed in 10.31s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness.py::TestRequiredSetDerivationOnRealManifest::test_unreachable_entry_yields_zero_scenarios_and_must_fail_closed",
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_unreachable_entry_is_refused_by_the_harness_itself"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRequiredSetDerivationOnRealManifest::test_unreachable_entry_yields_zero_scenarios_and_must_fail_closed",
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_unreachable_entry_is_refused_by_the_harness_itself"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_unreachable_entry_is_refused_by_the_harness_itself",
+    "why": "plan 不再调用非空判据 ⇒ 纯函数变成死代码（本 spec 第①号假绿形态：判据正确但没有消费方）",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.20s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_unreachable_entry_is_refused_by_the_harness_itself"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_unreachable_entry_is_refused_by_the_harness_itself"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.4
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol",
+    "why": "plan 不再逐场景解析生产符号 ⇒ 接线是否存在这条判据在生产路径上不可达。首轮 GREEN 的原因是判据只看 plan 产出的场景 id（少了解析并不改变它）——改成「把某场景的生产符号换成不存在的名字，plan 必须拒」后才可 falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.31s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_plan_really_resolves_every_scenarios_production_symbol"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.4
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_schema_debt_scenario_is_unverifiable_and_still_required",
+    "why": "已登记的 schema 欠账场景不再被识别 ⇒ 它会走别的分支，「为什么永远差这一条」失去归因",
+    "verdict": "RED",
+    "summary": "16 failed, 102 passed in 8.67s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_schema_debt_scenario_is_unverifiable_and_still_required",
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_the_recomputer_saw_the_full_required_set",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_a_run_assessed_against_its_own_bundle_is_not_stale",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_baseline_has_no_bundle_stale_reason",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_source_commit_change_still_flows_from_the_recomputer",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_every_required_scenario_got_its_own_row",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_scenario_kind_domain_is_accepted_by_v151",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_upstream_gap_scenarios_are_failed_with_task32_attribution"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_schema_debt_scenario_is_unverifiable_and_still_required"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_upstream_gap_scenarios_are_failed_not_unverifiable",
+    "why": "上游实现缺口不再判 failed ⇒ 两条 Task 32 欠账场景会显示成 unverifiable，于是「接了 OO 就自动变绿」—— 而生产上那道校验根本不存在",
+    "verdict": "RED",
+    "summary": "2 failed, 116 passed in 10.20s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_upstream_gap_scenarios_are_failed_not_unverifiable",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_upstream_gap_scenarios_are_failed_with_task32_attribution"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_upstream_gap_scenarios_are_failed_not_unverifiable",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_upstream_gap_scenarios_are_failed_with_task32_attribution"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.4
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_every_black_box_scenario_is_unverifiable_without_a_real_build",
+    "why": "🔴 没有真实 OO/浏览器也能判 passed ⇒ 直接违反 Property 49（probe/pilot 未实际通过时必须保持 UNVERIFIABLE）",
+    "verdict": "RED",
+    "summary": "3 failed, 115 passed in 10.18s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_every_black_box_scenario_is_unverifiable_without_a_real_build",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_every_black_box_scenario_is_unverifiable_without_a_real_build",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+    "why": "只看 browser build、不看 OO build ⇒ 只需要真实 OO（不需要浏览器）的场景（identity retention / dedupe / 动态行列）会被判 passed",
+    "verdict": "RED",
+    "summary": "3 failed, 115 passed in 10.38s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_every_black_box_scenario_is_unverifiable_without_a_real_build",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_missing_evidence_input_is_unverifiable",
+    "why": "证据种类缺失不再拦 ⇒ 一条什么都不提交的观测也能走到判据并 passed",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.35s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_missing_evidence_input_is_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_missing_evidence_input_is_unverifiable"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_without_three_way_input_is_unverifiable",
+    "why": "字段级场景缺三方 projection 也放行 ⇒ oracle 拿 None 去执行（AttributeError），P25/P26 的判定退化成「什么都没查」。首轮 GREEN 的原因是 want 指向直接调 `evaluate_*` 的判据 —— 那道门在 `run_scenario_oracle` 里，必须走它才测得到",
+    "verdict": "RED",
+    "summary": "1 failed, 117 passed in 10.19s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_without_three_way_input_is_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_without_three_way_input_is_unverifiable"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.3
+  }
+]

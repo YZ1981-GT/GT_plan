@@ -1,0 +1,1017 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_unapproved_bundle_rejected",
+    "why": "unapproved bundle 竟可 finalize published representation ⇒ Requirement 2.3 的「只有 approved bundle」失效。判据必须落在**服务层**：DB 的 trg_wpcr_identity 也会拒，但那条门管不住「服务层先用它算 identity 再写别处」",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.68s",
+    "added": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_unapproved_bundle_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_unapproved_bundle_rejected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 41.3
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_slot_omission_rejected",
+    "why": "slot omission（三 typed slot 少一个）被放过 ⇒ 「不得以缺字段代替版本化 typed null marker」失效。omission 与「slot 值非法」是两条独立禁令，各有各的变异",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.67s",
+    "added": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_slot_omission_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_slot_omission_rejected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 41.2
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected",
+    "why": "空串 / 全零 / 非小写 hex 的 slot digest 被放过 ⇒ Requirement 2.3 原文点名的四种非法空值全部失守（全零 hash 是最隐蔽的一种：它「看起来像 digest」）",
+    "verdict": "RED",
+    "summary": "4 failed, 303 passed, 1 warning in 37.21s",
+    "added": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[0000000000000000000000000000000000000000000000000000000000000000]",
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ]",
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[]",
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[abc]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[0000000000000000000000000000000000000000000000000000000000000000]",
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ]",
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[]",
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_invalid_slot_digest_rejected[abc]"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.8
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_marker_cannot_impersonate_per_entry_contract",
+    "why": "`projection_contract` 入口用 typed null marker 冒充 per-entry contract ⇒ 结构化底稿退化成 contract-less 模式而 bundle 看起来「完整」（Requirement 6.19）",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.61s",
+    "added": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_marker_cannot_impersonate_per_entry_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_marker_cannot_impersonate_per_entry_contract"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 41.2
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_all_zero_authority_digest_rejected",
+    "why": "authority model digest 全零被放过 ⇒ representation 绑定的「权威模型」不可校验。与 M03（slot digest）分开是因为 authority 不是三个 slot 之一，短路一处不影响另一处",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.33s",
+    "added": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_all_zero_authority_digest_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestBundleRejectionMatrix::test_all_zero_authority_digest_rejected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.9
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestTransactionWitness::test_missing_step_is_its_own_error_type",
+    "why": "缺步骤不再报错 ⇒ 「只提交 projection、不写 representation」这一半被禁形态在见证层失去判据。它与「事务分裂」是两个异常类型，短路一个不会被另一个遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.39s",
+    "added": [
+      "test_task15_content_mutation.py::TestTransactionWitness::test_missing_step_is_its_own_error_type"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestTransactionWitness::test_missing_step_is_its_own_error_type"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.9
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestTransactionWitness::test_split_transaction_is_detected",
+    "why": "事务分裂不再报错 ⇒ 中途 commit/rollback 可以悄悄发生。这条与 M20（真注入第二次 commit）是一对：前者证明判据存在，后者证明被禁行为真的会被它抓到",
+    "verdict": "RED",
+    "summary": "2 failed, 305 passed, 1 warning in 41.76s",
+    "added": [
+      "test_task15_content_mutation.py::TestTransactionWitness::test_property_witness_passes_iff_all_steps_share_one_xid",
+      "test_task15_content_mutation.py::TestTransactionWitness::test_split_transaction_is_detected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestTransactionWitness::test_property_witness_passes_iff_all_steps_share_one_xid",
+      "test_task15_content_mutation.py::TestTransactionWitness::test_split_transaction_is_detected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 45.3
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestTransactionWitness::test_commit_latch_allows_exactly_one_commit",
+    "why": "commit 闩失效 ⇒ 一次业务 mutation 可以提交两次。判据同时断言「第二次在真正 commit **之前**被拦住」（session.commits 仍为 1），否则闩只是事后记账",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.76s",
+    "added": [
+      "test_task15_content_mutation.py::TestTransactionWitness::test_commit_latch_allows_exactly_one_commit"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestTransactionWitness::test_commit_latch_allows_exactly_one_commit"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 41.2
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable",
+    "why": "门面变成透传 ⇒ 纯表示路径重新**碰得到** revision 域。这是 Property 4 从「构造上不可能」退回「注释里禁止」的那一步",
+    "verdict": "RED",
+    "summary": "4 failed, 303 passed, 1 warning in 35.63s",
+    "added": [
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_representation_service_wraps_even_a_bare_repository",
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable[bump_content_revision]",
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable[create_content_version]",
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable[set_current_content_version]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_representation_service_wraps_even_a_bare_repository",
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable[bump_content_revision]",
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable[create_content_version]",
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_revision_domain_methods_are_unreachable[set_current_content_version]"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 39.0
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestRevisionLockedRepository::test_forbidden_set_covers_the_three_revision_writers",
+    "why": "禁用名单漏掉 `create_content_version` ⇒ 纯表示升级可以自己造 content version。守卫反查 repository.py 里所有动 revision 域的方法并要求逐个进名单 ——「只声明名单不校验」等于名单可以被悄悄改空",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 35.37s",
+    "added": [
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_forbidden_set_covers_the_three_revision_writers"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestRevisionLockedRepository::test_forbidden_set_covers_the_three_revision_writers"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 38.7
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_projection_based_requires_projection",
+    "why": "projection-based 入口收到 authoritative 字节也放行 ⇒ 结构化底稿被当成不透明文件提交，受管字段与 projection hash 全部失真",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 35.59s",
+    "added": [
+      "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_projection_based_requires_projection"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_projection_based_requires_projection"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 38.9
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_projection_based_requires_contract",
+    "why": "缺 per-entry contract 仍放行 ⇒ Requirement 3.3 的「不得降级为 contract-less 模式」失效。它与「缺 adapter」共用异常类型，故守卫断言各自的文案片段",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 35.67s",
+    "added": [
+      "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_projection_based_requires_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_projection_based_requires_contract"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 39.0
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_custom_authority_rejects_contract",
+    "why": "custom/opaque 入口携带 per-entry contract 被放过 ⇒ 「contract slot 必须是版本化 typed null marker」与「custom 不被强制 instrumentation」两条同时失守",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 35.51s",
+    "added": [
+      "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_custom_authority_rejects_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestAuthorityShapeMatrix::test_custom_authority_rejects_contract"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 38.8
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestConflictGate::test_unresolved_conflicts_block_commit",
+    "why": "有冲突却零裁决时直接提交 ⇒ merged 只是「hold 在 current」的快照，等于服务端替审计师选了 current 那一边（AC 8.1 明令不自动选边）",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 36.93s",
+    "added": [
+      "test_task15_content_mutation.py::TestConflictGate::test_unresolved_conflicts_block_commit"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestConflictGate::test_unresolved_conflicts_block_commit"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.4
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestConflictGate::test_partial_resolution_is_still_rejected",
+    "why": "删掉逐条覆盖检查、只留「裁决非空」⇒ 交一条裁决就能提交 N 条冲突。这条与 M14 是两个层次：前者是「有没有裁决」，本条是「裁决够不够」。🔴 不能用 `kind=delete`：该调用是**多行**的，删掉首行会让后两行成为悬空实参 ⇒ SyntaxError ⇒ 文件级 collect ERROR ⇒ pytest 的 `-rf` 摘要里没有任何failed 名 ⇒ 四态判定报 GREEN（首轮实测就是这个假象，真凶是脚本不是守卫）。改成把调用换成等价元组构造 `_ = (…)`：语法合法、两个实参照旧求值、唯一消失的就是覆盖检查本身",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.19s",
+    "added": [
+      "test_task15_content_mutation.py::TestConflictGate::test_partial_resolution_is_still_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestConflictGate::test_partial_resolution_is_still_rejected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.8
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestRoundtripEquivalence::test_value_drift_is_rejected",
+    "why": "反读值漂移被放过 ⇒ Property 65「projection 与同 revision representation 等值」彻底失效：库里记的 projection hash 与 OOXML 里的实际值可以不同",
+    "verdict": "RED",
+    "summary": "3 failed, 304 passed, 1 warning in 37.38s",
+    "added": [
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_illegal_numeric_representation_is_not_silently_equal",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_three_failure_reasons_have_distinct_messages",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_value_drift_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_three_failure_reasons_have_distinct_messages",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_value_drift_is_rejected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 41.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestRoundtripEquivalence::test_missing_managed_field_is_rejected",
+    "why": "materialize 漏写受管字段被放过 ⇒ 「HTML 里填了、OO 里没有」而 commit 成功。第二个 want 走**真文件**路径，证明判据不只在纯函数层生效",
+    "verdict": "RED",
+    "summary": "3 failed, 304 passed, 1 warning in 37.21s",
+    "added": [
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_missing_managed_field_is_rejected",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_three_failure_reasons_have_distinct_messages",
+      "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_roundtrip_gap_blocks_before_any_db_write"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_missing_managed_field_is_rejected",
+      "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_roundtrip_gap_blocks_before_any_db_write"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.8
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_unmanaged_region_drift_blocks_commit",
+    "why": "未管理区域漂移不再阻断 ⇒ 公式/样式/drawing/chart 被 materialize 重写后照样发布（Requirement 3.5 / 6.10）",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.06s",
+    "added": [
+      "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_unmanaged_region_drift_blocks_commit"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_unmanaged_region_drift_blocks_commit"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.7
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestProjectionPayload::test_decimal_is_serialized_without_float_error",
+    "why": "金额用 float 序列化 ⇒ `Decimal('0.1')` 变 0.1 的二进制近似，同一份业务内容两次算出不同 digest ⇒ AC 3.6 的「相同 projection 幂等复用」永不成立",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.34s",
+    "added": [
+      "test_task15_content_mutation.py::TestProjectionPayload::test_decimal_is_serialized_without_float_error"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestProjectionPayload::test_decimal_is_serialized_without_float_error"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 40.9
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_all_five_writes_share_one_transaction_id",
+    "why": "🔴 **注入**：content version 写完立刻提交 —— 这正是 Requirement 3.1 明令禁止的「先提交 projection-only version，再补 artifact/revision」形态。「五张表同生共死」是否定式承诺，源码里没有语句可短路，只能注入反例（同 Task 12 的 M51 / Task 14 的 M74~M78）。三条独立判据同时红：数据库 xmin 不再全等、after_commit 计数变 2、服务见证与 xmin 不符",
+    "verdict": "RED",
+    "summary": "47 failed, 260 passed, 1 warning in 35.93s",
+    "added": [
+      "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_commit_is_the_only_session_commit_in_the_two_modules",
+      "test_task15_content_mutation_pg.py::TestCustomAuthoritativePath::test_content_version_binds_authoritative_artifact",
+      "test_task15_content_mutation_pg.py::TestCustomAuthoritativePath::test_custom_commit_still_advances_revision_once",
+      "test_task15_content_mutation_pg.py::TestCustomAuthoritativePath::test_custom_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_candidate_is_invisible_to_the_resolver_before_finalize",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_failed_finalize_changes_nothing",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[foreign_path-relative_path]",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[forged_digest-digest]",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_scenarios_are_isolated",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_not_ready_candidate_is_rejected",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_unapproved_bundle_is_not_loadable",
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestNoDoubleRevision::test_every_revision_has_exactly_one_content_version",
+      "test_task15_content_mutation_pg.py::TestNoDoubleRevision::test_second_commit_advances_by_exactly_one",
+      "test_task15_content_mutation_pg.py::TestNoDoubleRevision::test_stale_base_is_rejected",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_event_payload_binds_the_full_identity",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_outbox_row_exists_after_commit_but_unpublished",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_publish_after_commit_marks_the_row",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[cross_entry-PendingMutationScopeError-g7.disclosure.soe]",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[cross_wp-PendingMutationScopeError-\\u8de8",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[expired-PendingMutationExpiredError-\\u5df2\\u8fc7\\u671f]",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[wrong_base-PendingMutationPayloadError-content",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_first_commit_consumed_the_token",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_replay_returns_the_same_version_without_new_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_revision_and_old_rows_untouched",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_no_commit_happened",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_no_new_rows_survived",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_pointer_and_revision_unchanged",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_published_file_survives_as_unreferenced_orphan",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_client_confirmed_base_did_not_advance",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_server_last_applied_advanced",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_all_five_writes_share_one_transaction_id",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_business_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_commit_creates_exactly_one_version_and_one_representation",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_exactly_one_database_commit",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_no_content_version_lacks_a_representation",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_service_witness_agrees_with_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_all_five_writes_share_one_transaction_id",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_exactly_one_database_commit",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_service_witness_agrees_with_database"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 39.5
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+    "why": "🔴 **注入**：往纯表示 finalize 里塞一次 business revision 递增。Property 4 的「纯 template/instrumentation/contract/bundle/representation 变化不得推进 content_revision」是否定式承诺 —— 本条一红即证明 `RevisionLockedRepository` 不是装饰性注释，而是真的把这条路堵死了",
+    "verdict": "RED",
+    "summary": "10 failed, 297 passed, 1 warning in 37.50s",
+    "added": [
+      "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_revision_bump_has_exactly_one_call_site",
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.0
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+    "why": "🔴 **注入**：finalize 中途提交 ⇒ representation/pointer/candidate/outbox 分裂到两个事务。「失败时原 pointer 不变」依赖的正是「它们同生共死」——分裂之后一半提交一半回滚，pointer 会指向一个 candidate 仍是 staged 的世界",
+    "verdict": "RED",
+    "summary": "10 failed, 297 passed, 1 warning in 37.39s",
+    "added": [
+      "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_commit_is_the_only_session_commit_in_the_two_modules",
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.9
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+    "why": "🔴 **注入**：纯表示路径去动 `working_paper.current_content_version_id`。与 M21 分开是为了证明门面挡的**不只是** `bump_content_revision` 一个方法 ——禁用名单三个成员各自可 falsify（M10 管名单本身，M21/M23 管两个真实调用形态）",
+    "verdict": "RED",
+    "summary": "10 failed, 297 passed, 1 warning in 37.24s",
+    "added": [
+      "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_current_content_version_pointer_has_one_call_site",
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.8
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "*",
+    "why": "等价变异（`0 or X` 恒等于 X）—— **刻意**放一条无行为差异的变异做**反向自检**：它必须判 GREEN。若它意外打红，说明测试对源码文本敏感（例如某个守卫在数行数、比字符串），那种判据会随任何无害改动假红。本条是唯一允许 GREEN 的变异，其余任何 GREEN 都是守卫缺陷",
+    "verdict": "GREEN",
+    "summary": "307 passed, 1 warning in 37.09s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 40.7
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message",
+    "why": "pending mutation 的 entry scope 校验被短路 ⇒ 另一个 entry 的 token 可以用来提交本 entry 的内容（Property 10 的「token 跨 scope 必须拒绝」）。改**一个条件行**而不是整个多行 `if`：后者会破坏续行语法 ⇒ collect ERROR。🔴 判据靠 `cross_entry` 这条**仅 entry 不同**的 token：首轮只有一条 wp 与 entry 同时不同的 token，短路 entry 那一项后 wp 那一项照样拦下、异常类型与文案都不变 ⇒ 判 GREEN。拆成 cross_wp / cross_entry 两条后，entry 合取项被短路时拒绝理由退化成 `PendingMutationPayloadError`，参数化用例必红",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.20s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[cross_entry-PendingMutationScopeError-g7.disclosure.soe]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[cross_entry-PendingMutationScopeError-g7.disclosure.soe]"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.9
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message",
+    "why": "过期 token 仍可消费 ⇒ 短 TTL 形同虚设（Property 10 的「过期必须拒绝」）。守卫按**三条各自的异常类型 + 各自文案**断言，因此本条与 M25/M27 互不遮蔽",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.35s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[expired-PendingMutationExpiredError-\\u5df2\\u8fc7\\u671f]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[expired-PendingMutationExpiredError-\\u5df2\\u8fc7\\u671f]"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.0
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message",
+    "why": "同 Idempotency-Key 不同 content base 被放过 ⇒ 旧 base 的 payload 可以盖掉新内容（Property 10 的「同 key 不同 payload 必须拒绝」）",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.35s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[wrong_base-PendingMutationPayloadError-content"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[wrong_base-PendingMutationPayloadError-content"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.0
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_replay_returns_the_same_version_without_new_revision",
+    "why": "已 committed 的 token 不再走重放分支 ⇒ 重复请求会**再提交一次**并推进第二个revision。这是 Property 10 的核心：重复请求返回同 operation/version/room",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 37.22s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_replay_returns_the_same_version_without_new_revision"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_replay_returns_the_same_version_without_new_revision"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.8
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+    "why": "generation 恒为 1 ⇒ 同一 content version 的第二代与第一代撞 `uq_wpcr_generation`。真实后果不是「报错」而是**升级永远做不成**，而 revision 相同 ⇒ 事后从数字上看不出这一代丢了",
+    "verdict": "RED",
+    "summary": "9 failed, 298 passed, 1 warning in 37.45s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 41.0
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected",
+    "why": "staged candidate 与 DB 登记 artifact 的**路径**不再比对 ⇒ 可以拿另一个candidate 目录里的 artifact finalize 本 candidate，representation 记的artifact 与等值报告对不上。🔴 两轮修正：首轮 want 写 `*` 判 GREEN（无任何用例真的喂错 artifact）；补了「喂另一份 candidate 字节」后仍 GREEN —— 因为那样路径与 digest **同时**不符，紧随其后的 digest 判据顶上来，异常类型与文案都不变。最终反例是「同字节、异路径」的孪生 candidate，只有路径这一条不符，短路它即 finalize 成功",
+    "verdict": "RED",
+    "summary": "11 failed, 296 passed, 1 warning in 36.87s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[foreign_path-relative_path]",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[forged_digest-digest]",
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[foreign_path-relative_path]",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[forged_digest-digest]"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 40.3
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected",
+    "why": "artifact **digest** 不再比对 ⇒ 路径对但内容被换掉的 artifact 也能 finalize。与 M30 成对：那条管路径、本条管 digest，反例是「真路径 + 伪 digest」的 `forged_digest` 场景。写 `if False and (` 而不是 `if False:` —— 该 `if` 是**多行**条件，整行换成 `if False:` 会让第二行成为悬空表达式 ⇒ SyntaxError ⇒ collect ERROR ⇒ 判定退化成 GREEN（M15 踩过同一个坑）；`False and (…)` 让两个合取项同时失效且语法合法",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 35.56s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[forged_digest-digest]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[forged_digest-digest]"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.9
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestFinalizeGate::test_not_ready_candidate_is_rejected",
+    "why": "短路「缺 approved per-entry contract」这条前置 ⇒ 拒绝理由变成下一条（缺 bundle）。守卫断言拒绝**文案里含 contract**，因此本条打红即证明：「未 ready 被拒」这条判据落在**正确的原因**上，而不是「随便抛了个异常」（Task 12 的 M34、Task 14 的 M71/M72 是同一个遮蔽形态）",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 35.38s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_not_ready_candidate_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_not_ready_candidate_is_rejected"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.6
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestEventPayload::test_business_commit_payload_has_design_required_keys",
+    "why": "业务 commit 的事件自报「revision 没变」⇒ 下游不会刷新真正变了的内容。这个标记是「同一个事件类型既来自业务应用又来自纯表示升级」的唯一区分手段",
+    "verdict": "RED",
+    "summary": "2 failed, 305 passed, 1 warning in 35.85s",
+    "added": [
+      "test_task15_content_mutation.py::TestEventPayload::test_business_commit_payload_has_design_required_keys",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_event_payload_binds_the_full_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestEventPayload::test_business_commit_payload_has_design_required_keys",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_event_payload_binds_the_full_identity"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 39.4
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestEventPayload::test_definition_upgrade_payload_marks_revision_unchanged",
+    "why": "纯表示升级的事件自报「revision 变了」⇒ 下游把一次隐形模板升级当成业务改动推给审计师（并可能触发不必要的重载/重算）",
+    "verdict": "RED",
+    "summary": "2 failed, 305 passed, 1 warning in 35.25s",
+    "added": [
+      "test_task15_content_mutation.py::TestEventPayload::test_definition_upgrade_payload_marks_revision_unchanged",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestEventPayload::test_definition_upgrade_payload_marks_revision_unchanged",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestEventPayload::test_event_type_exists_and_matches_design",
+    "why": "必填键清单与 design §outbox 漂移 ⇒ 「payload 有哪些键」失去单一真源。守卫直接从 design.md 的 JSON 块解析键集合做双向比对，因此改代码常量或改 design 任一侧都会红",
+    "verdict": "RED",
+    "summary": "3 failed, 304 passed, 1 warning in 35.47s",
+    "added": [
+      "test_task15_content_mutation.py::TestEventPayload::test_business_commit_payload_has_design_required_keys",
+      "test_task15_content_mutation.py::TestEventPayload::test_definition_upgrade_payload_marks_revision_unchanged",
+      "test_task15_content_mutation.py::TestEventPayload::test_event_type_exists_and_matches_design"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestEventPayload::test_business_commit_payload_has_design_required_keys",
+      "test_task15_content_mutation.py::TestEventPayload::test_event_type_exists_and_matches_design"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 38.8
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+    "why": "纯表示升级被记成 `content_commit` ⇒ 审计轨迹里「这一代是业务改动还是隐形模板升级」永久分不开，而 revision 恰好相同、事后无法从数字上区分",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 39.06s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 42.8
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason",
+    "why": "refresh 不留原因 ⇒ 审计师看到「要求重开编辑器」却查不到为什么。V151 的 `ck_wpoor_refresh_reason` 是第二道锁，本条同时验证服务层与 DB 层",
+    "verdict": "RED",
+    "summary": "4 failed, 303 passed, 1 warning in 38.71s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_server_last_applied_advanced"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 42.5
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+    "why": "merged≠incoming 时不再要求重载 ⇒ live editor 仍持有旧 incoming，下一次 forcesave 会用旧基线把服务器合并结果**回退**（AC 2.9 的核心风险）",
+    "verdict": "RED",
+    "summary": "2 failed, 305 passed, 1 warning in 38.34s",
+    "added": [
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason"
+    ],
+    "added_files": [
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 42.1
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_revision_bump_has_exactly_one_call_site",
+    "why": "🔴 **注入**：在同一个模块里加第二条 revision 递增调用点。Property 61 的「所有 writer 进入唯一 revision 域」是否定式承诺 —— 判据是「`bump_content_revision(` 在 backend/app 里恰一处调用」，多一处即第二个 revision 域。刻意包在 `if False:` 里：真执行会报 AttributeError，判定会退化成 WRONG-TEST 而不是 RED（也顺带证明判据扫的是源码结构）。锚点**不能**是 `class ContentMutationService:` —— insert 落在类语句之后会让原类体前多出一个顶层 class，类体缺失 ⇒ IndentationError ⇒ 文件级 collect ERROR ⇒ 判定报 GREEN（首轮实测的假象）。改锚 `__all__` 的收尾 `]`：那里是模块顶层语句边界，注入的顶层 class 语法合法，`scope_check` 再断言它确实落在第 0 列",
+    "verdict": "RED",
+    "summary": "1 failed, 306 passed, 1 warning in 38.29s",
+    "added": [
+      "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_revision_bump_has_exactly_one_call_site"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task15_content_mutation.py::TestProperty61SingleRevisionDomain::test_revision_bump_has_exactly_one_call_site"
+    ],
+    "added_files": [
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 42.0
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_exactly_one_production_consumer",
+    "why": "退役登记指向错误模块 ⇒ 「消费方恰一个且是唯一 commit 入口」这条翻转后的边界判据失去正确期望值。Task 14 的边界没有因为退役而被弱化：期望值来自登记表，登记表错了就红",
+    "verdict": "RED",
+    "summary": "2 failed, 305 passed, 1 warning in 38.03s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_exactly_one_production_consumer",
+      "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_exactly_one_production_consumer",
+      "test_task15_content_mutation.py::TestTask15ScopeBoundary::test_merge_domain_deferral_is_retired"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py",
+      "test_task15_content_mutation.py"
+    ],
+    "restored": true,
+    "seconds": 41.8
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_exactly_one_production_consumer",
+    "why": "🔴 删掉唯一消费方的 import ⇒ merge 域退回**零生产消费方**（Task 14 交付时的假绿第①源：additive 死代码）。这条证明翻转后的判据两侧都可 falsify ——M39 管「换了模块」、M78（Task 14 脚本）管「多了一个」、本条管「零个」",
+    "verdict": "RED",
+    "summary": "56 failed, 251 passed, 1 warning in 41.38s",
+    "added": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_exactly_one_production_consumer",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_identical_projections_pass",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_illegal_numeric_representation_is_not_silently_equal",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_property_amount_roundtrip_is_format_insensitive",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_three_failure_reasons_have_distinct_messages",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_typed_equality_tolerates_formatting",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_value_drift_is_rejected",
+      "test_task15_content_mutation.py::TestRoundtripEquivalence::test_word_only_fields_are_excluded",
+      "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_successful_stage_publishes_both_artifacts",
+      "test_task15_content_mutation.py::TestStageAndVerifyWithRealFiles::test_unmanaged_region_drift_blocks_commit",
+      "test_task15_content_mutation_pg.py::TestCustomAuthoritativePath::test_content_version_binds_authoritative_artifact",
+      "test_task15_content_mutation_pg.py::TestCustomAuthoritativePath::test_custom_commit_still_advances_revision_once",
+      "test_task15_content_mutation_pg.py::TestCustomAuthoritativePath::test_custom_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_candidate_is_invisible_to_the_resolver_before_finalize",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_failed_finalize_changes_nothing",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[foreign_path-relative_path]",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_artifact_is_rejected[forged_digest-digest]",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_foreign_candidate_scenarios_are_isolated",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_not_ready_candidate_is_rejected",
+      "test_task15_content_mutation_pg.py::TestFinalizeGate::test_unapproved_bundle_is_not_loadable",
+      "test_task15_content_mutation_pg.py::TestHarness::test_no_harness_errors",
+      "test_task15_content_mutation_pg.py::TestNoDoubleRevision::test_every_revision_has_exactly_one_content_version",
+      "test_task15_content_mutation_pg.py::TestNoDoubleRevision::test_second_commit_advances_by_exactly_one",
+      "test_task15_content_mutation_pg.py::TestNoDoubleRevision::test_stale_base_is_rejected",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_event_payload_binds_the_full_identity",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_outbox_row_exists_after_commit_but_unpublished",
+      "test_task15_content_mutation_pg.py::TestOutboxInSameTransaction::test_publish_after_commit_marks_the_row",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[cross_entry-PendingMutationScopeError-g7.disclosure.soe]",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[cross_wp-PendingMutationScopeError-\\u8de8",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[expired-PendingMutationExpiredError-\\u5df2\\u8fc7\\u671f]",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_each_rejection_has_its_own_type_and_message[wrong_base-PendingMutationPayloadError-content",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_first_commit_consumed_the_token",
+      "test_task15_content_mutation_pg.py::TestProperty10Idempotency::test_replay_returns_the_same_version_without_new_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_candidate_row_records_the_finalized_representation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_entry_pointer_moved_to_the_new_generation",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_is_one_transaction",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_finalize_succeeded",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_generation_bound_to_the_same_content_version",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_new_representation_is_recorded_as_definition_upgrade",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_resolver_switches_to_the_new_generation_at_same_revision",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_revision_and_old_rows_untouched",
+      "test_task15_content_mutation_pg.py::TestRepresentationFinalizeIsAdditiveOnly::test_upgrade_event_declares_revision_unchanged",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_no_commit_happened",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_no_new_rows_survived",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_pointer_and_revision_unchanged",
+      "test_task15_content_mutation_pg.py::TestRollbackLeavesInvisibleOrphan::test_published_file_survives_as_unreferenced_orphan",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_client_confirmed_base_did_not_advance",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_room_entered_refresh_required_with_a_reason",
+      "test_task15_content_mutation_pg.py::TestRoomBaselines::test_server_last_applied_advanced",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_all_five_writes_share_one_transaction_id",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_business_commit_succeeded",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_commit_creates_exactly_one_version_and_one_representation",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_exactly_one_database_commit",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_no_content_version_lacks_a_representation",
+      "test_task15_content_mutation_pg.py::TestSingleTransactionAtomicity::test_service_witness_agrees_with_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_has_exactly_one_production_consumer"
+    ],
+    "added_files": [
+      "test_task14_merge_conflicts.py",
+      "test_task15_content_mutation.py",
+      "test_task15_content_mutation_pg.py"
+    ],
+    "restored": true,
+    "seconds": 45.1
+  }
+]

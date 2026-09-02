@@ -16,6 +16,7 @@
         <span v-if="healthTag" class="h2-oo-tag" :class="`h2-oo-tag--${healthTag.type}`">
           {{ healthTag.text }}
         </span>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h2-construction-in-progress" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -324,6 +325,7 @@ import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H2TabIndex 非 lazy（底稿目录轻量，首屏必显）

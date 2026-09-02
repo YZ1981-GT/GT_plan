@@ -1,0 +1,281 @@
+[
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "candidate bundle 也能进 evidence ⇒ AC 12.1 的「approved non-null bundle」空转",
+    "verdict": "RED",
+    "summary": "2 failed, 103 passed in 10.87s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_candidate_bundle_is_refused_by_the_harness_itself"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestPlanIsDerivedFromSourceFacts::test_candidate_bundle_is_refused_by_the_harness_itself"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "🔴 authority model 不再从 definition 行解析而是写死 ⇒ 「未知枚举或自由文本豁免fail closed」空转，任何入口都能拿到 opaque 从而少跑两个字段级场景",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.85s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "bundle 的 authority child 可以是 contract/template ⇒ authority model 的身份来源被打通，`authority_model_type` 恒为 NULL 也不再报",
+    "verdict": "GREEN",
+    "summary": "105 passed in 10.80s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "authority model definition 未 approved 也放行 ⇒ AC 6.2 的「独立先行批准」空转",
+    "verdict": "GREEN",
+    "summary": "105 passed in 10.85s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "plan 与 run 的 bundle 可以不一致 ⇒ 落库证据声称「按 bundle A 验的」，判定其实按 bundle B 的 required set 做（跨 bundle 复用，Property 70）",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.90s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "authority model digest 可以不一致 ⇒ 字段级两场景是否被替换与落库声明脱钩",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.93s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.4
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "已 finalize 的 run 还能追加场景 ⇒ 可以先 finalize 成 passed 再补一条失败场景",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.76s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed",
+    "why": "🔴 aggregate_result 不再由服务端重算决定 ⇒ 一个全 unverifiable 的 run 也会落 passed，平台可以自称双向回写已通过",
+    "verdict": "RED",
+    "summary": "2 failed, 103 passed in 10.73s",
+    "added": [
+      "test_task39_pilot_harness.py::TestResultCannotBeHandFilled::test_finalize_writes_only_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestResultCannotBeHandFilled::test_finalize_writes_only_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result",
+    "why": "finished_at 不落 ⇒ V151 的 `ck_wpstr_result_requires_finish` 会拒非 unverified结果，且「已完成但未通过」与「还没跑」在库里同形",
+    "verdict": "RED",
+    "summary": "10 failed, 95 passed in 10.88s",
+    "added": [
+      "test_task39_pilot_harness.py::TestResultCannotBeHandFilled::test_finalize_writes_only_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_the_recomputer_saw_the_full_required_set",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_a_run_assessed_against_its_own_bundle_is_not_stale",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_baseline_has_no_bundle_stale_reason",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_source_commit_change_still_flows_from_the_recomputer",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestResultCannotBeHandFilled::test_finalize_writes_only_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_run_starts_unverified_with_no_finish_time",
+    "why": "run 一开就是 passed ⇒ 「开了但没跑完」的 run 直接计入已验收",
+    "verdict": "RED",
+    "summary": "21 failed, 84 passed in 8.31s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_the_recomputer_saw_the_full_required_set",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_a_run_assessed_against_its_own_bundle_is_not_stale",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_baseline_has_no_bundle_stale_reason",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_source_commit_change_still_flows_from_the_recomputer",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_identity_columns_are_derived_not_supplied",
+      "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_run_starts_unverified_with_no_finish_time",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_every_required_scenario_got_its_own_row",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_scenario_kind_domain_is_accepted_by_v151",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_upstream_gap_scenarios_are_failed_with_task32_attribution",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_outside_the_required_set_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_without_a_trace_bundle_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_download_only_with_entities_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_run_starts_unverified_with_no_finish_time"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_identity_columns_are_derived_not_supplied",
+    "why": "required set digest 不再由推导写入 ⇒ AC 14.16 的「scenario set 变化即 stale」失去锚点（旧 evidence 永远新鲜）",
+    "verdict": "RED",
+    "summary": "21 failed, 84 passed in 8.29s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_the_recomputer_saw_the_full_required_set",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_a_run_assessed_against_its_own_bundle_is_not_stale",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_baseline_has_no_bundle_stale_reason",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_source_commit_change_still_flows_from_the_recomputer",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_identity_columns_are_derived_not_supplied",
+      "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_run_starts_unverified_with_no_finish_time",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_every_required_scenario_got_its_own_row",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_scenario_kind_domain_is_accepted_by_v151",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_upstream_gap_scenarios_are_failed_with_task32_attribution",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_outside_the_required_set_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_without_a_trace_bundle_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_download_only_with_entities_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestOpenRunFreezesDerivedIdentity::test_identity_columns_are_derived_not_supplied"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestResultCannotBeHandFilled::test_open_run_refuses_a_mismatched_runner_identity",
+    "why": "runner 身份不再自洽校验 ⇒ 每个 run 一开始就 stale（runner_changed），而 stale 的 run 不参与已验收计数 ⇒ 「跑了但永远不算」变成静默状态",
+    "verdict": "GREEN",
+    "summary": "105 passed in 10.97s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.4
+  }
+]

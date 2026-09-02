@@ -27,7 +27,7 @@ if "%PY%"=="" if exist "%BACKEND_DIR%\.venv\Scripts\python.exe" set "PY=%BACKEND
 if "%PY%"=="" ( where python >nul 2>nul && set "PY=python" )
 if "%PY%"=="" ( echo [ERROR] Python not found & exit /b 1 )
 
-:: --- git mode 提示（repo-git-workflow-unification spec）---
+REM --- git mode ---
 if not defined GIT_MODE set "GIT_MODE=single"
 echo [GT] GIT_MODE=%GIT_MODE% (single=单用户快节奏 / multi=多用户严格 PR)
 if "%GIT_MODE%"=="multi" echo [GT] 多用户模式：直推 main 拒绝，必走 PR
@@ -48,6 +48,9 @@ call :kill_port %BACKEND_PORT%
 call :kill_port %FRONTEND_PORT%
 call :kill_port %DSH_PORT%
 timeout /t 1 /nobreak >nul
+REM strictPort: vite exits if port is taken (no drift to 3031).
+REM Port may linger after taskkill; wait explicitly.
+call :wait_port_free %FRONTEND_PORT%
 echo       Done.
 
 :: ─── [2/5] start backend ─────────────────────────────────────
@@ -75,20 +78,20 @@ if !READY!==0 (
   echo       [WARN] Backend not responding after 30s.
 )
 
-:: ─── [3.5] DSH SDK runtime check (Task 30: no longer starts Web UI iframe) ───
-:: 🔴 dsh-agent-panel-integration Task 30: 启动脚本不再为 iframe 启动 DSH Web UI。
-:: DSH 多步 Agent 通过平台后端 DshEngine（per-run subprocess）执行，不需要独立 Web UI。
-:: 只检查 SDK vendor 目录存在性作为开发提示。
+:: ─── [3.5] DSH SDK runtime check ───
+REM dsh-agent-panel-integration Task 30: launcher no longer starts DSH Web UI for iframe.
+REM DSH Agent runs via platform backend DshEngine (per-run subprocess), no standalone Web UI needed.
+REM Only check SDK vendor dir existence as a dev hint.
 if exist "%DSH_DIR%\python\sdk-runtime" (
   echo [3.5] DSH SDK runtime detected at %DSH_DIR% (vendor read-only).
   echo       DSH Agent runs via platform backend DshEngine (per-run subprocess).
 ) else (
-  echo [3.5] DSH SDK not found at %DSH_DIR% — DSH Agent 不可用 (native engine only).
+  echo [3.5] DSH SDK not found at %DSH_DIR% — DSH Agent unavailable (native engine only).
 )
 
 :: ─── [4/5] start frontend ────────────────────────────────────
 echo [4/5] Starting frontend on :%FRONTEND_PORT% ...
-:: 用 127.0.0.1 而非 localhost：后端仅监听 IPv4，localhost 会先试 IPv6 ::1 → 每请求 +2s
+REM Use 127.0.0.1 instead of localhost: backend listens IPv4 only, localhost may try IPv6 first
 start "%FRONTEND_TITLE%" /min cmd /k "title %FRONTEND_TITLE% && cd /d "%FRONTEND_DIR%" && set VITE_API_BASE_URL=http://127.0.0.1:%BACKEND_PORT% && set VITE_DSH_URL=http://127.0.0.1:%DSH_PORT% && set VITE_DEV_PORT=%FRONTEND_PORT% && npm run dev"
 
 :: ─── [5/5] wait for frontend ─────────────────────────────────
@@ -139,4 +142,17 @@ exit /b 0
 for /f %%P in ('powershell -NoProfile -Command "$ErrorActionPreference='SilentlyContinue'; Get-NetTCPConnection -LocalPort %~1 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { $_ }"') do (
   taskkill /PID %%P /F >nul 2>nul
 )
+exit /b 0
+
+:wait_port_free
+REM Wait until the specified port has no listener (max ~4s).
+REM After taskkill the socket may not release immediately;
+REM vite with strictPort will exit if the port is still occupied.
+REM Perf constraints:
+REM   1. Polling must stay in one powershell invocation (bat for-loop restarts PS each iter ~2s)
+REM   2. Cannot use Get-NetTCPConnection (CIM query, ~1.2s per call)
+REM   3. Cannot use TcpListener bind (only binds one address family, may give false result)
+REM GetActiveTcpListeners() is a pure .NET call (ms-level) returning all address families.
+powershell -NoProfile -Command "$p=[System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties(); for ($i=0; $i -lt 20; $i++) { if (-not ($p.GetActiveTcpListeners() | Where-Object { $_.Port -eq %~1 })) { exit 0 }; Start-Sleep -Milliseconds 200 }; exit 1" >nul 2>nul
+if not "!errorlevel!"=="0" echo       [WARN] Port %~1 still occupied, frontend may fail to start.
 exit /b 0

@@ -127,9 +127,9 @@ async def _gate_editor(
 
 
 def _onlyoffice_storage_dir(project_id: UUID) -> Path:
-    """项目级 OnlyOffice 编辑文件存储目录"""
-    root = Path(settings.STORAGE_ROOT)
-    return root / "projects" / str(project_id) / "workpapers" / "onlyoffice"
+    """项目级 OO 目录 —— 段名/绝对化委派 canonical_paths（Task 58 / Req 9.3 见该模块）。"""
+    from app.services.workpaper_sync.canonical_paths import onlyoffice_canonical_dir
+    return onlyoffice_canonical_dir(project_id)
 
 
 async def _load_wp_or_404(db: AsyncSession, wp_id: UUID) -> tuple[WorkingPaper, str]:
@@ -372,11 +372,16 @@ def _ensure_all_sheets_visible(file_path: Path) -> None:
         logger.warning("_ensure_all_sheets_visible failed for %s: %s", file_path.name, e)
 
 
-def _generate_doc_key(file_path: Path, wp_code: str) -> str:
-    """doc_key = hash(wp_code + mtime_ns)。同 wp_code 所有 sheet 共享同一 key。"""
-    stat = file_path.stat()
-    raw = f"{wp_code}:{stat.st_mtime_ns}"
-    return hashlib.md5(raw.encode()).hexdigest()
+# doc_key 不再由本模块生成。
+#
+# 旧实现是 `md5(wp_code + st_mtime_ns)`：任何一次写盘（包括下面那次 sheet 可见性改写）
+# 都会轮转 doc_key，OO 于是把它当成另一个文档 —— 进行中的协同会话被切断，且两个用户在
+# 不同时刻打开同一底稿会各自进一间房，最后保存的人静默覆盖另一个人的全部改动。
+#
+# 现在由 `app.services.onlyoffice_room_identity` 从 room 身份 `(wp_id, entry_id,
+# generation)` 派生（Task 21 / AC 2.7 / Property 6）。sheet 名与「完整 Excel」视图算在
+# entry_id 里，所以切换 sheet 仍然换 key、仍会重新下载；变化的只是「同一视图反复打开
+# 不再无谓轮转」。**不留 mtime fallback**（design §wp_onlyoffice_router）。
 
 
 def _rewrite_onlyoffice_download_url(url: str) -> str:
@@ -690,8 +695,13 @@ async def get_sheet_onlyoffice_config(
     ):
         _ensure_all_sheets_visible(file_path)
 
-    # 4. 生成 doc_key
-    doc_key = _generate_doc_key(file_path, _sheet_wp_code)
+    # 4. room 身份派生 doc_key（Task 21：与 mtime/路径/用户全部无关）
+    from app.services import onlyoffice_room_identity as _room_identity
+
+    _room_entry_id = _room_identity.sheet_entry_id(
+        wp_code=_sheet_wp_code, sheet_name=sheet_name, whole_workbook=whole_workbook
+    )
+    doc_key = await _room_identity.resolve_room_doc_key(db, wp_id=wp_id, entry_id=_room_entry_id)
 
     # 5. 构建 URL（download_url 嵌全 claim 有限时效签名 token，Req 10.1/10.10）
     base_url = settings.ONLYOFFICE_CALLBACK_BASE or str(request.base_url).rstrip("/")
@@ -1081,6 +1091,37 @@ def _verify_callback_jwt(request: Request) -> bool:
         return False
 
 
+def _has_room_bound_callback_query(request: Request) -> bool:
+    """URL 是否带齐 room/generation/doc_key/route_credential 四项绑定 query。
+
+    参数名从 `callback_route.URL_BOUND_PARAMS` **读取**而不是在此重写一份：
+    两处各写一份清单时，新增一项绑定会让委派判据静默漏掉新式 callback，
+    于是它落进 legacy 分支被按 sheet 名覆盖文件 —— 而两边的单测都绿。
+    """
+    from app.services.workpaper_sync.callback_route import URL_BOUND_PARAMS
+
+    query = request.query_params
+    return all(str(query.get(name) or "").strip() for name in URL_BOUND_PARAMS)
+
+
+async def _delegate_room_bound_callback(request: Request, db: AsyncSession) -> dict:
+    """新式 callback **只**委派 Task 22 的 `CallbackDeliveryService`。
+
+    本函数刻意不做任何判定：不 `jwt.decode`、不比 doc_key、不判 status 语义、
+    不把 URL 里的 participant hint 当作者 —— 全部在
+    `callback_route.verify_callback_route` 与 delivery service 内。
+    """
+    from app.routers.wp_sync_router import post_room_onlyoffice_callback
+
+    raw_room = str(request.query_params.get("room_id") or "").strip()
+    try:
+        room_id = UUID(raw_room)
+    except (ValueError, TypeError):
+        logger.warning("新式 callback 的 room_id=%r 非法 UUID", raw_room)
+        return {"error": 1}
+    return await post_room_onlyoffice_callback(room_id=room_id, request=request, db=db)
+
+
 # 🔴 OnlyOffice DocServer 回调端点：用 OnlyOffice callback JWT 自校验（无用户 Bearer）。
 # 同 wopi/contents，必须挂 public_router 绕过 dedicated_wp_gate，否则保存回写恒 401。
 @public_router.post("/{wp_id}/sheets/{sheet_name}/onlyoffice-callback")
@@ -1103,7 +1144,27 @@ async def post_sheet_onlyoffice_callback(
     注意：此端点不做用户鉴权（由 OnlyOffice 容器内部调用），
     安全性由 JWT 签名验证 + 内网隔离保障。
     必须始终返回 {"error": 0} 确认收到（OnlyOffice 协议要求）。
+
+    ═══ 兼容委派（spec workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 28）═══
+
+    design §「callback compatibility 与真值表」要求**现有 callback URL 保持兼容**，
+    但由 room/generation/doc_key/route_credential 四项绑定签发的新式 callback
+    （`callback_route.build_callback_url` 产出）**只**委派新服务
+    （`CallbackDeliveryService`），本函数下方的 legacy 逻辑一行都不跑。
+
+    判据是 URL 的四项绑定 query 是否齐备 —— 那是 `assert_url_binding` 校验的同一组
+    参数名（`callback_route.URL_BOUND_PARAMS`，单一真源）。legacy 编辑器签发的 URL
+    没有这四项，因此其行为逐字节不变（本改动对 legacy 路径是**纯增量**）。
+
+    ⚠️ 尚未收口：把 legacy 分支整体删掉、让本端点**无条件**只委派，取决于
+    `get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `get_whole_excel_grid`
+    三条 resolver 行先迁到 room/staged representation substrate —— 那是 **Task 30**
+    的 `multi_resolver` gate 明文承接的范围（自 Task 20 移交）。在它们仍是
+    `status=deferred` 之前无条件委派会让 legacy 编辑器的保存直接失效。
     """
+    if _has_room_bound_callback_query(request):
+        return await _delegate_room_bound_callback(request, db)
+
     # 1. JWT 验证（若配置了 secret）
     if not _verify_callback_jwt(request):
         logger.warning(
@@ -1235,8 +1296,23 @@ async def post_sheet_onlyoffice_callback(
         if _custom_target is not None:
             target = _custom_target
         elif is_word_template:
-            # word-template: 保存到 storage/{project_id}/workpapers/{wp_code}.docx
-            target = Path(f"storage/{project_id}/workpapers/{wp_code}.docx")
+            # 🔴 Task 58 / Requirement 9.3 / Property 39：word-template 落盘目标必须
+            # 与 config / download 读侧解析到**同一** canonical path。
+            #
+            # 原实现是 `Path(f"storage/{project_id}/workpapers/{wp_code}.docx")` ——
+            # 缺 `projects/` 与 `onlyoffice/` 两段、且是**相对 CWD** 的路径。读侧走
+            # `_onlyoffice_storage_dir()`（`.../projects/{pid}/workpapers/onlyoffice/`）
+            # ⇒ 写进去的文件读侧永远看不到，表现为「OO 里保存成功，重开又是旧的」。
+            # 2026-08-29 磁盘实测：孤儿根下共 159 份 docx，读侧目录只有 16 份。
+            #
+            # 现在统一走 `word_canonical_write_target()`，它内部就是
+            # `WordCanonicalResolver.resolve(intent=callback)`，与 config/download/
+            # materialize/extract 共用同一个解析函数（意图只决定权限，不决定路径）。
+            from app.services.workpaper_sync.word_resolution import (
+                word_canonical_write_target,
+            )
+
+            target = word_canonical_write_target(project_id, _save_wp_code or wp_code)
         else:
             # 按模板实际扩展名落盘（F2-22 为 docx，不得硬编码 xlsx）
             target = _oo_dir / f"{_save_wp_code}{_save_ext}"
@@ -1244,12 +1320,25 @@ async def post_sheet_onlyoffice_callback(
         try:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_bytes(file_bytes)
+            # 文件生命周期版本（`file_version`）—— 本路径**自己**的所有者。
+            #
+            # Task 18 / Requirement 2.1 / 2.12：原来由共享的 `orchestrator.after_save`
+            # 递增。那个 handler 必须可重放（Requirement 2.12），因此不能持有任何版本域
+            # ——重放一次就多一个伪版本。真正知道「文件被换了」的只有这一行紧邻的
+            # `write_bytes`，所以所有者落在这里。
+            #
+            # 业务内容版本（`content_revision`）不在这里推进：OO callback 迁入
+            # `ContentMutationService` 是 Task 19/22 的活，它要先有 durable incoming、
+            # extract、三方 merge 与 canonical rematerialize 才能算「一次业务内容应用」。
+            wp.file_version = (wp.file_version or 0) + 1
             logger.info(
-                "OnlyOffice callback: 文件已保存 wp_id=%s sheet=%s path=%s size=%d",
+                "OnlyOffice callback: 文件已保存 wp_id=%s sheet=%s path=%s size=%d "
+                "file_version=%s",
                 wp_id,
                 sheet_name,
                 target,
                 len(file_bytes),
+                wp.file_version,
             )
         except Exception as exc:
             logger.error(
@@ -1422,9 +1511,19 @@ async def post_sheet_onlyoffice_callback(
 
             await release_session(user_id, doc_key)
 
-        # 统一后处理 — orchestrator 负责 file_version++, prefill_stale, audit log, event_bus
+        # 统一后处理 — orchestrator 负责 file_version++, prefill_stale, audit log,
+        # 以及耐久 outbox 入队（同事务不发布），commit 后再 publish_pending。
+        #
+        # Task 16 / Requirement 13.4：这一处**必须**保留 try/except 并且仍然返回
+        # error=0 —— design.md「明确拒绝的方案 §8」说明白了：文件已经耐久保存后再给
+        # OnlyOffice 返回非零会让它重发 callback，制造重复 delivery 与重复版本。所以这
+        # 里的正确形态是"ack OO + 把失败记成 ERROR"，而不是原来的 warning。
+        # 事件本身不再依赖这个 except：after_save 已经把 WORKPAPER_SAVED 写成耐久
+        # outbox 行，只要事务提交成功，outbox_replay_worker 就会把它发出去。
+        # 真正的失败恢复台账（callback recovery case）由 Task 22 建立。
         try:
             from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
+            from app.services.workpaper_sync.outbox import DurableEventOutboxService
 
             # 创建虚拟 user 对象（callback 来自 OO 容器，非真实用户请求）
             class _CallbackUser:
@@ -1440,11 +1539,17 @@ async def post_sheet_onlyoffice_callback(
                 },
             )
             await db.commit()
+            await DurableEventOutboxService.publish_pending(db)
         except Exception as exc:
-            logger.warning(
-                "orchestrator.after_save failed in onlyoffice_callback wp=%s: %s",
-                wp_id, exc,
+            logger.error(
+                "orchestrator.after_save failed in onlyoffice_callback wp=%s "
+                "(文件已耐久保存，仍向 OO 返回 error=0 避免重发): %s",
+                wp_id, exc, exc_info=True,
             )
+            try:
+                await db.rollback()
+            except Exception:  # pragma: no cover - 回滚失败时 session 已不可用
+                logger.error("onlyoffice callback: rollback 失败 wp=%s", wp_id, exc_info=True)
 
         return {"error": 0}
 

@@ -8,6 +8,7 @@
       <div v-if="showModeToolbar" class="d6-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
         <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d6-contract-assets" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -205,6 +206,7 @@ import { useD6ReviewThreads } from './composables/useD6ReviewThreads'
 import D6TabIndex from './d6/D6TabIndex.vue'
 import D6TabProcedure from './d6/D6TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const D6TabAdjudication = defineAsyncComponent(() => import('./d6/D6TabAdjudication.vue'))
 const D6TabDetail = defineAsyncComponent(() => import('./d6/D6TabDetail.vue'))

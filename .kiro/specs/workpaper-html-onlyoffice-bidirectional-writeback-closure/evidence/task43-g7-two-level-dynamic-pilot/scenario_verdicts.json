@@ -1,0 +1,372 @@
+{
+  "aggregate_result": "failed (含 UNVERIFIABLE 黑盒场景，无一条 passed)",
+  "environment": {
+    "browser_build": "NOT-EXECUTED",
+    "onlyoffice_build": "NOT-EXECUTED",
+    "why": "真实 OO 未执行 ⇒ 一律走 NOT_EXECUTED 哨兵。Property 49：probe/pilot 未实际通过时必须保持 UNVERIFIABLE，不得因文档声明计为通过"
+  },
+  "error_code_distribution": {
+    "evidence_input_missing": 11,
+    "real_onlyoffice_not_executed": 10,
+    "scenario_kind_unrepresentable": 1,
+    "upstream_gap": 2
+  },
+  "ordering": {
+    "black_box_branch_line": 32,
+    "black_box_error_code": "real_onlyoffice_not_executed",
+    "black_box_outcome": "unverifiable",
+    "upstream_debt_branch_line": 28,
+    "upstream_gap_decided_before_black_box": true,
+    "upstream_gap_error_code": "upstream_gap",
+    "upstream_gap_outcome": "failed",
+    "why": "顺序不可交换：把 upstream_debt 放到 black-box 之后，缺实现的场景在没有 OO 的环境里会显示成 unverifiable ⇒ 将来接上真实 OO 会把它们**自动刷绿**，而它们其实永远不会通过"
+  },
+  "passed_count": 0,
+  "property_oracle_landing": {
+    "P22": [
+      "different_field_merge"
+    ],
+    "P28": [
+      "oo_to_html",
+      "html_to_oo"
+    ],
+    "P49": [
+      "identity_retention"
+    ],
+    "P66": [
+      "identity_retention"
+    ],
+    "P69": [
+      "single_participant_close"
+    ]
+  },
+  "result_distribution": {
+    "failed": 2,
+    "unverifiable": 22
+  },
+  "scenarios": {
+    "authorization_first_recovery_claim": {
+      "error_code": "evidence_input_missing",
+      "family": "recovery",
+      "needs_black_box": false,
+      "requirement": "5.8",
+      "requires": [
+        "db_entities",
+        "recovery_lifecycle",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "b_close_after_a_forcesave_terminal": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "close",
+      "needs_black_box": true,
+      "requirement": "4.10",
+      "requires": [
+        "close_barrier",
+        "db_entities",
+        "onlyoffice_forcesave",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "b_close_before_a_forcesave_terminal": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "close",
+      "needs_black_box": true,
+      "requirement": "4.10",
+      "requires": [
+        "close_barrier",
+        "db_entities",
+        "onlyoffice_forcesave",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "browser_crash_no_userdata_recovery_case": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "recovery",
+      "needs_black_box": true,
+      "requirement": "4.10",
+      "requires": [
+        "browser_trace",
+        "recovery_lifecycle",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "close_leader_revoked_no_successor_recovery_required": {
+      "error_code": "evidence_input_missing",
+      "family": "close",
+      "needs_black_box": false,
+      "requirement": "4.10",
+      "requires": [
+        "close_barrier",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "close_leader_revoked_successor_exactly_one": {
+      "error_code": "evidence_input_missing",
+      "family": "close",
+      "needs_black_box": false,
+      "requirement": "4.10",
+      "requires": [
+        "close_barrier",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "close_reconciler_reentrant_exactly_one_capture": {
+      "error_code": "evidence_input_missing",
+      "family": "close",
+      "needs_black_box": false,
+      "requirement": "4.10",
+      "requires": [
+        "close_barrier",
+        "db_entities"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "cross_participant_idempotency_409": {
+      "error_code": "evidence_input_missing",
+      "family": "authorization",
+      "needs_black_box": false,
+      "requirement": "4.1",
+      "requires": [
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "different_field_merge": {
+      "error_code": "evidence_input_missing",
+      "family": "merge",
+      "needs_black_box": false,
+      "requirement": "6.8",
+      "requires": [
+        "artifact_digests",
+        "merge_execution"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "download_only_zero_three_entities": {
+      "error_code": "evidence_input_missing",
+      "family": "recovery",
+      "needs_black_box": false,
+      "requirement": "12.11",
+      "requires": [
+        "recovery_lifecycle"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "frozen_base_status_6_2_dedupe": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "dedupe",
+      "needs_black_box": true,
+      "requirement": "4.3",
+      "requires": [
+        "db_entities",
+        "onlyoffice_forcesave",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "html_to_oo": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "direction",
+      "needs_black_box": true,
+      "requirement": "3.1",
+      "requires": [
+        "artifact_digests",
+        "browser_trace",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "identity_retention": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "identity",
+      "needs_black_box": true,
+      "requirement": "6.16",
+      "requires": [
+        "artifact_digests",
+        "onlyoffice_forcesave"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "oo_to_html": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "direction",
+      "needs_black_box": true,
+      "requirement": "4.1",
+      "requires": [
+        "artifact_digests",
+        "db_entities",
+        "onlyoffice_forcesave",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "opaque_version_rollback_no_numeric_collision": {
+      "error_code": "evidence_input_missing",
+      "family": "rollback",
+      "needs_black_box": false,
+      "requirement": "10.6",
+      "requires": [
+        "artifact_digests",
+        "db_entities"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "quarantined_rejects_application_and_engine": {
+      "error_code": "scenario_kind_unrepresentable",
+      "family": "authorization",
+      "needs_black_box": false,
+      "requirement": "5.6",
+      "requires": [
+        "db_entities"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "refresh_required_reopen": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "conflict",
+      "needs_black_box": true,
+      "requirement": "4.11",
+      "requires": [
+        "db_entities",
+        "onlyoffice_forcesave",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "rollback": {
+      "error_code": "evidence_input_missing",
+      "family": "rollback",
+      "needs_black_box": false,
+      "requirement": "14.2",
+      "requires": [
+        "artifact_digests",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "same_application_higher_sequence_fold": {
+      "error_code": "upstream_gap",
+      "family": "dedupe",
+      "needs_black_box": false,
+      "requirement": "5.5",
+      "requires": [
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "failed",
+      "upstream_debt": "Task 32 欠账：`room_latest_durable_application_id/_sequence` 无读路由 ⇒ 「same-application higher-sequence fold 不 self-stale」的结果无从观测。写侧已由 Task 23 实现，缺的是可观测的读路由"
+    },
+    "same_field_conflict_resolve": {
+      "error_code": "evidence_input_missing",
+      "family": "conflict",
+      "needs_black_box": false,
+      "requirement": "6.8",
+      "requires": [
+        "artifact_digests",
+        "merge_execution"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "single_participant_close": {
+      "error_code": "evidence_input_missing",
+      "family": "close",
+      "needs_black_box": false,
+      "requirement": "4.10",
+      "requires": [
+        "close_barrier",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "two_user_close_order_a_then_b": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "close",
+      "needs_black_box": true,
+      "requirement": "4.10",
+      "requires": [
+        "browser_trace",
+        "close_barrier",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "two_user_close_order_b_then_a": {
+      "error_code": "real_onlyoffice_not_executed",
+      "family": "close",
+      "needs_black_box": true,
+      "requirement": "4.10",
+      "requires": [
+        "browser_trace",
+        "close_barrier",
+        "db_entities",
+        "server_timeline"
+      ],
+      "result": "unverifiable",
+      "upstream_debt": null
+    },
+    "wrong_prior_confirmation_bundle_fence_contributor_rejected": {
+      "error_code": "upstream_gap",
+      "family": "authorization",
+      "needs_black_box": false,
+      "requirement": "5.8",
+      "requires": [
+        "db_entities",
+        "recovery_lifecycle"
+      ],
+      "result": "failed",
+      "upstream_debt": "Task 32 欠账：`recovery.claim_recovery_case()` 从不校验 expected_generation / expected_write_fence / expected_definition_bundle_sha256 ⇒ 「错误 prior confirmation/bundle/fence/contributor 拒绝」在生产路径上不可达。本场景因此只能落 failed（不是 unverifiable：缺口是**实现缺失**而不是环境缺失）"
+    }
+  },
+  "upstream_gap_and_black_box_scenarios": [],
+  "upstream_gap_counterfactual_without_debt_branch": {
+    "same_application_higher_sequence_fold": {
+      "differs_from_real": true,
+      "error_code": "timeline_stage_missing",
+      "result": "unverifiable"
+    },
+    "wrong_prior_confirmation_bundle_fence_contributor_rejected": {
+      "differs_from_real": true,
+      "error_code": "recovery_precondition_not_measured",
+      "result": "unverifiable"
+    }
+  },
+  "upstream_gap_scenarios": [
+    "same_application_higher_sequence_fold",
+    "wrong_prior_confirmation_bundle_fence_contributor_rejected"
+  ]
+}

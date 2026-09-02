@@ -42,6 +42,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.custom_query import snapshot_writer_addr_id as _addr
 from app.services.custom_query import snapshot_writer_modules as _mod
+from app.services.workpaper_sync.outbox import DurableOutboxError
 
 # 共享定义（错误码 / 异常 / cell_ref 解析）实现在 snapshot_writer_shared —— 伴生模块
 # 也要用它们，放在本文件会造成循环导入。此处 re-export：既有
@@ -274,12 +275,18 @@ class SnapshotWriter:
                 logger.warning("xlsx cache update failed (non-fatal): %s", e)
 
         # Step 8: 统一后处理 — 使用 orchestrator 替代孤立本地 EventBus
-        # orchestrator 负责: file_version++, prefill_stale, updated_at, event_bus.publish
+        # orchestrator 负责: file_version++, prefill_stale, updated_at, 耐久 outbox 入队
+        # （事件由两个 router 在 commit 之后 publish_pending 发出）
         #
         # 非致命，但**不能静默**：这里挂掉意味着 file_version 没++、prefill_stale 没标、
         # WORKPAPER_SAVED 没发 —— 下游 cross_ref / stale / SSE 全不触发，而用户看到的
         # 是「保存成功」。原实现把整块（含 ORM select）吞成一条 WARNING，正是最贵的那类
         # fail-open：接线错了也表现为「静默成功」。故改为记 ERROR 并在返回体带 warnings。
+        #
+        # Task 16 / Requirement 13.4 再收紧一档：**耐久事件写不进去**这一类失败不再被
+        # 兜住。回写与入队在同一个事务里，入队失败时让它抛出去 → router 回滚 → 客户端
+        # 可重试，比「数据写了但下游联动永久断开」正确。软失败（ORM 实例取不到）仍按原
+        # 契约记 ERROR + 返回体 warnings。
         downstream_warnings: list[str] = []
         try:
             from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
@@ -301,6 +308,17 @@ class SnapshotWriter:
                 )
                 downstream_warnings.append("下游联动未触发：底稿 ORM 实例不可用")
             else:
+                # 文件生命周期版本（`file_version`）—— 本路径**自己**的所有者。
+                #
+                # Task 18 / Requirement 2.1 / 2.12：原来由共享的
+                # `orchestrator.after_save` 递增；那个 handler 必须可重放，所以不能持有
+                # 任何版本域。本回写路径在 Step 7 用 `_sync_update_xlsx_cache` 换掉了
+                # xlsx 缓存，是这条文件生命周期的实际推进者。
+                #
+                # 业务内容版本（`content_revision`）不在这里推进：custom 回写迁入
+                # `ContentMutationService` 归 Task 19（custom 底稿的权威是 xlsx 本体，
+                # 走 `custom_authoritative_ooxml` authority model，不是 JSON projection）。
+                wp_obj.file_version = (wp_obj.file_version or 0) + 1
                 await save_orchestrator.after_save(
                     db, wp_obj, user,
                     trigger="custom_query_writeback",
@@ -309,9 +327,18 @@ class SnapshotWriter:
                         "sheet_name": sheet_name,
                         "cell_ref": cell_ref,
                         "addr_id": addr_id,
+                        "file_version": wp_obj.file_version,
                     },
                 )
                 now = wp_obj.updated_at  # 使用 orchestrator 设置的 updated_at
+        except DurableOutboxError:
+            # Requirement 13.4：耐久事件是「下游联动没丢」的唯一凭据，写不进去就必须
+            # 让整笔回写失败，不能降级成一条返回体 warning。
+            logger.error(
+                "耐久事件入队失败，回写整笔回滚 wp_id=%s addr_id=%s", wp_id, addr_id,
+                exc_info=True,
+            )
+            raise
         except Exception as exc:
             logger.error(
                 "orchestrator.after_save 失败（回写已落库，但下游联动未触发）: %s",

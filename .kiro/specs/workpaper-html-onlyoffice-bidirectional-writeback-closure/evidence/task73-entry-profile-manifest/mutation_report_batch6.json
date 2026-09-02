@@ -1,0 +1,100 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+    "why": "这就是本任务被反复警告的陷阱：从 capability 派生 room_model 后，`_CAPABILITY_ROOM_MODEL` 与 RG-15/16/17 变成恒真重言式，守卫从此永远绿，比原来的欠账更糟（假绿第③源）。是最现实的「让 RG-15 别再报错」的错误改法",
+    "verdict": "RED",
+    "summary": "3 failed, 286 passed in 62.06s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py",
+      "test_workpaper_sync_manifest_contract.py"
+    ],
+    "restored": true,
+    "seconds": 64.8
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+    "why": "`GtB60DocxPane.vue` 文件头注释里写着「切到在线编辑前先 GET onlyoffice-config」，不剥注释会把它当成真实请求端点 ⇒ 该 entry 的 room_model 得到假事实（实测踩过）",
+    "verdict": "RED",
+    "summary": "17 failed, 266 passed, 6 errors in 61.39s (0:01:01)",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py",
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 64.3
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestProfileFieldsExistOnEveryEntry::test_provenance_points_at_real_source_lines",
+    "why": "`^\\s*//` 里的 `\\s` 也匹配换行 ⇒ 一串空行 + 一条 `//` 被整段吞掉、行数不守恒（实测 WorkpaperWordEditor.vue 1365 → 1332 行），provenance 的 `#Lnn` 全部左移指错行。只断言「文件存在」的判据对此全绿 —— 所以判据必须校验那一行真的含该事实",
+    "verdict": "RED",
+    "summary": "17 failed, 266 passed, 6 errors in 60.82s (0:01:00)",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py",
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 63.7
+  }
+]

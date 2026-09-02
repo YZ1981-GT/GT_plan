@@ -8,6 +8,7 @@
       <div v-if="showModeToolbar" class="d5-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
         <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d5-receivables-financing" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -142,6 +143,7 @@ import { parseNum } from './composables/useD5FormulaEngine'
 import D5TabIndex from './d5/D5TabIndex.vue'
 import D5TabProcedure from './d5/D5TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const D5TabAdjudication = defineAsyncComponent(() => import('./d5/D5TabAdjudication.vue'))
 const D5TabDetail = defineAsyncComponent(() => import('./d5/D5TabDetail.vue'))

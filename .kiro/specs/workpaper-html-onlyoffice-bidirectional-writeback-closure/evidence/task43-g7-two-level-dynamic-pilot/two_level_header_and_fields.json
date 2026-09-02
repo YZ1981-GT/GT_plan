@@ -1,0 +1,4552 @@
+{
+  "all_header_refs_match": true,
+  "distinct_stable_keys": 107,
+  "duplicate_leaf_labels": {
+    "期初数/上期发生额": 5,
+    "期末数/本期发生额": 5
+  },
+  "dynamic_columns": {
+    "binding": {
+      "minority_financials_1": "C",
+      "minority_financials_10": "L",
+      "minority_financials_2": "D",
+      "minority_financials_3": "E",
+      "minority_financials_4": "F",
+      "minority_financials_5": "G",
+      "minority_financials_6": "H",
+      "minority_financials_7": "I",
+      "minority_financials_8": "J",
+      "minority_financials_9": "K"
+    },
+    "distinct_column_count": 10,
+    "distinct_key_count": 10,
+    "identity": "{slot}_{seq}",
+    "identity_is_the_imported_constant": true,
+    "keys": [
+      "minority_financials_1",
+      "minority_financials_2",
+      "minority_financials_3",
+      "minority_financials_4",
+      "minority_financials_5",
+      "minority_financials_6",
+      "minority_financials_7",
+      "minority_financials_8",
+      "minority_financials_9",
+      "minority_financials_10"
+    ],
+    "label_independent": true,
+    "render_sub_columns": [
+      [
+        "current",
+        "期末数/本期发生额"
+      ],
+      [
+        "prior",
+        "期初数/上期发生额"
+      ]
+    ],
+    "source_ref": "源xlsx!附注披露信息（国企）!C62:L62"
+  },
+  "field_count": 107,
+  "fields": [
+    {
+      "cell_observed": {
+        "cell": "C64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C64"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D64"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E64"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F64"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G64"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H64"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I64"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J64"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K64"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L64",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L64"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-1/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 64,
+      "row_label": {
+        "cell": "A64:B64",
+        "declared": "流动资产",
+        "match": true,
+        "observed": "流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A64:B64"
+      },
+      "stable_field_key": "minority_financials/minority-fs-1/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C65"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D65"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E65"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F65"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G65"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H65"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I65"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J65"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K65"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L65",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L65"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-2/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 65,
+      "row_label": {
+        "cell": "A65:B65",
+        "declared": "非流动资产",
+        "match": true,
+        "observed": "非流动资产",
+        "source_ref": "源xlsx!附注披露信息（国企）!A65:B65"
+      },
+      "stable_field_key": "minority_financials/minority-fs-2/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C66"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D66"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E66"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F66"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G66"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H66"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I66"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J66"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K66"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L66",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L66"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-3/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 66,
+      "row_label": {
+        "cell": "A66:B66",
+        "declared": "资产合计",
+        "match": true,
+        "observed": "资产合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A66:B66"
+      },
+      "stable_field_key": "minority_financials/minority-fs-3/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C67"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D67"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E67"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F67"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G67"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H67"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I67"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J67"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K67"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L67",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L67"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-4/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 67,
+      "row_label": {
+        "cell": "A67:B67",
+        "declared": "流动负债",
+        "match": true,
+        "observed": "流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A67:B67"
+      },
+      "stable_field_key": "minority_financials/minority-fs-4/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C68"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D68"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E68"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F68"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G68"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H68"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I68"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J68"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K68"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L68",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L68"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-5/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 68,
+      "row_label": {
+        "cell": "A68:B68",
+        "declared": "非流动负债",
+        "match": true,
+        "observed": "非流动负债",
+        "source_ref": "源xlsx!附注披露信息（国企）!A68:B68"
+      },
+      "stable_field_key": "minority_financials/minority-fs-5/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C69"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D69"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E69"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F69"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G69"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H69"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I69"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J69"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K69"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L69",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L69"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-6/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 69,
+      "row_label": {
+        "cell": "A69:B69",
+        "declared": "负债合计",
+        "match": true,
+        "observed": "负债合计",
+        "source_ref": "源xlsx!附注披露信息（国企）!A69:B69"
+      },
+      "stable_field_key": "minority_financials/minority-fs-6/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C70"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D70"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E70"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F70"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G70"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H70"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I70"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J70"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K70"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L70",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L70"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-7/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 70,
+      "row_label": {
+        "cell": "A70:B70",
+        "declared": "营业收入",
+        "match": true,
+        "observed": "营业收入",
+        "source_ref": "源xlsx!附注披露信息（国企）!A70:B70"
+      },
+      "stable_field_key": "minority_financials/minority-fs-7/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C71"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D71"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E71"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F71"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G71"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H71"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I71"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J71"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K71"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L71",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L71"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-8/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 71,
+      "row_label": {
+        "cell": "A71:B71",
+        "declared": "净利润",
+        "match": true,
+        "observed": "净利润",
+        "source_ref": "源xlsx!附注披露信息（国企）!A71:B71"
+      },
+      "stable_field_key": "minority_financials/minority-fs-8/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C72"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D72"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E72"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F72"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G72"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H72"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I72"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J72"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K72"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L72",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L72"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-9/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 72,
+      "row_label": {
+        "cell": "A72:B72",
+        "declared": "综合收益总额",
+        "match": true,
+        "observed": "综合收益总额",
+        "source_ref": "源xlsx!附注披露信息（国企）!A72:B72"
+      },
+      "stable_field_key": "minority_financials/minority-fs-9/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "C73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!C73"
+      },
+      "column": "C",
+      "column_key": "minority_financials_1",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_1_current",
+      "leaf": {
+        "cell": "C63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!C63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_current",
+      "render_sub_key": "current",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_1",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "D73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!D73"
+      },
+      "column": "D",
+      "column_key": "minority_financials_2",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "C",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "C",
+          "D"
+        ],
+        "placeholder": "<DYNAMIC:c3>",
+        "source_ref": "源xlsx!附注披露信息（国企）!C62:D62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_1_prior",
+      "leaf": {
+        "cell": "D63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!D63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_1_prior",
+      "render_sub_key": "prior",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_2",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "E73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!E73"
+      },
+      "column": "E",
+      "column_key": "minority_financials_3",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_2_current",
+      "leaf": {
+        "cell": "E63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!E63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_current",
+      "render_sub_key": "current",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_3",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "F73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!F73"
+      },
+      "column": "F",
+      "column_key": "minority_financials_4",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "E",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "E",
+          "F"
+        ],
+        "placeholder": "<DYNAMIC:c5>",
+        "source_ref": "源xlsx!附注披露信息（国企）!E62:F62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_2_prior",
+      "leaf": {
+        "cell": "F63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!F63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_2_prior",
+      "render_sub_key": "prior",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_4",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "G73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!G73"
+      },
+      "column": "G",
+      "column_key": "minority_financials_5",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_3_current",
+      "leaf": {
+        "cell": "G63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!G63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_current",
+      "render_sub_key": "current",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_5",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "H73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!H73"
+      },
+      "column": "H",
+      "column_key": "minority_financials_6",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "G",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "G",
+          "H"
+        ],
+        "placeholder": "<DYNAMIC:c7>",
+        "source_ref": "源xlsx!附注披露信息（国企）!G62:H62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_3_prior",
+      "leaf": {
+        "cell": "H63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!H63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_3_prior",
+      "render_sub_key": "prior",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_6",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "I73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!I73"
+      },
+      "column": "I",
+      "column_key": "minority_financials_7",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_4_current",
+      "leaf": {
+        "cell": "I63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!I63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_current",
+      "render_sub_key": "current",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_7",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "J73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!J73"
+      },
+      "column": "J",
+      "column_key": "minority_financials_8",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "I",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "I",
+          "J"
+        ],
+        "placeholder": "<DYNAMIC:c9>",
+        "source_ref": "源xlsx!附注披露信息（国企）!I62:J62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_4_prior",
+      "leaf": {
+        "cell": "J63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!J63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_4_prior",
+      "render_sub_key": "prior",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_8",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "K73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!K73"
+      },
+      "column": "K",
+      "column_key": "minority_financials_9",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_5_current",
+      "leaf": {
+        "cell": "K63",
+        "declared": "期末数/本期发生额",
+        "match": true,
+        "observed": "期末数/本期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!K63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_current",
+      "render_sub_key": "current",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_9",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "L73",
+        "observed": null,
+        "source_ref": "源xlsx!附注披露信息（国企）!L73"
+      },
+      "column": "L",
+      "column_key": "minority_financials_10",
+      "formula_source_ref": null,
+      "group": {
+        "anchor_column": "K",
+        "observed_cell_is_blank": true,
+        "observed_horizontal_merge": [
+          "K",
+          "L"
+        ],
+        "placeholder": "<DYNAMIC:c11>",
+        "source_ref": "源xlsx!附注披露信息（国企）!K62:L62"
+      },
+      "json_pointer": "/tables/minority-financials/minority-fs-10/values/minority-fs-company_5_prior",
+      "leaf": {
+        "cell": "L63",
+        "declared": "期初数/上期发生额",
+        "match": true,
+        "observed": "期初数/上期发生额",
+        "source_ref": "源xlsx!附注披露信息（国企）!L63"
+      },
+      "mode": "editable",
+      "render_column_key": "minority-fs-company_5_prior",
+      "render_sub_key": "prior",
+      "row_from": 73,
+      "row_label": {
+        "cell": "A73:B73",
+        "declared": "经营活动现金流量",
+        "match": true,
+        "observed": "经营活动现金流量",
+        "source_ref": "源xlsx!附注披露信息（国企）!A73:B73"
+      },
+      "stable_field_key": "minority_financials/minority-fs-10/minority_financials_10",
+      "table_key": "minority_financials",
+      "value_type": "amount"
+    },
+    {
+      "cell_observed": {
+        "cell": "A79",
+        "observed": "1",
+        "source_ref": "源xlsx!附注披露信息（国企）!A79"
+      },
+      "column": "A",
+      "column_key": "seq",
+      "formula_source_ref": null,
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/ordinal",
+      "leaf": {
+        "cell": "A78",
+        "declared": "序号",
+        "match": true,
+        "observed": "序号",
+        "source_ref": "源xlsx!附注披露信息（国企）!A78"
+      },
+      "mode": "auto_source",
+      "render_column_key": null,
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/seq",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "integer"
+    },
+    {
+      "cell_observed": {
+        "cell": "B79",
+        "observed": "='处置子公司测试表（不包含一揽子交易）G7-11'!B9",
+        "source_ref": "源xlsx!附注披露信息（国企）!B79"
+      },
+      "column": "B",
+      "column_key": "name",
+      "formula_source_ref": "='处置子公司测试表（不包含一揽子交易）G7-11'!B9",
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/values/name",
+      "leaf": {
+        "cell": "B78",
+        "declared": "企业名称",
+        "match": true,
+        "observed": "企业名称",
+        "source_ref": "源xlsx!附注披露信息（国企）!B78"
+      },
+      "mode": "formula",
+      "render_column_key": "name",
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/name",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "text"
+    },
+    {
+      "cell_observed": {
+        "cell": "C79",
+        "observed": "='处置子公司测试表（不包含一揽子交易）G7-11'!C9",
+        "source_ref": "源xlsx!附注披露信息（国企）!C79"
+      },
+      "column": "C",
+      "column_key": "registered_place",
+      "formula_source_ref": "='处置子公司测试表（不包含一揽子交易）G7-11'!C9",
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/values/registeredPlace",
+      "leaf": {
+        "cell": "C78",
+        "declared": "注册地",
+        "match": true,
+        "observed": "注册地",
+        "source_ref": "源xlsx!附注披露信息（国企）!C78"
+      },
+      "mode": "formula",
+      "render_column_key": "registeredPlace",
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/registered_place",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "text"
+    },
+    {
+      "cell_observed": {
+        "cell": "D79",
+        "observed": "='处置子公司测试表（不包含一揽子交易）G7-11'!D9",
+        "source_ref": "源xlsx!附注披露信息（国企）!D79"
+      },
+      "column": "D",
+      "column_key": "business_nature",
+      "formula_source_ref": "='处置子公司测试表（不包含一揽子交易）G7-11'!D9",
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/values/businessNature",
+      "leaf": {
+        "cell": "D78",
+        "declared": "业务性质",
+        "match": true,
+        "observed": "业务性质",
+        "source_ref": "源xlsx!附注披露信息（国企）!D78"
+      },
+      "mode": "formula",
+      "render_column_key": "businessNature",
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/business_nature",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "text"
+    },
+    {
+      "cell_observed": {
+        "cell": "E79",
+        "observed": "='处置子公司测试表（不包含一揽子交易）G7-11'!E9",
+        "source_ref": "源xlsx!附注披露信息（国企）!E79"
+      },
+      "column": "E",
+      "column_key": "holding_ratio",
+      "formula_source_ref": "='处置子公司测试表（不包含一揽子交易）G7-11'!E9",
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/values/holdingRatio",
+      "leaf": {
+        "cell": "E78",
+        "declared": "持股比例（%）",
+        "match": true,
+        "observed": "持股比例（%）",
+        "source_ref": "源xlsx!附注披露信息（国企）!E78"
+      },
+      "mode": "formula",
+      "render_column_key": "holdingRatio",
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/holding_ratio",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "ratio"
+    },
+    {
+      "cell_observed": {
+        "cell": "F79",
+        "observed": "='处置子公司测试表（不包含一揽子交易）G7-11'!F9",
+        "source_ref": "源xlsx!附注披露信息（国企）!F79"
+      },
+      "column": "F",
+      "column_key": "voting_rights",
+      "formula_source_ref": "='处置子公司测试表（不包含一揽子交易）G7-11'!F9",
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/values/votingRights",
+      "leaf": {
+        "cell": "F78",
+        "declared": "表决权比例（%）",
+        "match": true,
+        "observed": "表决权比例（%）",
+        "source_ref": "源xlsx!附注披露信息（国企）!F78"
+      },
+      "mode": "formula",
+      "render_column_key": "votingRights",
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/voting_rights",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "ratio"
+    },
+    {
+      "cell_observed": {
+        "cell": "G79",
+        "observed": "='处置子公司测试表（不包含一揽子交易）G7-11'!G9",
+        "source_ref": "源xlsx!附注披露信息（国企）!G79"
+      },
+      "column": "G",
+      "column_key": "reason",
+      "formula_source_ref": "='处置子公司测试表（不包含一揽子交易）G7-11'!G9",
+      "group": null,
+      "json_pointer": "/tables/former-subsidiary-basic/{row_uuid}/values/reason",
+      "leaf": {
+        "cell": "G78",
+        "declared": "本期不再成为子公司的原因",
+        "match": true,
+        "observed": "本期不再成为子公司的原因",
+        "source_ref": "源xlsx!附注披露信息（国企）!G78"
+      },
+      "mode": "formula",
+      "render_column_key": "reason",
+      "render_sub_key": null,
+      "row_from": "row_identity",
+      "row_label": {
+        "source_ref": null
+      },
+      "stable_field_key": "former_subsidiary_basic/{row_uuid}/reason",
+      "table_key": "former_subsidiary_basic",
+      "value_type": "text"
+    }
+  ],
+  "formula_mask": {
+    "matrix": null,
+    "record": [
+      "B79:G83"
+    ],
+    "record_formula_cells_observed": {
+      "B79": "='处置子公司测试表（不包含一揽子交易）G7-11'!B9",
+      "B80": "='处置子公司测试表（不包含一揽子交易）G7-11'!B10",
+      "B81": "='处置子公司测试表（不包含一揽子交易）G7-11'!B11",
+      "B82": "='处置子公司测试表（不包含一揽子交易）G7-11'!B12",
+      "B83": "='处置子公司测试表（不包含一揽子交易）G7-11'!B13",
+      "C79": "='处置子公司测试表（不包含一揽子交易）G7-11'!C9",
+      "C80": "='处置子公司测试表（不包含一揽子交易）G7-11'!C10",
+      "C81": "='处置子公司测试表（不包含一揽子交易）G7-11'!C11",
+      "C82": "='处置子公司测试表（不包含一揽子交易）G7-11'!C12",
+      "C83": "='处置子公司测试表（不包含一揽子交易）G7-11'!C13",
+      "D79": "='处置子公司测试表（不包含一揽子交易）G7-11'!D9",
+      "D80": "='处置子公司测试表（不包含一揽子交易）G7-11'!D10",
+      "D81": "='处置子公司测试表（不包含一揽子交易）G7-11'!D11",
+      "D82": "='处置子公司测试表（不包含一揽子交易）G7-11'!D12",
+      "D83": "='处置子公司测试表（不包含一揽子交易）G7-11'!D13",
+      "E79": "='处置子公司测试表（不包含一揽子交易）G7-11'!E9",
+      "E80": "='处置子公司测试表（不包含一揽子交易）G7-11'!E10",
+      "E81": "='处置子公司测试表（不包含一揽子交易）G7-11'!E11",
+      "E82": "='处置子公司测试表（不包含一揽子交易）G7-11'!E12",
+      "E83": "='处置子公司测试表（不包含一揽子交易）G7-11'!E13",
+      "F79": "='处置子公司测试表（不包含一揽子交易）G7-11'!F9",
+      "F80": "='处置子公司测试表（不包含一揽子交易）G7-11'!F10",
+      "F81": "='处置子公司测试表（不包含一揽子交易）G7-11'!F11",
+      "F82": "='处置子公司测试表（不包含一揽子交易）G7-11'!F12",
+      "F83": "='处置子公司测试表（不包含一揽子交易）G7-11'!F13",
+      "G79": "='处置子公司测试表（不包含一揽子交易）G7-11'!G9",
+      "G80": "='处置子公司测试表（不包含一揽子交易）G7-11'!G10",
+      "G81": "='处置子公司测试表（不包含一揽子交易）G7-11'!G11",
+      "G82": "='处置子公司测试表（不包含一揽子交易）G7-11'!G12",
+      "G83": "='处置子公司测试表（不包含一揽子交易）G7-11'!G13"
+    }
+  },
+  "group_merges_observed": {
+    "C62": [
+      "C",
+      "D"
+    ],
+    "E62": [
+      "E",
+      "F"
+    ],
+    "G62": [
+      "G",
+      "H"
+    ],
+    "I62": [
+      "I",
+      "J"
+    ],
+    "K62": [
+      "K",
+      "L"
+    ]
+  },
+  "header_refs_checked": 107,
+  "header_rows": {
+    "count": 2,
+    "group": 62,
+    "leaf": 63
+  },
+  "label_rename_does_not_change_identity": "实体改名只动 entityName；10 个 {slot}_{seq} 键逐字不变（label_independent）",
+  "managed_sheet": "附注披露信息（国企）",
+  "metadata_sheet_in_disclosure": false,
+  "template_slot_group_merges": [
+    [
+      "C62:D62",
+      "C",
+      "<DYNAMIC:c3>"
+    ],
+    [
+      "E62:F62",
+      "E",
+      "<DYNAMIC:c5>"
+    ],
+    [
+      "G62:H62",
+      "G",
+      "<DYNAMIC:c7>"
+    ],
+    [
+      "I62:J62",
+      "I",
+      "<DYNAMIC:c9>"
+    ],
+    [
+      "K62:L62",
+      "K",
+      "<DYNAMIC:c11>"
+    ]
+  ]
+}

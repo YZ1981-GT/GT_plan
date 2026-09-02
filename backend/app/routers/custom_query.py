@@ -2697,6 +2697,12 @@ async def cell_writeback(
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
 
+    # Task 16 / Requirement 13.1 / Property 52：snapshot_writer 在事务内只把
+    # WORKPAPER_SAVED 写成耐久 outbox 行，事件必须在 content commit 之后才发布。
+    from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+    await DurableEventOutboxService.publish_pending(db)
+
     # 审计日志 — 回写逐次记录（不节流，R14.3/R14.4）：操作者/UTC 秒级时间戳/操作类型/
     # 目标 addr_id 集合/新旧值/结果，经 audit_helper 单点接线。
     # workpaper 模块已在回写事务内记审计（R14.8「无审计不回写」，见 snapshot_writer 第 10 步），

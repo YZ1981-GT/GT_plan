@@ -241,11 +241,21 @@ class TestResolverContract:
         mod = _import_resolver()
         # 🔴 期望集按**实测**冻结（探针实跑 resolve_wp_file 得到的取值），
         #    不按「应该叫什么」猜：本条曾写 "file" 而实现是 "file" → 假红一轮。
+        #
+        # 🔴 2026-08：workpaper-html-onlyoffice-bidirectional-writeback-closure
+        #    Task 12 新增 `path_rejected` / `type_mismatch` 两档（Requirement 9.5/9.6,
+        #    Property 41/42）。**不得**把它们并进 `missing`：
+        #    * `path_rejected` = 路径越界（安全事件，要进安全日志与裁决清册）；
+        #    * `type_mismatch` = 命中了文件但类型不符（resolver 正确拒绝父级异类型
+        #      回退），与「该 wp_code 根本没登记模板」是两回事。
+        #    合并后 Requirement 9.4 与 9.5 就无法各自验证。
         assert set(mod.WP_FILE_VERDICTS) == {
             "file",
             "template_fallback",
             "missing",
             "empty",
+            "path_rejected",
+            "type_mismatch",
         }, f"verdict 取值域变更需同步守卫: {mod.WP_FILE_VERDICTS}"
         # 每个取值都要有中文标签（供 ZIP 清单/前端提示，禁裸英文）
         for v in mod.WP_FILE_VERDICTS:

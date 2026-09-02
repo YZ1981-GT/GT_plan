@@ -1,0 +1,57 @@
+{
+  "config_id": "workpaper_sync_limits",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 11,
+  "requirements": ["5.6", "10.8", "14.11"],
+  "properties": ["Property 17", "Property 60"],
+  "purpose": "Requirement 14.11 的默认安全预算与 OOXML 安全策略的**唯一真源**。design.md §Capacity Budget 明确『预算来自单一 workpaper_sync_limits 配置并被 contract/test 读取，禁止代码散落常量』：生产代码（ooxml_security.py / artifacts.py / retention.py）与守卫测试都只能从这里取值，任何硬编码数字都是第二真源。",
+
+  "budgets": {
+    "max_compressed_bytes": 52428800,
+    "max_compressed_label": "50 MiB",
+    "max_expanded_bytes": 536870912,
+    "max_expanded_label": "512 MiB",
+    "max_zip_entries": 20000,
+    "max_compression_ratio": 100,
+    "max_table_rows": 100000,
+    "max_projection_fields": 200000
+  },
+
+  "baseline_operation": {
+    "comment": "Requirement 14.12 的基准 operation 规格；只用于容量报告与性能门，不参与 fail-visible 拒绝判定。",
+    "max_bytes": 10485760,
+    "max_fields": 50000,
+    "incoming_durable_p95_seconds": 10,
+    "applied_terminal_p95_seconds": 30
+  },
+
+  "streaming": {
+    "comment": "流式读取块大小。必须远小于 max_expanded_bytes，否则『内存受界』失效；守卫用 tracemalloc 峰值锁死。",
+    "chunk_bytes": 262144,
+    "peak_memory_budget_bytes": 16777216
+  },
+
+  "ooxml_policy": {
+    "policy_version": "workpaper-sync-ooxml-security:v1",
+    "zip_magic_hex": "504b0304",
+    "required_parts": ["[Content_Types].xml"],
+    "document_type_markers": {
+      "xlsx": "xl/workbook.xml",
+      "docx": "word/document.xml"
+    },
+    "allow_external_relationships": false,
+    "external_relationship_target_mode": "External",
+    "allow_macros": false,
+    "macro_part_markers": ["vbaproject.bin", "vbadata.xml"],
+    "macro_content_types": [
+      "application/vnd.ms-office.vbaproject",
+      "application/vnd.ms-word.vbaData+xml"
+    ],
+    "allow_embedded_objects": false,
+    "embedded_object_prefixes": ["word/embeddings/", "xl/embeddings/"],
+    "forbidden_entry_name_patterns": ["..", ":", "\\"],
+    "reject_absolute_entry_names": true,
+    "comment": "宏与外部关系默认拒绝（Requirement 10.8）。放开任一项必须改 policy_version 并同步 requirements/guards —— 守卫断言 policy_version 与拒绝行为一一对应。"
+  }
+}

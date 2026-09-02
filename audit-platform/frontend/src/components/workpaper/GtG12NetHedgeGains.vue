@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g12-net-hedge-gains" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -156,6 +157,7 @@ import { G12_ACCOUNT_CODE } from './composables/g12Constants'
 import { parseNum } from './composables/useG12FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G12TabProcedure = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabProcedure.vue'))
 const G12TabAdjudication = defineAsyncComponent(() => import('./g12-net-hedge-gains/core/G12TabAdjudication.vue'))

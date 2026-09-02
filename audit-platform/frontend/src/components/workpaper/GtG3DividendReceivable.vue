@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g3-dividend-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
@@ -183,6 +184,7 @@ import { useHostApplicableStandards } from './composables/hostApplicableStandard
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G3TabAdjudication = defineAsyncComponent(() => import('./g3-dividend-receivable/G3TabAdjudication.vue'))

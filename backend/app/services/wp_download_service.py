@@ -59,6 +59,16 @@ _VERDICT_ADVICE: dict[str, str] = {
         "ZIP 内该份是**空白模板**而非您的录入内容。"
         "若底稿界面已有数据，请改用底稿页的「导出数据」获取含录入内容的版本。"
     ),
+    # ── Task 12（workpaper-html-onlyoffice-bidirectional-writeback-closure）新增两档 ──
+    "path_rejected": (
+        "该底稿的文件路径指向存储根之外（历史脏数据或被人工改过），"
+        "已按安全策略拒绝读取。请用「生成底稿」重新生成，或联系管理员核查该底稿的 "
+        "file_path。"
+    ),
+    "type_mismatch": (
+        "该底稿所需格式与磁盘上的文件类型不符（例如需要 Word 却只找到 Excel），"
+        "已拒绝用异类型文件凑数。请联系管理员补齐该底稿编码对应格式的模板。"
+    ),
 }
 
 #: 未登记档位的兜底建议（出现即说明 `_VERDICT_ADVICE` 该补键了）
@@ -363,12 +373,22 @@ class WpUploadService:
             raise ValueError("底稿不存在")
 
         # 版本冲突检测
-        if not force_overwrite and uploaded_version < wp.file_version:
+        #
+        # 🔴 Task 19：比对目标换成 `working_paper.content_revision`（唯一 business
+        #    content revision 域）。改造前比 `file_version` —— 那个计数器同时被 WOPI、
+        #    另一条 upload 路径与 storage 快照推进，跨域比较必然造假冲突。
+        #    这里只是「早失败 + 给用户可读信息」；真正的并发裁决是下方 commit 事务内的
+        #    CAS（两者缺一不可，与 wp_html_save 的 Step 2b 同形）。
+        server_content_revision = int(getattr(wp, "content_revision", 0) or 0)
+        if not force_overwrite and uploaded_version < server_content_revision:
             return {
                 "status": "conflict",
                 "uploaded_version": uploaded_version,
-                "server_version": wp.file_version,
-                "message": f"版本冲突: 上传版本 {uploaded_version} < 服务器版本 {wp.file_version}",
+                "server_version": server_content_revision,
+                "message": (
+                    f"版本冲突: 上传版本 {uploaded_version} < 服务器版本 "
+                    f"{server_content_revision}"
+                ),
             }
 
         # 写入文件
@@ -376,11 +396,59 @@ class WpUploadService:
         file_path.parent.mkdir(parents=True, exist_ok=True)
         file_path.write_bytes(file_content)
 
-        # 更新数据库
-        wp.file_version += 1
+        # ─── Task 19：迁入统一 business revision 域（Requirement 2.2 / Property 61）───
+        #
+        # 改造前是 `wp.file_version += 1` + `await db.flush()`：离线上传自己推进一个
+        # 跨通道版本计数器，与 `WorkingPaperService.upload_offline_edit` **争同一个
+        # 计数器**（清册原话），而文件写入与版本递增不是一个原子单元。
+        #
+        # 改造后：上传的 OOXML 字节就是权威内容本体，原样提交为
+        # `authoritative_payload`；business content revision 由
+        # `ContentMutationService.commit(...)` 的 CAS 唯一推进；`updated_at` /
+        # `prefill_stale` 仍在这里写（Requirement 2.1 明列的非内容非版本副作用字段）。
+        from app.services.workpaper_sync.content_mutation import UPLOAD as _UPLOAD_SOURCE
+        from app.services.workpaper_sync.models import (
+            RevisionConflictError as _RevisionConflictError,
+        )
+        from app.services.workpaper_sync.writer_migration import (
+            build_content_mutation_service_writer,
+            opaque_entry_id,
+        )
+
         wp.updated_at = datetime.now(timezone.utc)
         wp.prefill_stale = True  # 标记需要重新解析
         await db.flush()
+
+        _writer = build_content_mutation_service_writer(db)
+        _expected_revision = await _writer.current_revision(wp_id)
+        try:
+            _receipt = await _writer.commit_bytes(
+                project_id=project_id,
+                wp_id=wp_id,
+                entry_id=opaque_entry_id(wp_code=None, wp_id=wp_id),
+                source=_UPLOAD_SOURCE,
+                payload=file_content,
+                document_type=file_path.suffix.lstrip(".").lower() or "xlsx",
+                expected_revision=_expected_revision,
+                # Task 65：authority model 由 lane 登记决定（`offline_upload` →
+                # `opaque_single_onlyoffice`），不再由调用点传身份参数。
+                substrate_path=file_path,
+                lane_id="offline_upload",
+            )
+        except _RevisionConflictError:
+            # 真并发：CAS 命中 0 行。返回与既有「版本冲突」同形的结构化结果，
+            # 调用方（router）的分支不用改。窄捕获 —— 不得把发布失败也吞成冲突。
+            return {
+                "status": "conflict",
+                "uploaded_version": uploaded_version,
+                "server_version": _expected_revision,
+                "message": (
+                    f"版本冲突: 其他会话在本次上传期间修改了该底稿"
+                    f"（服务器内容版本 {_expected_revision}）"
+                ),
+            }
+        await _writer.publish_committed_events(_receipt)
+        new_content_revision = _receipt.revision
 
         # 双写云端（非阻塞，失败只记日志）
         try:
@@ -434,7 +502,7 @@ class WpUploadService:
                 project_id=project_id,
                 object_type="workpaper",
                 object_id=wp_id,
-                version_no=wp.file_version,
+                version_no=new_content_revision,
             )
         except Exception as _vl_err:
             logger.warning(f"[VERSION_LINE] write_stamp failed (non-blocking): {_vl_err}")
@@ -446,7 +514,13 @@ class WpUploadService:
             payload = EventPayload(
                 event_type=EventType.WORKPAPER_SAVED,
                 project_id=project_id,
-                extra={"wp_id": str(wp_id), "file_version": wp.file_version, "trigger": "upload"},
+                extra={
+                    "wp_id": str(wp_id),
+                    # Task 19：键名保留兼容，值是唯一 business content revision。
+                    "file_version": new_content_revision,
+                    "content_revision": new_content_revision,
+                    "trigger": "upload",
+                },
             )
             await event_bus.publish(payload)
             logger.info("event WORKPAPER_SAVED published: wp=%s", wp_id)
@@ -454,8 +528,8 @@ class WpUploadService:
             logger.warning("event publish failed (non-blocking): %s", e)
 
         logger.info(
-            "upload_file: wp=%s, new_version=%d, size=%d bytes",
-            wp_id, wp.file_version, len(file_content),
+            "upload_file: wp=%s, new_content_revision=%d, size=%d bytes",
+            wp_id, new_content_revision, len(file_content),
         )
 
         # ── 三式联动：自动生成 structure.json ──
@@ -477,6 +551,8 @@ class WpUploadService:
         return {
             "status": "success",
             "wp_id": str(wp.id),
-            "new_version": wp.file_version,
+            "new_version": new_content_revision,
+            "content_revision": new_content_revision,
+            "content_version_id": str(_receipt.content_version_id),
             "file_size": len(file_content),
         }

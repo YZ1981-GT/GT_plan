@@ -149,7 +149,10 @@
  * Requirements: 1.1, 1.2, 1.4, 6.3, 6.7
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, inject, defineAsyncComponent } from 'vue'
-import { useG7DualMode } from './composables/useG7DualMode'
+// Task 45: legacy useG7DualMode deleted — pilot host now delegates to sync bridge.
+// 宿主只传 entry/flush/reload；DOM 与 API 顺序由 bridge 守卫。
+// The actual bridge integration is provided by GtWpRenderer / WorkpaperSyncEditorHost.
+import { usePilotBridgeAdapter } from './sync/usePilotBridgeAdapter'
 import { useG7FormData } from './composables/useG7FormData'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
@@ -307,11 +310,12 @@ const formData = useG7FormData({
 /** G7 allResponses Map 供目录页进度/结论看板使用 */
 const g7AllResponses = computed(() => formData.data.value)
 
-// ─── 双模式切换 (HTML ↔ OnlyOffice) ─────────────────────────────────────────
-const dualMode = useG7DualMode({
+// ─── 双模式切换 (HTML ↔ OnlyOffice) — Task 45: bridge adapter ──────────────
+const dualMode = usePilotBridgeAdapter({
+  entryId: 'xlsx/gt-g7-long-term-equity-main',
   wpId: wpIdRef,
   sheetName: computed(() => props.sheetName || ''),
-  reloadAll: async () => {
+  reloadHtml: async () => {
     await formData.load()
     const parsed = formData.parseContent()
     if (parsed && Object.keys(parsed).length > 0) {

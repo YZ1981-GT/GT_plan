@@ -20,6 +20,7 @@
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f4-accounts-payable" />
       </div>
 
       <!-- 全局勾稽告警 -->
@@ -183,6 +184,7 @@ import CycleImportExportDropdown from './shared/CycleImportExportDropdown.vue'
 import { isImportExportSheet, resolveImportExportSheet } from './shared/cycleImportExportRegistry'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 const F4TabAdjudication = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjudication.vue'))
 const F4TabDetail = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabDetail.vue'))
 const F4TabAdjustment = defineAsyncComponent(() => import('./f4-accounts-payable/F4TabAdjustment.vue'))

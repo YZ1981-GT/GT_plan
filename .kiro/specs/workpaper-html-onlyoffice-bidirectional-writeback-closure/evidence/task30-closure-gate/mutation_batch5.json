@@ -1,0 +1,121 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 5
+  },
+  "mutations": [
+    {
+      "id": "M25",
+      "path": "backend/data/workpaper_resolver_migration_matrix.json",
+      "want": "test_task30_closure_gate.py::test_the_registered_blocker_points_at_a_task_that_really_gates_publication",
+      "why": "把阻塞登记指向不存在的任务号。没有这条判据时，`blocking_task` 可以是任意数字、`reason` 可以是任意散文，「为什么这 4 行迁不了」下一轮又要从头查。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 49.84s",
+      "added": [
+        "test_task30_closure_gate.py::test_the_registered_blocker_points_at_a_task_that_really_gates_publication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_the_registered_blocker_points_at_a_task_that_really_gates_publication"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "071d824148f3541056199c736391d4dbb5e2ce6d368627e0f03128ace6299102",
+      "seconds": 53.3
+    },
+    {
+      "id": "M26",
+      "path": "backend/app/services/workpaper_sync/rooms.py",
+      "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_contract_numbers_have_single_source_in_oo_contract",
+      "why": "真正的「另写常量」：把契约里的 120 秒抄成模块常量。原判据（剥字符串后扫子串）**抓不到**它（子串不在、数值不在名单里），只会去打红正确的属性读取。修好后的判据必须在这里红。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 52.58s",
+      "added": [
+        "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_contract_numbers_have_single_source_in_oo_contract"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_contract_numbers_have_single_source_in_oo_contract"
+      ],
+      "added_files": [
+        "test_task21_room_service.py"
+      ],
+      "restored": true,
+      "restored_sha256": "182286d854ef8c5e03c3522ec98094c5bf1a64d128db8e0526a6952d5e2a371e",
+      "seconds": 56.5
+    },
+    {
+      "id": "M27",
+      "path": "backend/app/services/workpaper_sync/rooms.py",
+      "want": "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_contract_numbers_have_single_source_in_oo_contract",
+      "why": "真正的「另写解析」：绕过 `oo_contract` 的 loader，自己按字符串键从 JSON 取值 ⇒契约换版时这一处不会跟着走。原判据同样抓不到（字符串被剥掉了）。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 53.36s",
+      "added": [
+        "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_contract_numbers_have_single_source_in_oo_contract"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task21_room_service.py::TestCallbackContractHasProductionConsumer::test_contract_numbers_have_single_source_in_oo_contract"
+      ],
+      "added_files": [
+        "test_task21_room_service.py"
+      ],
+      "restored": true,
+      "restored_sha256": "182286d854ef8c5e03c3522ec98094c5bf1a64d128db8e0526a6952d5e2a371e",
+      "seconds": 57.2
+    },
+    {
+      "id": "M28",
+      "path": "backend/app/services/workpaper_sync/callback_delivery.py",
+      "want": "test_task22_callback_claim.py::test_jwt_decoding_lives_only_in_callback_route",
+      "why": "在 delivery 里新增第二处 callback token 解码 —— Task 22 要求校验只有一处实现。改成 AST 判据后这条必须红；原判据（扫 `^from jose`）在本文件已经因为 Task 24 的签发而恒红，新缺陷混不出来。",
+      "verdict": "RED",
+      "summary": "1 failed, 322 passed, 1 warning in 53.29s",
+      "added": [
+        "test_task22_callback_claim.py::test_jwt_decoding_lives_only_in_callback_route"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task22_callback_claim.py::test_jwt_decoding_lives_only_in_callback_route"
+      ],
+      "added_files": [
+        "test_task22_callback_claim.py"
+      ],
+      "restored": true,
+      "restored_sha256": "5e8e8c71c09fcd45bee1591320c6391bb76a968e1009da74c8a4cc1da31022b0",
+      "seconds": 57.2
+    },
+    {
+      "id": "M29",
+      "path": "backend/app/services/workpaper_sync/rooms.py",
+      "want": "*",
+      "why": "对照项（预期 GREEN）：往同一个文件加一个与契约数值无关的模块常量。它证明 M26/M27 的判据不是「这个文件一改就红」，而是真的在看「绑的是不是契约数量」。",
+      "verdict": "RED",
+      "summary": "323 passed, 1 warning in 53.29s",
+      "added": [],
+      "gone": [],
+      "hit": [],
+      "added_files": [],
+      "restored": true,
+      "restored_sha256": "182286d854ef8c5e03c3522ec98094c5bf1a64d128db8e0526a6952d5e2a371e",
+      "seconds": 57.1
+    }
+  ]
+}

@@ -59,6 +59,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+# 🔴 Task 12（workpaper-html-onlyoffice-bidirectional-writeback-closure）：
+# 路径边界（Property 42）、文档类型 fail-closed（Property 41）与子码最具体匹配
+# （Property 40）三条判据统一由 `app.services.workpaper_sync.canonical_paths`
+# 承担，本模块不再自写。该模块是**纯同步、零 ORM**的（否则会破坏本模块
+# 「无 DB 依赖」的承诺，见上方 §设计约束）。
+from app.services.workpaper_sync.canonical_paths import (
+    DocumentTypeMismatchError,
+    document_type_of,
+    is_within_any_legacy_root,
+)
+
 logger = logging.getLogger(__name__)
 
 # ─── 路径基准 ────────────────────────────────────────────────────────────────
@@ -88,14 +99,26 @@ def _relative_bases() -> tuple[Path, ...]:
     return tuple(seen)
 
 
-WpFileVerdict = Literal["file", "template_fallback", "empty", "missing"]
+WpFileVerdict = Literal[
+    "file", "template_fallback", "empty", "missing", "path_rejected", "type_mismatch"
+]
 
 #: 判定结果取值域（守卫按它断言，禁止在调用方硬写字面量）
+#:
+#: 🔴 Task 12 新增两档，且**不得**合并进 `missing`：
+#: * `path_rejected` —— 解析结果落在允许根之外（目录穿越 / 项目外绝对路径 /
+#:   软链接越界）。语义是「这条路径本身不该被使用」，与「文件丢了」是两件事：
+#:   前者要进安全日志与裁决清册，后者只要提示重新生成底稿。
+#: * `type_mismatch` —— 命中了文件但类型与 adapter 期望不符（Requirement 9.5 /
+#:   Property 41）。若并进 `missing`，「resolver 正确拒绝了父级异类型回退」就与
+#:   「这个 wp_code 根本没登记模板」分不开，Requirement 9.4/9.5 无法各自验证。
 WP_FILE_VERDICTS: tuple[WpFileVerdict, ...] = (
     "file",
     "template_fallback",
     "empty",
     "missing",
+    "path_rejected",
+    "type_mismatch",
 )
 
 #: 中文原因文案（唯一真源，ZIP 跳过清单与前端提示共用）
@@ -104,6 +127,8 @@ VERDICT_LABELS: dict[str, str] = {
     "template_fallback": "底稿文件缺失，已回退空白模板",
     "empty": "未配置底稿文件路径（file_path 为空）",
     "missing": "底稿文件不存在（路径已配置但磁盘上找不到）",
+    "path_rejected": "底稿文件路径越界（不在允许的存储根内，已拒绝）",
+    "type_mismatch": "底稿文件类型与所需格式不符（已拒绝回退异类型文件）",
 }
 
 
@@ -178,6 +203,7 @@ def resolve_wp_file(
     wp_code: str | None = None,
     *,
     allow_template_fallback: bool = True,
+    expected_document_type: str | None = None,
 ) -> WpFileResolution:
     """把 `working_paper.file_path` 解析成一个**可读文件**的绝对路径。
 
@@ -187,9 +213,13 @@ def resolve_wp_file(
         allow_template_fallback: 是否允许回退到 `wp_templates` 模板库。
             打包/下载场景建议 True（空白模板 + 清单标注 优于整份缺失）；
             哈希/校验场景应传 False（模板哈希不等于底稿哈希）。
+        expected_document_type: `"xlsx"` / `"docx"`。给定时启用类型门
+            （Requirement 9.5 / Property 41）：命中的文件类型不符即判 `type_mismatch`，
+            **绝不**回退到父级异类型文件。为 None 时不做类型判定（兼容既有调用方）。
 
     Returns:
-        :class:`WpFileResolution`。`path` 非 None 时保证 `is_file()` 为真。
+        :class:`WpFileResolution`。`path` 非 None 时保证 `is_file()` 为真，
+        且落在允许的存储根内（Property 42）。
 
     Examples:
         >>> r = resolve_wp_file("", "D2")           # doctest: +SKIP
@@ -208,22 +238,55 @@ def resolve_wp_file(
             raw=file_path,
             tried=(),
             blank=True,
+            expected_document_type=expected_document_type,
         )
 
-    # ─── Step 2/3: 逐个候选试 is_file() ─────────────────────────────────
+    # ─── Step 2/3: 逐个候选试 is_file() + 边界 + 类型 ────────────────────
     for candidate in _candidates(str(file_path)):
         tried.append(str(candidate))
         try:
-            if candidate.is_file():
-                return WpFileResolution(
-                    path=candidate,
-                    verdict="file",
-                    reason=VERDICT_LABELS["file"],
-                    raw=str(file_path),
-                    tried=tuple(tried),
-                )
+            hit = candidate.is_file()
         except OSError as err:  # 权限 / 路径过长等
             logger.debug("resolve_wp_file: 候选路径检查失败 %s: %s", candidate, err)
+            continue
+        if not hit:
+            continue
+        # 🔴 判定顺序：边界 → 类型 → 命中。反过来写会让「项目外绝对路径」先按
+        #    类型放行/拒绝，安全判据被业务判据遮蔽（Property 42 是安全门，必须最先）。
+        if not is_within_any_legacy_root(candidate):
+            logger.error(
+                "resolve_wp_file: 路径越界被拒 raw=%r resolved=%s（Property 42）",
+                file_path, candidate,
+            )
+            return WpFileResolution(
+                path=None,
+                verdict="path_rejected",
+                reason=VERDICT_LABELS["path_rejected"],
+                raw=str(file_path),
+                tried=tuple(tried),
+            )
+        if expected_document_type is not None and (
+            document_type_of(candidate) != expected_document_type
+        ):
+            logger.error(
+                "resolve_wp_file: 文档类型不符被拒 raw=%r resolved=%s 期望=%s 实得=%s"
+                "（Property 41：禁止回退异类型文件）",
+                file_path, candidate, expected_document_type, document_type_of(candidate),
+            )
+            return WpFileResolution(
+                path=None,
+                verdict="type_mismatch",
+                reason=VERDICT_LABELS["type_mismatch"],
+                raw=str(file_path),
+                tried=tuple(tried),
+            )
+        return WpFileResolution(
+            path=candidate,
+            verdict="file",
+            reason=VERDICT_LABELS["file"],
+            raw=str(file_path),
+            tried=tuple(tried),
+        )
 
     # ─── Step 4/5: 模板库回退 → missing ─────────────────────────────────
     return _template_fallback(
@@ -232,6 +295,7 @@ def resolve_wp_file(
         raw=file_path,
         tried=tuple(tried),
         blank=False,
+        expected_document_type=expected_document_type,
     )
 
 
@@ -242,8 +306,9 @@ def _template_fallback(
     raw: str | None,
     tried: tuple[str, ...],
     blank: bool,
+    expected_document_type: str | None = None,
 ) -> WpFileResolution:
-    """模板库回退。失败时按 `blank` 区分 `empty` / `missing`。"""
+    """模板库回退。失败时按 `blank` 区分 `empty` / `missing`；类型不符判 `type_mismatch`。"""
     terminal: WpFileVerdict = "empty" if blank else "missing"
 
     if not allow or not wp_code:
@@ -255,25 +320,66 @@ def _template_fallback(
             tried=tried,
         )
 
+    tpl = None
     try:
         # 局部 import：`wp_template_finder` 会读磁盘索引 JSON，
         # 模块级 import 会让本模块在无模板库的环境下不可导入。
         from app.services.wp_template_init_service import find_template_file_any
 
         tpl = find_template_file_any(wp_code)
-    except Exception as err:  # noqa: BLE001 — 模板库不可用不应打断导出
-        logger.warning(
-            "resolve_wp_file: 模板库回退失败 wp_code=%s: %s", wp_code, err
+    except ImportError as err:
+        # 🔴 Task 12：把原来的 `except Exception` 收窄成两类具体异常并升级到 ERROR。
+        #    fail-open 的代价在 memory 里是「最贵的一类」：宽泛 except 会把
+        #    「函数名写错 / 索引 JSON 结构变了 / 传错参数」全吞成 WARNING，
+        #    表现为「这份底稿没有模板」，而四层静态检查全绿。
+        logger.error(
+            "resolve_wp_file: 模板库模块不可导入 wp_code=%s: %s（部署缺件，非「无模板」）",
+            wp_code, err,
         )
-        tpl = None
+    except (OSError, ValueError, KeyError, TypeError) as err:
+        logger.error(
+            "resolve_wp_file: 模板库回退失败 wp_code=%s: %s（索引损坏或调用形态错，"
+            "不是「该 wp_code 无模板」）",
+            wp_code, err,
+        )
 
     if tpl is not None:
         tpl_path = Path(tpl)
         tried = (*tried, str(tpl_path))
         # 🔴 模板库也可能返回目录/失效路径，同样必须 is_file() 把关
         if tpl_path.is_file():
+            resolved = tpl_path.resolve()
+            if not is_within_any_legacy_root(resolved):
+                logger.error(
+                    "resolve_wp_file: 模板库返回越界路径被拒 wp_code=%s path=%s",
+                    wp_code, resolved,
+                )
+                return WpFileResolution(
+                    path=None,
+                    verdict="path_rejected",
+                    reason=VERDICT_LABELS["path_rejected"],
+                    raw=raw if raw is None else str(raw),
+                    tried=tried,
+                )
+            if expected_document_type is not None and (
+                document_type_of(resolved) != expected_document_type
+            ):
+                # Property 41 的核心反例：`find_template_file_any()` 对 B/S 子码会
+                # 回退到父级 XLSX。此处显式拒绝，不返回异类型文件。
+                logger.error(
+                    "resolve_wp_file: 模板库回退命中异类型文件被拒 wp_code=%s path=%s "
+                    "期望=%s 实得=%s（Requirement 9.5：禁止回退父级异类型文件）",
+                    wp_code, resolved, expected_document_type, document_type_of(resolved),
+                )
+                return WpFileResolution(
+                    path=None,
+                    verdict="type_mismatch",
+                    reason=VERDICT_LABELS["type_mismatch"],
+                    raw=raw if raw is None else str(raw),
+                    tried=tried,
+                )
             return WpFileResolution(
-                path=tpl_path.resolve(),
+                path=resolved,
                 verdict="template_fallback",
                 reason=VERDICT_LABELS["template_fallback"],
                 raw=raw if raw is None else str(raw),
@@ -289,6 +395,29 @@ def _template_fallback(
     )
 
 
+def resolve_template_docx(wp_code: str) -> WpFileResolution:
+    """按最具体 wp_code 解析 DOCX 模板（Property 40/41 的存量入口）。
+
+    与 `resolve_wp_file(..., expected_document_type="docx")` 的区别：本函数**不看**
+    `working_paper.file_path`，只走模板库，供「只要模板、不要底稿实例」的场景
+    （Word config / 通用 DOCX 裁决清册）使用。类型不符一律 `type_mismatch`，
+    绝不返回父级 XLSX。
+
+    🔴 `blank=False` 是刻意的：本函数根本不读 `file_path`，所以「找不到」只能是
+    **模板缺失**（`missing`），不能是 `empty`（其文案为「未配置底稿文件路径
+    （file_path 为空）」）。传 `blank=True` 会让 Requirement 9.5 要求的「模板缺失
+    显式报错」在清册里显示成「没配路径」，把部署缺件误导成数据没填。
+    """
+    return _template_fallback(
+        wp_code=wp_code,
+        allow=True,
+        raw=None,
+        tried=(),
+        blank=False,
+        expected_document_type="docx",
+    )
+
+
 __all__ = [
     "BACKEND_ROOT",
     "REPO_ROOT",
@@ -297,4 +426,5 @@ __all__ = [
     "WpFileResolution",
     "WpFileVerdict",
     "resolve_wp_file",
+    "resolve_template_docx",
 ]

@@ -10,6 +10,7 @@
           size="small"
           @change="(v: any) => dualMode.switchMode(v)"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g2-interest-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
@@ -219,6 +220,7 @@ import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInje
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import CycleTabProcedure from './shared/CycleTabProcedure.vue'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))

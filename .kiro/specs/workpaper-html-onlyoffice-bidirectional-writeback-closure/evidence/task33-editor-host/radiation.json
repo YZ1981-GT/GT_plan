@@ -1,0 +1,9 @@
+{
+  "frontend": [
+    "audit-platform/frontend/src/components/workpaper/sync/__tests__/WorkpaperSyncEditorHost.spec.ts",
+    "audit-platform/frontend/src/components/workpaper/sync/__tests__/useWorkpaperSyncBridge.spec.ts"
+  ],
+  "backend": [
+    "backend/tests/workpaper_sync/test_task32_bridge_state_domain.py"
+  ]
+}

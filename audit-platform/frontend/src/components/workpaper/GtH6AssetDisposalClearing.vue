@@ -27,6 +27,7 @@
           :disabled="!isOoAvailable && currentMode === 'html'"
           @change="onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h6-asset-disposal-clearing" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -174,6 +175,7 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 

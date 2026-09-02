@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import settings as app_settings
-from app.routers.wp_onlyoffice_router import router
+from app.routers.wp_onlyoffice_router import public_router, router
 
 
 # ---------------------------------------------------------------------------
@@ -39,6 +39,31 @@ class _FakeUser:
     id = FAKE_USER_ID
     username = "test_auditor"
     role = MagicMock(value="admin")
+
+
+def _sequenced_execute(*head: object) -> AsyncMock:
+    """前 N 次 execute 依次返回 `head`，之后**恒**返回「查不到行」的空结果。
+
+    🔴 不用固定长度的 `side_effect=[...]`：Task 21 起 config 端点多了一次 room 查询
+    （doc_key 由 room 身份派生，不再由文件 mtime 派生），统一门在同一个注入 session 上
+    还会再查若干次。固定列表一旦被耗尽就抛 `StopAsyncIteration`，测试失败原因与被测行为
+    完全无关。尾部的空结果不是「造数据」，而是如实表达「这一路查询都查不到行」——
+    对 room 查询来说正是生产的基线代际路径（无存活 room ⇒ 按 generation 1 派生 doc_key）。
+    """
+    queue = list(head)
+
+    def _empty() -> MagicMock:
+        result = MagicMock()
+        result.scalar_one_or_none.return_value = None
+        result.scalar.return_value = None
+        result.first.return_value = None
+        result.scalars.return_value.all.return_value = []
+        return result
+
+    async def _execute(*_args: object, **_kwargs: object) -> object:
+        return queue.pop(0) if queue else _empty()
+
+    return AsyncMock(side_effect=_execute)
 
 
 def _make_app_with_edit_wp(tmp_path, project_id, wp_code="D0", wp_status="draft"):
@@ -63,10 +88,20 @@ def _make_app_with_edit_wp(tmp_path, project_id, wp_code="D0", wp_status="draft"
     fake_proj_result.scalar.return_value = False  # project not deleted
 
     fake_db = AsyncMock()
-    fake_db.execute = AsyncMock(side_effect=[fake_wp_result, fake_proj_result])
+    # 🔴 Task 21 起 `resolve_room_doc_key()` 多一次 room 查询（doc_key 由 room 身份派生，
+    #    不再是 mtime）。side_effect 只喂两条时第三次 execute 会 StopAsyncIteration。
+    #    `scalar_one_or_none() -> None` = 「本入口还没有存活 room」，正是生产基线代际路径。
+    fake_room_result = MagicMock()
+    fake_room_result.scalar_one_or_none.return_value = None
+    fake_db.execute = _sequenced_execute(fake_wp_result, fake_proj_result, fake_room_result)
 
     app = FastAPI()
     app.include_router(router)
+    # 🔴 callback / wopi.contents / onlyoffice.health 挂在 `public_router`（机对机入口，
+    #    绕过 dedicated_wp_gate 的 get_current_user）。只挂 `router` 的测试 app 里它们
+    #    根本不存在 ⇒ 全部 404，与生产 `router_registry.workpaper` 同时注册两个 router
+    #    不一致（Task 30 关门时修）。
+    app.include_router(public_router)
 
     fake_user = _FakeUser()
 
@@ -148,10 +183,17 @@ class TestAcquireReleaseFlow:
         fake_proj_result2.scalar.return_value = False
 
         fake_db2 = AsyncMock()
-        fake_db2.execute = AsyncMock(side_effect=[fake_wp_result2, fake_proj_result2])
+        # 🔴 Task 21 起 `resolve_room_doc_key()` 多一次 room 查询（doc_key 由 room 身份派生，
+        #    不再是 mtime）。side_effect 只喂两条时第三次 execute 会 StopAsyncIteration。
+        #    `scalar_one_or_none() -> None` = 「本入口还没有存活 room」，正是生产基线代际路径。
+        fake_room_result2 = MagicMock()
+        fake_room_result2.scalar_one_or_none.return_value = None
+        fake_db2.execute = _sequenced_execute(fake_wp_result2, fake_proj_result2, fake_room_result2)
 
         app2 = FastAPI()
         app2.include_router(router)
+        # 🔴 callback 挂在 `public_router` 上（同上）。只挂 `router` 时它不存在 ⇒ 404。
+        app2.include_router(public_router)
 
         async def _override_db2():
             yield fake_db2
@@ -279,7 +321,12 @@ class TestIdempotentRenewal:
             fake_proj_result.scalar.return_value = False
 
             fake_db = AsyncMock()
-            fake_db.execute = AsyncMock(side_effect=[fake_wp_result, fake_proj_result])
+            # 🔴 Task 21 起 `resolve_room_doc_key()` 多一次 room 查询（doc_key 由 room 身份派生，
+            #    不再是 mtime）。side_effect 只喂两条时第三次 execute 会 StopAsyncIteration。
+            #    `scalar_one_or_none() -> None` = 「本入口还没有存活 room」，正是生产基线代际路径。
+            fake_room_result = MagicMock()
+            fake_room_result.scalar_one_or_none.return_value = None
+            fake_db.execute = _sequenced_execute(fake_wp_result, fake_proj_result, fake_room_result)
             return fake_db
 
         # 创建文件
@@ -371,6 +418,11 @@ class TestReleaseStatusCodes:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 挂在 `public_router`（机对机入口，
+        #    绕过 dedicated_wp_gate 的 get_current_user）。只挂 `router` 的测试 app 里它们
+        #    根本不存在 ⇒ 全部 404，与生产 `router_registry.workpaper` 同时注册两个 router
+        #    不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -421,6 +473,11 @@ class TestMissingFieldsSkipRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 挂在 `public_router`（机对机入口，
+        #    绕过 dedicated_wp_gate 的 get_current_user）。只挂 `router` 的测试 app 里它们
+        #    根本不存在 ⇒ 全部 404，与生产 `router_registry.workpaper` 同时注册两个 router
+        #    不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -459,6 +516,11 @@ class TestMissingFieldsSkipRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 挂在 `public_router`（机对机入口，
+        #    绕过 dedicated_wp_gate 的 get_current_user）。只挂 `router` 的测试 app 里它们
+        #    根本不存在 ⇒ 全部 404，与生产 `router_registry.workpaper` 同时注册两个 router
+        #    不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -497,6 +559,11 @@ class TestMissingFieldsSkipRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 挂在 `public_router`（机对机入口，
+        #    绕过 dedicated_wp_gate 的 get_current_user）。只挂 `router` 的测试 app 里它们
+        #    根本不存在 ⇒ 全部 404，与生产 `router_registry.workpaper` 同时注册两个 router
+        #    不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()

@@ -1,0 +1,383 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 16
+  },
+  "mutations": [
+    {
+      "id": "M01",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[room_pointer]",
+      "why": "不再校验 substrate 来源 ⇒ callback 到达时的 room pointer / registry alias / upgrade candidate / operation path 都能当 substrate（AC 4.3 明令禁止）。四种形态各自参数化，删掉判据时四条同时红",
+      "verdict": "RED",
+      "summary": "4 failed, 460 passed in 42.17s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[operation_path]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[registry_alias]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[room_pointer]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[upgrade_candidate]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[operation_path]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[registry_alias]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[room_pointer]",
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_every_forbidden_origin_is_rejected[upgrade_candidate]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 44.7
+    },
+    {
+      "id": "M02",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_legal_origin_but_different_artifact_id_is_rejected",
+      "why": "只查「声明的来源」不查「事实上取到的是不是那一个」⇒ 从 room pointer 查到一个 artifact 再把 origin 写成 application_incoming_fk 就能过关。与 M01 分开：声明是意图，id 相等才是事实",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.78s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_legal_origin_but_different_artifact_id_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_legal_origin_but_different_artifact_id_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.3
+    },
+    {
+      "id": "M03",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_quarantined_is_rejected_with_coordinator_specific_type",
+      "why": "coordinator 入口不再拒绝 quarantined ⇒ 三层拒绝少一层。真库侧同时红：PG 守卫断言 `open_substrate` 报的是 coordinator 自己的 error_code",
+      "verdict": "RED",
+      "summary": "3 failed, 461 passed in 42.16s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_quarantined_is_rejected_with_coordinator_specific_type",
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_entry_layer_refuses_with_its_own_code",
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_quarantined_is_rejected_with_coordinator_specific_type",
+        "test_task26_oo_to_html_pg.py::TestQuarantinedThreeLayerRefusal::test_coordinator_layer_is_not_shadowed_by_the_db_layer"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 44.8
+    },
+    {
+      "id": "M04",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_non_incoming_kind_is_rejected",
+      "why": "不再要求 substrate 是 incoming ⇒ published representation 也能被当 OO→HTML 的只读基底，于是「客户端刚回写的字节」与「服务器现状」混成一份",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.67s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_non_incoming_kind_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_non_incoming_kind_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.3
+    },
+    {
+      "id": "M05",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_durable_state_without_durable_at_is_rejected",
+      "why": "只看 state 不看 `durable_at` ⇒ 半写入态（state 已改而 durable fact 未落）也能进 engine。AC 5.4 明确 ownership 只以 immutable `durable_at` 判定",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.96s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_durable_state_without_durable_at_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_durable_state_without_durable_at_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.6
+    },
+    {
+      "id": "M06",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestSubstrateAdmission::test_incoming_with_published_at_is_rejected",
+      "why": "不再拒绝带 `published_at` 的 incoming ⇒ 「有人试过晋升它」这条痕迹被忽略（Property 65：incoming 永不 published/current/resolver-visible）",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.39s",
+      "added": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_incoming_with_published_at_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestSubstrateAdmission::test_incoming_with_published_at_is_rejected"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.1
+    },
+    {
+      "id": "M07",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_whitelist_is_exactly_the_three_allowed_actions",
+      "why": "白名单被悄悄加一项 `release` ⇒ Requirement 5.6「永不 release、永不转 durable」被放开。白名单必须与需求原文三项逐字锁死",
+      "verdict": "RED",
+      "summary": "2 failed, 463 passed in 43.23s",
+      "added": [
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_everything_else_is_refused[release]",
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_whitelist_is_exactly_the_three_allowed_actions"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_everything_else_is_refused[release]",
+        "test_task26_oo_to_html.py::TestQuarantineWhitelist::test_whitelist_is_exactly_the_three_allowed_actions"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.0
+    },
+    {
+      "id": "M08",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately",
+      "why": "typed null marker 冒充 per-entry contract 时不再失败 ⇒ projection-based result 会在没有 approved contract 的情况下发布（AC 8.12 末句）",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.56s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.2
+    },
+    {
+      "id": "M09",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately",
+      "why": "把适用范围反过来 ⇒ custom/opaque 入口（contract slot 本就该是 typed null marker）恒失败，而 projection-based 的真正判据被跳过。两侧都必须钉住，否则「对所有 authority model 都要求 approved contract」会反过来违反 Requirement 6.19",
+      "verdict": "RED",
+      "summary": "3 failed, 461 passed in 43.31s",
+      "added": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_custom_authority_model_is_out_of_scope_and_passes",
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_missing_contract_slot_fails",
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_custom_authority_model_is_out_of_scope_and_passes",
+        "test_task26_oo_to_html.py::TestApprovedContractChild::test_typed_null_marker_contract_slot_fails_immediately"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 45.9
+    },
+    {
+      "id": "M10",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[project_revoked]",
+      "why": "打开后撤销 project 可见性仍放行 ⇒ Property 43 的第一条直接失效。真库两个 fence 场景一并红",
+      "verdict": "RED",
+      "summary": "10 failed, 454 passed in 43.24s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[project_revoked]",
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_fence_ordering_puts_visibility_before_generation",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_application_and_operation_are_authorization_stale_not_error[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_nothing_committed_on_fence_failure[fence_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_nothing_committed_on_fence_failure[fence_before_write]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_publish_fence_fires_before_any_file_is_published",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_write_fence_fires_after_publish_and_before_revision_bump"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[project_revoked]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_publish]",
+        "test_task26_oo_to_html_pg.py::TestFinalAuthorizationFence::test_each_revocation_shape_blocks_the_commit[revoked_before_write]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 45.9
+    },
+    {
+      "id": "M11",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[workflow_locked]",
+      "why": "复核锁定/归档后仍可提交内容。与 M10 分开：合成一条 `all([...])` 时删掉任一条都会被其余遮蔽",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.89s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[workflow_locked]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[workflow_locked]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.7
+    },
+    {
+      "id": "M12",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[generation_superseded]",
+      "why": "generation 已 supersede 的旧 application 仍可提交 ⇒ 撤销 writer 后旋转 generation 这条保护形同虚设（AC 2.8 / 4.7）",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.61s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[generation_superseded]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[generation_superseded]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.4
+    },
+    {
+      "id": "M13",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[write_fence_advanced]",
+      "why": "write fence 提升后旧会话仍可提交 ⇒ 「期间有 participant 被撤销」的内容会被合进去（AC 10.10）",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.67s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[write_fence_advanced]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[write_fence_advanced]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.3
+    },
+    {
+      "id": "M14",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_frozen_side_null_initiator_has_its_own_error_code",
+      "why": "frozen 侧 null initiator 放行 ⇒ system/route identity 冒充用户授权（AC 10.10 明令禁止）。首轮实测判 GREEN：它与 observed 侧共用 `InitiatorMissingError`，删掉后被后者遮蔽 ⇒ 已拆成 `FrozenInitiatorMissingError` + 独立 error_code",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.41s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_frozen_side_null_initiator_has_its_own_error_code"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_frozen_side_null_initiator_has_its_own_error_code"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.1
+    },
+    {
+      "id": "M15",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_replaced]",
+      "why": "换了个人当 initiator 也放行 ⇒ 冻结的发起人身份可被替换。与 M14 分开：「没有人」与「换了人」是两条独立判据",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.33s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_replaced]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[initiator_replaced]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.0
+    },
+    {
+      "id": "M16",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[permission_epoch_changed]",
+      "why": "initiator 的权限 epoch 变了仍放行 ⇒ 降权用户的编辑照样落库",
+      "verdict": "RED",
+      "summary": "1 failed, 463 passed in 43.43s",
+      "added": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[permission_epoch_changed]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestFinalAuthorizationFence::test_each_branch_rejects_independently[permission_epoch_changed]"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ab8b9e323464f8e836fd9e64b523de063043d85f3a263a540e549b40c956dc1c",
+      "seconds": 46.1
+    }
+  ]
+}

@@ -64,8 +64,19 @@ class TestSnapshotWriterOrchestratorIntegration:
     """集成测试：snapshot_writer → orchestrator → 主 event_bus"""
 
     @pytest.mark.asyncio
-    async def test_writeback_triggers_main_event_bus(self):
-        """snapshot_writer 写回后，通过 orchestrator 发布 WORKPAPER_SAVED 到主 event_bus"""
+    async def test_writeback_enqueues_durable_event_for_post_commit_publish(self):
+        """snapshot_writer 写回后，经 orchestrator 把 WORKPAPER_SAVED 写进耐久 outbox。
+
+        **Validates: Requirements 13.1**
+
+        spec workpaper-html-onlyoffice-bidirectional-writeback-closure Task 16 把判据
+        翻面：原用例断言"write_cell 里已经发到主 event_bus"。但 snapshot_writer 自己
+        不 commit（提交方是 custom_query / custom_query_writeback 两个 router），在它内部
+        发布就意味着"事务还没提交事件已经出去了" —— 回滚后下游按不存在的内容刷新
+        （Property 52）。现在的正确形态是：写回事务内只落一条 pending 耐久行，router
+        commit 之后再 `publish_pending`。发布顺序本身由
+        `workpaper_sync/test_task16_durable_outbox_wiring.py` 按行号次序守卫。
+        """
         sheet_name = "审定表"
         parsed_data = _make_snapshot_with_cell(sheet_name, 6, 1, 100.0)
         now = datetime.now(timezone.utc)
@@ -131,17 +142,27 @@ class TestSnapshotWriterOrchestratorIntegration:
         # 联动没触发时必须暴露出来，不能静默（Step 8 的 fail-open 已改为记 ERROR + warnings）
         assert "warnings" not in result, f"下游联动未触发：{result.get('warnings')}"
 
-        # 本测试的**真正断言**：事件发到了主 event_bus（而非孤立总线）
-        assert events_published, (
-            "write_cell 未向主 event_bus 发布事件 —— orchestrator.after_save 没被调到，"
+        # 本测试的**真正断言**：orchestrator 真被调到了，并且在写回事务里落下了一条
+        # 完整的耐久事件行 —— 接线断了（orchestrator 没被调到）这里就是空。
+        outbox_rows = [
+            call.args[0]
+            for call in mock_db.add.call_args_list
+            if type(call.args[0]).__name__ == "ImportEventOutbox"
+        ]
+        assert outbox_rows, (
+            "write_cell 未写入耐久 outbox 行 —— orchestrator.after_save 没被调到，"
             "下游 cross_ref / stale / SSE 都不会触发"
         )
-        kinds = [
-            getattr(p, "event_type", None) or getattr(p, "type", None) or str(p)
-            for p in events_published
-        ]
-        assert any("WORKPAPER_SAVED" in str(k) or "workpaper_saved" in str(k) for k in kinds), (
-            f"发布的事件里没有 WORKPAPER_SAVED：{kinds}"
+        assert len(outbox_rows) == 1
+        row = outbox_rows[0]
+        assert row.event_type == "workpaper.saved", row.event_type
+        assert row.status.value == "pending", "写回事务内必须还是 pending"
+        assert row.payload["trigger"] == "custom_query_writeback"
+        assert row.payload["wp_id"] == wp_id
+
+        # 而且这一步**不许**已经发出去：snapshot_writer 不是提交方。
+        assert events_published == [], (
+            f"写回事务内不该发布事件，实得 {events_published}"
         )
 
     @pytest.mark.asyncio

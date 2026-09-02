@@ -194,4 +194,11 @@ async def writeback_confirm(
         )
         written.append(result if isinstance(result, dict) else {"result": "ok"})
     await db.commit()
+
+    # Task 16 / Requirement 13.1 / Property 52：snapshot_writer 在事务内只把
+    # WORKPAPER_SAVED 写成耐久 outbox 行，事件必须在 content commit 之后才发布。
+    from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+    await DurableEventOutboxService.publish_pending(db)
+
     return {"success": True, "written": written, "count": len(written)}

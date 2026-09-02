@@ -193,9 +193,48 @@ def find_template_file(wp_code: str) -> Path | None:
     return None
 
 
+# ---------------------------------------------------------------------------
+# 子码判据（Task 58 / Requirement 9.4）
+# ---------------------------------------------------------------------------
+#
+# 🔴 `^A\d+-\d+` 是**存量缺陷**，不是设计：它只把 A 类子码当子码，于是 `B2-1` /
+# `B18-3-1` / `B40-1` 这类 B 子码落进下面「主程序表：xlsx 优先」分支，被
+# `find_template_file()` 的「终极回退：用主表」抢到父级 XLSX。2026-08-29 逐条实测：
+# 28 个 `word-template` wp_code 里 **9 个**（B18-3-1 / B18-3-2 / B2-1 / B2-11 /
+# B2-3 / B2-6 / B2-8 / B40-1 / B40-2）磁盘上都有自己的 DOCX，却全部解析到父级 XLSX。
+#
+# 修法**不是**把这个正则改成字母类无关：那会让 `D2-2` / `E1-3` 这类 Excel 子表
+# 也走子码分支，而它们的真实载体是范围式命名的父文件（`D2-1至D2-4 …xlsx`），子码
+# 分支的同名前缀判据匹配不到 ⇒ 数百个 wp_code 解析成 None（实测过）。
+#
+# 正确修法是**只把 DOCX 那一步提到前面并让它字母类无关**（见
+# `find_template_file_any` 的 ① 段）：`resolve_own_docx_or_none()` 按
+# `canonical_paths.specificity_rank` 取最具体载体、且类型门只放 DOCX，所以
+# * 有自己 DOCX 的子码（含 B/S）拿到自己的 DOCX；
+# * 没有自己 DOCX 的子码（D2-2 等）原样落回下方既有 xlsx 链，行为零变化。
+#
+# 本常量保留 A-only 形态**只**用于「A 子码不得回退父级 XLSX」这条既有严格性
+# （下方 ② 段），不再承担「是不是子码」的判断。
+_LEGACY_A_ONLY_SUB_CODE_RE = re.compile(r"^A\d+-\d+")
+
+
+def _resolve_most_specific_docx(wp_code: str) -> Path | None:
+    """该 wp_code **自有**的最具体 DOCX 载体（Task 58 统一 Word resolver 的唯一入口）。
+
+    委派 `workpaper_sync.word_resolution`，**不**在本模块复制具体度/类型判据 ——
+    复制会让任一侧被短路都不改变行为（变异检验判 GREEN）。
+
+    局部 import：`word_resolution` 依赖 `app.core.config`（读 `STORAGE_ROOT`），
+    模块级 import 会让本模块在纯路径场景（无配置）下不可导入。
+    """
+    from app.services.workpaper_sync.word_resolution import resolve_own_docx_or_none
+
+    return resolve_own_docx_or_none(wp_code)
+
+
 def find_all_template_files(wp_code: str) -> list[Path]:
     """查找 wp_code 对应的所有模板文件（多文件底稿）"""
-    is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
+    is_sub_code = bool(_LEGACY_A_ONLY_SUB_CODE_RE.match(wp_code))
     if is_sub_code:
         single = find_template_file_any(wp_code)
         return [single] if single else []
@@ -262,13 +301,23 @@ def find_template_file_any(wp_code: str) -> Path | None:
         if path.exists():
             return path
 
-    is_sub_code = bool(re.match(r"^A\d+-\d+", wp_code))
+    # ── ① 所有适用 wp_code：自有 DOCX 优先（Requirement 9.4 / P40）─────────
+    #
+    # 提到 A-only 分支**之前**且字母类无关，是本次唯一的行为变更点。加法性质：
+    # 命中即返回自己的 DOCX，不命中原样落回下方既有链（含 A 子码的 xlsx 严格分支
+    # 与主码的 xlsx 优先分支），故 `D2-2` / `E1-3` 这类无自有 DOCX 的子码零变化。
+    #
+    # 桥只认 **exact-own** DOCX 且 **无自有工作簿**（见 `resolve_own_docx_or_none`）：
+    # 放宽任一条都会倒转具体度或翻转格式，1539 个 wp_code 的全量比对实测过
+    # （`B30-13-1` / `B60-1` 具体度倒转、`S33-1` 格式翻转）。
+    most_specific_docx = _resolve_most_specific_docx(wp_code)
+    if most_specific_docx is not None:
+        return most_specific_docx
+
+    # ── ② A 子码既有严格性：不得回退父程序表 XLSX ─────────────────────────
+    is_sub_code = bool(_LEGACY_A_ONLY_SUB_CODE_RE.match(wp_code))
 
     if is_sub_code:
-        # docx 子码优先（A9-1、A10-1…）
-        docx = _find_docx_by_index_or_disk(wp_code)
-        if docx:
-            return docx
         # xlsx 子码（A7-1、A10-2…）：仅匹配同名前缀文件
         index = _load_index()
         xlsx_matches = [

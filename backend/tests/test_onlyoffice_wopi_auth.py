@@ -22,7 +22,7 @@ from httpx import ASGITransport, AsyncClient
 from jose import jwt
 
 from app.core.config import settings as app_settings
-from app.routers.wp_onlyoffice_router import router
+from app.routers.wp_onlyoffice_router import public_router, router
 
 
 # ---------------------------------------------------------------------------
@@ -55,6 +55,11 @@ def _build_app_with_db(fake_db):
     """构建测试 FastAPI app + 注入 mock DB"""
     app = FastAPI()
     app.include_router(router)
+    # 🔴 callback / wopi.contents / onlyoffice.health 挂在 `public_router`（机对机入口，
+    #    绕过 dedicated_wp_gate 的 get_current_user）。只挂 `router` 的测试 app 里它们
+    #    根本不存在 ⇒ 全部 404，与生产 `router_registry.workpaper` 同时注册两个 router
+    #    不一致（Task 30 关门时修）。
+    app.include_router(public_router)
 
     async def _override_db():
         yield fake_db

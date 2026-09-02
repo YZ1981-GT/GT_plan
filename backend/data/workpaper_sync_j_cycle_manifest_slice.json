@@ -1,0 +1,1941 @@
+{
+  "schema_version": "manifest-slice:v1",
+  "task": "Task 52",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "J 循环 Excel 独立 entry 的冻结 slice。🔴 与前六轮形态差异最大的一轮：J 循环有 3 个可达宿主（J1/J2/J3）与 3 本权威模板，但 source manifest 里只有 **1 条**独立 entry —— 只有 J1 宿主挂了 GtOnlyOfficeSheet，J2/J3 宿主一个 OO 挂载点都没有，按可复算的 selection_rule 根本进不了 manifest。任务正文点名的「J2 orphan composable」实测是 **4 个** orphan dual-mode composable（J2 两个 + J3 两个），其中 2 个是「二阶 orphan」（只被一个自身零入边的 barrel re-export）；「真实传输键」实测与命名规律不同构（J1-2 一张逻辑表对应三个键 J1-2-detail-{shortTerm,postEmployment,severance}，身份字段是 id 不是 rowId），而 orphan 载体 useJ2FormData/useJ3FormData 拼的是 `J2-${key}` / `J3-${key}` 前缀派生键 —— 生产路径从未写过那种形态。",
+  "frozen_at": "Task 52（2026-08-31）",
+  "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "sibling_slices": [
+    "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_g_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_h_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_i_cycle_manifest_slice.json"
+  ],
+  "slice_scope": {
+    "cycle": "J",
+    "document_type": "xlsx",
+    "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'J' 开头 ③ independent_entry is True。实算：命中 wp_code_patterns 以 J 开头的 entry 共 2 条（xlsx/j1/gt-j1-employee-compensation 的 ['J1E'] 与 xlsx/j1/inspection/j1-tab-general-check 的 ['J1-8','J1T']），其中 independent_entry 为 true 的 1 条 ⇒ 本 slice 恰 1 条。第 2 条是 parent_duplicate 子入口（parent_entry_id = 前者），按 AC 1.6 不独立计数。J 循环没有 pilot，故不需要第四条排除条件。",
+    "independent_entry_count": 1,
+    "j_prefixed_entry_total": 2,
+    "j_prefixed_independent_total": 1,
+    "excluded_pilot_entry_count": 0,
+    "parent_duplicate_count": 1,
+    "parent_duplicate_note": "🔴 J 循环 parent_duplicate 子入口 **1 条**：xlsx/j1/inspection/j1-tab-general-check（宿主 j1/inspection/J1TabGeneralCheck.vue，wp_code_patterns ['J1-8','J1T']，parent_entry_id = xlsx/j1/gt-j1-employee-compensation）。它自己挂了一个 GtOnlyOfficeSheet，所以 generator 把它枚举成 entry，但 independent_entry=false ⇒ 按 AC 1.6 复用父 entry 的 adapter、不独立计数。与 D（D4 有 31 条）、H（H4/H8 共 5 条）同类，与 F/I（各 0 条）不同 ⇒ 本 slice 触发 conditional_sections 的 parent_duplicate_summary。",
+    "excluded_from_slice": [
+      {
+        "what": "J 循环的 pilot —— 不存在",
+        "reason": "🔴 这一条登记的是「查过且没有」，不是遗漏。本 spec 的四个 pilot 是 B60（Task 40）/ D2（Task 41）/ H1（Task 42）/ G7（Task 43）。逐文件读 backend/data/workpaper_sync_contracts/*.json 的 review.entry_id 实得：b60.hour_budget.json → 'xlsx/b60/gt-b60-bundle'、d2.receivable_detail.json → 'xlsx/gt-d2-accounts-receivable'、g7.soe_subsidiary_disclosure.json → 'xlsx/gt-g7-long-term-equity-main'、h1.disposal_check.json → 'xlsx/gt-h1-fixed-assets'（🔴 文件名与 entry_id 不同构：g7 的文件名暗示 soe_subsidiary 而 entry 是 long-term-equity-main，b60 是三段式 —— 按文件名猜必错），无一条属 J 循环。故 selection_rule 不需要「排除 pilot」这一条。",
+        "verified_how": "对 CONTRACT_DIR 下每份 *.json 逐文件 json.loads 后读 review.entry_id（不是数文件个数、不是按文件名推断），断言无一条以 'xlsx/j' 或 'xlsx/gt-j' 开头。"
+      },
+      {
+        "what": "J0 函证册 —— 不存在",
+        "reason": "🔴 backend/wp_templates/J/ 下只有 3 本工作簿（J1/J2/J3），没有 J0；wp_template_finder 的 find_template_file('J0') 与 find_template_file_any('J0') 都返回 None。D0 的 9 个 confirmation-* 组件跨循环复用（E0/F0/G0/H0/K0/L0），J 循环不在复用清单里。与 I 循环同形（也无 J0/I0）。",
+        "verified_how": "枚举 backend/wp_templates/J 的文件集合（跳 `~$` 锁文件）+ 对 'J0' 实跑两个解析函数断言 None。"
+      },
+      {
+        "what": "J2 宿主 GtJ2DefinedBenefitPlan.vue 与 J3 宿主 GtJ3ShareBasedPayment.vue",
+        "reason": "🔴 **不是漏迁，是 selection_rule 现算的结果**：两个宿主在 source manifest 的 186 条 entry 里**一条都没有** —— manifest 的枚举口径是「模板 AST 里的 GtOnlyOfficeSheet 挂载点」，而这两个宿主的 template 里既没有 GtOnlyOfficeSheet 也没有 el-segmented（逐文件实读：j2 宿主 238 行 / j3 宿主 210 行，两者的 import 段只有 CycleTabProcedure + useChecklistPersistence + useWorkpaperScaffold + useWorkpaperReviewThreads，无 OO 组件、无 dual-mode composable）。它们在产品意义上可达（htmlRendererRegistry.ts#L1704 componentType 'j2-defined-benefit-plan' / #L1712 'j3-share-based-payment' 各有真 defineAsyncComponent 模块边），只是**没有 OO 侧入口**。把它们手写进 independent_entries 会违反 step 1 的 forbidden「手抄 entry 列表」并让 selection_rule 不再可复算 ⇒ 登记在此，并把它们的 orphan dual-mode composable 与位置化身份缺陷落进 orphan_dual_mode_inventory / dynamic_row_identity 的 non_entry_host_scope，由 BP-6 / BP-7 承接。",
+        "verified_how": "① 现算 selection_rule 得 entry 集合 == {xlsx/j1/gt-j1-employee-compensation}；② 断言 manifest 里没有任何 entry 的 host_path 等于这两个宿主路径；③ 两个宿主的 SFC 外层 template 里 'GtOnlyOfficeSheet' 与 'el-segmented' 命中数各为 0；④ htmlRendererRegistry 里两条 componentType 的 import 路径真指向这两个文件。",
+        "ac_15_applicability": "🔴 顺带兑现了 AC 1.5 想要的效果但**不是**本任务的裁决产物：这两个宿主只显示 HTML 模式、零切换按钮，不存在「不可兑现的切换按钮」。但 AC 1.5 的触发条件是「入口**被裁决**为纯 OO 或纯 HTML」，而它们不是 manifest entry ⇒ 没有裁决 ⇒ AC 1.5 对本 slice**不适用**（见 honest_adjudication_summary.ac_15_not_applicable_because）。"
+      },
+      {
+        "what": "6 个 `useJ{1,2,3}*FormData` / `*Integration` / `*CrossSheet` 等业务 composable，与 J1/J2/J3 的 34 个子 Tab 组件",
+        "reason": "子 Tab 是同一 entry 内的 sheet 分发组件（唯一例外 J1TabGeneralCheck.vue 自己有 OO 挂载点，故被枚举成 parent_duplicate 子入口，见 parent_duplicate_summary）；FormData/Integration/CrossSheet 是持久化与联动载体而非 legacy dual-mode 实现，不在 legacy_deletion_paradigm step 3 的删除对象内。其中 useJ2FormData / useJ3FormData 是「长得像载体的死代码」，登记在 orphan_dual_mode_inventory.lookalike_persistence_carriers（Task 72 改线时最容易误接的东西）。",
+        "verified_how": "对每个子 Tab 断言它不在 manifest 的 186 条 entry 的 host_path 集合里（除 J1TabGeneralCheck.vue）。"
+      }
+    ]
+  },
+  "independent_entries": [
+    {
+      "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+      "wp_code_pattern": "J1E",
+      "document_type": "xlsx",
+      "host": "GtJ1EmployeeCompensation.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5",
+        "BP-8",
+        "BP-9",
+        "BP-10",
+        "BP-11"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（本 entry 有 HTML 对端）；填 single_html 会违反 AC 12.9（OO 侧有真实业务价值：23 张 sheet 的权威模板经项目存储真实打开）；填 unreachable 与 htmlRendererRegistry.ts#L1696 的真模块边矛盾；填 bidirectional 会违反 AC 12.1 的 SR-6（六件前置一件未落地）。见 adjudication_criteria.capability_enum_note。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "J/J1 应付职工薪酬.xlsx",
+      "mount_count": 1,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "shared_platform_persistence_adapter",
+        "write_carrier_path": "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts",
+        "write_carrier_note": "🔴 J 循环独有的第三种写载体族：既不是 H/I 的 host_inline（宿主自己 import http 并 PUT），也不是 per-entry 的 `useJ{n}FormData`，而是**平台级共享持久化适配器** `useChecklistPersistence`（23 个真语句消费方，K1~K13 / D2 / K5 / J1 / J2 / J3 等共用）。宿主只做 `handleChildSave(items) → persistence.saveDebounced(item_id, patch)`（#L213-217），逐 item 防抖 / flush / 错误态全在适配器里。按 H 的「载体里必须有 http.put」或 I 的「宿主 import http」两种口径去核，本 entry 都会假红。",
+        "write_client": "api",
+        "write_client_import": "import { api } from '@/services/apiProxy'",
+        "write_client_import_source": "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L8",
+        "write_carrier_consumed_at": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L105",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L182",
+        "read_carrier": "shared_platform_persistence_adapter_load_with_render_config_snapshot_baseline",
+        "read_carrier_path": "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses（persistence.load()）；render-config 快照（props.htmlData 的 responses_snapshot / allResponses / checklist_responses 三键，经 collectChecklistResponses 归一）只作断网/旧数据兼容基线，GET 成功后以服务端为准并补齐快照独有的 section",
+        "endpoint_read_source": "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L263",
+        "read_carrier_consumed_at": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L186",
+        "endpoint_source": "backend/app/routers/checklist_responses.py",
+        "endpoint_source_get": "backend/app/routers/checklist_responses.py#L84",
+        "endpoint_source_put": "backend/app/routers/checklist_responses.py#L132",
+        "payload_column": "remark",
+        "payload_column_mode": "remark_only_conclusion_null_for_the_primary_table",
+        "payload_write_site": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L247",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "prefix_plus_section_key_derived",
+        "transport_key_shape": "J1-2-detail-{shortTerm|postEmployment|severance}",
+        "row_identity_key": "id",
+        "row_identity_generator": "module_function_inline_template_literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L127",
+        "row_identity_generator_form": "id: `j1d-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": false,
+        "row_identity_load_fallback_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L181",
+        "row_identity_load_fallback_form": "id: String(r.id || `j1d-load-${i}-${Math.random().toString(36).slice(2, 6)}`)",
+        "row_identity_load_fallback_is_positional": false,
+        "row_identity_load_fallback_defect": "nondeterministic_regeneration",
+        "row_identity_load_fallback_note": "🔴 兜底分支不是「位置化」而是「非确定性」：`${i}` 参与但后接 Math.random()，所以两行不会撞 id；代价是同一行每次 load 都换 id ⇒ 契约层按 stable field key + row identity 拆字段时，缺 id 的历史数据会被当成新行。它与 I 循环 family_b（`bv-${r.rowId || i}`，纯下标兜底、会撞）**不是同一种缺陷**，判据必须分得开（见 dynamic_row_identity.positional_identity_inventory 的四族划分）。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "J1-2-detail-shortTerm",
+          "J1-2-detail-postEmployment",
+          "J1-2-detail-severance"
+        ],
+        "table_keys_note": "🔴 这里只登记 primary managed table（三边锁的对象），而它**一张逻辑表对应三个传输键** —— 与 D~I 六轮的「一表一键」都不同（I6 的键例外只是命名例外，仍是一表一键）。本 entry 另有 J1A 程序表、审定表 J1-1（J1-1-rows / J1-1-audited-total / J1-1-audited-begin-total）、J1-3 调整分录（J1-3-adjustment-rows / J1-3-note / J1-3-conclusion）、J1-4 月度分析、J1-5 同行业对比、J1-6..J1-10 五张检查表与两份附注披露（J1-disc-{listed|soe}-{summary,short-term,post-employment,notes}）的各自键，逐条见 transport_key_resolution。",
+        "second_write_path_note": "🔴 本 entry 有**两条并存的写路径**：① 宿主的 `useChecklistPersistence`（子 Tab 经 props.saveImmediate 汇入）；② 7 个子 Tab 各自 `import http from '@/utils/http'` 直接 PUT 同一端点（J1TabAdjudication.vue#L283 / J1TabAdjustment.vue#L95 与 #L250 / J1TabDisclosureListed.vue#L292 / J1TabDisclosureSoe.vue#L271 / J1TabGeneralCheck.vue#L469 / J1TabNonMonetaryCheck.vue#L259 / J1TabSeveranceCheck.vue#L319）。两条路径写同一张表的不同 item_id，互不经过对方的防抖/版本号 ⇒ 契约与 adapter 必须同时覆盖两条，否则「只接了适配器」会漏掉 7 个 Tab 的写入（BP-5）。",
+        "primary_table": {
+          "item_id_set": [
+            "J1-2-detail-shortTerm",
+            "J1-2-detail-postEmployment",
+            "J1-2-detail-severance"
+          ],
+          "owner_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts",
+          "owner_constant": "STORAGE_KEY_PREFIX",
+          "owner_declaration_kind": "module_constant_plus_derivation_function",
+          "owner_constant_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L108",
+          "owner_derivation_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L110",
+          "owner_derivation_form": "`${STORAGE_KEY_PREFIX}${section}`，section ∈ J1_SECTIONS[].key",
+          "second_declaration_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts",
+          "second_declaration_constant": "J1_DETAIL_SECTION_KEYS",
+          "second_declaration_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts#L94",
+          "second_declaration_verdict": "CONSISTENT",
+          "second_declaration_note": "🔴 同一组键有**两份声明**：写方 useJ1Detail 由前缀派生，读方（附注披露的 j1DisclosureDetailPull / useJ1DisclosureSections）用 useJ1Adjudication 导出的三个**全字面量**常量，注释自称「与 useJ1Detail 的 STORAGE_KEY_PREFIX 一致」。本 slice 把那句注释当作待核的声明（TK-1 的判据就是去核它真不真）：前缀一改而字面量不改，读方会静默读空而两侧各自的单测都不会红。当前实测三键逐字相等 ⇒ verdict = CONSISTENT，风险登记为 BP-11。",
+          "what_it_holds": "应付职工薪酬明细（J1-2）三个分区各存一个 JSON 行数组 —— 短期薪酬 20 行骨架 / 离职后福利与其他长期福利 8 行骨架 / 一年内支付的辞退福利动态行；每行含未审滚动（期初/本期增加/本期减少/期末）+ 期初调整 + 账项调整（增加/减少）+ 审定四列 + 备注",
+          "template_relative_path": "J/J1 应付职工薪酬.xlsx",
+          "template_sheet": "明细表J1-2 ",
+          "template_sheet_note": "🔴 sheet 名尾部有一个真实空格（`'明细表J1-2 '`），审定表也是（`'审定表J1-1 '`）。openpyxl 按精确名取表 ⇒ 判据里把它 strip 掉会 KeyError。与 J2/J3 册（`'明细表J2-2'` / 无尾空格）不同。",
+          "sheet_name_trailing_space": true,
+          "identity_cell": "A11",
+          "identity_text": "序号",
+          "label_column": "B",
+          "label_column_identity_cell": "B11",
+          "label_column_identity_text": "项目名称"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L105",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L186",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L213",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L182",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L263",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L108",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L247",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts#L94",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+        "module_kind": "shared_platform_base_consumed_directly_by_host",
+        "lines": 65,
+        "wraps_shared_base": null,
+        "wraps_shared_base_note": "🔴 本字段对 J1 是 null 而不是 false/true：J1 **没有** per-entry dual-mode composable（不存在 useJ1DualMode.ts / useJ1EntryDualMode.ts），宿主 #L110 直接 import 共享基类。H 循环 9 个、I 循环 6 个都是各自独立实现且 wraps_shared_base 全为 false；D/M/N/G2 有 wrapper。J1 是第三种形态：直连共享基类，故「wrap 与否」不适用。",
+        "host_consumes_it": true,
+        "host_consumption_source": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L110",
+        "host_binding_source": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L170",
+        "localStorage_prefix": null,
+        "localStorage_prefix_note": "🔴 共享基类**不做任何 localStorage 持久化**（逐行实读 65 行：只有 mode/ooAvailable/checking 三个 ref + checkOOHealth + switchMode + onMounted 探测），所以 J1 没有 `j1-dual-mode:` 之类的键。legacy_deletion_paradigm 的 step 5（统一 localStorage 键前缀）对本 entry**不适用**；H/I 循环那 15 个独立实现各自带前缀，判据若写死「必须有 localStorage 前缀」会对 J1 假红。",
+        "health_probe_client": "http",
+        "health_probe_endpoint": "GET /api/workpapers/onlyoffice/health",
+        "health_probe_source": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts#L31",
+        "shared_base_real_statement_consumers": 29,
+        "shared_base_j_cycle_consumers": [
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L110",
+          "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts#L7",
+          "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts#L7"
+        ],
+        "shared_base_preserved": true,
+        "shared_base_preserved_because": "29 个真语句消费方里只有 3 个属 J 循环 ⇒ 删掉 J 的 3 条之后仍有 26 个（B22A/B22B×2/B22C/B50 五个宿主 + D1/D3/D4/D5/D6/D7 六个 wrapper + G2 + M1..M10 十个 + N2 + 2 个 vi.mock 测试 + 1 个自测），按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue"
+        ],
+        "test_only_consumers": [],
+        "test_only_consumers_note": "🔴 J1 宿主没有任何 spec 文件对它 vi.mock 共享基类（I1 有 `vi.mock('../composables/useI1DualMode')`）⇒ 改线时不会出现 I 循环那种「删了 composable 导致 vitest 报 Cannot find module」的连带修改。",
+        "mention_only_non_consumers": []
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9",
+        "divergence_origin": "backend/data/workpaper_sync_entry_overlay.json#/defaults_by_component/GtOnlyOfficeSheet"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主经 `useChecklistPersistence`（#L105 import，#L177 实例化）把 13 个子 Tab 的 save 回调（#L213 handleChildSave → persistence.saveDebounced）汇成逐 item 防抖 PUT 到 /api/workpapers/{wp_id}/checklist-responses（适配器 #L182），另有 7 个子 Tab 各自 `http.put` 同一端点直写；读侧 persistence.load() GET 同一端点（#L263），render-config 快照只作兼容基线。primary managed table 的三个键 `J1-2-detail-{shortTerm,postEmployment,severance}` 由 useJ1Detail.ts#L108 的 STORAGE_KEY_PREFIX + section 键派生（#L110-112），行身份字段是 `id`（#L127 生成式，非位置化），行数组序列化成 remark 落库（#L241-249）。后端 checklist_responses 路由的 GET(#L84)/PUT(#L132) 真实存在。⇒ html_counterpart_verdict = exists，按 AC 12.8 **不得**标 single_onlyoffice（AC 12.8 明禁「为满足数字伪造字段映射或修改模板制造对端」，反过来也禁「有对端却当没有」）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 权威模板 `J1 应付职工薪酬.xlsx` 实测 23 张 sheet（196750 字节），其中 **15** 张是活的业务表（底稿目录 / J1A 程序表 / 审定表J1-1 / 明细表J1-2 / J1-3..J1-10 / 上市与国企两份附注披露 / IPO企业薪酬审计提示），另 7 张是 `-删除`/`-原版`/`-原` 标记的历史 sheet、1 张 GT_Custom 机制表；② 宿主 #L17 的 GtOnlyOfficeSheet 挂载点把 `dualMode.resolveOoSheetName()` 传下去，OO 侧打开的是项目存储里的真实 xlsx（wp_onlyoffice_router.get_sheet_onlyoffice_config → _resolve_wp_file 项目存储优先），callback 会把编辑落盘；③ HTML 侧只覆盖 13 个 sheet 的结构化视图，源模板的 J1-11/J1-12 等 sheet 在 HTML 侧没有对应 Tab（宿主 #L88 有 el-empty 兜底文案「将使用 OnlyOffice」），即 OO 侧独有内容确实存在。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：无 approved authority model（BP-3）、无人工审核的 per-entry contract（BP-2）、无 non-null approved definition bundle（BP-3）、无 Task 17 的 non-current instrumentation candidate 与 Task 36 finalize 出的 published representation（BP-1）、未注册 adapter（BP-1）、无逐 scenario evidence（BP-4）。另有本 entry 特有的两条前置：写路径双轨并存（BP-5）与主表行模型第二分区与源模板不符（BP-8）。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task52_j_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_approved_per_entry_contract",
+          "no_real_onlyoffice_94_required_scenario_run"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L9",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L10",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L17",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"j1-dual-mode-bar\"",
+      "ui_toolbar_gate_note": "本宿主的工具栏门控是 `v-if=\"!isLoading && isHtmlSheet\"`（#L9，isHtmlSheet = currentSheet !== 'J1-index'，#L168）。🔴 工具栏内的 `el-segmented`（#L10）**没有二级门控** —— 与 I2 同型缺陷（其余 5 条 I entry 有 `v-if=\"dualMode.isOoAvailable.value\"`）：OO 探测失败时 `仅结构化视图` 的 el-tag 会出现（#L14），但切换器本身照旧可点。共享基类 switchMode 里有 `if (target === 'onlyoffice' && !ooAvailable.value) return`（#L48）做了运行时兜底，所以点了不会真切过去 —— 于是表现成「点了没反应」，比 AC 1.5 要求的「不显示不可兑现的切换按钮」更差（无声失败）。登记为 BP-10。",
+      "ui_toolbar_gate_second_level": null,
+      "extra_unrelated_segmented_sites": [
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L27",
+        "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L386"
+      ],
+      "extra_unrelated_segmented_note": "🔴 全 J 域 `el-segmented` 共 3 处，只有宿主 #L10 那处是模式切换器；J1TabGeneralCheck.vue#L27 与 J2TabAdjudication.vue#L386 是 Tab 内部的分段控件。全文件 grep 会把它们误判成第二个模式切换器 ⇒ 判据必须先按 ui_toolbar_gate 声明的锚点截出工具栏区块再看。",
+      "notice_mounted": false,
+      "notice_mounted_note": "🔴 J1 宿主没有 import/挂载 `GtEntrySyncCapabilityNotice.vue`，也没有引用 `workpaperEntrySyncNotice.ts` 的文案真源。实测该组件的 41 个生产消费方全是 D（7）/F（5）/G（17）/H（10）宿主与 1 个自测；I 与 J 循环 0 个。AC 1.4 的「显示可操作原因」义务未兑现 ⇒ BP-10。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task52_j_cycle_migration.py::TestAc14HonestModeVisibility"
+    }
+  ],
+  "parent_duplicate_summary": {
+    "note": "🔴 J 循环有 1 条 parent_duplicate 子入口：`xlsx/j1/inspection/j1-tab-general-check`（宿主 audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue，wp_code_patterns ['J1-8','J1T']，parent_entry_id = xlsx/j1/gt-j1-employee-compensation，independent_entry = false）。按 AC 1.6 它复用父 entry 的 adapter、不独立计数，也不单独发布 contract/bundle/candidate/evidence。为什么它会被 generator 枚举出来：它自己在模板里挂了一个 GtOnlyOfficeSheet（与父宿主 #L17 那处并列），而 J1TabAllocationCheck / J1TabSeveranceCheck 等其余 12 个子 Tab 都没有 ⇒ 只有它进了 manifest。它的业务内容与父 entry 同库同表（`J1-8-voucher-check` 与 `J1-8-post-period` 两个 item_id，J1TabGeneralCheck.vue#L324 / #L467，经自己的 http.put #L469 直写），属父 entry 写路径双轨的一部分（BP-5）。",
+    "children": [
+      {
+        "entry_id": "xlsx/j1/inspection/j1-tab-general-check",
+        "parent_entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "host_path": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue",
+        "wp_code_patterns": [
+          "J1-8",
+          "J1T"
+        ],
+        "independent_entry": false,
+        "own_transport_keys": [
+          "J1-8-voucher-check",
+          "J1-8-post-period"
+        ],
+        "own_transport_key_sources": [
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L324",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L467"
+        ]
+      }
+    ]
+  },
+  "authoritative_templates": {
+    "root": "backend/wp_templates/J",
+    "why_this_root": "唯一权威目录是 backend/wp_templates/（wp_template_init_service 生成底稿时从这里复制、wp_template_finder 以 _index.json 索引）。逐文件 size + sha256 现算冻结，任一漂移 fail closed（Requirement 6.10）。",
+    "reference_copy_status": "absent_in_worktree",
+    "reference_copy_note": "🔴 参考副本目录 `基础数据/致同通用审计程序及底稿模板（2025年修订）/` 在本工作树中**不存在**（与 D/E/F/G/H/I 六轮实测一致）。故本 slice 无法做「权威版 vs 参考副本」的双处比对，只能以权威目录字节为唯一真源；不得据参考副本重建（G4/G5/G6 曾因此返工）。",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件（用户开着 WPS/Excel 时会出现，且可能还有未保存改动）。实测本次枚举 0 个锁文件。",
+    "files": [
+      {
+        "name": "J1 应付职工薪酬.xlsx",
+        "size": 196750,
+        "sha256": "a6100d91202f4d066dc39fb00e3016ea87794489bb75d308fec2733e92ca6061",
+        "belongs_to_entry": "xlsx/j1/gt-j1-employee-compensation",
+        "sheet_count": 23,
+        "in_runtime_index": true,
+        "primary_detail_sheet": "明细表J1-2 ",
+        "adjudication_sheet": "审定表J1-1 ",
+        "sheet_name_trailing_space": true,
+        "sheet_name_trailing_space_note": "🔴 `明细表J1-2 ` 与 `审定表J1-1 ` 两张 sheet 名尾部各有一个真实空格；`应付职工薪酬实质性程序表 J1A` 名中含空格。openpyxl 按精确名取表 ⇒ 判据不得 strip。",
+        "retired_sheet_count": 7,
+        "business_sheet_count": 15,
+        "mechanism_sheet_count": 1,
+        "retired_sheets": [
+          "应付职工薪酬实质性程序表 J1A-原版",
+          "应付职工薪酬实质性程序表 L1A-原",
+          "股份支付检查表J1-10-删除",
+          "应付职工薪酬余额及期后事项检查表J1-11-删除",
+          "职工薪酬政策统计表J1-12-删除",
+          "IPO企业股权激励工具关注的审计重点-删除",
+          "首发业务解答二-删除"
+        ],
+        "retired_sheets_note": "🔴 以 `-删除` / `-原版` / `-原` 结尾的历史 sheet 共 7 张，`GT_Custom`（模板机制表）1 张 ⇒ 业务 sheet = 23 − 7 − 1 = 15。三个计数与 sheet_count 必须自洽（守卫 openpyxl 现读 sheetnames 后按后缀现算并四向等值比对：sheet_count == len(sheetnames)、retired_sheet_count == len(retired_sheets) == 现算命中数、business_sheet_count == sheet_count − retired − mechanism）。这一层是 not_single_html_because 的证据（「OO 侧有真实业务价值」= 15 张活业务表），不能是自述。"
+      },
+      {
+        "name": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+        "size": 107237,
+        "sha256": "b9a4d87c95d275d7d6d20e91494bf20760eeb22140a3588b5670dea4266fcce1",
+        "belongs_to_entry": null,
+        "excluded_reason": "🔴 J2 宿主 GtJ2DefinedBenefitPlan.vue 在 source manifest 里不是 entry（无 GtOnlyOfficeSheet 挂载点，见 slice_scope.excluded_from_slice 第 3 条）⇒ 本册没有可归属的 entry_id。它仍要登记在这里并冻结 digest：① 它确实在 backend/wp_templates/J 下（目录集合等值判据的分母）；② template_resolution_audit 要证明 J2 码不会回落到 J1 册；③ 将来 J2 若接上 OO 入口，这份 digest 是它的 template identity 基线。SR-8 要求 belongs_to_entry 为 null 时必须给 excluded_reason —— 本 slice 是 D~I 六轮里**第一份**真正走到 SR-8 null 分支的（H 循环有两条但理由是 pilot/整册服务多 entry，不是「宿主不是 entry」）。",
+        "sheet_count": 9,
+        "in_runtime_index": true,
+        "primary_detail_sheet": "明细表J2-2",
+        "adjudication_sheet": "审定表J2-1",
+        "sheet_name_trailing_space": false,
+        "retired_sheet_count": 0,
+        "retired_sheets": [],
+        "retired_sheets_note": "J2 册无 `-删除`/`-原版` 历史 sheet；`长期应付职工薪酬实质性程序表 L2A` 是 L 循环的程序表串在 J2 册里（源模板原样，不是缺陷登记对象）。"
+      },
+      {
+        "name": "J3 股份支付.xlsx",
+        "size": 50195,
+        "sha256": "72e026f43612ec6b6b6f11d1115908463453a3118bfc9409b055402a18e3f491",
+        "belongs_to_entry": null,
+        "excluded_reason": "🔴 同 J2：J3 宿主 GtJ3ShareBasedPayment.vue 无 GtOnlyOfficeSheet 挂载点 ⇒ 不是 manifest entry ⇒ 本册无可归属 entry_id。J3 另有一层特殊：它**无独立科目**（宿主 docstring 明写「费用端走 K8/K9，权益端走 M4，现金端走 J1」），所以即便将来接 OO 入口，它的审定表也不回写 trial_balance。",
+        "sheet_count": 6,
+        "in_runtime_index": true,
+        "primary_detail_sheet": "股份支付情况表J3-1",
+        "adjudication_sheet": null,
+        "adjudication_sheet_note": "🔴 J3 册**没有审定表** —— 6 张 sheet 是 底稿目录 / 股份支付实质性程序表 J3A / 股份支付情况表J3-1 / 股份支付检查表J3-2 / IPO企业股权激励工具关注的审计重点 / 首发业务解答二。与「每循环必有 X-1 审定表」的通例不同，因为 J3 无独立科目。",
+        "sheet_name_trailing_space": false,
+        "retired_sheet_count": 0,
+        "retired_sheets": []
+      }
+    ],
+    "belongs_to_entry_mapping_note": "🔴 3 个文件 ↔ 1 个 entry 是**单射但不满射**（1 条有主、2 条 belongs_to_entry 为 null 且各带 excluded_reason）。这与 I（6↔6 双射）、H（11 文件 / 9 entry，2 条带 excluded_reason 但理由是 pilot 与整册服务多 entry）、G（一册服务三 entry，多对一）都不同 ⇒ 判据必须验「单射 + 每个 null 都有 excluded_reason + 有主的那条真命中 slice 的 entry_id」，写死「双射」会对本 slice 假红，写死「多对一」会放过「悄悄夹带跨循环模板」。"
+  },
+  "template_resolution_audit": {
+    "why_this_section_exists": "F 循环（BP-5）与 D 循环（BP-5）都查出「整册码回落打开错工作簿」，G 循环有同型的 sheet 标签缺陷。本任务对 J 循环做同一项实测，结论是**没有**该缺陷 —— 但「没有」必须落成可复算判据，否则后来者要么重复调查，要么误以为 J 也有。",
+    "how_verified": "以 backend/app/services/wp_template_finder 的 find_template_file 与 find_template_file_any 对 37 个 J 码逐个实跑（J{1,2,3} 各自的整册码 + A 程序表码 + -1..-10 十个子码，共 36 个，加 J0）。两个函数的返回值都记在 measured 里；守卫现跑并与冻结结果等值比对。",
+    "result": "clean",
+    "invariant": "对每个被测的 J 码 `J{n}` 及其子码 `J{n}-{m}`（m ∈ 1..10），两个解析函数都返回文件名以 `J{n} ` 开头的那本工作簿，无一条回落到另一本；`J{n}A` 与 `J0` 两个函数都返回 None。",
+    "why_j_is_clean_unlike_f2": "F2 的失效根因是「同一 wp_code 在 _index.json 里有 11 条候选、优先级只由索引顺序决定」。J 循环的索引里每个 J 码**恰好一本**工作簿（3 条索引项对 3 个文件，一一对应），候选集合大小恒为 1 ⇒ 优先级链根本不参与。与 H/I 同理。",
+    "program_table_code_note": "`J1A` / `J2A` / `J3A` 这类程序表码在 `_index.json` 里没有独立条目，两个解析函数都返回 None —— 这是正确的：程序表是各册内的一张 sheet（`应付职工薪酬实质性程序表 J1A` / `长期应付职工薪酬实质性程序表 J2A` / `股份支付实质性程序表 J3A`），且三个宿主都把 J{n}A 分发给共享组件 `shared/CycleTabProcedure.vue`（J1 宿主 #L28 / J2 宿主 #L20 / J3 宿主 #L25）。",
+    "j0_code_note": "`J0` 亦返回 None（两个函数都是）—— J 循环没有函证册，见 slice_scope.excluded_from_slice 第 2 条。守卫对它断言 None，与程序表码同处理但理由不同（一个是「sheet 不是册」，一个是「册不存在」）。",
+    "over_range_subcode_note": "🔴 J2-5..J2-10 与 J3-3..J3-10 这些**源模板里并不存在对应 sheet** 的子码，两个解析函数仍返回各自的册（解析按册前缀而非 sheet）。这不是缺陷，但必须登记：判据若写成「解析结果非 None ⇒ 该 sheet 存在」就会误报。本节只断言「解析到哪一本册」，不断言 sheet 存在性 —— sheet 存在性由 authoritative_templates.files[].sheet_count 与 primary_detail_sheet 那一层验。",
+    "measured": [
+      { "wp_code": "J1", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1A", "resolved": null, "resolved_any": null },
+      { "wp_code": "J1-1", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-2", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-3", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-4", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-5", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-6", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-7", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-8", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-9", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J1-10", "resolved": "J1 应付职工薪酬.xlsx", "resolved_any": "J1 应付职工薪酬.xlsx" },
+      { "wp_code": "J2", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2A", "resolved": null, "resolved_any": null },
+      { "wp_code": "J2-1", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-2", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-3", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-4", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-5", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-6", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-7", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-8", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-9", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J2-10", "resolved": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx", "resolved_any": "J2 长期应付职工薪酬-设定受益计划净资产.xlsx" },
+      { "wp_code": "J3", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3A", "resolved": null, "resolved_any": null },
+      { "wp_code": "J3-1", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-2", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-3", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-4", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-5", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-6", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-7", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-8", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-9", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J3-10", "resolved": "J3 股份支付.xlsx", "resolved_any": "J3 股份支付.xlsx" },
+      { "wp_code": "J0", "resolved": null, "resolved_any": null }
+    ]
+  },
+  "j_cycle_form_differences": {
+    "why_this_section_exists": "Task 48（F）与 Task 49（G）各自都因为「假设与前一循环同形」返工过一次，Task 50（H）为此新增 h_cycle_form_differences，Task 51（I）沿用。J 循环实测出**六处**与 D/F/G/H/I 都不同的形态，判据必须逐条从 slice 读声明再回源核对，不得写死任一种。",
+    "differences": [
+      {
+        "id": "JD-1",
+        "name": "three_hosts_one_manifest_entry",
+        "what": "J 循环有 3 个可达宿主（GtJ1EmployeeCompensation / GtJ2DefinedBenefitPlan / GtJ3ShareBasedPayment，htmlRendererRegistry.ts#L1696/#L1704/#L1712 各有真 defineAsyncComponent 模块边）与 3 本权威模板，但 source manifest 里只有 **1 条**独立 entry —— 只有 J1 宿主挂了 GtOnlyOfficeSheet（#L17）。",
+        "why_it_matters": "前六轮的隐含前提是「每个循环宿主 ↔ 每条 entry」（I：6 宿主 6 entry；H：9+pilot）。照此写「slice 的 entry 数应等于 backend/wp_templates/{cycle} 下的册数」这类判据，J 循环会得 3 而实际 1 ⇒ 要么假红、要么被「补上两条手写 entry」的错误修法绕过（违反 step 1 的 forbidden）。反过来若只按 selection_rule 现算而不登记这两个宿主，J2/J3 的 orphan composable 与位置化身份缺陷就无人承接。",
+        "how_to_verify": "① 按 selection_rule 现算 entry 集合，断言恰 1 条；② 断言 J2/J3 宿主路径**不在** manifest 的 host_path 集合里；③ 断言两个宿主的外层 template 里 GtOnlyOfficeSheet 与 el-segmented 各 0 命中；④ 断言 htmlRendererRegistry 里三条 componentType 的 import 路径真指向三个宿主文件。",
+        "hosts": {
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": {
+            "component_type": "j1-employee-compensation",
+            "registry_source": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L1696",
+            "has_oo_mount": true,
+            "manifest_entry_id": "xlsx/j1/gt-j1-employee-compensation"
+          },
+          "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue": {
+            "component_type": "j2-defined-benefit-plan",
+            "registry_source": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L1704",
+            "has_oo_mount": false,
+            "manifest_entry_id": null
+          },
+          "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue": {
+            "component_type": "j3-share-based-payment",
+            "registry_source": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts#L1712",
+            "has_oo_mount": false,
+            "manifest_entry_id": null
+          }
+        }
+      },
+      {
+        "id": "JD-2",
+        "name": "host_consumes_shared_base_directly_no_per_entry_wrapper",
+        "what": "J1 **没有** per-entry dual-mode composable —— 不存在 `useJ1DualMode.ts` 也不存在 `useJ1EntryDualMode.ts`；宿主 #L110 直接 `import { useWorkpaperEntryDualMode } from '../composables/useWorkpaperEntryDualMode'` 并在 #L170 实例化。",
+        "why_it_matters": "H 循环 9 个、I 循环 6 个 dual-mode composable 全是各自独立实现（wraps_shared_base 全 false），deletion plan 的对象就是那些文件。J1 的删除对象**不存在** ⇒ 照抄 I 的「每 entry 一个待删 composable」判据会因文件缺失而假红；而 legacy_deletion_paradigm 的 step 3（物理删除 legacy composable）对 J1 **不适用**，step 4（宿主改线）才适用。另外共享基类零 localStorage ⇒ step 5（统一键前缀）也不适用。",
+        "how_to_verify": "① 断言 `composables/useJ1DualMode.ts` 与 `composables/useJ1EntryDualMode.ts` 两个路径都不存在；② 断言宿主里指向共享基类的 import 路径字面量存在；③ 断言共享基类源码里 `localStorage` 命中数为 0 且行数恰 65；④ 断言 slice 的 legacy_dual_mode.wraps_shared_base 为 null 且 localStorage_prefix 为 null。",
+        "shared_base": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+        "per_entry_wrapper_paths_that_do_not_exist": [
+          "audit-platform/frontend/src/components/workpaper/composables/useJ1DualMode.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useJ1EntryDualMode.ts",
+          "audit-platform/frontend/src/composables/workpaper/j1/useJ1DualMode.ts"
+        ]
+      },
+      {
+        "id": "JD-3",
+        "name": "write_carrier_is_shared_platform_adapter_plus_seven_per_tab_direct_puts",
+        "what": "写载体是**平台级共享持久化适配器** `useChecklistPersistence`（客户端 `api` from `@/services/apiProxy`，#L8），三个 J 宿主各自 import 它（J1#L105 / J2#L110 / J3#L87）；**同时** J1 的 7 个子 Tab 各自 `import http from '@/utils/http'` 直接 PUT 同一端点。两条写路径并存。",
+        "why_it_matters": "H 有三族（host_inline / formdata_composable / per_tab），I 是 5:1（host_inline / formdata_composable）。J 是第三种：shared_platform_persistence_adapter + per_tab 直写并存。按 I 的「宿主必须 import http」去核，J1 宿主的 script 里没有 `@/utils/http` ⇒ 假红；按 H 的「载体里必须有 http.put」去核，`useChecklistPersistence` 用的是 `api.put` 不是 `http.put` ⇒ 也假红。判据必须按 entry 声明的 write_client 名字去找 `{client}.put(...)`。",
+        "how_to_verify": "按 entry 的 `html_counterpart.write_client`（'api'）+ `write_carrier_path` + `write_client_import` 三个声明去那个文件里找 `api.put(` 与 `checklist-responses`；再对 second_write_path_sites 逐条断言该文件里真有 `http.put(` 且 URL 含 checklist-responses。",
+        "second_write_path_sites": [
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue#L283",
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L95",
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L250",
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureListed.vue#L292",
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureSoe.vue#L271",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L469",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabNonMonetaryCheck.vue#L259",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabSeveranceCheck.vue#L319"
+        ],
+        "second_write_path_file_count": 7,
+        "second_write_path_site_count": 8,
+        "second_write_path_count_note": "🔴 8 个站点分布在 **7** 个文件里（J1TabAdjustment.vue 有两处：#L95 的 persistRows 与 #L250 的 AI 说明/结论回写）⇒ 文件数与站点数必须分别登记并分别现算，混用会让「7」和「8」哪个是对的说不清。",
+        "second_write_path_client_forms": {
+          "why_this_key_exists": "🔴 7 个文件里 client 的取得形态**分两族**：4 个用静态 `import http from '@/utils/http'`，3 个用**动态** `const http = (await import('@/utils/http')).default`（逐调用点各写一次）。判据若写死「文件里必须有 `from '@/utils/http'`」会对那 3 个假红（首轮实测就是这样红的）；反过来只查 `http.put` 会放过「client 从哪来」这件事。两族逐文件登记 + 两侧等值。",
+          "static_import": {
+            "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue": 18,
+            "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue": 292,
+            "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabNonMonetaryCheck.vue": 183,
+            "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabSeveranceCheck.vue": 229
+          },
+          "dynamic_import": {
+            "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue": [282, 436, 513],
+            "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureListed.vue": [291, 393, 500],
+            "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDisclosureSoe.vue": [270, 325, 470]
+          },
+          "static_import_file_count": 4,
+          "dynamic_import_file_count": 3,
+          "static_import_pattern": "^\\s*import http from '@/utils/http'",
+          "dynamic_import_pattern": "await import\\('@/utils/http'\\)",
+          "counting_note": "4 + 3 = 7 == second_write_path_file_count ✓。两族的文件集合必须互斥且并集等于 second_write_path_sites 的文件集合（守卫现扫两个正则并逐文件比对行号）。"
+        },
+        "registered_as": "BP-5"
+      },
+      {
+        "id": "JD-4",
+        "name": "one_logical_table_three_transport_keys_identity_field_is_id",
+        "what": "primary managed table（J1-2 明细表）**一张逻辑表对应三个传输键** `J1-2-detail-{shortTerm,postEmployment,severance}`，由 `STORAGE_KEY_PREFIX = 'J1-2-detail-'`（useJ1Detail.ts#L108）+ section 键在 `storageKey()`（#L110-112）里拼出；行身份字段是 `id` 而不是 `rowId`。",
+        "why_it_matters": "D~I 六轮都是「一表一键」（I6 的 `I6-2-detail-rows` 只是命名例外）。按「table_keys 恰 1 条」写的判据会对 J1 假红；按命名规律推断成 `J1-2-rows` 会全查不到（该字符串在 J 域 0 命中）。身份字段名同理：写死 `rowId` 会在 J1-2 上恒真（对象里根本没有 rowId 这个键，任何断言都不会触发）。",
+        "how_to_verify": "从 owner 常量现读：断言 `STORAGE_KEY_PREFIX` 的字面量、`J1_SECTIONS[].key` 的三个 section 名，拼出的三键集合必须等于 slice 的 table_keys；再断言 `J1_DETAIL_SECTION_KEYS`（第二份声明，useJ1Adjudication.ts#L94）的三个字面量与之逐字相等。",
+        "keys": [
+          "J1-2-detail-shortTerm",
+          "J1-2-detail-postEmployment",
+          "J1-2-detail-severance"
+        ],
+        "identity_field": "id",
+        "nonexistent_guessed_keys": [
+          "J1-2-rows",
+          "J1-2-detail-rows",
+          "J1-detail-rows"
+        ],
+        "nonexistent_guessed_keys_note": "这三个「按命名规律该有」的键在全 J 域源码里命中数为 0 —— 反向自检：判据必须能证明「按规律猜会猜错」，否则「现读 owner 常量」这条要求只是口号。"
+      },
+      {
+        "id": "JD-5",
+        "name": "four_orphan_dual_mode_composables_two_of_them_second_order",
+        "what": "J 循环有 **4 个** orphan dual-mode composable：`components/workpaper/composables/useJ2EntryDualMode.ts`（41 行）与 `useJ3EntryDualMode.ts`（37 行）是**一阶 orphan**（生产与测试的 import 边都是 0）；`composables/workpaper/j2/useJ2DualMode.ts`（35 行）与 `composables/workpaper/j3/useJ3DualMode.ts`（39 行）是**二阶 orphan**（唯一的生产「消费方」是各自目录的 barrel `index.ts`，而那两个 barrel 自身的入边数为 0）。",
+        "why_it_matters": "H/I 的孤儿都是 FormData 持久化载体且都是一阶（0 边）。二阶 orphan 会骗过「有消费方 ⇒ 不是孤儿」的朴素判据：`useJ2DualMode` 的边数是 2（barrel + 1 个 spec），看起来活着。必须做**可达性**判定（顺着 barrel 再问一层）而不是**入度**判定。另外 J2 同时有两个 dual-mode composable（`useJ2EntryDualMode` 与 `useJ2DualMode`），任务正文说的「J2 orphan composable」是这一对而不是单个。",
+        "how_to_verify": "见 orphan_dual_mode_inventory.reachability_recipe：逐模块算 statement-position import 边；若全部生产边都指向 barrel，则对 barrel 再算入边；barrel 入边为 0 ⇒ 该模块判为 second_order_orphan。两侧都验：声称零边的真零、声称经 barrel 的真只经 barrel。",
+        "first_order": [
+          "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts",
+          "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts"
+        ],
+        "second_order": [
+          "audit-platform/frontend/src/composables/workpaper/j2/useJ2DualMode.ts",
+          "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts"
+        ],
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "JD-6",
+        "name": "third_pseudo_consumer_edge_form_json_snippet_in_generated_baseline",
+        "what": "第三种「伪消费边」形态：`components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts` 里有 **5 处** JSON `\"snippet\"` 字符串值，其内容逐字包含 `from './composables/useWorkpaperEntryDualMode'`（#L1319 / #L1353 / #L1387 / #L1421 / #L1477）。它们是生成器记录的迁移债务快照，不是 import 语句。",
+        "why_it_matters": "I 循环把「符号名 grep 会误报」这条钉死了，改用 import 路径字面量口径 —— 但**路径字面量口径同样会被这 5 处骗到**（字符串里就有 `from '...'` 的完整形态）。实测：宽口径（逐文件命中即计）得共享基类 30 个消费方，statement-position 口径得 **29** 个。差的那 1 个就是这个生成文件。判据必须再加一条：匹配位置所在行、其之前的未转义双引号个数为奇数 ⇒ 该匹配落在双引号字符串内 ⇒ 不是语句。",
+        "how_to_verify": "两侧都验：① 该生成文件里 `useWorkpaperEntryDualMode` 的子串命中数 > 0（伪边确实存在，不是判据自说自话）；② statement-position 口径下该文件的 import 边数 == 0；③ 共享基类的 statement 边总数 == 29 且 J 循环贡献恰 3 条。",
+        "pseudo_edge_sites": [
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1319",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1353",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1387",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1421",
+          "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1477"
+        ],
+        "pseudo_edge_count": 5,
+        "wide_scope_consumer_count": 30,
+        "statement_position_consumer_count": 29
+      }
+    ]
+  },
+  "orphan_dual_mode_inventory": {
+    "why_this_key_exists": "🔴 直接兑现 tasks.md 的 Task 52 正文第一条前半句「先解清 J2 orphan composable」。这一节**不是**删除清单（那在 deletion plan 里），是「J 循环到底有几个 dual-mode 死桩、它们死在哪一层、改线时会不会误接」的可复算结论。结论：**4 个**（J2 两个 + J3 两个），零生产可达；其中 2 个靠「一个自身零入边的 barrel re-export」维持虚假入度 ⇒ 朴素的入度判据会放过它们。它们同时是 AC 1.7 的对象（不可达旧桩 SHALL 删除，不得以豁免或 DEPRECATED 注释长期保留）。",
+    "scan_scope": "audit-platform/frontend/src 全域 **7186** 个 .ts/.vue（含 __tests__，因为「只有测试在用」与「谁都不用」必须分得开）",
+    "consumer_edge_recipe": "只认三种 **statement-position** 形态：`from '<spec>'` / `import('<spec>')` / `vi.mock('<spec>')`，其中 `<spec>` 的**末段**（rsplit('/')[-1]）等于模块 stem 或 stem + .ts / .vue。🔴 再加一条 JD-6 要求的排除：匹配位置在其所在行内，若之前的未转义 `\"` 个数为奇数 ⇒ 该匹配落在双引号字符串里（生成文件的 JSON snippet）⇒ 不计。**禁符号名 grep**（I 循环实测 4 处 `* - Follow useIxDualMode pattern` 注释会被误报成消费边；J 循环的对应陷阱是 JD-6 的 5 处 JSON snippet）。",
+    "reachability_recipe": "orphan 分两阶：① **一阶** —— statement-position 生产边数 == 0 且测试边数 == 0；② **二阶** —— 全部生产边都指向同一目录的 barrel `index.ts`，且对该 barrel 再算入边（`@/composables/workpaper/{cyc}` / `./{cyc}` / `../{cyc}` 及带 `/index`、`/index.ts` 的四种写法）得 0 ⇒ 模块从任何真实宿主都不可达。判据两侧都验：声称一阶的边数真为 0；声称二阶的**生产边恰好只有 barrel 那一条**且 barrel 入边真为 0。",
+    "modules": [
+      {
+        "id": "OD-1",
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts",
+        "lines": 41,
+        "orphan_order": "first_order",
+        "wraps_shared_base": true,
+        "wraps_shared_base_source": "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts#L7",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": null,
+        "what_it_contains": "J2 内部 sheet code → 源 xlsx tab 名映射表 `J2_SHEET_MAP`（8 条：底稿目录→J2-目录 / J2A / J2-1..J2-4 / J2附注(上市) / J2附注(国企)）+ 转调共享基类的 resolveOoSheetName",
+        "sheet_map_constant": "J2_SHEET_MAP",
+        "sheet_map_source": "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts#L14",
+        "sheet_map_entry_count": 8,
+        "sheet_map_defect": "maps_to_sheet_names_that_do_not_exist",
+        "sheet_map_defect_detail": "🔴 映射的目标 tab 名与权威模板不符：源模板 `J2 长期应付职工薪酬-设定受益计划净资产.xlsx` 的 9 张 sheet 是 底稿目录 / 长期应付职工薪酬实质性程序表 J2A / 长期应付职工薪酬实质性程序表 L2A / 审定表J2-1 / 附注披露信息（上市公司）/ 附注披露信息（国有企业）/ 明细表J2-2 / 调整分录汇总表J2-3 / 计提情况检查表J2-4。映射表里的 8 个目标（`J2-目录` / `J2A` / `J2-1` / `J2-2` / `J2-3` / `J2-4` / `J2附注(上市)` / `J2附注(国企)`）**一个都不在** sheetnames 里 ⇒ 即便有人把它接上宿主，OO 侧会按不存在的 sheet 名打开。这是「死代码里的错逻辑」的实证：它不但没人用，用了也是错的。",
+        "would_be_host": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+        "host_actually_consumes_it": false,
+        "host_has_oo_mount": false,
+        "verdict": "unreachable_legacy_stub",
+        "ac_17_applies": true,
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "OD-2",
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts",
+        "lines": 37,
+        "orphan_order": "first_order",
+        "wraps_shared_base": true,
+        "wraps_shared_base_source": "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts#L7",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": null,
+        "what_it_contains": "J3 内部 sheet code → 源 xlsx tab 名映射表 `J3_SHEET_MAP`（4 条：J3→J3-目录 / J3A / J3-1 / J3-2）+ 转调共享基类的 resolveOoSheetName",
+        "sheet_map_constant": "J3_SHEET_MAP",
+        "sheet_map_source": "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts#L14",
+        "sheet_map_entry_count": 4,
+        "sheet_map_defect": "maps_to_sheet_names_that_do_not_exist",
+        "sheet_map_defect_detail": "🔴 同 OD-1：源模板 `J3 股份支付.xlsx` 的 6 张 sheet 是 底稿目录 / 股份支付实质性程序表 J3A / 股份支付情况表J3-1 / 股份支付检查表J3-2 / IPO企业股权激励工具关注的审计重点 / 首发业务解答二；映射表的 4 个目标（`J3-目录` / `J3A` / `J3-1` / `J3-2`）一个都不在 sheetnames 里。",
+        "would_be_host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue",
+        "host_actually_consumes_it": false,
+        "host_has_oo_mount": false,
+        "verdict": "unreachable_legacy_stub",
+        "ac_17_applies": true,
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "OD-3",
+        "module": "audit-platform/frontend/src/composables/workpaper/j2/useJ2DualMode.ts",
+        "lines": 35,
+        "orphan_order": "second_order",
+        "wraps_shared_base": false,
+        "wraps_shared_base_source": null,
+        "production_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L11"
+        ],
+        "test_only_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j2/__tests__/j2Components.spec.ts#L13"
+        ],
+        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
+        "barrel_inbound_edges": 0,
+        "localStorage_prefix": null,
+        "what_it_contains": "自成一套的 mode ref + isHtmlMode/isOOMode computed + switchMode/toggleMode，**无 OO 健康探测**、无 sheet 名解析、无持久化 —— 与共享基类零关系（不 import 它）",
+        "sheet_map_constant": null,
+        "sheet_map_defect": null,
+        "would_be_host": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+        "host_actually_consumes_it": false,
+        "host_has_oo_mount": false,
+        "verdict": "unreachable_legacy_stub_behind_orphan_barrel",
+        "why_it_looks_alive": "🔴 它的 statement-position 边数是 **2**（barrel + 1 个 spec），朴素的「入度 > 0 ⇒ 不是孤儿」判据会放它过去。真相是那条生产边指向的 barrel `composables/workpaper/j2/index.ts` 自身入边为 **0** —— 全仓没有任何文件 import `@/composables/workpaper/j2`（J2 的宿主与 6 个子 Tab 都是逐模块深链，不走 barrel）。",
+        "ac_17_applies": true,
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "OD-4",
+        "module": "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts",
+        "lines": 39,
+        "orphan_order": "second_order",
+        "wraps_shared_base": false,
+        "wraps_shared_base_source": null,
+        "production_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j3/index.ts#L7"
+        ],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j3/index.ts",
+        "barrel_inbound_edges": 0,
+        "localStorage_prefix": null,
+        "what_it_contains": "自成一套的 mode ref + isHtml/isOO computed + switchMode + **自己那份 checkOOHealth**（`http.get('/api/workpapers/onlyoffice/health')`，#L25）—— 与共享基类的探测实现重复且更弱（无 `_silent`、无信封双形态兼容）",
+        "legacy_endpoint_direct_call": "GET /api/workpapers/onlyoffice/health",
+        "legacy_endpoint_direct_call_source": "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts#L25",
+        "legacy_endpoint_note": "🔴 这条直调命中 legacy_deletion_paradigm 的 step 6 明禁项（「/api/workpapers/onlyoffice/health 的调用只能通过 sync bridge 的 materialize 协议」）。它现在没有危害只因为整个模块不可达 —— 但只要有人顺着 barrel 把它接起来，就是一条绕过 bridge 的旁路。",
+        "sheet_map_constant": null,
+        "sheet_map_defect": null,
+        "would_be_host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue",
+        "host_actually_consumes_it": false,
+        "host_has_oo_mount": false,
+        "verdict": "unreachable_legacy_stub_behind_orphan_barrel",
+        "why_it_looks_alive": "statement-position 边数 1（只有 barrel），barrel 入边 0。",
+        "ac_17_applies": true,
+        "registered_as": "BP-6"
+      }
+    ],
+    "shared_base": {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+      "lines": 65,
+      "statement_position_consumers": 29,
+      "pseudo_string_edges": 5,
+      "pseudo_string_edge_file": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts",
+      "j_cycle_contribution": 3,
+      "j_cycle_contribution_sites": [
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L110",
+        "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts#L7",
+        "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts#L7"
+      ],
+      "remaining_after_j_cycle_work": 26,
+      "remaining_after_j_cycle_work_recipe": "29 − 3（J1 宿主改线后 import 消失 + OD-1/OD-2 两个 orphan 被删）= 26。🔴 计数口径必须是**窄口径（真语句边）**：宽口径会把 JD-6 的生成文件也算进来得 30，于是「删完还剩几个」这个决定「共享基类能不能删」的数就错了。",
+      "preserved": true,
+      "preserved_because": "26 个剩余消费方（B22A / B22B×2 / B22C / B50 五个宿主 + D1/D3/D4/D5/D6/D7 六个 wrapper + G2 + M1..M10 十个 + N2 + 2 个 vi.mock 测试 + 1 个自测）全在 J 循环之外，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+      "verification_recipe": "两侧都验：① 现算 statement 边总数 == 29；② J 循环那 3 条逐条命中声明的行号；③ 现算宽口径 == 30 且差集恰是生成文件那一处（证明 JD-6 的排除条不是空谈）。"
+    },
+    "lookalike_persistence_carriers": {
+      "why_this_key_exists": "🔴 这一节**不是**删除清单，是「改线时最容易误接的东西」清单（沿用 I 循环 BP-5 的形态）。两个 FormData composable 生产可达性同样为零（只被各自的孤立 barrel re-export），但都含完整的持久化管道，长得比真载体更像载体。Task 72 若把 adapter 接到它们身上，宿主行为一点不变而守卫因为「文件确实被改了」全绿。",
+      "in_scope_of_deletion_plan": false,
+      "why_not_in_scope": "本清册的删除对象是 legacy **dual-mode** composable（legacy_deletion_paradigm step 3）。FormData composable 是持久化载体，属另一类；且它们的 `writebackTB` / `publishAdjudicated` 逻辑将来可能被真实 adapter 复用 ⇒ 删除决定不由本任务下，登记为 BP-7。",
+      "modules": [
+        {
+          "module": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts",
+          "lines": 152,
+          "production_consumers": [
+            "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L4"
+          ],
+          "test_only_consumers": [],
+          "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
+          "barrel_inbound_edges": 0,
+          "pipeline_it_contains": [
+            "GET /api/workpapers/{wpId}/render-config (#L51)",
+            "PUT /api/workpapers/{wpId}/checklist-responses (#L90)",
+            "POST /api/projects/{projectId}/trial-balance/writeback (#L102)",
+            "POST /api/projects/{projectId}/events/publish (#L117)"
+          ],
+          "fabricated_transport_key_form": "item_id: `J2-${key}`",
+          "fabricated_transport_key_source": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
+          "fabricated_transport_key_note": "🔴 它把 item_id 拼成 `J2-` + 「render-config 的 html_data.responses 里的任意键」—— 键集合在编译期不可知、运行期由后端返回什么定什么。而 J2 真实持久化用的是 6 个子 Tab 里的**字面量 KEY 对象**（`J2-1-main` / `J2-2-main` / … 见 transport_key_resolution 的 TK-6）。两种形态只在「都以 J2- 开头」上巧合相似 ⇒ 接错了不会立刻报错，只会写出一批谁都读不到的行。",
+          "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue#L110（宿主经 useChecklistPersistence）",
+          "registered_as": "BP-7"
+        },
+        {
+          "module": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts",
+          "lines": 151,
+          "production_consumers": [
+            "audit-platform/frontend/src/composables/workpaper/j3/index.ts#L3",
+            "audit-platform/frontend/src/composables/workpaper/j3/useJ3Detail.ts#L20",
+            "audit-platform/frontend/src/composables/workpaper/j3/useJ3Integration.ts#L17"
+          ],
+          "test_only_consumers": [],
+          "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j3/index.ts",
+          "barrel_inbound_edges": 0,
+          "transitive_consumers_also_orphan": [
+            "audit-platform/frontend/src/composables/workpaper/j3/useJ3Detail.ts",
+            "audit-platform/frontend/src/composables/workpaper/j3/useJ3Integration.ts"
+          ],
+          "transitive_note": "🔴 它有 3 条入边而不是 1 条，但另两条来自 `useJ3Detail`（自身入边 1 条 = 只有 barrel）与 `useJ3Integration`（自身入边实测 **0**）⇒ 三者构成一个只经孤立 barrel 相连的簇，从任何真实宿主都不可达。判据不能只看一层。**不宣称**整个 `composables/workpaper/j3/` 目录都是死的 —— 同目录的 `useJ3ImportExport.ts` 有一条真实生产边（`components/workpaper/j3/core/J3TabDetail.vue#L16`，走 `@/composables/workpaper/j3/useJ3ImportExport` 深链而非 barrel），`useJ3FormulaEngine` / `useJ3OptionPricingEngine` 另有测试边。",
+          "pipeline_it_contains": [
+            "GET /api/workpapers/{wpId}/render-config (#L61)",
+            "PUT /api/workpapers/{wpId}/checklist-responses (#L99)"
+          ],
+          "fabricated_transport_key_form": "item_id: `J3-${key}`",
+          "fabricated_transport_key_source": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts#L96",
+          "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue#L87（宿主经 useChecklistPersistence）",
+          "registered_as": "BP-7"
+        }
+      ]
+    },
+    "summary": {
+      "orphan_dual_mode_total": 4,
+      "orphan_dual_mode_first_order": 2,
+      "orphan_dual_mode_second_order": 2,
+      "orphan_dual_mode_with_broken_sheet_map": 2,
+      "orphan_dual_mode_with_legacy_endpoint_direct_call": 1,
+      "orphan_barrels": 2,
+      "lookalike_persistence_carriers_total": 2,
+      "counting_note": "🔴 各计数按维度现算并与本键等值比对：orphan_order == 'first_order' 的 OD-1/OD-2 共 2 条；'second_order' 的 OD-3/OD-4 共 2 条；sheet_map_defect 非 null 的 OD-1/OD-2 共 2 条；legacy_endpoint_direct_call 非 null 的 OD-4 共 1 条；barrel_only_reachable_via 去重后 2 个 barrel。多一条少一条都红。"
+    }
+  },
+  "transport_key_resolution": {
+    "why_this_key_exists": "🔴 直接兑现 tasks.md 的 Task 52 正文第一条后半句「与真实传输键」。判据要求：**从 owner 常量现读，禁按命名规律推断**。本节把 J 循环每个持久化区块的 owner 声明、键集合、派生方式、身份字段、消费方与落库路径逐条冻结，并把「按规律猜会猜错」的反例一并登记（分母不为空才能证明那条要求不是口号）。",
+    "how_to_verify": "守卫对每条 declaration：① 打开 `owner_module` 现读 `owner_constant` / `owner_function` 的字面量或对象字面量；② 按 `derivation` 现算键集合并与 `keys` 等值比对（有序或集合按 declaration 的 `key_order_matters` 定）；③ 断言 `identity_field` 真出现在该模块的行对象构造处；④ 对 `persisted_via` 声明的路径断言该文件里真有对应的 PUT 站点；⑤ 对 `nonexistent_guessed_keys` 反向断言：这些串在全 J 域生产源码里命中数为 0。",
+    "forbidden_shortcuts": [
+      "只 grep 键字符串存在 —— legacy 别名与注释里的旧键也会命中（I6 实测踩过）",
+      "按 `{wp_code}-rows` / `{wp_code}-detail-rows` 之类命名规律推断 —— J1-2 的三个键与两者都不同构",
+      "把 orphan 载体拼出的键形态当真实形态（useJ2FormData 的 `J2-${key}` / useJ3FormData 的 `J3-${key}`）",
+      "把身份字段写死成 rowId —— J1-2 用 id，写死会让断言在该表上恒真"
+    ],
+    "declarations": [
+      {
+        "id": "TK-1",
+        "entry_scoped": true,
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "block": "J1-2 明细表（primary managed table）",
+        "owner_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts",
+        "owner_constant": "STORAGE_KEY_PREFIX",
+        "owner_constant_value": "J1-2-detail-",
+        "owner_constant_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L108",
+        "owner_function": "storageKey",
+        "owner_function_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L110",
+        "declaration_kind": "module_constant_plus_derivation_function",
+        "derivation": "`${STORAGE_KEY_PREFIX}${section}`，section 取自 `J1_SECTIONS[].key`（同模块 #L53 的常量数组，三个值 shortTerm / postEmployment / severance）",
+        "keys": [
+          "J1-2-detail-shortTerm",
+          "J1-2-detail-postEmployment",
+          "J1-2-detail-severance"
+        ],
+        "key_order_matters": true,
+        "key_order_source": "J1_SECTIONS 的数组顺序（决定 persistAll 里 items 的顺序，#L243-248）",
+        "identity_field": "id",
+        "identity_field_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L127",
+        "persisted_via": "宿主 useChecklistPersistence（saveImmediate → handleChildSave → persistence.saveDebounced）",
+        "persist_site": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L249",
+        "consumed_by": [
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabDetail.vue#L190",
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1DetailSection.vue#L193"
+        ],
+        "second_declaration_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts",
+        "second_declaration_constant": "J1_DETAIL_SECTION_KEYS",
+        "second_declaration_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts#L94",
+        "second_declaration_kind": "three_full_literal_keys",
+        "second_declaration_claim": "该常量上方注释逐字写着「J1-2 明细表分区存储键（与 useJ1Detail 的 STORAGE_KEY_PREFIX 一致）」—— 本条判据就是去核这句话真不真",
+        "second_declaration_verdict": "CONSISTENT",
+        "second_declaration_verdict_detail": "写方（前缀派生）与读方（三个全字面量）现读后逐字相等，3/3。但这是**两份真源**：前缀一改而字面量不改，读方（附注披露的 j1DisclosureDetailPull / useJ1DisclosureSections#L377/#L384）会静默读空，两侧各自的单测都不会红 ⇒ 登记为 BP-11 的一部分（结构性风险，非当前缺陷）。",
+        "second_declaration_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j1/useJ1DisclosureSections.ts#L31",
+          "audit-platform/frontend/src/composables/workpaper/j1/useJ1DisclosureSections.ts#L377",
+          "audit-platform/frontend/src/composables/workpaper/j1/useJ1DisclosureSections.ts#L384"
+        ],
+        "status": "resolved_two_declarations_currently_consistent"
+      },
+      {
+        "id": "TK-2",
+        "entry_scoped": true,
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "block": "J1-1 审定表",
+        "owner_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts",
+        "owner_constant": "J1_ADJ_ROWS_KEY / J1_ADJ_END_TOTAL_KEY / J1_ADJ_BEGIN_TOTAL_KEY",
+        "owner_constant_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts#L88",
+        "declaration_kind": "three_module_constants",
+        "derivation": "三个独立字面量常量，无派生",
+        "keys": [
+          "J1-1-rows",
+          "J1-1-audited-total",
+          "J1-1-audited-begin-total"
+        ],
+        "key_order_matters": false,
+        "identity_field": null,
+        "identity_field_note": "审定表行是固定四分类骨架（CATEGORIES，#L80：（1）短期薪酬 /（2）离职后福利-设定提存计划 /（3）辞退福利 /（4）一年内到期的其他长期职工福利），无动态行 ⇒ 无行身份字段。",
+        "persisted_via": "宿主 useChecklistPersistence",
+        "persist_site": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts#L355",
+        "consumed_by": [
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue"
+        ],
+        "extra_keys_in_same_tab": [
+          "J1-adjudication-audit-note",
+          "J1-adjudication-audit-conclusion"
+        ],
+        "extra_keys_owner": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue#L460",
+        "extra_keys_note": "🔴 同一张 Tab 里**另有两个键在组件内声明**（NOTE_KEY / CONCLUSION_KEY，#L460-461）且形态与 composable 那三个完全不同（`J1-adjudication-*` 而非 `J1-1-*`）—— 按「一个 Tab 一个 owner 模块」的假设去找会漏掉这两个。它们经该组件自己的 `http.put`（#L283）直写，属 JD-3 的第二写路径。",
+        "status": "resolved"
+      },
+      {
+        "id": "TK-3",
+        "entry_scoped": true,
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "block": "J1-3 调整分录汇总表",
+        "owner_module": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue",
+        "owner_constant": "STORAGE_KEY",
+        "owner_constant_value": "J1-3-adjustment-rows",
+        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L49",
+        "declaration_kind": "component_local_constant_plus_two_inline_literals",
+        "derivation": "一个常量 + 两个内联字面量（#L246 'J1-3-note' / #L247 'J1-3-conclusion'）",
+        "keys": [
+          "J1-3-adjustment-rows",
+          "J1-3-note",
+          "J1-3-conclusion"
+        ],
+        "key_order_matters": false,
+        "identity_field": "rowId",
+        "identity_field_source": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L36",
+        "identity_generator": "genId",
+        "identity_generator_declaration_source": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L75",
+        "identity_generator_source": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L76",
+        "identity_generator_form": "`j1adj-${Date.now()}-${idx ?? Math.random().toString(36).slice(2, 6)}`",
+        "identity_call_site": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L59",
+        "identity_defect": "positional_within_one_tick",
+        "identity_defect_detail": "🔴 `genId(idx)` 在**给了 idx 时不带随机串** —— `idx ?? random` 是二选一而非拼接。loadRows()（#L59）对整个数组在同一次同步循环里调用 `genId(i)`，`Date.now()` 对同批全部相同 ⇒ 缺 rowId 的历史数据会得到 `j1adj-<同一毫秒>-<下标>`，身份**就是下标**。而 addRow（#L104）调 `genId()` 无参 ⇒ 走随机分支、不位置化。同一个函数两种强度，判据必须按调用点分而不是按函数名分。这些 rowId 经 persistRows(#L85-97) 的 `http.put` 真落库。",
+        "persisted_via": "组件自己的 http.put（JD-3 的第二写路径）",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L95",
+        "consumed_by": [
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L44"
+        ],
+        "registered_as": "BP-8",
+        "status": "resolved_with_defect"
+      },
+      {
+        "id": "TK-4",
+        "entry_scoped": true,
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "block": "J1-6 计提情况检查表 / J1-7 分配情况检查表",
+        "owner_module": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue + J1TabAllocationCheck.vue",
+        "owner_constant": "KEYS",
+        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L171",
+        "owner_constant_source_2": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAllocationCheck.vue#L242",
+        "declaration_kind": "component_local_object_constant",
+        "derivation": "对象字面量逐字段，无派生",
+        "keys": [
+          "J1-6-short-term",
+          "J1-6-post-employment",
+          "J1-6-questions",
+          "J1-6-conclusion",
+          "J1-7-alloc-rows",
+          "J1-7-policy",
+          "J1-7-note",
+          "J1-7-conclusion",
+          "J1-7-total-admin-expense",
+          "J1-7-total-selling-expense",
+          "J1-7-total-production-cost"
+        ],
+        "key_order_matters": false,
+        "identity_field": "id",
+        "identity_field_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L163",
+        "identity_field_source_2": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAllocationCheck.vue#L232",
+        "identity_generator_form": "`acr-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}` / `alloc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}`",
+        "identity_defect": null,
+        "identity_defect_note": "两者都是 Date.now() + idx + **随机串**拼接 ⇒ 不位置化（与 TK-3 的 `idx ?? random` 二选一形态不同）。J1TabAllocationCheck 另有 #L321 的 `alloc-pull-${Date.now()}-${added}-${random}`（取数新增行），同族。",
+        "persisted_via": "宿主 useChecklistPersistence（两 Tab 都用 props.saveImmediate）",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L206",
+        "consumed_by": [
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L57",
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L61"
+        ],
+        "status": "resolved"
+      },
+      {
+        "id": "TK-5",
+        "entry_scoped": true,
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "block": "J1-8 检查表（= parent_duplicate 子入口 xlsx/j1/inspection/j1-tab-general-check）",
+        "owner_module": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue",
+        "owner_constant": "ITEM_ID",
+        "owner_constant_value": "J1-8-voucher-check",
+        "owner_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L324",
+        "declaration_kind": "component_local_constant_plus_one_inline_literal",
+        "derivation": "一个常量 + 一个内联字面量（#L467 'J1-8-post-period'）",
+        "keys": [
+          "J1-8-voucher-check",
+          "J1-8-post-period"
+        ],
+        "key_order_matters": false,
+        "identity_field": null,
+        "identity_field_note": "凭证抽查行与期后事项行都不带独立身份字段（整表 JSON 数组按位置存），但**没有跨表引用**这些行 ⇒ 不构成 forbidden_identity_kinds 意义上的缺陷；登记在此以免后来者以为漏查。",
+        "persisted_via": "组件自己的 http.put（JD-3 的第二写路径）",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L469",
+        "consumed_by": [
+          "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L65"
+        ],
+        "naming_regularity_counterexample": "🔴 按规律该有 `J1-8-rows` / `J1-8-note` / `J1-8-conclusion` —— 实测这三个串在全 J 域生产源码里命中数为 0。本 Tab 只有两个键，且其中一个的名字（`-voucher-check`）与 sheet 码毫无字面关系。",
+        "status": "resolved"
+      },
+      {
+        "id": "TK-6",
+        "entry_scoped": false,
+        "entry_id": null,
+        "non_entry_host": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+        "block": "J2 全册（**任务正文点名的「真实传输键」问题本体**）",
+        "owner_module": "六个 J2 子 Tab 各自的组件局部 `KEY` 对象",
+        "owner_constant": "KEY",
+        "owner_constant_sources": [
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjudication.vue#L45",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabDetail.vue#L35",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L30",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabAccrualCheck.vue#L31",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabDisclosureListed.vue#L46",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabDisclosureSoe.vue#L49"
+        ],
+        "tabs_without_key_object": [
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabIndex.vue"
+        ],
+        "tabs_without_key_object_note": "J2TabIndex（目录页）只读 allResponses 算完成度、不写库 ⇒ 无 KEY 对象。写下来是为了让「六个 Tab」这个数有可复核的补集。",
+        "declaration_kind": "six_component_local_object_constants",
+        "derivation": "各 Tab 的对象字面量逐字段，无派生、无共享常量模块",
+        "keys_sample": [
+          "J2-1-main",
+          "J2-1-postperiod",
+          "J2-1-dbo",
+          "J2-1-plan-assets",
+          "J2-1-assumptions",
+          "J2-1-sensitivity",
+          "J2-1-note",
+          "J2-1-conclusion",
+          "J2-2-main",
+          "J2-2-maturity",
+          "J2-2-dbp-status",
+          "J2-2-plan-assets",
+          "J2-2-assumptions",
+          "J2-2-sensitivity",
+          "J2-2-note",
+          "J2-2-conclusion",
+          "J2-3-entries",
+          "J2-3-note",
+          "J2-3-conclusion"
+        ],
+        "keys_sample_note": "🔴 这是**样本不是全集**：J2-4 与两份附注披露各自还有一组（J2TabAccrualCheck 的 6 个、J2TabDisclosureListed 的 11 个、J2TabDisclosureSoe 的 9 个）。本 slice 不冻结 J2 的键全集 —— 它不是 entry，冻结全集会造出一份没有消费方的死声明（additive 注入即死代码）。判据只验「真实形态 = 各 Tab 的字面量 KEY 对象」与「orphan 载体的形态 ≠ 真实形态」这两件事，分母是三个已冻结的 owner 常量。",
+        "identity_field": "id",
+        "identity_field_source": "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L104",
+        "identity_defect": "pure_ordinal_persisted",
+        "identity_defect_detail": "🔴 `id: i + 1`（#L104）是**纯序号、无稳定兜底**，来自 `props.htmlData.adjustments` 的种子行；随后 `scheduleSave()` 把 `JSON.stringify(entries)` 写进 `KEY.entries`（'J2-3-entries'，#L121）⇒ 真落库。删中间一行再新增，后续行的 id 全部左移、历史备注串到另一笔分录。#L111 的 `id: e.id ?? i + 1` 是兜底形态（弱一级）。这是全 J 域**唯一**的 family_a 命中。",
+        "persisted_via": "宿主 useChecklistPersistence（props.saveImmediate）",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L121",
+        "orphan_carrier_fabricated_form": "item_id: `J2-${key}`",
+        "orphan_carrier_fabricated_source": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
+        "orphan_carrier_verdict": "FABRICATED_KEY_SHAPE_NEVER_WRITTEN_IN_PRODUCTION",
+        "orphan_carrier_verdict_detail": "🔴 **这就是任务正文要「解清」的东西**：`useJ2FormData.saveResponses()` 把 item_id 拼成 `J2-` + `render-config 返回的 html_data.responses 的任意键`，键集合编译期不可知；而生产路径写的是六个 Tab 的字面量键（`J2-1-main` 形态）。两者只在「都以 `J2-` 开头」上巧合相似 ⇒ 若 Task 72 把 adapter 接到这个 orphan 载体上，宿主行为一点不变（它不可达）、契约字段却会按一套从未存在过的键形态生成，而「文件确实被改了」会让常规守卫全绿。判据：断言 `J2-${key}` 这个模板串只出现在 orphan 载体里、且 orphan 载体的生产可达性为 0。",
+        "registered_as": "BP-7 + BP-8",
+        "status": "resolved_with_defect"
+      },
+      {
+        "id": "TK-7",
+        "entry_scoped": false,
+        "entry_id": null,
+        "non_entry_host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue",
+        "block": "J3 全册",
+        "owner_module": "三个 J3 子 Tab 各自的组件局部 `KEY` 对象",
+        "owner_constant": "KEY",
+        "owner_constant_sources": [
+          "audit-platform/frontend/src/components/workpaper/j3/core/J3TabDetail.vue#L33",
+          "audit-platform/frontend/src/components/workpaper/j3/core/J3TabCheck.vue#L31",
+          "audit-platform/frontend/src/components/workpaper/j3/core/J3TabIpoFocus.vue#L24"
+        ],
+        "declaration_kind": "three_component_local_object_constants",
+        "derivation": "各 Tab 的对象字面量逐字段，无派生",
+        "tabs_without_key_object": [
+          "audit-platform/frontend/src/components/workpaper/j3/core/J3TabIndex.vue"
+        ],
+        "tabs_without_key_object_note": "🔴 J3TabIndex（目录页）**没有** `KEY` 对象 —— 它只读 allResponses 算完成度，不写库。首版把它列进 owner_constant_sources，被守卫打红改正：判据要求「声明的每个 owner 文件里真有那个常量」，所以「四个 Tab」这个数是错的，实为三个。同理 J2 侧的 J2TabIndex 也无 KEY 对象（TK-6 一开始就没列它）。",
+        "keys_sample": [
+          "J3-1-plans",
+          "J3-1-resolution",
+          "J3-1-fairvalue",
+          "J3-1-expert",
+          "J3-1-note",
+          "J3-1-conclusion"
+        ],
+        "keys_sample_note": "同 TK-6：样本而非全集（J3-2 与 IPO 页各自还有一组）。理由同上 —— J3 不是 entry。",
+        "identity_field": "id",
+        "identity_field_source": "audit-platform/frontend/src/components/workpaper/j3/core/J3TabDetail.vue#L126",
+        "identity_defect": "ordinal_as_fallback",
+        "identity_defect_detail": "`id: p.id ?? i + 1`（J3TabDetail#L126）与 `id: r.id ?? i + 1`（J3TabCheck#L103 与 #L105，两处）—— 三处都是下标兜底（family_b），会在「历史数据无 id」时位置化。",
+        "persisted_via": "宿主 useChecklistPersistence（props.saveImmediate）",
+        "persist_site": "audit-platform/frontend/src/components/workpaper/j3/core/J3TabDetail.vue#L158",
+        "orphan_carrier_fabricated_form": "item_id: `J3-${key}`",
+        "orphan_carrier_fabricated_source": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts#L96",
+        "orphan_carrier_verdict": "FABRICATED_KEY_SHAPE_NEVER_WRITTEN_IN_PRODUCTION",
+        "orphan_carrier_verdict_detail": "与 TK-6 同型（`J3-${key}`，#L96）。",
+        "registered_as": "BP-7 + BP-8",
+        "status": "resolved_with_defect"
+      }
+    ],
+    "nonexistent_guessed_keys": [
+      "J1-2-rows",
+      "J1-2-detail-rows",
+      "J1-detail-rows",
+      "J1-8-rows",
+      "J1-8-note",
+      "J1-8-conclusion",
+      "J2-2-rows",
+      "J3-1-rows"
+    ],
+    "nonexistent_guessed_keys_note": "🔴 这 8 个「按命名规律该有」的键在全 J 域生产源码（89 个文件）里命中数各为 0。这是「禁按命名规律推断」那条要求的**非空反向分母** —— 没有它，「我们现读了 owner 常量」只是自述。判据两侧都验：8 个各 0 命中，且 declarations 里登记的每个键至少 1 命中。",
+    "summary": {
+      "declarations_total": 7,
+      "entry_scoped_declarations": 5,
+      "non_entry_declarations": 2,
+      "declarations_resolved_clean": 4,
+      "declarations_resolved_with_defect": 3,
+      "declarations_with_two_source_declarations": 1,
+      "counting_note": "🔴 按维度现算并等值比对：entry_scoped == true 的 TK-1..TK-5 共 5 条；false 的 TK-6/TK-7 共 2 条；status 以 'resolved' 或 'resolved_two_declarations_currently_consistent' 结尾的 TK-1/TK-2/TK-4/TK-5 共 4 条；'resolved_with_defect' 的 TK-3/TK-6/TK-7 共 3 条；second_declaration_module 非空的 TK-1 共 1 条。"
+    }
+  },
+  "row_model_derivation": {
+    "why_this_key_exists": "沿用 Task 51 确立的 **source_ref 三边锁**（前五轮的 slice 只把 source_ref 写成 `工作簿!sheet!cell`，守卫只验「那个 cell 存在」⇒ 声明与实现同时错成一致时判据仍自洽）。三条边：① 声明（本节的 declared_source_ref / cells）② 源真读（openpyxl 打开权威模板逐格读）③ 实现现读（从 impl_module 抽常量）。守卫断言 ② == slice 冻结的 expected_source_labels **且** ② == ③（有序）**且** verdict == 实际比对结果。三边任一被单独改动都打红，同源错（同时改 ① 与 ③）也打红。",
+    "how_to_verify": "对每条 declaration：用 openpyxl 打开 `authoritative_templates.root/{workbook}`，取 `{sheet}` 的 `{cells}` 区间逐格读（sheet 名**不得 strip**，J1 册两张表名尾部有真空格）；再按 `impl_extraction_kind` 从 `impl_module` 抽出 `impl_constant` 的标签序列；三者有序比对。",
+    "forbidden_shortcuts": [
+      "只断言 sheet 名在 workbook.sheetnames 里 —— 那不验单元格内容",
+      "只断言 cell 非空 —— 那不验它等于声明的标签",
+      "用集合比对代替有序比对 —— 顺序错位会被放过",
+      "把 impl 常量硬抄进守卫常量 —— 那是第二真源，改了实现不改守卫就假绿",
+      "把全角/半角标点归一后再比 —— 会把 RD-2 的真缺陷洗掉（见该条的 diff_kinds）"
+    ],
+    "declarations": [
+      {
+        "id": "RD-1",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "model_name": "J1_SECTIONS[0].defaultRows（短期薪酬 20 行骨架）",
+        "impl_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts",
+        "impl_constant": "J1_SECTIONS",
+        "impl_constant_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L53",
+        "impl_section_key": "shortTerm",
+        "impl_default_rows_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L58",
+        "impl_extraction_kind": "section_default_rows_field:label",
+        "impl_extraction": "J1_SECTIONS 里 key == 'shortTerm' 那项的 defaultRows 数组内逐项 `label: '<中文>'`，按出现顺序",
+        "source_read_mode": "value",
+        "declared_source_ref": "backend/wp_templates/J/J1 应付职工薪酬.xlsx!明细表J1-2 !B13:B32",
+        "workbook": "J1 应付职工薪酬.xlsx",
+        "sheet": "明细表J1-2 ",
+        "cells": "B13:B32",
+        "boundary_cells": [
+          { "cell": "A11", "value": "序号" },
+          { "cell": "B11", "value": "项目名称" },
+          { "cell": "B12", "value": null },
+          { "cell": "A33", "value": "合计" },
+          { "cell": "B33", "value": null }
+        ],
+        "boundary_claim": "A11/B11 是两级表头的第一行（'序号' / '项目名称'），B12 为 null（第二行表头只在 C..N 列有 '期初数/本期增加/…'）；A33 = '合计' 而 B33 为 null ⇒ 区间上界 B32 正确。B34 起是下一分区标题（'（2）离职后福利中设定提存计划…'）。守卫逐格真读这 5 个边界格并与本清单等值比对 —— 区间整体上/下移一行会被打红（而只验「20 格都非空」不会）。",
+        "expected_source_labels": [
+          "工资、奖金、津贴和补贴",
+          "其中：1.工资",
+          "2.奖金",
+          "3.津贴",
+          "4.补贴",
+          "5.其他",
+          "职工福利费",
+          "社会保险费",
+          "1.基本医疗保险费",
+          "2.补充医疗保险费",
+          "3.工伤保险费",
+          "4.生育保险费",
+          "住房公积金",
+          "工会经费",
+          "职工教育经费",
+          "短期带薪缺勤",
+          "短期利润分享计划",
+          "非货币性福利",
+          "其他短期薪酬",
+          "其中：以现金结算的股份支付"
+        ],
+        "impl_labels": [
+          "工资、奖金、津贴和补贴",
+          "其中：1.工资",
+          "2.奖金",
+          "3.津贴",
+          "4.补贴",
+          "5.其他",
+          "职工福利费",
+          "社会保险费",
+          "1.基本医疗保险费",
+          "2.补充医疗保险费",
+          "3.工伤保险费",
+          "4.生育保险费",
+          "住房公积金",
+          "工会经费",
+          "职工教育经费",
+          "短期带薪缺勤",
+          "短期利润分享计划",
+          "非货币性福利",
+          "其他短期薪酬",
+          "其中：以现金结算的股份支付"
+        ],
+        "verdict": "MATCH",
+        "verdict_detail": "20/20 逐格有序相等（含 `其中：` 前缀与半角数字序号 `1.` 形态逐字一致）。这是全 slice 唯一的三向一致正例 —— 没有正例锚点的穷举判据无法区分「守卫在跑」与「守卫恒返回空」。",
+        "status": "clean"
+      },
+      {
+        "id": "RD-2",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "model_name": "J1_SECTIONS[1].defaultRows（离职后福利与其他长期福利 8 行骨架）",
+        "impl_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts",
+        "impl_constant": "J1_SECTIONS",
+        "impl_constant_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L53",
+        "impl_section_key": "postEmployment",
+        "impl_default_rows_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L85",
+        "impl_extraction_kind": "section_default_rows_field:label",
+        "impl_extraction": "J1_SECTIONS 里 key == 'postEmployment' 那项的 defaultRows 数组内逐项 `label: '<中文>'`，按出现顺序",
+        "source_read_mode": "value",
+        "declared_source_ref": "backend/wp_templates/J/J1 应付职工薪酬.xlsx!明细表J1-2 !B37:B44",
+        "workbook": "J1 应付职工薪酬.xlsx",
+        "sheet": "明细表J1-2 ",
+        "cells": "B37:B44",
+        "boundary_cells": [
+          { "cell": "A35", "value": "序号" },
+          { "cell": "B35", "value": "项目名称" },
+          { "cell": "B36", "value": null },
+          { "cell": "B45", "value": null },
+          { "cell": "A46", "value": "合计" }
+        ],
+        "boundary_claim": "A35/B35 是本分区两级表头的第一行，B36 为 null；B45 真读为 null（源模板的预留空行），A46 = '合计' ⇒ 区间 B37:B44 恰好是 8 行业务标签。🔴 B45 那一格是关键：把区间写成 B37:B45（9 格）会多出一个 null，而 impl 只有 8 项 ⇒ 判据必须能区分「源有预留空行」与「impl 漏了一行」。",
+        "expected_source_labels": [
+          "离职后福利",
+          "其中：1．基本养老保险费",
+          "2．失业保险费",
+          "3．企业年金缴费",
+          "4．其他",
+          "其他长期职工福利",
+          "其中：1．xxx",
+          "2．其他"
+        ],
+        "impl_labels": [
+          "离职后福利",
+          "其中：1.基本养老保险",
+          "2.失业保险费",
+          "3.企业年金缴费",
+          "4.其他",
+          "其他长期职工福利",
+          "其中：1.xxx",
+          "2.其他"
+        ],
+        "verdict": "MISMATCH",
+        "verdict_detail": "🔴 逐格有序相等仅 **2/8**。两类差异必须分开记，因为强度不同：① **真标签差异 1 处** —— impl 的 `其中：1.基本养老保险` 比源模板的 `其中：1．基本养老保险费` **少一个「费」**（不是标点问题）；② **数字序号分隔符差异 5 处** —— impl 用半角 `.`（U+002E），源模板用全角 `．`（U+FF0E），涉及第 2/3/4/6/7 项（`2．失业保险费` / `3．企业年金缴费` / `4．其他` / `其中：1．xxx` / `2．其他`）。第 1 项同时含两类差异，故按位置计 6 处不等、2 处相等。",
+        "diff_kinds": {
+          "real_label_difference": 1,
+          "real_label_difference_sites": [
+            {
+              "index": 1,
+              "source": "其中：1．基本养老保险费",
+              "impl": "其中：1.基本养老保险",
+              "missing_char": "费"
+            }
+          ],
+          "fullwidth_halfwidth_separator_only": 5,
+          "fullwidth_halfwidth_separator_only_sites": [
+            { "index": 2, "source": "2．失业保险费", "impl": "2.失业保险费" },
+            { "index": 3, "source": "3．企业年金缴费", "impl": "3.企业年金缴费" },
+            { "index": 4, "source": "4．其他", "impl": "4.其他" },
+            { "index": 6, "source": "其中：1．xxx", "impl": "其中：1.xxx" },
+            { "index": 7, "source": "2．其他", "impl": "2.其他" }
+          ],
+          "why_both_are_recorded": "🔴 判据**不得**先归一全角/半角再比 —— 那会把第 ① 类（真少一个字）也一起洗掉。反过来若把第 ② 类也当同等严重的缺陷，会导致「照源模板把 20 行短期薪酬的半角序号也改成全角」这种伤害正例（RD-1 的 20/20 用的正是半角 `1.` 且与源一致）的错误修法。两类分别登记、分别计数，修一类而不改登记也要打红（反向变异 M 的对象）。"
+        },
+        "second_declared_source": {
+          "ref": "backend/data/note_template_soe.json#/sections/[107]/tables/[2]/rows",
+          "section_number": "八、40",
+          "section_title": "应付职工薪酬",
+          "rows_read": [
+            "离职后福利",
+            "其中：基本养老保险费",
+            "失业保险费",
+            "企业年金缴费",
+            "其他",
+            "其他长期职工福利（不适用的删除）",
+            "其中：xxx",
+            "其他",
+            "合计"
+          ],
+          "also_in": "backend/data/note_template_listed.json#/sections/[121]/tables/[2]/rows（逐字相同的 9 行）",
+          "verdict": "MISMATCH",
+          "verdict_detail": "🔴 两份附注模板的第 2 行都是 `其中：基本养老保险费`（**带「费」**，无数字序号），与源 xlsx 一致、与 impl 不一致。即两个真源彼此吻合而 impl 与两者都不符 —— 这正是 Task 51 正文「防同源错仍自洽」要拦的形态在 J 循环的复现：只验「source_ref 指向的 sheet 存在」的守卫会全绿。全文搜索 `基本养老保险`（不带费）在两份 note_template 里命中数为 **0**。"
+        },
+        "consequence": "底稿→附注同步时（j1NoteSectionMap.ts 推送 J1 披露载荷），行标签 `其中：1.基本养老保险` 与 note_template 的 `其中：基本养老保险费` 对不上 ⇒ `note_sub_table_projector` 只能按位置对齐；一旦源模板行序调整或用户插行，金额会整体错行。且该标签会经 J1-2 明细 → J1 披露的 detail pull（j1DisclosureDetailPull.ts）流入附注。",
+        "registered_as": "BP-8",
+        "status": "defect_registered_not_fixed"
+      },
+      {
+        "id": "RD-3",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "model_name": "J1_SECTIONS[2].defaultRows（一年内支付的辞退福利 —— 动态行，无分类真源）",
+        "impl_module": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts",
+        "impl_constant": "J1_SECTIONS",
+        "impl_constant_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L53",
+        "impl_section_key": "severance",
+        "impl_default_rows_source": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L100",
+        "impl_extraction_kind": "section_default_rows_field:label",
+        "declaration_polarity": "negative",
+        "source_read_mode": "value",
+        "declared_source_ref": "backend/wp_templates/J/J1 应付职工薪酬.xlsx!明细表J1-2 !B50:B52",
+        "workbook": "J1 应付职工薪酬.xlsx",
+        "sheet": "明细表J1-2 ",
+        "cells": "B50:B52",
+        "boundary_cells": [
+          { "cell": "A48", "value": "序号" },
+          { "cell": "B48", "value": "项目名称" },
+          { "cell": "A50", "value": "1" },
+          { "cell": "A53", "value": "合计" },
+          { "cell": "B53", "value": null }
+        ],
+        "boundary_claim": "A48/B48 是两级表头第一行；A50 = '1' 是唯一的序号占位（A51/A52 为 null）；A53 = '合计'。⇒ 源模板给了 3 个预留行位而只在第一行填了序号，B 列三格全空。",
+        "expected_source_labels": [null, null, null],
+        "impl_labels": [""],
+        "verdict": "NEGATIVE_NO_SOURCE_CLASSIFICATION",
+        "verdict_detail": "源区间 B50:B52 三格真读**全为 None**（A50 = '1' 是序号占位，B/C/D/E 列空，A53 = '合计'）⇒ 该分区在源模板里是**空白动态区**，没有任何分类标签可派生。impl 相应地只 seed **1 行**空 label（`{ seq: '1', label: '', indent: 0, isSubItem: false }`）⇒ 与 memory 铁律 ⑥「动态区骨架行数禁写死、改 max(seed 行数,1)」一致：既没有把源模板的 3 个预留行抄成 3 行占位（那会被推成占位披露行），也没有凭空造分类名。",
+        "why_negative_declaration_matters": "🔴 否定式判据是「照源模板补全分类」这个危险动作的唯一拦网：若有人把 B50:B52 的三个空行抄成三行占位、或按经验补上「辞退福利-协商解除 / 辞退福利-裁员」之类分类名，正向判据（比对标签序列）不会红（源本来就空、随便写都不等），只有「源必须真为空 **且** impl 必须恰 1 行空 label」这条双向断言会红。",
+        "status": "negative_declaration_clean"
+      },
+      {
+        "id": "RD-4",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "model_name": "同一组「离职后福利」8 行标签的**第二份 impl 声明**（J1-6 计提情况检查表）与 RD-2 的第一份互不一致",
+        "impl_module": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue",
+        "impl_constant": "POST_EMPLOYMENT_DEFAULTS",
+        "impl_constant_source": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L153",
+        "impl_extraction_kind": "object_field:label",
+        "declaration_polarity": "cross_impl_divergence",
+        "source_read_mode": "value",
+        "declared_source_ref": "backend/wp_templates/J/J1 应付职工薪酬.xlsx!明细表J1-2 !B37:B44（与 RD-2 同一源区间）",
+        "workbook": "J1 应付职工薪酬.xlsx",
+        "sheet": "明细表J1-2 ",
+        "cells": "B37:B44",
+        "cross_impl_divergence": {
+          "shared_row": "「基本养老保险费」那一行",
+          "site_a": {
+            "ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L87",
+            "label": "其中：1.基本养老保险",
+            "has_fee_char": false
+          },
+          "site_b": {
+            "ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L155",
+            "label": "其中：1.基本养老保险费",
+            "has_fee_char": true
+          },
+          "source_xlsx": {
+            "ref": "backend/wp_templates/J/J1 应付职工薪酬.xlsx!明细表J1-2 !B38",
+            "label": "其中：1．基本养老保险费",
+            "has_fee_char": true
+          },
+          "note_template_soe": {
+            "ref": "backend/data/note_template_soe.json#/sections/[107]/tables/[2]/rows/[1]",
+            "label": "其中：基本养老保险费",
+            "has_fee_char": true
+          },
+          "note_template_listed": {
+            "ref": "backend/data/note_template_listed.json#/sections/[121]/tables/[2]/rows/[1]",
+            "label": "其中：基本养老保险费",
+            "has_fee_char": true
+          }
+        },
+        "verdict": "SECOND_IMPL_AGREES_WITH_SOURCE_FIRST_DOES_NOT",
+        "verdict_detail": "🔴 三个真源（源 xlsx B38 + 两份 note_template）与**第二份 impl**（J1-6 的 POST_EMPLOYMENT_DEFAULTS#L155）都带「费」，只有**第一份 impl**（J1-2 的 J1_SECTIONS#L87）不带。⇒ RD-2 的 MISMATCH 不是「源读错了」也不是「全平台都这么写」，缺陷精确定位在 useJ1Detail.ts#L87 **单一处**。这条判据的价值：它把「改哪一边」这个决定从判断变成了事实（改 impl 而不是改源/改 note_template），并且**双向锁死** —— 若有人把 #L155 也改成不带费（往错的方向对齐），本条同样打红。",
+        "why_this_declaration_matters": "🔴 前六轮的三边锁只处理「一个 impl 常量 vs 一个/两个真源」。J 循环出现第四种形态：**同一行模型有两份 impl 声明且互相不一致**。若只做 RD-2（第一份 vs 源），修法可能被误导成「源模板写错了、按 impl 改 note_template」；有了 RD-4，第二份 impl 站在源那一侧，多数结论明确。缺了这条，判据在「往哪边对齐」上是沉默的。",
+        "registered_as": "BP-8",
+        "status": "cross_impl_divergence_registered"
+      }
+    ],
+    "summary": {
+      "declarations_total": 4,
+      "clean": 1,
+      "defect_registered": 1,
+      "negative_declaration_clean": 1,
+      "cross_impl_divergence_registered": 1,
+      "clean_ids": ["RD-1"],
+      "defect_ids": ["RD-2"],
+      "negative_ids": ["RD-3"],
+      "cross_impl_ids": ["RD-4"],
+      "source_rows_covered": 31,
+      "impl_rows_covered": 29,
+      "counting_note": "🔴 计数按 **status** 维度现算并与本键等值比对：status == 'clean' 的 RD-1 共 1 条；'defect_registered_not_fixed' 的 RD-2 共 1 条；'negative_declaration_clean' 的 RD-3 共 1 条；'cross_impl_divergence_registered' 的 RD-4 共 1 条。source_rows_covered / impl_rows_covered 只统计有标签序列的三条（RD-1/RD-2/RD-3）：source = 20 + 8 + 3 = 31（含 RD-3 的 3 个空格）；impl = 20 + 8 + 1 = 29。RD-4 不计入行数（它比的是单行的字符差异，不是序列）。两个总数分别现算，混用会掩盖「RD-3 的 3 vs 1 是有意的」这条结论。",
+      "why_only_j1_has_declarations": "🔴 只有 J1 是 slice 的 entry ⇒ 只有它的行模型进三边锁。J2/J3 的行模型（J2TabDetail 的 8 个区块 / J3TabDetail 的股份支付情况表）**刻意不冻结**：为不是 entry 的宿主写一份没有消费方的行模型声明，就是「additive 注入即死代码」。它们的行身份缺陷由 dynamic_row_identity.positional_identity_inventory 的 non_entry_host_scope 承接（那一节有真消费方 —— BP-8 的判据要用它）。"
+    }
+  },
+  "dynamic_row_identity": {
+    "why_this_section_exists": "本 slice 的 1 条 entry 含多张「行数由业务数据决定」的动态行表（J1-2 三分区明细 / J1-3 调整分录 / J1-6 两张计提检查 / J1-7 分配检查 / J1-8 两张一般检查），触发 slice_schema.conditional_sections 的 dynamic_row_identity。三条直接用途：① 逐表登记身份字段与生成点，Task 72 改线时不必重查；② 为 Property 23 提供真分母；③ 把「哪些地方把行身份取成位置」冻结成穷举清单，新出现的下一条会被发现。",
+    "source_of_truth": "各 owner 模块 / Tab 组件的源码（本节每行都带 source_ref 指到具体文件与行号），不是本文件的自述",
+    "forbidden_identity_kinds": [
+      "array_index",
+      "ordinal",
+      "position",
+      "mutable_chinese_label"
+    ],
+    "kind_semantics_note": "🔴 `tables[].row_identity.kind` 描述的是该表**主身份机制**（沿用 I 循环 Task 51 的既定口径：I1-2 声明 generated_opaque_string，而 I1 的 family_b 下标兜底登记在 positional_identity_inventory + BP-6）。兜底分支的缺陷**不**改写 kind —— 否则范式校验器会因 kind ∈ forbidden_identity_kinds 直接打红，而本任务并不修前端代码，结果是要么加豁免（禁止）要么假装没查到（更糟）。缺陷落在 positional_identity_inventory 并由 BP-8 承接，两处都可复算。",
+    "tables": [
+      {
+        "table_key": "J1-2-detail-shortTerm",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-2-detail-shortTerm",
+        "seed_row_count": 20,
+        "seed_row_count_source": "row_model_derivation.declarations[RD-1].impl_labels 的长度",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L127",
+          "load_fallback_kind": "nondeterministic_regeneration",
+          "load_fallback_source_ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L181"
+        }
+      },
+      {
+        "table_key": "J1-2-detail-postEmployment",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-2-detail-postEmployment",
+        "seed_row_count": 8,
+        "seed_row_count_source": "row_model_derivation.declarations[RD-2].impl_labels 的长度",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L127",
+          "load_fallback_kind": "nondeterministic_regeneration",
+          "load_fallback_source_ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L181"
+        }
+      },
+      {
+        "table_key": "J1-2-detail-severance",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-2-detail-severance",
+        "seed_row_count": 1,
+        "seed_row_count_source": "row_model_derivation.declarations[RD-3].impl_labels 的长度（源模板该区为空白动态区 ⇒ seed 1 行空 label，符合 memory 铁律 ⑥）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L127",
+          "add_row_source_ref": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L279",
+          "add_row_note": "addRow() 用 `createEmptyRow({seq: String(rows.length + 1), ...}, rows.length)` —— `seq` 是**展示序号**（family_c，不得被判为身份），`id` 仍走 #L127 的生成式。"
+        }
+      },
+      {
+        "table_key": "J1-3-adjustment-rows",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-3-adjustment-rows",
+        "seed_row_count": 0,
+        "seed_row_count_source": "loadRows() 无数据时 `rows.value = []`（J1TabAdjustment.vue#L54）—— 纯动态，无骨架",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_positional_fallback",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L75",
+          "load_fallback_kind": "positional_within_one_tick",
+          "load_fallback_source_ref": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L59",
+          "defect": "genId(idx) 在给了 idx 时走 `idx ?? random` 的 idx 分支 ⇒ 不带随机串；loadRows 对整数组同步调用 ⇒ Date.now() 同批相同 ⇒ id 实质是下标。登记为 BP-8。"
+        }
+      },
+      {
+        "table_key": "J1-6-short-term",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-6-short-term",
+        "seed_row_count": 11,
+        "seed_row_count_source": "SHORT_TERM_DEFAULTS（J1TabAccrualCheck.vue#L138 起，逐项 label）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L163"
+        }
+      },
+      {
+        "table_key": "J1-6-post-employment",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-6-post-employment",
+        "seed_row_count": 8,
+        "seed_row_count_source": "POST_EMPLOYMENT_DEFAULTS（J1TabAccrualCheck.vue#L153，逐项 label —— 即 RD-4 的第二份 impl 声明）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L163"
+        }
+      },
+      {
+        "table_key": "J1-7-alloc-rows",
+        "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+        "persistence_key": "J1-7-alloc-rows",
+        "seed_row_count": null,
+        "seed_row_count_source": "分配检查行由用户新增或从序时账取数派生（#L321 的 `alloc-pull-*`）⇒ 无固定骨架行数（不得写死）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAllocationCheck.vue#L232",
+          "pull_row_source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAllocationCheck.vue#L321"
+        }
+      },
+      {
+        "table_key": "J1-8-voucher-check",
+        "entry_id": "xlsx/j1/inspection/j1-tab-general-check",
+        "entry_scope_note": "🔴 属 parent_duplicate 子入口的表。按 AC 1.6 它复用父 entry 的 adapter ⇒ 父 entry 的 contract **必须**覆盖它，故登记在此而不是另开一节。",
+        "persistence_key": "J1-8-voucher-check",
+        "seed_row_count": null,
+        "seed_row_count_source": "凭证抽查行由用户新增 ⇒ 无固定骨架",
+        "row_identity": {
+          "kind": "positional_array_order_no_identity_field",
+          "identity_field": null,
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L464",
+          "why_not_a_forbidden_kind": "整表 JSON 数组按位置存且**没有任何跨表引用**这些行（无 ref_index chip、无附注同步、无 TB 回写）⇒ 位置即语义、不存在「身份串行」的后果。写下来是为了让判据分得开：把它算成 forbidden 会逼出一个没有实际风险的假缺陷；不写下来则后来者会以为漏查。"
+        }
+      },
+      {
+        "table_key": "J1-8-post-period",
+        "entry_id": "xlsx/j1/inspection/j1-tab-general-check",
+        "entry_scope_note": "同上，parent_duplicate 子入口的表。",
+        "persistence_key": "J1-8-post-period",
+        "seed_row_count": null,
+        "seed_row_count_source": "期后事项行由用户新增 ⇒ 无固定骨架",
+        "row_identity": {
+          "kind": "positional_array_order_no_identity_field",
+          "identity_field": null,
+          "source_ref": "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L467",
+          "why_not_a_forbidden_kind": "同 J1-8-voucher-check。"
+        }
+      }
+    ],
+    "positional_identity_inventory": {
+      "why_this_key_exists": "「哪些地方把行身份取成位置」必须是**穷举且可复算**的清单，否则守卫只能对声明过的那几条打红，新出现的下一条不会被发现。这里冻结扫描口径与全部命中，并按**五族**分类 —— 只有 A/B 两族是真缺陷（BP-8），C/D/E 三族写下来是为了让判据分得开（不分开会把展示序号与含随机串的生成式一起报成位置化，判据于是既有误报又失去可信度）。",
+      "scan_recipe": "对 J 域 **89** 个生产 .ts/.vue（口径见 scanned_scope）先 stripComments()，再逐行匹配身份键赋值 `(?<![\\w$])(rowId|rowKey|id)\\s*:\\s*([^,\\n]+)`，取右侧表达式；表达式里出现 `${i}`/`${idx}`/`${index}` 或以 `i`/`idx`/`index`（可带 `+ 1`）结尾即计命中。",
+      "scanned_scope": "components/workpaper/{j1,j2,j3}/** 的 .ts/.vue + composables/workpaper/{j1,j2,j3}/** 的 .ts + components/workpaper/composables 下文件名匹配 `^(?:use)?[jJ][123](?![0-9])` 的文件；排除 `__tests__` 目录与 `.spec.ts` / `.test.ts` / `.unit.test.ts` / `.playwright.ts`。实测 **89** 个文件。",
+      "scanned_scope_note": "🔴 J 循环的 owner 模块**分居两处**：`components/workpaper/composables/`（j1AllocationLedgerPull / j1DisclosureConsistency / j1NoteSectionMap / j2* / useJ2EntryDualMode / useJ3EntryDualMode）与 `src/composables/workpaper/{j1,j2,j3}/`（27 + 12 + 11 个）。前六轮的扫描口径只覆盖 `components/workpaper/**`（I 循环 235 个文件全在那一棵树下）—— 照抄会漏掉 `src/composables/workpaper/j1/useJ1Detail.ts` 这个**主表 owner**，于是「0 命中」是空跑出来的。",
+      "total_hits": 10,
+      "family_a_pure_ordinal_persisted": {
+        "count": 1,
+        "why_worst": "身份**完全**由数组下标 + 1 构成、无任何稳定兜底，且结果经 saveImmediate 真写进 checklist_responses ⇒ 删中间一行再新增，后续行 id 全部左移、历史备注与金额串到另一笔分录。",
+        "hits": [
+          {
+            "site": "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L104",
+            "expression": "id: i + 1",
+            "context": "load() 里 `(props.htmlData.adjustments as Record<string, unknown>[]).map((e, i) => ({ id: i + 1, ... }))` —— 从 render-config 种子派生调整分录行",
+            "writes_to_key": "J2-3-entries（组件局部常量 KEY.entries，J2TabAdjustment.vue#L18 起的 KEY 对象）",
+            "persist_ref": "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L121",
+            "persist_path": "J2TabAdjustment.vue#L121 `props.saveImmediate([{ item_id: KEY.entries, ... }])` → 宿主 GtJ2DefinedBenefitPlan.vue#L192 handleChildSave → persistence.saveDebounced → useChecklistPersistence#L182 api.put",
+            "scope": "non_entry_host",
+            "host": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue"
+          }
+        ]
+      },
+      "family_b_index_as_fallback": {
+        "count": 6,
+        "why_still_a_defect": "主身份是上游行的稳定 id/rowId，只在上游缺 id 时回落到下标 —— 回落分支在「render-config 种子派生的行尚未被保存」「旧版本持久化数据无 id」两种情形下**会**执行，届时身份即位置化。比 family_a 弱但不是零风险。",
+        "hits": [
+          {
+            "site": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L59",
+            "expression": "rowId: r.rowId || genId(i)",
+            "generator_source": "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L75",
+            "generator_form": "`j1adj-${Date.now()}-${idx ?? Math.random().toString(36).slice(2, 6)}`",
+            "severity_note": "🔴 本族里最强的一条：`idx ?? random` 是**二选一**而不是拼接 ⇒ 给了 idx 就没有随机串，同批 load 的 Date.now() 相同 ⇒ 兜底 id 实质等于下标。",
+            "writes_to_key": "J1-3-adjustment-rows",
+            "persist_path": "J1TabAdjustment.vue#L95 组件自己的 http.put（JD-3 的第二写路径）",
+            "scope": "entry",
+            "entry_id": "xlsx/j1/gt-j1-employee-compensation"
+          },
+          {
+            "site": "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L181",
+            "expression": "id: String(r.id || `j1d-load-${i}-${Math.random().toString(36).slice(2, 6)}`)",
+            "severity_note": "含随机串 ⇒ **不会撞** id，但每次 load 都换 ⇒ 非确定性身份。与上一条不同强度，判据不得合并。",
+            "writes_to_key": "J1-2-detail-{shortTerm|postEmployment|severance}",
+            "persist_path": "useJ1Detail.ts#L249 saveImmediate → 宿主 useChecklistPersistence",
+            "scope": "entry",
+            "entry_id": "xlsx/j1/gt-j1-employee-compensation"
+          },
+          {
+            "site": "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L111",
+            "expression": "id: e.id ?? i + 1",
+            "writes_to_key": "J2-3-entries",
+            "scope": "non_entry_host",
+            "host": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue"
+          },
+          {
+            "site": "audit-platform/frontend/src/components/workpaper/j3/core/J3TabCheck.vue#L103",
+            "expression": "id: r.id ?? i + 1",
+            "writes_to_key": "J3-2 的 KEY.variation",
+            "scope": "non_entry_host",
+            "host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue"
+          },
+          {
+            "site": "audit-platform/frontend/src/components/workpaper/j3/core/J3TabCheck.vue#L105",
+            "expression": "id: r.id ?? i + 1",
+            "writes_to_key": "J3-2 的 KEY.vouchers",
+            "scope": "non_entry_host",
+            "host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue"
+          },
+          {
+            "site": "audit-platform/frontend/src/components/workpaper/j3/core/J3TabDetail.vue#L126",
+            "expression": "id: p.id ?? i + 1",
+            "writes_to_key": "J3-1-plans",
+            "scope": "non_entry_host",
+            "host": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue"
+          }
+        ]
+      },
+      "family_c_generated_opaque_with_random_must_not_be_flagged": {
+        "count": 3,
+        "why_here": "这 3 处的表达式里确实出现 `${i}` / `${idx}`，但同时拼了 `Date.now()` **与** `Math.random()` ⇒ 下标只在同一毫秒内做去重、不构成身份。用「表达式里出现 i/idx 即报」的粗口径会把它们全报成位置化，判据于是既有误报又失去可信度。反向自检：本节的判据**必须不点名**这 3 处。",
+        "sites": [
+          "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L127 `id: \\`j1d-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}\\``",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAccrualCheck.vue#L163 `id: \\`acr-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}\\``",
+          "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabAllocationCheck.vue#L232 `id: \\`alloc-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 5)}\\``"
+        ],
+        "discriminator": "表达式同时含 `Date.now()` 与 `Math.random()` ⇒ 归本族。🔴 判别式必须是「同时含两者」而不是「含 random」：`genId(idx)`（family_b 第 1 条）的函数体里也出现 `Math.random()`，但那是 `??` 的另一支、给了 idx 时不执行 ⇒ 只看「含 random」会把最严重的那条洗成 family_c。",
+        "scan_recipe_for_this_family": "在 total_hits 的命中集合内，筛出表达式同时匹配 `Date\\.now\\(\\)` 与 `Math\\.random\\(\\)` 且**不含** `\\?\\?` 与 `\\|\\|` 的站点，实测 3 处。守卫断言这 3 处不在 family_a/family_b 的命中集合里。"
+      },
+      "family_d_display_ordinal_must_not_be_flagged": {
+        "count": 3,
+        "why_here": "这 3 处是**展示序号**（目录页表格第一列的「序号」），不是行身份 —— 它们与身份字段同在一个对象字面量里，用「整行判」的粗口径会把它们报成位置化。反向自检：本节的判据**必须不点名**这 3 处。",
+        "sites": [
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabIndex.vue#L73 `seq: i + 1`",
+          "audit-platform/frontend/src/components/workpaper/j2/J2TabIndex.vue#L65 `seq: i + 1`",
+          "audit-platform/frontend/src/components/workpaper/j3/core/J3TabIndex.vue#L63 `seq: i + 1`"
+        ],
+        "scan_recipe_for_this_family": "逐行匹配 `\\bseq\\s*:\\s*[^,]*(?:idx|index|\\bi\\b)\\s*\\+\\s*1`，实测 3 处。守卫断言这 3 处**不在** family_a/family_b 的命中集合里（它们的键是 `seq` 而不是 `id`/`rowId`/`rowKey`，所以本来就不该被身份键正则命中 —— 这条是对正则口径的反向自检）。",
+        "why_only_three_unlike_i_cycle": "I 循环有 20 处（i1AdditionCheckModel / i1DisclosureSyncPayload / useI1Adjustment / useI2Adjustment 等大量 `seq: idx + 1`）。J 循环只有 3 处、且全在三个目录页组件里 —— J 的表格大多用源模板的固定 `seq`（如 J1_SECTIONS 的 '一'/'二'/'三' 中文序号）而不是运行时算。"
+      },
+      "family_e_four_table_seed_absent": {
+        "count": 0,
+        "why_here": "🔴 H 循环的 BP-6 是「四表种子路径把行身份取成数组下标」（H2/H4/H8 三条 entry 的 `rowId: \\`seed-${i}\\``）。J 循环**没有**这一族：按 `` `(seed|row|detail|item)-${i}` `` 形态全扫，命中 0 处。写下来的理由与 I 循环 family_d 相同 —— 「没有」必须落成可复算判据（0 命中要有变异证明它不是空跑），否则后来者要么重复调查、要么以为 J 也有。",
+        "scan_recipe_for_this_family": "逐行匹配 `` `(?:seed|row|detail|item)-\\$\\{\\s*(?:i|idx|index)\\s*\\}`` ``，实测 0 处。守卫断言恰好 0 命中（出现第 1 条即红）。",
+        "not_claimed_as_evidence_of_quality": "🔴 0 命中只表示「本 slice 无该类条目」，**不**表示 J 循环的四表种子路径是干净的 —— J 循环根本没有四表种子路径（J1 的取数走序时账按月拉取 `pullExpenseLedgerMonthly`，按 label 匹配已有行填值而不新建行，J1TabDetail.vue#L284-300）。分母为空的部分只断言前提成立，不宣称通过。"
+      },
+      "entry_scope_vs_non_entry_scope": {
+        "why_this_split": "🔴 J 循环独有的必要划分：10 处命中里只有 2 处在 slice 的 entry（J1）范围内，其余 8 处在 J2/J3 两个**非 entry 宿主**里。两者的 must_fix_before 不同：entry 内的必须在为 J1 发布 per-entry contract（step 6）之前修；非 entry 的必须在 J2/J3 接上 OO 入口并成为 entry 之前修。把它们混成一个数会让「J1 的契约还差什么」说不清。",
+        "entry_scope_hits": 2,
+        "entry_scope_sites": [
+          "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L59",
+          "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L181"
+        ],
+        "non_entry_scope_hits": 8,
+        "non_entry_scope_hosts": [
+          "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue",
+          "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue"
+        ],
+        "counting_note": "entry_scope_hits + non_entry_scope_hits 只统计 family_a + family_b（1 + 6 = 7）与 family_c 的 3 处（全在 J1，entry 内）⇒ 2（family_b 的 J1 两条）+ 8（family_a 1 + family_b 4 + family_c 3）= 10。🔴 family_c 的 3 处虽在 J1 但**不是缺陷** ⇒ 缺陷维度的 entry_scope 数是 **2**、non_entry 数是 **5**（family_a 1 + family_b 的 J2/J3 四条）。两组数各有用途，必须分别登记且分别现算。",
+        "defect_only_entry_scope_hits": 2,
+        "defect_only_non_entry_scope_hits": 5
+      },
+      "registered_as": "BP-8"
+    },
+    "hardcoded_scan_result": {
+      "why_this_key_exists": "「不硬编码列数/行数」若只写在文档里就是散文。这里把扫描口径与实测结果冻结下来，守卫按同一口径现扫并与本结果等值比对 —— 将来有人写死列数/行数会立刻打红，反之修好了不改登记也会打红。",
+      "scanned_scope": "与 positional_identity_inventory.scanned_scope 同一批 **89** 个文件；扫描前剥块注释（`/* ... */`）与行注释（`//`）与 HTML 注释",
+      "patterns": {
+        "blankRows_with_integer_literal": 0,
+        "horizontal_company_column_literals": 0,
+        "column_key_is_label": 0,
+        "row_cell_key_is_label": 0,
+        "seed_placeholder_literals": 0,
+        "four_table_seed_positional": 0
+      },
+      "pattern_definitions": {
+        "blankRows_with_integer_literal": "`blankRows\\([^)]*,\\s*\\d+\\s*\\)` —— memory 铁律 ⑥ 点名的「动态区骨架行数写死」形态",
+        "horizontal_company_column_literals": "`['\\\"`](?:公司|单位)[1-9]\\d*['\\\"`]` —— 横向展开列名字面量（H7 范式 SK-3 的反例形态）",
+        "column_key_is_label": "`key:\\s*[A-Za-z_$][\\w$]*(?:\\.[\\w$]+)*\\.label\\b` —— 用可变中文 label 作列 key（H8 的 DV-1 形态）",
+        "row_cell_key_is_label": "`row\\[\\s*[A-Za-z_$][\\w$]*(?:\\.[\\w$]+)*\\.label\\s*\\]` —— 行单元格键用 label",
+        "seed_placeholder_literals": "`['\\\"][^'\\\"]{0,6}(?:公司|单位|课题|项目)[1-9]\\d*['\\\"]` —— 写死的种子行/列名（I 循环有 3 处 `可比公司1/2/3`）",
+        "four_table_seed_positional": "`` `(?:seed|row|detail|item)-\\$\\{\\s*(?:i|idx|index)\\s*\\}`` `` —— 四表种子路径把行身份取成下标（H 循环 BP-6 形态）"
+      },
+      "why_all_six_are_zero": "J 循环的表结构与 H/I 不同：没有按公司/单位横向展开的宽表（J1-5 同行业对比是**纵向**多行、列固定），没有 `blankRows` 这个工具函数的调用（全 J 域 0 命中，该函数在 H/K 域使用），披露载荷的列 key 走 j1NoteSectionMap / j2NoteSectionMap 的显式常量而不是 `c.label`。🔴 六个 0 都必须有变异证明它们不是空跑出来的（见变异脚本对每个模式各注入一条）。",
+      "not_claimed_as_evidence_of_quality": "🔴 全 0 只表示「本 slice 无这六类硬编码」，不得解读为「J 循环的动态结构处理是干净的」—— 真实缺陷在 positional_identity_inventory（10 处命中、7 处是缺陷）与 row_model_derivation（RD-2/RD-4）里。"
+    }
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-1",
+      "blocks": "bidirectional",
+      "what": "唯一的 entry 没有 Task 17 的 non-current instrumentation candidate，也没有 Task 36 finalize 出的 published representation，adapter 未注册。",
+      "consequence": "Task 36 的 ExcelEntryFinalizeGate.finalize_candidate 无 candidate 可 finalize ⇒ 不可能产出 published representation ⇒ resolver/room/current/evidence 都拿不到合法身份 ⇒ 标 bidirectional 就是假双向。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "Task 52 的正文范围是 J 循环 entry 的枚举/裁决/对端调查/J2 orphan composable 与真实传输键的解清/行模型三边锁与 UI 义务，不含跑 Task 17 的 instrumentation 与 Task 36 的 finalize（两者各有自己的任务与门）。伪造 candidate finalize 是 AP-5 明禁项。",
+      "must_fix_before": "把 J entry 标 bidirectional 或注册 adapter 之前",
+      "owner_task": "Task 17 + Task 36",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/excel_entry_gate.py",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ]
+    },
+    {
+      "id": "BP-2",
+      "blocks": "bidirectional",
+      "what": "唯一的 entry 没有人工审核的 per-entry contract。workpaper_sync_contracts/ 下 5 个 JSON（_example.candidate.json / b60.hour_budget / d2.receivable_detail / g7.soe_subsidiary_disclosure / h1.disposal_check）里**没有一条**的 review.entry_id 属 J 循环 ⇒ 本 slice 的 contract 数为 0。",
+      "consequence": "projection_contract bundle 的 contract slot 必须是 approved definition，缺失即 PerEntryContractUnapprovedError；typed null marker 不得冒充。且 J1 的写路径是双轨（宿主共享适配器 + 7 个子 Tab 直写，JD-3），契约必须同时覆盖两条，抄别人的模板一定漏。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 6 要求逐 entry 人工审核发布，逐字段带 source_ref（xlsx 还要 cell）。J1 一册 15 张业务 sheet、9 张动态行表、24+ 个传输键 ⇒ 独立工作量；且 RD-2/RD-4 的行标签缺陷未修之前发布契约会把错标签固化进 stable field key。",
+      "must_fix_before": "把 J entry 标 bidirectional 之前；且必须在 BP-8 兑现之后（否则错标签进契约）",
+      "owner_task": "Task 52 后续（step 6，逐 entry 人工审核发布）",
+      "source_refs": [
+        "backend/data/workpaper_sync_contracts",
+        "backend/app/services/workpaper_sync/contracts.py"
+      ]
+    },
+    {
+      "id": "BP-3",
+      "blocks": "bidirectional",
+      "what": "唯一的 entry 没有 approved authority model，也没有 non-null approved definition bundle。",
+      "consequence": "authority_model 三值枚举缺省 ⇒ Requirement 2.3 / 6.19 的「不得用 SQL NULL / 空串 / 全零 hash 代替」被违反；bundle digest 为空 ⇒ 任何 representation 都无法绑定。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 5 / step 7 的发布顺序是 template → instrumentation → contract → bundle → representation，contract（BP-2）未发布之前 bundle 不可能非空。",
+      "must_fix_before": "把 J entry 标 bidirectional 之前",
+      "owner_task": "Task 52 后续（step 5 / step 7）",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/adapters/registry.py",
+        "backend/data/workpaper_sync_migration_paradigm.json#definition_producer_paradigm.steps"
+      ]
+    },
+    {
+      "id": "BP-4",
+      "blocks": "verification",
+      "what": "唯一的 entry 没有真实 OnlyOffice 9.4 的 required scenario set 执行记录，evidence.sync_test_run_id 与 required_scenario_set_digest 全为 null。",
+      "consequence": "verification_state 只能是 UNVERIFIABLE；Property 69 的正向逐 scenario 闭合无分母 ⇒ 本 slice 不宣称通过那部分。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "需要真实 OO 9.4 环境与 Task 44 同型的 gate；本任务不具备该条件，且 tasks.md 的前置段明写「真实 OO required scenarios 未完成前保持 UNVERIFIABLE」。",
+      "must_fix_before": "把 J entry 计入已验收（verification_state=VERIFIED）之前",
+      "owner_task": "J 循环的 OO 9.4 gate（Task 44 同型）",
+      "source_refs": [
+        "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py",
+        "backend/data/workpaper_sync_j_cycle_manifest_slice.json#independent_entries/0/evidence"
+      ]
+    },
+    {
+      "id": "BP-5",
+      "blocks": "adapter_wiring",
+      "what": "🔴 J1 的写路径**双轨并存**：宿主的共享持久化适配器 `useChecklistPersistence`（子 Tab 经 props.saveImmediate 汇入）与 **7 个子 Tab 各自的 `http.put`**（8 个站点，见 j_cycle_form_differences.JD-3.second_write_path_sites）。两条路径写同一张 checklist_responses 表的不同 item_id，互不经过对方的防抖与版本号。",
+      "observable_consequences": [
+        "只把 adapter 接到宿主适配器上 ⇒ 7 个子 Tab 的写入完全绕过 bridge，双向回写对 J1-1/J1-3/J1-8/J1-9/J1-10 与两份附注披露无效，而宿主侧的 scenario 会全绿",
+        "两条路径对同一 wp 并发写时没有共同的 revision/generation ⇒ 后写覆盖先写且无冲突提示（AC 11.3 要求的四种文案分别表达在此无从谈起）",
+        "契约的 stable field key 若只从宿主适配器那一侧枚举，会漏掉 J1-adjudication-audit-note / J1-adjudication-audit-conclusion 这两个**组件内声明**的键（TK-2 的 extra_keys）"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "收敛双写路径要改 7 个子 Tab 的持久化调用（把 http.put 换成 props.saveImmediate），属前端重构而非本任务的 slice/清册/守卫范围；且改动会改变 source commit ⇒ 需要新的 test run。",
+      "must_fix_before": "step 9 注册 adapter 并改线之前（否则会接到只覆盖一半写入的载体上）",
+      "owner_task": "Task 66（plan）/ Task 72（execute）—— 🔴 需新立任务或并入 Task 72；J 循环没有在办的 owner spec（实扫 .kiro/specs/ 顶层只有 5 个在办目录，无 j-cycle 相关）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L213",
+        "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjudication.vue#L283",
+        "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L95",
+        "audit-platform/frontend/src/components/workpaper/j1/inspection/J1TabGeneralCheck.vue#L469"
+      ]
+    },
+    {
+      "id": "BP-6",
+      "blocks": "ac_1_7_unreachable_stub_deletion",
+      "what": "🔴 **4 个 orphan dual-mode composable**（AC 1.7 的不可达旧桩）：`useJ2EntryDualMode.ts`（41 行）与 `useJ3EntryDualMode.ts`（37 行）生产与测试边全 0；`composables/workpaper/j2/useJ2DualMode.ts`（35 行）与 `j3/useJ3DualMode.ts`（39 行）只被各自的 barrel re-export，而两个 barrel 自身入边为 0（二阶 orphan）。前两个的 sheet 名映射表（8 条 / 4 条）目标 sheet 在权威模板里**一个都不存在**；`useJ3DualMode` 还直调 `/api/workpapers/onlyoffice/health`（#L25，legacy_deletion_paradigm step 6 明禁）。",
+      "observable_consequences": [
+        "AC 1.7 明写「不可达旧桩 SHALL 删除；不得以豁免或 DEPRECATED 注释长期保留」—— 4 个文件共 152 行至今在库",
+        "二阶 orphan 会骗过「入度 > 0 ⇒ 不是孤儿」的判据：useJ2DualMode 的边数是 2、看起来活着",
+        "Task 72 若顺着 barrel 把 useJ3DualMode 接上宿主，会引入一条绕过 sync bridge 的 OO health 旁路",
+        "两个 sheet 映射表的目标名全错 ⇒ 谁按它接线，OO 侧会按不存在的 sheet 打开"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "删除动作由 deletion plan 的执行方统一做（legacy_deletion_paradigm step 3 + step 7 的 post-delete 全场景重验），且删除会改变 source commit ⇒ evidence 需重跑。本任务负责把清册与判据冻结到位。",
+      "must_fix_before": "J2/J3 接上 OO 入口成为 entry 之前；且 AC 1.7 没有时限豁免 ⇒ 也不应等到那时",
+      "owner_task": "Task 66（plan）/ Task 72（execute）—— 🔴 需新立任务或并入 Task 72",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts",
+        "audit-platform/frontend/src/composables/workpaper/j2/useJ2DualMode.ts",
+        "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts",
+        "backend/data/workpaper_sync_j_cycle_deletion_plan.json"
+      ]
+    },
+    {
+      "id": "BP-7",
+      "blocks": "adapter_wiring",
+      "what": "🔴 两个「长得像载体的死代码」：`composables/workpaper/j2/useJ2FormData.ts`（152 行）与 `j3/useJ3FormData.ts`（151 行）都只经孤立 barrel 可达，却各含完整持久化管道（render-config GET + checklist PUT + J2 还有 trial-balance/writeback 与 events/publish），且把 item_id 拼成 `J2-${key}` / `J3-${key}` —— 生产路径从未写过这种形态。",
+      "observable_consequences": [
+        "Task 72 改线时若把 adapter 接到它们身上，宿主行为一点不变（它们不可达）而守卫因为「文件确实被改了」全绿 —— 假绿第①源（additive 注入即死代码）的最贵形态",
+        "契约字段若按它们的键形态生成，会得到一套从未存在过的 stable field key，与真实数据（六/四个 Tab 的字面量 KEY）完全错开",
+        "`useJ2FormData.writebackTB` 直调 trial-balance/writeback 与 events/publish ⇒ 若被接起来，会绕过 bridge 的 materialize 协议写四表"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "它们不是 legacy **dual-mode** composable，不在 legacy_deletion_paradigm step 3 的删除对象内；且 `writebackTB` / `publishAdjudicated` 的逻辑将来可能被真实 adapter 复用 ⇒ 删或留的决定不由本任务下。",
+      "must_fix_before": "step 9 注册 adapter 并改线之前（否则会接到死代码上）",
+      "owner_task": "Task 66（plan）/ Task 72（execute）—— 🔴 需新立任务或并入 Task 72",
+      "source_refs": [
+        "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
+        "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts#L96",
+        "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
+        "audit-platform/frontend/src/composables/workpaper/j3/index.ts"
+      ]
+    },
+    {
+      "id": "BP-8",
+      "blocks": "bidirectional",
+      "what": "🔴 两类**行模型/行身份**缺陷：① `J1_SECTIONS[postEmployment]` 的 8 行标签与源 xlsx `明细表J1-2 !B37:B44` 只有 2/8 相等 —— 含 1 处真标签差异（`其中：1.基本养老保险` 少一个「费」）与 5 处全角/半角序号分隔符差异；同一组标签的**第二份 impl**（J1TabAccrualCheck#L155）与两份 note_template 都带「费」⇒ 缺陷定位在 useJ1Detail.ts#L87 单一处（RD-2 / RD-4）。② 行身份位置化 7 处：family_a 1 处纯序号且真落库（J2TabAdjustment#L104 `id: i + 1` → `J2-3-entries`）+ family_b 6 处下标兜底，其中 entry 范围内 2 处（J1TabAdjustment#L59 的 `genId(i)` 无随机串 ⇒ 兜底 id 实质等于下标、真 PUT 落库；useJ1Detail#L181 非确定性再生成）。",
+      "observable_consequences": [
+        "底稿→附注同步后附注行标签与 note_template 的 rows[].label 对不上 ⇒ note_sub_table_projector 只能按位置对齐，插行/删行会整体错行",
+        "为 J1 发布 per-entry contract 时会把错标签固化进 stable field key（source_ref 指向的 cell 与 label 不符）",
+        "J1-3 调整分录在「历史数据无 rowId」时身份即下标 ⇒ 删中间一行后金额与备注串到另一笔分录，而该表经 A13 错报链路对外",
+        "J2-3-entries 的纯序号身份在 J2 成为 entry 后会直接违反 Property 23"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改 label 与改身份生成式都是前端代码改动，且会改变底稿→附注的既有数据对齐（已保存的行标签是旧值）⇒ 需要迁移策略与浏览器实测，超出本任务的 slice/清册/守卫范围。伪造「已修」或改 slice 里的 verdict 都是 AP 明禁项。",
+      "must_fix_before": "为 xlsx/j1/gt-j1-employee-compensation 发布 per-entry contract（step 6）之前；J2/J3 的那 5 处在它们成为 entry 之前",
+      "owner_task": "🔴 需新立任务或并入 Task 66/72（J 循环没有在办的 owner spec；实扫 .kiro/specs/ 顶层只有 5 个在办目录）",
+      "source_refs": [
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L87",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L181",
+        "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L59",
+        "audit-platform/frontend/src/components/workpaper/j1/core/J1TabAdjustment.vue#L75",
+        "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L104",
+        "backend/wp_templates/J/J1 应付职工薪酬.xlsx",
+        "backend/data/note_template_soe.json",
+        "backend/data/note_template_listed.json"
+      ]
+    },
+    {
+      "id": "BP-9",
+      "blocks": "manifest_truth",
+      "what": "🔴 source manifest 的 J entry 记着 `capability: \"single_onlyoffice\"` + `html_store: \"unresolved\"`，与本 slice 的 `capability: null` + `html_counterpart_verdict: \"exists\"` 不一致。**这不是 manifest 抄错** —— 它是 source-backed 生成物，那两个值来自 `backend/data/workpaper_sync_entry_overlay.json` 的 `defaults_by_component.GtOnlyOfficeSheet`（对全部挂 GtOnlyOfficeSheet 的 entry 一律给这两个默认值）。",
+      "consequence": "任何直接读 manifest 的下游（registry 的 capability 校验、legacy baseline 生成器、报告）都会看到「已裁决为纯 OO」这个与实际调查相反的结论；重新生成 manifest 不会自动修正，必须先改 overlay 的 defaults 或给该 entry 加 override。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "overlay 是六个 slice 共用的输入（D/E/F/G/H/I 都有同型 BP），单方面改 defaults_by_component 会同时改动其余循环的 manifest 值 ⇒ 必须在 adapter 注册后统一重生成。本任务把差异如实登记而不去动共享文件（并发回退高发文件）。",
+      "must_fix_before": "重新生成 manifest 并声称 J 循环已迁移之前",
+      "owner_task": "Task 52 后续 step 9（注册 adapter 后重新生成 manifest）",
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_overlay.json",
+        "backend/data/workpaper_sync_entry_manifest.json"
+      ]
+    },
+    {
+      "id": "BP-10",
+      "blocks": "ui_honesty",
+      "what": "🔴 AC 1.4 的 UI 义务未兑现，且比 I 循环更差一层：① J1 宿主没有挂 `GtEntrySyncCapabilityNotice.vue`、也没有引用 `workpaperEntrySyncNotice.ts` 的文案真源（该组件的 41 个生产消费方全是 D/F/G/H 宿主，I 与 J 各 0）；② 工具栏内的 `el-segmented`（#L10）**没有二级门控** —— OO 探测失败时旁边的 `仅结构化视图` el-tag（#L14）会出现，但切换器本身照旧可点，共享基类的 `switchMode` 只在运行时 `return`（#L48）⇒ 表现成「点了没反应」。",
+      "observable_consequences": [
+        "审计师在 HTML 侧录完切到 OO 侧看不到数据（两侧各自独立落盘），界面没有任何可操作原因提示 —— AC 1.4 后半句「显示可操作原因」零兑现",
+        "OO 不可用时点切换器无声失败，比 AC 1.5 要求的「不显示不可兑现的切换按钮」更差（无反馈）",
+        "只放 el-tooltip 不算「显示」（EP teleport + 仅 hover 才进 DOM）⇒ 修法必须是常显摘要 + tooltip 细节，且挂载点要落在 ui_toolbar_gate 声明的 `.j1-dual-mode-bar` 区块内"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 11 的 UI 改动会改变 source commit ⇒ 该 entry 的 evidence 立即 stale、需要新 test run；且本任务同时在改 slice 与清册，把宿主模板一起改会让「哪个改动导致 evidence stale」不可归因。判据已按 AC 1.4 的形态写好（常显摘要 + 区块内挂载 + 二级门控三要素），修完即可被守卫验收。",
+      "must_fix_before": "J entry 的裁决对外生效之前（AC 1.4 是裁决自带的义务，不是备注）",
+      "owner_task": "Task 52 后续（step 11）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L9",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L10",
+        "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts#L48",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ]
+    },
+    {
+      "id": "BP-11",
+      "blocks": "bidirectional",
+      "what": "🔴 primary managed table 的传输键有**两份真源**：写方 `useJ1Detail.ts#L108` 的 `STORAGE_KEY_PREFIX` + `storageKey()` 派生，读方 `useJ1Adjudication.ts#L94` 的 `J1_DETAIL_SECTION_KEYS` 三个全字面量（注释自称「与 useJ1Detail 的 STORAGE_KEY_PREFIX 一致」）。当前实测三键逐字相等（TK-1 verdict = CONSISTENT），但这是结构性风险而非当前缺陷。",
+      "observable_consequences": [
+        "改前缀而不改字面量 ⇒ 附注披露侧的 detail pull（useJ1DisclosureSections#L377/#L384）静默读空，J1 附注的短期薪酬/离职后福利两段变空，而两侧各自的单测都不会红",
+        "为 J1 发布 per-entry contract 时若只从写方枚举键，读方那三个字面量不会被纳入契约 ⇒ 契约漂移检测看不见读方",
+        "反向同理：改字面量而不改前缀，写方仍写旧键、读方读新键"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "收敛成单一真源（让 useJ1Adjudication 从 useJ1Detail 导入前缀，或把三键提到一个共享常量模块）是前端重构；且 `useJ1Detail` 与 `useJ1Adjudication` 互相引用会成环（后者已被前者的消费方引用），需要抽第三个 leaf 模块 ⇒ 属独立改动。本任务把两份声明的一致性做成可复算判据（TK-1 的双侧比对），改任一侧而不改另一侧立即打红。",
+      "must_fix_before": "为 xlsx/j1/gt-j1-employee-compensation 发布 per-entry contract（step 6）之前",
+      "owner_task": "🔴 需新立任务或并入 Task 66/72",
+      "source_refs": [
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L108",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Adjudication.ts#L94",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1DisclosureSections.ts#L377"
+      ]
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+    "assertions": [
+      "本 slice 的 1 条 entry 与 D slice 的 7 条、E slice 的 1 条、F slice 的 8 条、G slice 的 17 条、H slice 的 9 条、I slice 的 6 条均无交集（七 slice 两两不相交，逐对现算）",
+      "该 entry 在 workpaper_sync_contracts/ 下没有文件 —— 未交付 contract 的 entry 不伪造 contract，也不借用 b60.hour_budget / d2.receivable_detail / g7.soe_subsidiary_disclosure / h1.disposal_check 任一份（逐文件读 review.entry_id 断言无一条属本 slice）",
+      "authoritative_templates 的 3 个文件里只有 1 个 belongs_to_entry 命中本 slice 的 entry_id，另 2 个为 null 且各带 excluded_reason（SR-8 的 null 分支）⇒ 不存在「一本模板挂到别人 entry 上」也不存在「悄悄夹带跨循环模板」",
+      "该 entry 的 evidence.contract_test 指向本 Task 52 的守卫文件，sync_test_run_id / required_scenario_set_digest 全为 null，不引用任何 pilot 的 scenario 实体或 evidence",
+      "deletion plan 里 4 个待删 orphan 文件路径与本 slice/兄弟 slice 的任何 legacy_dual_mode.module 路径都不重复（共享基类 useWorkpaperEntryDualMode 在 J 的清册里标为 preserved 而非 delete，与 D/M/N 循环的 wrapper 各自独立）",
+      "🔴 共享基类的处理**不构成**跨 entry 复用：它是平台级基类（29 个真语句消费方），J 循环只贡献 3 条边；清册对它的动作是「不删 + 记录删完 J 之后的剩余消费方数 26」，不是「把它算作 J 的资产」",
+      "J2/J3 两个非 entry 宿主的 orphan composable 与位置化身份缺陷登记在本 slice 的 non_entry_host_scope，但**不**生成 entry、不占 independent_entry_count、不产出 contract/bundle/scenario —— 避免用「相邻宿主的债务」把本 slice 的 entry 数做大",
+      "row_model_derivation 的 4 条 declaration 全部绑定同一个 entry_id 且都指向 J1 那一本工作簿（单 entry 单 workbook 绑定），不存在一条 declaration 跨两本册或跨两个 entry"
+    ]
+  },
+  "honest_adjudication_summary": {
+    "total_independent": 1,
+    "pilot_contract_published": 0,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 0,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "capability_verdict_pending": 1,
+    "html_counterpart_exists": 1,
+    "html_counterpart_none": 0,
+    "finalized_published_representations": 0,
+    "entries_left_unverifiable": 1,
+    "parent_duplicate_children": 1,
+    "reachable_hosts_in_cycle": 3,
+    "hosts_with_oo_mount": 1,
+    "hosts_without_oo_mount": 2,
+    "authoritative_template_files": 3,
+    "template_files_with_owner_entry": 1,
+    "template_files_without_owner_entry": 2,
+    "orphan_dual_mode_modules": 4,
+    "orphan_dual_mode_first_order": 2,
+    "orphan_dual_mode_second_order": 2,
+    "orphan_barrels": 2,
+    "lookalike_persistence_carriers": 2,
+    "shared_base_statement_consumers": 29,
+    "shared_base_pseudo_string_edges": 5,
+    "shared_base_j_cycle_consumers": 3,
+    "transport_key_declarations_total": 7,
+    "transport_key_declarations_with_defect": 3,
+    "transport_key_declarations_with_two_source_declarations": 1,
+    "row_model_declarations_total": 4,
+    "row_model_declarations_clean": 1,
+    "row_model_declarations_defect": 1,
+    "row_model_declarations_negative": 1,
+    "row_model_declarations_cross_impl": 1,
+    "positional_identity_hits_total": 10,
+    "positional_identity_defect_hits": 7,
+    "positional_identity_defect_hits_entry_scope": 2,
+    "positional_identity_defect_hits_non_entry_scope": 5,
+    "dynamic_row_identity_tables": 9,
+    "entries_with_second_write_path": 1,
+    "second_write_path_files": 7,
+    "second_write_path_sites": 8,
+    "entries_missing_segmented_second_level_gate": 1,
+    "entries_mounting_the_ac14_notice": 0,
+    "hardcoded_pattern_hits_total": 0,
+    "counting_notes": {
+      "positional_identity_hits_total": "10 = family_a 1 + family_b 6 + family_c 3。family_d（展示序号 3 处）与 family_e（四表种子 0 处）**不计入** total_hits —— 它们的键不是身份键（`seq`）或形态不存在，本来就不该被身份键正则命中，写下来是对正则口径的反向自检。",
+      "positional_identity_defect_hits": "7 = family_a 1 + family_b 6。family_c 的 3 处虽被同一正则命中但不是缺陷（同时含 Date.now() 与 Math.random() 且不含 `??`/`||`）。",
+      "positional_identity_defect_hits_entry_scope": "2 = J1TabAdjustment#L59 + useJ1Detail#L181（都在 slice 的 entry 范围内）。另 5 处缺陷在 J2/J3 两个非 entry 宿主里。2 + 5 = 7 ✓",
+      "dynamic_row_identity_tables": "9 = J1-2 三分区 3 + J1-3 一张 1 + J1-6 两张 2 + J1-7 一张 1 + J1-8 两张 2（后两张属 parent_duplicate 子入口，按 AC 1.6 由父 entry 的契约覆盖，故计入）。",
+      "second_write_path_files": "7 个文件 / 8 个站点（J1TabAdjustment.vue 有两处）—— 两个数分别现算，混用会让「7 还是 8」说不清。",
+      "authoritative_template_files": "3 = J1/J2/J3 三本；其中 belongs_to_entry 非 null 的 1 本、为 null 且带 excluded_reason 的 2 本（1 + 2 = 3 ✓）。本 slice 是 D~I 六轮里第一份真正走到 SR-8 null 分支的。",
+      "shared_base_statement_consumers": "29 是 **statement-position 窄口径**（排除 JD-6 的 5 处 JSON snippet 字符串）。宽口径是 30 ⇒ 差集恰是 workpaperSyncLegacyBaseline.generated.ts 那一个文件。两个数都登记，是为了让「窄口径不是随口说的」有反向分母。",
+      "hardcoded_pattern_hits_total": "0 = 六个模式各 0（blankRows 写死行数 / 横向公司列字面量 / 列 key 用 label / 行单元格键用 label / 种子占位字面量 / 四表种子位置化）。🔴 六个 0 各有一条变异注入证明它们不是空跑出来的。"
+    },
+    "reason": "唯一的 entry 实测有 HTML 对端（checklist_responses + remark 列 + 平台级共享持久化适配器 + 7 个子 Tab 直写的第二写路径，且 primary managed table 的三个传输键与模板依据已 openpyxl 逐格核验），按 AC 12.8 不能标 single_onlyoffice；OO 侧 15 张活业务 sheet 有真实业务价值，按 AC 12.9 不能标 single_html；宿主在 htmlRendererRegistry 有真模块边，不是 unreachable；AC 12.1 的六件前置一件未落地，不能标 bidirectional ⇒ 记 capability: null + 待裁决三字段，并在 slice_counters.unadjudicated 如实计 1。",
+    "ac_15_not_applicable_because": "🔴 AC 1.5 的触发条件是「入口**被裁决**为纯 OO 或纯 HTML」。本 slice 的唯一 entry 的 capability 为 null（待裁决），四个终态一个都不成立 ⇒ 触发条件不成立 ⇒ **AC 1.5 对本 slice 不适用**，生效的是 AC 1.4（未注册 adapter ⇒ 禁止显示「可双向回写」并显示可操作原因，见 BP-10）。J2/J3 两个非 entry 宿主虽然事实上只显示 HTML 模式、零切换按钮（顺带满足了 AC 1.5 想要的效果），但它们不是 manifest entry、没有裁决 ⇒ 那不是本任务的裁决产物，不作为 AC 1.5 的兑现来宣称。🔴 特别说明：本 slice **没有**把「有对端但映射不可靠」读成「无对端」来裁 single —— 那种情形按范式仍是待裁决态，映射不可靠的部分（RD-2/RD-4 的行标签、BP-11 的两份键真源）登记为阻断项而不是裁决理由。",
+    "slice_counters": {
+      "unadjudicated": 1,
+      "fake_bidirectional_claimed_verified": 0,
+      "bidirectional_unverified": 0,
+      "stale_evidence": 0,
+      "note": "unadjudicated=1 的含义是「本 slice 有 1 条 entry 的 capability 终态尚未确定」，缺什么已逐条落在 blocking_preconditions。fake_bidirectional_claimed_verified=0 的分母是真的：唯一 entry 的 verification_state 是 UNVERIFIABLE 且带 6 条 unverifiable_reasons，没有任何一条声称已验收。bidirectional_unverified=0 是因为 bidirectional 条数为 0（不是「都验收了」）。stale_evidence=0 是因为压根没有 evidence 实体（不是「都新鲜」）。四个 0/1 都不得解读为「已具备双向能力」。"
+    }
+  },
+  "property_denominators": {
+    "why_this_key_exists": "Task 46 首轮把「没有 contract → Property 通过」写成结论，那是空分母重言式（同 spec 的 Task 20 专门写代码拒绝这种论证）。本节逐 Property 显式区分「有真分母的部分（真验）」与「无适用分母的部分（只断言前提成立 + 承载者存在，**不宣称通过**）」。",
+    "property_3": {
+      "what_it_asserts": "未注册 adapter 不得宣称双向 —— 任一 `bidirectional` entry 必须解析到唯一 adapter、approved authoritative model 与非空 immutable definition bundle；`projection_contract` 还必须解析到 approved per-entry contract。删 adapter/bundle/contract 任一项后守卫打红（design.md §Property 3，Validates Requirements 1.4）",
+      "j_cycle_denominator": "🔴 **两个分母，一空一实**。空的那个：`bidirectional` entry 数 = 0 ⇒ 「删 adapter/bundle/contract 任一项后守卫打红」这部分无对象。实的那个：AC 1.4 的**否定方向** —— 分母 = 本 slice 全部 1 条 entry + 全 manifest 186 条 entry 的 adapter_id 现读 + `workpaperEntrySyncNotice.entrySyncNotice()` 的两个真分支（已注册 ⇒ 返回 null / 未注册 ⇒ 返回非空通知）+ 宿主模板的宣称文案扫描。这一侧是**非空**的，真验。",
+      "how_handled": "守卫真验五件事：① 断言 slice 的 entry 与 registry 的 DELIVERED_PER_ENTRY_CONTRACTS 都没有 J 循环的 adapter（adapter_id 为 null 且 registry 里无该 entry_id）；② 断言 slice 里没有任何 entry 的 capability == 'bidirectional'（正向门关着）；③ 断言 J1 宿主模板里没有「可双向回写」「已同步」「双向」等宣称文案（现扫，非空分母）；④ 断言 AC 1.4 的文案真源模块存在、`SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 为空数组、且 `entrySyncNotice()` 对未注册 entry 返回非空的四字段通知 —— 这条靠现读 TS 源码的形态判据（常量与函数签名 + 两个分支的 return 形态）；⑤ 断言 BP-10 已登记（宿主未挂 notice 是已知缺口，不是「无事发生」）。",
+      "not_claimed_passing": true,
+      "not_claimed_passing_part": "「任一 bidirectional entry 删掉 adapter/bundle/contract 之一后守卫打红」这条 —— 本 slice 的 bidirectional 条数为 0，分母为空，只断言前提（正向门关着 + 承载它的 pilot 守卫文件真存在）不宣称通过。",
+      "carrier_for_the_empty_part": "backend/tests/workpaper_sync/test_task13_contract_registry.py + backend/app/services/workpaper_sync/adapters/registry.py 的 assert_bundle_usable / assert_projection_contract_resolved"
+    },
+    "property_20": {
+      "what_it_asserts": "generated col 占位不可注册生产 adapter —— contract 含无语义 `col_[a-z]+` 且无人工 stable key/source_ref 时 registry 校验失败（design.md §Property 20，Validates Requirements 6.1）",
+      "j_cycle_denominator": "**contract 维度分母为空**（本 slice 已发布的 per-entry contract 数 = 0，见 BP-2），故「registry 拒绝占位 contract」这部分**不宣称通过**。但 Property 20 的实质是「无语义占位不得进入生产身份」，它在本 slice 有**非空的同型分母**：4 条 row_model declaration 的标签序列 + 7 条 transport_key declaration 的键集合 —— 逐个断言不含 `col_[a-z]+` 形态、不用中文 label 作键、键与身份字段分离。",
+      "how_handled": "守卫真验四件事：① 前提断言 —— 逐文件读 workpaper_sync_contracts/ 下每份 contract 的 `review.entry_id`，断言无一条属本 slice（不是数文件个数）；② 承载字段级判据的 pilot 守卫文件真存在（test_task13_contract_registry.py）；③ 在非空同型分母上真验 —— 4 条 declaration 的 impl_labels/expected_source_labels 与 7 条 declaration 的 keys 里 `col_[a-z]+` 命中数为 0，且 hardcoded_scan_result 的 column_key_is_label / row_cell_key_is_label 两项现扫为 0；④ 断言 nonexistent_guessed_keys 的 8 个串各 0 命中而 declarations 登记的每个键至少 1 命中（键是现读出来的，不是猜的）。",
+      "not_claimed_passing": true,
+      "not_claimed_passing_part": "「contract 含 col_ 占位时 registry 真的拒绝」这条 —— 分母为空（本 slice contract 数 0），只断言前提成立 + 承载者存在，不宣称通过。"
+    },
+    "property_69": {
+      "what_it_asserts": "evidence 由逐 scenario 实体与服务端重算闭合（design.md §Property 69，Validates Requirements 12.10）",
+      "j_cycle_denominator": "非空但**全为负向** —— 唯一 entry 的 evidence 是 UNVERIFIABLE，分母是「UNVERIFIABLE 必须带非空 unverifiable_reasons」与「声称 VERIFIED 必须有 sync_test_run_id + required_scenario_set_digest」两条蕴含关系；另有 **43 项计数**（honest_adjudication_summary 的各字段）必须从 independent_entries / orphan_dual_mode_inventory / transport_key_resolution / row_model_derivation / dynamic_row_identity / authoritative_templates 六个节现算等值。",
+      "how_handled": "守卫按 SR-7 断言 UNVERIFIABLE 带非空 reasons（6 条）；按「VERIFIED ⇒ 有 run id + digest」断言无一条空口声称已验收；把 summary 的各计数逐项从各自来源节现算并等值比对；断言 slice_counters 除 unadjudicated=1 外全 0 且这三个 0 各自的「为什么是 0」被写明（不得解读为已验收）。",
+      "not_claimed_passing": false,
+      "not_claimed_passing_part": "逐 scenario evidence 实体的**正向**闭合（需真实 OO 9.4 探针 —— BP-4）。"
+    },
+    "property_70": {
+      "what_it_asserts": "scenario / evidence / contract / bundle / candidate 不得跨 entry 或跨场景复用（design.md §Property 70，Validates Requirements 12.12）",
+      "j_cycle_denominator": "非空 —— 1 条 J entry × (D 7 + E 1 + F 8 + G 17 + H 9 + I 6) 的两两不相交判据（七 slice）、契约归属逐文件读 review.entry_id（5 份 JSON）、3 本模板 belongs_to_entry 的**单射 + null 必带 excluded_reason** 判据、4 条 declaration 的单 entry 单 workbook 绑定、deletion plan 4 条待删路径的全局去重。",
+      "how_handled": "守卫真验：七个 slice 的 entry 集合两两不相交；契约目录里没有任何文件的 review.entry_id 属本 slice，且四条 pilot 契约的 review.entry_id 分别真是 xlsx/b60/gt-b60-bundle / xlsx/gt-d2-accounts-receivable / xlsx/gt-g7-long-term-equity-main / xlsx/gt-h1-fixed-assets（逐文件读，不按文件名猜）；模板归属是单射且 2 条 null 各带 excluded_reason；deletion plan 的路径集合与 slice 的 legacy_dual_mode.module 无重复。",
+      "not_claimed_passing": false
+    },
+    "property_21_22_23_28_not_claimed": {
+      "why_here": "Task 52 的正文只点名 Property 3 / 20 / 69 / 70，但相邻任务（46/48/49/50/51）的守卫分别额外核了 Property 21（contract 字段完整）/ 22（动态列 key 与 label 解耦）/ 23（动态行身份不使用下标）/ 28（immutable definition 漂移 fail closed）。本 slice 在**真分母**上顺带验了 22 的静态部分（label-as-key 全 slice 0 命中 + 六个硬编码模式各 0）、23 的静态前提（9 张动态行表的身份字段与生成点 + 10 处命中五族划分 + family_d/family_e 的反向自检）与 28 的 template identity 一层（3 个模板 digest 现算 + 目录集合等值 + 37 条 wp_code 解析实跑 + 23/9/6 张 sheet 名现读 + J1 册的 retired/business/mechanism 三向计数）。",
+      "not_claimed_passing": true,
+      "partially_claimed": [
+        "Property 22（静态结构部分：label-as-key 与硬编码列数/行数穷举 0 命中）",
+        "Property 23（静态前提部分：身份字段与生成点声明 + 位置化命中五族穷举划分）",
+        "Property 28（template identity 一层：3 个模板 digest / sheet 名 / 解析结果）"
+      ],
+      "not_claimed_parts": [
+        "Property 21 全部 —— contract 数为 0，分母为空",
+        "Property 22 的运行时部分 —— 需真实渲染，本任务只做静态形态判据",
+        "Property 23 的运行时部分 —— 需真实增删行的浏览器实测",
+        "Property 28 的 bundle / instrumentation / contract / authority model 四层漂移 —— 四者在本 slice 全为 null（BP-1/BP-2/BP-3），分母为空"
+      ]
+    }
+  },
+  "paradigm_schema_conflict": {
+    "what": "范式 JSON 的 slice_schema.applies_to_tasks 是 [48..57]，effective_from_task_48 明文把 html_counterpart_verdict / html_counterpart_source_refs 与阻断项的 status / must_fix_before / source_refs 列为追加必填；同时 capability 必须落在四个终态枚举内**或**为 null 且待裁决三字段齐备（SR-3 蕴含式）。",
+    "how_resolved_here": "沿用 D（Task 46 收口）/ F（Task 48）/ G（Task 49）/ H（Task 50）/ I（Task 51）已确立的诚实形态：capability 记 null + capability_verdict_stage + capability_target + 非空 capability_target_blocked_by，并让 slice_counters.unadjudicated 等于待裁决条数（SR-9）。追加必填项全部补齐（entry 的两个 html_counterpart 字段、11 条阻断项各带 status / must_fix_before / source_refs）。",
+    "residual_inconsistency": null,
+    "new_section_not_in_schema": {
+      "sections": [
+        "j_cycle_form_differences",
+        "orphan_dual_mode_inventory",
+        "transport_key_resolution",
+        "row_model_derivation",
+        "template_resolution_audit",
+        "property_denominators",
+        "paradigm_schema_conflict",
+        "positional_identity_inventory（嵌在 dynamic_row_identity 内）",
+        "hardcoded_scan_result（嵌在 dynamic_row_identity 内）"
+      ],
+      "why_not_a_conflict": "`slice_schema.required_top_level` 是**必填清单**而非白名单，校验器 `validate_slice_against_schema` 只检查必填项存在 + 各子结构形态，对额外顶层键不报违规（实测 D/F/G/H/I 五份 slice 各自都有范式没声明的节）。",
+      "how_it_is_still_locked": "本节不靠范式校验器管，而由 test_task52_j_cycle_migration.py 的 TestOrphanDualModeInventory / TestTransportKeyResolution / TestRowModelDerivation 逐条现读源码与源 xlsx 比对，并对各 summary 的计数做现算等值。",
+      "why_row_model_derivation_not_classification_row_model_derivation": "🔴 I 循环那一节叫 `classification_row_model_derivation`（对象是分类枚举常量）。J 循环的对象是**行骨架标签序列**（J1_SECTIONS 的 defaultRows），不是分类枚举 —— J 没有 per-cycle 的 `xAccountScope.ts` / 分类桶 dataclass。沿用旧名会让「这节在核什么」不可读；改名后守卫按新名读，两份 slice 各自的判据互不干扰。"
+    },
+    "known_red_it_causes": {
+      "status": "none",
+      "why": "G1 收口（SR-3 改成蕴含式 + 新增 SR-9）已把待裁决态变成范式的合法一等公民，`test_slice_schema_validator_coverage.py` 的 `_UNJUDGED_SLICES` 为空且本 slice **不往里加豁免** —— 新增 slice 自动进入 `scan_glob` 的分母并被同一校验器按同一强度检查。本 slice 实测违规数 0。",
+      "locked_by": "backend/tests/workpaper_sync/test_task52_j_cycle_migration.py::TestParadigmCompliance::test_the_slice_passes_the_paradigm_nominated_validator + test_unjudged_slices_registry_stays_empty"
+    },
+    "sibling_slice_conflicts": "与 D / E / F / G / H / I 六份 slice 无字段级冲突（本 slice 是它们的同构变体：把 I 的 classification_row_model_derivation + i_cycle_form_differences 换成 row_model_derivation + j_cycle_form_differences + 两个 J 专属节 orphan_dual_mode_inventory / transport_key_resolution，并新增 parent_duplicate_summary —— 后者是 D/H 已有的 conditional_section，字段形态照它们）。",
+    "paradigm_bytes_untouched": "本任务**不改** backend/data/workpaper_sync_migration_paradigm.json 的任何字节（守卫用硬编码 digest 双向锁死 `paradigm` 块），也不扩充 capability_enum。"
+  },
+  "properties_verified": [3, 20, 69, 70],
+  "requirements_covered": [
+    "1.4",
+    "1.5",
+    "1.7",
+    "6.1",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ]
+}

@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g13-fair-value-changes" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -128,6 +129,7 @@ import { G13_ACCOUNT_CODE } from './composables/g13Constants'
 import { parseNum } from './composables/useG13FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G13TabProcedure = defineAsyncComponent(() => import('./g13-fair-value-changes/G13TabProcedure.vue'))
 const G13TabAdjudication = defineAsyncComponent(() => import('./g13-fair-value-changes/G13TabAdjudication.vue'))

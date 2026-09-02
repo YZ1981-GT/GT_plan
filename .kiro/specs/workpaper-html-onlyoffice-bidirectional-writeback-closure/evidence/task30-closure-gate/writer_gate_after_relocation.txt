@@ -1,0 +1,23 @@
+D:\GT_plan\backend\tests\test_ledger_keyword_escape.py:1: SyntaxWarning: invalid escape sequence '\%'
+  """关键词 LIKE 元字符转义测试（voucher-sampling-hardening Task 6）
+Workpaper writer / resolver unified-revision gate
+  rows=320 writers=269 resolvers=72 retired=2
+  content stores written: {'<artifact_or_delegated_only>': 116, 'checklist_responses': 83, 'working_paper': 71}
+  version fields written: {'file_version': 5, 'parsed_data.schema_version': 1}
+  artifact-snapshot-only writers: 1 | representation upgrade lane: 1
+  unadjudicated_writer: 236 [app.routers.a171_ai_generate::a171_sync_from_docx, app.routers.a176_docx_sync::a176_sync_from_docx, app.routers.a17_summary::independence_import_b3_periods, app.routers.a21_review::review_sign ... +232]
+  unadjudicated_resolver: 34 [app.routers.attachments::download_attachment, app.routers.attachments::preview_attachment, app.routers.completion_phase::export_workpaper_word, app.routers.excel_html::diff_file_versions ... +30]
+  bypasses_unified_commit: 261 [app.routers.a171_ai_generate::a171_sync_from_docx, app.routers.a176_docx_sync::a176_sync_from_docx, app.routers.a17_summary::independence_import_b3_periods, app.routers.a21_review::review_sign ... +257]
+  writes_legacy_version_field: 5 [app.routers.wp_editor_router::save_univer_data, app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback, app.routers.wp_structure::save_structure, app.services.custom_query.snapshot_writer::SnapshotWriter._write_workpaper_cell ... +1]
+  owns_direct_commit: 105 [app.routers.a17_summary::independence_import_b3_periods, app.routers.a21_review::review_sign, app.routers.a21_review::review_unlock, app.routers.audit_check::report_audit_checks ... +101]
+  keeps_legacy_write_path_beside_unified_commit: 0
+  after_save_still_increments_revision: 0
+  representation_upgrade_increments_business_revision: 0
+  artifact_snapshot_writer_not_verifiable: 0
+  retired_writer_not_verifiable: 0
+  multi_resolver: 4 [app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config, app.routers.wp_onlyoffice_router::get_sheet_wopi_contents, app.routers.wp_onlyoffice_router::get_whole_excel_grid, app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback]
+  non_canonical_resolver_only: 64 [app.routers.attachments::download_attachment, app.routers.attachments::preview_attachment, app.routers.completion_phase::export_workpaper_word, app.routers.excel_html::confirm_as_template ... +60]
+  writer_without_characterization_test: 208 [app.routers.a171_ai_generate::a171_sync_from_docx, app.routers.a176_docx_sync::a176_sync_from_docx, app.routers.a17_summary::independence_import_b3_periods, app.routers.a21_review::review_sign ... +204]
+  missing_required_domain: 0
+  total blocking facts: 917
+[BLOCKED] workpaper writers have not converged on a single revision domain

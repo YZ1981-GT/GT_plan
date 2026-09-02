@@ -10,6 +10,7 @@
           size="small"
           @change="(v: any) => dualMode.switchMode(v)"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g1-trading-financial-assets" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
@@ -290,6 +291,7 @@ import G1TabInventory from './g1-trading-financial-assets/inspection/G1TabInvent
 import G1TabBusinessModel from './g1-trading-financial-assets/classification/G1TabBusinessModel.vue'
 import G1TabDerivativeCheck from './g1-trading-financial-assets/inspection/G1TabDerivativeCheck.vue'
 import G1PreparationHandbookDialog from './g1-trading-financial-assets/G1PreparationHandbookDialog.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G1TabDisclosureListed = defineAsyncComponent(() => import('./g1-trading-financial-assets/core/G1TabDisclosureListed.vue'))
 const G1TabDisclosureSOE = defineAsyncComponent(() => import('./g1-trading-financial-assets/core/G1TabDisclosureSOE.vue'))

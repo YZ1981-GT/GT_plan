@@ -1,0 +1,121 @@
+[
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app",
+    "why": "把发现面收窄到单个包 ⇒ services 侧的 writer 整批离开分母。这是「改小分母」最直接的一刀，且改完清册照旧能生成、门照旧能跑，只是数字变小",
+    "verdict": "RED",
+    "summary": "5 failed, 52 passed, 5 warnings, 3 errors in 62.88s (0:01:02)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 66.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_production_source_predicate_excludes_exactly_the_non_shipping_trees",
+    "why": "给「非交付目录」排除表加一个**业务**包 ⇒ 同样是把生产 writer 移出分母，但伪装成一条看起来无害的排除规则。判据必须双向断言（该挡的挡住 + 不该挡的没挡），只断言前者时这条会 GREEN",
+    "verdict": "RED",
+    "summary": "6 failed, 51 passed, 5 warnings, 3 errors in 80.66s (0:01:20)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_task20_writer_gate.py::test_the_production_source_predicate_excludes_exactly_the_non_shipping_trees",
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_production_source_predicate_excludes_exactly_the_non_shipping_trees",
+      "test_task20_writer_gate.py::test_the_writer_denominator_is_every_production_module_under_backend_app"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 83.7
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_both_workpaper_content_stores_stay_in_the_denominator",
+    "why": "删掉第二个内容存储 ⇒ 97 行写 `checklist_responses.remark/conclusion` 的 writer 一次性离开分母。Requirement 9.11 点名的「第二权威」正是这张没有版本列的表，把它从内容存储表里拿掉等于把该 AC 的实证面删掉",
+    "verdict": "RED",
+    "summary": "7 failed, 50 passed, 5 warnings, 3 errors in 98.07s (0:01:38)",
+    "added": [
+      "test_task20_writer_gate.py::test_both_workpaper_content_stores_stay_in_the_denominator",
+      "test_task20_writer_gate.py::test_the_lane_is_part_of_the_freshness_contract",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_generator_refuses_an_unverifiable_retirement",
+      "test_workpaper_writer_inventory.py::test_raw_sql_content_writes_are_discovered",
+      "test_workpaper_writer_inventory.py::test_single_hop_delegation_resolves_same_module_and_imported_callees",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_both_workpaper_content_stores_stay_in_the_denominator"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 101.1
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files",
+    "why": "把 `template_provisioning` 收进门的必需 domain 集 ⇒ 「Task 3 自己裁决进了正文枚举之外的 lane」这条反证消失（`adjudicated - required` 变空），窄读法就再没有实证反驳了。它不改任何计数，只抹掉**反驳窄读法的那条证据** —— 这类变异最难察觉",
+    "verdict": "RED",
+    "summary": "1 failed, 59 passed, 5 warnings in 94.44s (0:01:34)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 97.4
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files",
+    "why": "直接改 spec 原话，把「所有 writer」换成自指的「清册内 writer」（窄读法的落脚点）。provenance 判据存在的意义就是让收窄 scope 这个动作**必须先改 spec** ⇒ 浮到人面前。标题仍是 `### Property 61:` 形态，所以不是靠格式校验红的",
+    "verdict": "RED",
+    "summary": "1 failed, 59 passed, 5 warnings in 96.88s (0:01:36)",
+    "added": [
+      "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task20_writer_gate.py::test_the_universal_scope_is_the_specs_own_definition_not_this_files"
+    ],
+    "added_files": [
+      "test_task20_writer_gate.py"
+    ],
+    "restored": true,
+    "seconds": 99.9
+  }
+]

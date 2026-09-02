@@ -14,6 +14,7 @@
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f1-prepayment" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -208,6 +209,7 @@ const F1TabComprehensiveCheck = defineAsyncComponent(() => import('./f1/F1TabCom
 const F1TabDisclosureListed = defineAsyncComponent(() => import('./f1/F1TabDisclosureListed.vue'))
 const F1TabDisclosureSoe = defineAsyncComponent(() => import('./f1/F1TabDisclosureSoe.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const props = defineProps<{
   wpId: string

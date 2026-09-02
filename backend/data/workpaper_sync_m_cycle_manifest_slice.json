@@ -1,0 +1,4112 @@
+{
+ "schema_version": "manifest-slice:v1",
+ "task": "Task 55",
+ "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+ "description": "M 循环（权益循环）Excel 独立 entry 的冻结 slice。🔴 与前九轮形态差异最大的四处：① **dual-mode 载体成对孪生** —— 20 个 `useM*DualMode.ts` == entry 数 × 2，其中 11 个 orphan / 9 个 live（M9 的两个孪生**都**是 orphan）；② **inert 开关 0 条** —— 9 条可兑现 + 1 条完全无开关，抄 L 那份 `switch_present_but_inert` 会直接判错；③ 🔴 **活载体的 `M{n}_SHEET_MAP` 有 11 对指向权威册不存在的 sheet 名**（前九轮没核过这一层 —— AC 6.10 的 sheet-name 层缺口，现状静默错位）；④ **位置化行身份的主形态在持久化键上** —— `itemId: …row-${n}…` 现算 44 处（10 条 entry 全中），而 L 那套只看 `rowKey:`/`id:` 的扫描器只命中 1 处。另有 tasks.md 点名项「公式/分类 summary 保持受保护」的实证：源侧公式格 2937 个（81 张 sheet），消费侧 18 处公式重算列 + 28 处分类/汇总派生值被当普通字段持久化（BP-11，宁缺勿造不硬造映射）。",
+ "frozen_at": "Task 55（2026-08-31）",
+ "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+ "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+ "sibling_slices": [
+  "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_g_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_h_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_i_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_j_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_k_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_l_cycle_manifest_slice.json"
+ ],
+ "slice_scope": {
+  "cycle": "M",
+  "document_type": "xlsx",
+  "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'M' 开头 ③ independent_entry == true。守卫按本规则从 manifest **现算**集合并与 independent_entries 做等值比对，多写一条（凑数）或少写一条（漏迁）都红。",
+  "independent_entry_count": 10,
+  "m_prefixed_entry_total": 10,
+  "m_prefixed_independent_total": 10,
+  "excluded_pilot_entry_count": 0,
+  "parent_duplicate_count": 0,
+  "parent_duplicate_note": "🔴 M 循环 parent_duplicate 子入口 **0 条** —— 实测 manifest 里没有任何 entry 的 `parent_entry_id` 落在这 10 条 M entry_id 上（现算 0），故 `slice_schema.conditional_sections` 的 `parent_duplicate_summary` **未触发**，本 slice 不写该节。守卫两侧都验：既断言现算为 0，也断言未触发的条件节确实缺席（写了就是 additive 死数据）。",
+  "excluded_from_slice": [
+   {
+    "what": "M0（权益循环函证或汇总册）",
+    "reason": "🔴 **不存在** —— 与 L 循环形成对照：L 有一本 `L0 债务循环函证.xlsx` 在 `_index.json` 里却没有 entry（那轮据此登记 `template_files_without_owner_entry: 1`）。M 循环 `backend/wp_templates/M/` 下**没有** M0 册、`_index.json` 里也没有 `M/M0` 条目、manifest 全量 entry 里 `'m0' in entry_id.lower()` 命中 0 ⇒ 排除集为空（如实登记 0）。",
+    "verified_how": "① 对 manifest 全量 entry 现算 `'m0' in entry_id.lower()` == 0；② `_index.json` 里 `M/` 前缀条目现算 10 条、与磁盘 10 本册集合相等；③ 模板册数 10 == entry 数 10，`belongs_to_entry` 无一为 null（与 L 的「差 1」相反 —— 判据不得照抄）。"
+   },
+   {
+    "what": "四个 pilot entry（B60 / D2 / H1 / G7）",
+    "reason": "Tasks 40–43 已单独迁移，Task 45 已删其 legacy 并冻结范式；不重复计数。",
+    "verified_how": "逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的顶层 `review.entry_id`，实得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 M ⇒ 本 slice 的 excluded_pilot_entry_count == 0。🔴 契约归属按 `review.entry_id` 判，不按文件名猜（四者的文件名与 entry_id 不同构）。目录里第 5 个文件 `_example.candidate.json` 的 `review_status == 'candidate'` 且 `review.entry_id` 为 **null** —— 它是「candidate 不得注册生产 adapter」的反例分母，守卫**不得**要求它的 entry_id 非空。"
+   },
+   {
+    "what": "M 循环的非 xlsx entry",
+    "reason": "本 slice 只覆盖 Excel 独立 entry（Wave 5 的 Excel lane）。",
+    "verified_how": "现算 M 前缀 entry 的 document_type 分布，10 条全是 xlsx ⇒ 排除集为空（如实登记 0）。"
+   },
+   {
+    "what": "M 循环的 parent_duplicate 子入口",
+    "reason": "AC 1.6 要求它们复用父 entry 的 adapter 而不独立计数。",
+    "verified_how": "现算 `parent_entry_id ∈ 10 条 M entry_id` 的条数 == 0 ⇒ 排除集为空（如实登记 0）。"
+   },
+   {
+    "what": "共享基类 `audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts`",
+    "reason": "被非 M 边使用，shared_base_preserved 约束不删。🔴 但与 L 不同：M 域**贡献 10 条边**（每条 entry 的 Entry 封装各 1 条），改线后从 29 条收缩到 19 条。",
+    "verified_how": "现算窄口径 statement 边 == 26 生产 + 3 测试 = 29 条，其中 M 路径 10 条；宽口径 token 文件数 33，差集含 generated baseline（token 只在双引号 JSON 字符串里）—— 这条差集证明「排除双引号内匹配」的口径必要。"
+   },
+   {
+    "what": "3 张「修订前」Q 表（一般风险准备实质性程序表 Q8A  (修订前) / 其他权益工具实质性程序表 Q10A (修订前) / 未分配利润实质性程序表 Q6A  (修订前)）",
+    "reason": "它们是权威册里的 sheet，不是独立 entry（wp 码前缀是 Q 不是 M，selection_rule 不会命中）。但它们参与 sheet 覆盖面与折叠判据 ⇒ 在 sheet_granularity_and_router_audit 里逐张判，不在 entry 层排除。",
+    "verified_how": "对 10 本册全部 sheet 名现算 `'修订前' in name` == 3；manifest 里 `wp_code_patterns` 含 `Q` 开头的 entry 现算 0。"
+   }
+  ]
+ },
+ "independent_entries": [
+  {
+   "entry_id": "xlsx/gt-m1-dividends-payable",
+   "wp_code_pattern": "M1D",
+   "document_type": "xlsx",
+   "host": "GtM1DividendsPayable.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M1-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M1-",
+    "how_resolved": "M1 的业务内容由 per-cycle 持久化 composable `useM1FormData.ts` 承载：`const ITEM_PREFIX = 'M1-'`（#L42）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L88）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L84）、`api.put(...)` 写（#L119）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M1 应付股利（利润）.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "fe19e06e954699db4c0d710a12ec9af02ea4ba462d13fb7cd9fc2ed4d5fa6bf2",
+    "sheet_count": 11,
+    "in_runtime_index": true,
+    "formula_cells": 338,
+    "sheets_with_formula": 9
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L149",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts",
+    "orphan_twin_lines": 188,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM1DualMode.ts` 自带 `m1-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m1-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'structured' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 11,
+    "dispatch_branch_count": 10,
+    "sheets_covered_by_html_child": 10,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts#L16",
+    "declared_pairs": 10,
+    "pairs_hitting_a_real_sheet": 10,
+    "pairs_missing_from_authoritative_workbook": [],
+    "fallback_literal": "审定表M1-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M1 实测**有** HTML 对端（checklist_responses + `M1-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M1 应付股利（利润）.xlsx`（11 张 sheet、338 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M1 应付股利（利润）.xlsx` 共 11 张 sheet（底稿目录、应付股利实质性程序表M1、审定表M1-1、附注披露信息（上市公司）、附注披露信息（国有企业） …），其中 9 张带公式、公式格合计 338 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m2-paid-in-capital",
+   "wp_code_pattern": "M2P",
+   "document_type": "xlsx",
+   "host": "GtM2PaidInCapital.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M2-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M2-",
+    "how_resolved": "M2 的业务内容由 per-cycle 持久化 composable `useM2FormData.ts` 承载：`const ITEM_PREFIX = 'M2-'`（#L42）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L88）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L84）、`api.put(...)` 写（#L119）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M2 实收资本（股本）.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "85b8e9bf871e89dbd02dfccd00ebe9c8dec1d8b137faedfa996dfa4ec26686a0",
+    "sheet_count": 11,
+    "in_runtime_index": true,
+    "formula_cells": 574,
+    "sheets_with_formula": 9
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L142",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts",
+    "orphan_twin_lines": 188,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM2DualMode.ts` 自带 `m2-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m2-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'structured' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 10,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {
+     "M2-2": [
+      "明细表（上市公司）M2-2",
+      "明细表（非上市公司）M2-2"
+     ]
+    },
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts#L16",
+    "declared_pairs": 9,
+    "pairs_hitting_a_real_sheet": 6,
+    "pairs_missing_from_authoritative_workbook": [
+     {
+      "sheet_code": "procedure",
+      "declared": "实收资本实质性程序表M2A",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "M2-2",
+      "declared": "明细表M2-2",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "M2-5",
+      "declared": "检查表M2-5",
+      "nearest_real": [
+       "实收资本（股本）检查表M2-5"
+      ]
+     }
+    ],
+    "fallback_literal": "审定表M2-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M2 实测**有** HTML 对端（checklist_responses + `M2-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M2 实收资本（股本）.xlsx`（11 张 sheet、574 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M2 实收资本（股本）.xlsx` 共 11 张 sheet（底稿目录、 实收资本实质性程序表 M2A、审定表M2-1、附注披露信息（上市公司）、附注披露信息（国有企业） …），其中 9 张带公式、公式格合计 574 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。",
+     "BP-4：M2 的 OO sheet 名映射有 3 对指向权威册**不存在**的 sheet ⇒ 切到 OnlyOffice 无法定位到正确工作表，「切过去看到什么」不可观察。",
+     "BP-8：M2 的 dispatch code 折叠（['M2-2']）⇒ 两张权威 sheet 共用一个渲染分支，contract 的 sheet_key 粒度无法一对一。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m3-treasury-stock",
+   "wp_code_pattern": "M3T",
+   "document_type": "xlsx",
+   "host": "GtM3TreasuryStock.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M3-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M3-",
+    "how_resolved": "M3 的业务内容由 per-cycle 持久化 composable `useM3FormData.ts` 承载：`const ITEM_PREFIX = 'M3-'`（#L42）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L88）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L84）、`api.put(...)` 写（#L119）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M3 库存股.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "a0ee640d9f3919e6c10e46dc9048dcc860472116a68da128df7ab4f087939151",
+    "sheet_count": 10,
+    "in_runtime_index": true,
+    "formula_cells": 255,
+    "sheets_with_formula": 7
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L133",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts",
+    "orphan_twin_lines": 188,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM3DualMode.ts` 自带 `m3-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m3-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'structured' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 8,
+    "sheets_falling_through_to_oo": [
+     "参考－会计规定",
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts#L16",
+    "declared_pairs": 8,
+    "pairs_hitting_a_real_sheet": 7,
+    "pairs_missing_from_authoritative_workbook": [
+     {
+      "sheet_code": "procedure",
+      "declared": "库存股实质性程序表M3A",
+      "nearest_real": []
+     }
+    ],
+    "fallback_literal": "审定表M3-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M3 实测**有** HTML 对端（checklist_responses + `M3-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M3 库存股.xlsx`（10 张 sheet、255 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M3 库存股.xlsx` 共 10 张 sheet（底稿目录、 库存股实质性程序表 M3A、审定表M3-1、附注披露信息（上市公司）、明细表M3-2 …），其中 7 张带公式、公式格合计 255 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。",
+     "BP-4：M3 的 OO sheet 名映射有 1 对指向权威册**不存在**的 sheet ⇒ 切到 OnlyOffice 无法定位到正确工作表，「切过去看到什么」不可观察。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m4-capital-reserve",
+   "wp_code_pattern": "M4C",
+   "document_type": "xlsx",
+   "host": "GtM4CapitalReserve.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L85",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L120",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M4-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M4-",
+    "how_resolved": "M4 的业务内容由 per-cycle 持久化 composable `useM4FormData.ts` 承载：`const ITEM_PREFIX = 'M4-'`（#L43）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L89）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L85）、`api.put(...)` 写（#L120）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M4 资本公积.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "09d6688e728023c48ccd49013dba718dbb5154bda2dbc6e6a8ef94cde5d545dd",
+    "sheet_count": 9,
+    "in_runtime_index": true,
+    "formula_cells": 193,
+    "sheets_with_formula": 7
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L134",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts",
+    "orphan_twin_lines": 188,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM4DualMode.ts` 自带 `m4-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m4-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'structured' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 9,
+    "dispatch_code_count": 9,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 8,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts#L16",
+    "declared_pairs": 8,
+    "pairs_hitting_a_real_sheet": 7,
+    "pairs_missing_from_authoritative_workbook": [
+     {
+      "sheet_code": "procedure",
+      "declared": "资本公积实质性程序表M4A",
+      "nearest_real": []
+     }
+    ],
+    "fallback_literal": "审定表M4-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M4 实测**有** HTML 对端（checklist_responses + `M4-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M4 资本公积.xlsx`（9 张 sheet、193 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M4 资本公积.xlsx` 共 9 张 sheet（底稿目录、资本公积实质性程序表 M4A、审定表M4-1、附注披露信息（上市公司）、附注披露信息（国有企业） …），其中 7 张带公式、公式格合计 193 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。",
+     "BP-4：M4 的 OO sheet 名映射有 1 对指向权威册**不存在**的 sheet ⇒ 切到 OnlyOffice 无法定位到正确工作表，「切过去看到什么」不可观察。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m5-surplus-reserve",
+   "wp_code_pattern": "M5S",
+   "document_type": "xlsx",
+   "host": "GtM5SurplusReserve.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M5-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M5-",
+    "how_resolved": "M5 的业务内容由 per-cycle 持久化 composable `useM5FormData.ts` 承载：`const ITEM_PREFIX = 'M5-'`（#L42）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L88）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L84）、`api.put(...)` 写（#L119）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M5 盈余公积.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "572919b71ca374fe34c62f4c59d5756f902a0492bb81e286c4d4af066b98db45",
+    "sheet_count": 10,
+    "in_runtime_index": true,
+    "formula_cells": 193,
+    "sheets_with_formula": 8
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L142",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts",
+    "orphan_twin_lines": 186,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM5DualMode.ts` 自带 `m5-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m5-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'html' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts#L16",
+    "declared_pairs": 9,
+    "pairs_hitting_a_real_sheet": 9,
+    "pairs_missing_from_authoritative_workbook": [],
+    "fallback_literal": "审定表M5-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M5 实测**有** HTML 对端（checklist_responses + `M5-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M5 盈余公积.xlsx`（10 张 sheet、193 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M5 盈余公积.xlsx` 共 10 张 sheet（底稿目录、盈余公积实质性程序表 M5A、审定表M5-1、附注披露信息（上市公司）、附注披露信息（国有企业） …），其中 8 张带公式、公式格合计 193 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m6-retained-earnings",
+   "wp_code_pattern": "M6R",
+   "document_type": "xlsx",
+   "host": "GtM6RetainedEarnings.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L47",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L93",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L124",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M6-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M6-",
+    "how_resolved": "M6 的业务内容由 per-cycle 持久化 composable `useM6FormData.ts` 承载：`const ITEM_PREFIX = 'M6-'`（#L47）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L93）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L89）、`api.put(...)` 写（#L124）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M6 未分配利润.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "fc09ebd1c95e56f616ebca1b046a0a1fe2a5e04b5b786877dbe953c486d07bd7",
+    "sheet_count": 10,
+    "in_runtime_index": true,
+    "formula_cells": 175,
+    "sheets_with_formula": 8
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L34",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     34
+    ],
+    "segmented_sites_before_comment_strip": [
+     34
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L139",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts",
+    "orphan_twin_lines": 186,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM6DualMode.ts` 自带 `m6-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m6-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'html' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts#L18",
+    "declared_pairs": 6,
+    "pairs_hitting_a_real_sheet": 6,
+    "pairs_missing_from_authoritative_workbook": [],
+    "fallback_literal": "审定表M6-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M6 实测**有** HTML 对端（checklist_responses + `M6-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM6FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M6 未分配利润.xlsx`（10 张 sheet、175 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M6 未分配利润.xlsx` 共 10 张 sheet（底稿目录、未分配利润实质性程序表 M6A 、未分配利润实质性程序表 Q6A  (修订前)、审定表M6-1、附注披露信息（上市公司） …），其中 8 张带公式、公式格合计 175 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m7-special-reserve",
+   "wp_code_pattern": "M7S",
+   "document_type": "xlsx",
+   "host": "GtM7SpecialReserve.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L45",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L124",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M7-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M7-",
+    "how_resolved": "M7 的业务内容由 per-cycle 持久化 composable `useM7FormData.ts` 承载：`const ITEM_PREFIX = 'M7-'`（#L45）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L91）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L87）、`api.put(...)` 写（#L124）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M7 专项储备.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "46d938a5d9c3e1651a6cd7f04fcaeafa9fa3ff9fe830b56afc28a928349906ae",
+    "sheet_count": 10,
+    "in_runtime_index": true,
+    "formula_cells": 233,
+    "sheets_with_formula": 8
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L142",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts",
+    "orphan_twin_lines": 186,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM7DualMode.ts` 自带 `m7-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m7-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'html' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts#L16",
+    "declared_pairs": 9,
+    "pairs_hitting_a_real_sheet": 8,
+    "pairs_missing_from_authoritative_workbook": [
+     {
+      "sheet_code": "procedure",
+      "declared": "专项储备实质性程序表M7A",
+      "nearest_real": []
+     }
+    ],
+    "fallback_literal": "审定表M7-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M7 实测**有** HTML 对端（checklist_responses + `M7-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM7FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M7 专项储备.xlsx`（10 张 sheet、233 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M7 专项储备.xlsx` 共 10 张 sheet（底稿目录、 专项储备实质性程序表 M7A 、审定表M7-1、附注披露信息（上市公司）、附注披露信息（国有企业） …），其中 8 张带公式、公式格合计 233 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。",
+     "BP-4：M7 的 OO sheet 名映射有 1 对指向权威册**不存在**的 sheet ⇒ 切到 OnlyOffice 无法定位到正确工作表，「切过去看到什么」不可观察。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m8-general-risk-reserve",
+   "wp_code_pattern": "M8G",
+   "document_type": "xlsx",
+   "host": "GtM8GeneralRiskReserve.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L48",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L94",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L127",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M8-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M8-",
+    "how_resolved": "M8 的业务内容由 per-cycle 持久化 composable `useM8FormData.ts` 承载：`const ITEM_PREFIX = 'M8-'`（#L48）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L94）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L90）、`api.put(...)` 写（#L127）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M8 一般风险准备.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
+    "sheet_count": 11,
+    "in_runtime_index": true,
+    "formula_cells": 227,
+    "sheets_with_formula": 9
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L19",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     19
+    ],
+    "segmented_sites_before_comment_strip": [
+     19
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L139",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts",
+    "orphan_twin_lines": 186,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM8DualMode.ts` 自带 `m8-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m8-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'html' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "针对性测试M8-5-删除",
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {
+     "procedure": [
+      "一般风险准备实质性程序表 M8A ",
+      "一般风险准备实质性程序表 Q8A  (修订前)"
+     ]
+    },
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts#L18",
+    "declared_pairs": 8,
+    "pairs_hitting_a_real_sheet": 8,
+    "pairs_missing_from_authoritative_workbook": [],
+    "fallback_literal": "审定表M8-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M8 实测**有** HTML 对端（checklist_responses + `M8-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM8FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M8 一般风险准备.xlsx`（11 张 sheet、227 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M8 一般风险准备.xlsx` 共 11 张 sheet（底稿目录、一般风险准备实质性程序表 M8A 、一般风险准备实质性程序表 Q8A  (修订前)、审定表M8-1、附注披露信息（上市公司） …），其中 9 张带公式、公式格合计 227 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。",
+     "BP-8：M8 的 dispatch code 折叠（['procedure']）⇒ 两张权威 sheet 共用一个渲染分支，contract 的 sheet_key 粒度无法一对一。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+   "wp_code_pattern": "M9O",
+   "document_type": "xlsx",
+   "host": "GtM9OtherComprehensiveIncome.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L46",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L92",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L125",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M9-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M9-",
+    "how_resolved": "M9 的业务内容由 per-cycle 持久化 composable `useM9FormData.ts` 承载：`const ITEM_PREFIX = 'M9-'`（#L46）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L92）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L88）、`api.put(...)` 写（#L125）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M9 其他综合收益.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
+    "sheet_count": 9,
+    "in_runtime_index": true,
+    "formula_cells": 470,
+    "sheets_with_formula": 7
+   },
+   "mount_count": 1,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": null,
+    "anchor_absent_because": "M9 宿主模板里 `el-segmented` 现算 0 处 —— 它没有模式切换栏（见 mode_switch_resolution 的 no_switch_at_all）。",
+    "segmented_sites_in_gate": [],
+    "segmented_sites_before_comment_strip": [],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "none",
+    "site": null,
+    "module": null,
+    "module_is_orphan": true,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+    "orphan_twin_lines": 186,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM9DualMode.ts` 自带 `m9-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m9-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'html' | 'onlyoffice'",
+    "switch_is_redeemable": false,
+    "switch_is_redeemable_why": "M9 没有模式切换栏（`el-segmented` 现算 0、mode 门控分支现算 0）；它的 `GtOnlyOfficeSheet` 只是「未迁移 sheet」的 `v-else` 兜底，不由 mode 决定。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 9,
+    "dispatch_code_count": 9,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 8,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {},
+    "oo_sheet_name_expression": "props.sheetName"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts#L16",
+    "declared_pairs": 8,
+    "pairs_hitting_a_real_sheet": 6,
+    "pairs_missing_from_authoritative_workbook": [
+     {
+      "sheet_code": "procedure",
+      "declared": "其他综合收益实质性程序表M9A",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "M9-4",
+      "declared": "OCI核对表M9-4",
+      "nearest_real": []
+     }
+    ],
+    "fallback_literal": "审定表M9-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": true
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M9 实测**有** HTML 对端（checklist_responses + `M9-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM9FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M9 其他综合收益.xlsx`（9 张 sheet、470 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M9 其他综合收益.xlsx` 共 9 张 sheet（底稿目录、其他综合收益实质性程序表 M9A、审定表M9-1、附注披露信息（上市公司）、附注披露信息（国有企业） …），其中 7 张带公式、公式格合计 470 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-m10-other-equity-instruments",
+   "wp_code_pattern": "M10O",
+   "document_type": "xlsx",
+   "host": "GtM10OtherEquityInstruments.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11",
+    "BP-12"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "M10-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "M10-",
+    "how_resolved": "M10 的业务内容由 per-cycle 持久化 composable `useM10FormData.ts` 承载：`const ITEM_PREFIX = 'M10-'`（#L42）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L88）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L84）、`api.put(...)` 写（#L119）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。🔴 与 K 循环不同，这里**不经** `useChecklistPersistence` 共享适配器；与 L 循环相同的是端点，但 M 的 10 份 FormData 模块各自声明一份 ITEM_PREFIX，10 个前缀两两不互为前缀（`M1-` 与 `M10-` 不冲突，因为都以 `-` 收尾）。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "M10 其他权益工具.xlsx",
+    "root": "backend/wp_templates/M",
+    "sha256": "c804b879770c07c261d903917a7d6ae43af8047d2a6c40d707c08673ca489eea",
+    "sheet_count": 11,
+    "in_runtime_index": true,
+    "formula_cells": 279,
+    "sheets_with_formula": 9
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L30",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     30
+    ],
+    "segmented_sites_before_comment_strip": [
+     30
+    ],
+    "segmented_sites_that_are_not_mode_switches": [],
+    "child_level_segmented_site": null,
+    "mounts_ac14_notice": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L141",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+    "module_is_orphan": false,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts",
+    "orphan_twin_lines": 186,
+    "localStorage_prefix": null,
+    "localStorage_prefix_why_null": "🔴 M 的活载体是共享基类 `useWorkpaperEntryDualMode` 的薄封装，而共享基类把 mode 存在**内存 ref** 里（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage** ⇒ 活路径上没有键前缀。只有 orphan 孪生 `useM10DualMode.ts` 自带 `m10-dual-mode` 键。判据不得照抄 L（L1 活路径有 `l1-proc:` 键）。",
+    "orphan_twin_localStorage_literal": "m10-dual-mode",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "orphan_twin_mode_values": "'html' | 'onlyoffice'",
+    "switch_is_redeemable": true,
+    "switch_is_redeemable_why": "宿主模板里 `<template v-if=\"dualMode.mode.value === 'html'\">` 与其 `v-else` 分支下的 `<GtOnlyOfficeSheet :sheet-name=\"dualMode.resolveOoSheetName()\" />` 同时存在（mode 门控分支现算 1 处、`GtOnlyOfficeSheet` 现算 4 处）⇒ 切到 OnlyOffice 会渲染出 OO 编辑器。🔴 但**能渲染 ≠ 能定位**：见 oo_sheet_map_audit / BP-4。"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "附注披露信息核对（国企）",
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {
+     "procedure": [
+      "其他权益工具实质性程序表 M10A",
+      "其他权益工具实质性程序表 Q10A (修订前)"
+     ]
+    },
+    "oo_sheet_name_expression": "dualMode.resolveOoSheetName()"
+   },
+   "oo_sheet_map_audit": {
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts#L16",
+    "declared_pairs": 9,
+    "pairs_hitting_a_real_sheet": 6,
+    "pairs_missing_from_authoritative_workbook": [
+     {
+      "sheet_code": "procedure",
+      "declared": "其他权益工具实质性程序表M10A",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "disclosure-listed",
+      "declared": "附注披露信息（上市公司）",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "disclosure-soe",
+      "declared": "附注披露信息（国有企业）",
+      "nearest_real": []
+     }
+    ],
+    "fallback_literal": "审定表M10-1",
+    "fallback_hits_a_real_sheet": true,
+    "module_is_orphan": false
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "M10 实测**有** HTML 对端（checklist_responses + `M10-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM10FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M10 其他权益工具.xlsx`（11 张 sheet、279 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `M10 其他权益工具.xlsx` 共 11 张 sheet（底稿目录、其他权益工具实质性程序表 M10A、其他权益工具实质性程序表 Q10A (修订前)、审定表M10-1、附注披露信息核对（上市公司） …），其中 9 张带公式、公式格合计 279 个，不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 「OO sheet 名映射错了」也**不是**裁 single_html 的理由 —— 那是 BP-4 的缺陷登记，AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就「开关坏了不是理由」定论，本条同理）。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-m` 在 registry.py 命中 0）。SR-6 硬性禁止。另有 BP-11：审定表把公式重算列当普通字段持久化，在补 contract 前无法声明 `mode=formula` + `formula_mask`（AC 6.6）。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task55_m_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-11：审定表把公式重算列与分类/汇总派生值当普通字段写进 checklist_responses ⇒ 「OO 改公式格必须形成 protected 冲突」（Property 24）在本 entry 上没有受保护声明可依。",
+     "BP-4：M10 的 OO sheet 名映射有 3 对指向权威册**不存在**的 sheet ⇒ 切到 OnlyOffice 无法定位到正确工作表，「切过去看到什么」不可观察。",
+     "BP-8：M10 的 dispatch code 折叠（['procedure']）⇒ 两张权威 sheet 共用一个渲染分支，contract 的 sheet_key 粒度无法一对一。",
+     "BP-12：有权威 sheet 因宿主匹配串与 sheet 真名不符而落到 OO 兜底 ⇒ 已存在的 HTML 子组件永不渲染，HTML 侧覆盖面结论不可信。"
+    ]
+   }
+  }
+ ],
+ "authoritative_templates": {
+  "root": "backend/wp_templates/M",
+  "why_this_root": "唯一权威目录是 `backend/wp_templates/`（`wp_template_init_service` 生成底稿时从这里复制、`wp_template_finder` 以 `_index.json` 索引）。`基础数据/…` 参考副本已落后，只能用于比对不能当真源。",
+  "reference_copy_status": "absent_in_worktree",
+  "reference_copy_note": "🔴 参考副本目录 `基础数据/致同通用审计程序及底稿模板（2025年修订）/` 在本工作树中**不存在**（与 D/E/F/G/H/I/J/K/L 九轮一致），故「两处比对 size」这一步在本轮无对象；守卫如实断言 `is_dir()` 为 False，不得写成「已比对一致」。",
+  "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件（用户开着 WPS/Excel 时会出现，且可能还有未保存改动）。实测本次枚举 0 个锁文件。",
+  "formula_scan_policy": "🔴 公式格计数必须用 `data_only=False`。`data_only=True` 只拿缓存值、公式全部丢失 ⇒ 计数会从 2937 掉到 0，而守卫若也用 True 就两边一起错、不打红。sheet 名列表那一处可以用 `read_only=True, data_only=True`（只取 sheetnames），但**不得 strip** —— 源侧多张 sheet 名带前导/尾随空格。",
+  "files": [
+   {
+    "name": "M1 应付股利（利润）.xlsx",
+    "size": 302441,
+    "sha256": "fe19e06e954699db4c0d710a12ec9af02ea4ba462d13fb7cd9fc2ed4d5fa6bf2",
+    "sheet_count": 11,
+    "belongs_to_entry": "xlsx/gt-m1-dividends-payable",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M10 其他权益工具.xlsx",
+    "size": 139234,
+    "sha256": "c804b879770c07c261d903917a7d6ae43af8047d2a6c40d707c08673ca489eea",
+    "sheet_count": 11,
+    "belongs_to_entry": "xlsx/gt-m10-other-equity-instruments",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M2 实收资本（股本）.xlsx",
+    "size": 120532,
+    "sha256": "85b8e9bf871e89dbd02dfccd00ebe9c8dec1d8b137faedfa996dfa4ec26686a0",
+    "sheet_count": 11,
+    "belongs_to_entry": "xlsx/gt-m2-paid-in-capital",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M3 库存股.xlsx",
+    "size": 109810,
+    "sha256": "a0ee640d9f3919e6c10e46dc9048dcc860472116a68da128df7ab4f087939151",
+    "sheet_count": 10,
+    "belongs_to_entry": "xlsx/gt-m3-treasury-stock",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M4 资本公积.xlsx",
+    "size": 105867,
+    "sha256": "09d6688e728023c48ccd49013dba718dbb5154bda2dbc6e6a8ef94cde5d545dd",
+    "sheet_count": 9,
+    "belongs_to_entry": "xlsx/gt-m4-capital-reserve",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M5 盈余公积.xlsx",
+    "size": 109027,
+    "sha256": "572919b71ca374fe34c62f4c59d5756f902a0492bb81e286c4d4af066b98db45",
+    "sheet_count": 10,
+    "belongs_to_entry": "xlsx/gt-m5-surplus-reserve",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M6 未分配利润.xlsx",
+    "size": 114625,
+    "sha256": "fc09ebd1c95e56f616ebca1b046a0a1fe2a5e04b5b786877dbe953c486d07bd7",
+    "sheet_count": 10,
+    "belongs_to_entry": "xlsx/gt-m6-retained-earnings",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M7 专项储备.xlsx",
+    "size": 108714,
+    "sha256": "46d938a5d9c3e1651a6cd7f04fcaeafa9fa3ff9fe830b56afc28a928349906ae",
+    "sheet_count": 10,
+    "belongs_to_entry": "xlsx/gt-m7-special-reserve",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M8 一般风险准备.xlsx",
+    "size": 114420,
+    "sha256": "6ea4da1f3a9ba741633f89edab167f9dc21c9f8bcccf95ebcbb1fda5c779f8c6",
+    "sheet_count": 11,
+    "belongs_to_entry": "xlsx/gt-m8-general-risk-reserve",
+    "in_runtime_index": true
+   },
+   {
+    "name": "M9 其他综合收益.xlsx",
+    "size": 453383,
+    "sha256": "bc9994a0828b0b61c701363b01cf23779595075ea249accb31f03c46bcea794e",
+    "sheet_count": 9,
+    "belongs_to_entry": "xlsx/gt-m9-other-comprehensive-income",
+    "in_runtime_index": true
+   }
+  ]
+ },
+ "blocking_preconditions": [
+  {
+   "id": "BP-1",
+   "blocks": [
+    "step_5",
+    "step_6",
+    "step_7",
+    "bidirectional"
+   ],
+   "what": "10 条 entry 都没有 approved authority model / reviewed per-entry contract / non-null approved definition bundle。",
+   "status": "open",
+   "must_fix_before": "任一 M entry 标 bidirectional（AC 12.1 / SR-6）",
+   "observable_consequences": [
+    "`backend/data/workpaper_sync_contracts/` 下逐文件读 `review.entry_id`，无一条属本 slice（现算命中 0）。",
+    "10 条 entry 的 `authority_model` / `definition_bundle` 全为 null。"
+   ],
+   "source_refs": [
+    "backend/data/workpaper_sync_contracts",
+    "backend/app/services/workpaper_sync/contracts.py",
+    "backend/app/services/workpaper_sync/definitions.py"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-2",
+   "blocks": [
+    "step_8",
+    "bidirectional"
+   ],
+   "what": "没有经 Task 36 `ExcelEntryFinalizeGate.finalize_candidate` finalize 出的 published representation generation。",
+   "status": "open",
+   "must_fix_before": "任一 M entry 标 bidirectional",
+   "consequence": "10 条 entry 的 `instrumentation_candidate` / `published_representation` 全为 null；canonical resolver 仍是 legacy_sheet_onlyoffice_router。",
+   "source_refs": [
+    "backend/app/services/workpaper_sync/excel_entry_gate.py",
+    "backend/app/services/workpaper_sync/materialize_coordinator.py"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-3",
+   "blocks": [
+    "step_10",
+    "bidirectional"
+   ],
+   "what": "真实 OnlyOffice 9.4 探针未对任何 M entry 执行 ⇒ 无逐 scenario evidence。",
+   "status": "open",
+   "must_fix_before": "evidence.verification_state 脱离 UNVERIFIABLE",
+   "consequence": "10 条 entry 的 `sync_test_run_id` / `required_scenario_set_digest` 全为 null。",
+   "source_refs": [
+    "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py",
+    "backend/app/services/workpaper_sync/evidence.py"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-4",
+   "blocks": [
+    "step_9",
+    "step_10",
+    "step_11"
+   ],
+   "what": "🔴 **M 循环独有的最贵一条**：`use{code}EntryDualMode.ts` 的 `M{n}_SHEET_MAP` 共声明 84 对「内部 sheet code → 源 xlsx tab 名」，其中 **11 对**指向权威册里**不存在**的 sheet 名（活模块里 9 对，另 2 对在 orphan 的 `useM9EntryDualMode.ts` 里）。错法三种：① 丢掉源 sheet 名里的空格（`实收资本实质性程序表M2A` vs 真名 `' 实收资本实质性程序表 M2A'`，M2/M3/M4/M7/M9/M10 各一处）；② 名字整段不同（M2 的 `检查表M2-5` vs 真名 `实收资本（股本）检查表M2-5`、M9 的 `OCI核对表M9-4` vs 真名 `其他综合收益核对表M9-4`、M10 的 `附注披露信息（上市公司）/（国有企业）` vs 真名 `附注披露信息核对（上市公司）/（国企）`）；③ 把两张同码 sheet 压成一个不存在的名字（M2 的 `明细表M2-2` —— 真册里是 `明细表（上市公司）M2-2` 与 `明细表（非上市公司）M2-2` 两张）。",
+   "status": "open",
+   "must_fix_before": "step 9 注册 adapter（OO 侧无法定位工作表时 materialize 的 sheet_key 语义不成立）",
+   "observable_consequences": [
+    "用户点「OnlyOffice」→ OO 打开工作簿但定位不到声明的 tab（名字不存在），落到 `|| code` 兜底或首张 sheet。",
+    "AC 6.10 要求「contract/template 结构漂移 SHALL fail closed，指出首个漂移 sheet/field/cell」——现状是**静默错位**，没有任何一处 fail closed（Property 28 的 template 层已有守卫，sheet-name 映射层此前无人守）。",
+    "9 对活映射错，但 10 条 fallback 字面量（`审定表M{n}-1`）**全部命中真 sheet** ⇒ 用户看到的是「打开了审定表」而不是报错，缺陷因此长期不可见。"
+   ],
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts#L16",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts#L16",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts#L16",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts#L16",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts#L16",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts#L16",
+    "backend/wp_templates/M"
+   ],
+   "entries": [
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m7-special-reserve"
+   ]
+  },
+  {
+   "id": "BP-5",
+   "blocks": [
+    "step_9"
+   ],
+   "what": "legacy dual-mode 未清理：20 个 `useM*DualMode.ts` 里 **11 个是 orphan**（生产边与测试边各 0，共 1911 行）、9 个在用（共 396 行）。",
+   "status": "open",
+   "must_fix_before": "step 9 宿主改线到 sync bridge",
+   "consequence": "AC 1.7 要求不可达旧桩 SHALL 删除；11 个 orphan 至今在库，且内容完整（改线时极易误接）。",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-6",
+   "blocks": [
+    "step_5_of_legacy_deletion_paradigm"
+   ],
+   "what": "模式值未统一：4 个 orphan 模块的 mode 枚举仍是 `'structured' | 'onlyoffice'`（M1~M4），其余 6 个已是 `'html' | 'onlyoffice'`。legacy_deletion_paradigm 的 step 5（unify_mode_values）要求统一到 `'html'` 并走 `workpaperSyncModeStorage.ts` 幂等迁移。",
+   "status": "open",
+   "must_fix_before": "删除 orphan 或把它们的键迁进 `workpaper-sync-mode:` 前缀",
+   "consequence": "同一循环内两套模式值字面量；orphan 各自声明 `m{n}-dual-mode` localStorage 键（10 个），迁移脚本必须逐个认。",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts",
+    "backend/data/workpaper_sync_migration_paradigm.json"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve"
+   ]
+  },
+  {
+   "id": "BP-7",
+   "blocks": [
+    "step_11"
+   ],
+   "what": "AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice` 在 10 个 M 宿主里**一个都没挂**（现算 0）。",
+   "status": "open",
+   "must_fix_before": "step 11 的 DOM 级判据有对象",
+   "observable_consequences": [
+    "9 条 entry 的工具条上有一个可点的「OnlyOffice」按钮、切过去还真能渲染出 OO —— 而 adapter_id 为 null、migration_state 为 legacy_fake_bidirectional ⇒ 用户看不到「为什么这不算双向回写」。",
+    "AC 1.4 要求「显示可操作原因」，现状零提示。",
+    "🔴 只放 `el-tooltip` 不算满足（EP teleport + 仅 hover 才进 DOM）⇒ 必须常显摘要 + tooltip 细节。"
+   ],
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+    "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-8",
+   "blocks": [
+    "step_6"
+   ],
+   "what": "sheet 粒度折叠：3 条 entry（M2/M8/M10）各有一个 dispatch code 被两张权威 sheet 命中，合计 3 处折叠。M2 是 `M2-2` ←（上市/非上市两张明细表）；M8 与 M10 是 `procedure` ←（本版 M{n}A + 修订前 Q{n}A）。",
+   "status": "open",
+   "must_fix_before": "step 6 发布 per-entry contract（sheet_key 必须一对一）",
+   "observable_consequences": [
+    "M8 的 `一般风险准备实质性程序表 Q8A  (修订前)` 与本版 M8A 渲染成**同一个** `GtAProgramConsole sheet-name=\"M8A\"` ⇒ 打开修订前 sheet 看到的是本版内容。",
+    "M10 同型；且 M10 宿主里那条 `if (name.includes('修订前') || name.includes('Q10A')) return name` 是**不可达死代码** —— 它排在 `name.includes('实质性程序表')` 之后，而 Q10A 的 sheet 名含该串。",
+    "🔴 M6 是**唯一处理正确**的一条：它把 `Q6A && 修订前` 的判断放在 `实质性程序表` **之前**，返回专用 code `skip-q6a` 并渲染 `el-empty`（『已跳过（无需编制）』）⇒ 三张 Q{n}A sheet 有三种不同待遇，其中两种是折叠。"
+   ],
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue",
+    "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
+    "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
+    "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue"
+   ],
+   "entries": [
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m8-general-risk-reserve"
+   ]
+  },
+  {
+   "id": "BP-9",
+   "blocks": [
+    "manifest_regeneration"
+   ],
+   "what": "manifest / overlay 里这 10 条的 `capability` 是 `single_onlyoffice`、`html_store` 是 `unresolved`，与本 slice 的裁决不一致。",
+   "status": "open_by_design",
+   "must_fix_before": "step 9 之后重生成 manifest（届时 adapter_id 非空、capability 由裁决驱动）",
+   "consequence": "两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` **默认值**，不是逐 entry 裁决（AP-3：把默认值当结论）。守卫断言「必须不一致且已登记本 BP」，**不是**断言相等。",
+   "source_refs": [
+    "backend/data/workpaper_sync_entry_overlay.json",
+    "backend/data/workpaper_sync_entry_manifest.json"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-10",
+   "blocks": [
+    "step_6",
+    "step_10"
+   ],
+   "what": "位置化行身份两族共 45 处：① 渲染键族 1 处（`rowKey: String(idx)`，与 L 循环 BP-10 同型）；② 🔴 **持久化键族 44 处**（`itemId: \\`M{n}-…-row-${n}-…\\``，其中 `const n = i + 1`）—— 这一族 L 循环那套只看 `id:` / `rowKey:` / `rowId:` 字面量的扫描器**查不出来**，因为位置化发生在 item_id 模板里，不在行对象的身份字段上。",
+   "status": "open",
+   "must_fix_before": "step 6 声明 row_identity（AC 12.1 / Property 23）",
+   "observable_consequences": [
+    "内存里行身份是熵键（`m1-adj-${Date.now()}-${Math.random()…}`，现算 23 处）—— 看起来是 generated_opaque；但落库的 item_id 是 `row-1..row-N` 纯位置 ⇒ 删掉第 2 行再保存，第 3..N 行的数据会**覆盖到第 2..N-1 号 item_id 上**，末位 item_id 变成孤儿旧值。",
+    "10 条 entry **全部**命中（11 个文件）⇒ 这是循环级系统性形态，不是个别疏漏。",
+    "反向判据：展示序号族（`seq: idx + 1`）现算 10 处**不计入缺陷**（它们只进渲染不进身份），若守卫把它们也算进来，缺陷数会虚高。"
+   ],
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L267",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L268",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L269",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L270",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L213",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L214",
+    "audit-platform/frontend/src/components/workpaper/m1/core/M1TabAdjudication.vue#L390"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-11",
+   "blocks": [
+    "step_6",
+    "step_7"
+   ],
+   "what": "🔴 tasks.md 点名项「公式/分类 summary 保持受保护」的实证欠账：权威册里公式格现算 **2937** 个（分布在 81 张 sheet），而前端把 **18** 处公式重算列与 **28** 处分类/汇总派生值当**普通字段**写进 checklist_responses（`remark: String(row.audited)` / `itemId: 'M10-4-summary-liability-total'` 这类）。",
+   "status": "open",
+   "must_fix_before": "step 6 发布 per-entry contract —— 这些键必须声明 `mode=formula` 或 `mode=auto_source` 并落 `formula_mask`，不得声明 `editable`",
+   "observable_consequences": [
+    "AC 6.6 要求「公式、auto-source 和受保护单元格 SHALL 默认只读；OO 对其修改 SHALL 产生受保护字段冲突，不得覆盖公式结果」。M 侧现在**没有任何 contract**，故平台三类保护策略（`read_only_formula` / `read_only_auto_source` / `read_only_masked_cell`）在 M 上一条也挂不上。",
+    "若照现状把这些键当 `editable` 投影进 contract，OO 改公式格就会被当成合法用户输入 merge 进来 ——Property 24 直接失效。",
+    "🔴 **宁缺勿造**：本 slice **不**为 M 造任何 contract、不猜 `formula_mask` 区域。受保护清册只登记「哪些键是派生的、源侧哪些格是公式」两个可复算事实，映射留给 step 6。"
+   ],
+   "source_refs": [
+    "backend/app/services/workpaper_sync/merge.py",
+    "backend/app/services/workpaper_sync/excel_rematerialize.py",
+    "backend/app/services/workpaper_sync/excel_extract.py",
+    "backend/app/services/workpaper_sync/conflicts.py",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts"
+   ],
+   "entries": [
+    "xlsx/gt-m1-dividends-payable",
+    "xlsx/gt-m10-other-equity-instruments",
+    "xlsx/gt-m2-paid-in-capital",
+    "xlsx/gt-m3-treasury-stock",
+    "xlsx/gt-m4-capital-reserve",
+    "xlsx/gt-m5-surplus-reserve",
+    "xlsx/gt-m6-retained-earnings",
+    "xlsx/gt-m7-special-reserve",
+    "xlsx/gt-m8-general-risk-reserve",
+    "xlsx/gt-m9-other-comprehensive-income"
+   ]
+  },
+  {
+   "id": "BP-12",
+   "blocks": [
+    "step_3_coverage_conclusion",
+    "step_6"
+   ],
+   "what": "M10 的权威 sheet `附注披露信息核对（国企）` 落到 OO 兜底 —— 宿主判断串是 `name.includes('国有企业')`，而该 sheet 真名用的是「国企」⇒ 已存在的子组件 `M10TabDisclosureSoe` **永不渲染**。",
+   "status": "open",
+   "must_fix_before": "把 M10 的 HTML 覆盖面结论当真",
+   "observable_consequences": [
+    "M10 宿主里 `M10TabDisclosureSoe` 的 `v-else-if=\"currentSheet === 'disclosure-soe'\"` 分支在权威册上**取不到任何 sheet** ⇒ 结构性死代码（与 G7 两级表头 0/38 同型）。",
+    "它是 13 张落 OO 的 sheet 里唯一一张 `unmatched_by_dispatch`；其余是 GT_Custom 10 张、参考页 1 张、名字带「删除」1 张。"
+   ],
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
+    "audit-platform/frontend/src/components/workpaper/m10/core/M10TabDisclosureSoe.vue",
+    "backend/wp_templates/M/M10 其他权益工具.xlsx"
+   ],
+   "entries": [
+    "xlsx/gt-m10-other-equity-instruments"
+   ]
+  }
+ ],
+ "cross_entry_isolation": {
+  "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+  "assertions": [
+   "10 份 slice（D/E/F/G/H/I/J/K/L/M）的 entry 集合两两不相交 —— 配对数由 C(10,2) **现算**，不写死。",
+   "契约目录里没有任何文件的 `review.entry_id` 属本 slice（逐文件读顶层 `review.entry_id`，不数文件个数）。",
+   "四条 pilot 契约的 `review.entry_id` 分别真是 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets。",
+   "第 5 个契约文件 `_example.candidate.json` 的 `review_status == 'candidate'` 且 `review.entry_id` 为 null —— 反例分母，不得要求其非空。",
+   "10 本模板的 `belongs_to_entry` 是到本 slice entry_id 的**双射**（无 null、无重复）。",
+   "10 条 entry 的 `template_ref.workbook` 集合大小 == 10、`sha256` 集合大小 == 10。",
+   "10 个 `M{n}-` item_id 前缀两两不同，且两两**不互为前缀**（`M1-` 与 `M10-` 因都以 `-` 收尾而不冲突）。",
+   "registry 里现算 M adapter 数 == 0（`xlsx/gt-m` 在 registry.py 命中 0）。",
+   "deletion plan 的删除路径与其余九份 slice 的删除路径不相交。"
+  ],
+  "contract_scan_recipe": "🔴 契约目录共 5 个文件，其中 **生产契约 4 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）+ **candidate 1 份**（`_example.candidate.json`，`review_status == \"candidate\"`、`review.entry_id` 为 null）。判归属一律读 `review.entry_id`，**不按文件名猜**（`b60.hour_budget.json` 的 entry_id 是 `xlsx/b60/gt-b60-bundle`，两者不同构）。",
+  "production_contract_files": [
+   "b60.hour_budget.json",
+   "d2.receivable_detail.json",
+   "g7.soe_subsidiary_disclosure.json",
+   "h1.disposal_check.json"
+  ],
+  "candidate_contract_files": [
+   "_example.candidate.json"
+  ],
+  "pairwise_recipe": "配对数 = C(len(slices), 2)。本轮 slice 数 10 ⇒ 45 对（L 那轮 9 份 ⇒ 36 对）。🔴 守卫必须**现算** `len(slices) * (len(slices) - 1) // 2` 并与实际比较的对数相等，不得写死 45 —— 下一轮（N 循环）会变成 55。"
+ },
+ "m_cycle_form_differences": [
+  {
+   "id": "MD-1",
+   "what": "dual-mode 载体是**成对孪生**：每条 entry 各有 `useM{n}DualMode.ts`（自带完整实现、186~188 行）与 `useM{n}EntryDualMode.ts`（共享基类薄封装、43~45 行）两个文件。",
+   "why_it_matters": "文件总数 20 == entry 数 × 2，而 orphan 数 11 ≠ live 数 9（M9 的**两个**孪生都是 orphan）。前九轮没有这个形态：L 是 9 文件 / 8 entry 的三分、K 是 13 == 13 的二分。照抄任一种都会把分母算错。",
+   "recompute_recipe": "`FRONTEND.rglob('useM*DualMode.ts')` 现算 20 个；逐个算 statement-position 生产/测试边，两者皆 0 者为 orphan（现算 11），否则 live（现算 9）；断言 orphan ∪ live 恰是全集且交集为空。",
+   "counters": {
+    "module_files_total": 20,
+    "orphan": 11,
+    "live": 9,
+    "orphan_lines": 1911,
+    "live_lines": 396
+   }
+  },
+  {
+   "id": "MD-2",
+   "what": "开关裁决分布 = **9 条可兑现 + 1 条完全无开关 + 0 条 inert**。",
+   "why_it_matters": "🔴 L 循环有 4 条 inert（BP-4 就是为它立的），M 循环 **inert 为 0**。把 L 那份 `inert_mode_switch_resolution` 的 verdict `switch_present_but_inert` 抄过来会直接判错：M1~M8/M10 的 `el-segmented` 真有 mode 门控分支（各 1 处）且 `v-else` 下真挂 `GtOnlyOfficeSheet`。M9 则连 `el-segmented` 都没有（它的 `GtOnlyOfficeSheet` 是「未迁移 sheet」兜底，不由 mode 决定）。",
+   "recompute_recipe": "逐宿主剥注释取 `<template>` 顶层块：`el-segmented` 数、`v-if|v-else-if|v-show=\"…dualMode…\"` 数、`GtOnlyOfficeSheet` 数三者现算；三者皆 >0 ⇒ switch_redeemable；有 segmented 而 mode 门控为 0 ⇒ switch_present_but_inert；无 segmented ⇒ no_switch_at_all。",
+   "counters": {
+    "switch_redeemable": 9,
+    "switch_present_but_inert": 0,
+    "no_switch_at_all": 1
+   }
+  },
+  {
+   "id": "MD-3",
+   "what": "🔴 **本轮最贵的形态差异**：活载体声明了一张 `M{n}_SHEET_MAP`（内部 sheet code → 源 xlsx tab 名），共 84 对，其中 11 对指向权威册**不存在**的 sheet 名。",
+   "why_it_matters": "前九轮的 slice 从不核这一层：L 那轮核的是「sheet 是否有 HTML 承载」与「dispatch code 是否重复」，**没有**「声明给 OO 的 tab 名在册里存在吗」这一边。M 循环把它暴露出来是因为 M 的活载体把 tab 名写成显式字典（L 是 `resolveOoSheetName` 里的表达式拼接）。这条边是 AC 6.10「结构漂移 fail closed」在 **sheet-name 层**的缺口 —— 现状是静默错位。",
+   "recompute_recipe": "正则从 `use{code}EntryDualMode.ts` 现读 `M{n}_SHEET_MAP` 的键值对（现算 84 对），对每个值断言它 ∈ openpyxl 真读的 `wb.sheetnames`（**不得 strip**，源侧多处有前导/尾随空格）；不成立者计入缺陷（现算 11，其中活模块 9）。反向判据：10 条 fallback 字面量（`审定表M{n}-1`）必须**全部命中**真 sheet —— 证明扫描器不是恒判不存在。",
+   "counters": {
+    "declared_pairs": 84,
+    "pairs_missing_in_workbook": 11,
+    "pairs_missing_in_live_modules": 9,
+    "entries_affected": 6,
+    "fallback_literals_hitting_real_sheet": 10
+   }
+  },
+  {
+   "id": "MD-4",
+   "what": "权威册里有 3 张「修订前」程序表，且它们的 wp 码前缀是 **Q** 而不是 M（Q6A / Q8A / Q10A）。",
+   "why_it_matters": "三张 sheet 有**三种不同待遇**：M6 在 `实质性程序表` 判断**之前**拦掉并返回专用 code `skip-q6a`（渲染 `el-empty`「已跳过（无需编制）」）；M8 完全没有拦（`实质性程序表` 先命中）⇒ 折叠到本版 M8A；M10 写了拦的代码但**排在后面** ⇒ 那条 `if` 是不可达死代码，同样折叠。按 wp 码前缀选 entry 的 selection_rule 不会命中这三张（它们不是 entry），但按 sheet 数做覆盖面结论时必须逐张判。",
+   "recompute_recipe": "对 10 本册的全部 sheet 名现算 `'修订前' in name`（现算 3 张）；逐宿主**复刻** `currentSheet` 的判定顺序（从源码现读步骤序列，不硬编码），对这 3 张分别跑出 dispatch code 并断言：M6 → `skip-q6a`（有分支）、M8/M10 → `procedure`（与本版程序表同码 ⇒ 折叠）。",
+   "counters": {
+    "pre_revision_sheets": 3,
+    "handled_by_dedicated_branch": 1,
+    "collapsed_onto_procedure": 2
+   }
+  },
+  {
+   "id": "MD-5",
+   "what": "权威册与 entry **1:1**（10 本册 / 10 条 entry，`belongs_to_entry` 无一为 null），且**没有 M0**。",
+   "why_it_matters": "L 循环是 9 本册 / 8 条 entry（多出一本 L0 函证册，`template_files_without_owner_entry: 1`）。M 循环 `backend/wp_templates/` 下**没有** M0 目录条目、manifest 里也没有含 `m0` 的 entry ⇒ 「模板数 > entry 数」这条判据在 M 上必须写成相等，抄 L 的「差 1」会假红。",
+   "recompute_recipe": "`(TEMPLATE_DIR/'M').iterdir()` 跳 `~$` 现算册数；断言 == len(independent_entries)；断言 `belongs_to_entry` 是到 entry_id 的**双射**；断言 `_index.json` 里 `M/` 前缀条目集合与磁盘集合相等；断言 manifest 全量 entry 里 `'m0' in entry_id.lower()` 命中 0。",
+   "counters": {
+    "template_files": 10,
+    "entries": 10,
+    "template_files_without_owner_entry": 0,
+    "m0_entries_in_manifest": 0
+   }
+  },
+  {
+   "id": "MD-6",
+   "what": "活路径上**没有** localStorage 模式键 —— 共享基类 `useWorkpaperEntryDualMode` 把 mode 存在内存 `ref` 里，每次挂载重置为 `'html'`。键只存在于 11 个 orphan 里（`m{n}-dual-mode`）。",
+   "why_it_matters": "L1 的活路径有 `l1-proc:` + wpId 键、K 各有一份；M 的活路径 0 键。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效；抄 L 的「活载体键要迁移」会去找一个不存在的东西。",
+   "recompute_recipe": "现读 `audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts`，断言其中 `localStorage` 命中 0、`ref<WorkpaperRenderMode>('html')` 命中 1；对 9 个活模块断言各自文件内 `dual-mode` 键字面量命中 0；对 11 个 orphan 断言各带一个 `m{n}-dual-mode` 字面量。",
+   "counters": {
+    "live_modules_with_storage_key": 0,
+    "orphan_modules_with_storage_key": 10,
+    "shared_base_localstorage_hits": 0
+   }
+  },
+  {
+   "id": "MD-7",
+   "what": "共享基类 `useWorkpaperEntryDualMode` 的 statement 边现算 29 条（生产 26 + 测试 3），其中 **M 域贡献 10 条**⇒ 改线后剩 19 条。",
+   "why_it_matters": "🔴 L 循环对共享基类贡献 **0** 条，那份清册明确写「本清册执行前后该计数不变」。M 循环贡献 10 条（每条 entry 的 Entry 封装各 1 条）⇒ 计数**会收缩**。照抄 L 的「不变」判据在 M 上必假红。",
+   "recompute_recipe": "窄口径 statement 边现算 == 29，按路径分出 M 域 10 条与非 M 域 19 条；宽口径 token 文件数现算 33，差集必须只含【基类自身 + 只在双引号字符串里出现的 generated baseline + 未走 statement 形态的两处】—— 这条同时证明「排除双引号字符串内匹配」的口径是必要的而不是装饰。",
+   "counters": {
+    "statement_edges": 29,
+    "production_edges": 26,
+    "test_edges": 3,
+    "m_cycle_edges": 10,
+    "edges_after_rewiring": 19,
+    "wide_token_files": 33
+   }
+  },
+  {
+   "id": "MD-8",
+   "what": "位置化行身份的**主形态在持久化键上**：`itemId` 模板族现算 44 处（10 条 entry 全中），而 L 循环那套「`id:`/`rowKey:`/`rowId:` 值里含下标」的扫描器只命中 1 处。",
+   "why_it_matters": "内存里行身份是熵键（`m{n}-adj-${Date.now()}-${Math.random()…}`，现算 23 处）—— 单看这一层会判成 generated_opaque、零缺陷。缺陷在 `saveAndWriteback()` 里：`computedRows.value.map((row, i) => { const n = i + 1; … itemId: \\`M1-M1-1-row-${n}-name\\` })`。删行后重存会把后续行的数据覆盖到前一号 item_id 上。🔴 这就是「照抄前轮扫描器会漏检」的具体形态。",
+   "recompute_recipe": "两族分开现算并**两侧都验**：① 渲染键族 = L 那套正则，断言现算值 == 声明值；② 持久化键族 = `itemId:\\s*`[^`]*row-\\$\\{(n|i|idx|index)\\}` 现算，并对每个命中文件断言同文件内存在 `const n = (i|idx|index) + 1`（证明 `n` 真是下标而非业务序号）；③ 反向判据：展示序号族现算 10 处**不计入**缺陷。",
+   "counters": {
+    "render_key_family": 1,
+    "persistence_key_family": 44,
+    "entropy_row_key_sites": 23,
+    "display_sequence_sites": 10,
+    "entries_with_persistence_key_defect": 10
+   }
+  }
+ ],
+ "orphan_dual_mode_inventory": {
+  "why_this_key_exists": "「哪些 dual-mode 模块是死桩、哪些还在跑」必须是穷举且可复算的清单，否则守卫只能对声明过的那几条打红，新出现的下一条不会被发现。",
+  "scan_recipe": "① `FRONTEND.rglob('useM*DualMode.ts')` 取全部候选（现算 20 个）；② 对每个候选算 statement-position 生产/测试边（排除双引号字符串内的匹配）；③ 两者皆 0 ⇒ orphan（现算 11），否则 live（现算 9）；④ 断言两个容器无交集、并集 == 全集。",
+  "orphan_order_recipe": "orphan 判定用**可达性**而非入度：一阶 orphan = 生产边与测试边各 0；二阶 orphan = 唯一生产边指向一个自身入边为 0 的模块。本 slice 无 barrel（`audit-platform/frontend/src/components/workpaper/composables/index.ts` 不存在）⇒ 无 barrel 入边、11 个 orphan **全是一阶**（现算二阶 0）。",
+  "m_cycle_specific_note": "🔴 M 的 orphan 集合含 **1 个 Entry 封装**（`useM9EntryDualMode.ts`）—— 它与其余 9 个 Entry 封装同构（都薄封装共享基类），但 M9 宿主根本没有 import 它 ⇒ M9 的**两个**孪生都是死桩。判据不得写成「Entry 封装一定是活的」。🔴 另注：`useM9EntryDualMode.ts` 的 `M9_SHEET_MAP` 里有 2 对错映射，因为它是死桩、这两处**不计入** BP-4 的活缺陷数。",
+  "modules": [
+   {
+    "id": "OD-1",
+    "wp_code": "M10",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m10-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-2",
+    "wp_code": "M1",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m1-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-3",
+    "wp_code": "M2",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m2-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-4",
+    "wp_code": "M3",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m3-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-5",
+    "wp_code": "M4",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m4-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-6",
+    "wp_code": "M5",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m5-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-7",
+    "wp_code": "M6",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m6-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-8",
+    "wp_code": "M7",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m7-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-9",
+    "wp_code": "M8",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m8-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-10",
+    "wp_code": "M9",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m9-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "is_the_entry_wrapper_twin": false
+   },
+   {
+    "id": "OD-11",
+    "wp_code": "M9",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+    "lines": 43,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "WorkpaperRenderMode",
+    "storage_literal": null,
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [],
+    "is_the_entry_wrapper_twin": true
+   }
+  ],
+  "live_modules": [
+   {
+    "id": "LM-1",
+    "wp_code": "M10",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+    "lines": 44,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L141"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-2",
+    "wp_code": "M1",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts",
+    "lines": 45,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L149"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-3",
+    "wp_code": "M2",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+    "lines": 45,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L142"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-4",
+    "wp_code": "M3",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+    "lines": 43,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L133"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-5",
+    "wp_code": "M4",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+    "lines": 43,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L134"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-6",
+    "wp_code": "M5",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts",
+    "lines": 44,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L142"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-7",
+    "wp_code": "M6",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts",
+    "lines": 43,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L139"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-8",
+    "wp_code": "M7",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+    "lines": 44,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L142"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   },
+   {
+    "id": "LM-9",
+    "wp_code": "M8",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts",
+    "lines": 45,
+    "production_consumers": 1,
+    "production_consumer_refs": [
+     "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L139"
+    ],
+    "test_only_consumers": 0,
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true
+   }
+  ],
+  "shared_base_preserved": {
+   "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+   "lines": 65,
+   "reason": "共享基类被大量非 M 模块使用，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+   "statement_position_consumers": 29,
+   "production_consumers": 26,
+   "test_consumers": 3,
+   "m_cycle_consumers": 10,
+   "m_cycle_consumer_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts#L8",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts#L8"
+   ],
+   "remaining_after_this_plan": 19,
+   "remaining_after_this_plan_recipe": "🔴 29 − 10 = 19 —— 与 L 循环相反：L 对共享基类贡献 0 条（清册写「前后不变」），M 贡献 10 条 ⇒ **会收缩**。判据不得照抄 L 那条「删完不变」。",
+   "wide_token_files": 33,
+   "wide_minus_narrow": [
+    "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue",
+    "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts"
+   ],
+   "wide_minus_narrow_why": "宽口径（逐文件 token 命中）比窄口径多 4 个文件：基类自身、`sync/workpaperSyncLegacyBaseline.generated.ts`（token 只出现在 JSON `\"snippet\"` **双引号字符串**里 ——不排除双引号内匹配就会把它算成活边）、以及两个只在注释/类型别名里提及的文件。这条差集就是「排除双引号字符串内匹配」这个口径的**存在理由**，守卫必须两侧都算。",
+   "calls_legacy_health_endpoint": true,
+   "persists_mode_to_localstorage": false
+  },
+  "counters": {
+   "dual_mode_module_files_total": 20,
+   "orphan_dual_mode_modules": 11,
+   "orphan_dual_mode_first_order": 11,
+   "orphan_dual_mode_second_order": 0,
+   "orphan_barrels": 0,
+   "orphan_dual_mode_lines_total": 1911,
+   "orphan_entry_wrapper_twins": 1,
+   "live_dual_mode_modules": 9,
+   "live_dual_mode_lines_total": 396,
+   "orphan_modules_calling_legacy_health_endpoint": 10,
+   "live_modules_calling_legacy_health_endpoint": 0,
+   "modules_calling_legacy_config_endpoint": 0,
+   "orphan_modules_with_structured_mode_value": 4,
+   "orphan_modules_with_storage_key": 10,
+   "live_modules_with_storage_key": 0,
+   "modules_not_scoped_to_wp_id": 0,
+   "counting_recipe": "守卫从 modules[] / live_modules[] 现算全部计数并与 counters 等值比对：两容器长度、Σ lines、health/config 端点计数、structured 模式值计数、storage 键计数、wp_id 分区计数。**两侧都验**：声明的 `production_consumers` 也要等于现算边数（只断言「现算为 0」时，声明写 1、实际 0 这种谎话能通过 —— Task 54 的 M20 教训）。"
+  }
+ },
+ "mode_switch_resolution": {
+  "why_this_key_exists": "tasks.md 的 Task 55 正文要求「每 entry 独立 contract/evidence」，而 AC 1.4 / 1.5 的 UI 义务要按**开关是否可兑现**分别判。逐宿主核验后本节冻结二值结论。",
+  "verdict": "switch_redeemable_but_mis_targeted",
+  "verdict_is_binary": false,
+  "verdict_allowed_values": [
+   "switch_redeemable",
+   "switch_present_but_inert",
+   "no_switch_at_all"
+  ],
+  "verdict_why_not_a_single_enum_value": "逐 entry 裁决不同（9 条 switch_redeemable + 1 条 no_switch_at_all），顶层 verdict 因此是复合描述而非枚举值 —— 三值枚举只用在 `per_entry_verdict` 上（每条都必须是其一）。顶层那个后缀 `but_mis_targeted` 指 BP-4：开关能渲染出 OO，但声明给 OO 的 tab 名有 9 处指向不存在的 sheet。",
+  "per_entry_verdict": {
+   "M1": "switch_redeemable",
+   "M2": "switch_redeemable",
+   "M3": "switch_redeemable",
+   "M4": "switch_redeemable",
+   "M5": "switch_redeemable",
+   "M6": "switch_redeemable",
+   "M7": "switch_redeemable",
+   "M8": "switch_redeemable",
+   "M9": "no_switch_at_all",
+   "M10": "switch_redeemable"
+  },
+  "why_this_is_not_a_reason_to_adjudicate_single": "🔴 三条都要成立才允许裁 single，本节的结论一条都不满足：① AC 12.8 的判据是「无 HTML 对端」，而 10 条 entry 的 checklist_responses 通道实测存在；② AC 12.9 的判据是「无 OO 业务价值」，而 10 本权威册共 102 张 sheet、2937 个公式格；③ 宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable。「M9 没有开关」也不是裁 single_html 的理由 —— 它的 OO 兜底渲染器仍在，且 Task 54 已定论「开关坏了/没有开关」不是 AC 12.9 的判据。",
+  "live_ac_is_1_4": "生效的是 **AC 1.4**：10 条 entry 的 adapter_id 全为 null、migration_state 全为 legacy_fake_bidirectional，而 9 条的工具条上有一个可点且**真能切过去**的 OnlyOffice 按钮 ⇒ 必须显示「为什么这不算双向回写」的可操作原因。实测 10 个宿主里挂 `GtEntrySyncCapabilityNotice` 的现算 0（BP-7）。🔴 只放 `el-tooltip` 不算满足（EP teleport + 仅 hover 才进 DOM）⇒ 必须常显摘要 + tooltip 细节。AC 1.4 的单一真源是 `audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts` 与 `audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue`。",
+  "sites": [
+   {
+    "wp_code": "M1",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L149",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M2",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L142",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M3",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L133",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M4",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L134",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M5",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L142",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M6",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L34",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L139",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M7",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L142",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M8",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L19",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L139",
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M9",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
+    "verdict": "no_switch_at_all",
+    "segmented_site": null,
+    "mode_gated_v_if_count": 0,
+    "onlyoffice_component_count_in_file": 3,
+    "carrier_import_site": null,
+    "mounts_ac14_notice": false
+   },
+   {
+    "wp_code": "M10",
+    "host": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
+    "verdict": "switch_redeemable",
+    "segmented_site": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L30",
+    "mode_gated_v_if_count": 1,
+    "onlyoffice_component_count_in_file": 4,
+    "carrier_import_site": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L141",
+    "mounts_ac14_notice": false
+   }
+  ],
+  "contrast_with_inert": {
+   "why_this_key_exists": "🔴 L 循环有 4 条 inert 开关（`el-segmented` 在、mode 门控 `v-if` 现算 0、文件内 `GtOnlyOfficeSheet` 现算 0）。M 循环 **0 条 inert**。这个对照存在的意义是：证明扫描器不是恒判 redeemable —— 若把 M 的判据写成「有 segmented 就算 redeemable」，L 那 4 条也会被判成 redeemable。故守卫必须**三要素**齐验（segmented + mode 门控 + OO 组件），并对 M9 断言三者全 0。",
+   "m_cycle_inert_count": 0,
+   "control_group_for_zero": "M9（三要素全 0，是 no_switch_at_all 而不是 inert）"
+  },
+  "counters": {
+   "entries_with_redeemable_switch": 9,
+   "entries_with_inert_switch": 0,
+   "entries_with_no_switch_at_all": 1,
+   "entries_mounting_the_ac14_notice": 0,
+   "hosts_with_oo_mount": 10
+  }
+ },
+ "sheet_granularity_and_router_audit": {
+  "why_this_key_exists": "本节冻结四件可复算的事：① 权威册每张 sheet 有没有 HTML 承载；② dispatch code 有没有折叠；③ 落到 OO 兜底的 sheet 各是什么类别；④ 🔴 **M 独有的第四件**：活载体声明给 OO 的 tab 名在权威册里存不存在（BP-4）。",
+  "dispatch_replication_recipe": "🔴 **复刻**宿主 `currentSheet` computed 的判定顺序，而不是猜：从源码现读步骤序列（`and2` / `coderx` / `rx_or_inc` / `inc` / `inc2raw` / `index` 六种形态），按**声明顺序**对每张真 sheet 名跑一遍得到 dispatch code，再断言该 code ∈ 宿主模板里现算的 `currentSheet === '…'` 分支集合。顺序要紧：M10 那条 `修订前` 判断排在 `实质性程序表` 之后 ⇒ 不可达（BP-8）。",
+  "per_entry": [
+   {
+    "wp_code": "M1",
+    "entry_id": "xlsx/gt-m1-dividends-payable",
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 11,
+    "dispatch_branch_count": 10,
+    "sheets_covered_by_html_child": 10,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M2",
+    "entry_id": "xlsx/gt-m2-paid-in-capital",
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 10,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {
+     "M2-2": [
+      "明细表（上市公司）M2-2",
+      "明细表（非上市公司）M2-2"
+     ]
+    }
+   },
+   {
+    "wp_code": "M3",
+    "entry_id": "xlsx/gt-m3-treasury-stock",
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 8,
+    "sheets_falling_through_to_oo": [
+     "参考－会计规定",
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M4",
+    "entry_id": "xlsx/gt-m4-capital-reserve",
+    "authoritative_sheet_count": 9,
+    "dispatch_code_count": 9,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 8,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M5",
+    "entry_id": "xlsx/gt-m5-surplus-reserve",
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M6",
+    "entry_id": "xlsx/gt-m6-retained-earnings",
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M7",
+    "entry_id": "xlsx/gt-m7-special-reserve",
+    "authoritative_sheet_count": 10,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M8",
+    "entry_id": "xlsx/gt-m8-general-risk-reserve",
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "针对性测试M8-5-删除",
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {
+     "procedure": [
+      "一般风险准备实质性程序表 M8A ",
+      "一般风险准备实质性程序表 Q8A  (修订前)"
+     ]
+    }
+   },
+   {
+    "wp_code": "M9",
+    "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+    "authoritative_sheet_count": 9,
+    "dispatch_code_count": 9,
+    "dispatch_branch_count": 8,
+    "sheets_covered_by_html_child": 8,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {}
+   },
+   {
+    "wp_code": "M10",
+    "entry_id": "xlsx/gt-m10-other-equity-instruments",
+    "authoritative_sheet_count": 11,
+    "dispatch_code_count": 10,
+    "dispatch_branch_count": 9,
+    "sheets_covered_by_html_child": 9,
+    "sheets_falling_through_to_oo": [
+     "附注披露信息核对（国企）",
+     "GT_Custom"
+    ],
+    "duplicated_dispatch_codes": {
+     "procedure": [
+      "其他权益工具实质性程序表 M10A",
+      "其他权益工具实质性程序表 Q10A (修订前)"
+     ]
+    }
+   }
+  ],
+  "oo_fallthrough_classification": {
+   "recipe": "对每张落 OO 的 sheet 现算类别：`== 'GT_Custom'` ⇒ gt_custom；含「修订前」⇒ pre_revision_q_sheet；以「参考」开头 ⇒ reference_only；含「删除」⇒ marked_deleted_in_name；其余 ⇒ unmatched_by_dispatch。",
+   "counts": {
+    "gt_custom": 10,
+    "reference_only": 1,
+    "marked_deleted_in_name": 1,
+    "unmatched_by_dispatch": 1
+   },
+   "note": "13 张落 OO 的 sheet 里 10 张是 `GT_Custom` 自定义区（本来就该走 OO）、1 张是 M3 的 `参考－会计规定`（纯参考页）、1 张是 M8 的 `针对性测试M8-5-删除`（**名字里就写着「删除」**，源模板作者标注的废弃 sheet）、1 张是 M10 的 `附注披露信息核对（国企）` —— 只有最后这张是**缺陷**（BP-12）。🔴 `pre_revision_q_sheet` 计数为 0：3 张 Q 表里 M6 的走了专用 `skip-q6a` 分支（算 covered）、M8/M10 的折叠到 `procedure`（也算 covered，但是错的 ⇒ BP-8）。这说明「covered」不等于「正确」—— 覆盖面判据必须与折叠判据分开算。"
+  },
+  "oo_sheet_map_audit": {
+   "why_separate_from_coverage": "覆盖面判据问「这张 sheet 有没有 HTML 组件接」，本节问「切到 OO 时声明的 tab 名对不对」。两者独立：M2 的 `明细表（上市公司）M2-2` **有** HTML 组件（覆盖面算 covered），但 SHEET_MAP 给 OO 的名字 `明细表M2-2` 在册里不存在（本节算缺陷）。",
+   "per_entry": {
+    "M1": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts#L16",
+     "declared_pairs": 10,
+     "pairs_hitting_a_real_sheet": 10,
+     "pairs_missing_from_authoritative_workbook": [],
+     "fallback_literal": "审定表M1-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M2": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts#L16",
+     "declared_pairs": 9,
+     "pairs_hitting_a_real_sheet": 6,
+     "pairs_missing_from_authoritative_workbook": [
+      {
+       "sheet_code": "procedure",
+       "declared": "实收资本实质性程序表M2A",
+       "nearest_real": []
+      },
+      {
+       "sheet_code": "M2-2",
+       "declared": "明细表M2-2",
+       "nearest_real": []
+      },
+      {
+       "sheet_code": "M2-5",
+       "declared": "检查表M2-5",
+       "nearest_real": [
+        "实收资本（股本）检查表M2-5"
+       ]
+      }
+     ],
+     "fallback_literal": "审定表M2-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M3": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts#L16",
+     "declared_pairs": 8,
+     "pairs_hitting_a_real_sheet": 7,
+     "pairs_missing_from_authoritative_workbook": [
+      {
+       "sheet_code": "procedure",
+       "declared": "库存股实质性程序表M3A",
+       "nearest_real": []
+      }
+     ],
+     "fallback_literal": "审定表M3-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M4": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts#L16",
+     "declared_pairs": 8,
+     "pairs_hitting_a_real_sheet": 7,
+     "pairs_missing_from_authoritative_workbook": [
+      {
+       "sheet_code": "procedure",
+       "declared": "资本公积实质性程序表M4A",
+       "nearest_real": []
+      }
+     ],
+     "fallback_literal": "审定表M4-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M5": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts#L16",
+     "declared_pairs": 9,
+     "pairs_hitting_a_real_sheet": 9,
+     "pairs_missing_from_authoritative_workbook": [],
+     "fallback_literal": "审定表M5-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M6": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts#L18",
+     "declared_pairs": 6,
+     "pairs_hitting_a_real_sheet": 6,
+     "pairs_missing_from_authoritative_workbook": [],
+     "fallback_literal": "审定表M6-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M7": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts#L16",
+     "declared_pairs": 9,
+     "pairs_hitting_a_real_sheet": 8,
+     "pairs_missing_from_authoritative_workbook": [
+      {
+       "sheet_code": "procedure",
+       "declared": "专项储备实质性程序表M7A",
+       "nearest_real": []
+      }
+     ],
+     "fallback_literal": "审定表M7-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M8": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts#L18",
+     "declared_pairs": 8,
+     "pairs_hitting_a_real_sheet": 8,
+     "pairs_missing_from_authoritative_workbook": [],
+     "fallback_literal": "审定表M8-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    },
+    "M9": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts#L16",
+     "declared_pairs": 8,
+     "pairs_hitting_a_real_sheet": 6,
+     "pairs_missing_from_authoritative_workbook": [
+      {
+       "sheet_code": "procedure",
+       "declared": "其他综合收益实质性程序表M9A",
+       "nearest_real": []
+      },
+      {
+       "sheet_code": "M9-4",
+       "declared": "OCI核对表M9-4",
+       "nearest_real": []
+      }
+     ],
+     "fallback_literal": "审定表M9-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": true
+    },
+    "M10": {
+     "module": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+     "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts#L16",
+     "declared_pairs": 9,
+     "pairs_hitting_a_real_sheet": 6,
+     "pairs_missing_from_authoritative_workbook": [
+      {
+       "sheet_code": "procedure",
+       "declared": "其他权益工具实质性程序表M10A",
+       "nearest_real": []
+      },
+      {
+       "sheet_code": "disclosure-listed",
+       "declared": "附注披露信息（上市公司）",
+       "nearest_real": []
+      },
+      {
+       "sheet_code": "disclosure-soe",
+       "declared": "附注披露信息（国有企业）",
+       "nearest_real": []
+      }
+     ],
+     "fallback_literal": "审定表M10-1",
+     "fallback_hits_a_real_sheet": true,
+     "module_is_orphan": false
+    }
+   },
+   "counters": {
+    "declared_pairs_total": 84,
+    "pairs_hitting_a_real_sheet": 73,
+    "pairs_missing_from_authoritative_workbook": 11,
+    "pairs_missing_in_live_modules": 9,
+    "pairs_missing_in_orphan_modules": 2,
+    "entries_with_any_missing_pair": 6,
+    "fallback_literals_total": 10,
+    "fallback_literals_hitting_a_real_sheet": 10
+   }
+  },
+  "counters": {
+   "authoritative_template_sheets_total": 102,
+   "authoritative_template_sheets_owned": 102,
+   "sheets_covered_by_html_children": 89,
+   "sheets_falling_through_to_oo": 13,
+   "entries_with_sheet_granularity_collapse": 3,
+   "collapsed_sheet_pairs": 3,
+   "pre_revision_q_sheets": 3,
+   "counting_recipe": "守卫三向现算：① Σ 各 entry 的 authoritative_sheet_count == 102 == Σ openpyxl 真读 sheet 数；② Σ covered + Σ fallthrough == 总数（89 + 13 == 102）；③ 折叠 entry 集合现算 == ['M2', 'M8', 'M10']，折叠对数 == 3。"
+  },
+  "verdict": "sheet 粒度大体干净（89/102 有 HTML 承载，落 OO 的 13 张里 10 张是 GT_Custom），但有两类真缺陷：① 3 条 entry 的 dispatch code 折叠（BP-8）；② M10 的国企披露 sheet 因匹配串与真名不符而落 OO、已存在的子组件永不渲染（BP-12）。③ 另有 9 处活映射把 OO 指向不存在的 tab（BP-4）。🔴 **宁缺勿造**：本 slice 不改宿主、不改模板、不为凑覆盖面而新建组件；三类缺陷全部登记为阻断项。"
+ },
+ "protected_formula_and_classification_summary": {
+  "why_this_key_exists": "tasks.md 的 Task 55 正文点名「公式/分类 summary 保持受保护」。本节冻结**三件可复算的事**：① 权威册里到底有多少公式格、分布在哪些 sheet（源侧事实，openpyxl 现读）；② 前端把哪些**派生值**（公式重算列 + 分类/汇总）当普通字段写进了 HTML 持久化通道（消费侧事实）；③ 平台的受保护字段冲突机制在哪、是不是单一真源（承载者事实）。🔴 **宁缺勿造**：本 slice 不为 M 造任何 contract、不猜 `formula_mask` 区域、不把公式格投影成可写字段。无法干净映射的部分登记为 BP-11，不硬造映射。",
+  "ac_reference": "6.6",
+  "property_reference": "24",
+  "source_side": {
+   "recipe": "openpyxl `data_only=False` 逐册逐 sheet 逐格：`isinstance(v, str) and len(v) > 1 and v.startswith('=')` 计数。**不得**用 `data_only=True`（那会拿到缓存值、公式全丢）。",
+   "formula_cells_total": 2937,
+   "sheets_with_formula_total": 81,
+   "per_entry": {
+    "M1": {
+     "formula_cells": 338,
+     "sheets_with_formula": 9,
+     "top_sheets": [
+      {
+       "sheet": "明细表M1-2",
+       "formula_cells": 141
+      },
+      {
+       "sheet": "审定表M1-1",
+       "formula_cells": 92
+      },
+      {
+       "sheet": "应付股利（利润）测算表M1-5",
+       "formula_cells": 28
+      }
+     ]
+    },
+    "M2": {
+     "formula_cells": 574,
+     "sheets_with_formula": 9,
+     "top_sheets": [
+      {
+       "sheet": "明细表（上市公司）M2-2",
+       "formula_cells": 187
+      },
+      {
+       "sheet": "审定表M2-1",
+       "formula_cells": 129
+      },
+      {
+       "sheet": "明细表（非上市公司）M2-2",
+       "formula_cells": 115
+      }
+     ]
+    },
+    "M3": {
+     "formula_cells": 255,
+     "sheets_with_formula": 7,
+     "top_sheets": [
+      {
+       "sheet": "审定表M3-1",
+       "formula_cells": 129
+      },
+      {
+       "sheet": "明细表M3-2",
+       "formula_cells": 72
+      },
+      {
+       "sheet": "外币投资汇率测算表M3-4",
+       "formula_cells": 23
+      }
+     ]
+    },
+    "M4": {
+     "formula_cells": 193,
+     "sheets_with_formula": 7,
+     "top_sheets": [
+      {
+       "sheet": "明细表M4-2",
+       "formula_cells": 89
+      },
+      {
+       "sheet": "审定表M4-1",
+       "formula_cells": 41
+      },
+      {
+       "sheet": "附注披露信息（上市公司）",
+       "formula_cells": 18
+      }
+     ]
+    },
+    "M5": {
+     "formula_cells": 193,
+     "sheets_with_formula": 8,
+     "top_sheets": [
+      {
+       "sheet": "审定表M5-1",
+       "formula_cells": 59
+      },
+      {
+       "sheet": "明细表M5-2",
+       "formula_cells": 41
+      },
+      {
+       "sheet": "附注披露信息（上市公司）",
+       "formula_cells": 26
+      }
+     ]
+    },
+    "M6": {
+     "formula_cells": 175,
+     "sheets_with_formula": 8,
+     "top_sheets": [
+      {
+       "sheet": "明细表M6-2",
+       "formula_cells": 63
+      },
+      {
+       "sheet": "审定表M6-1",
+       "formula_cells": 33
+      },
+      {
+       "sheet": "附注披露信息（上市公司）",
+       "formula_cells": 26
+      }
+     ]
+    },
+    "M7": {
+     "formula_cells": 233,
+     "sheets_with_formula": 8,
+     "top_sheets": [
+      {
+       "sheet": "审定表M7-1",
+       "formula_cells": 78
+      },
+      {
+       "sheet": "明细表M7-2",
+       "formula_cells": 56
+      },
+      {
+       "sheet": "专项储备计提测试表M7-4",
+       "formula_cells": 29
+      }
+     ]
+    },
+    "M8": {
+     "formula_cells": 227,
+     "sheets_with_formula": 9,
+     "top_sheets": [
+      {
+       "sheet": "审定表M8-1",
+       "formula_cells": 84
+      },
+      {
+       "sheet": "明细表M8-2",
+       "formula_cells": 56
+      },
+      {
+       "sheet": "一般风险准备测试表M8-4",
+       "formula_cells": 29
+      }
+     ]
+    },
+    "M9": {
+     "formula_cells": 470,
+     "sheets_with_formula": 7,
+     "top_sheets": [
+      {
+       "sheet": "附注披露信息（国有企业）",
+       "formula_cells": 148
+      },
+      {
+       "sheet": "明细表M9-2",
+       "formula_cells": 145
+      },
+      {
+       "sheet": "附注披露信息（上市公司）",
+       "formula_cells": 71
+      }
+     ]
+    },
+    "M10": {
+     "formula_cells": 279,
+     "sheets_with_formula": 9,
+     "top_sheets": [
+      {
+       "sheet": "明细表M10-2",
+       "formula_cells": 125
+      },
+      {
+       "sheet": "审定表M10-1",
+       "formula_cells": 86
+      },
+      {
+       "sheet": "附注披露信息核对（上市公司）",
+       "formula_cells": 15
+      }
+     ]
+    }
+   },
+   "cross_sheet_formula_note": "每张 sheet 的 `A3` / `C3` / `E3` 一带是跨 sheet 引用 `=底稿目录!A2` 这类元信息公式 ——它们同样是受保护格（AC 6.6 的「公式」），不是噪声。🔴 判据只数「以 `=` 开头的字符串格」，**不**按列/行猜哪些是业务公式 —— 猜就是自造。"
+  },
+  "consumer_side": {
+   "recipe": "① 派生列：同文件内先现算 `row.<f> = calc*(…)` 得到派生字段名集合，再找 `itemId: \\`…\\`, data: { remark: String(row.<f>) }` 且 `<f>` ∈ 该集合的站点；② 分类/汇总：`itemId: '…(summary|subtotal|total)…'` 现算。两条都**不是**符号名 grep —— ① 要求「被 calc 赋值」与「被持久化」同时成立。",
+   "derived_column_persist_sites": 18,
+   "summary_persist_sites": 28,
+   "derived_column_persist": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L269",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L270",
+     "derived_field": "endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L214",
+     "derived_field": "beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L215",
+     "derived_field": "endAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L224",
+     "derived_field": "beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L225",
+     "derived_field": "endAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L210",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L211",
+     "derived_field": "endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L234",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L235",
+     "derived_field": "endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L268",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L269",
+     "derived_field": "endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L242",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L243",
+     "derived_field": "endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L267",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L268",
+     "derived_field": "endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L278",
+     "derived_field": "audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L279",
+     "derived_field": "endBalance"
+    }
+   ],
+   "summary_persist": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L276",
+     "item_id": "M10-1-perpetualBond-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L277",
+     "item_id": "M10-1-preferredStock-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L278",
+     "item_id": "M10-1-other-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L279",
+     "item_id": "M10-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts#L356",
+     "item_id": "M10-4-summary-equity-total"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts#L357",
+     "item_id": "M10-4-summary-liability-total"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts#L358",
+     "item_id": "M10-4-summary-consistent"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L221",
+     "item_id": "M1-M1-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L231",
+     "item_id": "M2-M2-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L217",
+     "item_id": "M3-M3-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L241",
+     "item_id": "M4-1-premium-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L242",
+     "item_id": "M4-1-other-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L243",
+     "item_id": "M4-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L275",
+     "item_id": "M5-1-statutory-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L276",
+     "item_id": "M5-1-discretionary-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L277",
+     "item_id": "M5-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L249",
+     "item_id": "M6-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L250",
+     "item_id": "M6-1-total-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L274",
+     "item_id": "M7-1-safety-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L275",
+     "item_id": "M7-1-maintenance-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L276",
+     "item_id": "M7-1-other-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L277",
+     "item_id": "M7-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM8Adjudication.ts#L196",
+     "item_id": "M8-1-total-endAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM8Adjudication.ts#L197",
+     "item_id": "M8-1-total-beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L285",
+     "item_id": "M9-1-nonReclass-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L286",
+     "item_id": "M9-1-reclass-subtotal"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L287",
+     "item_id": "M9-1-total-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L303",
+     "item_id": "M9-4-total-diff"
+    }
+   ],
+   "classification_summary_highlight": {
+    "entry_id": "xlsx/gt-m10-other-equity-instruments",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts",
+    "authoritative_sheet": "负债与权益区分检查表M10-4",
+    "what": "M10 的「负债/权益区分」分类结论是 `computed()` 派生量（`summary` / `computedJudgments` / `liabilityWarnings` / `inconsistentItems`），其中三个被写进 checklist：`M10-4-summary-equity-total` / `M10-4-summary-liability-total` / `M10-4-summary-consistent`。",
+    "why_it_must_stay_protected": "这三个键的值由 `useM10ClassificationEngine` 按工具条款重算得出。若 contract 把它们声明成 `editable`，OO 侧改一个数就会被 merge 成用户输入、而前端下次重算又把它改回去 —— 审计师看到的分类结论会在两个真源之间摆动，且没有任何冲突提示。AC 6.6 要求这类格**默认只读**且 OO 改动**必须产生受保护字段冲突**。",
+    "sites": [
+     {
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts#L356",
+      "item_id": "M10-4-summary-equity-total"
+     },
+     {
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts#L357",
+      "item_id": "M10-4-summary-liability-total"
+     },
+     {
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useM10ClassificationCheck.ts#L358",
+      "item_id": "M10-4-summary-consistent"
+     }
+    ]
+   }
+  },
+  "platform_carrier": {
+   "why_this_matters": "「保持受保护」不是本 slice 自己实现的能力 —— 平台已有一套机制。本节把承载者钉死，并要求守卫**结构性**校验它仍是单一真源（不是字符串存在）。",
+   "protection_policy_enum": {
+    "file": "backend/app/services/workpaper_sync/conflicts.py",
+    "class": "ProtectionPolicy",
+    "members": [
+     "editable",
+     "read_only_formula",
+     "read_only_auto_source",
+     "read_only_masked_cell",
+     "word_only"
+    ],
+    "protected_members": [
+     "read_only_formula",
+     "read_only_auto_source",
+     "read_only_masked_cell"
+    ],
+    "is_protected_predicate": "not editable and not word_only"
+   },
+   "three_readonly_sources": {
+    "file": "backend/app/services/workpaper_sync/merge.py",
+    "what": "`FieldMode.formula` ⇒ read_only_formula；`FieldMode.auto_source` ⇒ read_only_auto_source；`spec.cell` 落在 `template.formula_mask` 里的 `editable` 字段 ⇒ read_only_masked_cell（**第三类是独立判据**：契约允许 editable 字段的列落在 mask 里，Task 13 只校验反向）。"
+   },
+   "conflict_emitter": {
+    "file": "backend/app/services/workpaper_sync/excel_rematerialize.py",
+    "function": "protected_conflicts_from_incoming",
+    "wraps": "excel_extract.protected_conflicts_for_findings",
+    "why_wrapper_not_reimplementation": "定向包装 Task 37 的补齐规则，不重写 —— 重写会让 merge 侧与 rematerialize 侧口径分叉，分叉时两边都不红。守卫按**结构**校验：该函数体内必须真的调用被包装者（不是同名新实现）。",
+    "tamper_assertion": "excel_extract.assert_protected_tamper_fully_reported"
+   },
+   "mask_declaration_site": {
+    "file": "backend/app/services/workpaper_sync/contracts.py",
+    "keys": [
+     "formula_mask",
+     "protected_field_keys"
+    ],
+    "note": "契约的 `formula_mask` 是 sheet/table 级只读区域声明；`protected_field_keys()` 按 field 汇总。"
+   }
+  },
+  "verdict": "M 循环源侧公式格 2937 个（81 张 sheet）是**真分母**；消费侧有 18 处公式重算列 + 28 处分类/汇总派生值被当普通字段持久化，构成 BP-11。平台机制齐备且是单一真源。🔴 但「OO 改公式格 → 产生 protected 冲突」这条**端到端**判据在 M 上分母为空（M 侧 contract 数 0 ⇒ 没有 `formula_mask` 可挂），故 Property 24 只宣称「源侧清册 + 消费侧欠账 + 承载者结构」三部分通过，**不宣称**端到端通过 —— 见 property_denominators.property_24。",
+  "counters": {
+   "formula_cells_total": 2937,
+   "sheets_with_formula_total": 81,
+   "entries_with_formula_sheets": 10,
+   "derived_column_persist_sites": 18,
+   "summary_persist_sites": 28,
+   "entries_with_derived_column_persist": 9,
+   "entries_with_summary_persist": 10,
+   "contracts_published_for_this_slice": 0,
+   "formula_mask_regions_declared_for_this_slice": 0
+  }
+ },
+ "dynamic_row_identity": {
+  "why_this_section_exists": "本 slice 的 10 条 entry 全部含「行数由业务数据决定」的动态行表（审定表可增删行、明细表可增删行），触发 `slice_schema.conditional_sections` 的 `dynamic_row_identity`。",
+  "source_of_truth": "各 owner composable 的源码（本节每行都带 source_ref 指到具体文件与行号），不是本文件的自述",
+  "forbidden_identity_kinds": [
+   "array_index",
+   "display_sequence",
+   "label_text",
+   "positional_persistence_key"
+  ],
+  "kind_semantics_note": "🔴 `tables[].row_identity.kind` 描述该表的**主身份机制**（沿用 I/J/K/L 四轮的既定口径）。M 循环必须分**两层**看：内存层身份是 `generated_opaque`（熵键 `m{n}-adj-${Date.now()}-${Math.random()…}`，现算 23 处），持久化层身份是 `positional_persistence_key`（`itemId: …row-${n}…`，现算 44 处，`const n = i + 1`）。两层不一致就是 BP-10 的实质 —— 只声明内存层会把这条系统性缺陷藏起来。",
+  "tables": [
+   {
+    "table_key": "m1_adjudication_rows",
+    "entry_id": "xlsx/gt-m1-dividends-payable",
+    "persistence_key": "M1-M1-1-row-{n}-{field}",
+    "row_identity": {
+     "kind": "generated_opaque_in_memory_positional_in_store",
+     "identity_field": "key",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L158",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L213",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L211"
+    },
+    "registered_as": [
+     "BP-10"
+    ]
+   },
+   {
+    "table_key": "m9_adjudication_rows",
+    "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+    "persistence_key": "M9-1-row-{n}-{field}",
+    "row_identity": {
+     "kind": "generated_opaque_in_memory_positional_in_store",
+     "identity_field": "key",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L216",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L275",
+     "index_binding_source_ref": null
+    },
+    "registered_as": [
+     "BP-10"
+    ]
+   },
+   {
+    "table_key": "m10_adjudication_rows",
+    "entry_id": "xlsx/gt-m10-other-equity-instruments",
+    "persistence_key": "M10-1-row-{n}-{field}",
+    "row_identity": {
+     "kind": "generated_opaque_in_memory_positional_in_store",
+     "identity_field": "key",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L210",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L267",
+     "index_binding_source_ref": null
+    },
+    "registered_as": [
+     "BP-10"
+    ]
+   }
+  ],
+  "positional_identity_inventory": {
+   "scan_recipe": "两族分开穷举（剥注释、保留行号）：① 渲染键族 —— `(rowId|rowKey|id)\\s*:\\s*<值>` 且值里含下标 token 或 `${i|idx|index}`；② 持久化键族 —— `itemId:\\s*`…row-\\$\\{(n|i|idx|index)\\}…``。反向判据：展示序号族（`seq: idx + 1`）**不计入**缺陷。",
+   "render_key_family": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/m1/core/M1TabAdjudication.vue#L390",
+     "key": "rowKey",
+     "value": "String(idx)"
+    }
+   ],
+   "persistence_key_family": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L267",
+     "item_id_template": "M10-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L268",
+     "item_id_template": "M10-1-row-${n}-group"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L269",
+     "item_id_template": "M10-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L270",
+     "item_id_template": "M10-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L213",
+     "item_id_template": "M1-M1-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L214",
+     "item_id_template": "M1-M1-1-row-${n}-beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L215",
+     "item_id_template": "M1-M1-1-row-${n}-endAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L223",
+     "item_id_template": "M2-M2-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L224",
+     "item_id_template": "M2-M2-1-row-${n}-beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L225",
+     "item_id_template": "M2-M2-1-row-${n}-endAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L209",
+     "item_id_template": "M3-M3-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L210",
+     "item_id_template": "M3-M3-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L211",
+     "item_id_template": "M3-M3-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L232",
+     "item_id_template": "M4-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L233",
+     "item_id_template": "M4-1-row-${n}-block"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L234",
+     "item_id_template": "M4-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L235",
+     "item_id_template": "M4-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L265",
+     "item_id_template": "M5-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L266",
+     "item_id_template": "M5-1-row-${n}-block"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L267",
+     "item_id_template": "M5-1-row-${n}-category"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L268",
+     "item_id_template": "M5-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L269",
+     "item_id_template": "M5-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L240",
+     "item_id_template": "M6-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L241",
+     "item_id_template": "M6-1-row-${n}-category"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L242",
+     "item_id_template": "M6-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L243",
+     "item_id_template": "M6-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L265",
+     "item_id_template": "M7-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L266",
+     "item_id_template": "M7-1-row-${n}-category"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L267",
+     "item_id_template": "M7-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L268",
+     "item_id_template": "M7-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM8Adjudication.ts#L188",
+     "item_id_template": "M8-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM8Adjudication.ts#L189",
+     "item_id_template": "M8-1-row-${n}-endAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM8Adjudication.ts#L190",
+     "item_id_template": "M8-1-row-${n}-beginAudited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L275",
+     "item_id_template": "M9-1-row-${n}-name"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L276",
+     "item_id_template": "M9-1-row-${n}-block"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L277",
+     "item_id_template": "M9-1-row-${n}-category"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L278",
+     "item_id_template": "M9-1-row-${n}-audited"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L279",
+     "item_id_template": "M9-1-row-${n}-endBalance"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L290",
+     "item_id_template": "M9-4-row-${n}-source"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L291",
+     "item_id_template": "M9-4-row-${n}-type"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L292",
+     "item_id_template": "M9-4-row-${n}-category"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L293",
+     "item_id_template": "M9-4-row-${n}-sourceAfterTax"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L294",
+     "item_id_template": "M9-4-row-${n}-bookedIncrease"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L295",
+     "item_id_template": "M9-4-row-${n}-diff"
+    }
+   ],
+   "display_sequence_family": [
+    "audit-platform/frontend/src/components/workpaper/m1/core/M1TabIndex.vue#L211",
+    "audit-platform/frontend/src/components/workpaper/m10/core/M10TabIndex.vue#L209",
+    "audit-platform/frontend/src/components/workpaper/m2/core/M2TabIndex.vue#L209",
+    "audit-platform/frontend/src/components/workpaper/m3/core/M3TabIndex.vue#L207",
+    "audit-platform/frontend/src/components/workpaper/m4/core/M4TabIndex.vue#L208",
+    "audit-platform/frontend/src/components/workpaper/m5/core/M5TabIndex.vue#L209",
+    "audit-platform/frontend/src/components/workpaper/m6/core/M6TabIndex.vue#L208",
+    "audit-platform/frontend/src/components/workpaper/m7/core/M7TabIndex.vue#L209",
+    "audit-platform/frontend/src/components/workpaper/m8/core/M8TabIndex.vue#L208",
+    "audit-platform/frontend/src/components/workpaper/m9/core/M9TabIndex.vue#L208"
+   ],
+   "generated_opaque_family": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Adjudication.ts#L210",
+     "prefix": "m10-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM10Detail.ts#L268",
+     "prefix": "m10-det"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Adjudication.ts#L158",
+     "prefix": "m1-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM1Detail.ts#L225",
+     "prefix": "m1-detail"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Adjudication.ts#L166",
+     "prefix": "m2-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2CapitalCheck.ts#L271",
+     "prefix": "m2-verify"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Detail.ts#L286",
+     "prefix": "m2-listed"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM2Detail.ts#L334",
+     "prefix": "m2-unlisted"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Adjudication.ts#L157",
+     "prefix": "m3-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM3Detail.ts#L152",
+     "prefix": "m3-det"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Adjudication.ts#L180",
+     "prefix": "m4-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM4Detail.ts#L226",
+     "prefix": "m4-det"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Adjudication.ts#L207",
+     "prefix": "m5-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM5Detail.ts#L200",
+     "prefix": "m5-det"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Adjudication.ts#L183",
+     "prefix": "m6-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM6Detail.ts#L236",
+     "prefix": "m6-det"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Adjudication.ts#L208",
+     "prefix": "m7-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM7Detail.ts#L249",
+     "prefix": "m7-detail"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM8Detail.ts#L209",
+     "prefix": "m8-detail"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Adjudication.ts#L216",
+     "prefix": "m9-adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9Detail.ts#L281",
+     "prefix": "m9-detail"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useM9OciReconcile.ts#L197",
+     "prefix": "m9-reconcile"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/m3/calc/M3TabFxInvest.vue#L324",
+     "prefix": "m3-fx"
+    }
+   ],
+   "counters": {
+    "render_key_hits": 1,
+    "persistence_key_hits": 44,
+    "display_sequence_sites": 10,
+    "generated_opaque_sites": 23,
+    "defect_hits_total": 45,
+    "entries_with_positional_identity_defects": 10,
+    "entries_without_positional_identity_defects": 0,
+    "files_with_persistence_key_defect": 11
+   }
+  },
+  "hardcoded_pattern_scan": {
+   "recipe": "六族硬编码正则逐文件现算（剥注释、保留行号）；「0 命中」也要落成判据并用变异证明它是非空跑。",
+   "hits": {
+    "blankRows_literal_count": [],
+    "horizontal_company_column_literals": [],
+    "column_key_uses_label": [],
+    "row_cell_key_uses_label": [],
+    "seed_placeholder_literal": [],
+    "positional_row_id_template": []
+   },
+   "counters": {
+    "hardcoded_blankRows_literal_count": 0,
+    "hardcoded_horizontal_company_column_literals": 0,
+    "hardcoded_column_key_uses_label": 0,
+    "hardcoded_row_cell_key_uses_label": 0,
+    "hardcoded_seed_placeholder_literal": 0,
+    "hardcoded_positional_row_id_template": 0,
+    "hardcoded_pattern_hits_total": 0,
+    "hardcoded_patterns_at_zero": 6,
+    "hardcoded_patterns_total": 6
+   },
+   "why_zero_is_a_judgement": "六族全 0 命中。这是**判据**不是缺席：扫描分母是 M 域 222 个生产文件（现算，非空），且同一套正则在 G/H/I/K 循环上有过非 0 命中。变异脚本会往真源码里注入一处 `blankRows(p, 3)` 证明该族不是恒 0。"
+  }
+ },
+ "honest_adjudication_summary": {
+  "total_independent": 10,
+  "pilot_contract_published": 0,
+  "adjudicated_as_bidirectional": 0,
+  "adjudicated_as_single_onlyoffice": 0,
+  "adjudicated_as_single_html": 0,
+  "adjudicated_as_unreachable": 0,
+  "capability_verdict_pending": 10,
+  "html_counterpart_exists": 10,
+  "html_counterpart_none": 0,
+  "finalized_published_representations": 0,
+  "entries_left_unverifiable": 10,
+  "parent_duplicate_children": 0,
+  "reachable_hosts_in_cycle": 10,
+  "hosts_with_oo_mount": 10,
+  "authoritative_template_files": 10,
+  "template_files_with_owner_entry": 10,
+  "template_files_without_owner_entry": 0,
+  "authoritative_template_sheets_total": 102,
+  "authoritative_template_sheets_owned": 102,
+  "sheets_covered_by_html_children": 89,
+  "sheets_falling_through_to_oo": 13,
+  "oo_fallthrough_gt_custom": 10,
+  "oo_fallthrough_reference_only": 1,
+  "oo_fallthrough_marked_deleted_in_name": 1,
+  "oo_fallthrough_unmatched_by_dispatch": 1,
+  "oo_fallthrough_pre_revision_q_sheet": 0,
+  "entries_with_sheet_granularity_collapse": 3,
+  "collapsed_sheet_pairs": 3,
+  "pre_revision_q_sheets": 3,
+  "oo_sheet_map_declared_pairs": 84,
+  "oo_sheet_map_pairs_hitting_a_real_sheet": 73,
+  "oo_sheet_map_pairs_missing_from_workbook": 11,
+  "oo_sheet_map_pairs_missing_in_live_modules": 9,
+  "oo_sheet_map_pairs_missing_in_orphan_modules": 2,
+  "oo_sheet_map_entries_affected": 6,
+  "oo_sheet_map_fallback_literals_hitting_a_real_sheet": 10,
+  "dual_mode_module_files_total": 20,
+  "orphan_dual_mode_modules": 11,
+  "orphan_dual_mode_first_order": 11,
+  "orphan_dual_mode_second_order": 0,
+  "orphan_barrels": 0,
+  "orphan_dual_mode_lines_total": 1911,
+  "orphan_entry_wrapper_twins": 1,
+  "live_dual_mode_modules": 9,
+  "live_dual_mode_lines_total": 396,
+  "orphan_modules_calling_legacy_health_endpoint": 10,
+  "live_modules_calling_legacy_health_endpoint": 0,
+  "dual_mode_modules_calling_legacy_config_endpoint": 0,
+  "orphan_modules_with_structured_mode_value": 4,
+  "orphan_modules_with_storage_key": 10,
+  "live_modules_with_storage_key": 0,
+  "dual_mode_modules_not_scoped_to_wp_id": 0,
+  "shared_base_statement_consumers": 29,
+  "shared_base_m_cycle_consumers": 10,
+  "shared_base_consumers_after_rewiring": 19,
+  "shared_base_wide_token_files": 33,
+  "hosts_calling_legacy_health_endpoint_directly": 0,
+  "per_entry_persistence_modules": 10,
+  "hosts_importing_shared_checklist_persistence": 0,
+  "entries_with_redeemable_switch": 9,
+  "entries_with_inert_switch": 0,
+  "entries_with_no_switch_at_all": 1,
+  "entries_mounting_the_ac14_notice": 0,
+  "m_production_files_scanned": 222,
+  "dynamic_row_identity_tables": 3,
+  "positional_identity_render_key_hits": 1,
+  "positional_identity_persistence_key_hits": 44,
+  "positional_identity_defect_hits": 45,
+  "positional_identity_display_sequence_sites": 10,
+  "positional_identity_generated_opaque_sites": 23,
+  "entries_with_positional_identity_defects": 10,
+  "entries_without_positional_identity_defects": 0,
+  "files_with_persistence_key_defect": 11,
+  "hardcoded_pattern_hits_total": 0,
+  "hardcoded_patterns_at_zero": 6,
+  "hardcoded_patterns_total": 6,
+  "authoritative_formula_cells_total": 2937,
+  "authoritative_sheets_with_formula": 81,
+  "derived_column_persist_sites": 18,
+  "summary_persist_sites": 28,
+  "classification_summary_persist_sites": 3,
+  "formula_mask_regions_declared_for_this_slice": 0,
+  "blocking_preconditions_total": 12,
+  "counting_notes": {
+   "why_this_key_exists": "计数一律从来源节现算，禁写死数字。本键逐条说明「哪个计数从哪一节算出来」，守卫按本映射把 summary 的**每一族**计数都做等值比对 —— 漏一族就等于那族可以随便填（Task 54 的 M28/M29 教训：`positional_identity_family_*` 与 `hardcoded_pattern_*` 曾被漏掉）。",
+   "from_independent_entries": [
+    "total_independent",
+    "capability_verdict_pending",
+    "html_counterpart_exists",
+    "html_counterpart_none",
+    "adjudicated_as_bidirectional",
+    "adjudicated_as_single_onlyoffice",
+    "adjudicated_as_single_html",
+    "adjudicated_as_unreachable",
+    "entries_left_unverifiable",
+    "finalized_published_representations",
+    "pilot_contract_published",
+    "reachable_hosts_in_cycle",
+    "per_entry_persistence_modules"
+   ],
+   "from_authoritative_templates": [
+    "authoritative_template_files",
+    "template_files_with_owner_entry",
+    "template_files_without_owner_entry",
+    "authoritative_template_sheets_total",
+    "authoritative_template_sheets_owned",
+    "authoritative_formula_cells_total",
+    "authoritative_sheets_with_formula"
+   ],
+   "from_sheet_granularity_and_router_audit": [
+    "sheets_covered_by_html_children",
+    "sheets_falling_through_to_oo",
+    "oo_fallthrough_gt_custom",
+    "oo_fallthrough_reference_only",
+    "oo_fallthrough_marked_deleted_in_name",
+    "oo_fallthrough_unmatched_by_dispatch",
+    "oo_fallthrough_pre_revision_q_sheet",
+    "entries_with_sheet_granularity_collapse",
+    "collapsed_sheet_pairs",
+    "pre_revision_q_sheets",
+    "oo_sheet_map_declared_pairs",
+    "oo_sheet_map_pairs_hitting_a_real_sheet",
+    "oo_sheet_map_pairs_missing_from_workbook",
+    "oo_sheet_map_pairs_missing_in_live_modules",
+    "oo_sheet_map_pairs_missing_in_orphan_modules",
+    "oo_sheet_map_entries_affected",
+    "oo_sheet_map_fallback_literals_hitting_a_real_sheet"
+   ],
+   "from_orphan_dual_mode_inventory": [
+    "dual_mode_module_files_total",
+    "orphan_dual_mode_modules",
+    "orphan_dual_mode_first_order",
+    "orphan_dual_mode_second_order",
+    "orphan_barrels",
+    "orphan_dual_mode_lines_total",
+    "orphan_entry_wrapper_twins",
+    "live_dual_mode_modules",
+    "live_dual_mode_lines_total",
+    "orphan_modules_calling_legacy_health_endpoint",
+    "live_modules_calling_legacy_health_endpoint",
+    "dual_mode_modules_calling_legacy_config_endpoint",
+    "orphan_modules_with_structured_mode_value",
+    "orphan_modules_with_storage_key",
+    "live_modules_with_storage_key",
+    "dual_mode_modules_not_scoped_to_wp_id",
+    "shared_base_statement_consumers",
+    "shared_base_m_cycle_consumers",
+    "shared_base_consumers_after_rewiring",
+    "shared_base_wide_token_files"
+   ],
+   "from_mode_switch_resolution": [
+    "entries_with_redeemable_switch",
+    "entries_with_inert_switch",
+    "entries_with_no_switch_at_all",
+    "entries_mounting_the_ac14_notice",
+    "hosts_with_oo_mount"
+   ],
+   "from_dynamic_row_identity": [
+    "m_production_files_scanned",
+    "dynamic_row_identity_tables",
+    "positional_identity_render_key_hits",
+    "positional_identity_persistence_key_hits",
+    "positional_identity_defect_hits",
+    "positional_identity_display_sequence_sites",
+    "positional_identity_generated_opaque_sites",
+    "entries_with_positional_identity_defects",
+    "entries_without_positional_identity_defects",
+    "files_with_persistence_key_defect",
+    "hardcoded_pattern_hits_total",
+    "hardcoded_patterns_at_zero",
+    "hardcoded_patterns_total"
+   ],
+   "from_protected_formula_and_classification_summary": [
+    "derived_column_persist_sites",
+    "summary_persist_sites",
+    "classification_summary_persist_sites",
+    "formula_mask_regions_declared_for_this_slice"
+   ],
+   "from_blocking_preconditions": [
+    "blocking_preconditions_total"
+   ],
+   "computed_from_source_only": [
+    "hosts_calling_legacy_health_endpoint_directly",
+    "hosts_importing_shared_checklist_persistence",
+    "parent_duplicate_children"
+   ]
+  },
+  "reason": "10 条 entry 逐一实测**都有** HTML 对端（checklist_responses + `M{n}-{sheet}-{field}` item_id 命名空间 + 逐 entry 一份 `useM{n}FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；10 本权威册共 102 张 sheet、2937 个公式格 ⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边全部可达 ⇒ 非 unreachable；AC 12.1 的六件前置一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 10 条全部落**待裁决态**，如实计入 slice_counters.unadjudicated。",
+  "ac_15_not_applicable_because": "🔴 AC 1.5 的触发条件是「入口**被裁决**为纯 OO 或纯 HTML」。本 slice 10 条 entry 的 capability 全为 null（待裁决），无一条被裁为 single_* ⇒ AC 1.5 **不适用**。生效的是 AC 1.4（见 mode_switch_resolution）。把 AC 1.5 硬套上来会得出「应当收掉切换按钮」的错结论 —— 而 9 条 entry 的开关是**真能兑现**的（切过去确实渲染 OO 编辑器），该修的是「切过去定位到错 tab」（BP-4）与「没有可操作原因」（BP-7），不是把按钮删掉。",
+  "slice_counters": {
+   "unadjudicated": 10,
+   "fake_bidirectional_claimed_verified": 0,
+   "bidirectional_unverified": 0,
+   "stale_evidence": 0,
+   "note": "unadjudicated == 10 == len([e for e in independent_entries if e['capability'] is None])（SR-9 现算等值）。其余三项为 0 只表示「本 slice 无该类条目」，**不得**解读为「已具备双向能力」。"
+  }
+ },
+ "property_denominators": {
+  "why_this_key_exists": "空分母重言式（「没有 contract → Property 通过」）是本 spec 明确拒绝的论证。本节逐 Property 显式区分「有真分母的部分（真验）」与「无适用分母的部分（**不宣称通过**）」。🔴 本轮 Property 集是 **24 / 28 / 69 / 70**（前几轮是 20/22/23）—— Property 24 是新出现的，论证方向必须按它自己的原文来，**不得**照抄 Property 20 那套「generated col 占位」的分母论证。",
+  "property_24": {
+   "what_it_asserts": "保护字段修改形成冲突 —— OO 修改 formula / auto-source 单元格时 current 公式和值不变，并生成 protected conflict（design.md §Property 24，Validates Requirements 6.6）",
+   "m_cycle_denominator": "🔴 **三个分母，两实一空**。实的两个：① **源侧公式清册** —— 10 本权威册 openpyxl `data_only=False` 逐格现算 2937 个公式格、分布在 81 张 sheet，逐 entry 非零（分母 = 10 本册，非空）；② **消费侧派生值清册** —— 18 处公式重算列（判据是「同文件内被 `row.<f> = calc*(…)` 赋值」**且**「被 `String(row.<f>)` 持久化」两条同时成立）+ 28 处分类/汇总派生值（含 M10 的三处 `M10-4-summary-*`），分母非空；③ 承载者结构 —— `ProtectionPolicy` 五值枚举、三类只读来源判别式、`protected_conflicts_from_incoming` 对 Task 37 函数的**包装**关系（分母 = 4 个后端模块，非空）。空的那个：**端到端** —— M 侧 contract 数 0 ⇒ 没有 `formula_mask` 可挂 ⇒ 「OO 改公式格 → 真的生成 protected 冲突」无对象可跑。",
+   "how_handled": "守卫真验六件事：① 逐册 openpyxl 现算公式格数并与 slice 逐 entry 等值比对，且**显式断言 `data_only=True` 会得到 0**（证明扫描口径是判据不是巧合）；② 消费侧两族站点现算并与声明等值（两侧都验）；③ `ProtectionPolicy` 用 importlib 真加载 `conflicts.py` 取枚举成员集合、断言 `is_protected` 谓词对三个 read_only_* 为真、对 editable/word_only 为假（**行为判据**）；④ `protected_conflicts_from_incoming` 的**函数体**里真的调用了 `protected_conflicts_for_findings`（括号配对截函数体，不是全文 grep）；⑤ 断言 M 侧 contract 数 == 0 且 `formula_mask` 声明数 == 0（空分母那侧的前提）；⑥ 断言本 slice 没有为 M 造任何 contract 文件（宁缺勿造）。",
+   "not_claimed_passing": true,
+   "not_claimed_passing_part": "「OO 改公式格 → current 公式和值不变 + 生成 protected conflict」这条端到端判据 —— 分母为空（M 侧 contract 数 0、formula_mask 数 0），只断言前提成立 + 承载者结构，不宣称通过。",
+   "carrier_for_the_empty_part": "backend/app/services/workpaper_sync/merge.py 的 `_protection_policy_of` + excel_rematerialize.py 的 `protected_conflicts_from_incoming` + excel_extract.py 的 `assert_protected_tamper_fully_reported`；端到端跑通需真实 OO 9.4（BP-3）与 M 的 per-entry contract（BP-1 / BP-11）。"
+  },
+  "property_28": {
+   "what_it_asserts": "immutable definition 漂移 fail closed（design.md §Property 28，Validates Requirements 6.10）",
+   "m_cycle_denominator": "🔴 **三个分母，两实一空**。实的两个：**模板层** —— 10 本权威册的 size + sha256 现算比对、逐册 sheet 清单 openpyxl 现读（前导/尾随空格不 strip）、`_index.json` 运行时索引命中、锁文件 0 个、参考副本 absent、89 + 13 == 102 的 sheet 覆盖等值（非空）；**sheet-name 映射层** —— 84 对声明逐对与真 sheet 名比对，11 对不存在（非空，且这是本轮**新增**的一条边 —— AC 6.10 要求「指出首个漂移 sheet/field/cell」，现状在这一层是静默错位，无人 fail closed）。空的那个：**bundle 层** —— definition bundle 不存在（10 条 entry 的 definition_bundle 全 null）⇒ 「bundle digest 漂移 fail closed」无对象可验，不宣称通过。",
+   "how_handled": "守卫真验：① 10 本册 sha256 用 hashlib 现算并与本 slice 逐字比对；② 注册文件集合与磁盘集合等值（多写/少写都红）；③ 逐册 sheet 名列表现读比对，并**显式断言**`' 实收资本实质性程序表 M2A'` 的前导空格与 `'未分配利润实质性程序表 M6A '` 的尾随空格未被 strip（若守卫 strip 了，BP-4 的 11 处缺陷会有 6 处凭空消失）；④ 锁文件 0 个（现算 `~$` 前缀）；⑤ 参考副本目录 `is_dir()` 为 False；⑥ belongs_to_entry 双射；⑦ `_index.json` 里 `M/` 条目集合 == 磁盘集合；⑧ 84 对映射逐对现算、缺陷集合与声明等值，且 10 条 fallback 字面量必须**全部命中**真 sheet（反向判据：证明扫描器不是恒判不存在）；⑨ 断言 10 条 entry 的 definition_bundle / published_representation 全 null（空分母那侧的前提）。",
+   "not_claimed_passing": true,
+   "not_claimed_passing_part": "bundle 层 drift（definition bundle digest 漂移 fail closed）—— 分母为空。",
+   "carrier_for_the_empty_part": "backend/app/services/workpaper_sync/ 的 definitions / bundle 层 + backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py（需真实 OO 9.4，见 BP-3）"
+  },
+  "property_69": {
+   "what_it_asserts": "evidence 由逐 scenario 实体与服务端重算闭合（design.md §Property 69，Validates Requirements 12.10）",
+   "m_cycle_denominator": "非空但**全为负向** —— 10 条 entry 的 evidence 都是 UNVERIFIABLE，分母是「UNVERIFIABLE 必须带非空 unverifiable_reasons」（10 条）与「声称 VERIFIED 必须有 sync_test_run_id + required_scenario_set_digest」（0 条声称，故断言「无一条空口声称」）。🔴 M 循环多两条 entry 级差异：① BP-4 只能出现在 5 条真有 SHEET_MAP 缺陷的 entry 的 reasons 里（其余 5 条不得带）；② BP-8 只能出现在 3 条折叠 entry 里、BP-12 只能出现在 1 条里 —— 守卫两侧都验，否则把 reasons 抄成 10 条同形也能过。",
+   "how_handled": "守卫按 SR-7 断言 10 条 UNVERIFIABLE 各带非空 reasons；断言无一条 entry 声称 VERIFIED；断言 BP-4 / BP-8 / BP-12 各只出现在其 `entries` 列表所指的 entry 的 reasons 里（真假两侧都验）；把 summary 的**每一族**计数逐项从各自来源节现算并等值比对（按 counting_notes 的分组穷举，并断言 counting_notes 覆盖了 summary 的全部非平凡键）；断言 slice_counters 四项与实际吻合（SR-9 的 unadjudicated == 10）。",
+   "not_claimed_passing": false,
+   "not_claimed_passing_part": "逐 scenario evidence 实体的**正向**闭合（需真实 OO 9.4 探针 —— BP-3）。"
+  },
+  "property_70": {
+   "what_it_asserts": "scenario / evidence / contract / bundle / candidate 不得跨 entry 或跨场景复用（design.md §Property 70，Validates Requirements 12.12）",
+   "m_cycle_denominator": "非空 —— **10 份** slice（D / E / F / G / H / I / J / K / L / M）的两两不相交判据（配对数由 `C(10,2)` **现算** = 45 对；L 那轮是 9 份 36 对 ⇒ 数字必须现算不能写死）、契约归属逐文件读 `review.entry_id`、10 本模板 belongs_to_entry 的双射性、10 条 entry 的 template_ref 两两不同（workbook 与 sha256 双集合）、10 个 `M{n}-` item_id 前缀两两不同**且两两不互为前缀**。",
+   "how_handled": "守卫真验：十份 slice 的 entry 集合两两不相交（对数现算并与 `C(n,2)` 等值）；契约目录里没有任何文件的 review.entry_id 属本 slice，且四条 pilot 契约的 review.entry_id 分别真是那四个值（candidate 那份 entry_id 为 null，**不**要求非空）；10 本模板的 belongs_to_entry 是双射；template_ref.workbook / sha256 集合大小各 == 10；10 个 item_id 前缀两两不互为前缀（`M1-` vs `M10-` 的真实风险点）；deletion plan 的删除路径与其余九份 slice 的删除路径不相交。",
+   "not_claimed_passing": false
+  },
+  "property_3_and_23_partial": {
+   "why_here": "Task 55 的正文只点名 Property 24 / 28 / 69 / 70，但相邻任务（46/48~54）的守卫分别额外核了 Property 3（未注册 adapter 不得宣称双向）与 23（动态行身份不使用下标）。本 slice 沿用它们能沿用的部分，并显式写明**哪些部分不宣称通过**。",
+   "not_claimed_passing": true,
+   "partially_claimed": [
+    "Property 3 的**否定方向**（10 条 entry 的 adapter_id 全 null、registry 无 M adapter、宿主模板无「可双向回写」字样）—— 分母非空，真验。🔴 M 循环额外真验一条：**开关可兑现 ≠ 可以宣称双向**。9 条 entry 的开关切过去真会渲染 OO 编辑器（这与 L 的 inert 相反），所以「模板里没有『可双向回写』字样」这条判据在 M 上**不够** —— 必须再加「AC 1.4 的提示组件必须挂上」的 DOM 级判据（现算 0 ⇒ BP-7）。正向（bidirectional entry 删 adapter/bundle 之一后打红）分母为空，不宣称通过。",
+    "Property 23 的**缺陷侧**（两族共 45 处位置化行身份穷举 + 10 处展示序号的反向判据 + 23 处熵键清册 + 3 张动态表的 source_ref）—— 分母非空，真验且如实登记为 BP-10。🔴 与前轮的关键差别：M 的主形态在**持久化键**上，L/K 那套只看 `rowKey:`/`id:` 的扫描器只命中 1 处 ⇒ 沿用旧扫描器会把 44 处系统性缺陷判成 1 处。正向（稳定身份在插删排序后不变）需要真实 OO 动态能力场景，分母为空。"
+   ],
+   "not_claimed_parts": [
+    "Property 20（generated col 占位不可注册生产 adapter）—— 本 slice contract 数 0，分母为空；只断言前提（契约归属、pilot 四条、registry 无 M adapter）。",
+    "Property 21（per-entry contract 逐字段完整）—— 本 slice contract 数 0，分母为空。",
+    "Property 22（动态列 key 与 label 解耦）—— M 循环无按公司/单位横向展开的宽表（`horizontal_company_column_literals` 与 `column_key_uses_label` 现算各 0 命中），分母为空；「0 命中」只作反向判据，不当成 Property 22 通过。",
+    "Property 3 / 23 / 24 / 28 的正向部分（见各条）。"
+   ]
+  }
+ },
+ "paradigm_schema_conflict": {
+  "what": "范式 JSON 的 `slice_schema.applies_to_tasks` 是 [48..57]、`effective_from_task_48` 对 ≥48 的任务追加 `html_counterpart_verdict` / `html_counterpart_source_refs` 与 BP 的 `status` / `must_fix_before` / `source_refs`；同时 SR-3 要求 capability ∈ 四值枚举**或**待裁决三字段齐备。",
+  "how_resolved_here": "沿用 D（Task 46 收口）/ F（48）/ G（49）/ H（50）/ I（51）/ J（52）/ K（53）/ L（54）已确立的诚实形态：capability 为 null + `capability_verdict_stage` / `capability_target` / `capability_target_blocked_by` 三字段齐备，10 条如实计入 `slice_counters.unadjudicated`（SR-9 现算等值）。追加的两个 entry 字段与三个 BP 字段全部补齐（本任务号 55 ≥ 48，`enforce_task48` 生效）。",
+  "residual_inconsistency": null,
+  "new_section_not_in_schema": {
+   "sections": [
+    "m_cycle_form_differences",
+    "orphan_dual_mode_inventory",
+    "mode_switch_resolution",
+    "sheet_granularity_and_router_audit",
+    "protected_formula_and_classification_summary",
+    "property_denominators"
+   ],
+   "why_not_a_conflict": "`slice_schema` 只规定**必填**字段（`required_top_level` 等）与条件节的触发形态，不禁止 slice 追加自述节。本 slice 追加的六节都带 `why_this_key_exists` + 可复算 recipe + counters，并由本轮守卫逐节现算比对 —— 不是自由文本。",
+   "the_one_that_is_new_this_round": "🔴 `protected_formula_and_classification_summary` 是**本轮新增**的顶层节，对应 tasks.md 的点名项「公式/分类 summary 保持受保护」。它与 L 那份 `sheet_granularity_and_router_audit` 同构（why + recipe + per_entry + counters + verdict），但判据对象不同：那节判「sheet 有没有 HTML 承载」，本节判「派生值有没有被当可写字段」。",
+   "paradigm_json_is_read_only_here": "本任务**不改** `workpaper_sync_migration_paradigm.json` 一个字节。Task 54 的守卫用 `raw_block_digest()` + `canonical_digest()` 双向锁死 `/paradigm`，改一个字节全红；本轮守卫也复算这两个 digest 并与 `paradigm_registry` 里的常量比对。"
+  }
+ },
+ "properties_verified": [
+  {
+   "property": 24,
+   "validates_requirement": "6.6",
+   "claim": "partial",
+   "see": "property_denominators.property_24"
+  },
+  {
+   "property": 28,
+   "validates_requirement": "6.10",
+   "claim": "partial",
+   "see": "property_denominators.property_28"
+  },
+  {
+   "property": 69,
+   "validates_requirement": "12.10",
+   "claim": "negative_direction_full",
+   "see": "property_denominators.property_69"
+  },
+  {
+   "property": 70,
+   "validates_requirement": "12.12",
+   "claim": "full",
+   "see": "property_denominators.property_70"
+  }
+ ],
+ "requirements_covered": [
+  "1.3",
+  "1.4",
+  "1.5",
+  "1.6",
+  "1.7",
+  "6.6",
+  "6.10",
+  "12.1",
+  "12.4",
+  "12.8",
+  "12.9",
+  "12.10",
+  "12.11",
+  "12.12",
+  "14.1"
+ ]
+}

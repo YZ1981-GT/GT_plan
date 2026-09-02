@@ -1,0 +1,659 @@
+{
+  "all_header_refs_match": true,
+  "distinct_stable_keys": 25,
+  "duplicate_leaf_labels": {
+    "对手方名称": 2,
+    "日期/编号": 3,
+    "金额": 2
+  },
+  "field_count": 25,
+  "fields": [
+    {
+      "column": "A",
+      "column_key": "seq",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/seq",
+      "leaf": {
+        "cell": "A10",
+        "declared": "序号",
+        "match": true,
+        "observed": "序号"
+      },
+      "mid": null,
+      "mode": "auto_source",
+      "source_ref": "源xlsx!减少检查表H1-8!A13",
+      "value_type": "integer"
+    },
+    {
+      "column": "B",
+      "column_key": "category",
+      "enum_source_ref": "源xlsx!减少检查表H1-8!B13:B27",
+      "enum_values": [
+        "房屋及建筑物",
+        "机器设备",
+        "运输设备",
+        "办公设备",
+        "其他设备"
+      ],
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/category",
+      "leaf": {
+        "cell": "B10",
+        "declared": "固定资产类别",
+        "match": true,
+        "observed": "固定资产类别"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!B13",
+      "value_type": "enum"
+    },
+    {
+      "column": "C",
+      "column_key": "asset_no",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/assetNo",
+      "leaf": {
+        "cell": "C10",
+        "declared": "固定资产编号",
+        "match": true,
+        "observed": "固定资产编号"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!C13",
+      "value_type": "text"
+    },
+    {
+      "column": "D",
+      "column_key": "asset_name",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/name",
+      "leaf": {
+        "cell": "D10",
+        "declared": "固定资产名称",
+        "match": true,
+        "observed": "固定资产名称"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!D13",
+      "value_type": "text"
+    },
+    {
+      "column": "E",
+      "column_key": "disposal_method",
+      "enum_source_ref": "源xlsx!减少检查表H1-8!E13:E27",
+      "enum_values": [
+        "处置",
+        "其他减少"
+      ],
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/disposalMethod",
+      "leaf": {
+        "cell": "E10",
+        "declared": "减少方式",
+        "match": true,
+        "observed": "减少方式"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!E13",
+      "value_type": "enum"
+    },
+    {
+      "column": "F",
+      "column_key": "disposal_date",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/disposalDate",
+      "leaf": {
+        "cell": "F10",
+        "declared": "减少日期",
+        "match": true,
+        "observed": "减少日期"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!F13",
+      "value_type": "date"
+    },
+    {
+      "column": "G",
+      "column_key": "voucher_no",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/voucherNo",
+      "leaf": {
+        "cell": "G10",
+        "declared": "凭证号",
+        "match": true,
+        "observed": "凭证号"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!G13",
+      "value_type": "text"
+    },
+    {
+      "column": "H",
+      "column_key": "counterpart_account",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/counterpartAccount",
+      "leaf": {
+        "cell": "H10",
+        "declared": "对方科目",
+        "match": true,
+        "observed": "对方科目"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!H13",
+      "value_type": "text"
+    },
+    {
+      "column": "I",
+      "column_key": "original_cost",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/originalCost",
+      "leaf": {
+        "cell": "I12",
+        "declared": "原值",
+        "match": true,
+        "observed": "原值"
+      },
+      "mid": {
+        "cell": "I11",
+        "declared": "转入清理的固定资产",
+        "match": true,
+        "observed": "转入清理的固定资产"
+      },
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!I13",
+      "value_type": "amount"
+    },
+    {
+      "column": "J",
+      "column_key": "acc_dep",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/accDep",
+      "leaf": {
+        "cell": "J12",
+        "declared": "累计折旧",
+        "match": true,
+        "observed": "累计折旧"
+      },
+      "mid": {
+        "cell": "I11",
+        "declared": "转入清理的固定资产",
+        "match": true,
+        "observed": "转入清理的固定资产"
+      },
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!J13",
+      "value_type": "amount"
+    },
+    {
+      "column": "K",
+      "column_key": "impairment",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/impairment",
+      "leaf": {
+        "cell": "K12",
+        "declared": "减值准备",
+        "match": true,
+        "observed": "减值准备"
+      },
+      "mid": {
+        "cell": "I11",
+        "declared": "转入清理的固定资产",
+        "match": true,
+        "observed": "转入清理的固定资产"
+      },
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!K13",
+      "value_type": "amount"
+    },
+    {
+      "column": "L",
+      "column_key": "net_value",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/netValue",
+      "leaf": {
+        "cell": "L12",
+        "declared": "净值",
+        "match": true,
+        "observed": "净值"
+      },
+      "mid": {
+        "cell": "I11",
+        "declared": "转入清理的固定资产",
+        "match": true,
+        "observed": "转入清理的固定资产"
+      },
+      "mode": "formula",
+      "source_ref": "源xlsx!减少检查表H1-8!L13",
+      "value_type": "amount"
+    },
+    {
+      "column": "M",
+      "column_key": "disposal_cost",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/disposalCost",
+      "leaf": {
+        "cell": "M12",
+        "declared": "清理费用",
+        "match": true,
+        "observed": "清理费用"
+      },
+      "mid": {
+        "cell": "M11",
+        "declared": "清理净收入",
+        "match": true,
+        "observed": "清理净收入"
+      },
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!M13",
+      "value_type": "amount"
+    },
+    {
+      "column": "N",
+      "column_key": "disposal_income",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/disposalIncome",
+      "leaf": {
+        "cell": "N12",
+        "declared": "清理收入",
+        "match": true,
+        "observed": "清理收入"
+      },
+      "mid": {
+        "cell": "M11",
+        "declared": "清理净收入",
+        "match": true,
+        "observed": "清理净收入"
+      },
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!N13",
+      "value_type": "amount"
+    },
+    {
+      "column": "O",
+      "column_key": "disposal_gain_loss",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "I10",
+        "declared": "减少情况",
+        "match": true,
+        "observed": "减少情况"
+      },
+      "json_pointer": "/rows/{row_uuid}/disposalGainLoss",
+      "leaf": {
+        "cell": "O11",
+        "declared": "清理净损益",
+        "match": true,
+        "observed": "清理净损益"
+      },
+      "mid": null,
+      "mode": "formula",
+      "source_ref": "源xlsx!减少检查表H1-8!O13",
+      "value_type": "amount"
+    },
+    {
+      "column": "P",
+      "column_key": "application_ref",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "P10",
+        "declared": "审批单",
+        "match": true,
+        "observed": "审批单"
+      },
+      "json_pointer": "/rows/{row_uuid}/applicationRef",
+      "leaf": {
+        "cell": "P11",
+        "declared": "日期/编号",
+        "match": true,
+        "observed": "日期/编号"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!P13",
+      "value_type": "text"
+    },
+    {
+      "column": "Q",
+      "column_key": "is_approved",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "P10",
+        "declared": "审批单",
+        "match": true,
+        "observed": "审批单"
+      },
+      "json_pointer": "/rows/{row_uuid}/isApproved",
+      "leaf": {
+        "cell": "Q11",
+        "declared": "是否经过恰当审批",
+        "match": true,
+        "observed": "是否经过恰当审批"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!Q13",
+      "value_type": "enum"
+    },
+    {
+      "column": "R",
+      "column_key": "contract_ref",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "R10",
+        "declared": "合同/协议/订单",
+        "match": true,
+        "observed": "合同/协议/订单"
+      },
+      "json_pointer": "/rows/{row_uuid}/contractRef",
+      "leaf": {
+        "cell": "R11",
+        "declared": "日期/编号",
+        "match": true,
+        "observed": "日期/编号"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!R13",
+      "value_type": "text"
+    },
+    {
+      "column": "S",
+      "column_key": "contract_party",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "R10",
+        "declared": "合同/协议/订单",
+        "match": true,
+        "observed": "合同/协议/订单"
+      },
+      "json_pointer": "/rows/{row_uuid}/contractParty",
+      "leaf": {
+        "cell": "S11",
+        "declared": "对手方名称",
+        "match": true,
+        "observed": "对手方名称"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!S13",
+      "value_type": "text"
+    },
+    {
+      "column": "T",
+      "column_key": "contract_amount",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "R10",
+        "declared": "合同/协议/订单",
+        "match": true,
+        "observed": "合同/协议/订单"
+      },
+      "json_pointer": "/rows/{row_uuid}/contractAmount",
+      "leaf": {
+        "cell": "T11",
+        "declared": "金额",
+        "match": true,
+        "observed": "金额"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!T13",
+      "value_type": "amount"
+    },
+    {
+      "column": "U",
+      "column_key": "invoice_ref",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "U10",
+        "declared": "发票",
+        "match": true,
+        "observed": "发票"
+      },
+      "json_pointer": "/rows/{row_uuid}/invoiceRef",
+      "leaf": {
+        "cell": "U11",
+        "declared": "日期/编号",
+        "match": true,
+        "observed": "日期/编号"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!U13",
+      "value_type": "text"
+    },
+    {
+      "column": "V",
+      "column_key": "invoice_party",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "U10",
+        "declared": "发票",
+        "match": true,
+        "observed": "发票"
+      },
+      "json_pointer": "/rows/{row_uuid}/invoiceParty",
+      "leaf": {
+        "cell": "V11",
+        "declared": "对手方名称",
+        "match": true,
+        "observed": "对手方名称"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!V13",
+      "value_type": "text"
+    },
+    {
+      "column": "W",
+      "column_key": "invoice_amount",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": {
+        "cell": "U10",
+        "declared": "发票",
+        "match": true,
+        "observed": "发票"
+      },
+      "json_pointer": "/rows/{row_uuid}/invoiceAmount",
+      "leaf": {
+        "cell": "W11",
+        "declared": "金额",
+        "match": true,
+        "observed": "金额"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!W13",
+      "value_type": "amount"
+    },
+    {
+      "column": "Y",
+      "column_key": "index_ref",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/indexRef",
+      "leaf": {
+        "cell": "Y10",
+        "declared": "索引号",
+        "match": true,
+        "observed": "索引号"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!Y13",
+      "value_type": "text"
+    },
+    {
+      "column": "Z",
+      "column_key": "is_abnormal",
+      "enum_source_ref": null,
+      "enum_values": null,
+      "group": null,
+      "json_pointer": "/rows/{row_uuid}/isAbnormal",
+      "leaf": {
+        "cell": "Z10",
+        "declared": "是否异常",
+        "match": true,
+        "observed": "是否异常"
+      },
+      "mid": null,
+      "mode": "editable",
+      "source_ref": "源xlsx!减少检查表H1-8!Z13",
+      "value_type": "enum"
+    }
+  ],
+  "formula_cells_observed": {
+    "L13": "=I13-J13-K13",
+    "L14": "=I14-J14-K14",
+    "L15": "=I15-J15-K15",
+    "L16": "=I16-J16-K16",
+    "L17": "=I17-J17-K17",
+    "L18": "=I18-J18-K18",
+    "L19": "=I19-J19-K19",
+    "L20": "=I20-J20-K20",
+    "L21": "=I21-J21-K21",
+    "L22": "=I22-J22-K22",
+    "L23": "=I23-J23-K23",
+    "L24": "=I24-J24-K24",
+    "L25": "=I25-J25-K25",
+    "L26": "=I26-J26-K26",
+    "L27": "=I27-J27-K27",
+    "O13": "=N13-M13-L13",
+    "O14": "=N14-M14-L14",
+    "O15": "=N15-M15-L15",
+    "O16": "=N16-M16-L16",
+    "O17": "=N17-M17-L17",
+    "O18": "=N18-M18-L18",
+    "O19": "=N19-M19-L19",
+    "O20": "=N20-M20-L20",
+    "O21": "=N21-M21-L21",
+    "O22": "=N22-M22-L22",
+    "O23": "=N23-M23-L23",
+    "O24": "=N24-M24-L24",
+    "O25": "=N25-M25-L25",
+    "O26": "=N26-M26-L26",
+    "O27": "=N27-M27-L27"
+  },
+  "group_merges_observed": {
+    "I10": [
+      "I",
+      "J",
+      "K",
+      "L",
+      "M",
+      "N",
+      "O"
+    ],
+    "P10": [
+      "P",
+      "Q"
+    ],
+    "R10": [
+      "R",
+      "S",
+      "T"
+    ],
+    "U10": [
+      "U",
+      "V",
+      "W"
+    ]
+  },
+  "header_rows": {
+    "count": 3,
+    "group": 10,
+    "leaf": 12,
+    "mid": 11
+  },
+  "managed_sheet": "减少检查表H1-8",
+  "placeholder_column": {
+    "column": "X",
+    "declared_as_field": false,
+    "header_text": "……"
+  },
+  "skeleton_policy": {
+    "expression": "max(seed, 1)",
+    "first_data_row": 13,
+    "footer_row": 28,
+    "last_data_row": 27,
+    "samples": {
+      "0": 1,
+      "1": 1,
+      "1260": 1260,
+      "15": 15,
+      "2": 2
+    },
+    "template_physical_skeleton_rows": 15
+  }
+}

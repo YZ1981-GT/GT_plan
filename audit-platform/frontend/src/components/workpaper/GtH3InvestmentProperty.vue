@@ -23,6 +23,7 @@
           style="margin-left: 16px"
           @change="(val: string | number) => switchModel(val as 'cost' | 'fair_value')"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h3-investment-property" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -324,6 +325,7 @@ import { createH3RowNavigation, H3RowNavigationKey } from './composables/useH3Ro
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 
 // core — H3TabIndex 非 lazy（底稿目录轻量，首屏必显）— 骨架阶段先 lazy

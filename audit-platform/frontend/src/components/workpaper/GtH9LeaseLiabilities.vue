@@ -29,6 +29,7 @@
         <el-tag v-if="ooHealthChecking" size="small" type="info">检测中...</el-tag>
         <el-tag v-else-if="isOoAvailable" size="small" type="success">OnlyOffice 拉取成功</el-tag>
         <el-tag v-else size="small" type="warning">仅结构化视图</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h9-lease-liabilities" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -204,6 +205,7 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 

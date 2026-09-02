@@ -1,0 +1,20 @@
+[
+  {
+    "id": "C01",
+    "verdict": "GREEN",
+    "expected": "GREEN",
+    "matches_expectation": true,
+    "summary": "59 passed in 10.41s",
+    "added": [],
+    "why": "只改预算超限的错误文案、不改行为。预期 GREEN —— 若判 RED 说明守卫在断言文案"
+  },
+  {
+    "id": "C02",
+    "verdict": "GREEN",
+    "expected": "GREEN",
+    "matches_expectation": true,
+    "summary": "59 passed in 10.74s",
+    "added": [],
+    "why": "只改注释。预期 GREEN —— 若判 RED 说明守卫在读源码注释而不是行为"
+  }
+]

@@ -18,6 +18,8 @@
 
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
 
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d1-notes-receivable" />
+
         <el-tag v-if="formSaving" type="info" size="small">保存中…</el-tag>
 
       </div>
@@ -503,6 +505,8 @@ import D1TabDetailCustomer from './d1/D1TabDetailCustomer.vue'
 import D1TabBadDebt from './d1/D1TabBadDebt.vue'
 
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 
 

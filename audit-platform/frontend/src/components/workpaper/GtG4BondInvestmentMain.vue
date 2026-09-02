@@ -19,6 +19,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g4-bond-investment-main" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -154,6 +155,7 @@ import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThrea
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G4TabProcedure = defineAsyncComponent(() => import('./g4-bond-investment-main/core/G4TabProcedure.vue'))

@@ -1,0 +1,71 @@
+[
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+    "why": "未登记的事实会被 `evaluate_closure` 判成 unregistered 或干脆不计入阻断总数 ⇒ 142 条真实漂移静默消失",
+    "verdict": "RED",
+    "summary": "3 failed, 286 passed in 63.07s (0:01:03)",
+    "added": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_participates_in_the_blocking_total"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+    ],
+    "added_files": [
+      "test_task13_contract_registry.py",
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.9
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+    "why": "唯一的生产消费方不传观察器 ⇒ RG-16/17 在生产路径上仍然是死代码，漂移条数从 142 掉到 5（只剩 RG-15）",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 62.81s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 65.9
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+    "why": "47 条 entry 的宿主没有传 readonly，其 editability 完全由组件 prop 默认值决定。翻掉它必须让 manifest 与复核期望同时打红 —— 否则 editability 只是个手填值",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 63.40s (0:01:03)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py",
+      "test_workpaper_sync_manifest_contract.py"
+    ],
+    "restored": true,
+    "seconds": 66.3
+  }
+]

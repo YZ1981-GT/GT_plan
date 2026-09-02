@@ -1,0 +1,22 @@
+[
+  {
+    "id": "M21",
+    "side": "fe",
+    "want": "新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm",
+    "why": "不等一次渲染就构造 DocEditor ⇒ placeholder 容器还没带上新 id 进 DOM，OnlyOffice 静默什么都不做、用户只看到空白（legacy 的真实故障形态）。🔴 首轮实测判定 WRONG-TEST：**首次**挂载碰不到这条 —— 紧随其后的 `await docsApiLoader()` 恰好也让出一个微任务，Vue 的渲染 flush 在那时已经跑完。真正需要它的是**重挂**（容器 id 变了但旧 id 还在 DOM 上），故 want 指向重开判据；把 want 改指过来比强行给首挂判据编一条时序断言诚实",
+    "verdict": "RED",
+    "summary": "37/38 passed, numFailedTestSuites=2",
+    "added": [
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm"
+    ],
+    "gone": [],
+    "hit": [
+      "重挂与 DocsAPI 载入 新代际重开：旧编辑器被销毁、新 descriptor 重新挂载并重新 confirm"
+    ],
+    "added_files": [
+      "WorkpaperSyncEditorHost.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 3.2
+  }
+]

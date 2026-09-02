@@ -40,6 +40,7 @@
           :options="modeOptions"
           size="small"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h8-right-of-use-assets" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -349,6 +350,7 @@ import { h8Scope } from './composables/hCycleAccountScope'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 

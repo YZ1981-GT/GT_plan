@@ -19,6 +19,7 @@
           size="small"
           @change="(v: any) => dualMode.switchMode(v)"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g5-long-term-receivable" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-button size="small" type="primary" plain @click="openHandbook('preparation')">
           📖 编制手册
@@ -198,6 +199,7 @@ import type { ChecklistResponse } from './composables/useF1FormData'
 import { extractG5SheetCode, resolveG5SheetLabel } from './composables/g5SheetLabels'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
 const G5TabProcedure = defineAsyncComponent(() => import('./g5-long-term-receivable/core/G5TabProcedure.vue'))

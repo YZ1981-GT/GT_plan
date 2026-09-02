@@ -13,6 +13,7 @@
         <el-tag v-if="dualMode.ooConfigReady.value" size="small" type="success">OnlyOffice 拉取成功</el-tag>
         <el-tag v-else-if="dualMode.fetchingConfig.value" size="small" type="info">拉取中…</el-tag>
         <el-tag v-else-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h10-asset-disposal-income" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -168,6 +169,7 @@ const H10TabDirectory = defineAsyncComponent(() => import('./h10/core/H10TabDire
 const GCycleBIndexExtras = defineAsyncComponent(() => import('./shared/GCycleBIndexExtras.vue'))
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 const props = defineProps<{

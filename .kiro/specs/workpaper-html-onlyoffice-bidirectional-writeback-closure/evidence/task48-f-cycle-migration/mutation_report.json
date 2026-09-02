@@ -1,0 +1,1001 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_bidirectional_requires_all_five_identity_fields",
+    "why": "把终态未定改成 bidirectional 而五个身份字段仍为 null 仍绿 ⇒ AC 12.1 的「缺 approved contract/bundle 不得进入 bidirectional 验收」整条失守",
+    "verdict": "RED",
+    "summary": "5 failed, 77 passed, 1 warning in 5.55s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_bidirectional_requires_all_five_identity_fields",
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_matches_honest_capability",
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_only_schema_violations_are_the_registered_sr3_gap",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries",
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_bidirectional_requires_all_five_identity_fields",
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_matches_honest_capability",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.8
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_single_onlyoffice_requires_no_html_counterpart",
+    "why": "有 HTML 对端（verdict=exists）却裁 single_onlyoffice 仍绿 ⇒ AC 12.8 的唯一合法判据失守，这正是 Task 46 首轮把 7 条 D entry 全裁错的形态",
+    "verdict": "RED",
+    "summary": "5 failed, 77 passed, 1 warning in 5.57s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_matches_honest_capability",
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_single_onlyoffice_requires_no_html_counterpart",
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_only_schema_violations_are_the_registered_sr3_gap",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries",
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_matches_honest_capability",
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_single_onlyoffice_requires_no_html_counterpart",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_every_entry_has_a_binary_html_counterpart_verdict",
+    "why": "AP-3：把「还没查」写成 unresolved 仍绿 ⇒ step 3 的二值结论可以被含糊值顶替，而据此裁 single 就又回到循环论证",
+    "verdict": "RED",
+    "summary": "3 failed, 79 passed, 1 warning in 5.57s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_every_entry_has_a_binary_html_counterpart_verdict",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries",
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_every_entry_has_a_binary_html_counterpart_verdict",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_adjudication_reason_is_not_circular",
+    "why": "用重复键把裁决理由替换成循环论证原文（JSON 后键覆盖前键）仍绿 ⇒ AP-1 检测器只扫 reason 不扫另两个理由字段，换个字段写循环论证照样通过",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.60s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_adjudication_reason_is_not_circular"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_adjudication_reason_is_not_circular"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_blockers_reference_real_preconditions",
+    "why": "entry 引用不存在的阻断项仍绿 ⇒ capability_target_blocked_by 可以指向任何编号，「缺什么已逐条登记」这句话失去约束",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.60s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_blockers_reference_real_preconditions",
+      "test_task48_f_cycle_migration.py::TestWordLaneBoundaryAndUnifiedCommit::test_word_lane_block_records_the_authority_model_premise_defect"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAdjudicationLegality::test_capability_blockers_reference_real_preconditions"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar",
+    "why": "工具栏门控锚点被改成宿主里不存在的类名仍绿 ⇒ 区块判据没有真去定位区块，「通知挂在模式工具栏内」这条退化成恒真",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.52s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_template_ref_resolves_through_the_runtime_index",
+    "why": "template_ref 指向不存在的文件仍绿 ⇒ 「权威模板只认 backend/wp_templates 且必须在 _index.json 里」这条无人把守，后面每个 digest 都会对着一份不存在的模板算",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.53s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_template_ref_resolves_through_the_runtime_index",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_template_ref_resolves_through_the_runtime_index",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest",
+    "why": "🔴 Task 46 首轮实测过的 fail-open 形态：判据写成 `if tref:` 时 template_ref 为null 会整条跳过（置 null 后 36 例全绿）。本文件写的是「必须非空」，必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_template_ref_resolves_through_the_runtime_index",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_template_ref_resolves_through_the_runtime_index",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.8
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+    "why": "模板 sha256 改一位仍绿 ⇒ Requirement 6.10 的 definition 漂移 fail closed 失守，「digest 现算复核」退化成读一遍自己写的值",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+    "why": "size 改一字节仍绿 ⇒ 字节级冻结只冻了 sha256 而没冻 size，两者任一漂移都应 fail closed",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.52s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_normalized_structure_hash_recomputes",
+    "why": "把结构 hash 换成全零仍绿 ⇒ 结构漂移判据没有真调用生产实现现算，且 Requirement 2.3 的「全零 hash 不得代替真 digest」也没人管",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 3.69s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_digests_are_real_digests",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_normalized_structure_hash_recomputes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_digests_are_real_digests",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_normalized_structure_hash_recomputes"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.8
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_template_owner_mapping_is_consistent",
+    "why": "模板归属到不存在的 entry 仍绿 ⇒ SR-8 失守，可以悄悄夹带跨循环模板或把模板挂到已删除的 entry 上",
+    "verdict": "RED",
+    "summary": "3 failed, 79 passed, 1 warning in 5.52s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_only_schema_violations_are_the_registered_sr3_gap",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_template_owner_mapping_is_consistent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_template_owner_mapping_is_consistent"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_in_runtime_index_flag_recomputes",
+    "why": "把不可达合册的 in_runtime_index 手填成 true 仍绿 ⇒ 该标记没有从 _index.json 现算，BP-8 描述的「运行时不可达」可以被一行谎话抹掉",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.57s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_in_runtime_index_flag_recomputes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_in_runtime_index_flag_recomputes"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute",
+    "why": "不可达合册 F2存货.xlsx 的 digest 改一位仍绿 ⇒ 「登记集合 == 磁盘实况」只比了文件名而没比内容，BP-8 登记的那份冗余模板可以被人悄悄换掉",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.51s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_authoritative_templates_digests_recompute"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template",
+    "why": "身份列表头少一个空格仍绿 ⇒ 第三边（权威 xlsx 真读）退化成模糊比对，而 F5-2 的表头恰恰是「项目 月份」（中间有空格）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.65s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.9
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template",
+    "why": "身份单元格坐标改一行仍绿 ⇒ sheet!cell 没被真读（F2-3 的 A7 是「数量」不是「存货编码」）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 4.28s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 7.4
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template",
+    "why": "把 sheet 换成同册的另一张表仍绿 ⇒ 三边锁的第三边可以指向任意 sheet，契约会按错表的列结构生成",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.10s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_identity_cell_matches_the_authoritative_template"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.2
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_bp5_wrong_workbook_fallback_is_reproducible",
+    "why": "BP-5 的 status 被改成 FIXED 而解析器没动仍绿 ⇒ 阻断项状态可以自说自话，「登记了」与「解决了」在报告里长得一样",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.55s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_bp5_wrong_workbook_fallback_is_reproducible"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_bp5_wrong_workbook_fallback_is_reproducible"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_blocking_preconditions_are_complete",
+    "why": "阻断项的 source_ref 指向不存在的路径仍绿 ⇒ 无据可查的阻断项等于自由文本豁免",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.50s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_blocking_preconditions_are_complete"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_blocking_preconditions_are_complete"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_is_declared_by_its_owner_module",
+    "why": "owner_constant 写错常量名仍绿 ⇒ 第二边只查了「字面量出现过」，而没有校验它到底挂在哪个常量上（改名后契约的 json_pointer 会失配）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_is_declared_by_its_owner_module"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_is_declared_by_its_owner_module"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_is_declared_by_its_owner_module",
+    "why": "把「由 sheetCode 拼出」误报成「模块常量」仍绿 ⇒ 三态判据互相顶替，契约会按单键而不是 (sheet_code, table_role) 两维生成，漏掉 10 张分类表",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_is_declared_by_its_owner_module"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_primary_table_is_declared_by_its_owner_module"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.9
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_transport_key_kind_is_declared_and_matches_the_source",
+    "why": "🔴 这正是本任务首轮踩的形态错：把监盘的「注入式」当成「拼接式」。改回去必须 RED —— 否则 slice 可以声称一种源码里不存在的机制（拼接式判据要求 sheet_codes_in_family 与 transport_key_composition_source，注入式给不出）",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.66s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_transport_key_kind_is_declared_and_matches_the_source",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_transport_key_kind_is_declared_and_matches_the_source",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.9
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_row_identity_key_and_generator_are_source_backed",
+    "why": "行身份键从 id 改成 rowId 仍绿 ⇒ 判据没回源码核对，照抄 D 循环「全 rowId」的结论会让 F2 的契约按不存在的字段取行身份",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.43s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_row_identity_key_and_generator_are_source_backed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_row_identity_key_and_generator_are_source_backed"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.5
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+    "why": "把真实存在的位置化缺陷（F5 载入路径用数组下标 i 拼 id）改报成 false 仍绿 ⇒ 漏报侧无人把守，BP-7 可以被悄悄抹掉",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.54s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+    "why": "把不存在的位置化缺陷虚报成 true 仍绿 ⇒ 虚报侧无人把守，可以拿一个不存在的缺陷去凑 BP 数量",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.52s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_persistence_composable_really_calls_both_endpoints",
+    "why": "把持久化 composable 换成一个不发 checklist-responses 请求的模块仍绿 ⇒ 「业务内容落在 HTML 侧」这个结论退化成路径存在性判据",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.55s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_persistence_composable_really_calls_both_endpoints"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_persistence_composable_really_calls_both_endpoints"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed",
+    "why": "机制名被改成没有对应源码探针的名字仍绿 ⇒ composite_transport_keys 变成「登记了但没人验」的死数据（G7 两级表头 0/38 的同型）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed",
+    "why": "🔴 首轮此条判 GREEN，暴露的是守卫缺陷：判据原本写「sources 里至少一个通过探针」，于是把 CK-1 的一个 source 换成不含 `${sheetCode}-` 的 useF1Detail.ts 后，其余 4 个仍命中 ⇒ 登记表可以混进不体现该机制的模块。改成「每个 source 都必须通过探针」后必须 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.53s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_dynamic_row_identity_section_satisfies_the_conditional_schema",
+    "why": "dynamic_row_identity 的 kind 落进 forbidden_identity_kinds 仍绿 ⇒ 范式 conditional_sections 的禁列判据没生效",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.58s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_dynamic_row_identity_section_satisfies_the_conditional_schema",
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_only_schema_violations_are_the_registered_sr3_gap"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_dynamic_row_identity_section_satisfies_the_conditional_schema"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.9
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_slice_scope_is_recomputable_from_the_manifest",
+    "why": "「自洽删除」形态：把 scope 计数改成 7 仍绿 ⇒ 「8」在文档里无推导，漏迁一条 entry 时守卫看不出来（判据必须从 manifest 按 selection_rule 现算）",
+    "verdict": "RED",
+    "summary": "3 failed, 79 passed, 1 warning in 5.51s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_only_schema_violations_are_the_registered_sr3_gap",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_slice_scope_is_recomputable_from_the_manifest",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_slice_scope_is_recomputable_from_the_manifest",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_slice_scope_is_recomputable_from_the_manifest",
+    "why": "「删一条 entry」的等价形态（entry 集合被篡改）仍绿 ⇒ slice 与 source manifest的集合等值判据失守",
+    "verdict": "RED",
+    "summary": "10 failed, 72 passed, 1 warning in 5.60s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed",
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_positional_row_identity_defects_are_real_and_exhaustive",
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_dynamic_row_identity_section_satisfies_the_conditional_schema",
+      "test_task48_f_cycle_migration.py::TestParadigmCompliance::test_the_only_schema_violations_are_the_registered_sr3_gap",
+      "test_task48_f_cycle_migration.py::TestProperty21ContractFieldsNotClaimedPassingForFCycle::test_no_f_entry_has_a_registered_adapter",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_every_entry_template_ref_is_registered_with_digest",
+      "test_task48_f_cycle_migration.py::TestProperty28DefinitionDriftFailClosed::test_template_owner_mapping_is_consistent",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_slice_scope_is_recomputable_from_the_manifest",
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_slice_scope_is_recomputable_from_the_manifest",
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries",
+    "why": "把未裁决计数归零仍绿 ⇒ 「归零不是进度」这条失守，8 条终态未定的 entry 可以在报告里表现为零欠账",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries",
+    "why": "复合键 entry 计数虚报成 3 仍绿 ⇒ 「复合传输键核验」的产出可以是随口一个数字",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.58s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty69EvidenceAndCounters::test_summary_counters_are_recomputed_from_entries"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty21ContractFieldsNotClaimedPassingForFCycle::test_property_denominator_block_declares_what_is_not_claimed",
+    "why": "🔴 把「Property 21 在 F 循环不宣称通过」改成宣称通过仍绿 ⇒ 空分母重言式的入口重新打开（Task 46 首轮就是这么写的：没有 contract 所以 Property 21 通过）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.50s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty21ContractFieldsNotClaimedPassingForFCycle::test_property_denominator_block_declares_what_is_not_claimed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty21ContractFieldsNotClaimedPassingForFCycle::test_property_denominator_block_declares_what_is_not_claimed"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice",
+    "why": "deletion plan 的裁决与 slice 脱钩仍绿 ⇒ 两份产物可以各说一套，Task 66/72 会照着旧裁决去删",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.51s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice",
+    "why": "plan 侧把 verdict 改成 none 仍绿 ⇒ 「有 HTML 对端」这个决定性事实在删除计划里可以被单侧翻掉",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.50s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_matches_slice"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_composables_are_distinct_and_real",
+    "why": "清册里的 composable 路径写错仍绿 ⇒ Task 72 会照着一份与磁盘脱钩的清单执行删除",
+    "verdict": "RED",
+    "summary": "3 failed, 79 passed, 1 warning in 5.53s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_composables_are_distinct_and_real",
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_f_cycle_composables_really_do_not_wrap_the_shared_base",
+      "test_task48_f_cycle_migration.py::TestSourceCodeStructure::test_deletion_plan_covers_every_host_composable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_deletion_plan_composables_are_distinct_and_real",
+      "test_task48_f_cycle_migration.py::TestSourceCodeStructure::test_deletion_plan_covers_every_host_composable"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_f_cycle_composables_really_do_not_wrap_the_shared_base",
+    "why": "把「不包共享基座」误报成 true 仍绿 ⇒ shared_base_preserved 的结论（F 循环一条都不消费它）没有源码支撑，Task 72 可能连基座一起删",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_f_cycle_composables_really_do_not_wrap_the_shared_base"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_f_cycle_composables_really_do_not_wrap_the_shared_base"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestWordLaneBoundaryAndUnifiedCommit::test_word_lane_block_records_the_authority_model_premise_defect",
+    "why": "把 Word lane 的 document_type 改成 xlsx 仍绿 ⇒ 「该 lane 与本 entry 的 xlsx 通道无共用」这个裁决前提可以被翻掉而无人发现（翻掉后 F2 监盘就该重算裁决影响）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.51s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestWordLaneBoundaryAndUnifiedCommit::test_word_lane_block_records_the_authority_model_premise_defect"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestWordLaneBoundaryAndUnifiedCommit::test_word_lane_block_records_the_authority_model_premise_defect"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+    "why": "宿主的挂载点被删（import 还留着）仍绿 ⇒ 判据退化成 grep 符号名，「模型声明了而模板零引用」的结构性死代码照样通过（G7 两级表头 0/38 同型）",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.50s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+    "why": "宿主传了别的 entry id 仍绿 ⇒ 通知与 entry 的绑定没被校验，将来某个 entry 真接上双向后它这条警告不会消失",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.51s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+    "why": "把挂载点整行注释掉仍绿 ⇒ 判据没先 stripComments，注释可以充当证据（平台已登记的假绿形态）",
+    "verdict": "RED",
+    "summary": "2 failed, 80 passed, 1 warning in 5.52s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice",
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_every_pending_entry_host_mounts_the_notice"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.8
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_hosts_do_not_claim_bidirectional_writeback",
+    "why": "宿主直接打出「可双向回写」仍绿 ⇒ AC 1.4 前半句无人把守",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.56s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_hosts_do_not_claim_bidirectional_writeback"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_hosts_do_not_claim_bidirectional_writeback"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.8
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar",
+    "why": "监盘宿主的工具栏类名被改而 slice 的 ui_toolbar_gate 没跟上仍绿 ⇒ 「通知挂在模式工具栏内」这条判据不会因为宿主结构漂移而打红",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.57s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_mount_sits_inside_the_declared_mode_toolbar"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_registered_entry_ids_agree_with_the_slice",
+    "why": "前端把没有 adapter 的 entry 登记成已注册仍绿 ⇒ 界面会以「已双向」呈现，正是 AC 1.4 前半句禁止的事",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.57s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_registered_entry_ids_agree_with_the_slice"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_registered_entry_ids_agree_with_the_slice"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_component_renders_summary_and_binds_entry_id",
+    "why": "常显摘要从模板里消失（原因只剩 hover 才出现的 tooltip）仍绿 ⇒ AC 1.4 的「显示可操作原因」退化成默认看不见（EP tooltip 内容是 teleport）",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.52s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_component_renders_summary_and_binds_entry_id"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestAc14HonestModeVisibility::test_notice_component_renders_summary_and_binds_entry_id"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.7
+  },
+  {
+    "id": "M47",
+    "side": "fe",
+    "want": "D 循环 7 个 entry 全部拿到非空通知",
+    "why": "通知函数恒返回 null（等于关掉整条 AC 1.4 提示）仍绿 ⇒ 前端判据没有正向分母。F 循环复用的是同一个真源模块，所以由它的既有 spec 承载正向分母",
+    "verdict": "RED",
+    "summary": "6/9 passed, numFailedTestSuites=3",
+    "added": [
+      "GtEntrySyncCapabilityNotice — DOM 侧判据 挂载后真渲染标签、原因与 entry 绑定",
+      "entrySyncNotice — 未注册 adapter 的入口必须给可操作原因（AC 1.4） D 循环 7 个 entry 全部拿到非空通知",
+      "entrySyncNotice — 未注册 adapter 的入口必须给可操作原因（AC 1.4） 已注册 adapter 的 entry 不再显示该警告（另一侧真分母）"
+    ],
+    "gone": [],
+    "hit": [
+      "GtEntrySyncCapabilityNotice — DOM 侧判据 挂载后真渲染标签、原因与 entry 绑定",
+      "entrySyncNotice — 未注册 adapter 的入口必须给可操作原因（AC 1.4） D 循环 7 个 entry 全部拿到非空通知"
+    ],
+    "added_files": [
+      "workpaperEntrySyncNotice.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.5
+  }
+]

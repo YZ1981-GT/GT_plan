@@ -144,6 +144,38 @@ from app.models.acnr_invalidation_model import (  # noqa: F401
     AcnrInvalidationEpoch,
     AcnrInvalidationOutbox,
 )
+# 底稿 HTML ↔ OnlyOffice 双向回写同步域（迁移 V151 的 28 张表）
+from app.models.workpaper_sync_models import (  # noqa: F401
+    WORKPAPER_SYNC_TABLES,
+    WorkpaperArtifact,
+    WorkpaperCallbackDelivery,
+    WorkpaperCallbackRecoveryCase,
+    WorkpaperCallbackRecoveryCaseEvent,
+    WorkpaperContentApplication,
+    WorkpaperContentApplicationEvent,
+    WorkpaperContentRepresentation,
+    WorkpaperContentRevisionBackfillLedger,
+    WorkpaperContentVersion,
+    WorkpaperEntryEvidenceScenario,
+    WorkpaperForcesaveRequest,
+    WorkpaperOoClientConfirmation,
+    WorkpaperOoCloseIntent,
+    WorkpaperOoCloseIntentEvent,
+    WorkpaperOoParticipant,
+    WorkpaperOoRoom,
+    WorkpaperPendingMutation,
+    WorkpaperRepresentationUpgradeCandidate,
+    WorkpaperSyncConflict,
+    WorkpaperSyncDefinitionArtifact,
+    WorkpaperSyncDefinitionBundle,
+    WorkpaperSyncDefinitionNullMarker,
+    WorkpaperSyncEntryState,
+    WorkpaperSyncOperation,
+    WorkpaperSyncOperationContributor,
+    WorkpaperSyncOperationEvent,
+    WorkpaperSyncScopeIndex,
+    WorkpaperSyncTestRun,
+)
 
 __all__ = [
     # --- base ---

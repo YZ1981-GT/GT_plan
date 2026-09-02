@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_projection_payload_comes_from_the_restored_snapshot[VersionTrailService.rollback_to_snapshot]",
+    "why": "把恢复内容换成空载荷 ⇒ content version 的 projection digest 与实际落库的`checklist_responses` 无关，任何两次回滚都算出同一个 hash（内容寻址身份失效，历史读取再也分不出版本）。🔴 首轮判 GREEN，实测到守卫缺陷：接线判据只断言`html_data` 这个**关键字在不在**，从不看里面是什么 ⇒ 补 `test_the_projection_payload_comes_from_the_restored_snapshot` 后转 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 257 passed, 1 xfailed, 2 xpassed, 6 warnings in 67.88s (0:01:07)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_projection_payload_comes_from_the_restored_snapshot[VersionTrailService.rollback_to_snapshot]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_projection_payload_comes_from_the_restored_snapshot[VersionTrailService.rollback_to_snapshot]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 71.0
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope",
+    "why": "去掉 entry_id 里的 sheet code ⇒ F2-22 与 F2-23（同一底稿的两份不同 docx）落到同一个 entry scope，互相顶掉对方的 entry pointer 与 representation generation。从此按 F2-22 的历史版本下载会拿到 F2-23 的文件 —— 而两边各自的保存都「成功」。🔴 首轮判 GREEN，实测到守卫缺陷：原判据自己拿 `_SHEET_CODE` 去调构造器，证明的是「构造器**能**产出两个不同 entry」，从不看 writer 的**调用点**传了什么 ⇒ 补调用点 AST 断言后转 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 257 passed, 1 xfailed, 2 xpassed, 6 warnings in 67.75s (0:01:07)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 70.9
+  }
+]

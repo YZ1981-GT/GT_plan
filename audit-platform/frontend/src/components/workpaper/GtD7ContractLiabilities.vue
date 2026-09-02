@@ -8,6 +8,7 @@
       <div v-if="showModeToolbar" class="d7-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
         <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d7-contract-liabilities" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -173,6 +174,7 @@ import { useD7ReviewThreads } from './composables/useD7ReviewThreads'
 import D7TabIndex from './d7/D7TabIndex.vue'
 import D7TabProcedure from './d7/D7TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const D7TabAdjudication = defineAsyncComponent(() => import('./d7/D7TabAdjudication.vue'))
 const D7TabDetail = defineAsyncComponent(() => import('./d7/D7TabDetail.vue'))

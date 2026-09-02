@@ -1,0 +1,727 @@
+{
+ "schema_version": "deletion-plan:v1",
+ "task": "Task 57",
+ "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/",
+ "slice_ref": "backend/data/workpaper_sync_abcs_cycle_manifest_slice.json",
+ "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+ "frozen_at": "Task 57（2026-08-31）",
+ "description": "A/B/C/S 与跨循环共享 Excel entry 的 legacy 删除计划。🔴 与 D~N 十一轮**形态不同**：本轮 46 条 entry **没有任何 per-entry dual-mode composable**（现算 `composables/use[ABCS]\\d.*DualMode.ts` 命中 0；而全域 `*DualMode*.ts` 共 115 个模块，无一属 A/B/C/S）。双模式载体只有两类：**宿主内联 `<el-segmented>`**（32 条）与**四个共享载体的薄封装**（10 条），另 4 条无任何载体。故 **`delete_files` 现在为空**（此刻无零边 orphan），但 `delete_after_rewire` **非空**：`useWpDualMode.ts` 的全部 3 条生产边都在本 slice 内，46 条改线后它必成 orphan ⇒ AC 1.7 要求删除。照抄 N 那轮「立刻删 3 个 orphan dual-mode 模块 + 5 个 orphan 业务模块」的判据在本轮恒空跑（现算 0）。",
+ "reason": "step 9（register_adapter_and_wire_host）尚未开始：46 条的 `adapter_id` 现算全为 null。🔴 本计划的存在**不是**裁决理由（AP-1）：裁决理由是 step 3 的二值结论 `exists`。",
+ "delete_files": [],
+ "delete_files_is_empty_because": "现算三件事：① `composables/` 下匹配 `^use[ABCS]\\d.*DualMode\\.ts$` 的文件 **0 个**；② 46 条 entry 的宿主里没有一个 import per-entry dual-mode composable；③ 四个共享载体**此刻都还有生产消费方** ⇒ 没有一个是当下的零边 orphan。**空数组是实算结果，不是漏写**；守卫必须断言「现算 orphan dual-mode 模块数 == 0」**且**「`delete_after_rewire` 非空」，而不是「删除清单非空」。",
+ "delete_after_rewire": [
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/composables/useWpDualMode.ts",
+   "carrier": "useWpDualMode.ts",
+   "production_edge_count": 3,
+   "in_scope_edge_count": 3,
+   "in_scope_edges": [
+    "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue#L223",
+    "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue#L166",
+    "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue#L301"
+   ],
+   "why": "全部生产边都在本 slice 内 ⇒ 46 条改线后成为零生产边 orphan，AC 1.7 要求删除（不得以豁免或 DEPRECATED 注释保留）",
+   "blocked_by": [
+    "BP-5"
+   ]
+  }
+ ],
+ "latent_orphan_after_rewire": [
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/composables/factories/createDualMode.ts",
+   "carrier": "factories/createDualMode.ts",
+   "remaining_edges_after_rewire": [
+    "audit-platform/frontend/src/components/workpaper/composables/factories/index.ts#L21",
+    "audit-platform/frontend/src/components/workpaper/composables/factories/index.ts#L22"
+   ],
+   "why_not_in_delete_after_rewire": "改线后只剩 **barrel** 入边（`factories/index.ts` 的 re-export）⇒ 是否真 orphan 取决于 barrel 自身可达性。🔴 barrel 入边按**路径解析**口径识别（禁 stem 相等），本轮如实登记为潜在 orphan，不擅自删（AC 1.7 的删除对象是「不可达旧桩」，barrel-only 需要先证明 barrel 不可达）。"
+  }
+ ],
+ "must_rewire": [
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/CashFlowVerification.vue",
+   "entry_ids": [
+    "xlsx/cash-flow-verification"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA101GovernanceCommunication.vue",
+   "entry_ids": [
+    "xlsx/gt-a101-governance-communication"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA111SubsequentEventsInquiry.vue",
+   "entry_ids": [
+    "xlsx/gt-a111-subsequent-events-inquiry"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA112DualChecklist.vue",
+   "entry_ids": [
+    "xlsx/gt-a112-dual-checklist"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA115DisclosureChecklist.vue",
+   "entry_ids": [
+    "xlsx/gt-a115-disclosure-checklist"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA121LegalConfirmation.vue",
+   "entry_ids": [
+    "xlsx/gt-a121-legal-confirmation"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA171AuditSummary.vue",
+   "entry_ids": [
+    "xlsx/gt-a171-audit-summary"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA1721Kam.vue",
+   "entry_ids": [
+    "xlsx/gt-a1721-kam"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA1731ConsultationExecution.vue",
+   "entry_ids": [
+    "xlsx/gt-a1731-consultation-execution"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA173ConsultationRecord.vue",
+   "entry_ids": [
+    "xlsx/gt-a173-consultation-record"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA174DisagreementRecord.vue",
+   "entry_ids": [
+    "xlsx/gt-a174-disagreement-record"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA176ClosingMeeting.vue",
+   "entry_ids": [
+    "xlsx/gt-a176-closing-meeting"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA177IndependenceDeclaration.vue",
+   "entry_ids": [
+    "xlsx/gt-a177-independence-declaration"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA181RegulatorySubmission.vue",
+   "entry_ids": [
+    "xlsx/gt-a181-regulatory-submission"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA182RegulatoryCommunication.vue",
+   "entry_ids": [
+    "xlsx/gt-a182-regulatory-communication"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA271ItAuditMemo.vue",
+   "entry_ids": [
+    "xlsx/gt-a271-it-audit-memo"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA38GoodwillImpairment.vue",
+   "entry_ids": [
+    "xlsx/gt-a38-goodwill-impairment"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
+   "entry_ids": [
+    "xlsx/gt-a3-consolidation-console"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA51CashflowAudit.vue",
+   "entry_ids": [
+    "xlsx/gt-a51-cashflow-audit"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA81OtherInfoRepresentation.vue",
+   "entry_ids": [
+    "xlsx/gt-a81-other-info-representation"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtA91DeficiencyLetter.vue",
+   "entry_ids": [
+    "xlsx/gt-a91-deficiency-letter"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB14DueDiligenceReport.vue",
+   "entry_ids": [
+    "xlsx/gt-b14-due-diligence-report"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB1Evaluation.vue",
+   "entry_ids": [
+    "xlsx/gt-b1-evaluation"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB1KaaCheck.vue",
+   "entry_ids": [
+    "xlsx/gt-b1-kaa-check"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB1RiskAssessment.vue",
+   "entry_ids": [
+    "xlsx/gt-b1-risk-assessment"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue",
+   "entry_ids": [
+    "xlsx/gt-b22-a-control-matrix"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue",
+   "entry_ids": [
+    "xlsx/gt-b22-b-control-matrix"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue",
+   "entry_ids": [
+    "xlsx/gt-b22-b-deficiency-evaluation"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue",
+   "entry_ids": [
+    "xlsx/gt-b22-c-design-effectiveness"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB23ProcessControl.vue",
+   "entry_ids": [
+    "xlsx/gt-b23-process-control"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue",
+   "entry_ids": [
+    "xlsx/gt-b50-risk-assessment"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtC22ItgcBundle.vue",
+   "entry_ids": [
+    "xlsx/gt-c22-itgc-bundle"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtCControlTest.vue",
+   "entry_ids": [
+    "xlsx/gt-c-control-test"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtCustomWpEditor.vue",
+   "entry_ids": [
+    "xlsx/gt-custom-wp-editor"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
+   "entry_ids": [
+    "xlsx/gt-wp-renderer"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s12-cpa-expert/GtS12CpaExpert.vue",
+   "entry_ids": [
+    "xlsx/s12-cpa-expert/gt-s12-cpa-expert"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s13-mgmt-expert/GtS13MgmtExpert.vue",
+   "entry_ids": [
+    "xlsx/s13-mgmt-expert/gt-s13-mgmt-expert"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s14-accounting-estimate/GtS14AccountingEstimate.vue",
+   "entry_ids": [
+    "xlsx/s14-accounting-estimate/gt-s14-accounting-estimate"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s15-eps-roe/GtS15EpsRoe.vue",
+   "entry_ids": [
+    "xlsx/s15-eps-roe/gt-s15-eps-roe"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s20-revenue-deduction/GtS20RevenueDeduction.vue",
+   "entry_ids": [
+    "xlsx/s20-revenue-deduction/gt-s20-revenue-deduction"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s21-data-asset/GtS21DataAsset.vue",
+   "entry_ids": [
+    "xlsx/s21-data-asset/gt-s21-data-asset"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s3-policy-change/GtS3PolicyChange.vue",
+   "entry_ids": [
+    "xlsx/s3-policy-change/gt-s3-policy-change"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue",
+   "entry_ids": [
+    "xlsx/s4-nonmonetary-exchange/gt-s4-nonmonetary-exchange"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s5-debt-restructuring/GtS5DebtRestructuring.vue",
+   "entry_ids": [
+    "xlsx/s5-debt-restructuring/gt-s5-debt-restructuring"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/s6-fund-occupation/GtS6FundOccupation.vue",
+   "entry_ids": [
+    "xlsx/s6-fund-occupation/gt-s6-fund-occupation"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  },
+  {
+   "host": "audit-platform/frontend/src/components/workpaper/shared/CycleStandaloneProcedureShell.vue",
+   "entry_ids": [
+    "xlsx/shared/cycle-standalone-procedure-shell"
+   ],
+   "what": "宿主内联的 `<el-segmented>` + mode 门控 `GtOnlyOfficeSheet` 挂载点改线到 sync bridge（`WorkpaperSyncEditorHost` / adapter），宿主只传 entryId/wpId/sheetName + flush/reload 回调",
+   "blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-4",
+    "BP-5"
+   ]
+  }
+ ],
+ "must_not_delete": [
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+   "why": "共享基类，现算 26 条生产边（本 slice 仅 5 条）+ 1 条测试边；`shared_base_preserved` 约束",
+   "recompute": "statement-position import 边现算，🔴 每轮现算不得照抄（M=29 / N=27 / 本轮=26+1）"
+  },
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/composables/useCycleHtmlOoDualMode.ts",
+   "why": "共享载体，现算 3 条生产边，本 slice 仅 1 条（`shared/CycleStandaloneProcedureShell.vue`）⇒ 改线后仍有 2 条非本 slice 边",
+   "recompute": "statement-position import 边现算"
+  },
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+   "why": "AC 1.4 的单一真源，现算 41 条非本 slice 宿主在挂载；本 slice 需**新增**挂载（BP-7）而不是删除",
+   "recompute": "statement-position import 边现算"
+  },
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+   "why": "同上，AC 1.4 文案的单一真源",
+   "recompute": "同上"
+  },
+  {
+   "path": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+   "why": "本 slice 分组键第一维的真源（211 条 componentType）；删改会让分组恒空",
+   "recompute": "现算 `componentType:` 行数 == 211"
+  }
+ ],
+ "must_not_delete_templates": {
+  "why": "AP-2：不得为满足数字修改或删除权威模板",
+  "roots": [
+   "backend/wp_templates/A",
+   "backend/wp_templates/B",
+   "backend/wp_templates/C",
+   "backend/wp_templates/S"
+  ],
+  "file_count": 367,
+  "confirmation_workbooks": [
+   "D/D0 收入循环函证.xlsx",
+   "E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+   "F/F0 存货循环函证.xlsx",
+   "G/G0 投资循环函证.xlsx",
+   "H/H0 固定资产循环函证.xlsx",
+   "K/K0 管理循环函证.xlsx",
+   "L/L0 债务循环函证.xlsx"
+  ]
+ },
+ "properties_verified": [
+  3,
+  22,
+  69,
+  70
+ ],
+ "requirements_covered": [
+  "1.3",
+  "1.4",
+  "1.5",
+  "1.6",
+  "1.7",
+  "6.2",
+  "6.4",
+  "6.10",
+  "12.1",
+  "12.4",
+  "12.8",
+  "12.9",
+  "12.10",
+  "12.11",
+  "12.12",
+  "13.5",
+  "14.1"
+ ],
+ "counters": {
+  "delete_files": 0,
+  "delete_after_rewire": 1,
+  "latent_orphan_after_rewire": 1,
+  "must_rewire_hosts": 46,
+  "must_rewire_entries": 46,
+  "must_not_delete": 5,
+  "orphan_dual_mode_modules": 0,
+  "per_entry_dual_mode_composables": 0,
+  "shared_dual_mode_carriers": 4,
+  "entries_on_shared_carrier": 10,
+  "entries_host_inline": 32,
+  "entries_with_no_carrier": 4,
+  "shared_base_production_edges": 26,
+  "shared_base_in_scope_edges": 5
+ }
+}

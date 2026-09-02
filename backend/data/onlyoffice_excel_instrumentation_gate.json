@@ -1,0 +1,69 @@
+{
+  "gate_id": "onlyoffice-excel-instrumentation-gate",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "17",
+  "purpose": "Task 17 的 instrumentation generator 在动手前必须先证明「Task 5 的真实 OO 9.4 载体裁决仍然新鲜」。本文件把 Task 5 契约自己声明的 stale_policy.invalidate_on 四项落成机器可比对的 digest 基线；任一项漂移即 fail closed，不得沿用旧裁决继续 instrumentation（Requirement 14.16 / Property 71）。",
+  "authoritative_notes": [
+    "权威模板源只认 `backend/wp_templates/`；`基础数据/致同通用审计程序及底稿模板…` 是参考副本且已落后，不得据它判断。",
+    "本文件不是第二份载体裁决 —— carrier/anchor 的 probe_verdict 单一真源仍是 `backend/data/onlyoffice_excel_identity_carrier_contract.json`。这里只锁「那份契约与它的实证依据有没有变」。",
+    "digest 全部为对应文件的 SHA-256（小写 hex），由 `python backend/scripts/diagnose/refresh_excel_instrumentation_gate.py --check` 重算比对。"
+  ],
+  "tier_a_runtime": {
+    "enforced_by": "app.services.workpaper_sync.excel_instrumentation.ExcelIdentityCarrierGate.load",
+    "why": "这几项在生产部署里必然存在（全在 backend/ 下），因此运行时可无条件强制。缺文件或 digest 不符一律 fail closed。",
+    "files": [
+      {
+        "role": "carrier_contract",
+        "path": "backend/data/onlyoffice_excel_identity_carrier_contract.json",
+        "sha256": "c88df6d7c2a122cfea678657191530c223f77efe7afa6c3e20303d5659d1f31b"
+      },
+      {
+        "role": "fingerprint_module",
+        "path": "backend/app/services/excel_structure_fingerprint.py",
+        "sha256": "eed868a0e276ec02029adcbe4953387bf65cacc6f685ed758299fd6ad04d357f"
+      }
+    ],
+    "onlyoffice_build": "9.4.0-129",
+    "probed_templates": [
+      {
+        "template_id": "K11",
+        "path": "backend/wp_templates/K/K11 资产减值损失.xlsx",
+        "sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190"
+      },
+      {
+        "template_id": "C24",
+        "path": "backend/wp_templates/C/C24 会计分录 - 细节测试.xlsx",
+        "sha256": "b70229f48c13a635595b13f74aa199cb2d96ed1106a1661a66cecb7e6e87d5c6"
+      }
+    ]
+  },
+  "tier_b_evidence": {
+    "enforced_by": "app.services.workpaper_sync.excel_instrumentation.ExcelIdentityCarrierGate.assert_evidence_fresh",
+    "why": "probe 脚本与 evidence JSON 位于 `.kiro/specs/**`，生产部署不带；因此只在仓库上下文（守卫测试 / CI）里强制。evidence 目录缺失本身即判 stale —— 不得降级为「跳过」。",
+    "files": [
+      {
+        "role": "probe_script",
+        "path": "backend/scripts/diagnose/probe_oo94_excel_identity.py",
+        "sha256": "c27cc64a6313aaa13f4dda05b05e7bbbfdf8ed0c0639d0aa9fa5ab696f0fa6af"
+      },
+      {
+        "role": "operation_matrix",
+        "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task5-oo94-excel-identity/operation_matrix.json",
+        "sha256": "7ed6c8dbfcfe814d82533cec868034a0be3b5e0cd2bd0f98c22b2530187feb22"
+      },
+      {
+        "role": "instrumentation_report",
+        "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task5-oo94-excel-identity/instrumentation_report.json",
+        "sha256": "b90f0c523c83ca2fca322de0fd12a139fb3bec38731fafeb1dc7f5ef164ca1f3"
+      }
+    ]
+  },
+  "stale_action": "重跑 `probe_oo94_excel_identity.py` 全流程并重新裁决 carrier/anchor 的 probe_verdict，再用 refresh 脚本更新本文件的 digest；在此之前 instrumentation generator 必须拒绝运行。",
+  "maps_to_task5_stale_policy": {
+    "OnlyOffice build 变化（当前 9.4.0-129）": "tier_a_runtime.onlyoffice_build",
+    "两份源模板任一 sha256 变化": "tier_a_runtime.probed_templates[].sha256",
+    "probe 脚本或 `excel_structure_fingerprint` 模块变化": "tier_b_evidence.files[probe_script] + tier_a_runtime.files[fingerprint_module]",
+    "evidence 目录中 operation_matrix.json / instrumentation_report.json 变化": "tier_b_evidence.files[operation_matrix, instrumentation_report]"
+  }
+}

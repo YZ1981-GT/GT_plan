@@ -1,0 +1,857 @@
+{
+  "blocking_preconditions": [
+    {
+      "blocks": [
+        "definition_bundle",
+        "published_representation",
+        "adapter_registration"
+      ],
+      "id": "BP-16",
+      "must_fix_before": "为任一 B 子码装载生产契约 / 注册 adapter",
+      "numbering_note": "续接 F2 lane 的 BP-1..BP-15（本记录消费它们、不改它们）。",
+      "observable_consequences": [
+        "per-entry 契约只能 staged，不进 contracts.available_contract_ids()",
+        "registry.assert_contract_file_current 会因生产目录无此文件而拒绝注册",
+        "manifest 的 capability_counts / unadjudicated_count 里看不到这 9 个 entry"
+      ],
+      "same_root_cause_as": "BP-10（F2 Word lane 的同型问题）",
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_manifest.json",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ],
+      "status": "open",
+      "what": "Task 63 的 9 个 B 子码在 source-backed manifest 里没有 per-entry entry：`workpaper_sync_entry_manifest.json` 按**宿主**建 entry，这 9 个 wp_code 只被泛匹配 entry `docx/gt-wp-renderer` 覆盖（其 `wp_match.wp_code_patterns` 为空数组）⇒ 「契约登记行的 entry_id 必须命中 manifest」这条双向等值判据无法满足。"
+    },
+    {
+      "blocks": [
+        "definition_bundle",
+        "published_representation"
+      ],
+      "id": "BP-17",
+      "must_fix_before": "Task 77 WordEntryFinalizeGate.finalize_candidate 可被调用",
+      "observable_consequences": [
+        "WordInstrumentationUpgrader.stage_and_register_candidate 写死 target_definition_bundle_id=None / state=awaiting_contract",
+        "finalize 时 candidate.target_definition_bundle_id is None ⇒ PerEntryContractUnapprovedError"
+      ],
+      "source_refs": [
+        "backend/app/services/workpaper_sync/word_instrumentation.py",
+        "backend/app/services/workpaper_sync/word_entry_gate.py"
+      ],
+      "status": "open",
+      "what": "approved definition bundle 需要 DB 侧 definition 行；Task 76 的 provisioner 已交付，但本 lane 一条都还没发布 ⇒ `WordEngineBinding` 只能用离线 candidate 校验模式，`assert_may_publish()` 恒抛。"
+    },
+    {
+      "blocks": [
+        "adapter_registration",
+        "capability_verdict",
+        "evidence"
+      ],
+      "id": "BP-18",
+      "must_fix_before": "把任一 B 子码的 capability 从 null 改成 bidirectional",
+      "observable_consequences": [
+        "9 个 entry 的 verification_state 只能是 UNVERIFIABLE",
+        "sync_test_run_id / required_scenario_set_digest 均为 null",
+        "Property 69 / 70 在本 lane 上分母为空 ⇒ 本任务不宣称它们通过"
+      ],
+      "source_refs": [
+        "backend/app/services/workpaper_sync/adapters/registry.py",
+        "backend/data/workpaper_sync_f2_word_lane_publication.json",
+        ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md"
+      ],
+      "status": "open",
+      "what": "`registry.PENDING_ENGINE_ADAPTERS` 仍禁止 `adapters/word.py`，放行门写明是 Task 61 （真实 OO 9.4 F2 Word gate）；Task 61 当前 `[-]`，其 BP-10~BP-15 六条全部 open。"
+    },
+    {
+      "blocks": [
+        "contract_publication",
+        "authority_model",
+        "definition_bundle"
+      ],
+      "id": "BP-20",
+      "must_fix_before": "为任一 B 子码发布 tagged-SDT per-entry contract",
+      "not_worked_around_because": "Task 63 正文明禁「不为满足数字伪造 contract/bundle/finalize」；把 placeholder_generic_N 当 stable_field_key 发布 9 份契约会让数字达标而内容空转",
+      "observable_consequences": [
+        "若按现状发布，contract 的 stable_field_key 只能是 placeholder_generic_N，审计师无从知道每个字段该填什么",
+        "Task 77 word_entry_gate 的 declared 清册三边锁会锁住一组不稳定身份：模板改一处文字即 tag 集合漂移",
+        "B40-1 / B40-2 的字段集为空 ⇒ 与 Task 77 拒绝的「空集上 equivalent=True 是空转」同型"
+      ],
+      "resolution_paths": [
+        "源模板引入 `${token}` 显式占位符（与 F2-22/F2-23 同形），由底稿模板编制方给出每个待填位置的业务语义",
+        "或人工逐份裁定每个 `××` 的业务含义并落成显式字段清册（不经中文正则），再据它生成 instrumentation definition"
+      ],
+      "source_refs": [
+        "backend/app/services/wp_docx_template_parser.py",
+        "backend/data/onlyoffice_word_sdt_carrier_contract.json",
+        ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md"
+      ],
+      "status": "open",
+      "what": "9 个 B 子码的**字段身份基础不合法**：9 份权威 DOCX 里 `${token}` 占位符现算共 0 个；HTML 侧字段全部由 `wp_docx_template_parser` 的 legacy 中文标记正则（`××`）+ 出现顺序编号派生成 `placeholder_generic_N`。这类身份既违反 Requirement 7.1（禁中文 label 作定位/身份），又与 Task 6 裁为 failed 的 `paragraph_index` / `run_index` 同一失效模式（文档前面插一段含 `××` 的文字，后面所有编号全部移位）。`B40-1` / `B40-2` 更是连 legacy 字段都为 0，结构化岛为空集 ⇒ 契约会是空转。"
+    },
+    {
+      "blocks": [
+        "contract_publication"
+      ],
+      "id": "BP-19",
+      "must_fix_before": "为 B2-3 发布 authority model / contract / bundle",
+      "observable_consequences": [
+        "resolve_word_template('B2-3') 经 pick_most_specific 只返回其中一份（现算为「第一封」），另一份在 Word 域不可达",
+        "若按单一 entry 发布，第二封沟通函的编辑结果无处回写"
+      ],
+      "options": [
+        "拆成两个 entry（需新 wp_code，涉及 wp_index/overrides/前端注册，跨 Task 58 清册）",
+        "裁决只有一封进 Word 双向域，另一封保持模板下载（需业务确认哪一封是底稿正本）"
+      ],
+      "source_refs": [
+        "backend/data/workpaper_word_template_adjudication.json",
+        "backend/app/services/workpaper_sync/canonical_paths.py"
+      ],
+      "status": "open",
+      "what": "`B2-3` 的 own_docx_carriers 有 2 份（「第一封沟通函」/「第二封沟通函」），`carrier_ambiguity=true`。一个 wp_code 对两份权威 docx 时，per-entry contract 的「一个 entry 一份 template digest」前提不成立。"
+    }
+  ],
+  "carrier_ambiguity_adjudication": [
+    {
+      "carrier_count": 2,
+      "carriers": [
+        {
+          "dollar_token_count": 0,
+          "exists": true,
+          "relative_path": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+          "sha256": "6dd3df4a529968573f9e0f6b20c95bb1c5dc28769978f0aeb12c30fd2161659b",
+          "size_bytes": 22705,
+          "w_tbl_count": 1,
+          "w_tr_count": 1
+        },
+        {
+          "dollar_token_count": 0,
+          "exists": true,
+          "relative_path": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx",
+          "sha256": "365829d7d037211344dd694610b54fbb1a6fe4aa9e8f97b5c4fd1eb8d49d15cd",
+          "size_bytes": 21275,
+          "w_tbl_count": 1,
+          "w_tr_count": 1
+        }
+      ],
+      "not_decided_in_this_task_because": "两个方案都需要业务给出「哪一封是底稿正本」或「新 wp_code 编码」，且 BP-20（字段身份基础不合法）未解除前，无论选哪个都发不出契约",
+      "options": [
+        {
+          "cost": [
+            "需新增 wp_code：牵动 wp_index、wp_code_overrides.json、前端注册",
+            "Task 58 清册行数与 Requirement 7.7 的「9 个子码」数字需同步复核"
+          ],
+          "effect": "两份载体都可达，各自独立 contract / bundle / evidence（符合 Property 70）",
+          "id": "OPT-SPLIT",
+          "recommended": null,
+          "what": "拆成两个 entry（第一封 / 第二封各自一个 wp_code）"
+        },
+        {
+          "cost": [
+            "被裁出的那一封在线编辑结果无处回写，只能离线填写后上传",
+            "需业务明确哪一封是正本（两封是审计流程的两个阶段，不是同一文档的两个版本）"
+          ],
+          "effect": "不新增 wp_code，契约前提成立",
+          "id": "OPT-PRIMARY",
+          "recommended": null,
+          "what": "裁定只有一封是底稿正本进 Word 双向域，另一封保持模板下载"
+        }
+      ],
+      "resolution": "pending_business_confirmation",
+      "resolver_currently_returns": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+      "unreachable_in_word_domain": [
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx"
+      ],
+      "why_it_blocks_contract_publication": "per-entry contract 的 template slot 冻结**一份** template_sha256；一个 wp_code 对两份权威 docx 时，「一个 entry 一份 template digest」前提不成立",
+      "wp_code": "B2-3"
+    }
+  ],
+  "cross_entry_isolation": {
+    "assertions": [
+      "10 个 entry 的 own_docx_carriers 两两无交集",
+      "published 五个 id 全为 null ⇒ 本轮不存在可被复用的 bundle",
+      "无载体 entry 的 fake_switch.action=removed，有载体 entry 为 retained，两类不混用同一处置"
+    ],
+    "rule": "每个 entry 的 template / contract / bundle / evidence 逐项独享，不交叉复用（Property 70 / Task 63 正文「每个 entry 保留自身 evidence/UNVERIFIABLE 状态」）。"
+  },
+  "entries": [
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 1,
+        "legacy_derived_field_ids": [
+          "placeholder_generic"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 63,
+        "row_identity_needed": false,
+        "template_relative_path": "B/B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx",
+        "template_sha256": "e4d6049437774d2e49babf542ade99e7cb3734ea04b6d4b093781b46ba42d9de",
+        "w_sdt_count": 0,
+        "w_tbl_count": 0,
+        "w_tr_count": 0
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx"
+      ],
+      "parent_code": "B18",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B18-3-1"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 1,
+        "legacy_derived_field_ids": [
+          "placeholder_generic"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 71,
+        "row_identity_needed": false,
+        "template_relative_path": "B/B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx",
+        "template_sha256": "af2b4e63b3a10c7fb406ba2b7ce00202d178ea9f2f0ee7daf32d5aa83a993485",
+        "w_sdt_count": 0,
+        "w_tbl_count": 0,
+        "w_tr_count": 0
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx"
+      ],
+      "parent_code": "B18",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B18-3-2"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 2,
+        "legacy_derived_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 13,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx",
+        "template_sha256": "8f7cb5f36d2625c7041e810a678f3573efde6713e38a014831136b644b88ae5d",
+        "w_sdt_count": 0,
+        "w_tbl_count": 1,
+        "w_tr_count": 1
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx"
+      ],
+      "parent_code": "B2",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B2-1"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 1,
+        "legacy_derived_field_ids": [
+          "placeholder_generic"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 22,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx",
+        "template_sha256": "d765d548abe2a5f0c41acaeacbacd25318744b6185cff18a927bcb9e76b26202",
+        "w_sdt_count": 0,
+        "w_tbl_count": 1,
+        "w_tr_count": 1
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx"
+      ],
+      "parent_code": "B2",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B2-11"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": true,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 1,
+        "legacy_derived_field_ids": [
+          "placeholder_generic"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 29,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+        "template_sha256": "6dd3df4a529968573f9e0f6b20c95bb1c5dc28769978f0aeb12c30fd2161659b",
+        "w_sdt_count": 0,
+        "w_tbl_count": 1,
+        "w_tr_count": 1
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx"
+      ],
+      "parent_code": "B2",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B2-3"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 4,
+        "legacy_derived_field_ids": [
+          "placeholder_generic",
+          "placeholder_generic_2",
+          "placeholder_generic_3",
+          "placeholder_generic_4"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 14,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx",
+        "template_sha256": "8ac7d9a137c8d5f82208636318b7c0c4b6fcdc7bce6f105af23dc33b25509387",
+        "w_sdt_count": 0,
+        "w_tbl_count": 1,
+        "w_tr_count": 1
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx"
+      ],
+      "parent_code": "B2",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B2-6"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": true,
+        "legacy_chinese_derived_count": 1,
+        "legacy_derived_field_ids": [
+          "placeholder_generic"
+        ],
+        "legacy_patterns_hit": [
+          "××"
+        ],
+        "paragraph_count": 12,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx",
+        "template_sha256": "178bac9df44838fded1b661994b4dc5bcc39af735765b23d0675450f4dc070db",
+        "w_sdt_count": 0,
+        "w_tbl_count": 1,
+        "w_tr_count": 1
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx"
+      ],
+      "parent_code": "B2",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B2-8"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": false,
+        "legacy_chinese_derived_count": 0,
+        "legacy_derived_field_ids": [],
+        "legacy_patterns_hit": [],
+        "paragraph_count": 3,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B40-1 项目组讨论备忘录.docx",
+        "template_sha256": "b706152690fe9055bda155452ada8f7d0710c1a00f255bec66d01123e39789b4",
+        "w_sdt_count": 0,
+        "w_tbl_count": 2,
+        "w_tr_count": 22
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B40-1 项目组讨论备忘录.docx"
+      ],
+      "parent_code": "B40",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B40-1"
+    },
+    {
+      "blocked_by": [
+        "BP-20",
+        "Task 61",
+        "BP-16",
+        "BP-17",
+        "BP-18"
+      ],
+      "capability_verdict": "pending_bidirectional",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "resolved_docx",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "retained",
+        "why": "DOCX 载体与 HTML 宿主齐备，结构化视图与在线编辑两条路都真实可用，双模式切换不是假切换；启用 bidirectional 待 Task 61 与 BP-20"
+      },
+      "field_basis": {
+        "dollar_token_count": 0,
+        "dollar_token_names": [],
+        "field_identity_admissible": false,
+        "has_any_structured_field": false,
+        "legacy_chinese_derived_count": 0,
+        "legacy_derived_field_ids": [],
+        "legacy_patterns_hit": [],
+        "paragraph_count": 5,
+        "row_identity_needed": true,
+        "template_relative_path": "B/B40-2 对SCOT+的完整性进行再评估.docx",
+        "template_sha256": "8ab087fe48de52a042f411da32e1dcaaa5b800a1b99bc53c9d408939a9b56b76",
+        "w_sdt_count": 0,
+        "w_tbl_count": 2,
+        "w_tr_count": 14
+      },
+      "has_usable_docx_carrier": true,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": true,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "subcode_docx_recovered",
+      "ledger_unified_verdict": "resolved_docx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B40-2 对SCOT+的完整性进行再评估.docx"
+      ],
+      "parent_code": "B40",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "UNVERIFIABLE",
+      "wp_code": "B40-2"
+    },
+    {
+      "blocked_by": [],
+      "capability_verdict": "single_html_no_carrier",
+      "carrier_ambiguity": false,
+      "carrier_verdict": "template_missing",
+      "component_type": "word-template",
+      "fake_switch": {
+        "action": "removed",
+        "backend_gate": "app/routers/wp_render_strategies/_word_template.py::_carrier_absence_payload",
+        "frontend_gate": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue::hasNoUsableCarrier",
+        "popup_config_entry_removed": true,
+        "why": "结构化视图与在线编辑两条路都无模板可开；原实现落 「模板解析失败，请使用在线编辑模式」把审计师指向不存在的路"
+      },
+      "field_basis": null,
+      "has_usable_docx_carrier": false,
+      "html_counterpart": {
+        "host": "audit-platform/frontend/src/components/workpaper/WorkpaperWordEditor.vue",
+        "popup_config_present": false,
+        "registry_component_type": "word-template"
+      },
+      "ledger_adjudication": "template_missing_adjudicated",
+      "ledger_unified_verdict": "template_missing",
+      "legacy_verdict": "none",
+      "own_docx_carriers": [],
+      "parent_code": "S33",
+      "published": {
+        "adapter_id": null,
+        "authority_model_definition_id": null,
+        "contract_definition_id": null,
+        "definition_bundle_id": null,
+        "published_representation_id": null
+      },
+      "required_scenario_set_digest": null,
+      "sync_test_run_id": null,
+      "verification_state": "ADJUDICATED_MISSING",
+      "wp_code": "S33-REV"
+    }
+  ],
+  "generated_by": "backend/scripts/gen/generate_workpaper_task63_subcode_adjudication.py",
+  "record_digest": "2fe3ab8a846f8135483e18aa88344313f8ee34f53f0b7244dbe410a9a2d250ba",
+  "s33rev_carrier_hint": {
+    "candidate_carrier": {
+      "derived_wp_code": "S33-1",
+      "exists": true,
+      "relative_path": "S/S33-1程序修订说明.docx",
+      "sha256": "8b50536e6c4727386984bf52da762569a7f177340333bdc32092c91bf7ab6ec0",
+      "size_bytes": 14770
+    },
+    "collateral_defect": {
+      "consequence_if_s33_1_ever_enters_word_domain": "会把「程序修订说明」当成 S33-1「内控制度」的正文打开",
+      "strict_resolver_returns_for_s33_1": "S/S33-1程序修订说明.docx",
+      "what": "同一笔误同时污染 S33-1 的 Word 域严格解析",
+      "why_unreachable_today": "存量桥 `resolve_own_docx_or_none` 第 2 条限制（自有 xlsx 存在时不接管）挡住了运行态，且 S33-1 的 componentType 是 skip 不走 Word 域"
+    },
+    "evidence_that_it_belongs_to_s33rev": [
+      "S33 系列 wp_name ↔ 磁盘文件 1:1 完整对应：S33-1「内控制度」→ S33-1财务报告内部控制制度.xlsx，S33-2..S33-9 各自 xlsx 齐全，无空缺",
+      "`S/S33-1程序修订说明.docx` 是 S33* 下唯一多出来的文件，其业务名与 S33-REV 的 wp_name「程序修订说明」逐字对应",
+      "S33-1 自己已有工作簿载体 ['S/S33-1财务报告内部控制制度.xlsx']，「程序修订说明」不可能同时是它的正文",
+      "wp_index 实测：S33-REV 有真实记录（2 个项目各 1 条）与 2 个 working_paper 实例，不是无人使用的僵尸编码"
+    ],
+    "not_done_in_this_task_because": "Task 63 正文第二条 bullet 要求的是「裁决 single/missing 并移除假切换，不为满足数字伪造 contract/bundle/finalize」；补载体不在其中，且最终归属需底稿模板编制方确认",
+    "options": [
+      {
+        "cost": [
+          "改运行时权威模板库 `backend/wp_templates/`（memory 铁律：运行时权威）",
+          "`_index.json` 需同步 relative_path 与 wp_code",
+          "存量守卫 test_s33_rev_carrier_hint_is_recorded_as_open_debt 需按其自述改成断言解析成功"
+        ],
+        "effect": "`derive_wp_code_from_filename` 自然派生出 S33-REV ⇒ 一次修好两处（S33-REV 得到载体、S33-1 不再被误指），无需任何例外表",
+        "id": "OPT-A",
+        "recommended": true,
+        "what": "把源模板改名为 `S/S33-REV 程序修订说明.docx`"
+      },
+      {
+        "cost": [
+          "只修一处：S33-1 的严格解析仍误指「程序修订说明」（collateral_defect 未解）",
+          "引入第 3 条例外表条目（现有 2 条为 F2-22/F2-23），裁决权分散",
+          "严格 resolver `resolve_word_template` 不读该表 ⇒ Word 域五意图仍判 template_missing，只有存量桥受益 ⇒ 两套判据分叉"
+        ],
+        "effect": "S33-REV 能取到载体，源模板文件名不动",
+        "id": "OPT-B",
+        "recommended": false,
+        "what": "在 `wp_template_finder._EXPLICIT_TEMPLATE_RELPATHS` 加显式映射"
+      }
+    ],
+    "resolution": "pending_business_confirmation",
+    "wp_code": "S33-REV",
+    "wp_name": "综合核查-程序修订说明",
+    "wp_name_source": "backend/data/wp_account_mapping.json"
+  },
+  "schema_version": "task63-subcode-adjudication:v1",
+  "sources": {
+    "adjudication_ledger": {
+      "path": "backend/data/workpaper_word_template_adjudication.json",
+      "sha256": "86c772dcbffd0d1c6341463798e972df0977f507f7a102a66532c791cacd0e0a"
+    },
+    "component_overrides": {
+      "path": "backend/app/data/wp_code_overrides.json",
+      "sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394"
+    },
+    "template_index": {
+      "path": "backend/wp_templates/_index.json",
+      "sha256": "7d1b57e50da2e1431e100e9f304c30f05f9da815b596a2eab651999f153fd4dd"
+    }
+  },
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "stats": {
+    "adjudicated_missing": 1,
+    "by_carrier_verdict": {
+      "resolved_docx": 9,
+      "template_missing": 1
+    },
+    "by_verification_state": {
+      "ADJUDICATED_MISSING": 1,
+      "UNVERIFIABLE": 9
+    },
+    "carrier_ambiguity_entries": [
+      "B2-3"
+    ],
+    "dollar_token_total": 0,
+    "entry_count": 10,
+    "fake_switch_removed_entries": [
+      "S33-REV"
+    ],
+    "field_identity_admissible_entries": [],
+    "legacy_chinese_derived_total": 11,
+    "pending_bidirectional": 9,
+    "published_artifacts": 0,
+    "registered_adapters": 0,
+    "zero_structured_field_entries": [
+      "B40-1",
+      "B40-2"
+    ]
+  },
+  "task": "63"
+}

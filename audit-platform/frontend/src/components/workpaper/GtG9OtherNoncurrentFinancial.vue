@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g9-other-noncurrent-financial" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -167,6 +168,7 @@ import { parseNum } from './composables/useG9FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G9TabProcedure = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabProcedure.vue'))
 const G9TabAdjudication = defineAsyncComponent(() => import('./g9-other-noncurrent-financial/core/G9TabAdjudication.vue'))

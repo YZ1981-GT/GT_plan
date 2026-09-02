@@ -106,3 +106,209 @@ backend/app/routers/wp_editor_router.py  1120
 #     与一次删参同批会把 diff 淹没在搬迁噪声里。
 #     spec: advanced-query-hardening-wiring-closure（收口遗留项）
 backend/tests/test_snapshot_writer.py  1325
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（2026-09-02 入库）
+#
+# 🔴 这一批 168 条是**债务登记，不是豁免赦免**。该 spec 的 Task 1~77 产物一直未提交，
+#    入库时 pre-commit 一次性报出 170 个超限文件。其中 2 个 `*.generated.ts`
+#    （workpaperSyncManifest 6012 行 / workpaperSyncLegacyBaseline 5026 行）已改由
+#    check_file_size.py 的 GENERATED_SUFFIXES 豁免 —— 生成物「请拆分」不可执行，
+#    该管的是生成器（生成器本身照常受本门约束）。其余 168 条登记如下。
+#
+# 登记即受「不得再膨胀 >5%」约束；拆分完成后应逐条从本表移除。
+#
+# 拆分优先级（按真实危害排序，不按行数）：
+#   1) 生产代码 44 个（backend/app/**）—— 唯一影响可维护性的一类。最大的五个：
+#       3124  backend/app/services/workpaper_sync/repository.py
+#       3122  backend/app/services/workpaper_sync/oo_to_html.py
+#       2936  backend/app/services/workpaper_sync/excel_extract.py
+#       2936  backend/app/services/workpaper_sync/materialize_coordinator.py
+#       2450  backend/app/services/workpaper_sync/pilot_g7_two_level_dynamic.py
+#      其中 workpaper_sync/repository.py 与 oo_to_html.py 各约 3100 行，是
+#      「统一 commit / room / callback / recovery / artifact 五个关注点挤在一个仓储层」
+#      与「OO→HTML 抽取 + 合并 + 冲突 + 投影四段挤在一个模块」两种堆积，按关注点拆。
+#   2) 门与生成器 34 个（backend/scripts/**）—— check_task*/mutate_task*/generate_*。
+#      变异清单与判据条目**本身是数据不是逻辑**（沿用 mutate_ie_lifecycle_guards.py 1290 的
+#      在册先例）；拆分会让「守卫清单 → 变异覆盖率」的分母核对跨文件，收益为负。
+#   3) 守卫测试 89 个（backend/tests/**）—— 一个 Task 一个文件是本 spec 的既定
+#      归属边界（逐字节锁与辐射面判据都按文件归属计算）；按 Task 拆已是最细粒度。
+#   4) 前端 1 个。
+# ═══════════════════════════════════════════════════════════════════════════
+
+# ── 生产代码（优先拆分对象）──────────────────────────────────────────
+backend/app/models/audit_platform_schemas.py  1032
+backend/app/models/workpaper_models.py  1116
+backend/app/models/workpaper_sync_models.py  1152
+backend/app/routers/wp_onlyoffice_router.py  1749
+backend/app/routers/wp_sync_router.py  2341
+backend/app/services/excel_structure_fingerprint.py  918
+backend/app/services/word_sdt_fingerprint.py  874
+backend/app/services/workpaper_sync/adapters/registry.py  1326
+backend/app/services/workpaper_sync/artifacts.py  1493
+backend/app/services/workpaper_sync/callback_delivery.py  1837
+backend/app/services/workpaper_sync/close_intent.py  1008
+backend/app/services/workpaper_sync/command_service.py  949
+backend/app/services/workpaper_sync/conflict_resolution.py  1647
+backend/app/services/workpaper_sync/conflicts.py  1006
+backend/app/services/workpaper_sync/content_mutation.py  2080
+backend/app/services/workpaper_sync/contracts.py  1453
+backend/app/services/workpaper_sync/definitions.py  892
+backend/app/services/workpaper_sync/endpoint_guard.py  1119
+backend/app/services/workpaper_sync/entry_source_facts.py  1096
+backend/app/services/workpaper_sync/evidence.py  1252
+backend/app/services/workpaper_sync/excel_entry_gate.py  1317
+backend/app/services/workpaper_sync/excel_extract.py  2936
+backend/app/services/workpaper_sync/excel_instrumentation.py  1850
+backend/app/services/workpaper_sync/excel_materialize.py  1605
+backend/app/services/workpaper_sync/materialize_coordinator.py  2936
+backend/app/services/workpaper_sync/merge.py  1612
+backend/app/services/workpaper_sync/models.py  1486
+backend/app/services/workpaper_sync/oo_to_html.py  3122
+backend/app/services/workpaper_sync/opaque_entry_gate.py  1319
+backend/app/services/workpaper_sync/pilot_d2_large_json.py  1513
+backend/app/services/workpaper_sync/pilot_g7_two_level_dynamic.py  2450
+backend/app/services/workpaper_sync/pilot_h1_grouped_dynamic.py  1868
+backend/app/services/workpaper_sync/pilot_harness.py  1887
+backend/app/services/workpaper_sync/pilot_simple_checklist.py  980
+backend/app/services/workpaper_sync/projection_provisioning.py  1249
+backend/app/services/workpaper_sync/published_identity_observer.py  1341
+backend/app/services/workpaper_sync/repository.py  3124
+backend/app/services/workpaper_sync/request_application.py  1114
+backend/app/services/workpaper_sync/rooms.py  2017
+backend/app/services/workpaper_sync/timeline.py  911
+backend/app/services/workpaper_sync/word_entry_gate.py  1856
+backend/app/services/workpaper_sync/word_instrumentation.py  1797
+backend/app/services/workpaper_sync/word_sdt_engine.py  1783
+backend/app/services/workpaper_sync/writer_migration.py  937
+
+# ── 门与生成器（条目即数据，见上方第 2 条理由）────────────────────────
+backend/scripts/check/check_task44_oo94_excel_pilot_gate.py  2467
+backend/scripts/check/check_task61_oo94_word_pilot_gate.py  3048
+backend/scripts/check/check_task68_backend_chain_independent_regression.py  5742
+backend/scripts/check/check_task69_frontend_independent_regression.py  2754
+backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py  2971
+backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py  4778
+backend/scripts/check/check_task72_pre_delete_eligibility_gate.py  2690
+backend/scripts/check/mutate_task34_sync_ui_guards.py  933
+backend/scripts/diagnose/mutate_task14_merge_conflict_guards.py  874
+backend/scripts/diagnose/mutate_task26_oo_to_html_guards.py  1152
+backend/scripts/diagnose/mutate_task27_conflict_resolution_guards.py  829
+backend/scripts/diagnose/mutate_task28_sync_router_guards.py  916
+backend/scripts/diagnose/mutate_task29_timeline_evidence_guards.py  895
+backend/scripts/diagnose/mutate_task42_h1_grouped_dynamic_pilot_guards.py  845
+backend/scripts/diagnose/mutate_task43_g7_two_level_dynamic_pilot_guards.py  1032
+backend/scripts/diagnose/mutate_task46_d_cycle_migration_guards.py  832
+backend/scripts/diagnose/mutate_task48_f_cycle_migration_guards.py  895
+backend/scripts/diagnose/mutate_task49_g_cycle_migration_guards.py  1008
+backend/scripts/diagnose/mutate_task50_h_cycle_migration_guards.py  1234
+backend/scripts/diagnose/mutate_task51_i_cycle_migration_guards.py  1050
+backend/scripts/diagnose/mutate_task52_j_cycle_migration_guards.py  1373
+backend/scripts/diagnose/mutate_task54_l_cycle_guards.py  892
+backend/scripts/diagnose/mutate_task60_f2_word_adapter_guards.py  821
+backend/scripts/diagnose/mutate_task71_chaos_guards.py  878
+backend/scripts/diagnose/probe_oo94_excel_identity.py  1429
+backend/scripts/diagnose/probe_oo94_word_sdt.py  1980
+backend/scripts/diagnose/probe_task7_staged_artifact_boundaries.py  2345
+backend/scripts/gen/adjudicate_task74_writer_domains.py  887
+backend/scripts/gen/generate_task60_f2_word_contracts.py  1388
+backend/scripts/gen/generate_task62_generic_docx_adjudication.py  1096
+backend/scripts/gen/generate_task64_dedicated_word_chain.py  1230
+backend/scripts/gen/generate_task66_legacy_deletion_plan.py  2719
+backend/scripts/gen/generate_task67_structural_pre_reconcile.py  2279
+backend/scripts/gen/generate_workpaper_writer_inventory.py  1441
+
+# ── 守卫测试（一 Task 一文件，见上方第 3 条理由）──────────────────────
+backend/tests/test_wopi_working_paper_qc_review.py  975
+backend/tests/test_workpaper_staged_artifact_boundary_contract.py  801
+backend/tests/test_workpaper_word_sdt_carrier_contract.py  881
+backend/tests/test_workpaper_writer_inventory.py  1326
+backend/tests/test_wp_html_save.py  808
+backend/tests/test_wp_onlyoffice_router.py  2198
+backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py  1112
+backend/tests/workpaper_sync/test_migration_paradigm_contract.py  2217
+backend/tests/workpaper_sync/test_task10_orm_repository_contract.py  866
+backend/tests/workpaper_sync/test_task10_repository_pg.py  2470
+backend/tests/workpaper_sync/test_task11_artifact_repository.py  1263
+backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py  1082
+backend/tests/workpaper_sync/test_task12_canonical_resolver.py  1282
+backend/tests/workpaper_sync/test_task12_resolution_pg.py  1365
+backend/tests/workpaper_sync/test_task13_contract_registry.py  3001
+backend/tests/workpaper_sync/test_task14_merge_conflicts.py  2899
+backend/tests/workpaper_sync/test_task15_content_mutation.py  1842
+backend/tests/workpaper_sync/test_task15_content_mutation_pg.py  2049
+backend/tests/workpaper_sync/test_task16_durable_outbox_pg.py  1135
+backend/tests/workpaper_sync/test_task16_durable_outbox_wiring.py  859
+backend/tests/workpaper_sync/test_task17_excel_instrumentation.py  1443
+backend/tests/workpaper_sync/test_task17_excel_instrumentation_pg.py  1191
+backend/tests/workpaper_sync/test_task18_html_save_unified_revision_pg.py  830
+backend/tests/workpaper_sync/test_task19_writer_migration.py  1751
+backend/tests/workpaper_sync/test_task20_writer_gate.py  1569
+backend/tests/workpaper_sync/test_task21_room_service.py  1335
+backend/tests/workpaper_sync/test_task21_room_service_pg.py  2663
+backend/tests/workpaper_sync/test_task22_callback_claim.py  1326
+backend/tests/workpaper_sync/test_task22_callback_claim_pg.py  2089
+backend/tests/workpaper_sync/test_task23_request_application_pg.py  2774
+backend/tests/workpaper_sync/test_task24_close_intent.py  1305
+backend/tests/workpaper_sync/test_task24_close_intent_pg.py  1890
+backend/tests/workpaper_sync/test_task25_materialize_coordinator.py  1210
+backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py  2481
+backend/tests/workpaper_sync/test_task26_oo_to_html.py  2196
+backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py  3493
+backend/tests/workpaper_sync/test_task27_conflict_resolution.py  1039
+backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py  2767
+backend/tests/workpaper_sync/test_task28_sync_router.py  1788
+backend/tests/workpaper_sync/test_task28_sync_router_pg.py  1506
+backend/tests/workpaper_sync/test_task29_timeline_evidence.py  1888
+backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py  1565
+backend/tests/workpaper_sync/test_task30_closure_gate_pg.py  2146
+backend/tests/workpaper_sync/test_task35_content_event_refresh.py  824
+backend/tests/workpaper_sync/test_task36_excel_entry_gate.py  1810
+backend/tests/workpaper_sync/test_task37_excel_extract.py  2628
+backend/tests/workpaper_sync/test_task38_excel_materialize.py  3237
+backend/tests/workpaper_sync/test_task39_pilot_harness.py  1951
+backend/tests/workpaper_sync/test_task39_pilot_harness_pg.py  1035
+backend/tests/workpaper_sync/test_task40_simple_checklist_pilot.py  976
+backend/tests/workpaper_sync/test_task40_simple_checklist_pilot_pg.py  1017
+backend/tests/workpaper_sync/test_task41_d2_large_json_pilot.py  2087
+backend/tests/workpaper_sync/test_task41_d2_large_json_pilot_pg.py  1483
+backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot.py  3074
+backend/tests/workpaper_sync/test_task42_h1_grouped_dynamic_pilot_pg.py  1350
+backend/tests/workpaper_sync/test_task43_g7_two_level_dynamic_pilot.py  3549
+backend/tests/workpaper_sync/test_task43_g7_two_level_dynamic_pilot_pg.py  1265
+backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py  1373
+backend/tests/workpaper_sync/test_task46_d_cycle_migration.py  1424
+backend/tests/workpaper_sync/test_task47_e_cycle_migration.py  930
+backend/tests/workpaper_sync/test_task48_f_cycle_migration.py  2282
+backend/tests/workpaper_sync/test_task49_g_cycle_migration.py  3142
+backend/tests/workpaper_sync/test_task50_h_cycle_migration.py  2222
+backend/tests/workpaper_sync/test_task51_i_cycle_migration.py  2477
+backend/tests/workpaper_sync/test_task52_j_cycle_migration.py  3057
+backend/tests/workpaper_sync/test_task53_k_cycle_migration.py  2404
+backend/tests/workpaper_sync/test_task54_l_cycle_migration.py  2368
+backend/tests/workpaper_sync/test_task55_m_cycle_migration.py  2732
+backend/tests/workpaper_sync/test_task56_n_cycle_migration.py  2555
+backend/tests/workpaper_sync/test_task57_abcs_and_shared_migration.py  2418
+backend/tests/workpaper_sync/test_task58_word_canonical_resolver.py  916
+backend/tests/workpaper_sync/test_task59_word_sdt_engine.py  1975
+backend/tests/workpaper_sync/test_task60_f2_word_adapter.py  2402
+backend/tests/workpaper_sync/test_task61_oo94_word_pilot_gate.py  1625
+backend/tests/workpaper_sync/test_task62_generic_docx_entries.py  1080
+backend/tests/workpaper_sync/test_task66_legacy_deletion_plan.py  1332
+backend/tests/workpaper_sync/test_task67_structural_pre_reconcile.py  1815
+backend/tests/workpaper_sync/test_task68_backend_chain_regression.py  1581
+backend/tests/workpaper_sync/test_task73_entry_profile_manifest.py  1203
+backend/tests/workpaper_sync/test_task75_published_identity_observer.py  2046
+backend/tests/workpaper_sync/test_task76_projection_definition_provisioner.py  1020
+backend/tests/workpaper_sync/test_task76_projection_definition_provisioner_pg.py  1383
+backend/tests/workpaper_sync/test_task77_word_entry_gate.py  2134
+backend/tests/workpaper_sync/test_task77_word_entry_gate_pg.py  1208
+backend/tests/workpaper_sync/test_v151_schema_contract.py  2101
+backend/tests/workpaper_sync_chaos/test_task71_chaos_gate.py  2224
+backend/tests/workpaper_sync_frontend/test_task69_frontend_regression.py  880
+backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py  1567
+backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py  1072
+
+# ── 前端 ────────────────────────────────────────────────────────────
+audit-platform/frontend/src/components/workpaper/sync/__tests__/task69IndependentRegression.spec.ts  2103
+

@@ -1,0 +1,149 @@
+[
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_missing_jwt_secret_fails_closed_instead_of_signing_nothing",
+    "why": "无 secret 时不再拒 ⇒ 回到平台旧实现的 fail-open（`return \"\"`，等于把鉴权降级成可选）。契约 `command_service.jwt.required=true`",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 20.95s",
+    "added": [
+      "test_task24_close_intent.py::test_missing_jwt_secret_fails_closed_instead_of_signing_nothing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_missing_jwt_secret_fails_closed_instead_of_signing_nothing"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.6
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+    "why": "不再按契约 `platform_rule` 点名的 shape 签名：契约点名 payload_wrapped，实现却签成 flat body。Task 4 实测 OO 对 flat 也放行 ⇒ 这条在真实 OO 上**不会**报错，只能由守卫解码 JWT 并断言 `claims['payload']` 抓到。🔴 锚点刻意落在 claims 构造行而不是 `if claim_shape ==` 判定行：短路后者会掉进 `else: raise`，于是每一条出站测试一起挂 —— 判定仍是 RED 但「守卫是否真校验了 shape」被稀释掉了",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 21.04s",
+    "added": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.7
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_empty_onlyoffice_url_is_refused_instead_of_defaulting",
+    "why": "`ONLYOFFICE_URL` 为空时不再拒 ⇒ 端点退化成相对路径，出站目标由环境决定。与 callback 下载同一条 Task 4 实证 gap：空配置不得回退成「放行一切」",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 20.97s",
+    "added": [
+      "test_task24_close_intent.py::test_empty_onlyoffice_url_is_refused_instead_of_defaulting"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_empty_onlyoffice_url_is_refused_instead_of_defaulting"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 23.7
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+    "why": "超时与 token TTL 改成代码里的字面量 ⇒ 契约 `timers.notes[0]`「实现必须从本文件读取，不得在代码里另写常量」被违反，契约调整后实现悄悄不跟",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 21.89s",
+    "added": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+      "test_task24_close_intent_pg.py::test_predecessor_dispatch_carries_room_doc_key_and_frozen_request_id"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_outbound_request_carries_doc_key_request_id_and_signed_short_ttl_jwt",
+      "test_task24_close_intent_pg.py::test_predecessor_dispatch_carries_room_doc_key_and_frozen_request_id"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py",
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 24.8
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_retryable_error_is_checked_before_fsm_terminality",
+    "why": "可重试错误不再先判 ⇒ `RequestState.rejected`（FSM terminal）会被读成「已终结，放心走」，可重试的失败当场丢内容。这条判据的顺序本身是判据",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 22.73s",
+    "added": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[retryable_keeps_oo]",
+      "test_task24_close_intent.py::test_retryable_error_is_checked_before_fsm_terminality"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[retryable_keeps_oo]",
+      "test_task24_close_intent.py::test_retryable_error_is_checked_before_fsm_terminality"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.7
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_timeout_never_permits_reload_html",
+    "why": "超时不再单独成态 ⇒ Property 13「超时保持 OO、reloadHtml 次数为 0」失去执法点，前端会把超时当成「仍在等」而无限轮询、或直接切回 HTML",
+    "verdict": "RED",
+    "summary": "2 failed, 180 passed in 22.45s",
+    "added": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[timeout_keeps_oo]",
+      "test_task24_close_intent.py::test_timeout_never_permits_reload_html"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[timeout_keeps_oo]",
+      "test_task24_close_intent.py::test_timeout_never_permits_reload_html"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.5
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task24_close_intent.py::test_editor_destroy_gate_branches[crash_durable_but_no_case_refused]",
+    "why": "崩溃/OO 自发 close 的放行条件由合取松成析取 ⇒ incoming 已 durable 但还没建recovery case 时也允许销毁编辑器，durable incoming 成为无所有者死路（AC 5.4/5.8 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 181 passed in 22.55s",
+    "added": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[crash_durable_but_no_case_refused]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent.py::test_editor_destroy_gate_branches[crash_durable_but_no_case_refused]"
+    ],
+    "added_files": [
+      "test_task24_close_intent.py"
+    ],
+    "restored": true,
+    "seconds": 25.6
+  }
+]

@@ -21,6 +21,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
+from tests._unified_content_commit_stub import stub_unified_content_commit
+
 from app.services.version_trail_service import (
     SnapshotDetail,
     SnapshotMeta,
@@ -239,7 +241,13 @@ class TestFullFlowIntegration:
         db5.flush = AsyncMock()
 
         rollback_id = uuid.uuid4()
-        with patch("app.services.version_trail_service.WorkpaperSnapshot") as MockSnap3:
+        # 🔴 Task 19：回滚现在经统一入口提交（Requirement 2.2）。`AsyncMock` session 满足
+        #    不了那条真协议（mock 的 `scalar_one()` 恒真 ⇒ 「已有 representation」判据恒
+        #    成立）。本场景验的是版本链语义，lane 本身由 workpaper_sync/test_task15/18/19
+        #    在真库下验证，所以这里换记录式替身而不是放松断言。
+        with patch(
+            "app.services.version_trail_service.WorkpaperSnapshot"
+        ) as MockSnap3, stub_unified_content_commit():
             mock_rb = MagicMock()
             mock_rb.id = rollback_id
             mock_rb.snapshot_type = "rollback"

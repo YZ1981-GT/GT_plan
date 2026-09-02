@@ -154,18 +154,26 @@ class TestExistingTruthSources:
     """已有真源的结构自检 —— 不依赖 Task 4 交付物。"""
 
     def test_verdict_labels_cover_all_verdicts(self):
-        """`VERDICT_LABELS` 必须覆盖 `WP_FILE_VERDICTS` 全部取值（R1.3 真源完整性）。"""
+        """`VERDICT_LABELS` 必须覆盖 `WP_FILE_VERDICTS` 全部取值（R1.3 真源完整性）。
+
+        🔴 2026-08：workpaper-html-onlyoffice-bidirectional-writeback-closure Task 12
+        新增 `path_rejected`（路径越界，Property 42）与 `type_mismatch`（异类型回退被拒，
+        Property 41）两档。自证 sidecar 只对 `template_fallback` 打戳，这两档
+        `path is None` 不进 ZIP，故不影响自证四档语义，但取值域断言必须同步。
+        """
         assert set(WP_FILE_VERDICTS) == {
             "file",
             "template_fallback",
             "empty",
             "missing",
+            "path_rejected",
+            "type_mismatch",
         }, f"verdict 取值域变了，自证四档需同步复核：{WP_FILE_VERDICTS}"
         missing = [v for v in WP_FILE_VERDICTS if v not in VERDICT_LABELS]
         assert not missing, f"VERDICT_LABELS 缺档: {missing}"
 
     def test_verdict_labels_are_distinct_chinese(self):
-        """四档文案必须互不相同且是中文（否则用户看不出差别）。"""
+        """各档文案必须互不相同且是中文（否则用户看不出差别）。"""
         vals = [VERDICT_LABELS[v] for v in WP_FILE_VERDICTS]
         assert len(set(vals)) == len(vals), f"VERDICT_LABELS 文案有重复: {vals}"
         for v in vals:

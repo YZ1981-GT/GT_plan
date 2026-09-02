@@ -1,0 +1,51 @@
+[
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]",
+    "why": "🔴 Task 24 正文点名第二条：同一 eligibility snapshot 内换 leader。注入「round-robin」形态 —— 选 leader 时把**当前** leader 排除掉（只剩它时回退到全集，以免退化成崩溃而非选错）。于是第一次 reconcile 选出 L 之后，同一 snapshot 的第二次 reconcile 必然改选另一条：eligible 集合、eligibility epoch 与 digest 全都没变，leader 却换了人。首轮此处写的是「排序键依赖 reconciler 自己写的 `reconciled_at`」，实测判 GREEN 且**归因为无效变异**：每条 intent 在它自己那次 close 的reconcile 里就成了当时的最高 sequence ⇒ 都被写上 `reconciled_at`，注入的键分量在整个 eligible 集合上恒为同值、完全不影响 max()。唯一它非空的时刻（新 intent 尚未 reconcile）那条恰好也是 sequence 最高的，两种 comparator 选同一个人 —— 不可证伪",
+    "verdict": "RED",
+    "summary": "28 failed, 154 passed in 21.46s",
+    "added": [
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_capture_scenario_yields_exactly_one_close_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_really_overlapped",
+      "test_task24_close_intent_pg.py::test_concurrent_closes_still_yield_exactly_one_capture",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_created_at_does_not_decide_the_leader[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_every_scenario_produced_a_measurement",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_first_closer_gets_a_predecessor_and_last_closer_does_not[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[expired]",
+      "test_task24_close_intent_pg.py::test_leader_disqualified_before_promotion_yields_a_legitimate_successor[revoked]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_leader_is_the_highest_sequence_id_in_every_scenario[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_no_capture_before_predecessors_are_terminal[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ab__none]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__created_reversed]",
+      "test_task24_close_intent_pg.py::test_reconciler_is_reentrant_without_a_second_capture[order_ba__none]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[expired]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task24_close_intent_pg.py::test_no_phase_crashed_during_collection",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[expired]",
+      "test_task24_close_intent_pg.py::test_repeat_reconcile_in_one_eligibility_snapshot_keeps_the_leader[revoked]"
+    ],
+    "added_files": [
+      "test_task24_close_intent_pg.py"
+    ],
+    "restored": true,
+    "seconds": 24.6
+  }
+]

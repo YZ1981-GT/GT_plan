@@ -12,6 +12,7 @@
           :options="renderModeOptions"
           size="small"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d2-accounts-receivable" />
         <el-button
           v-if="canStartAiReview && props.sheetName"
           size="small"
@@ -284,7 +285,25 @@ import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
-import { useD2EntryDualMode, type D2RenderMode } from './composables/useD2EntryDualMode'
+// Task 45: legacy useD2EntryDualMode deleted — pilot host now delegates to sync bridge.
+import { usePilotBridgeAdapter, type PilotRenderMode } from '../sync/usePilotBridgeAdapter'
+// Re-export getSheetNameFromD2Code which was also in the deleted module.
+// The sheet name resolution function is kept inline since it's pure data.
+const D2_SHEET_MAP: Record<string, string> = {
+  D2: 'D2', 目录: 'D2', D2A: 'D2A',
+  'D2-1': 'D2-1', 'D2-2': 'D2-2', 'D2-3': 'D2-3', 'D2-4': 'D2-4',
+  'D2-5': 'D2-5', 'D2-6': 'D2-6', 'D2-7': 'D2-7', 'D2-8': 'D2-8',
+  'D2-9': 'D2-9', 'D2-10': 'D2-10', 'D2-11': 'D2-11', 'D2-12': 'D2-12',
+  'D2-13': 'D2-13',
+  附注上市: '附注披露信息(上市公司)', 附注国企: '附注披露信息(国企)',
+  截止测试: '截止测试',
+}
+function getSheetNameFromD2Code(code: string): string {
+  if (D2_SHEET_MAP[code]) return D2_SHEET_MAP[code]
+  if (code.includes('截止')) return code
+  return code
+}
+type D2RenderMode = PilotRenderMode
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -293,6 +312,7 @@ import { D2_SAVE_ITEMS_KEY, D2_WRITEBACK_KEY } from './composables/d2InjectionKe
 import { normalizeD2SheetName } from './composables/d2Constants'
 import D2TabIndex from './d2/D2TabIndex.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const D2TabProcedure = defineAsyncComponent(() => import('./d2/D2TabProcedure.vue'))
 const D2TabAdjudication = defineAsyncComponent(() => import('./d2/D2TabAdjudication.vue'))
@@ -381,18 +401,19 @@ const currentSheet = computed(() => normalizeD2SheetName(props.sheetName))
 
 const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 
-const dualMode = useD2EntryDualMode({
+// ─── Task 45: bridge adapter replaces legacy useD2EntryDualMode ─────────────
+const dualMode = usePilotBridgeAdapter({
+  entryId: 'xlsx/gt-d2-accounts-receivable',
   wpId: toRef(props, 'wpId'),
-  currentSheet,
-  reloadAllResponses: () => formData.loadAll(),
+  reloadHtml: () => formData.loadAll(),
 })
 
 const ooSheetName = computed(() =>
-  dualMode.resolveOoSheetName() || props.sheetName || 'D2-1',
+  getSheetNameFromD2Code(currentSheet.value) || props.sheetName || 'D2-1',
 )
 
 const renderMode = computed({
-  get: () => dualMode.mode.value,
+  get: () => dualMode.currentMode.value,
   set: (v: D2RenderMode) => { void dualMode.switchMode(v) },
 })
 

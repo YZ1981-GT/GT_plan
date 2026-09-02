@@ -39,7 +39,13 @@ def xlsx_to_univer_data(file_path: str, max_rows: int = 5000) -> dict[str, Any]:
     sheets: dict[str, Any] = {}
     sheet_order: list[str] = []
 
-    for idx, ws_name in enumerate(wb.sheetnames):
+    # Requirement 6.17：Task 17 的 instrumentation 会往底稿副本注入隐藏 `_GT_SYNC`
+    # metadata sheet。OO 标签栏本身不显示它，但本转换器原先逐个 `wb.sheetnames` 转
+    # Univer 快照 ⇒ 编辑器标签栏会多出一张审计师无法解释的表。排除名单单一真源见
+    # `excel_metadata_sheet_policy`；在 enumerate 之前过滤，`sheet{idx}` 编号保持连续。
+    from app.services.excel_metadata_sheet_policy import exclude_metadata_sheets
+
+    for idx, ws_name in enumerate(exclude_metadata_sheets(wb.sheetnames)):
         ws = wb[ws_name]
         ws_value = wb_value[ws_name] if (wb_value is not None and ws_name in wb_value.sheetnames) else None
         sheet_id = f"sheet{idx}"

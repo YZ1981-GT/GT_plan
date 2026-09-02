@@ -1,0 +1,467 @@
+{
+  "contract_id": "onlyoffice_callback_state_contract",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "4",
+  "status": "characterization_only",
+  "purpose": "OnlyOffice callback / Command Service 生命周期、JWT claim、下载安全与多人语义的版本化真值表（单一真源）。Task 4 只固化契约与实证判据，不接通生产 callback；实现由 Wave 2 Task 21/22/23/24 承接。",
+  "authoritative_notes": [
+    "本文件是真值表的唯一真源。任何 callback 处理分支不得在代码里另写一份 status 语义表。",
+    "`oo94_observed=true` 的行必须能在 evidence 目录的原始 payload 中复核；guard 测试按 evidence 反向校验，不接受手填。",
+    "`oo94_observed=false` 的行是协议文档态，处置一律保守（不下载/不建 application/告警可见），并由 unknown_status_policy 兜底。"
+  ],
+  "evidence": {
+    "dir": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task4-oo94-multiuser-callback",
+    "findings": "findings.md",
+    "raw_callbacks": "callbacks.jsonl",
+    "raw_commands": "commands.jsonl",
+    "artifact_analysis": "artifact_analysis.json",
+    "machine_projection": "observations.json",
+    "build": "oo_build.json",
+    "probe_script": "backend/scripts/diagnose/probe_oo94_multiuser_callback.py",
+    "onlyoffice_build": "9.4.0-129",
+    "onlyoffice_web_apps_build": "9.4.0-17bd46f468bf1ff77e010159b8920986",
+    "captured_at_utc": "2026-08-24T14:41:00Z",
+    "scenario": "两个独立 OO 用户（alice/bob）同一 doc_key 协同编辑真实平台模板 A31，覆盖 forcesave(带/不带 userdata)、并发贡献聚合、c=drop 撤销、无 userdata 关闭保存、host 返回非零 error、关闭后再 forcesave。"
+  },
+  "callback_statuses": [
+    {
+      "status": 1,
+      "oo_name": "editing",
+      "meaning": "有用户连接/断开该文档（协同状态心跳）",
+      "url_present": "never",
+      "userdata_present": "never",
+      "download_required": false,
+      "oo_response_error": 0,
+      "room_transition": "none_or_participant_presence_update",
+      "delivery_terminal_state": "acknowledged",
+      "request_correlation": "none",
+      "recovery_outcome": "none",
+      "application_allowed": false,
+      "oo94_observed": true,
+      "observed_count": 7,
+      "observed_body_fields_always": ["key", "status", "token", "users"],
+      "observed_body_fields_sometimes": ["actions"],
+      "handling": "只更新 participant presence / drop 取证；不下载、不建 application。`actions[].type=1` 为连接，`type=0` 为断开（含 Command Service `c=drop` 造成的断开）。",
+      "notes": [
+        "drop 后收到的 status=1 是**唯一**可用的 OO drop 取证：`actions=[{type:0,userid:<被撤销用户>}]` 且 `users` 不再含该用户。",
+        "该取证只证明会话被逐出，**不证明**其已合入内容被移除（见 multi_user_semantics.revocation）。"
+      ]
+    },
+    {
+      "status": 2,
+      "oo_name": "must_save",
+      "meaning": "文档已关闭编辑，需要保存（最终保存）",
+      "url_present": "always",
+      "userdata_present": "never",
+      "download_required": true,
+      "oo_response_error": 0,
+      "room_transition": "closing_to_closed",
+      "delivery_terminal_state": "durable_then_acknowledged",
+      "request_correlation": "close_capture_first_then_frozen_identity",
+      "recovery_outcome": "recovery_case_if_no_eligible_close_capture_or_ambiguous",
+      "application_allowed": true,
+      "oo94_observed": true,
+      "observed_count": 2,
+      "observed_body_fields_always": [
+        "actions", "changesurl", "filetype", "history", "key", "lastsave",
+        "notmodified", "status", "token", "url", "users"
+      ],
+      "observed_body_fields_sometimes": [],
+      "handling": "先下载并 sealing 为 durable incoming；再按 Requirement 4.10 归组：唯一 open close-capture request 优先；不存在 eligible request 时只有 frozen identity 唯一且无更高 sequence request 才可去重到既有 application；否则建零 operation recovery case。",
+      "notes": [
+        "实测**恒无 userdata**（OO 不为最终保存回传请求标识）⇒ 必须靠平台侧 close-capture 仲裁定位 request。",
+        "`notmodified` 可为 true（紧随 forcesave 之后关闭）但仍带可下载 url，不得因 notmodified 跳过 durable。",
+        "`actions=[{type:0,...}]` 只表示最后断开的那个用户，不是贡献者集合。"
+      ]
+    },
+    {
+      "status": 3,
+      "oo_name": "corrupted",
+      "meaning": "文档保存出错（OO 侧未能生成有效输出）",
+      "url_present": "optional",
+      "userdata_present": "optional",
+      "download_required": false,
+      "oo_response_error": 0,
+      "room_transition": "error_isolate_generation",
+      "delivery_terminal_state": "error",
+      "request_correlation": "bind_if_userdata_present_else_none",
+      "recovery_outcome": "none",
+      "application_allowed": false,
+      "oo94_observed": false,
+      "observed_count": 0,
+      "observed_body_fields_always": [],
+      "observed_body_fields_sometimes": [],
+      "handling": "不下载、不建 application；已关联 request/operation 落可见 error 终态并告警；room 需重开。",
+      "notes": [
+        "本次探针未能在受控条件下触发（需 DS 自身输出失败）⇒ 处置保守，禁止按 status 2 逻辑处理。"
+      ]
+    },
+    {
+      "status": 4,
+      "oo_name": "closed_no_changes",
+      "meaning": "文档关闭且无任何修改",
+      "url_present": "never",
+      "userdata_present": "never",
+      "download_required": false,
+      "oo_response_error": 0,
+      "room_transition": "closing_to_closed",
+      "delivery_terminal_state": "acknowledged",
+      "request_correlation": "close_capture_no_content",
+      "recovery_outcome": "none",
+      "application_allowed": false,
+      "oo94_observed": true,
+      "observed_count": 1,
+      "observed_body_fields_always": ["actions", "key", "status", "token"],
+      "observed_body_fields_sometimes": [],
+      "handling": "close-capture request（若存在）以 `no_content` 终结，不推进 content revision、不建 application；room 关闭。",
+      "notes": [
+        "实测 payload **既无 url 也无 users**，只有 `actions=[{type:0,...}]` ⇒ 不能指望从 status 4 里拿到参与者列表。"
+      ]
+    },
+    {
+      "status": 6,
+      "oo_name": "force_save",
+      "meaning": "强制保存（Command Service `c=forcesave` 或编辑器 forcesave 触发）",
+      "url_present": "always",
+      "userdata_present": "optional",
+      "download_required": true,
+      "oo_response_error": 0,
+      "room_transition": "stay_active",
+      "delivery_terminal_state": "durable_then_acknowledged",
+      "request_correlation": "request_first_when_userdata_present_else_ambiguous",
+      "recovery_outcome": "recovery_case_when_userdata_absent_or_request_unmatched",
+      "application_allowed": true,
+      "oo94_observed": true,
+      "observed_count": 5,
+      "observed_body_fields_always": [
+        "changesurl", "filetype", "forcesavetype", "history", "key", "lastsave",
+        "status", "token", "url", "users"
+      ],
+      "observed_body_fields_sometimes": ["userdata"],
+      "handling": "有 userdata 时先精确绑定并校验 frozen request，再由 frozen 快照 + durable incoming 计算 application key；无 userdata 时不得猜 base，durable 后建 recovery case。",
+      "notes": [
+        "`userdata` 是**可选**的：不带 userdata 的 Command Service forcesave 同样产生 status 6（实证 phase1#5）。",
+        "`forcesavetype=0` = Command Service 触发（实证值）。",
+        "status 6 payload **没有 actions 字段**，`users` 只有最后编辑者一人。"
+      ]
+    },
+    {
+      "status": 7,
+      "oo_name": "force_save_error",
+      "meaning": "强制保存出错",
+      "url_present": "never",
+      "userdata_present": "optional",
+      "download_required": false,
+      "oo_response_error": 0,
+      "room_transition": "stay_active",
+      "delivery_terminal_state": "error",
+      "request_correlation": "bind_if_userdata_present_else_none",
+      "recovery_outcome": "none",
+      "application_allowed": false,
+      "oo94_observed": false,
+      "observed_count": 0,
+      "observed_body_fields_always": [],
+      "observed_body_fields_sometimes": [],
+      "handling": "对应 frozen request 落可重试 error 终态；不下载、不建 application；前端保持 OO 模式并允许重试。",
+      "notes": [
+        "本次探针未能在受控条件下触发 ⇒ 不得把它当成 status 6 的同义分支。"
+      ]
+    }
+  ],
+  "unknown_status_policy": {
+    "mode": "fail_visible",
+    "oo_response_error": 0,
+    "delivery_terminal_state": "error",
+    "application_allowed": false,
+    "must_alert": true,
+    "must_persist_raw_payload": true,
+    "forbidden": [
+      "静默返回 error=0 且不留痕",
+      "按最近似 status 猜测处理",
+      "用宽泛 except Exception 降为成功或“本项目无数据”"
+    ],
+    "rationale": "Requirement 4.9：未知状态或无法唯一归组必须 fail visible。durable 前未发生下载，故 OO 侧无需重发（且 9.4 实测不会重发）。"
+  },
+  "userdata_rules": {
+    "present": {
+      "meaning": "携带 frozen forcesave/close-capture request id",
+      "handling": "request-first：先精确绑定并校验该 request（client base / representation / approved bundle / permission epoch / write fence），再计算 application key",
+      "forbidden": ["先按 incoming hash 命中旧 application 再读 request"]
+    },
+    "absent": {
+      "status_2": "优先绑定 generation 内唯一 open close-capture request；不存在 eligible request 时才可去重到 frozen identity 唯一、同 incoming 且无更高 sequence request 的 application；否则建零 operation recovery case",
+      "status_6": "不得猜 base；durable 后建零 operation recovery case",
+      "forbidden": ["按 callback 到达时的 room last-applied 指针推断 base"]
+    },
+    "duplicate": {
+      "oo94_behavior": "OO 原样回显重复 userdata，不做任何去重（实证：同一 userdata 连发两次 forcesave 均 error=0 且产出不同字节 artifact）",
+      "handling": "平台必须以 delivery key（含 status + discriminator）与 application key（含 frozen identity + incoming sha）双层幂等；`userdata` 只作为定位 frozen request 的指针，绝不作为幂等键",
+      "forbidden": ["把 userdata/request_id 当幂等键", "把重复 userdata 当作重放并直接复用上次终态而不重验授权"]
+    }
+  },
+  "oo_redelivery_semantics": {
+    "redelivers_on_nonzero_response": false,
+    "observed_wait_seconds": {"status_6": 95, "status_2": 180},
+    "client_ui_still_shows_saved": true,
+    "consequence": [
+      "durable 之后返回非零 = 静默丢件（OO 不会重发）⇒ incoming durable 后一律返回 error=0，把失败留在 operation/recovery 上可重试。",
+      "durable 之前（鉴权/下载/OOXML 校验/写入失败）返回非零仅表示本次拒绝，同样不会有重发 ⇒ 前端必须靠 operation 终态与 timeout，不能等 OO 补投。",
+      "UI 不得采信 OO 自身“所有更改已保存”文案，durable ack 只能来自平台 operation 状态（Requirement 4.12）。"
+    ]
+  },
+  "command_service": {
+    "endpoint": "POST {ONLYOFFICE_URL}/coauthoring/CommandService.ashx",
+    "jwt": {
+      "required": true,
+      "header": "Authorization",
+      "scheme": "Bearer",
+      "accepted_claim_shapes": ["payload_wrapped", "flat_body"],
+      "observed": "无 Authorization → error 6；`jwt({\"payload\": body})` 与 `jwt(body)` 均通过鉴权",
+      "platform_rule": "平台统一使用 payload_wrapped，并按 URL/claim 绑定签短期 token；不得因 flat 也被接受而放宽签名要求"
+    },
+    "return_codes": [
+      {
+        "error": 0,
+        "meaning": "命令已被接受（forcesave 已排入）",
+        "callback_expected": true,
+        "oo94_observed": true,
+        "platform_handling": "只标记 request accepted；绝不视为保存完成（Requirement 4.1）",
+        "platform_outcome": "accepted",
+        "retryable": false
+      },
+      {
+        "error": 1,
+        "meaning": "doc key 未在线（文档已关闭或从未打开）",
+        "callback_expected": false,
+        "oo94_observed": true,
+        "platform_handling": "request 立即落可诊断 error；提示重开编辑器，不进入 waiting_callback",
+        "platform_outcome": "doc_not_online",
+        "retryable": false
+      },
+      {
+        "error": 4,
+        "meaning": "距上次保存无新变更，未执行 forcesave",
+        "callback_expected": false,
+        "oo94_observed": true,
+        "platform_handling": "request 落 `no_changes` 终态并直接放行离开；不得无限等 callback",
+        "platform_outcome": "no_changes",
+        "retryable": false
+      },
+      {
+        "error": 6,
+        "meaning": "token 无效",
+        "callback_expected": false,
+        "oo94_observed": true,
+        "platform_handling": "配置/密钥故障，request 落 error 并告警；不重试到超时",
+        "platform_outcome": "configuration_error",
+        "retryable": false
+      },
+      {
+        "error": 2,
+        "meaning": "callback url 不正确（协议文档态）",
+        "callback_expected": false,
+        "oo94_observed": false,
+        "platform_handling": "同 error 6：配置故障，request 落 error 并告警",
+        "platform_outcome": "configuration_error",
+        "retryable": false
+      },
+      {
+        "error": 3,
+        "meaning": "内部服务器错误（协议文档态）",
+        "callback_expected": false,
+        "oo94_observed": false,
+        "platform_handling": "request 落可重试 error；保持 OO 模式",
+        "platform_outcome": "server_error",
+        "retryable": true
+      },
+      {
+        "error": 5,
+        "meaning": "命令不正确（协议文档态）",
+        "callback_expected": false,
+        "oo94_observed": false,
+        "platform_handling": "视为实现缺陷，request 落 error 并告警",
+        "platform_outcome": "implementation_defect",
+        "retryable": false
+      }
+    ],
+    "http_semantics": {
+      "http_status_always_200_even_on_error": true,
+      "rule": "必须解析 body 的 `error` 字段判成败；HTTP 200 不代表成功"
+    },
+    "drop": {
+      "command": "c=drop",
+      "observed_return": 0,
+      "effects_proven": [
+        "`c=info` 后不再列出该用户",
+        "产生 status=1 + `actions=[{type:0,userid:<user>}]` 的 drop 取证",
+        "该用户客户端进入“文件无法访问”，后续输入连本地都不生效"
+      ],
+      "effects_disproven": [
+        "已合入的内容不会被移除：drop 之后的 forcesave 与最终 status 2 artifact 仍含该用户此前写入的单元格"
+      ]
+    }
+  },
+  "clean_close": {
+    "client_precondition": "已完成 descriptor confirmation 的 authenticated active edit participant，在销毁编辑器前创建 close intent",
+    "server_protocol": "room row lock 内建 intent 并把 participant `active→closing`；active 首次归零时按最高 `(intent_sequence,id)` 选 deterministic leader；`reconcile_close_intents()` 在 predecessors 安全终结后 CAS 提升 leader 为 generation 内唯一 open close_capture request",
+    "oo94_facts": [
+      "OO 不提供“谁触发了关闭保存”的信息：status 2 无 userdata，`actions` 只含最后断开者。",
+      "无修改关闭走 status 4（无 url）⇒ close-capture 必须能以 `no_content` 终结。",
+      "关闭后再调 forcesave 返回 error 1 ⇒ close 之后不存在补救 forcesave 通道。"
+    ],
+    "forbidden": ["客户端直接创建 kind=close_capture", "以 system/route identity 代替用户授权"]
+  },
+  "timers": {
+    "command_service_http_timeout_seconds": 10,
+    "forcesave_callback_wait_timeout_seconds": 120,
+    "in_flight_grace_seconds": 30,
+    "in_flight_grace_rule": "Command Service 已 accepted 但 callback 未到达时，在 grace 内不得判定失败、不得允许切回 HTML 只 reload；grace 结束后 operation 落可重试 timeout 并保持 OO 模式（Requirement 4.4）",
+    "download_connect_timeout_seconds": 5,
+    "download_read_timeout_seconds": 30,
+    "delivery_ttl": {
+      "pending_mutation_token_seconds": 300,
+      "callback_download_url_validity_seconds": 300,
+      "callback_download_url_validity_source": "OO 回传 url 带 `expires` 查询参数，实测有效期约 300s ⇒ recovery 必须依赖已 durable 的 incoming，不得指望重新下载"
+    },
+    "recovery_case_claim_ttl_hours": 72,
+    "notes": [
+      "所有数值是 Task 4 定义的契约默认值，实现（Task 22/24）必须从本文件读取，不得在代码里另写常量。"
+    ]
+  },
+  "correlation_determinism": {
+    "delivery_key_components": ["room_id", "generation", "callback_status", "delivery_discriminator"],
+    "application_key_components": [
+      "wp_id", "room_id", "generation",
+      "frozen_client_base_version_id", "frozen_client_base_representation_id",
+      "incoming_sha256", "immutable_definition_bundle_sha256",
+      "authority_model_definition_sha256", "adapter_build_digest"
+    ],
+    "application_key_forbidden_components": ["callback_status", "request_id", "room.last_applied_at_arrival", "可变版本字符串", "registry alias"],
+    "oo94_evidence": {
+      "same_content_different_bytes": true,
+      "detail": "紧随 forcesave 之后的关闭保存（`notmodified:true`）内容 sha 完全一致、字节长度相同，但字节 sha256 不同（两个 phase 各独立复现一次）。",
+      "consequence": [
+        "status 6 与随后的 status 2 必然得到**不同** application key（key 含 incoming sha）⇒ 二者不会靠 incoming sha 自动折叠。",
+        "能靠同一 application 折叠的只有**同一 delivery 的网络重试**（同 url、同字节）。",
+        "禁止把 “status 6/2 同内容” 实现成 incoming-first 去重。"
+      ]
+    }
+  },
+  "multi_user_semantics": {
+    "callback_scope": "room_generation_route_event",
+    "proven_by": [
+      "A 侧发起的 forcesave 回传 artifact 同时含 A 与 B 的并发编辑（cb03_status6.xlsx: Z90=ALICE-EDIT-Z90 且 Z92=BOB-EDIT-Z92）",
+      "Command Service forcesave 请求体无发起人字段，OO 也不回传发起人",
+      "status 6 的 `users` 只含最后编辑者一人，而 `history.changes` 含全体贡献者"
+    ],
+    "users_field_semantics": "last_editor_only_not_contributors",
+    "contributor_snapshot_source": "history.changes[].user",
+    "contributor_snapshot_caveat": "包含已被 drop 的用户，故它是审计快照而非授权依据",
+    "participant_bound_callback_authorization": {
+      "allowed": false,
+      "reason": "callback 是 room/generation 级服务事件；route participant、forcesave initiator 与 contributors 三者不同一（实证）。"
+    },
+    "revocation": {
+      "oo_drop_proves": ["会话被逐出", "后续写入被阻断"],
+      "oo_drop_does_not_prove": ["已合入内容被移除"],
+      "decision": "write_fence_plus_generation_rotation",
+      "decision_detail": "撤销写权限用户后：立即提升 `write_fence_epoch`、取消 outstanding requests、supersede/rotate generation，其余有效用户在新 generation 重开；不实现选择性 participant 内容应用。",
+      "requirements": ["4.7", "10.3", "10.4"]
+    }
+  },
+  "jwt_claim_schema": {
+    "claim_schema_version": 1,
+    "unknown_or_missing_version": "reject_before_download",
+    "algorithm": "HS256",
+    "transport": {
+      "header": "Authorization",
+      "scheme": "Bearer",
+      "oo94_facts": [
+        "OO 9.4 同时在 header 与 callback body 里放 token（body 字段名 `token`），两者内容等价；平台只能以 header 为准并独立校验。",
+        "OO 的 outbox token claim 形如 `{\"payload\": <整个 callback body>}`，不含平台自定义 claim ⇒ 平台自有 claim 必须放在**自签的 callback route token** 上，不能指望 OO 回传。"
+      ]
+    },
+    "required_claims": {
+      "cbv": {"desc": "callback claim schema version", "type": "integer", "must_equal": 1},
+      "iss": {"desc": "签发者（平台后端标识）", "type": "string", "must_equal": "gt-audit-platform"},
+      "aud": {"desc": "受众（callback route）", "type": "string", "must_equal": "oo-callback-route"},
+      "act": {"desc": "允许动作", "type": "string", "enum": ["callback_write", "callback_notify"]},
+      "room_id": {"desc": "room 标识", "type": "uuid"},
+      "generation": {"desc": "room generation", "type": "integer"},
+      "doc_key": {"desc": "OO document key，必须等于 payload.key", "type": "string"},
+      "route_credential_id": {"desc": "room/generation 服务凭证 id（可撤销）", "type": "uuid"},
+      "callback_token_id": {"desc": "本条 route token 的 jti，用于撤销与去重", "type": "uuid"},
+      "exp": {"desc": "过期时间（短 TTL）", "type": "integer"},
+      "iat": {"desc": "签发时间", "type": "integer"}
+    },
+    "optional_claims": {
+      "participant_id": {
+        "desc": "仅作审计线索的可选 participant 标识",
+        "must_not_be_used_for": ["聚合 artifact 的唯一作者判定", "唯一授权依据"]
+      }
+    },
+    "url_binding": {
+      "rule": "callback URL 路径/查询必须与 claim 中的 `room_id`/`generation`/`doc_key`/`route_credential_id` 逐项一致，且 payload.key 必须等于 claim.doc_key 与 room 的当前 doc_key",
+      "mismatch_action": "在下载前拒绝并写安全日志（design Security 表：callback auth 失败 → OO 非零 error）"
+    },
+    "verification_order": [
+      "解析 header token（缺失即拒）",
+      "校验签名与 alg",
+      "校验 cbv 已知（未知/缺失 → 拒）",
+      "校验 iss/aud/act",
+      "校验 exp/iat",
+      "校验 room/generation/doc_key/route_credential 与 URL 绑定",
+      "校验 route credential 未撤销、generation 未 supersede、write fence 未变化",
+      "以上全部通过后才允许下载"
+    ],
+    "forbidden": [
+      "claim_version=None 或默认值绕过（Requirement 5.2）",
+      "只验签名不验 claim 绑定",
+      "用 opened-time 权限替代当次校验"
+    ]
+  },
+  "download_security": {
+    "policy_version": 1,
+    "required_controls": {
+      "url_allowlist": {
+        "mode": "host_allowlist",
+        "rule": "只接受 allowlist 内的 scheme+host+port（默认仅 ONLYOFFICE_URL 的 netloc）；path 也必须匹配 OO cache 前缀",
+        "oo94_note": "OO 回传 url 的 netloc 实测等于浏览器加载编辑器时的 netloc（本环境 localhost:8080），因此 allowlist 完全可行"
+      },
+      "dns_recheck_after_resolve": {
+        "rule": "解析后逐 IP 复核（禁止私网/环回/链路本地/元数据地址，除显式放行的 OO 主机），并把已校验 IP 固定给连接使用，防 DNS rebinding"
+      },
+      "redirect_policy": {"follow_redirects": false, "max_redirects": 0, "rule": "3xx 一律拒绝，禁止把 3xx body 当文件写盘"},
+      "streaming_size_cap_bytes": 52428800,
+      "streaming_size_cap_source": "Requirement 14.11 的『压缩 OOXML ≤50 MiB』，与 backend/data/workpaper_sync_limits.json 的 budgets.max_compressed_bytes 逐字节锁死；两处不等时 build_download_policy 直接抛 DownloadPolicyConfigError（不 fallback、不取 min）",
+      "streaming_size_cap_history": "首版写 209715200（200 MiB）。它比 max_compressed_bytes 大 4 倍 ⇒ 下载门永远不会先触发，超限一律由 stage_incoming 的 max_compressed_bytes 报出，错误码指向 OOXML 预算而真实原因是『下载没有界』。按 14.11『单一配置与测试锁死』改回 50 MiB。",
+      "streaming_rule": "必须流式写入 staging 并在超限时立即中止；禁止整包读入内存",
+      "connect_timeout_seconds": 5,
+      "read_timeout_seconds": 30,
+      "ooxml_checks": ["zip magic", "MIME/扩展一致性", "压缩比", "entry 数", "展开总量", "`../` 路径", "外部关系", "宏策略"]
+    },
+    "characterized_current_production_behavior": {
+      "call_site": "backend/app/routers/wp_onlyoffice_router.py::post_sheet_onlyoffice_callback",
+      "characterization_test": "backend/tests/test_workpaper_callback_download_security.py",
+      "gaps": [
+        "无 allowlist：只有 `_rewrite_onlyoffice_download_url` 把 netloc 换成 ONLYOFFICE_URL，path/query 仍来自不可信 payload（path 可含 `../`）",
+        "未配置 ONLYOFFICE_URL 时 netloc 完全由 payload 决定（SSRF 面开放，实测可直连环回/元数据地址形态）",
+        "无 DNS 解析后复核：域名解析到环回地址仍照常请求（DNS rebinding 未防，实测）",
+        "重定向未被显式禁止：实测 httpx 0.28 的 `raise_for_status()` 会对 3xx 抛错，因此当前 302 不会落盘 —— 但这是客户端库版本行为的隐式依赖，一旦开启 follow_redirects 或换客户端即失效（反证实测：跟随后确实抵达重定向目标）",
+        "`resp.content` 整包读入内存，无大小上限、无流式截断（实测 8 MiB 全量materialize）",
+        "单一 60s 总超时，无连接/读取分离超时（契约要求 5s/30s）",
+        "无 OOXML/zip magic/MIME 校验即落盘（实测 text/plain 内容照样被完整接收）",
+        "`httpx.AsyncClient(timeout=60)` 未关 `trust_env` ⇒ 下载会走环境/系统代理（Windows 下 `urllib.request.getproxies()` 读注册表系统代理，本机实测 http://127.0.0.1:7897 会劫持并返回 502）；既是保存失败诱因，也让底稿字节过第三方代理（Requirement 10.7）",
+        "下载后 `write_bytes` 直写共享 canonical 文件，无 staging/quarantine/incoming 隔离态（Property 17 现状）"
+      ],
+      "note": "Task 4 只做 characterization，不修生产 callback；修复由 Task 22 承接。所有 gap 均由 characterization_test 内的真实执行或 AST 数据流断言支撑。"
+    }
+  },
+  "requirements_covered": ["4.3", "4.9", "4.10", "5.1", "5.2", "5.3", "5.4", "5.6", "10.2", "10.4", "10.7", "10.9"],
+  "properties_gated": {
+    "16": "callback claim version 真校验（前置判据：claim schema/version 已定义且未知版本必须在下载前拒绝）",
+    "17": "callback 文件先隔离校验（前置判据：required_controls 已版本化，现状 gap 已 characterization）",
+    "63": "shared room 聚合 callback 与 participant 撤销安全（前置判据：callback=room 级事件已实证；drop 无法证明内容移除 ⇒ 固定 write fence + generation rotation）"
+  }
+}

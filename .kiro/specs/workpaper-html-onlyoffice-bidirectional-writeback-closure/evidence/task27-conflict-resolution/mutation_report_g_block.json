@@ -1,0 +1,69 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py",
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 2
+  },
+  "mutations": [
+    {
+      "id": "G01",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+      "why": "冲突改按 **requested** id 读 ⇒ requested 是合法 terminal duplicate 时预览恒空（冲突行挂在 canonical primary 上），而响应仍是 200 + `conflict_count=0`：审计师看到「没有冲突」，于是那些冲突永远不会被裁决，下一次 forcesave 又被 refresh-required 挡住。AC 8.5 末段明令只要求 canonical primary 绑定 application，正是为了让 duplicate 也能读到同一份冲突集",
+      "verdict": "RED",
+      "summary": "1 failed, 409 passed in 64.75s (0:01:04)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "0933a94e89e76a1c036233d32884576c7b2a44be0363536f5d112efa1fcd900d",
+      "seconds": 68.2
+    },
+    {
+      "id": "G02",
+      "path": "backend/app/services/workpaper_sync/conflict_resolution.py",
+      "want": "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+      "why": "裁决轨迹改按 **requested** id 回写 ⇒ duplicate 提交时 `mark_conflicts_resolved` 匹配 0 行：内容照常发布、resolve 照常回 200，但 AC 8.6 的审计轨迹（actor/时间/选择结果/落地值）**整批丢失**，冲突行永远停在未裁决态。与 G01 分两条：一条打读侧、一条打写侧，两者可以独立退化",
+      "verdict": "RED",
+      "summary": "7 failed, 403 passed in 64.39s (0:01:04)",
+      "added": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_no_third_operation_or_second_application_was_created",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_preview_through_the_duplicate_returns_the_primary_conflicts",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_resolve_through_the_duplicate_publishes_the_folded_projection",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows",
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_second_delivery_really_became_a_direct_terminal_duplicate",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_every_scenario_was_collected",
+        "test_task27_conflict_resolution_pg.py::TestHarness::test_no_phase_crashed_during_collection"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task27_conflict_resolution_pg.py::TestDuplicateRequestedOperation::test_the_resolution_trail_lands_on_the_primary_conflict_rows"
+      ],
+      "added_files": [
+        "test_task27_conflict_resolution_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "0933a94e89e76a1c036233d32884576c7b2a44be0363536f5d112efa1fcd900d",
+      "seconds": 67.8
+    }
+  ]
+}

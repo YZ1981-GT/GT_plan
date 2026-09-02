@@ -227,51 +227,59 @@ async def save_univer_data(
         import logging as _logging
         _logging.getLogger(__name__).warning("univer_snapshot 落库失败 wp=%s: %s", wp_id, exc)
 
-    # 6. 统一后处理（orchestrator）— file_version++, prefill_stale, updated_at, audit log, event_bus.publish
+    # 5b. 文件生命周期版本（`file_version`）—— 本路径**自己**的所有者。
+    #
+    # Task 18 / Requirement 2.1 / 2.12：`file_version` 原来由共享的
+    # `orchestrator.after_save` 递增。一个被四条写路径共用的、且必须可重放的副作用
+    # handler 不该是任何版本的所有者 —— 重放时再递增一次就是纯粹的伪版本。
+    #
+    # 版本域因此按语义分家：
+    #   * 业务内容版本 = `working_paper.content_revision`，唯一推进者是
+    #     `ContentMutationService.commit(...)`（本路径迁入归 Task 19）；
+    #   * 文件生命周期版本 = `file_version`，所有者是**真正写文件的那条路径** ——
+    #     本函数上面刚用 `univer_data_to_xlsx` 写完 xlsx（design §`working_paper` 增量
+    #     列：「`file_version` 保留给既有文件生命周期，不再被新同步协议当内容乐观锁」）。
+    #
+    # 位置刻意与旧的 `after_save` 递增点**逐行等价**（在 `build_slim_snapshot` 之后、
+    # 响应体读 `wp.file_version` 之前），因此 `univer_snapshot.version` 与响应里的
+    # `version` 都保持改造前的取值，不夹带无关行为变化。
+    wp.file_version = old_version + 1
+
+    # 6. 统一后处理（orchestrator）— prefill_stale, updated_at, audit log,
+    #    耐久 outbox 入队（不发布；提交后由 publish_pending 发出）
+    #
+    # Task 16 / Requirement 13.4：不再把 after_save 的意外异常降级成 warning。
+    # Task 18 / Requirement 2.12：after_save 一个版本字段都不写；`content_revision`
+    # 参数是只读的，本路径尚未迁入 `ContentMutationService`（Task 19），所以传 None。
+    from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
+    from app.services.workpaper_sync.outbox import DurableEventOutboxService
+
+    # 推导项目年度
+    saved_year: int | None = None
     try:
-        from app.services.workpaper_save_orchestrator import orchestrator as save_orchestrator
-
-        # 推导项目年度
-        saved_year: int | None = None
-        try:
-            from app.models.core import Project
-            saved_year = (
-                await db.execute(
-                    sa.select(sa.extract("year", Project.audit_period_end)).where(
-                        Project.id == project_id
-                    )
+        from app.models.core import Project
+        saved_year = (
+            await db.execute(
+                sa.select(sa.extract("year", Project.audit_period_end)).where(
+                    Project.id == project_id
                 )
-            ).scalar_one_or_none()
-            saved_year = int(saved_year) if saved_year is not None else None
-        except Exception:
-            saved_year = None
-
-        await save_orchestrator.after_save(
-            db, wp, current_user,
-            trigger="univer_save",
-            extra={
-                "content_hash": content_hash,
-                "sheets": write_result.get("sheets", 0),
-                "cells": write_result.get("cells", 0),
-                "year": saved_year,
-            },
-            # expected_version 已在上面早期检查，此处不再重复校验
-            expected_version=None,
-        )
-    except Exception as exc:
-        from app.services.workpaper_save_orchestrator import OptimisticLockError
-        if isinstance(exc, OptimisticLockError):
-            raise HTTPException(
-                status_code=409,
-                detail={
-                    "error_code": "VERSION_CONFLICT",
-                    "message": "底稿已被他人修改，请刷新后重试",
-                    "server_version": wp.file_version,
-                    "expected_version": expected_version,
-                },
             )
-        import logging as _logging
-        _logging.getLogger(__name__).warning("orchestrator.after_save failed in univer_save wp=%s: %s", wp_id, exc)
+        ).scalar_one_or_none()
+        saved_year = int(saved_year) if saved_year is not None else None
+    except Exception:
+        saved_year = None
+
+    await save_orchestrator.after_save(
+        db, wp, current_user,
+        trigger="univer_save",
+        extra={
+            "content_hash": content_hash,
+            "sheets": write_result.get("sheets", 0),
+            "cells": write_result.get("cells", 0),
+            "year": saved_year,
+            "file_version": wp.file_version,
+        },
+    )
 
     # 8. 自动解析（非阻塞）
     try:
@@ -294,6 +302,9 @@ async def save_univer_data(
         _logging.getLogger(__name__).warning("启动后台自动解析任务失败 wp=%s: %s", wp_id, e)
 
     await db.commit()
+
+    # Requirement 13.1 / Property 52：事件只在 content commit 之后发布。
+    await DurableEventOutboxService.publish_pending(db)
 
     from app.services.wp_parsed_data_service import touch_after_parsed_data_commit
 
@@ -470,8 +481,15 @@ async def get_wp_onlyoffice_config(
     from app.core.config import settings
     from app.services.onlyoffice_session_limiter import acquire_session
 
+    from app.services import onlyoffice_room_identity as _room_identity
+
+    # Task 21：文档身份由 room 派生 —— 既不含文件 mtime，也不含 `file_version`
+    # （Requirement 2.1 明文禁止 `file_version` 充当跨通道同步版本），更不含
+    # 「预填/未预填」这种展示态（否则同一份文件会在两个房间里被并行编辑）。
+    _room_entry_id = _room_identity.word_template_entry_id(wp_id=wp_id)
+    doc_key = await _room_identity.resolve_room_doc_key(db, wp_id=wp_id, entry_id=_room_entry_id)
+
     # 并发编辑会话限制
-    doc_key = f"wp-{wp_id}-{version or 'latest'}"
     allowed = await acquire_session(_user.id, doc_key)
     if not allowed:
         raise HTTPException(
@@ -512,7 +530,7 @@ async def get_wp_onlyoffice_config(
 
     return {
         "document_url": document_url,
-        "document_key": f"wp-{wp_id}-{wp.file_version}-{'pf' if prefilled else 'raw'}",
+        "document_key": doc_key,
         "title": wp.file_path.split("/")[-1] if wp.file_path else "声明书.docx",
         "onlyoffice_url": settings.ONLYOFFICE_URL,
         "callback_url": word_callback_url,

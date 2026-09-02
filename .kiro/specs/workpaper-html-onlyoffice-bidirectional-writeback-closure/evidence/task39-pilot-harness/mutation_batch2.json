@@ -1,0 +1,236 @@
+[
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+    "why": "merge 家族与 conflict 家族的 oracle 分派错位 ⇒ P25 的场景会用 P26 的判据（要求同字段冲突），互相把对方判失败",
+    "verdict": "WRONG-TEST",
+    "summary": "1 failed, 100 passed in 10.65s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_with_three_way_input_is_judged_by_the_oracle"
+    ],
+    "gone": [],
+    "hit": [],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_passes_when_both_sides_survive",
+    "why": "不同字段并行修改产生冲突也算通过 ⇒ P25 的核心判据（conflict_count=0）失效。首轮若 GREEN 说明构造的三方本来就零冲突 —— 判据必须落在能被 falsify 的输入上",
+    "verdict": "GREEN",
+    "summary": "101 passed in 10.68s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_the_current_side_is_lost",
+    "why": "🔴 不再检查 current 侧是否存活 ⇒ 「incoming 整体覆盖 current」同样零冲突，会被判 passed 而 A 已经丢了",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.61s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_the_current_side_is_lost"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_the_current_side_is_lost"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+    "why": "不再检查 incoming 侧是否被采纳 ⇒ 「原地不动」也算自动合并",
+    "verdict": "GREEN",
+    "summary": "101 passed in 10.59s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_is_unverifiable_without_explicit_keys",
+    "why": "不给两侧改动键也判定 ⇒ 判据退化成「零冲突」，而整体覆盖也满足零冲突",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.74s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_is_unverifiable_without_explicit_keys"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_is_unverifiable_without_explicit_keys"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_same_key_on_both_sides_is_not_a_p25_scenario",
+    "why": "两侧给同一个键也当 P25 ⇒ 那是 P26 的场景，会把「必冲突」误判成「必合并」",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.77s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_same_key_on_both_sides_is_not_a_p25_scenario"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_same_key_on_both_sides_is_not_a_p25_scenario"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_no_conflict_is_raised",
+    "why": "同字段异值没产生冲突也算通过 ⇒ 有一侧被静默采纳（P26 的反面）",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.93s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_no_conflict_is_raised"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_no_conflict_is_raised"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+    "why": "冲突三值不再与输入逐一比对 ⇒ 裁决界面可能显示错值而守卫全绿（P26 的「冲突三值完整」）",
+    "verdict": "GREEN",
+    "summary": "101 passed in 10.75s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_incoming_is_silently_applied",
+    "why": "🔴 冲突未裁决时 merged 已等于 incoming 也算通过 ⇒ 等于自动选了 OO 侧",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.59s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_incoming_is_silently_applied"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_incoming_is_silently_applied"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_is_unverifiable_without_a_conflict_key",
+    "why": "不给冲突键也判定 ⇒ 无法断言「三值完整」，判据空转",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.87s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_is_unverifiable_without_a_conflict_key"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_is_unverifiable_without_a_conflict_key"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestTimelineOracle::test_missing_stage_is_unverifiable_not_failed",
+    "why": "缺服务端时序阶段不再报 ⇒ 「没跑」与「跑了但顺序错」合成一类，而下一步的 `observed[stage]` 会 KeyError 穿透",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.81s",
+    "added": [
+      "test_task39_pilot_harness.py::TestTimelineOracle::test_missing_stage_is_unverifiable_not_failed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestTimelineOracle::test_missing_stage_is_unverifiable_not_failed"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestTimelineOracle::test_out_of_order_stages_fail",
+    "why": "时序不再校验 ⇒ AC 14.8 的 `request frozen < command accepted < incoming durable < terminal` 完全空转",
+    "verdict": "RED",
+    "summary": "1 failed, 100 passed in 10.71s",
+    "added": [
+      "test_task39_pilot_harness.py::TestTimelineOracle::test_out_of_order_stages_fail"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestTimelineOracle::test_out_of_order_stages_fail"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+    "why": "recovery 场景改用 OO→HTML 的时序序列 ⇒ AC 14.8 为 no-userdata crash 单列的`incoming durable < recovery case(no operation) < claim` 不再被检查",
+    "verdict": "GREEN",
+    "summary": "101 passed in 10.64s",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 14.0
+  }
+]

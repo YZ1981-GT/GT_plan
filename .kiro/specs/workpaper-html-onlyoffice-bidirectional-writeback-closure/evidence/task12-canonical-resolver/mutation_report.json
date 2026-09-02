@@ -1,0 +1,1093 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_traversal_rejected",
+    "why": "关掉边界比较 ⇒ 目录穿越/项目外绝对路径/软链接越界全部放行；Property 42 核心失效，artifacts.py 因委托它也一起破",
+    "verdict": "RED",
+    "summary": "3 failed, 133 passed, 1 warning in 9.93s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_absolute_outside_root_rejected",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_symlink_escape_rejected",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_traversal_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_traversal_rejected"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 12.6
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_symlink_escape_rejected",
+    "why": "把候选路径的 realpath 换成字符串拼接 ⇒ `..` 与软链接都不再展开，退回「只做前缀比较」的旧写法（Task 7 fs7 证明拦不住）",
+    "verdict": "RED",
+    "summary": "3 failed, 133 passed, 1 warning in 10.12s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_absolute_outside_root_rejected",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_symlink_escape_rejected",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_traversal_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_symlink_escape_rejected",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_traversal_rejected"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 12.9
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_empty_relative_rejected",
+    "why": "把空路径的 reason 改掉 ⇒ 「空串」与「越界」在诊断里无法区分，Requirement 5.12 要求的 error code 定位失效",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 9.87s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_empty_relative_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_empty_relative_rejected"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 12.6
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_cross_root_reuse_rejected",
+    "why": "关掉「已是绝对路径」的归属判定 ⇒ 同一 relative_path 在别的 project 根下也能解析成功（Task 7 fs7 的跨项目复用反例）",
+    "verdict": "RED",
+    "summary": "2 failed, 133 passed, 1 skipped, 1 warning in 10.93s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_prefix_only_boundary_check_is_fooled_by_symlink",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_cross_root_reuse_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_prefix_only_boundary_check_is_fooled_by_symlink",
+      "test_task12_canonical_resolver.py::TestProperty42PathBoundary::test_cross_root_reuse_rejected"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic",
+    "why": "把子码判据改回 A-only（既有 wp_template_finder 的写法）⇒ B12-1/S33-REV 被当主码，父级 XLSX 抢占子码 DOCX；正是 Requirement 9.4 点名的缺陷",
+    "verdict": "RED",
+    "summary": "8 failed, 128 passed, 1 warning in 11.95s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_a_only_regex_misses_b_sub_codes",
+      "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_finder_still_returns_parent_xlsx_for_b_sub_code",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_parent_code_of",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[B12-1-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[B7-3-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[D2-2-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[E1-3-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[S33-REV-True]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_a_only_regex_misses_b_sub_codes",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_parent_code_of",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[B12-1-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[B7-3-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[D2-2-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[E1-3-True]",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_sub_code_is_letter_class_agnostic[S33-REV-True]"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 15.6
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_specificity_rank_orders_exact_above_parent",
+    "why": "把父码的具体度抬到精确匹配之上 ⇒ 父级候选反过来抢占子码候选",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.08s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_exact_code_wins_over_parent_same_type",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_specificity_rank_orders_exact_above_parent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_exact_code_wins_over_parent_same_type",
+      "test_task12_canonical_resolver.py::TestProperty40MostSpecificSubCode::test_specificity_rank_orders_exact_above_parent"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_assert_document_type_rejects_xlsm_for_docx",
+    "why": "关掉类型门 ⇒ 需要 docx 时拿到 xlsx 也放行，`Document(xlsx)` 导出损坏",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.01s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_assert_document_type_rejects_xlsm_for_docx",
+      "test_task12_resolution_pg.py::TestProperty42DbSidePathSafety::test_document_type_mismatch_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_assert_document_type_rejects_xlsm_for_docx",
+      "test_task12_resolution_pg.py::TestProperty42DbSidePathSafety::test_document_type_mismatch_rejected"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py",
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_missing_and_mismatch_are_distinct_types",
+    "why": "把两类异常做成继承关系 ⇒ 「拒绝异类型回退」会被「缺模板」遮蔽，Requirement 9.4 与 9.5 无法各自验证（本任务实测到的遮蔽形态）",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.10s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_missing_and_mismatch_are_distinct_types",
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_no_candidate_raises_template_missing"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_missing_and_mismatch_are_distinct_types"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_only_parent_xlsx_raises_type_mismatch",
+    "why": "删掉「有异类型候选但无同类型候选」分支 ⇒ 父级 XLSX 场景退化成 TemplateMissingError，两条 Requirement 的语义被合并",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.10s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_only_parent_xlsx_raises_type_mismatch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_only_parent_xlsx_raises_type_mismatch"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_legacy_resolver_type_gate_is_wired",
+    "why": "legacy resolver 的类型门被短路 ⇒ `type_mismatch` 档不可达，异类型文件被当成命中返回",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.22s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_legacy_resolver_type_gate_is_wired"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_legacy_resolver_type_gate_is_wired"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_export_engine_declares_docx_type",
+    "why": "把 P41 的**真实消费方**改回不声明类型 ⇒ 新能力变成 additive 死代码（假绿第①源）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.05s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_export_engine_declares_docx_type"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty41NoCrossTypeFallback::test_export_engine_declares_docx_type"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestPathBoundaryHasSingleImplementation::test_legacy_resolver_uses_boundary_gate",
+    "why": "关掉 legacy 路径的边界门 ⇒ `/tmp/xxx.xlsx` 这类历史脏数据与项目外绝对路径被当成合法底稿读出去（download/WOPI/storage 三条链一起破）",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.18s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_out_of_root_absolute_is_path_rejected",
+      "test_task12_canonical_resolver.py::TestPathBoundaryHasSingleImplementation::test_legacy_resolver_uses_boundary_gate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_out_of_root_absolute_is_path_rejected",
+      "test_task12_canonical_resolver.py::TestPathBoundaryHasSingleImplementation::test_legacy_resolver_uses_boundary_gate"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_template_fallback_has_no_blanket_except",
+    "why": "把窄 except 改回 `except Exception` ⇒ 函数名写错/索引结构变了都被吞成「该 wp_code 无模板」；memory 记的「最贵的一类」fail-open",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.06s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_template_fallback_has_no_blanket_except"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_template_fallback_has_no_blanket_except"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_template_fallback_has_no_blanket_except",
+    "why": "把 fail-open 诊断从 ERROR 降级成 WARNING ⇒ 「模板库不可导入」在日志里看不见，表现为「该底稿没有模板」。守卫因此要求整个函数零 WARNING 出口",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.97s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_template_fallback_has_no_blanket_except"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestLegacyResolverBoundaryVerdicts::test_template_fallback_has_no_blanket_except"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc1_slot_omission",
+    "why": "关掉 slot omission 检查（FC-1）⇒ 少一个 typed slot 也能进 canonical bytes",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.98s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc1_slot_omission"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc1_slot_omission"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc2_sql_null_slot",
+    "why": "关掉 SQL NULL slot 检查（FC-2）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.12s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc2_sql_null_slot"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc2_sql_null_slot"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc3_json_null_field",
+    "why": "关掉 JSON null 字段检查（FC-3）—— 与 FC-2 是两条独立判据，只测一条时删另一条入口不会红",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.07s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc3_json_null_field"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc3_json_null_field"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc4_empty_string_field",
+    "why": "关掉空串/纯空白 slot 字段检查（FC-4）。锚点落在 `models.validate_bundle_slot`（唯一实现）—— `definitions` 侧的重合副本已删除",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.13s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc4_empty_string_field"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc4_empty_string_field"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc5_all_zero_digest",
+    "why": "关掉全零 hash 检查（FC-5）⇒ 「忘了算 hash 就填 0」的伪身份进 canonical bytes",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.01s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc5_all_zero_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc5_all_zero_digest"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc6_malformed_digest",
+    "why": "关掉 digest 形态检查（FC-6）⇒ 大写 hex / 长度不符也放行。🔴 锚点落在 `models.validate_bundle_slot`（唯一实现）：改造前 `definitions._normalize_slot_input` 自带一份重合副本，短路任一侧都不改行为 ⇒ 首轮变异实测 GREEN。已删掉副本、改为委托",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.02s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc6_malformed_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc6_malformed_digest"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc7_unregistered_marker",
+    "why": "让未登记 marker 自动「登记」⇒ registry 失去唯一性，任意 `xxx:none:vN` 都合法",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.12s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc7_unregistered_marker"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc7_unregistered_marker"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc10_malformed_definition_ref",
+    "why": "关掉 `definition:<uuid>` ref 形态检查（FC-10）。同 M20：锚点必须落在唯一实现上，`definitions` 侧的重合副本已删除",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.16s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc10_malformed_definition_ref"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc10_malformed_definition_ref"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc13_invalid_authority_digest",
+    "why": "关掉 authority model digest 检查（FC-13）。`definitions.normalize_authority_digest` 现在只做 NULL 判定 + 归一，形态判据单点在此",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.08s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc13_invalid_authority_digest"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc13_invalid_authority_digest"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc14_unknown_authority_model",
+    "why": "把未登记枚举静默当成 projection_contract（FC-14）⇒ 自由文本 authority model 被接受，custom/opaque 的 marker 规则同时失效",
+    "verdict": "RED",
+    "summary": "4 failed, 132 passed, 1 warning in 11.11s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestBundleCanonicalBytes::test_canonical_bytes_have_no_forbidden_tokens",
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_marker_impersonation_is_detected",
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc14_unknown_authority_model",
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_valid_opaque_bundle_uses_markers"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty28BundleCanonicalizerFailClosed::test_fc14_unknown_authority_model"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestBundleCanonicalBytes::test_marker_digest_matches_v151_seed_bytes",
+    "why": "去掉 sort_keys/separators/allow_nan ⇒ canonical bytes 不再对键序稳定，marker digest 与 V151 seed 不一致，DB trigger 与服务层互相打红",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.27s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestBundleCanonicalBytes::test_canonical_json_rejects_nan",
+      "test_task12_canonical_resolver.py::TestBundleCanonicalBytes::test_marker_digest_matches_v151_seed_bytes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestBundleCanonicalBytes::test_canonical_json_rejects_nan",
+      "test_task12_canonical_resolver.py::TestBundleCanonicalBytes::test_marker_digest_matches_v151_seed_bytes"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestPublishDag::test_contract_requires_template_and_instrumentation",
+    "why": "拆掉 contract 的前置 ⇒ 可以先发 contract 再发 template/instrumentation，DAG 固定顺序失效",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.07s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_contract_requires_template_and_instrumentation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_contract_requires_template_and_instrumentation"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestPublishDag::test_contract_requires_template_and_instrumentation",
+    "why": "关掉阶段偏序断言本体（`assert_publish_order` 的 raise 分支）",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.35s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_bundle_requires_all_three",
+      "test_task12_canonical_resolver.py::TestPublishDag::test_contract_requires_template_and_instrumentation"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_bundle_requires_all_three",
+      "test_task12_canonical_resolver.py::TestPublishDag::test_contract_requires_template_and_instrumentation"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 15.0
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestPublishDag::test_instrumentation_payload_rejects_backward_reference",
+    "why": "关掉 payload 级反向引用禁令 ⇒ instrumentation 可以引用 contract/bundle digest；只有阶段偏序时这条能被「先发 contract」绕过（两条判据缺一不可）",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.15s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_instrumentation_payload_rejects_backward_reference",
+      "test_task12_canonical_resolver.py::TestPublishDag::test_instrumentation_payload_rejects_bundle_reference"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_instrumentation_payload_rejects_backward_reference",
+      "test_task12_canonical_resolver.py::TestPublishDag::test_instrumentation_payload_rejects_bundle_reference"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestPublishDag::test_payload_rejects_self_reference",
+    "why": "关掉自引用禁令 ⇒ canonical payload 内嵌自身 UUID/hash，「同语义→同 digest」这条前提崩掉（Requirement 6.2）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.06s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_payload_rejects_self_reference"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestPublishDag::test_payload_rejects_self_reference"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestAliasNeverUsedForHistory::test_history_resolution_always_raises",
+    "why": "让历史读取可以按 alias 解析 ⇒ 同一历史 operation 重跑得到不同 bundle（Requirement 2.10 后半句失效）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.30s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestAliasNeverUsedForHistory::test_history_resolution_always_raises"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestAliasNeverUsedForHistory::test_history_resolution_always_raises"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 15.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty7SingleResolverEntry::test_historical_intents_require_frozen_identity",
+    "why": "让 retry 可以按 entry current pointer 解析 ⇒ 历史 retry 读到当前 bundle，Property 28「旧 operation 仍固定原 bundle」失效",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.17s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty7SingleResolverEntry::test_historical_intents_require_frozen_identity",
+      "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty7SingleResolverEntry::test_historical_intents_require_frozen_identity",
+      "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py",
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty39ConfigCallbackSameSource::test_neither_config_nor_callback_may_hide_sheets",
+    "why": "让 config 也能改 sheet 可见性 ⇒ Requirement 9.12「只作用于 room/staged representation」失效，openpyxl 会原地改共享 current artifact",
+    "verdict": "RED",
+    "summary": "3 failed, 133 passed, 1 warning in 10.94s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty39ConfigCallbackSameSource::test_neither_config_nor_callback_may_hide_sheets",
+      "test_task12_canonical_resolver.py::TestProperty7SingleResolverEntry::test_only_materialize_may_hide_sheets",
+      "test_task12_canonical_resolver.py::TestSheetVisibilityGate::test_config_intent_is_forbidden"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty39ConfigCallbackSameSource::test_neither_config_nor_callback_may_hide_sheets",
+      "test_task12_canonical_resolver.py::TestProperty7SingleResolverEntry::test_only_materialize_may_hide_sheets",
+      "test_task12_canonical_resolver.py::TestSheetVisibilityGate::test_config_intent_is_forbidden"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.5
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestSheetVisibilityGate::test_published_current_artifact_is_forbidden",
+    "why": "关掉 staged 限制 ⇒ 对 published current artifact 原地隐藏 sheet",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.05s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestSheetVisibilityGate::test_published_current_artifact_is_forbidden"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestSheetVisibilityGate::test_published_current_artifact_is_forbidden"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity",
+    "why": "关掉历史意图的 frozen identity 门（服务层本体）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.96s",
+    "added": [
+      "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestHistoricalReadsUseFrozenBundle::test_historical_intents_reject_missing_frozen_identity"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.5
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestCandidateIsolation::test_candidate_id_as_representation_is_rejected",
+    "why": "删掉 candidate 显式拒绝 ⇒ 拿 candidate id 当 representation_id 会一路走到模糊报错，Requirement 5.12 的 error code 定位失效",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.14s",
+    "added": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_candidate_id_as_representation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_candidate_id_as_representation_is_rejected"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_service_rejects_insert_time_digest_mismatch",
+    "why": "跳过 canonical digest 重算 ⇒ 「插入时 digest 就与 typed slots 不符」这条只有服务层能拦的门失效（DB trigger 只拦 approved 后的 UPDATE）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.01s",
+    "added": [
+      "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_service_rejects_insert_time_digest_mismatch"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_service_rejects_insert_time_digest_mismatch"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_unapproved_bundle_is_not_loadable",
+    "why": "让 candidate 态 bundle 可被 resolver 加载 ⇒ unapproved bundle 进 room",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.10s",
+    "added": [
+      "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_unapproved_bundle_is_not_loadable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_unapproved_bundle_is_not_loadable"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_retired_contract_child_invalidates_bundle",
+    "why": "让 retired 的 contract child 仍算合法 ⇒ definition 漂移后旧 bundle 不再 fail closed",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.47s",
+    "added": [
+      "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_retired_contract_child_invalidates_bundle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestProperty28FailClosedOnDrift::test_retired_contract_child_invalidates_bundle"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 15.0
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestProperty42DbSidePathSafety::test_cross_scope_rejected",
+    "why": "关掉 scope 归属校验 ⇒ 用别的 wp/entry 的 id 能解析到本 representation（横向越权）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.28s",
+    "added": [
+      "test_task12_resolution_pg.py::TestProperty42DbSidePathSafety::test_cross_scope_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestProperty42DbSidePathSafety::test_cross_scope_rejected"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestCandidateIsolation::test_finalize_requires_approved_contract",
+    "why": "关掉 candidate finalize 的 approved contract 前置 ⇒ 无 per-entry contract 也能 finalize 成 published representation（Requirement 6.18）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.50s",
+    "added": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_finalize_requires_approved_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_finalize_requires_approved_contract"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestCandidateIsolation::test_finalize_requires_equivalence_report",
+    "why": "关掉 visible-equivalence 报告前置 ⇒ compatibility 未通过也能 finalize（Requirement 9.10）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.49s",
+    "added": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_finalize_requires_equivalence_report"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_finalize_requires_equivalence_report"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestCandidateIsolation::test_candidate_not_consumable_for_every_intent",
+    "why": "把 `assert_candidate_not_consumable` 的恒抛禁令改成静默通过 ⇒ candidate 可被 resolver/room/evidence 消费（禁令必须有可执行判据）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.36s",
+    "added": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_candidate_not_consumable_for_every_intent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestCandidateIsolation::test_candidate_not_consumable_for_every_intent"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_status_derivation_truth_table",
+    "why": "把「意图 ∧ 证据」退化成「意图」⇒ 手写 migrated 就永远绿，任务书要求的「旧调用点已真的指向统一入口」失去判据（假绿第②源）。🔴 判定已抽成纯函数 `derive_status` 并由真值表守卫锁死：内联在 `build_matrix` 时，因当前矩阵零 regressed 行，短路后输出不变 ⇒ 首轮实测 GREEN",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.53s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_status_derivation_truth_table"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_status_derivation_truth_table"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_called_names_ignores_import_only",
+    "why": "让「直接函数调用」不再被收集 ⇒ 迁移证据只剩属性调用，`resolve_wp_file(...)` 这种直接调用形态漏判",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 10.37s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_called_names_ignores_import_only",
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestGuardSelfCheck::test_called_names_ignores_import_only",
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_denominator_matches_inventory",
+    "why": "把分母从「Task 3 清册的全部 resolver 分叉」缩成「POLICY 点名模块」⇒ 少登记一行就能蒙过去（分母必须由清册决定）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 9.42s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 13.0
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh",
+    "why": "把 WOPI 写入目标改回自写 `Path(wp.file_path)` ⇒ put_file 的函数级 residue 出现 raw_file_path_construction，矩阵该行必须变 regressed",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.64s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh",
+    "why": "把 storage/version 分叉改回自写 `Path(wp.file_path)` ⇒ save_version 的函数级 residue 判据必须打红（这正是「迁移是否真发生」的核心判据）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.05s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestPathBoundaryHasSingleImplementation::test_artifacts_delegates_to_canonical_paths",
+    "why": "让 artifacts.py 不再委托统一边界判据 ⇒ 边界实现又变两份（改一处另一处不红）",
+    "verdict": "RED",
+    "summary": "3 failed, 133 passed, 1 warning in 11.13s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestPathBoundaryHasSingleImplementation::test_artifacts_delegates_to_canonical_paths",
+      "test_task12_canonical_resolver.py::TestResolverMigrationMatrix::test_matrix_is_fresh",
+      "test_task12_resolution_pg.py::TestProperty42DbSidePathSafety::test_empty_relative_path_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestPathBoundaryHasSingleImplementation::test_artifacts_delegates_to_canonical_paths"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py",
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_resolve_template_docx_rejects_parent_xlsx",
+    "why": "拿掉 `resolve_template_docx` 的类型门 ⇒ 真实库里 B12-1 直接解析到父级 `B12 与相关人员访谈程序及记录.xlsx`，被 `Document()` 当 docx 打开 ⇒ 导出损坏（Requirement 9.4/9.5 的原始反例）",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 10.86s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_resolve_template_docx_rejects_parent_xlsx"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_resolve_template_docx_rejects_parent_xlsx"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.4
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_absent_code_is_missing_not_empty",
+    "why": "把模板专用入口的终态从 `missing` 退回 `empty` ⇒ 「模板缺失（部署缺件）」在裁决清册里显示成「未配置底稿文件路径」，Requirement 9.5 要求的显式报错指错了成因。锚点用 scope 相对定位：`blank=False,` 在本文件出现两次",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.10s",
+    "added": [
+      "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_absent_code_is_missing_not_empty"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_canonical_resolver.py::TestProperty40And41OnRealTemplateLibrary::test_absent_code_is_missing_not_empty"
+    ],
+    "added_files": [
+      "test_task12_canonical_resolver.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_is_additive_only",
+    "why": "让 finalize 顺手推进 business content revision ⇒ Requirement 9.10「纯 representation 升级不得递增 content revision」失效。🔴 这条变异是**注入**而不是短路：finalize 里本来没有任何改旧行的语句，「不改」这类否定式承诺只能靠注入反例来证明判据可falsify",
+    "verdict": "RED",
+    "summary": "1 failed, 135 passed, 1 warning in 11.12s",
+    "added": [
+      "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_is_additive_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_is_additive_only"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_creates_new_generation_and_binds_candidate",
+    "why": "finalize 不再把 candidate 绑到新建的 representation ⇒ 命中 DB 的 `ck_wpruc_finalized_pointer`（state=finalized 必须有 pointer），整段 finalize 回滚、新 generation 不落库；证明「新增一行 + 绑定」这条判据不是恒真的空转",
+    "verdict": "RED",
+    "summary": "2 failed, 134 passed, 1 warning in 11.08s",
+    "added": [
+      "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_creates_new_generation_and_binds_candidate",
+      "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_succeeded"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_creates_new_generation_and_binds_candidate",
+      "test_task12_resolution_pg.py::TestCandidateFinalizeIsAdditiveOnly::test_finalize_succeeded"
+    ],
+    "added_files": [
+      "test_task12_resolution_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  }
+]

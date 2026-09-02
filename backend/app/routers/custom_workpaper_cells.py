@@ -22,6 +22,7 @@ spec: .kiro/specs/custom-workpaper-dual-mode-formula-and-batch/ Wave 2 Task 6
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -40,6 +41,12 @@ from app.services.custom_workpaper_projection import (
     normalize_cell_ref,
     refresh_custom_projection,
     write_cells_to_xlsx,
+)
+from app.services.workpaper_sync.content_mutation import CUSTOM
+from app.services.workpaper_sync.models import RevisionConflictError
+from app.services.workpaper_sync.writer_migration import (
+    build_content_mutation_service_writer,
+    opaque_entry_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -173,14 +180,75 @@ async def update_custom_cells(
         raise HTTPException(status_code=500, detail=f"写入底稿文件失败: {exc}") from exc
 
     grid = refresh_custom_projection(ctx.wp, sheet_name)
-    ctx.wp.file_version = int(ctx.wp.file_version or 0) + 1
     ctx.wp.updated_by = current_user.id
-    await db.commit()
+
+    # ─── Task 19：迁入统一 business revision 域（Property 50 / 61）────────────
+    #
+    # 改造前这里是 `ctx.wp.file_version += 1` + `await db.commit()`：一个 **JSON
+    # projection 端点自己推进了权威 xlsx 的版本计数器**，且绕过统一提交入口
+    # （Requirement 2.2）。Property 50 的原文是「custom adapter 的 HTML/OO 修改都落
+    # 同一权威 xlsx content artifact，标准 projection persist 不被调用；但必须使用
+    # approved `custom_authoritative_ooxml` authoritative model 与非空 bundle」。
+    #
+    # 落地形态：
+    #   * 权威内容 = 刚写完的 xlsx **本体字节**，原样提交为 `authoritative_payload`
+    #     （不是 `grid`、也不是 `parsed_data` 投影 —— 那两个是投影，Requirement 2.11
+    #     禁止 JSON projection writer 改写权威本体）；
+    #   * bundle = `custom_authoritative_ooxml` authority model + 三个版本化 typed
+    #     null marker（`OpaqueAuthorityProvisioner` 幂等发布/复用，绝不留空 hash）；
+    #   * 唯一提交出口 = `ContentMutationService.commit(...)`；本端点自己**没有**
+    #     `db.commit()`，也**不再**碰任何版本字段。
+    writer = build_content_mutation_service_writer(db)
+    entry_id = opaque_entry_id(wp_code=ctx.wp_code, wp_id=wp_id)
+    expected_revision = await writer.current_revision(wp_id)
+    try:
+        authoritative_bytes = Path(ctx.wp.file_path).read_bytes()
+    except OSError as exc:
+        # 权威 xlsx 刚写成功却读不回来 ⇒ 不能报成功（半成功比失败更危险）。
+        logger.error("custom-cells 读回权威 xlsx 失败 wp_id=%s: %s", wp_id, exc)
+        raise HTTPException(
+            status_code=500, detail=f"读回底稿文件失败，未能提交内容版本: {exc}"
+        ) from exc
+
+    try:
+        receipt = await writer.commit_bytes(
+            project_id=ctx.wp.project_id,
+            wp_id=wp_id,
+            entry_id=entry_id,
+            source=CUSTOM,
+            payload=authoritative_bytes,
+            document_type="xlsx",
+            expected_revision=expected_revision,
+            substrate_path=Path(ctx.wp.file_path),
+            # Task 65：authority model 不再由本调用点传，改由 lane 登记单向决定
+            # （`opaque_entry_gate.authority_model_for_lane("custom_cells")` =
+            # `custom_authoritative_ooxml`）。原先 `commit_bytes` 的 `authority_model`
+            # 有默认值，漏传即静默落成 custom —— 那条参数现在已经不存在。
+            lane_id="custom_cells",
+            actor_id=current_user.id,
+        )
+    except RevisionConflictError as exc:
+        # 真并发：CAS 命中 0 行。窄捕获 —— 宽泛 except 会把「artifact 发布失败」
+        # 「事务分裂」一起吞成 409，用户看到的原因就是错的（Requirement 5.12）。
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "content_revision_conflict",
+                "message": "其他用户在本次写入期间修改了该底稿，请刷新后重试。",
+                "server_version": expected_revision,
+            },
+        ) from exc
+
+    await writer.publish_committed_events(receipt)
 
     return {
         "updated": written,
         "sheet_name": sheet_name,
-        "file_version": ctx.wp.file_version,
+        # 对外契约保留 `file_version` 键（前端已在用），但它现在装的是**唯一** business
+        # content revision。沿用键名是刻意的：换键名要同步改前端，属 Task 65 的活。
+        "file_version": receipt.revision,
+        "content_revision": receipt.revision,
+        "content_version_id": str(receipt.content_version_id),
         "grid": grid,
     }
 

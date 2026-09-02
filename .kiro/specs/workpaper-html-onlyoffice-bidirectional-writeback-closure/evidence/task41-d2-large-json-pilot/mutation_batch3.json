@@ -1,0 +1,351 @@
+[
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_aging_segments_match_the_frontend_aging_preset",
+    "why": "账龄段 label 与前端 `PRESET_SEGMENTS.FIVE_YEAR`／模板行 12 不再逐字相等仍绿 ⇒ 账龄真源三方脱钩，OO 侧写回会落到错的账龄段",
+    "verdict": "RED",
+    "summary": "22 failed, 128 passed in 30.84s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_aging_leaf_labels_match_the_template_second_level_header",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_aging_segments_match_the_frontend_aging_preset",
+      "test_task41_d2_large_json_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task41_d2_large_json_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task41_d2_large_json_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task41_d2_large_json_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task41_d2_large_json_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task41_d2_large_json_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task41_d2_large_json_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task41_d2_large_json_pilot_pg.py::test_required_digest_is_not_the_checklist_pilots",
+      "test_task41_d2_large_json_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task41_d2_large_json_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_every_managed_header_matches_the_real_cell_text",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_aging_leaf_labels_match_the_template_second_level_header",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_aging_segments_match_the_frontend_aging_preset"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 34.1
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_scalar_columns_match_the_frontend_column_defs_in_order",
+    "why": "json 路径与前端 `DetailRow` 的键名差一个大小写仍绿 ⇒ 拆分读不到值、回写写不进去，而「39 个字段都在」的计数判据照样通过（静默丢字段）",
+    "verdict": "RED",
+    "summary": "21 failed, 129 passed in 30.69s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_column_keys_are_snake_case_projections_of_the_json_paths",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_scalar_columns_match_the_frontend_column_defs_in_order",
+      "test_task41_d2_large_json_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task41_d2_large_json_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task41_d2_large_json_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task41_d2_large_json_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task41_d2_large_json_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task41_d2_large_json_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task41_d2_large_json_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task41_d2_large_json_pilot_pg.py::test_required_digest_is_not_the_checklist_pilots",
+      "test_task41_d2_large_json_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task41_d2_large_json_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_column_keys_are_snake_case_projections_of_the_json_paths",
+      "test_task41_d2_large_json_pilot.py::TestThreeSourceColumnLock::test_scalar_columns_match_the_frontend_column_defs_in_order"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 34.1
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestPublishDagIsOneWay::test_authority_model_is_projection_contract",
+    "why": "authority model 换成 opaque 后仍绿 ⇒ AC 12.12 的「字段级两场景替换」被悄悄触发，Property 25/26 直接从 required set 里消失，而 D2 的整张大表恰恰只能靠字段级三方",
+    "verdict": "RED",
+    "summary": "8 failed, 142 passed in 33.43s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestFrozenEntrySelection::test_required_set_digest_is_this_entry_own_not_the_checklist_pilot",
+      "test_task41_d2_large_json_pilot.py::TestFrozenEntrySelection::test_scenario_profile_is_the_shared_editable_standard",
+      "test_task41_d2_large_json_pilot.py::TestPropertyOracleLanding::test_every_property_lands_on_a_registered_oracle",
+      "test_task41_d2_large_json_pilot.py::TestPropertyOracleLanding::test_field_level_properties_are_not_substituted_away",
+      "test_task41_d2_large_json_pilot.py::TestPublishDagIsOneWay::test_authority_model_is_projection_contract",
+      "test_task41_d2_large_json_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task41_d2_large_json_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task41_d2_large_json_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestPropertyOracleLanding::test_field_level_properties_are_not_substituted_away",
+      "test_task41_d2_large_json_pilot.py::TestPublishDagIsOneWay::test_authority_model_is_projection_contract"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 36.8
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+    "why": "契约里的 template digest 不再是真实 payload 的 canonical digest 仍绿 ⇒ `assert_contract_identity_frozen` 只是在比两个都错的值（单向引用断裂）",
+    "verdict": "RED",
+    "summary": "19 failed, 131 passed in 30.60s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task41_d2_large_json_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task41_d2_large_json_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task41_d2_large_json_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task41_d2_large_json_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task41_d2_large_json_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task41_d2_large_json_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task41_d2_large_json_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task41_d2_large_json_pilot_pg.py::test_required_digest_is_not_the_checklist_pilots",
+      "test_task41_d2_large_json_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task41_d2_large_json_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 33.9
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_missing_row_identity_fails_closed",
+    "why": "缺 rowId 不再 fail closed ⇒ 行身份会退回数组下标（Requirement 6.5 / Property 23 明令禁止），删行再新增后旧身份被复用、数据串到新行",
+    "verdict": "RED",
+    "summary": "2 failed, 148 passed in 33.97s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_row_identity_pointer_matching_the_real_store_key_is_load_bearing",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_missing_row_identity_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_row_identity_pointer_matching_the_real_store_key_is_load_bearing",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_missing_row_identity_fails_closed"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.4
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_duplicate_row_identity_fails_closed",
+    "why": "重复 rowId 不再是结构冲突 ⇒ OO 里复制一行产生的重复 UUID 会静默合并成一行，两行数据被折叠（Requirement 6.15）",
+    "verdict": "RED",
+    "summary": "1 failed, 149 passed in 34.66s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_duplicate_row_identity_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_duplicate_row_identity_fails_closed"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 38.0
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_non_array_payload_fails_closed",
+    "why": "整张大表被存成别的形态时不再 fail closed ⇒ 静默当成零行，1260 行明细在一次 merge 里全部「消失」",
+    "verdict": "RED",
+    "summary": "1 failed, 149 passed in 33.94s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_non_array_payload_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_non_array_payload_fails_closed"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_row_budget_boundaries_on_the_store_split",
+    "why": "行预算不再边读边判 ⇒ 100000 行的表读完才发现越界，Requirement 14.11 要求的「不得 OOM 或截断」失守",
+    "verdict": "RED",
+    "summary": "2 failed, 148 passed in 33.90s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_row_budget_boundaries_on_the_store_split",
+      "test_task41_d2_large_json_pilot_pg.py::test_row_budget_boundaries_on_the_real_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_row_budget_boundaries_on_the_store_split",
+      "test_task41_d2_large_json_pilot_pg.py::test_row_budget_boundaries_on_the_real_payload"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_field_budget_boundaries_on_the_store_split",
+    "why": "field 预算不再计数 ⇒ 200000 field 边界永久不可达（真实载荷 49,140 个字段，四倍规模的项目会静默吃满内存）",
+    "verdict": "RED",
+    "summary": "2 failed, 148 passed in 34.12s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_field_budget_boundaries_on_the_store_split",
+      "test_task41_d2_large_json_pilot_pg.py::test_field_budget_boundaries_on_the_real_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_field_budget_boundaries_on_the_store_split",
+      "test_task41_d2_large_json_pilot_pg.py::test_field_budget_boundaries_on_the_real_payload"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 37.5
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_split_yields_one_field_per_column_per_row",
+    "why": "stable key 里不再带 row 身份 ⇒ 1260 行折叠成 39 个字段，「不把整 JSON 当一个字段」变成「把整列当一个字段」，任意两行并改必冲突",
+    "verdict": "RED",
+    "summary": "29 failed, 105 passed, 16 errors in 16.14s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestBooleanCellIsAKnownUpstreamIncoherence::test_a_real_boolean_cell_would_extract_cleanly",
+      "test_task41_d2_large_json_pilot.py::TestChunkedSidecarAndRoundtrip::test_baseline_extract_reads_back_every_managed_field",
+      "test_task41_d2_large_json_pilot.py::TestChunkedSidecarAndRoundtrip::test_formula_columns_are_read_as_cached_values_with_formula_inventory",
+      "test_task41_d2_large_json_pilot.py::TestChunkedSidecarAndRoundtrip::test_roundtrip_verifier_catches_a_single_changed_field",
+      "test_task41_d2_large_json_pilot.py::TestContractIsGroundedInTheTemplate::test_disk_contract_matches_the_source_of_truth",
+      "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_field_budget_boundaries_on_the_store_split",
+      "test_task41_d2_large_json_pilot.py::TestProperty60BudgetsFailVisible::test_row_budget_boundaries_on_the_store_split",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_bytes_and_text_and_parsed_inputs_agree",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_nested_aging_leaves_become_their_own_fields",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_row_identity_comes_from_the_payload_not_the_index",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_split_uses_the_contract_as_the_spec_source",
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_split_yields_one_field_per_column_per_row",
+      "test_task41_d2_large_json_pilot_pg.py::test_black_box_scenarios_are_unverifiable",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_digest_matches_the_canonical_recompute",
+      "test_task41_d2_large_json_pilot_pg.py::test_bundle_is_non_null_and_all_children_are_approved",
+      "test_task41_d2_large_json_pilot_pg.py::test_chunk_size_is_derived_from_limits_not_hardcoded",
+      "test_task41_d2_large_json_pilot_pg.py::test_download_only_scenario_has_zero_operation_and_application",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_required_scenario_has_a_persisted_row",
+      "test_task41_d2_large_json_pilot_pg.py::test_every_scenario_row_binds_a_published_trace_bundle",
+      "test_task41_d2_large_json_pilot_pg.py::test_field_budget_boundaries_on_the_real_payload",
+      "test_task41_d2_large_json_pilot_pg.py::test_four_definitions_and_one_bundle_are_published",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_entity_is_reused_across_scenarios",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_other_store_item_is_touched",
+      "test_task41_d2_large_json_pilot_pg.py::test_no_phase_crashed_during_collection",
+      "test_task41_d2_large_json_pilot_pg.py::test_ordinals_are_dense_and_unique",
+      "test_task41_d2_large_json_pilot_pg.py::test_pilot_class_stays_unverifiable_after_this_run",
+      "test_task41_d2_large_json_pilot_pg.py::test_plan_uses_this_pilot_bundle_and_derives_a_non_empty_set",
+      "test_task41_d2_large_json_pilot_pg.py::test_property25_and_26_really_ran_on_this_contract",
+      "test_task41_d2_large_json_pilot_pg.py::test_property27_every_other_row_merges_normally",
+      "test_task41_d2_large_json_pilot_pg.py::test_property27_only_the_touched_row_conflicts",
+      "test_task41_d2_large_json_pilot_pg.py::test_real_payload_is_well_inside_the_production_budget",
+      "test_task41_d2_large_json_pilot_pg.py::test_real_store_payload_is_the_frozen_866kb_shape",
+      "test_task41_d2_large_json_pilot_pg.py::test_real_workpaper_payload_is_untouched",
+      "test_task41_d2_large_json_pilot_pg.py::test_reorder_and_insert_are_not_whole_table_overwrites",
+      "test_task41_d2_large_json_pilot_pg.py::test_required_digest_is_not_the_checklist_pilots",
+      "test_task41_d2_large_json_pilot_pg.py::test_reused_entity_is_refused_at_write_time",
+      "test_task41_d2_large_json_pilot_pg.py::test_row_budget_boundaries_on_the_real_payload",
+      "test_task41_d2_large_json_pilot_pg.py::test_row_identity_is_the_payload_row_id_not_an_index",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_is_not_verified_without_real_onlyoffice",
+      "test_task41_d2_large_json_pilot_pg.py::test_run_row_freezes_this_pilot_identity",
+      "test_task41_d2_large_json_pilot_pg.py::test_sidecar_never_holds_the_whole_projection_in_one_buffer",
+      "test_task41_d2_large_json_pilot_pg.py::test_sidecar_streams_the_real_projection",
+      "test_task41_d2_large_json_pilot_pg.py::test_split_peak_memory_is_bounded",
+      "test_task41_d2_large_json_pilot_pg.py::test_upstream_gap_scenarios_are_failed_not_unverifiable",
+      "test_task41_d2_large_json_pilot_pg.py::test_whole_json_is_split_into_one_field_per_column_per_row"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestStorePayloadSplit::test_split_yields_one_field_per_column_per_row",
+      "test_task41_d2_large_json_pilot_pg.py::test_whole_json_is_split_into_one_field_per_column_per_row"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py",
+      "test_task41_d2_large_json_pilot_pg.py"
+    ],
+    "restored": true,
+    "seconds": 19.5
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize",
+    "why": "capability 启用门被短路 ⇒ 可以在没有 published representation 时宣称双向可用，前端显示不可兑现的切换（Requirement 1.5）",
+    "verdict": "RED",
+    "summary": "1 failed, 149 passed in 33.95s",
+    "added": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task41_d2_large_json_pilot.py::TestOrderingGate::test_capability_is_not_enabled_before_finalize"
+    ],
+    "added_files": [
+      "test_task41_d2_large_json_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 37.3
+  }
+]

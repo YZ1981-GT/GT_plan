@@ -1,0 +1,1763 @@
+{
+  "adjudications": [
+    "generic_docx_direct",
+    "subcode_docx_recovered",
+    "template_missing_adjudicated",
+    "dedicated_chain_child_docx",
+    "dedicated_chain_workbook_only"
+  ],
+  "dedicated_chain_prefixes": [
+    "A16",
+    "A17"
+  ],
+  "ledger_digest": "cfc0c9d528ba98b255ea57b3071816d9883f942d49c4c5b20b4c031be4f76ce4",
+  "owner_task": {
+    "dedicated_chain_child_docx": "64",
+    "dedicated_chain_workbook_only": "64",
+    "generic_docx_direct": "62",
+    "subcode_docx_recovered": "63",
+    "template_missing_adjudicated": "63"
+  },
+  "properties": [
+    40,
+    41
+  ],
+  "requirement_7_7": {
+    "declared_generic_docx": 18,
+    "declared_subcode_wrong_type": 9
+  },
+  "requirements": [
+    "7.7",
+    "9.1",
+    "9.2",
+    "9.4",
+    "9.5",
+    "9.11",
+    "12.5"
+  ],
+  "rows": [
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "A/A26-1 专业技术委员会业务报告审核提交资料清单.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "A26",
+      "source_refs": [
+        "A/A26-1 专业技术委员会业务报告审核提交资料清单.docx"
+      ],
+      "unified_relative_path": "A/A26-1 专业技术委员会业务报告审核提交资料清单.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A26-1"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "A/A26-2 专业技术委员会委员审核记录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "A26",
+      "source_refs": [
+        "A/A26-2 专业技术委员会委员审核记录.docx"
+      ],
+      "unified_relative_path": "A/A26-2 专业技术委员会委员审核记录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A26-2"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "A/A26-3 专业技术委员会会议记录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "A26",
+      "source_refs": [
+        "A/A26-3 专业技术委员会会议记录.docx"
+      ],
+      "unified_relative_path": "A/A26-3 专业技术委员会会议记录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A26-3"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "A/A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "A26",
+      "source_refs": [
+        "A/A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx"
+      ],
+      "unified_relative_path": "A/A26-4 专业技术委员会重大业务咨询意见或分歧会议记录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A26-4"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A8 其他信息程序表20170720.xlsx",
+          "wp_code": "A8"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A8 其他信息程序表20170720.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A8-2 其他信息比对记录20170725.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "A8",
+      "source_refs": [
+        "A/A8 其他信息程序表20170720.xlsx",
+        "A/A8-2 其他信息比对记录20170725.docx"
+      ],
+      "unified_relative_path": "A/A8-2 其他信息比对记录20170725.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A8-2"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B1-7 质量控制委员会会议记录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B1",
+      "source_refs": [
+        "B/B1-7 质量控制委员会会议记录.docx"
+      ],
+      "unified_relative_path": "B/B1-7 质量控制委员会会议记录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B1-7"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B18 了解内部审计程序表.xlsx",
+          "wp_code": "B18"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B18 了解内部审计程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B18",
+      "source_refs": [
+        "B/B18 了解内部审计程序表.xlsx",
+        "B/B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx"
+      ],
+      "unified_relative_path": "B/B18-3-1 利用内部审计人员为审计提供直接协助的书面协议（适用于企业设立内部审计部门或职能岗位）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B18-3-1"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B18 了解内部审计程序表.xlsx",
+          "wp_code": "B18"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B18 了解内部审计程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B18",
+      "source_refs": [
+        "B/B18 了解内部审计程序表.xlsx",
+        "B/B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx"
+      ],
+      "unified_relative_path": "B/B18-3-2 利用内部审计人员为审计提供直接协助的书面协议（适用于内部审计职能外包）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B18-3-2"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+          "wp_code": "B2"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B2",
+      "source_refs": [
+        "B/B2 与前任注册会计师的沟通程序表.xlsx",
+        "B/B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx"
+      ],
+      "unified_relative_path": "B/B2-1 向被审计单位发出的沟通函副本（就业务承接事项）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B2-1"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+          "wp_code": "B2"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B2",
+      "source_refs": [
+        "B/B2 与前任注册会计师的沟通程序表.xlsx",
+        "B/B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx"
+      ],
+      "unified_relative_path": "B/B2-11 与前任注册会计师的沟通函（就沪深交易所涉及复核时的重要事项）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B2-11"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+          "wp_code": "B2"
+        }
+      ],
+      "carrier_ambiguity": true,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B2",
+      "source_refs": [
+        "B/B2 与前任注册会计师的沟通程序表.xlsx",
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+        "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第二封沟通函）.docx"
+      ],
+      "unified_relative_path": "B/B2-3 与前任注册会计师的沟通函副本（就业务承接事项，第一封沟通函）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B2-3"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+          "wp_code": "B2"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B2",
+      "source_refs": [
+        "B/B2 与前任注册会计师的沟通程序表.xlsx",
+        "B/B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx"
+      ],
+      "unified_relative_path": "B/B2-6 向被审计单位发出的沟通函副本（就底稿使用事项）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B2-6"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+          "wp_code": "B2"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B2 与前任注册会计师的沟通程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B2",
+      "source_refs": [
+        "B/B2 与前任注册会计师的沟通程序表.xlsx",
+        "B/B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx"
+      ],
+      "unified_relative_path": "B/B2-8 与前任注册会计师的沟通函副本（就底稿查阅事项）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B2-8"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B40 项目组讨论程序表.xlsx",
+          "wp_code": "B40"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B40 项目组讨论程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B40-1 项目组讨论备忘录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B40",
+      "source_refs": [
+        "B/B40 项目组讨论程序表.xlsx",
+        "B/B40-1 项目组讨论备忘录.docx"
+      ],
+      "unified_relative_path": "B/B40-1 项目组讨论备忘录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B40-1"
+    },
+    {
+      "adjudication": "subcode_docx_recovered",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "B/B40 项目组讨论程序表.xlsx",
+          "wp_code": "B40"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "B/B40 项目组讨论程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "B/B40-2 对SCOT+的完整性进行再评估.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "B40",
+      "source_refs": [
+        "B/B40 项目组讨论程序表.xlsx",
+        "B/B40-2 对SCOT+的完整性进行再评估.docx"
+      ],
+      "unified_relative_path": "B/B40-2 对SCOT+的完整性进行再评估.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B40-2"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": true,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-1 财务报表审计业务约定书（通用、 总分所共同签署）.docx",
+        "B/B5-1 财务报表审计业务约定书（通用）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-1 财务报表审计业务约定书（通用、 总分所共同签署）.docx",
+        "B/B5-1 财务报表审计业务约定书（通用）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-1 财务报表审计业务约定书（通用）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-1"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": true,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-2 财务报表审计业务约定书（适用于上市公司审计、总分所共同签署）.docx",
+        "B/B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-2 财务报表审计业务约定书（适用于上市公司审计、总分所共同签署）.docx",
+        "B/B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-2 财务报表审计业务约定书（适用于上市公司审计）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-2"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-3 财务报表审计业务约定书（适用于国有企业审计）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-3"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-4 财务报表审计业务约定书（适用于IPO审计）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-4 财务报表审计业务约定书（适用于IPO审计）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-4 财务报表审计业务约定书（适用于IPO审计）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-4"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-5 内部控制审计业务约定书.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-5 内部控制审计业务约定书.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-5 内部控制审计业务约定书.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-5"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-6 IPO季度财务报表审阅业务约定书.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-6 IPO季度财务报表审阅业务约定书.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-6 IPO季度财务报表审阅业务约定书.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-6"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-7 审计及专项报告等其他鉴证业务约定书（新三板）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-7"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-8-1 审计及专项报告等其他鉴证业务约定书（企业债：会计准则）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-8-1"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-8-2 审计及专项报告等其他鉴证业务约定书（企业债：会计制度）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-8-2"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-9-1 医院审计业务约定书（被审计医院直接委托）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-9-1"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5 业务约定书控制表.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函-双语版.docx",
+          "wp_code": "B5"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "B/B5附件：数据分级确认函.docx",
+          "wp_code": "B5"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "B/B5-9-2 医院审计业务约定书（第三方委托）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": "B5",
+      "source_refs": [
+        "B/B5 业务约定书控制表.docx",
+        "B/B5-9-2 医院审计业务约定书（第三方委托）.docx",
+        "B/B5附件：数据分级确认函-双语版.docx",
+        "B/B5附件：数据分级确认函.docx"
+      ],
+      "unified_relative_path": "B/B5-9-2 医院审计业务约定书（第三方委托）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "B5-9-2"
+    },
+    {
+      "adjudication": "generic_docx_direct",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": false,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [
+        "S/S12A 评估专家工作报告（或评估专家工作总结）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "62",
+      "parent_code": null,
+      "source_refs": [
+        "S/S12A 评估专家工作报告（或评估专家工作总结）.docx"
+      ],
+      "unified_relative_path": "S/S12A 评估专家工作报告（或评估专家工作总结）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "S12A"
+    },
+    {
+      "adjudication": "template_missing_adjudicated",
+      "affected_by_legacy_a_only_defect": true,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "word-template",
+      "is_sub_code": true,
+      "ledger_class": "generic_word_template",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": null,
+      "legacy_verdict": "none",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [],
+      "owner_task": "63",
+      "parent_code": "S33",
+      "source_refs": [],
+      "unified_relative_path": null,
+      "unified_verdict": "template_missing",
+      "wp_code": "S33-REV"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "a16-bundle",
+      "is_sub_code": false,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A16  管理层声明书程序表.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": null,
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A16"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-1 管理层声明书-财务报表审计（企业会计准则）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-1 管理层声明书-财务报表审计（企业会计准则）.docx"
+      ],
+      "unified_relative_path": "A/A16-1 管理层声明书-财务报表审计（企业会计准则）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-1"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-2 管理层声明书-整合审计.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-2 管理层声明书-整合审计.docx"
+      ],
+      "unified_relative_path": "A/A16-2 管理层声明书-整合审计.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-2"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-3 管理层声明书-财务报表审计（IPO申报报表审计）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-3 管理层声明书-财务报表审计（IPO申报报表审计）.docx"
+      ],
+      "unified_relative_path": "A/A16-3 管理层声明书-财务报表审计（IPO申报报表审计）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-3"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-4 管理层声明书（IPO季度财务报表审阅）20170206.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-4 管理层声明书（IPO季度财务报表审阅）20170206.docx"
+      ],
+      "unified_relative_path": "A/A16-4 管理层声明书（IPO季度财务报表审阅）20170206.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-4"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-5 管理层声明书-财务报表审计（新三板申报报表审计）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-5 管理层声明书-财务报表审计（新三板申报报表审计）.docx"
+      ],
+      "unified_relative_path": "A/A16-5 管理层声明书-财务报表审计（新三板申报报表审计）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-5"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-6 管理层声明书-财务报表审计（企业债：会计准则）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-6 管理层声明书-财务报表审计（企业债：会计准则）.docx"
+      ],
+      "unified_relative_path": "A/A16-6 管理层声明书-财务报表审计（企业债：会计准则）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-6"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A16  管理层声明书程序表.xlsx",
+          "wp_code": "A16"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a16",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A16  管理层声明书程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A16-7 管理层关联交易声明书201910.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A16",
+      "source_refs": [
+        "A/A16  管理层声明书程序表.xlsx",
+        "A/A16-7 管理层关联交易声明书201910.docx"
+      ],
+      "unified_relative_path": "A/A16-7 管理层关联交易声明书201910.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A16-7"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [],
+      "carrier_ambiguity": false,
+      "component_type": "a17-bundle",
+      "is_sub_code": false,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A17  重大事项概要程序表.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": null,
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A17"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "a17-1-audit-summary",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-1 重大事项概要汇总.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-1 重大事项概要汇总.docx"
+      ],
+      "unified_relative_path": "A/A17-1 重大事项概要汇总.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-1"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-2-1 重大事项概要—关键审计事项.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-2-1 重大事项概要—关键审计事项.docx"
+      ],
+      "unified_relative_path": "A/A17-2-1 重大事项概要—关键审计事项.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-2-1"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-3 业务咨询记录-XX公司-XXX事项.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-3 业务咨询记录-XX公司-XXX事项.docx"
+      ],
+      "unified_relative_path": "A/A17-3 业务咨询记录-XX公司-XXX事项.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-3"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        },
+        {
+          "document_type": "docx",
+          "relative_path": "A/A17-3 业务咨询记录-XX公司-XXX事项.docx",
+          "wp_code": "A17-3"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-3-1 业务咨询结果执行情况记录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-3 业务咨询记录-XX公司-XXX事项.docx",
+        "A/A17-3-1 业务咨询结果执行情况记录.docx"
+      ],
+      "unified_relative_path": "A/A17-3-1 业务咨询结果执行情况记录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-3-1"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-4 重大专业分歧事项记录.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-4 重大专业分歧事项记录.docx"
+      ],
+      "unified_relative_path": "A/A17-4 重大专业分歧事项记录.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-4"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-5-1 审计工作完成核对表（适用于财报审计）.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A17-5-1"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-5-2 审计工作完成核对表（适用于内控审计）.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A17-5-2"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-5-3  审计工作完成核对表（IPO业务特别程序）.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A17-5-3"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-5-4  审计工作完成核对表（新三板挂牌业务特别程序）.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A17-5-4"
+    },
+    {
+      "adjudication": "dedicated_chain_workbook_only",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": false,
+      "legacy_relative_path": "A/A17-5-5  审计工作完成核对表（函证程序）.xlsx",
+      "legacy_verdict": "own_workbook",
+      "own_docx_carriers": [],
+      "own_xlsx_carriers": [
+        "A/A17-5-5  审计工作完成核对表（函证程序）.xlsx"
+      ],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-5-5  审计工作完成核对表（函证程序）.xlsx"
+      ],
+      "unified_relative_path": null,
+      "unified_verdict": "document_type_mismatch",
+      "wp_code": "A17-5-5"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-6  总结会会议记要.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-6  总结会会议记要.docx"
+      ],
+      "unified_relative_path": "A/A17-6  总结会会议记要.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-6"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx"
+      ],
+      "unified_relative_path": "A/A17-7 审计项目团队成员独立性声明书（适用于中国及国际审计准则）.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-7"
+    },
+    {
+      "adjudication": "dedicated_chain_child_docx",
+      "affected_by_legacy_a_only_defect": false,
+      "ancestor_carriers": [
+        {
+          "document_type": "xlsx",
+          "relative_path": "A/A17  重大事项概要程序表.xlsx",
+          "wp_code": "A17"
+        }
+      ],
+      "carrier_ambiguity": false,
+      "component_type": "skip",
+      "is_sub_code": true,
+      "ledger_class": "dedicated_chain_a17",
+      "legacy_bridge_takes_over": true,
+      "legacy_relative_path": "A/A17  重大事项概要程序表.xlsx",
+      "legacy_verdict": "parent_workbook",
+      "own_docx_carriers": [
+        "A/A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.docx"
+      ],
+      "own_xlsx_carriers": [],
+      "owner_task": "64",
+      "parent_code": "A17",
+      "source_refs": [
+        "A/A17  重大事项概要程序表.xlsx",
+        "A/A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.docx"
+      ],
+      "unified_relative_path": "A/A17-7A审计项目团队成员独立性声明书（适用于中国及国际审计准则）-专业技术委员会审核委员适用.docx",
+      "unified_verdict": "resolved_docx",
+      "wp_code": "A17-7A"
+    }
+  ],
+  "schema_version": "word-template-adjudication:v1",
+  "sources": {
+    "component_overrides": {
+      "path": "backend/app/data/wp_code_overrides.json",
+      "sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394"
+    },
+    "template_index": {
+      "path": "backend/wp_templates/_index.json",
+      "sha256": "7d1b57e50da2e1431e100e9f304c30f05f9da815b596a2eab651999f153fd4dd"
+    }
+  },
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "stats": {
+    "by_adjudication": {
+      "dedicated_chain_child_docx": 15,
+      "dedicated_chain_workbook_only": 7,
+      "generic_docx_direct": 18,
+      "subcode_docx_recovered": 9,
+      "template_missing_adjudicated": 1
+    },
+    "by_ledger_class": {
+      "dedicated_chain_a16": 8,
+      "dedicated_chain_a17": 14,
+      "generic_word_template": 28
+    },
+    "by_unified_verdict": {
+      "document_type_mismatch": 7,
+      "resolved_docx": 42,
+      "template_missing": 1
+    },
+    "carrier_ambiguity_rows": [
+      "B2-3",
+      "B5-1",
+      "B5-2"
+    ],
+    "carrier_count": 473,
+    "generic_docx_direct": 18,
+    "legacy_bridge_takeover_rows": [
+      "A16-1",
+      "A16-2",
+      "A16-3",
+      "A16-4",
+      "A16-5",
+      "A16-6",
+      "A16-7",
+      "A17-1",
+      "A17-2-1",
+      "A17-3",
+      "A17-3-1",
+      "A17-4",
+      "A17-6",
+      "A17-7",
+      "A17-7A",
+      "A26-1",
+      "A26-2",
+      "A26-3",
+      "A26-4",
+      "A8-2",
+      "B1-7",
+      "B18-3-1",
+      "B18-3-2",
+      "B2-1",
+      "B2-11",
+      "B2-3",
+      "B2-6",
+      "B2-8",
+      "B40-1",
+      "B40-2",
+      "B5-1",
+      "B5-2",
+      "B5-3",
+      "B5-4",
+      "B5-5",
+      "B5-6",
+      "B5-7",
+      "B5-8-1",
+      "B5-8-2",
+      "B5-9-1",
+      "B5-9-2",
+      "S12A"
+    ],
+    "row_count": 50,
+    "subcode_docx_recovered": 9,
+    "template_missing_adjudicated": 1,
+    "unadjudicated": 0,
+    "unattributed_index_files": [
+      "_reference/参考-审计指引第21号-管理建议书.docx",
+      "_reference/因素分析法毛利分析、工程施工、合同项目、贸易等特殊行业底稿参考示例.xlsx",
+      "_reference/应收账款预期信用损失计提及保理合同分析参考示例.xlsx",
+      "_reference/营业收入五步法、主要责任人代理人、知识产权分析参考示例.xlsx",
+      "_reference/质量控制委员会会议记录.docx",
+      "_reference/项目质量复核合伙人复核提交资料清单.docx"
+    ]
+  },
+  "task": "Wave 5 Task 58",
+  "word_component_type": "word-template"
+}

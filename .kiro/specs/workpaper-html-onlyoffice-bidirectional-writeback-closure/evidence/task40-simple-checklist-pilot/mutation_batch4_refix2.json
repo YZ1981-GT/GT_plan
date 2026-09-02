@@ -1,0 +1,22 @@
+[
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock",
+    "why": "发布路径改成只读磁盘契约（不比对源侧）⇒ 一份被手改过的契约可以直接发布，而双向锁只在守卫里被调用（判据与生产路径脱钩）",
+    "verdict": "RED",
+    "summary": "1 failed, 82 passed in 10.56s",
+    "added": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task40_simple_checklist_pilot.py::TestProductionWiring::test_both_production_paths_go_through_the_bidirectional_contract_lock"
+    ],
+    "added_files": [
+      "test_task40_simple_checklist_pilot.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  }
+]

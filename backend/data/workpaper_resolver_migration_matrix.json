@@ -1,0 +1,2364 @@
+{
+  "generated_from": "backend/data/workpaper_writer_inventory.json",
+  "inventory_digest": "b2bde05b4a25bc5b51f01914d4589836326a5884b4c4812e56bc3a503e46e58b",
+  "inventory_source_digest": "97fe18550ee8e935762a2057c533cfdf46b3e5ad2f883dcc3aedc30ef6250333",
+  "matrix_digest": "fc3f9dce93ad1ed50a56baa15ec4bde3de49dc3e8a396798af31329228a751bc",
+  "policy_modules": [
+    "app.routers.excel_html",
+    "app.routers.wp_onlyoffice_router",
+    "app.routers.wp_render_config_helpers",
+    "app.routers.wp_render_strategies._f2_stocktake_plan_sync",
+    "app.routers.wp_render_strategies._f2_stocktake_summary_sync",
+    "app.routers.wp_template",
+    "app.services.wopi_service",
+    "app.services.wp_download_service",
+    "app.services.wp_export.export_engine",
+    "app.services.wp_export.wp_file_resolver",
+    "app.services.wp_storage_service",
+    "app.services.wp_template_finder",
+    "app.services.wp_template_init_service",
+    "app.services.wp_xlsx_export_service"
+  ],
+  "policy_writers": [
+    "app.services.wp_download_service::WpDownloadService.download_pack",
+    "app.services.wp_download_service::WpDownloadService.download_single",
+    "app.services.wp_export.export_engine::WpExportEngine._export_docx",
+    "app.services.wp_template_finder::find_all_template_files",
+    "app.services.wp_template_finder::find_template_file_any"
+  ],
+  "rows": [
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.attachments",
+      "note": null,
+      "qualname": "download_attachment",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/attachments.py",
+      "status": "deferred",
+      "writer_id": "app.routers.attachments::download_attachment"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.attachments",
+      "note": null,
+      "qualname": "preview_attachment",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/attachments.py",
+      "status": "deferred",
+      "writer_id": "app.routers.attachments::preview_attachment"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.completion_phase",
+      "note": null,
+      "qualname": "export_workpaper_word",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/completion_phase.py",
+      "status": "deferred",
+      "writer_id": "app.routers.completion_phase::export_workpaper_word"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "confirm_as_template",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::confirm_as_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "diff_file_versions",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::diff_file_versions"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "download_file",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::download_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "execute_formulas",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::execute_formulas"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "export_module_excel",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::export_module_excel"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "export_module_word",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::export_module_word"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "get_cell_info",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::get_cell_info"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "get_html_preview",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::get_html_preview"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "list_file_versions",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::list_file_versions"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": "rollback",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "rollback_file_version",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::rollback_file_version"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "save_edits",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::save_edits"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "sync_from_onlyoffice",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::sync_from_onlyoffice"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": "upload_import",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "legacy_excel_html",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.excel_html",
+      "note": null,
+      "qualname": "upload_and_parse",
+      "reason": "上传/导入/rollback writer 由 Task 19 迁入 ContentMutationService 时一并换 resolver",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/excel_html.py",
+      "status": "deferred",
+      "writer_id": "app.routers.excel_html::upload_and_parse"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.office_preview",
+      "note": null,
+      "qualname": "_resolve_local_path",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/office_preview.py",
+      "status": "deferred",
+      "writer_id": "app.routers.office_preview::_resolve_local_path"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "raw_file_path_construction"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "raw_file_path_construction"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_download",
+      "note": null,
+      "qualname": "get_cloud_url",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/wp_download.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_download::get_cloud_url"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_guidance_chat",
+      "note": null,
+      "qualname": "_resolve_template_path",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/wp_guidance_chat.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_guidance_chat::_resolve_template_path"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_guidance_chat",
+      "note": null,
+      "qualname": "get_workpaper_guidance",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "_resolve_template_path"
+      ],
+      "source_path": "backend/app/routers/wp_guidance_chat.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_guidance_chat::get_workpaper_guidance"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_guidance_chat",
+      "note": null,
+      "qualname": "workpaper_ai_chat",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "_resolve_template_path"
+      ],
+      "source_path": "backend/app/routers/wp_guidance_chat.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_guidance_chat::workpaper_ai_chat"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "_resolve_wp_file",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "_onlyoffice_storage_dir"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::_resolve_wp_file"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "get_sheet_onlyoffice_config",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "_resolve_custom_wp_file",
+        "_resolve_wp_file",
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::get_sheet_onlyoffice_config"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "get_sheet_wopi_contents",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "_resolve_custom_wp_file",
+        "_resolve_wp_file",
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::get_sheet_wopi_contents"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "get_template_structure",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::get_template_structure"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "get_whole_excel_grid",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "_resolve_wp_file",
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::get_whole_excel_grid"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "upload_import",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "import_structured_docx",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::import_structured_docx"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "21,25,26,36",
+      "domain": "oo_callback",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "word_canonical_write_target"
+        ],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "onlyoffice_canonical_dir",
+          "word_canonical_write_target"
+        ]
+      },
+      "group": "oo_room",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_onlyoffice_router",
+      "note": null,
+      "qualname": "post_sheet_onlyoffice_callback",
+      "reason": "OO config/callback 的 substrate 必须是 room/staged representation，依赖 Task 21 room_service 与 Task 25/26 coordinator；Task 12 只提供 CanonicalResolutionService.assert_sheet_visibility_target 作为 Requirement 9.12 的可执行判据，未改 router 调用点。【Task 30 独立门补记：21/25/26 已落地后仍不可迁移】统一 resolver 只接受 published representation + approved non-null bundle（design「现有 wp_onlyoffice_router.py 保留 URL 兼容，但逻辑下沉」一节；repository.create_representation 走 assert_bundle_usable，materialize_coordinator 对无 published substrate 抛 SubstrateNotPublishedError）。而 published representation 只能由 Task 36 finalizeCandidate 在**逐 entry**人工审核并发布 approved per-entry contract + authority model + non-null bundle 之后产生（Task 36/40–57，Wave 3/4）。故这 4 行的剩余阻塞不是 Task 25/26 而是 Task 36：在任一 entry 拿到 approved bundle 之前，把 router 改成只经 substrate 取数会让全部底稿的 OO 入口 fail closed；保留 legacy 回退则 multi_resolver 归不了零。【裁决归属再移交：Task 30 → Task 71】Task 36 依赖 Task 30，故 criterion 留在 Task 30 即第二次成环；它真正能归零的时点是「每个 entry 都已有 published representation」，恰是 legacy 回退可删的时点，故归属落到 legacy_delete gate 成员 Task 71（见 adjudication_owner_task；本 criterion 自此不挂 bulk_adapters gate，否则 Wave 5 的 bulk adapter 迁移会依赖 Wave 7）。Task 30 的门在该 criterion 移出后判**过**，判据仍锁在 backend/tests/workpaper_sync/test_task30_closure_gate.py",
+      "resolver_identities": [
+        "_onlyoffice_storage_dir",
+        "_resolve_custom_wp_file"
+      ],
+      "source_path": "backend/app/routers/wp_onlyoffice_router.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_onlyoffice_router::post_sheet_onlyoffice_callback"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_config",
+      "note": null,
+      "qualname": "_get_render_config_impl",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "_resolve_template_path"
+      ],
+      "source_path": "backend/app/routers/wp_render_config.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_config::_get_render_config_impl"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_config",
+      "note": null,
+      "qualname": "export_template",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "_resolve_template_path"
+      ],
+      "source_path": "backend/app/routers/wp_render_config.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_config::export_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "export_storage",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_config_helpers",
+      "note": null,
+      "qualname": "_resolve_template_path",
+      "reason": "同上（render-config 侧的 _resolve_template_path 副本）",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_render_config_helpers.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_config_helpers::_resolve_template_path"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._a_program",
+      "note": null,
+      "qualname": "_generate_a_program_data",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_a_program.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._a_program::_generate_a_program_data"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_plan_sync",
+      "note": null,
+      "qualname": "_ensure_template",
+      "reason": "F2 Word lane 的 resolver 由 Task 58/59/60 统一改造，删除第二流程",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_ensure_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_plan_sync",
+      "note": null,
+      "qualname": "_onlyoffice_dir",
+      "reason": "F2 Word lane 的 resolver 由 Task 58/59/60 统一改造，删除第二流程",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_onlyoffice_dir"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "f2_word_sync",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_plan_sync",
+      "note": null,
+      "qualname": "_save_fields",
+      "reason": "F2 Word lane 的 resolver 由 Task 58/59/60 统一改造，删除第二流程",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::_save_fields"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "f2_word_sync",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_plan_sync",
+      "note": null,
+      "qualname": "f2_st_plan_sync_from_oo",
+      "reason": "F2 Word lane 的 resolver 由 Task 58/59/60 统一改造，删除第二流程",
+      "resolver_identities": [
+        "_onlyoffice_dir"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_from_oo"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "f2_word_sync",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_plan_sync",
+      "note": null,
+      "qualname": "f2_st_plan_sync_to_oo",
+      "reason": "F2 Word lane 的 resolver 由 Task 58/59/60 统一改造，删除第二流程",
+      "resolver_identities": [
+        "_onlyoffice_dir"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_plan_sync::f2_st_plan_sync_to_oo"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_summary_sync",
+      "note": null,
+      "qualname": "_ensure_template",
+      "reason": "同上（F2 汇总表）",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_ensure_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_summary_sync",
+      "note": null,
+      "qualname": "_onlyoffice_dir",
+      "reason": "同上（F2 汇总表）",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_onlyoffice_dir"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "f2_word_sync",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_summary_sync",
+      "note": null,
+      "qualname": "_save_fields",
+      "reason": "同上（F2 汇总表）",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::_save_fields"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "f2_word_sync",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_summary_sync",
+      "note": null,
+      "qualname": "f2_st_summary_sync_from_oo",
+      "reason": "同上（F2 汇总表）",
+      "resolver_identities": [
+        "_onlyoffice_dir"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_from_oo"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "59,60",
+      "domain": "f2_word_sync",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "f2_word",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_render_strategies._f2_stocktake_summary_sync",
+      "note": null,
+      "qualname": "f2_st_summary_sync_to_oo",
+      "reason": "同上（F2 汇总表）",
+      "resolver_identities": [
+        "_onlyoffice_dir"
+      ],
+      "source_path": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_render_strategies._f2_stocktake_summary_sync::f2_st_summary_sync_to_oo"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "65",
+      "domain": "custom",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "custom",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_template",
+      "note": null,
+      "qualname": "_create_one_custom_workpaper",
+      "reason": "custom 底稿以 xlsx 本体为唯一权威，resolver 收敛由 Task 65 承接",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/wp_template.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template::_create_one_custom_workpaper"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "65",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "custom",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_template",
+      "note": null,
+      "qualname": "generate_from_codes",
+      "reason": "custom 底稿以 xlsx 本体为唯一权威，resolver 收敛由 Task 65 承接",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/wp_template.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template::generate_from_codes"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_template_docx",
+      "note": null,
+      "qualname": "convert_docx_to_univer_doc",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file"
+      ],
+      "source_path": "backend/app/routers/wp_template_docx.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template_docx::convert_docx_to_univer_doc"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.wp_template_download",
+      "note": null,
+      "qualname": "download_template_by_code",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_template_download.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template_download::download_template_by_code"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_template_download",
+      "note": null,
+      "qualname": "download_template_prefilled",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_template_download.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template_download::download_template_prefilled"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.routers.wp_template_download",
+      "note": null,
+      "qualname": "preview_template_as_pdf",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/routers/wp_template_download.py",
+      "status": "deferred",
+      "writer_id": "app.routers.wp_template_download::preview_template_as_pdf"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "ad_hoc_storage_join",
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.a171_docx_sync",
+      "note": null,
+      "qualname": "_get_project_file",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/a171_docx_sync.py",
+      "status": "deferred",
+      "writer_id": "app.services.a171_docx_sync::_get_project_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "ad_hoc_storage_join",
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.a176_docx_sync",
+      "note": null,
+      "qualname": "_get_project_file",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/a176_docx_sync.py",
+      "status": "deferred",
+      "writer_id": "app.services.a176_docx_sync::_get_project_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "ad_hoc_storage_join",
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.a177_docx_sync",
+      "note": null,
+      "qualname": "_get_project_file",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/a177_docx_sync.py",
+      "status": "deferred",
+      "writer_id": "app.services.a177_docx_sync::_get_project_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.eqcr_memo_service",
+      "note": null,
+      "qualname": "EqcrMemoService.finalize_memo",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/eqcr_memo_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.eqcr_memo_service::EqcrMemoService.finalize_memo"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.export_job_service",
+      "note": null,
+      "qualname": "ExportJobService.update_progress",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/export_job_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.export_job_service::ExportJobService.update_progress"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.template_engine",
+      "note": null,
+      "qualname": "TemplateEngine.generate_project_workpapers",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/template_engine.py",
+      "status": "deferred",
+      "writer_id": "app.services.template_engine::TemplateEngine.generate_project_workpapers"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ]
+      },
+      "group": "wopi",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wopi_service",
+      "note": "check_file_info / get_file / put_file 三处统一走 resolve_wp_file",
+      "qualname": "WOPIHostService.check_file_info",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wopi_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wopi_service::WOPIHostService.check_file_info"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ]
+      },
+      "group": "wopi",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wopi_service",
+      "note": "check_file_info / get_file / put_file 三处统一走 resolve_wp_file",
+      "qualname": "WOPIHostService.get_file",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wopi_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wopi_service::WOPIHostService.get_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "wopi",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ]
+      },
+      "group": "wopi",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.services.wopi_service",
+      "note": "check_file_info / get_file / put_file 三处统一走 resolve_wp_file",
+      "qualname": "WOPIHostService.put_file",
+      "reason": null,
+      "resolver_identities": [],
+      "source_path": "backend/app/services/wopi_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "wopi",
+      "evidence": {
+        "function_found": false,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ]
+      },
+      "group": "wopi",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.services.wopi_service",
+      "note": "check_file_info / get_file / put_file 三处统一走 resolve_wp_file",
+      "qualname": "WOPIHostService.put_file._auto_fine_extract",
+      "reason": null,
+      "resolver_identities": [],
+      "source_path": "backend/app/services/wopi_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_fine_extract"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "wopi",
+      "evidence": {
+        "function_found": false,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ]
+      },
+      "group": "wopi",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.services.wopi_service",
+      "note": "check_file_info / get_file / put_file 三处统一走 resolve_wp_file",
+      "qualname": "WOPIHostService.put_file._auto_parse",
+      "reason": null,
+      "resolver_identities": [],
+      "source_path": "backend/app/services/wopi_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wopi_service::WOPIHostService.put_file._auto_parse"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root",
+          "resolve_wp_file"
+        ]
+      },
+      "group": "wopi",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wopi_service",
+      "note": "check_file_info / get_file / put_file 三处统一走 resolve_wp_file",
+      "qualname": "_resolve_put_target",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wopi_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wopi_service::_resolve_put_target"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.workpaper_generation_service",
+      "note": null,
+      "qualname": "WorkpaperGenerationService.ensure_working_paper",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/workpaper_generation_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.workpaper_generation_service::WorkpaperGenerationService.ensure_working_paper"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": [
+          "assert_within_root",
+          "resolve_within_root"
+        ]
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.workpaper_sync.artifacts",
+      "note": null,
+      "qualname": "ArtifactStorageLayout.project_root",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/workpaper_sync/artifacts.py",
+      "status": "deferred",
+      "writer_id": "app.services.workpaper_sync.artifacts::ArtifactStorageLayout.project_root"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_account_package_resolver",
+      "note": null,
+      "qualname": "_build_results._resolve_source_file",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/services/wp_account_package_resolver.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_account_package_resolver::_build_results._resolve_source_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.wp_conversion._generate",
+      "note": null,
+      "qualname": "WpConversionGenerateMixin._generate_one_workpaper",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_conversion/_generate.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_conversion._generate::WpConversionGenerateMixin._generate_one_workpaper"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [
+          "raw_file_path_construction"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "legacy_file_path",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wp_download_service",
+      "note": "打包下载已走 resolve_wp_file（wp-export-file-path-resolution），Task 12 继承其边界/类型门",
+      "qualname": "WpDownloadService.download_pack",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wp_download_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_pack"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [
+          "raw_file_path_construction"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "legacy_file_path",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wp_download_service",
+      "note": "单份下载已走 resolve_wp_file，同上",
+      "qualname": "WpDownloadService.download_single",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wp_download_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_download_service::WpDownloadService.download_single"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19",
+      "domain": "upload_import",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "raw_file_path_construction"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "raw_file_path_construction"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "upload_import",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.wp_download_service",
+      "note": null,
+      "qualname": "WpUploadService.upload_file",
+      "reason": "WpUploadService.upload_file 的 ad-hoc storage 拼接属 upload writer，Task 19 迁入统一 commit 时一并换；download 侧已在用 resolve_wp_file",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_download_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_download_service::WpUploadService.upload_file"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "legacy_file_path",
+      "intended_status": "migrated",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_export.export_engine",
+      "note": "经 _resolve_docx_template 走统一入口并声明 docx 类型门",
+      "qualname": "WpExportEngine._export_docx",
+      "reason": null,
+      "resolver_identities": [
+        "_resolve_docx_template"
+      ],
+      "source_path": "backend/app/services/wp_export/export_engine.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._export_docx"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "legacy_file_path",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wp_export.export_engine",
+      "note": "_resolve_docx_template 声明 expected_document_type='docx'（P41 真实消费方）",
+      "qualname": "WpExportEngine._resolve_docx_template",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wp_export/export_engine.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_export.export_engine::WpExportEngine._resolve_docx_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "is_within_any_legacy_root"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "is_within_any_legacy_root"
+        ]
+      },
+      "group": "legacy_file_path",
+      "intended_status": "migrated",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_export.wp_file_resolver",
+      "note": "legacy 路径域唯一入口；边界/类型/子码判据委托 canonical_paths",
+      "qualname": "_template_fallback",
+      "reason": null,
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/services/wp_export/wp_file_resolver.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_export.wp_file_resolver::_template_fallback"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "storage_version",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "resolver",
+      "module": "app.services.wp_storage_service",
+      "note": "save_version / list_versions 统一走 resolve_wp_file",
+      "qualname": "WpStorageService.list_versions",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wp_storage_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_storage_service::WpStorageService.list_versions"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": "history_restore",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [
+          "resolve_wp_file"
+        ],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": [
+          "resolve_wp_file"
+        ]
+      },
+      "group": "storage_version",
+      "intended_status": "migrated",
+      "is_resolver_fork": false,
+      "kind": "writer_resolver",
+      "module": "app.services.wp_storage_service",
+      "note": "save_version / list_versions 统一走 resolve_wp_file",
+      "qualname": "WpStorageService.save_version",
+      "reason": null,
+      "resolver_identities": [
+        "resolve_wp_file"
+      ],
+      "source_path": "backend/app/services/wp_storage_service.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_storage_service::WpStorageService.save_version"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "36",
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_own_docx_or_none"
+        ]
+      },
+      "group": "template_finder",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_finder",
+      "note": null,
+      "qualname": "find_all_template_files",
+      "reason": "本函数只服务 xlsx 多文件底稿（范围式命名 `D2-1至D2-4 …xlsx`），不在 Task 58 的 Word lane 内；Task 58 只把它的 A-only 正则提成命名常量（`_LEGACY_A_ONLY_SUB_CODE_RE`），行为逐字节不变（全量比对差异 0）。换成统一 resolver 需要该 entry 已有 published representation（Task 36 供给），与 wp_onlyoffice_router 同一条阻塞，归属 Task 71",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/services/wp_template_finder.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_finder::find_all_template_files"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": null,
+      "domain": null,
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_own_docx_or_none"
+        ]
+      },
+      "group": "template_finder",
+      "intended_status": "migrated",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_finder",
+      "note": "Task 58：自有-DOCX 探测提到 A-only 分支之前并委派 word_resolution.resolve_own_docx_or_none（→ canonical_paths.pick_most_specific）。9 个 B 子码由抢父级 XLSX 改为解析自己的 DOCX；1539 个 wp_code 全量比对差异 14 条（9 个目标 + B2-12/B30-3/B30-4/B30-5/B60 五个同族旁及项），零 None、find_all_template_files 差异 0",
+      "qualname": "find_template_file_any",
+      "reason": null,
+      "resolver_identities": [
+        "find_template_file"
+      ],
+      "source_path": "backend/app/services/wp_template_finder.py",
+      "status": "migrated",
+      "writer_id": "app.services.wp_template_finder::find_template_file_any"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "17,58",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "template_provisioning",
+      "intended_status": "deferred",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.services.wp_template_init_service",
+      "note": null,
+      "qualname": "_ensure_d4_ipo_loaded",
+      "reason": "模板初始化属 provisioning，不是内容解析；instrumentation 发布后由 Task 17/58 一并处理",
+      "resolver_identities": [],
+      "source_path": "backend/app/services/wp_template_init_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_init_service::_ensure_d4_ipo_loaded"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "17,58",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "template_provisioning",
+      "intended_status": "deferred",
+      "is_resolver_fork": false,
+      "kind": "writer",
+      "module": "app.services.wp_template_init_service",
+      "note": null,
+      "qualname": "_ensure_ipo_loaded",
+      "reason": "模板初始化属 provisioning，不是内容解析；instrumentation 发布后由 Task 17/58 一并处理",
+      "resolver_identities": [],
+      "source_path": "backend/app/services/wp_template_init_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_init_service::_ensure_ipo_loaded"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "17,58",
+      "domain": "template_provisioning",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "template_provisioning",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.wp_template_init_service",
+      "note": null,
+      "qualname": "init_workpaper_from_template",
+      "reason": "模板初始化属 provisioning，不是内容解析；instrumentation 发布后由 Task 17/58 一并处理",
+      "resolver_identities": [
+        "find_template_file_any"
+      ],
+      "source_path": "backend/app/services/wp_template_init_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_init_service::init_workpaper_from_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "export_storage",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_xlsx_export_service",
+      "note": null,
+      "qualname": "_sync_export_workpaper_xlsx",
+      "reason": "_resolve_template_path 是第 4 份模板路径副本，随 Task 19/20 writer 矩阵归零一并收敛",
+      "resolver_identities": [
+        "_resolve_template_path"
+      ],
+      "source_path": "backend/app/services/wp_xlsx_export_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
+    }
+  ],
+  "schema_version": "resolver-migration-matrix:v1",
+  "self_written_patterns": {
+    "ad_hoc_storage_join": "[\\\"']storage[\\\"']\\s*/\\s*[\\\"']projects[\\\"']",
+    "bare_exists_reachability": "if\\s+not\\s+[\\w\\.]+\\.exists\\(\\)",
+    "manual_backend_root": "parent\\.parent\\.parent",
+    "raw_file_path_construction": "=\\s*Path\\(\\s*(?:str\\()?\\s*\\w+\\.file_path"
+  },
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "stats": {
+    "by_group": {
+      "custom": 2,
+      "export_storage": 2,
+      "f2_word": 10,
+      "legacy_excel_html": 13,
+      "legacy_file_path": 5,
+      "oo_room": 7,
+      "out_of_task12_scope": 25,
+      "storage_version": 2,
+      "template_finder": 2,
+      "template_provisioning": 3,
+      "upload_import": 1,
+      "wopi": 6
+    },
+    "by_status": {
+      "deferred": 64,
+      "migrated": 14
+    },
+    "deferred": 64,
+    "migrated": 14,
+    "regressed": 0,
+    "resolver_fork_count": 63,
+    "row_count": 78
+  },
+  "task": "Wave 1 Task 12",
+  "unified_entry_calls": [
+    "resolve_wp_file",
+    "resolve_template_docx",
+    "resolve_published_artifact",
+    "resolve_within_root",
+    "join_within_root",
+    "assert_within_root",
+    "is_within_any_legacy_root",
+    "pick_most_specific",
+    "resolve_word_template",
+    "resolve_own_docx_or_none",
+    "word_canonical_write_target",
+    "onlyoffice_canonical_dir",
+    "onlyoffice_canonical_path"
+  ]
+}

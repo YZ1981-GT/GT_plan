@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g10-trading-financial-liabilities" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -185,6 +186,7 @@ import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
 import type { ChecklistResponse } from './composables/useF1FormData'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G10TabProcedure = defineAsyncComponent(() => import('./g10-trading-financial-liabilities/core/G10TabProcedure.vue'))
 const G10TabAdjudication = defineAsyncComponent(() => import('./g10-trading-financial-liabilities/core/G10TabAdjudication.vue'))

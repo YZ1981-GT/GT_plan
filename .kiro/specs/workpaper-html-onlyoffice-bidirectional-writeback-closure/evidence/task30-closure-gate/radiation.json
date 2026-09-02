@@ -1,0 +1,216 @@
+{
+  "changed": {
+    "backend/tests/workpaper_sync/test_task21_room_service.py": "修好契约数值单一真源判据",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py": "修好 token 解码单一实现判据",
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py": "新增：关门离线判据",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py": "新增：关门集成判据",
+    "backend/scripts/gen/generate_workpaper_resolver_migration_matrix.py": "POLICY 补记阻塞",
+    "backend/data/workpaper_resolver_migration_matrix.json": "重新生成（含新阻塞登记）",
+    "backend/data/workpaper_writer_inventory.json": "重新生成（Task 28 之后行号漂移）",
+    ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md": "修正 Task 20 「不再评估」措辞"
+  },
+  "scanned_test_files": 2283,
+  "unparsable": [],
+  "radiated": {
+    "backend/tests/four_table/test_h_cycle_adjudication_prefill.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/four_table/test_semantic_resolver_coverage.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/services/test_note_k_structure_closure.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/test_note_i_cycle_source_defects.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/test_onlyoffice_single_file_dockey.py": [
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/test_workpaper_ac_coverage_matrix.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/test_workpaper_staged_artifact_boundary_contract.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/test_workpaper_writer_inventory.py": [
+      "path:check_workpaper_writer_revision_gate",
+      "path:generate_workpaper_writer_inventory",
+      "path:workpaper_writer_inventory"
+    ],
+    "backend/tests/test_wp_html_save.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/test_wp_onlyoffice_router.py": [
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/test_x3_roundtrip_property.py": [
+      "path:tasks.md"
+    ],
+    "backend/tests/workpaper_sync/test_task10_orm_repository_contract.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task10_repository_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository"
+    ],
+    "backend/tests/workpaper_sync/test_task11_artifact_repository.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task11_retention_orphan_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository"
+    ],
+    "backend/tests/workpaper_sync/test_task12_canonical_resolver.py": [
+      "import:app.services.workpaper_sync.models",
+      "path:generate_workpaper_resolver_migration_matrix",
+      "path:workpaper_resolver_migration_matrix",
+      "path:workpaper_writer_inventory"
+    ],
+    "backend/tests/workpaper_sync/test_task12_resolution_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository"
+    ],
+    "backend/tests/workpaper_sync/test_task13_contract_registry.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py": [
+      "import:app.services.workpaper_sync.models",
+      "path:generate_workpaper_writer_inventory",
+      "path:workpaper_writer_inventory"
+    ],
+    "backend/tests/workpaper_sync/test_task15_content_mutation_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository"
+    ],
+    "backend/tests/workpaper_sync/test_task17_excel_instrumentation.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task17_excel_instrumentation_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "path:tasks.md"
+    ],
+    "backend/tests/workpaper_sync/test_task18_html_save_unified_revision.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task18_html_save_unified_revision_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository"
+    ],
+    "backend/tests/workpaper_sync/test_task19_writer_migration.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task20_writer_gate.py": [
+      "path:check_workpaper_writer_revision_gate",
+      "path:generate_workpaper_writer_inventory",
+      "path:tasks.md",
+      "path:workpaper_writer_inventory"
+    ],
+    "backend/tests/workpaper_sync/test_task21_room_service.py": [
+      "changed-itself",
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.oo_contract",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task21_room_service_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py": [
+      "changed-itself",
+      "import:app.services.workpaper_sync.callback_delivery",
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.oo_contract",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task22_callback_claim_pg.py": [
+      "import:app.services.workpaper_sync.callback_delivery",
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.oo_contract",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task23_request_application.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task23_request_application_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task24_close_intent.py": [
+      "import:app.services.workpaper_sync.close_intent",
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.oo_contract"
+    ],
+    "backend/tests/workpaper_sync/test_task24_close_intent_pg.py": [
+      "import:app.services.workpaper_sync.close_intent",
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task25_materialize_coordinator.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task25_materialize_coordinator_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task27_conflict_resolution_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task28_sync_router.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task28_sync_router_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ],
+    "backend/tests/workpaper_sync/test_task29_timeline_evidence.py": [
+      "import:app.services.workpaper_sync.models"
+    ],
+    "backend/tests/workpaper_sync/test_task29_timeline_evidence_pg.py": [
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository"
+    ],
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py": [
+      "changed-itself",
+      "import:app.services.workpaper_sync.callback_delivery",
+      "import:app.services.workpaper_sync.models",
+      "path:check_workpaper_writer_revision_gate",
+      "path:generate_workpaper_writer_inventory",
+      "path:tasks.md",
+      "path:workpaper_resolver_migration_matrix",
+      "path:workpaper_writer_inventory"
+    ],
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py": [
+      "changed-itself",
+      "import:app.services.workpaper_sync.callback_delivery",
+      "import:app.services.workpaper_sync.close_intent",
+      "import:app.services.workpaper_sync.models",
+      "import:app.services.workpaper_sync.repository",
+      "import:app.services.workpaper_sync.rooms"
+    ]
+  },
+  "radiated_count": 47
+}

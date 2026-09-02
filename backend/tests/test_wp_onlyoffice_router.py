@@ -27,12 +27,59 @@ from jose import jwt
 from app.core.config import settings as app_settings
 from app.routers.wp_onlyoffice_router import (
     _extract_user_id_from_callback,
-    _generate_doc_key,
     _onlyoffice_storage_dir,
     _resolve_wp_file,
     _sign_jwt,
+    public_router,
     router,
 )
+from app.services.onlyoffice_room_identity import BASELINE_GENERATION, sheet_entry_id
+from app.services.workpaper_sync.rooms import derive_doc_key
+
+#: Task 21 起 doc_key 由 room 身份 `(wp_id, entry_id, generation)` 派生，
+#: `_generate_doc_key(file_path, wp_code) = md5(wp_code + st_mtime_ns)` 已删除且不留
+#: fallback（design §wp_onlyoffice_router）。这里保留一个测试侧 helper 走**生产同一条
+#: 链路**，而不是在测试里抄一份公式。
+_ROUTER_TEST_WP_ID = uuid.UUID("44444444-4444-4444-4444-444444444444")
+
+
+def _room_doc_key(wp_code: str, sheet_name: str, *, whole: bool = False) -> str:
+    return derive_doc_key(
+        wp_id=_ROUTER_TEST_WP_ID,
+        entry_id=sheet_entry_id(
+            wp_code=wp_code, sheet_name=sheet_name, whole_workbook=whole
+        ),
+        generation=BASELINE_GENERATION,
+    )
+
+
+def _empty_result():
+    """「查到但为空」的通用结果：`.first()/.scalar()/.scalar_one_or_none()` 全 None。
+
+    Task 21 起 config 端点多了一次 room 身份查询（`resolve_room_doc_key`）。这些用例
+    本来就没在库里建 room，所以「空」是**真实**场景，不是为了凑 mock 数量。
+    """
+    result = MagicMock()
+    result.first.return_value = None
+    result.scalar.return_value = None
+    result.scalar_one_or_none.return_value = None
+    result.scalars.return_value.all.return_value = []
+    return result
+
+
+def _db_execute(*ordered):
+    """按顺序返回给定结果，其后一律返回 `_empty_result()`。
+
+    刻意不写死总调用次数：写死之后，任何一次「多查一条辅助数据」都会让整组用例
+    `StopIteration` 崩掉，而崩掉的原因与被测行为无关 —— 那是最容易被误读成回归的假红。
+    前两项（底稿行 / 门控结果）仍然精确给定，因为它们是本组用例真正要摆的场景。
+    """
+    queue = list(ordered)
+
+    async def _execute(*_args, **_kwargs):
+        return queue.pop(0) if queue else _empty_result()
+
+    return _execute
 
 
 # ---------------------------------------------------------------------------
@@ -60,6 +107,12 @@ async def app_client(tmp_storage):
     """构建测试 FastAPI app + AsyncClient"""
     app = FastAPI()
     app.include_router(router)
+    # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+    #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+    #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+    #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+    #    两个 router 不一致（Task 30 关门时修）。
+    app.include_router(public_router)
 
     # Mock 依赖
     fake_user = _FakeUser()
@@ -93,44 +146,43 @@ class TestHelpers:
         expected = tmp_path / "projects" / str(pid) / "workpapers" / "onlyoffice"
         assert result == expected
 
-    def test_generate_doc_key_deterministic(self, tmp_path):
-        """同一文件同一 mtime → 相同 doc_key"""
-        f = tmp_path / "test.xlsx"
-        f.write_bytes(b"hello")
-        key1 = _generate_doc_key(f, "D0")
-        key2 = _generate_doc_key(f, "D0")
+    def test_room_doc_key_deterministic(self, tmp_path):
+        """同 wp/entry/generation → 相同 doc_key（callback 侧要能重算）。"""
+        key1 = _room_doc_key("D0", "函证检查表")
+        key2 = _room_doc_key("D0", "函证检查表")
         assert key1 == key2
-        assert len(key1) == 32  # MD5 hex
+        assert key1.startswith("wpsync-")
+        assert len(key1) <= 150, "必须能落进 working_paper_oo_room.doc_key(150)"
 
-    def test_generate_doc_key_changes_on_modify(self, tmp_path):
-        """文件修改后 doc_key 变化"""
+    def test_room_doc_key_unchanged_when_file_is_modified(self, tmp_path):
+        """文件被改写后 doc_key **不变**（Task 21 / AC 2.7 / Property 6）。
+
+        原版断言的是「文件修改后 doc_key 变化」。旧公式 `md5(wp_code + st_mtime_ns)`
+        的后果是：sheet 可见性改写、callback 落盘、任何一次写入都会轮转 doc_key，
+        OO 于是把它当成另一个文档 —— 进行中的协同会话被切断。现在只有显式发布新
+        representation generation 才轮转 key。
+        """
         f = tmp_path / "test.xlsx"
         f.write_bytes(b"hello")
-        key1 = _generate_doc_key(f, "D0")
+        before_mtime = f.stat().st_mtime_ns
+        key1 = _room_doc_key("D0", "函证检查表")
 
-        # 修改文件（确保 mtime 变化）
-        import time
-        time.sleep(0.01)
-        f.write_bytes(b"world")
-        key2 = _generate_doc_key(f, "D0")
-        # mtime 改变 → key 应变化（但在极快的文件系统上 mtime 精度可能不够）
-        # 用 _ns 确保差异
-        assert key1 != key2 or f.stat().st_mtime_ns == f.stat().st_mtime_ns
+        os.utime(f, ns=(before_mtime + 1_000_000_000, before_mtime + 1_000_000_000))
+        assert f.stat().st_mtime_ns != before_mtime, "没能真的改掉 mtime ⇒ 本条假绿"
 
-    def test_generate_doc_key_same_wp_code_same_key(self, tmp_path):
-        """同 wp_code 不同 sheet 请求共享同一物理文件 → 相同 doc_key"""
-        f = tmp_path / "D0.xlsx"
-        f.write_bytes(b"shared workbook content")
-        # 同一 wp_code 的不同 sheet 调用，file 相同 → 得到相同 doc_key
-        key_sheet1 = _generate_doc_key(f, "D0")
-        key_sheet2 = _generate_doc_key(f, "D0")
-        assert key_sheet1 == key_sheet2
+        assert _room_doc_key("D0", "函证检查表") == key1
 
-        # 不同 wp_code → 不同 doc_key
-        f2 = tmp_path / "D1.xlsx"
-        f2.write_bytes(b"shared workbook content")
-        key_other = _generate_doc_key(f2, "D1")
-        assert key_sheet1 != key_other
+    def test_room_doc_key_separates_sheets_and_whole_workbook(self, tmp_path):
+        """每个 sheet 与「完整 Excel」视图各自一个 room 身份。
+
+        撞在一起的后果：整册视图会拿到缓存的单 sheet 副本（其余 sheet 已被 openpyxl
+        隐藏），用户看到的「完整 Excel」其实只有一张表。
+        """
+        key_sheet1 = _room_doc_key("D0", "函证检查表")
+        key_sheet2 = _room_doc_key("D0", "替代程序表")
+        key_whole = _room_doc_key("D0", "函证检查表", whole=True)
+        key_other_code = _room_doc_key("D1", "函证检查表")
+        assert len({key_sheet1, key_sheet2, key_whole, key_other_code}) == 4
 
     def test_sign_jwt_with_secret(self, monkeypatch):
         """有 secret 时生成有效 JWT"""
@@ -240,8 +292,14 @@ class TestOnlyOfficeConfigEndpoint:
         wp_id = uuid.uuid4()
         fake_user = _FakeUser()
 
-        # 直接测试 config 构建逻辑
-        doc_key = _generate_doc_key(template, "D0")
+        # 直接测试 config 构建逻辑（doc_key 走 room 身份，与生产同一条链路）
+        doc_key = derive_doc_key(
+            wp_id=wp_id,
+            entry_id=sheet_entry_id(
+                wp_code="D0", sheet_name="函证检查表", whole_workbook=False
+            ),
+            generation=BASELINE_GENERATION,
+        )
         config = {
             "document": {
                 "fileType": "xlsx",
@@ -316,7 +374,9 @@ class TestOnlyOfficeConfigEndpoint:
         fake_proj_result.scalar.return_value = False
 
         fake_db = AsyncMock()
-        fake_db.execute = AsyncMock(side_effect=[fake_wp_result, fake_proj_result])
+        fake_db.execute = AsyncMock(
+            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+        )
 
         # Mock acquire_session 返回 False（席位满）
         with patch("app.services.onlyoffice_session_limiter.acquire_session", new_callable=AsyncMock) as mock_acquire:
@@ -324,6 +384,12 @@ class TestOnlyOfficeConfigEndpoint:
 
             app = FastAPI()
             app.include_router(router)
+            # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+            #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+            #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+            #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+            #    两个 router 不一致（Task 30 关门时修）。
+            app.include_router(public_router)
 
             fake_user = _FakeUser()
 
@@ -392,7 +458,9 @@ class TestOnlyOfficeConfigEndpoint:
         fake_proj_result.scalar.return_value = False
 
         fake_db = AsyncMock()
-        fake_db.execute = AsyncMock(side_effect=[fake_wp_result, fake_proj_result])
+        fake_db.execute = AsyncMock(
+            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+        )
 
         # Mock acquire_session — should NOT be called
         with patch("app.services.onlyoffice_session_limiter.acquire_session", new_callable=AsyncMock) as mock_acquire:
@@ -400,6 +468,12 @@ class TestOnlyOfficeConfigEndpoint:
 
             app = FastAPI()
             app.include_router(router)
+            # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+            #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+            #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+            #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+            #    两个 router 不一致（Task 30 关门时修）。
+            app.include_router(public_router)
 
             fake_user = _FakeUser()
 
@@ -465,7 +539,9 @@ class TestOnlyOfficeConfigEndpoint:
         fake_proj_result.scalar.return_value = False
 
         fake_db = AsyncMock()
-        fake_db.execute = AsyncMock(side_effect=[fake_wp_result, fake_proj_result])
+        fake_db.execute = AsyncMock(
+            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+        )
 
         # Mock acquire_session 返回 True（席位充足）
         with patch("app.services.onlyoffice_session_limiter.acquire_session", new_callable=AsyncMock) as mock_acquire:
@@ -473,6 +549,12 @@ class TestOnlyOfficeConfigEndpoint:
 
             app = FastAPI()
             app.include_router(router)
+            # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+            #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+            #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+            #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+            #    两个 router 不一致（Task 30 关门时修）。
+            app.include_router(public_router)
 
             fake_user = _FakeUser()
 
@@ -538,13 +620,21 @@ class TestOnlyOfficeConfigEndpoint:
         fake_proj_result.scalar.return_value = False
 
         fake_db = AsyncMock()
-        fake_db.execute = AsyncMock(side_effect=[fake_wp_result, fake_proj_result])
+        fake_db.execute = AsyncMock(
+            side_effect=_db_execute(fake_wp_result, fake_proj_result)
+        )
 
         with patch("app.services.onlyoffice_session_limiter.acquire_session", new_callable=AsyncMock) as mock_acquire:
             mock_acquire.return_value = True
 
             app = FastAPI()
             app.include_router(router)
+            # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+            #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+            #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+            #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+            #    两个 router 不一致（Task 30 关门时修）。
+            app.include_router(public_router)
 
             fake_user = _FakeUser()
 
@@ -709,6 +799,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -759,6 +855,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -786,6 +888,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -833,6 +941,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -881,6 +995,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -908,6 +1028,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -940,6 +1066,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -969,6 +1101,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1004,6 +1142,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -1050,6 +1194,12 @@ class TestOnlyOfficeCallbackEndpoint:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -1196,6 +1346,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -1245,6 +1401,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1282,6 +1444,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1319,6 +1487,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1353,6 +1527,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1387,6 +1567,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1421,6 +1607,12 @@ class TestCallbackSeatRelease:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1574,6 +1766,12 @@ class TestWopiJwtVerification:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1628,6 +1826,12 @@ class TestWopiJwtVerification:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -1687,6 +1891,12 @@ class TestWopiJwtVerification:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -1746,6 +1956,12 @@ class TestWopiJwtVerification:
 
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield fake_db
@@ -1783,6 +1999,12 @@ class TestOnlyOfficeHealthEndpoint:
         """健康预检返回 healthy=True + 活跃席位数 + 上限"""
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1818,6 +2040,12 @@ class TestOnlyOfficeHealthEndpoint:
         """OnlyOffice 不可用时返回 healthy=False"""
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1852,6 +2080,12 @@ class TestOnlyOfficeHealthEndpoint:
         """health_check 或 get_active_count 异常时优雅降级（返回 unhealthy）"""
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1887,6 +2121,12 @@ class TestOnlyOfficeHealthEndpoint:
         """健康预检端点无需用户鉴权（状态端点）"""
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()
@@ -1923,6 +2163,12 @@ class TestOnlyOfficeHealthEndpoint:
         """验证 /onlyoffice/health 注册在 /{wp_id} 之前（不被当成 wp_id 捕获）"""
         app = FastAPI()
         app.include_router(router)
+        # 🔴 callback / wopi.contents / onlyoffice.health 三个端点挂在
+        #    `public_router` 上（机对机入口，绕过 dedicated_wp_gate 的
+        #    get_current_user）。只挂 `router` 的测试 app 里它们**不存在**，
+        #    于是全部返回 404 —— 与生产 `router_registry.workpaper` 同时注册
+        #    两个 router 不一致（Task 30 关门时修）。
+        app.include_router(public_router)
 
         async def _override_db():
             yield MagicMock()

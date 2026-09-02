@@ -1,0 +1,631 @@
+{
+  "contract_id": "h1.disposal_check",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "1bccb2d955ec9224564f8aa4d5b2a2cf96d436026463070c96be8e5737f80496",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "dynamic_rows": {
+      "note": "骨架行数由 pilot_h1_grouped_dynamic.skeleton_row_count(seed) 决定，seed=0 时为 1 行。模板自带的 15 行是模板事实、不是骨架策略；预置多余空占位会被下游推成占位披露行（平台铁律：动态区骨架行数禁写死）",
+      "skeleton_row_policy": "max(seed,1)",
+      "template_physical_skeleton_rows": 15
+    },
+    "entry_id": "xlsx/gt-h1-fixed-assets",
+    "excluded_columns": [
+      {
+        "column": "X",
+        "header_source_ref": "源xlsx!减少检查表H1-8!X10",
+        "reason": "模板的扩展占位列（表头文本恰为 `……`），没有业务语义也没有对应前端字段 —— 按 Requirement 6.1「禁止无来源自造字段」不声明为受管字段"
+      }
+    ],
+    "grouped_header": {
+      "duplicate_leaf_labels": [
+        "对手方名称",
+        "日期/编号",
+        "金额"
+      ],
+      "group_row": 10,
+      "groups": [
+        {
+          "cell": "I10",
+          "columns": [
+            "I",
+            "J",
+            "K",
+            "L",
+            "M",
+            "N",
+            "O"
+          ],
+          "label": "减少情况"
+        },
+        {
+          "cell": "P10",
+          "columns": [
+            "P",
+            "Q"
+          ],
+          "label": "审批单"
+        },
+        {
+          "cell": "R10",
+          "columns": [
+            "R",
+            "S",
+            "T"
+          ],
+          "label": "合同/协议/订单"
+        },
+        {
+          "cell": "U10",
+          "columns": [
+            "U",
+            "V",
+            "W"
+          ],
+          "label": "发票"
+        }
+      ],
+      "leaf_row": 12,
+      "mid_levels": [
+        {
+          "cell": "I11",
+          "columns": [
+            "I",
+            "J",
+            "K",
+            "L"
+          ],
+          "label": "转入清理的固定资产"
+        },
+        {
+          "cell": "M11",
+          "columns": [
+            "M",
+            "N"
+          ],
+          "label": "清理净收入"
+        },
+        {
+          "cell": "O11",
+          "columns": [
+            "O"
+          ],
+          "label": "清理净损益"
+        }
+      ],
+      "mid_row": 11
+    },
+    "html_store": {
+      "item_id": "H1-8-rows",
+      "note": "整张表存成这一条 item 的 remark（一个 JSON 数组字符串），行身份是载荷自带的 rowId。数组下标永不进入任何 key（Requirement 6.5 / Property 23）",
+      "observed_empty_in_reference_database": true,
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "h1_grouped_dynamic",
+    "reviewed_basis": "openpyxl 逐 sheet 直读权威模板 H/H1 固定资产.xlsx 的 26 张 sheet，只取受管 sheet 减少检查表H1-8：三级表头 10/11/12 行（4 个横向组 I10:O10/P10:Q10/R10:T10/U10:W10 + 3 个中层 I11:L11/M11:N11/O11:O12 + 6 个真叶子 I12..N12，其余 11 列为 X10:X12 形态的纵向合并）、动态区 13..27 行（15 行物理骨架，A13..A26 字面量 1..14 + A27 占位 ……）、L/O 两列逐行公式 =I-J-K / =N-M-L、A28 合计 footer（I28..O28 = SUM(x13:x27)）、B/E 两列共 2 条数据验证；25 个字段的 source_ref / header_source_ref / mid_source_ref / group_source_ref 均指向上述真实单元格。X 列是占位列故不声明；UUID 列取 AB 而非 AA（AA11 有可见注解）。明细表H1-2 因四级表头超出契约 header_rows 值域 1..3 而未选用，登记为 UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE",
+    "style_sources": {
+      "conditional_formatting_count": 0,
+      "data_validations": [
+        {
+          "sqref": "B13:B27",
+          "values": [
+            "房屋及建筑物",
+            "机器设备",
+            "运输设备",
+            "办公设备",
+            "其他设备"
+          ]
+        },
+        {
+          "sqref": "E13:E27",
+          "values": [
+            "处置",
+            "其他减少"
+          ]
+        }
+      ],
+      "note": "样式源由 excel_extract.verify_unmanaged_regions 的 managed_sheet_structure aspect 逐字节锁死（mergeCells/cols/dataValidations/conditionalFormatting/sheetProtection）",
+      "sheet_protection": false
+    },
+    "unmanaged_below_footer": [
+      {
+        "cell": "A29",
+        "content": "本期减少固定资产合计"
+      },
+      {
+        "cell": "I29",
+        "content": "='明细表H1-2'!O33"
+      },
+      {
+        "cell": "A30",
+        "content": "检查比例"
+      },
+      {
+        "cell": "I30",
+        "content": "=IF(I28=0,0,I28/$I$29)"
+      },
+      {
+        "cell": "AA11",
+        "content": "检查的关键证据和要素根据被审计单位具体情况修改"
+      }
+    ]
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "减少检查表H1-8",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "h18-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "seq",
+              "header_source_ref": "源xlsx!减少检查表H1-8!A10",
+              "header_text": "序号",
+              "json_pointer": "/rows/{row_uuid}/seq",
+              "mode": "auto_source",
+              "source_ref": "源xlsx!减少检查表H1-8!A13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/seq",
+              "store_item_id": "H1-8-rows",
+              "value_type": "integer"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "enum_source_ref": "源xlsx!减少检查表H1-8!B13:B27",
+              "enum_values": [
+                "房屋及建筑物",
+                "机器设备",
+                "运输设备",
+                "办公设备",
+                "其他设备"
+              ],
+              "header_source_ref": "源xlsx!减少检查表H1-8!B10",
+              "header_text": "固定资产类别",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!B13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/category",
+              "store_item_id": "H1-8-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_no",
+              "header_source_ref": "源xlsx!减少检查表H1-8!C10",
+              "header_text": "固定资产编号",
+              "json_pointer": "/rows/{row_uuid}/assetNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!C13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/asset_no",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "asset_name",
+              "header_source_ref": "源xlsx!减少检查表H1-8!D10",
+              "header_text": "固定资产名称",
+              "json_pointer": "/rows/{row_uuid}/name",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!D13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/asset_name",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "disposal_method",
+              "enum_source_ref": "源xlsx!减少检查表H1-8!E13:E27",
+              "enum_values": [
+                "处置",
+                "其他减少"
+              ],
+              "header_source_ref": "源xlsx!减少检查表H1-8!E10",
+              "header_text": "减少方式",
+              "json_pointer": "/rows/{row_uuid}/disposalMethod",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!E13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/disposal_method",
+              "store_item_id": "H1-8-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "disposal_date",
+              "header_source_ref": "源xlsx!减少检查表H1-8!F10",
+              "header_text": "减少日期",
+              "json_pointer": "/rows/{row_uuid}/disposalDate",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!F13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/disposal_date",
+              "store_item_id": "H1-8-rows",
+              "value_type": "date"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "voucher_no",
+              "header_source_ref": "源xlsx!减少检查表H1-8!G10",
+              "header_text": "凭证号",
+              "json_pointer": "/rows/{row_uuid}/voucherNo",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!G13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/voucher_no",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "counterpart_account",
+              "header_source_ref": "源xlsx!减少检查表H1-8!H10",
+              "header_text": "对方科目",
+              "json_pointer": "/rows/{row_uuid}/counterpartAccount",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!H13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/counterpart_account",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "original_cost",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!I12",
+              "header_text": "原值",
+              "json_pointer": "/rows/{row_uuid}/originalCost",
+              "mid_header_text": "转入清理的固定资产",
+              "mid_source_ref": "源xlsx!减少检查表H1-8!I11",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!I13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/original_cost",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "acc_dep",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!J12",
+              "header_text": "累计折旧",
+              "json_pointer": "/rows/{row_uuid}/accDep",
+              "mid_header_text": "转入清理的固定资产",
+              "mid_source_ref": "源xlsx!减少检查表H1-8!I11",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!J13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/acc_dep",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "impairment",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!K12",
+              "header_text": "减值准备",
+              "json_pointer": "/rows/{row_uuid}/impairment",
+              "mid_header_text": "转入清理的固定资产",
+              "mid_source_ref": "源xlsx!减少检查表H1-8!I11",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!K13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/impairment",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "net_value",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!L12",
+              "header_text": "净值",
+              "json_pointer": "/rows/{row_uuid}/netValue",
+              "mid_header_text": "转入清理的固定资产",
+              "mid_source_ref": "源xlsx!减少检查表H1-8!I11",
+              "mode": "formula",
+              "source_ref": "源xlsx!减少检查表H1-8!L13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/net_value",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "disposal_cost",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!M12",
+              "header_text": "清理费用",
+              "json_pointer": "/rows/{row_uuid}/disposalCost",
+              "mid_header_text": "清理净收入",
+              "mid_source_ref": "源xlsx!减少检查表H1-8!M11",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!M13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/disposal_cost",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "disposal_income",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!N12",
+              "header_text": "清理收入",
+              "json_pointer": "/rows/{row_uuid}/disposalIncome",
+              "mid_header_text": "清理净收入",
+              "mid_source_ref": "源xlsx!减少检查表H1-8!M11",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!N13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/disposal_income",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "disposal_gain_loss",
+              "group_header_text": "减少情况",
+              "group_source_ref": "源xlsx!减少检查表H1-8!I10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!O11",
+              "header_text": "清理净损益",
+              "json_pointer": "/rows/{row_uuid}/disposalGainLoss",
+              "mode": "formula",
+              "source_ref": "源xlsx!减少检查表H1-8!O13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/disposal_gain_loss",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "application_ref",
+              "group_header_text": "审批单",
+              "group_source_ref": "源xlsx!减少检查表H1-8!P10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!P11",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/applicationRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!P13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/application_ref",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_approved",
+              "group_header_text": "审批单",
+              "group_source_ref": "源xlsx!减少检查表H1-8!P10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!Q11",
+              "header_text": "是否经过恰当审批",
+              "json_pointer": "/rows/{row_uuid}/isApproved",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!Q13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/is_approved",
+              "store_item_id": "H1-8-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_ref",
+              "group_header_text": "合同/协议/订单",
+              "group_source_ref": "源xlsx!减少检查表H1-8!R10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!R11",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/contractRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!R13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/contract_ref",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "S",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_party",
+              "group_header_text": "合同/协议/订单",
+              "group_source_ref": "源xlsx!减少检查表H1-8!R10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!S11",
+              "header_text": "对手方名称",
+              "json_pointer": "/rows/{row_uuid}/contractParty",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!S13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/contract_party",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "T",
+                "row_from": "row_identity"
+              },
+              "column_key": "contract_amount",
+              "group_header_text": "合同/协议/订单",
+              "group_source_ref": "源xlsx!减少检查表H1-8!R10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!T11",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/contractAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!T13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/contract_amount",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "U",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_ref",
+              "group_header_text": "发票",
+              "group_source_ref": "源xlsx!减少检查表H1-8!U10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!U11",
+              "header_text": "日期/编号",
+              "json_pointer": "/rows/{row_uuid}/invoiceRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!U13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/invoice_ref",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_party",
+              "group_header_text": "发票",
+              "group_source_ref": "源xlsx!减少检查表H1-8!U10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!V11",
+              "header_text": "对手方名称",
+              "json_pointer": "/rows/{row_uuid}/invoiceParty",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!V13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/invoice_party",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "W",
+                "row_from": "row_identity"
+              },
+              "column_key": "invoice_amount",
+              "group_header_text": "发票",
+              "group_source_ref": "源xlsx!减少检查表H1-8!U10",
+              "header_source_ref": "源xlsx!减少检查表H1-8!W11",
+              "header_text": "金额",
+              "json_pointer": "/rows/{row_uuid}/invoiceAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!W13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/invoice_amount",
+              "store_item_id": "H1-8-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Y",
+                "row_from": "row_identity"
+              },
+              "column_key": "index_ref",
+              "header_source_ref": "源xlsx!减少检查表H1-8!Y10",
+              "header_text": "索引号",
+              "json_pointer": "/rows/{row_uuid}/indexRef",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!Y13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/index_ref",
+              "store_item_id": "H1-8-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "Z",
+                "row_from": "row_identity"
+              },
+              "column_key": "is_abnormal",
+              "header_source_ref": "源xlsx!减少检查表H1-8!Z10",
+              "header_text": "是否异常",
+              "json_pointer": "/rows/{row_uuid}/isAbnormal",
+              "mode": "editable",
+              "source_ref": "源xlsx!减少检查表H1-8!Z13",
+              "stable_field_key": "disposal_check_rows/{row_uuid}/is_abnormal",
+              "store_item_id": "H1-8-rows",
+              "value_type": "enum"
+            }
+          ],
+          "footer_anchor": {
+            "marker": "合计",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "L13:L27",
+            "O13:O27"
+          ],
+          "header_rows": 3,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "disposal_check_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "20165b7da28a3712fc511d9b001c8f979a6153bc1a1cb2d1449ef3d83673bedd",
+    "relative_path": "H/H1 固定资产.xlsx",
+    "template_sha256": "344f83216b9024e3c3fde7c1ed545eb0026a6cf088a0b0dfd0916e47b64fdc87"
+  },
+  "template_definition_sha256": "ef2e9042958aa94766b6d6d12fb9deee4ea909a64ee0944fce486ae570a916a1"
+}

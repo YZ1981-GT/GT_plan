@@ -1,0 +1,914 @@
+{
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 73,
+  "script": "backend/scripts/diagnose/mutate_task73_entry_profile_manifest_guards.py",
+  "anchor_self_check": "27/27 OK, 0 MISS",
+  "baseline_backend_passed": 295,
+  "guard_files": {
+    "backend/tests/workpaper_sync/test_task73_entry_profile_manifest.py": "Task 73 新建",
+    "backend/tests/test_workpaper_sync_manifest_contract.py": "Task 1 入口清册契约（补三字段进 _REQUIRED_FIELDS）",
+    "backend/tests/workpaper_sync/test_task13_contract_registry.py": "Task 13 registry 守卫（改写 missing_profile 不变式）"
+  },
+  "mutation_count": 27,
+  "verdict_counts": {
+    "RED": 27
+  },
+  "final_snapshot": [
+    {
+      "id": "M01",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+      "why": "这就是本任务被反复警告的陷阱：从 capability 派生 room_model 后，`_CAPABILITY_ROOM_MODEL` 与 RG-15/16/17 变成恒真重言式，守卫从此永远绿，比原来的欠账更糟（假绿第③源）。是最现实的「让 RG-15 别再报错」的错误改法",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 63.27s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+        "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py",
+        "test_workpaper_sync_manifest_contract.py"
+      ],
+      "restored": true,
+      "seconds": 66.2,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M02",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability",
+      "why": "反重言式判据的字面量分支被掏空 ⇒ `entry[\"capability\"]` 这种最常见的重言式写法不再 fail closed。判据靠合成源码双向验证，因此这条能真的打红",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 63.19s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[dict_key]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[dict_key]"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.1,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M03",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability",
+      "why": "属性形态（`host.capability`）与字面量形态是两条独立分支；合成一条时删掉任一都会被另一条遮蔽 ⇒ 变异判 GREEN。这条证明两个分支各自有判据",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 63.87s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[attribute]",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[attribute]",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.8,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M04",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability",
+      "why": "加一个 `_sneak(host)` helper 再从 derive_* 调用，就能绕过只看直接函数体的检查。传递闭包是这条门唯一能拦住间接重言式的机制",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 63.65s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_ast_guard_rejects_a_derivation_that_reads_capability[indirect_helper]"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.6,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M05",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_generator_calls_the_guard_before_deriving",
+      "why": "守卫只剩测试在调 ⇒ 它自己成了 additive 死代码（假绿第①源）。「新增能力是否真被生产消费」正是本任务要证明的那类判据",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 63.28s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_generator_calls_the_guard_before_deriving"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_generator_calls_the_guard_before_deriving"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.1,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M06",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+      "why": "RG-17 比的是「冻结的 manifest 裁决 ↔ 运行时真实行为」。把另一侧也改成读 manifest 后，它退化成自我比对：doc_key 实现漂移（mtime 回归、lease 消失）永远发现不了",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 63.34s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.2,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M07",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_descriptor_observation_never_reads_capability_tainted_baseline_flags",
+      "why": "红基线的 `flags.single_mode_switch_visible` = `capability ∈ {single_*} AND mode_evidence`，已经把 capability 揉进去了；拿它当 descriptor 事实会让 RG-16 部分重言。行为上两者数量接近（132 vs 176）⇒ 只有结构判据能拦住",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 61.83s (0:01:01)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_descriptor_observation_never_reads_capability_tainted_baseline_flags"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_descriptor_observation_never_reads_capability_tainted_baseline_flags"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 64.5,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M08",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_declaration_files_are_not_reachability_evidence",
+      "why": "`components.d.ts` 由 unplugin 自动生成、提到**每一个**组件 ⇒ 算进入边后可达性判据恒真，实测过：连 overlay 已裁决的 G6 旧桩都会被判成可达",
+      "verdict": "RED",
+      "summary": "6 failed, 277 passed, 6 errors in 60.43s (0:01:00)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_declaration_files_are_not_reachability_evidence",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_declaration_files_are_not_reachability_evidence",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 63.0,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M09",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references",
+      "why": "🔴 首版这条打在**模板标签**边上，实测 GREEN：当前 185 个宿主 tag-only 为 0（57 both / 127 import-only），删掉标签边对真实数据行为不变 = 无效变异。load-bearing 的是 import 边：删掉它 127 个宿主立刻零入边、被判不可达，editability 批量变 unreachable。标签边的能力另由合成索引判据锁住",
+      "verdict": "RED",
+      "summary": "8 failed, 275 passed, 6 errors in 59.85s",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 62.5,
+      "batch": "mutation_final_a.json"
+    },
+    {
+      "id": "M10",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references",
+      "why": "🔴 首版把 `if candidate.is_file()` 改成 `if True`，实测 GREEN：`'./GtX.vue'` 的第一个候选本来就是正确路径，改了也照样命中 = 无效变异。改成解析恒失败才真的掏空 import 边",
+      "verdict": "RED",
+      "summary": "9 failed, 274 passed, 6 errors in 59.43s",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_template_tag_edge_counts_even_without_an_import",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_unreachable_host_is_derived_from_zero_inbound_references"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 62.3,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M11",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such",
+      "why": "「尚不可观测」必须是机器可读状态。谎称已接线时 participant_lease 会变 True、RG-17 的 lease 门失效、`room_service_state` 与 manifest 不符 —— 三处都得打红。反向（把正则改成 if False）是无效变异：今天本来就是空集",
+      "verdict": "RED",
+      "summary": "7 failed, 276 passed, 6 errors in 63.00s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 65.8,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M12",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes",
+      "why": "静态看表达式里有没有 `st_mtime` 会被注释/间接 helper 骗过（rooms.py 已记录过同一个坑）。判据要求 xlsx provider 必须是 `probe_kind == behavioral`",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 63.58s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.5,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M13",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+      "why": "`GtB60DocxPane.vue` 文件头注释里写着「切到在线编辑前先 GET onlyoffice-config」，不剥注释会把它当成真实请求端点 ⇒ 该 entry 的 room_model 得到假事实（实测踩过）",
+      "verdict": "RED",
+      "summary": "17 failed, 266 passed, 6 errors in 61.28s (0:01:01)",
+      "added": [
+        "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted"
+      ],
+      "added_files": [
+        "test_task13_contract_registry.py",
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 64.1,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M14",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_endpoint_regex_never_spans_lines",
+      "why": "首版就是这个正则：一对跨 12 行的引号把整段注释吞成「端点」，b60 entry 因此被判`frontend_endpoint_without_backend_route` ⇒ room_model 假事实。⚠️ 它的**行为**后果被 `startswith(\"/\")` 过滤器挡住（吞出来的串以 `>` 开头），所以只能用针对正则本身的判据打红 —— 那个过滤器是纵深防御，单独删它行为不变",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 63.74s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_endpoint_regex_never_spans_lines"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_endpoint_regex_never_spans_lines"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.7,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M15",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_required_entry_fields_cover_the_three_profile_fields",
+      "why": "Task 1 的欠账正是这样发生的：字段没进必填集合，于是缺了也没人打红，静默消失",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 63.31s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_required_entry_fields_cover_the_three_profile_fields"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_required_entry_fields_cover_the_three_profile_fields"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.2,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M16",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+      "why": "必填集合列全了但检查被短路 = 好看的常量。这条与 M15 是两条独立判据",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 63.16s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.0,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M17",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestProfileParticipatesInTheManifestDigest::test_flipping_a_profile_field_changes_both_digests",
+      "why": "Requirement 1.2 要求「source-backed 字段与来源摘要进入 manifest digest」。字段不进摘要 ⇒ profile 变了 evidence 不会 stale（design 的 stale policy 失效）",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 63.20s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestProfileParticipatesInTheManifestDigest::test_flipping_a_profile_field_changes_both_digests",
+        "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestProfileParticipatesInTheManifestDigest::test_flipping_a_profile_field_changes_both_digests"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py",
+        "test_workpaper_sync_manifest_contract.py"
+      ],
+      "restored": true,
+      "seconds": 66.1,
+      "batch": "mutation_final_b.json"
+    },
+    {
+      "id": "M18",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+      "why": "双向锁死的一半：复核过的取值域与源码推导值必须逐条相等。短路后 overlay 变成一段无人核对的说明文字（AC 1.2 明禁自由文本决定 profile）",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 60.79s (0:01:00)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 63.7,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M19",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+      "why": "双向锁死的另一半：复核过但已无人派生的取值必须打红，否则 overlay 会攒下一堆描述早已不存在的源码形态的「批准」",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 62.64s (0:01:02)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 65.8,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M20",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+      "why": "这条是 `editability=unreachable` 唯一的独立复核：源码入边为 0 ↔ overlay unreachable_rule 必须同时成立。短路后 Requirement 1.7 的裁决无人交叉验证",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 61.93s (0:01:01)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 64.6,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M21",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "why": "RG-15 只需 manifest 自身字段，是唯一**无条件**能跑在全量真实 entry 上的交叉判据。不跑它，registry 报告对真实数据又退回零覆盖",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 62.54s (0:01:02)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 65.5,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M22",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "why": "这正是本任务要修的欠账形态：RG-16/17 只在手搓 fixture 上跑，对真实 manifest 结构性不可达（假绿第①源）",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 62.83s (0:01:02)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 65.7,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M23",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+      "why": "算出来了却不上报 = 闭合门永远看不到，Requirement 1.8「可见且阻断」失效",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 63.45s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.4,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M24",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "why": "未登记的事实会被 `evaluate_closure` 判成 unregistered 或干脆不计入阻断总数 ⇒ 142 条真实漂移静默消失",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 63.60s (0:01:03)",
+      "added": [
+        "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_participates_in_the_blocking_total"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+      ],
+      "added_files": [
+        "test_task13_contract_registry.py",
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.6,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M25",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+      "why": "唯一的生产消费方不传观察器 ⇒ RG-16/17 在生产路径上仍然是死代码，漂移条数从 142 掉到 5（只剩 RG-15）",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 63.31s (0:01:03)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_gate_passes_the_live_observer_not_a_stub",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 66.3,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M26",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+      "why": "47 条 entry 的宿主没有传 readonly，其 editability 完全由组件 prop 默认值决定。翻掉它必须让 manifest 与复核期望同时打红 —— 否则 editability 只是个手填值",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 64.06s (0:01:04)",
+      "added": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+        "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+        "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+      ],
+      "added_files": [
+        "test_task73_entry_profile_manifest.py",
+        "test_workpaper_sync_manifest_contract.py"
+      ],
+      "restored": true,
+      "seconds": 67.0,
+      "batch": "mutation_final_c.json"
+    },
+    {
+      "id": "M27",
+      "side": "be",
+      "want": "test_task73_entry_profile_manifest.py::TestProfileFieldsExistOnEveryEntry::test_provenance_points_at_real_source_lines",
+      "why": "`^\\s*//` 里的 `\\s` 也匹配换行 ⇒ 一串空行 + 一条 `//` 被整段吞掉、行数不守恒（实测 WorkpaperWordEditor.vue 1365 → 1332 行），provenance 的 `#Lnn` 全部左移指错行。只断言「文件存在」的判据对此全绿 —— 所以判据必须校验那一行真的含该事实",
+      "verdict": "RED",
+      "summary": "17 failed, 266 passed, 6 errors in 61.05s (0:01:01)",
+      "added": [
+        "test_task13_contract_registry.py::TestRegistryReportHasAProductionConsumer::test_closure_gate_consumes_the_registry_report",
+        "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_descriptor_is_absent_exactly_for_unreachable_hosts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg16_fires_where_a_single_capability_host_still_offers_both_modes",
+        "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_flipping_every_capability_leaves_the_profile_byte_identical",
+        "test_task73_entry_profile_manifest.py::TestDerivationIsIndependentOfBusinessAdjudication::test_room_observation_ignores_the_manifest_room_model",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_a_dropped_profile_field_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_missing_expected_profile_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_editability_falls_back_to_the_component_prop_default",
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_room_service_is_still_unwired_and_reported_as_such"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_comment_only_endpoints_are_not_counted"
+      ],
+      "added_files": [
+        "test_task13_contract_registry.py",
+        "test_task73_entry_profile_manifest.py"
+      ],
+      "restored": true,
+      "seconds": 64.0,
+      "batch": "mutation_final_b.json"
+    }
+  ],
+  "first_round_non_red_all_fixed": [
+    [
+      "M09",
+      "GREEN"
+    ],
+    [
+      "M10",
+      "GREEN"
+    ],
+    [
+      "M12",
+      "GREEN"
+    ],
+    [
+      "M13",
+      "GREEN"
+    ],
+    [
+      "M14",
+      "GREEN"
+    ],
+    [
+      "M18",
+      "GREEN"
+    ]
+  ],
+  "diagnostic_runs": [
+    {
+      "id": "M01",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "3 failed, 284 passed in 63.53s (0:01:03)"
+    },
+    {
+      "id": "M02",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "1 failed, 286 passed in 63.62s (0:01:03)"
+    },
+    {
+      "id": "M03",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "2 failed, 285 passed in 66.38s (0:01:06)"
+    },
+    {
+      "id": "M04",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "1 failed, 286 passed in 66.48s (0:01:06)"
+    },
+    {
+      "id": "M05",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "1 failed, 286 passed in 66.27s (0:01:06)"
+    },
+    {
+      "id": "M06",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "3 failed, 284 passed in 64.78s (0:01:04)"
+    },
+    {
+      "id": "M07",
+      "batch": "mutation_report_batch1.json",
+      "verdict": "RED",
+      "summary": "1 failed, 286 passed in 64.82s (0:01:04)"
+    },
+    {
+      "id": "M08",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "RED",
+      "summary": "6 failed, 275 passed, 6 errors in 65.36s (0:01:05)"
+    },
+    {
+      "id": "M09",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "GREEN",
+      "summary": "287 passed in 65.95s (0:01:05)"
+    },
+    {
+      "id": "M10",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "GREEN",
+      "summary": "287 passed in 64.34s (0:01:04)"
+    },
+    {
+      "id": "M11",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "RED",
+      "summary": "7 failed, 274 passed, 6 errors in 62.97s (0:01:02)"
+    },
+    {
+      "id": "M12",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "GREEN",
+      "summary": "1 error in 1.09s"
+    },
+    {
+      "id": "M13",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "GREEN",
+      "summary": "287 passed in 64.51s (0:01:04)"
+    },
+    {
+      "id": "M14",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "GREEN",
+      "summary": "287 passed in 63.65s (0:01:03)"
+    },
+    {
+      "id": "M15",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "RED",
+      "summary": "1 failed, 286 passed in 64.27s (0:01:04)"
+    },
+    {
+      "id": "M16",
+      "batch": "mutation_report_batch2.json",
+      "verdict": "RED",
+      "summary": "1 failed, 286 passed in 65.66s (0:01:05)"
+    },
+    {
+      "id": "M09",
+      "batch": "mutation_report_batch2b.json",
+      "verdict": "RED",
+      "summary": "8 failed, 275 passed, 6 errors in 64.11s (0:01:04)"
+    },
+    {
+      "id": "M10",
+      "batch": "mutation_report_batch2b.json",
+      "verdict": "RED",
+      "summary": "9 failed, 274 passed, 6 errors in 62.05s (0:01:02)"
+    },
+    {
+      "id": "M12",
+      "batch": "mutation_report_batch2b.json",
+      "verdict": "GREEN",
+      "summary": "1 error in 1.13s"
+    },
+    {
+      "id": "M13",
+      "batch": "mutation_report_batch2b.json",
+      "verdict": "RED",
+      "summary": "17 failed, 266 passed, 6 errors in 61.45s (0:01:01)"
+    },
+    {
+      "id": "M14",
+      "batch": "mutation_report_batch2b.json",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 61.66s (0:01:01)"
+    },
+    {
+      "id": "M12",
+      "batch": "mutation_report_batch3.json",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 65.52s (0:01:05)"
+    },
+    {
+      "id": "M17",
+      "batch": "mutation_report_batch3.json",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 69.01s (0:01:09)"
+    },
+    {
+      "id": "M18",
+      "batch": "mutation_report_batch3.json",
+      "verdict": "GREEN",
+      "summary": "289 passed in 66.04s (0:01:06)"
+    },
+    {
+      "id": "M19",
+      "batch": "mutation_report_batch3.json",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 65.77s (0:01:05)"
+    },
+    {
+      "id": "M20",
+      "batch": "mutation_report_batch3.json",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 65.13s (0:01:05)"
+    },
+    {
+      "id": "M18",
+      "batch": "mutation_report_batch4.json",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 64.18s (0:01:04)"
+    },
+    {
+      "id": "M21",
+      "batch": "mutation_report_batch4.json",
+      "verdict": "RED",
+      "summary": "1 failed, 288 passed in 62.03s (0:01:02)"
+    },
+    {
+      "id": "M22",
+      "batch": "mutation_report_batch4.json",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 59.94s"
+    },
+    {
+      "id": "M23",
+      "batch": "mutation_report_batch4.json",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 61.05s (0:01:01)"
+    },
+    {
+      "id": "M24",
+      "batch": "mutation_report_batch5.json",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 63.07s (0:01:03)"
+    },
+    {
+      "id": "M25",
+      "batch": "mutation_report_batch5.json",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 62.81s (0:01:02)"
+    },
+    {
+      "id": "M26",
+      "batch": "mutation_report_batch5.json",
+      "verdict": "RED",
+      "summary": "2 failed, 287 passed in 63.40s (0:01:03)"
+    },
+    {
+      "id": "M01",
+      "batch": "mutation_report_batch6.json",
+      "verdict": "RED",
+      "summary": "3 failed, 286 passed in 62.06s (0:01:02)"
+    },
+    {
+      "id": "M13",
+      "batch": "mutation_report_batch6.json",
+      "verdict": "RED",
+      "summary": "17 failed, 266 passed, 6 errors in 61.39s (0:01:01)"
+    },
+    {
+      "id": "M27",
+      "batch": "mutation_report_batch6.json",
+      "verdict": "RED",
+      "summary": "17 failed, 266 passed, 6 errors in 60.82s (0:01:00)"
+    }
+  ]
+}

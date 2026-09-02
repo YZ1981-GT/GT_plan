@@ -14,6 +14,7 @@
           :disabled="!isOoAvailable && currentMode === 'html'"
           @change="onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h4-engineering-materials" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -216,6 +217,7 @@ import { eventBus } from '@/utils/eventBus'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 // 版本 Host 由 Runtime Boundary(GtWpRenderer) 统一挂载
 const GtAProgramConsole = defineAsyncComponent(() => import('./GtCycleAProgramRouter.vue'))
 

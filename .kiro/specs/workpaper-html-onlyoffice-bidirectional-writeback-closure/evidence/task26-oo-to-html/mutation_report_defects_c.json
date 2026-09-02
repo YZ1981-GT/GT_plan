@@ -1,0 +1,156 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "backend/tests/workpaper_sync/test_task15_content_mutation.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 6
+  },
+  "mutations": [
+    {
+      "id": "D09",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_call_with_resolutions_is_refused_with_its_own_error_code",
+      "why": "删掉入口的 fail-closed 闸 ⇒ 带裁决的调用不再报错，而是**静默按无裁决处理**（分派已改成只看 `has_conflicts`，所以它落回 conflict 分支）。数据没错，但调用方以为裁决被应用了 —— 这正是 Task 27 接线时最容易踩的坑。同时打红 `_off` 的顺序判据（`src.index` 找不到调用点直接 ValueError），两条一起证明「闸在」与「闸在正确位置」是两件事",
+      "verdict": "RED",
+      "summary": "4 failed, 478 passed in 46.18s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_refusal_happens_before_substrate_open_and_any_adapter_call",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_call_with_resolutions_is_refused_with_its_own_error_code",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_nothing_moved_in_the_database",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_refusal_is_immediate_zero_adapter_zero_probe"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_refusal_happens_before_substrate_open_and_any_adapter_call",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_call_with_resolutions_is_refused_with_its_own_error_code"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "f626a2ed0d687045149764ea935d23a9c54c69e94e8455cc5cb2f038ced153ac",
+      "seconds": 49.2
+    },
+    {
+      "id": "D10",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_non_empty_adjudication_is_refused",
+      "why": "短路纯判据自身。与 D09 分层：D09 打的是**调用点**，本条打的是**判据体**。抽成模块级纯函数正是为了让本条可证伪 —— 留在方法里时它在 happy path 上恒不触发，短路它观察不到差别 ⇒ 判 GREEN（本文件已为三条判据吃过这个教训）",
+      "verdict": "RED",
+      "summary": "4 failed, 478 passed in 44.34s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_non_empty_adjudication_is_refused",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_call_with_resolutions_is_refused_with_its_own_error_code",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_nothing_moved_in_the_database",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_refusal_is_immediate_zero_adapter_zero_probe"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_non_empty_adjudication_is_refused",
+        "test_task26_oo_to_html_pg.py::TestManualAdjudicationIsRefusedOnRealDb::test_call_with_resolutions_is_refused_with_its_own_error_code"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py",
+        "test_task26_oo_to_html_pg.py"
+      ],
+      "restored": true,
+      "restored_sha256": "f626a2ed0d687045149764ea935d23a9c54c69e94e8455cc5cb2f038ced153ac",
+      "seconds": 47.2
+    },
+    {
+      "id": "D11",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_refusal_happens_before_substrate_open_and_any_adapter_call",
+      "why": "把闸门挪到 `load_bundle_snapshot` **之后**。行为不变（照样拒绝），因此只断言「抛了异常」的守卫全绿 —— 「立即失败」这半句必须有自己的判据。本条刻意只挪一站：挪到 `open_substrate` 之后还会连带打红 `_pg` 的零 adapter 断言，归因就不唯一了",
+      "verdict": "RED",
+      "summary": "1 failed, 481 passed in 44.53s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_refusal_happens_before_substrate_open_and_any_adapter_call"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_refusal_happens_before_substrate_open_and_any_adapter_call"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "f626a2ed0d687045149764ea935d23a9c54c69e94e8455cc5cb2f038ced153ac",
+      "seconds": 47.4
+    },
+    {
+      "id": "D12",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_coordinator_does_not_import_apply_resolutions",
+      "why": "登记表声称欠账已还，而模块里既没 import 也没调用 `apply_resolutions` ⇒ 「登记 ↔ 事实」双向锁死的**第一个方向**（登记说接了、其实没接）必须打红。这是 Task 27 接线时最可能出现的半状态：先把登记改成 retired、忘了真接线",
+      "verdict": "RED",
+      "summary": "1 failed, 481 passed in 44.50s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_coordinator_does_not_import_apply_resolutions"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_coordinator_does_not_import_apply_resolutions"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "f626a2ed0d687045149764ea935d23a9c54c69e94e8455cc5cb2f038ced153ac",
+      "seconds": 47.4
+    },
+    {
+      "id": "D13",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_coordinator_does_not_import_apply_resolutions",
+      "why": "双向锁死的**第二个方向**：接线出现了、登记还写着 deferred。与 D12 反向，两条都打同一条守卫但断言消息里的 `imported=`/`called=` 列表可区分。🔴 判据必须走 AST：docstring 里逐处解释「为什么**不**接线」时逐字写着这个符号名，子串匹配版本首轮实测直接假红 —— 那正是「grep 式守卫」的典型缺陷",
+      "verdict": "RED",
+      "summary": "1 failed, 481 passed in 44.51s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_coordinator_does_not_import_apply_resolutions"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_coordinator_does_not_import_apply_resolutions"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "f626a2ed0d687045149764ea935d23a9c54c69e94e8455cc5cb2f038ced153ac",
+      "seconds": 47.4
+    },
+    {
+      "id": "D14",
+      "path": "backend/app/services/workpaper_sync/oo_to_html.py",
+      "want": "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_resolutions_is_read_only_by_the_guard",
+      "why": "缺陷④的 (a) 半：分派退回「带裁决就走无冲突分支」。**单独注入时行为不变**（入口闸门先抛），所以只断言行为的守卫全绿 —— 这正是修法必须分两层的理由：结构层杜绝错值、闸门层杜绝静默忽略，两层各自可证伪。判据形态是「`resolutions` 在入口函数体里只能作闸门实参」：分派条件读它、或往下传给 `_apply_no_conflict`/`BusinessMutation`，都打红",
+      "verdict": "RED",
+      "summary": "1 failed, 481 passed in 46.54s",
+      "added": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_resolutions_is_read_only_by_the_guard"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task26_oo_to_html.py::TestManualAdjudicationFailsClosed::test_resolutions_is_read_only_by_the_guard"
+      ],
+      "added_files": [
+        "test_task26_oo_to_html.py"
+      ],
+      "restored": true,
+      "restored_sha256": "f626a2ed0d687045149764ea935d23a9c54c69e94e8455cc5cb2f038ced153ac",
+      "seconds": 49.6
+    }
+  ]
+}

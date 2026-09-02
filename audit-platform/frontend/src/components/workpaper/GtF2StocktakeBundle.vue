@@ -18,6 +18,7 @@
           size="small"
           type="warning"
         >仅预览·无回写</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f2-stocktake-bundle" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -85,6 +86,7 @@ import F2TabStocktakeSampleResult from './f2/stocktake/F2TabStocktakeSampleResul
 import F2TabStocktakeRollforward from './f2/stocktake/F2TabStocktakeRollforward.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const props = defineProps<{
   wpId: string

@@ -1,0 +1,1949 @@
+{
+  "schema_version": "f2-word-lane-publication:v1",
+  "task": 60,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "F2-22 / F2-23 统一 Word adapter 迁移的 per-entry 裁决与发布记录。本记录**不是** manifest slice：它刻意不匹配 AP-1 检测器的 scan_glob，理由见 why_not_a_cycle_manifest_slice。",
+  "paradigm_ref": {
+    "file": "backend/data/workpaper_sync_migration_paradigm.json",
+    "json_pointer": "/definition_producer_paradigm",
+    "steps_delivered": [
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "steps_blocked": [
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "step_1_note": "step 1（freeze_manifest_slice）在本 lane 上**不可执行**：它的 verifiable_by 要求守卫按 selection_rule 从 source manifest 现算 entry 集合并等值比对，而本 lane 在 manifest 里 0 条 entry；硬写一份 entry 清单会正中该 step 的 forbidden 第一条「手抄 entry 列表 —— 不可复算的清单等于自由文本」。"
+  },
+  "why_not_a_cycle_manifest_slice": {
+    "verdict": "deliberately_not_a_cycle_manifest_slice",
+    "reasons": [
+      "AP-1 检测器的 scan_glob 是 backend/data/*_cycle_manifest_slice.json，它把守的是「用本任务应交付的产物尚不存在当作裁 single_onlyoffice 的理由」；本 lane 的裁决不是 single_onlyoffice（html_counterpart_verdict == exists），进 scan 集合不增加任何保护。",
+      "范式 step 1 要求 slice 的 entry 集合可从 source manifest 按 selection_rule 现算；本 lane 在 manifest 里 0 条 entry ⇒ 任何 slice 形态都只能是手抄清单。",
+      "F 循环 slice 已把这两份 docx 登记为 excluded_from_slice[0]（归 Tasks 60/61）并把文件登记进 authoritative_templates（belongs_to_entry=null + excluded_reason）；再造一份 slice 声称它们是独立 entry 会与那份已冻结的登记冲突，且让两份文件双归属。",
+      "新增第 13 份 slice 会把 Property 70 的配对分母由 66 推到 78、把 test_slice_schema_validator_coverage.py 的事实陈述由 12 推到 13，并辐射 D~N + abcs 十二轮 per-cycle 守卫 —— 这些代价换不到任何新判据。"
+    ],
+    "denominators": {
+      "ap1_detector": "backend/tests/workpaper_sync/test_migration_paradigm_contract.py::TestAntiPatternCircularJustification",
+      "ap1_scan_glob": "backend/data/*_cycle_manifest_slice.json",
+      "slice_count_before_and_after_task_60": 12,
+      "property_70_pairwise_count": 66,
+      "pairwise_recipe": "len(sets)*(len(sets)-1)//2 —— 现算，禁写死",
+      "publication_record_is_outside_the_scan_glob": true
+    },
+    "f_slice_delegation": {
+      "path": "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+      "excluded_from_slice_index": 0,
+      "delegates_to": "Tasks 60/61",
+      "stocktake_entry_id": "xlsx/gt-f2-stocktake-bundle",
+      "stocktake_entry_capability": null,
+      "partially_wired_word_lane_writers": [
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py"
+      ],
+      "consumed_not_overturned": "本记录只消费该 slice 的既有结论（BP-6 的 overlay 默认值、BP-9 的 lane 选择重论证要求、复合 entry_id 范式），不改它一个字节。"
+    }
+  },
+  "source_ref_semantics": {
+    "runtime_locator": "w:tag（sdt_tag）—— 唯一正式协议锚点",
+    "one_time_migration_hints": [
+      "${token}",
+      "p{NN} 段落序号"
+    ],
+    "why_paragraph_ordinal_is_only_a_hint": "Task 6 实测 paragraph_index 的 probe_verdict=failed（文首插 2 段后整体位移）、run_index 亦 failed（3 run → 2 run）⇒ 两者都在 anchors_blocked 里。契约里的 source_ref 写 p{NN} 只为「谁来复核都能一眼定位」，运行态 extract/materialize 只按 sdt_tag 定位。",
+    "verbatim_rule": "paragraph_texts_verbatim 一律不 strip：F2-22 的 P003/P029 是空串、P024 是【提示：…】整段蓝字，strip 会把「模板里到底长什么样」这条判据削弱。"
+  },
+  "probe_gate": {
+    "source": "backend/data/onlyoffice_word_sdt_carrier_contract.json",
+    "task": "6",
+    "oo_build": "9.4.0-129",
+    "carriers_allowed_into_word_engine": [
+      "field_sdt_inline",
+      "field_sdt_block",
+      "sdt_external_body"
+    ],
+    "carriers_blocked": [
+      "row_sdt"
+    ],
+    "anchors_allowed": [
+      "w_tag"
+    ],
+    "anchors_blocked": [
+      "alias_display_name",
+      "sdt_id",
+      "paragraph_index",
+      "run_index"
+    ],
+    "row_carrier_consequence": "Requirement 7.2 当前设计（row-level SDT 携带 row_uuid）在 OO 9.4 上不成立，Tasks 59/60/61/62/63/64 里任何依赖 row 级 SDT 的部分必须先经 design 换载体",
+    "how_this_task_complies": "两份契约的 identity_carriers 现算只含 field_sdt_inline / field_sdt_block；无任何 repeaters（行域字段）⇒ 不依赖 row_sdt，也没有 row_uuid 需要承载。锚点只用 w:tag。"
+  },
+  "authoritative_templates": {
+    "root": "backend/wp_templates/F",
+    "reference_copy_status": "absent_from_working_tree",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件",
+    "files": [
+      {
+        "name": "F2-22 存货监盘计划.docx",
+        "size": 37539,
+        "sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+        "normalized_structure_hash": "27b722592ba5eb8b7ed46aa56754fd15d10fd53460049827edea578c44e9ce6b",
+        "belongs_to_lane_entry": "word-lane/f2-22-stocktake-plan",
+        "in_runtime_index": false,
+        "runtime_reachability": "经 wp_template_finder._EXPLICIT_TEMPLATE_RELPATHS['F2-22'] 显式命中；不在 _index.json 里也可达"
+      },
+      {
+        "name": "F2-23 存货监盘小结.docx",
+        "size": 37335,
+        "sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+        "normalized_structure_hash": "9aacc31e205bdf5b905f92456ceea0fd5e017f91627b062701acb193a45c4623",
+        "belongs_to_lane_entry": "word-lane/f2-23-stocktake-summary",
+        "in_runtime_index": false,
+        "runtime_reachability": "经 wp_template_finder._EXPLICIT_TEMPLATE_RELPATHS['F2-23'] 显式命中；不在 _index.json 里也可达"
+      }
+    ],
+    "read_only": "本任务不改模板一个字节：全部 size/sha256 由 hashlib 现算，漂移即 fail closed（Requirement 6.10 / 9.9）。"
+  },
+  "entries": [
+    {
+      "lane_entry_key": "word-lane/f2-22-stocktake-plan",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "wp_code": "F2-22",
+      "sheet_code": "F2-22",
+      "document_type": "docx",
+      "template_ref": "F/F2-22 存货监盘计划.docx",
+      "template_size": 37539,
+      "template_sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+      "template_normalized_structure_hash": "27b722592ba5eb8b7ed46aa56754fd15d10fd53460049827edea578c44e9ce6b",
+      "manifest_entry_state": "absent_from_source_manifest",
+      "manifest_entry_absence_recipe": "backend/data/workpaper_sync_entry_manifest.json 里 document_type=='docx' 的 entry 现算 7 条，其中 wp_code_patterns 有 F 前缀的 0 条 ⇒ 本 lane 无 entry",
+      "manifest_entry_absence_source_refs": [
+        "backend/data/workpaper_sync_entry_manifest.json",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts#L67",
+        "audit-platform/frontend/src/components/workpaper/wpPopupDocxConfigs.ts"
+      ],
+      "commit_entry_id_expression": "opaque_entry_id(wp_code=f\"{wp_code or wp_id}#{_SHEET_CODE}\", wp_id=wp_id)",
+      "commit_entry_id_materialized_form": "opaque:{wp_code}#F2-22",
+      "wired_writer": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+      "wired_writer_reason_tag": "f2_st_plan_sync_from_oo",
+      "second_pipeline_endpoints": [
+        "POST /api/workpapers/{wp_id}/f2-st/plan-sync-to-oo",
+        "POST /api/workpapers/{wp_id}/f2-st/plan-sync-from-oo"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "item_id": "F2-22-fields",
+        "payload_column": "remark",
+        "shape": "json_object_keyed_by_html_field_key",
+        "writer": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py::_save_fields",
+        "reader": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py::_load_fields",
+        "field_key_owner": "backend/app/services/f2_stocktake_plan_sync.py"
+      },
+      "html_counterpart_source_refs": [
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+        "backend/app/services/f2_stocktake_plan_sync.py",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
+        "backend/wp_templates/F/F2-22 存货监盘计划.docx"
+      ],
+      "authority_model": {
+        "value": "projection_contract",
+        "definition_payload": {
+          "schema_version": "authority-model-definition:v1",
+          "entry_lane_key": "word-lane/f2-22-stocktake-plan",
+          "authority_model": "projection_contract",
+          "document_type": "docx",
+          "contract_id": "f2.stocktake.plan",
+          "why": "逐字段 per-entry contract 已发布且载体是 tagged SDT ⇒ 结构化岛按契约投影；authority model 只能是 projection_contract（registry.assert_authority_model_contract_pairing 对 custom/opaque 明禁携带 SyncContract）。SDT 外自由正文的保留由 AC 7.3 / 7.9 与 verify_word_only_regions 承担，不靠把 authority model 降级成 opaque。",
+          "supersedes_premise": "两个 writer 现用 AuthorityModel.opaque_single_onlyoffice，其 docstring 的理由是「manifest 里 F2 entry 的 capability=single_onlyoffice」；该 capability 实为 workpaper_sync_entry_overlay.json 的组件级默认值（F 循环 slice 的 BP-6），不是逐 entry 裁决 ⇒ 前提失效（F 循环 slice 的 BP-9 点名要求本任务重新论证）。"
+        },
+        "definition_sha256": "d154130f37f2f221e6735c2218cabbcfa195f49235a398264eaa340bfc9c9913",
+        "db_published": false,
+        "blocked_by": [
+          "BP-10"
+        ],
+        "currently_used_by_writer": "opaque_single_onlyoffice",
+        "switch_condition": "bundle 发布 + adapter 注册后，writer 的 authority_model 必须同批改成 projection_contract；本轮不改生产代码（Task 60 正文：Task 61 全场景通过后才删除第二流程）"
+      },
+      "template_definition": {
+        "payload": {
+          "schema_version": "template-definition:v1",
+          "template_id": "F2-22",
+          "template_relative_path": "F/F2-22 存货监盘计划.docx",
+          "template_sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+          "normalized_structure_hash": "27b722592ba5eb8b7ed46aa56754fd15d10fd53460049827edea578c44e9ce6b",
+          "document_type": "docx"
+        },
+        "definition_sha256": "eaedaadc428fe2fdba14a513124f2c1bb48fbd94bd081d3493eb732404b28cea",
+        "recipe": "canonical_digest(word_instrumentation.build_word_template_payload(spec, template_sha256, structure_hash))",
+        "db_published": false
+      },
+      "instrumentation_definition": {
+        "payload": {
+          "schema_version": "instrumentation-definition:v1",
+          "entry_id": "f2.stocktake.plan",
+          "template_id": "F2-22",
+          "template_definition_sha256": "eaedaadc428fe2fdba14a513124f2c1bb48fbd94bd081d3493eb732404b28cea",
+          "template_sha256": "f19aa64a9daa01022231d91f43d342a4ae973088dbd42b58459ad65c206662ba",
+          "instrumentation_version": "1.0.0",
+          "identity_schema_version": "1.0.0",
+          "document_type": "docx",
+          "identity_carriers": [
+            "field_sdt_block",
+            "field_sdt_inline"
+          ],
+          "identity_anchors": [
+            "w_tag"
+          ],
+          "lock_policy": "no_w_lock_injected",
+          "sdt_tags": [
+            "gt:block:f2.stocktake.plan:plan/warehouses",
+            "gt:field:f2.stocktake.plan:plan/assignment",
+            "gt:field:f2.stocktake.plan:plan/audit_year",
+            "gt:field:f2.stocktake.plan:plan/auditors",
+            "gt:field:f2.stocktake.plan:plan/bs_date",
+            "gt:field:f2.stocktake.plan:plan/client_staff",
+            "gt:field:f2.stocktake.plan:plan/count_date",
+            "gt:field:f2.stocktake.plan:plan/count_method",
+            "gt:field:f2.stocktake.plan:plan/entity_name",
+            "gt:field:f2.stocktake.plan:plan/inventory_composition",
+            "gt:field:f2.stocktake.plan:plan/plan_date",
+            "gt:field:f2.stocktake.plan:plan/prep",
+            "gt:field:f2.stocktake.plan:plan/purpose",
+            "gt:field:f2.stocktake.plan:plan/requirements",
+            "gt:field:f2.stocktake.plan:plan/scope",
+            "gt:field:f2.stocktake.plan:plan/special_notes",
+            "gt:field:f2.stocktake.plan:plan/team_name",
+            "gt:field:f2.stocktake.plan:plan/warehouses"
+          ],
+          "row_uuids": [],
+          "probe_onlyoffice_build": "9.4.0-129"
+        },
+        "definition_sha256": "ce184f6be66627840af9b70bdd0da56009e8ead4384db459ed2b6d6677b6005f",
+        "recipe": "canonical_digest(word_instrumentation.build_word_instrumentation_payload(spec, template_definition_sha256, template_sha256, gate))",
+        "db_published": false
+      },
+      "instrumentation_spec": {
+        "entry_id": "f2.stocktake.plan",
+        "template_id": "F2-22",
+        "template_relative_path": "F/F2-22 存货监盘计划.docx",
+        "carriers": [
+          "field_sdt_block",
+          "field_sdt_inline"
+        ],
+        "expected_tags": [
+          "gt:block:f2.stocktake.plan:plan/warehouses",
+          "gt:field:f2.stocktake.plan:plan/assignment",
+          "gt:field:f2.stocktake.plan:plan/audit_year",
+          "gt:field:f2.stocktake.plan:plan/auditors",
+          "gt:field:f2.stocktake.plan:plan/bs_date",
+          "gt:field:f2.stocktake.plan:plan/client_staff",
+          "gt:field:f2.stocktake.plan:plan/count_date",
+          "gt:field:f2.stocktake.plan:plan/count_method",
+          "gt:field:f2.stocktake.plan:plan/entity_name",
+          "gt:field:f2.stocktake.plan:plan/inventory_composition",
+          "gt:field:f2.stocktake.plan:plan/plan_date",
+          "gt:field:f2.stocktake.plan:plan/prep",
+          "gt:field:f2.stocktake.plan:plan/purpose",
+          "gt:field:f2.stocktake.plan:plan/requirements",
+          "gt:field:f2.stocktake.plan:plan/scope",
+          "gt:field:f2.stocktake.plan:plan/special_notes",
+          "gt:field:f2.stocktake.plan:plan/team_name",
+          "gt:field:f2.stocktake.plan:plan/warehouses"
+        ],
+        "expected_instances": {
+          "gt:block:f2.stocktake.plan:plan/warehouses": 1,
+          "gt:field:f2.stocktake.plan:plan/assignment": 1,
+          "gt:field:f2.stocktake.plan:plan/audit_year": 1,
+          "gt:field:f2.stocktake.plan:plan/auditors": 1,
+          "gt:field:f2.stocktake.plan:plan/bs_date": 1,
+          "gt:field:f2.stocktake.plan:plan/client_staff": 1,
+          "gt:field:f2.stocktake.plan:plan/count_date": 1,
+          "gt:field:f2.stocktake.plan:plan/count_method": 1,
+          "gt:field:f2.stocktake.plan:plan/entity_name": 2,
+          "gt:field:f2.stocktake.plan:plan/inventory_composition": 1,
+          "gt:field:f2.stocktake.plan:plan/plan_date": 1,
+          "gt:field:f2.stocktake.plan:plan/prep": 1,
+          "gt:field:f2.stocktake.plan:plan/purpose": 1,
+          "gt:field:f2.stocktake.plan:plan/requirements": 1,
+          "gt:field:f2.stocktake.plan:plan/scope": 1,
+          "gt:field:f2.stocktake.plan:plan/special_notes": 1,
+          "gt:field:f2.stocktake.plan:plan/team_name": 1,
+          "gt:field:f2.stocktake.plan:plan/warehouses": 1
+        },
+        "row_injections": 0,
+        "row_injections_why_zero": "本文档 w:tbl / w:tr 计数为 0（逐段现算，见 field_evidence 的 negative_claims），且 Task 6 的 downstream_gate 把 row_sdt 列为 carriers_blocked ⇒ 行载体在本 entry 上既无对象也不许用"
+      },
+      "contract": {
+        "contract_id": "f2.stocktake.plan",
+        "staged_path": "backend/data/workpaper_sync_word_contracts/f2.stocktake.plan.json",
+        "review_status": "reviewed",
+        "canonical_sha256": "2ca1d664d7e6ffb925021c32f78449477d2b87b677da631999249f72aa0fa5c0",
+        "field_count": 17,
+        "installation": {
+          "state": "staged_outside_production_inventory",
+          "required_production_path": "backend/data/workpaper_sync_contracts/f2.stocktake.plan.json",
+          "blocked_by": [
+            "BP-10"
+          ],
+          "why": "contracts.available_contract_ids() 扫生产目录，且 test_task13_contract_registry.py::test_contract_directory_matches_the_delivery_ledger 要求「目录 ↔ registry.DELIVERED_PER_ENTRY_CONTRACTS 双向等值」且登记表每行 entry_id 必须命中 source-backed manifest。本 lane 在 manifest 里没有 entry ⇒ 现在装进生产目录只能二选一地假绿（登记表缺行，或伪造 manifest entry_id）。",
+          "required_ledger_row": {
+            "contract_id": "f2.stocktake.plan",
+            "entry_id": "<manifest 里该 lane 的 entry_id —— 尚不存在>",
+            "document_type": "docx",
+            "reason": "Task 60 发布的 F2 Word per-entry 契约；装入生产目录的前置是该 lane 先在 source-backed manifest 里有 entry"
+          }
+        }
+      },
+      "definition_bundle": null,
+      "bundle_slot_plan": {
+        "authority_model": "projection_contract",
+        "authority_model_definition_sha256": "d154130f37f2f221e6735c2218cabbcfa195f49235a398264eaa340bfc9c9913",
+        "slots": {
+          "template": {
+            "slot_type": "definition",
+            "slot_ref": null,
+            "slot_digest": "eaedaadc428fe2fdba14a513124f2c1bb48fbd94bd081d3493eb732404b28cea"
+          },
+          "instrumentation": {
+            "slot_type": "definition",
+            "slot_ref": null,
+            "slot_digest": "ce184f6be66627840af9b70bdd0da56009e8ead4384db459ed2b6d6677b6005f"
+          },
+          "contract": {
+            "slot_type": "definition",
+            "slot_ref": null,
+            "slot_digest": "2ca1d664d7e6ffb925021c32f78449477d2b87b677da631999249f72aa0fa5c0"
+          }
+        },
+        "publishable_now": false,
+        "blocked_by": [
+          "BP-10",
+          "BP-11"
+        ],
+        "gate_proof": "models.validate_bundle_slot 对 slot_type=='definition' 要求 slot_ref 形如 `definition:<uuid>`；DB 未发布 ⇒ 无 uuid ⇒ 本 plan 现在**必然**被门拒绝。守卫正向断言这条拒绝，绝不为凑 non-null 造假 uuid。"
+      },
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-10",
+        "BP-11",
+        "BP-12"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-10",
+        "BP-11",
+        "BP-12"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_canonical_path",
+      "capability": null,
+      "capability_verdict_stage": "word_contract_published_pending_bundle_and_representation",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-10",
+        "BP-11",
+        "BP-12",
+        "BP-13"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下一个都不成立：① html_counterpart_verdict == 'exists'（两个 writer 自己的 INSERT ... ON CONFLICT 写 F2-22-fields）⇒ AC 12.8 禁 single_onlyoffice；② OO 侧承载真实业务正文（33/32 段权威模板 + 逐字段结构化岛）⇒ AC 12.9 的 single_html 不适用；③ 入口在生产源码可达（useF2StocktakeDualMode 打四个端点）⇒ 不是 unreachable；④ AC 12.1 六件前置里 bundle / published representation / adapter / 逐 scenario evidence 四件未交付 ⇒ SR-6 禁 bidirectional。故 capability 记 null + 三字段齐备。",
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "本轮交付 AC 12.1 六件前置里的两件：approved authority model （projection_contract，canonical payload 可复算）与 reviewed per-entry contract（逐字段 source_ref 三边锁，17/16 个 token 全覆盖、无自造字段）。余下四件（non-null approved bundle / Task 15 finalize 的 published representation / 注册 adapter / 逐 scenario evidence）受 BP-10~BP-13 阻断，其中 BP-10 是**结构性**的：本 lane 在 source-backed manifest 里没有 entry，而生产契约目录与 DELIVERED_PER_ENTRY_CONTRACTS 的双向等值判据要求登记行的 entry_id 命中 manifest。",
+        "not_single_html_because": "OO 侧不是空白模板切换入口（AC 12.9 的判据）：权威模板是真实业务正文（F2-22 33 段 / F2-23 32 段，逐段原文已登记在 field_evidence），且 Task 6 的真实 OO 9.4 探针在这两份文档上取到 field/block 载体26/26 与 17/17 全保留。docx 权威册本身就是真实 OO 业务承载。",
+        "not_bidirectional_because": "AC 12.1 六件前置四件未交付（见 reason），且 AC 12.10 / 14.1 要求的服务端 evidence summary 与逐 scenario 产物级测试在本 lane 上一条没有 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task60_f2_word_adapter.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_source_backed_manifest_entry_for_this_lane",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_scenario_run_for_this_lane"
+        ]
+      },
+      "field_evidence": [
+        {
+          "stable_field_key": "plan/entity_name",
+          "token": "${entityName}",
+          "alias_display_only": "被审计单位",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/entity_name",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/entityName",
+          "html_field_key": "entityName",
+          "occurrences_in_document_xml": 2,
+          "paragraph_ordinals": [
+            1,
+            4
+          ],
+          "paragraph_texts_verbatim": [
+            "${entityName}",
+            "根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，我所决定对该公司存货进行监盘，特制定本监盘计划。"
+          ],
+          "run_counts_at_injection": [
+            1,
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/audit_year",
+          "token": "${auditYear}",
+          "alias_display_only": "审计年度",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/audit_year",
+          "value_type": "integer",
+          "mode": "editable",
+          "json_pointer": "/auditYear",
+          "html_field_key": "auditYear",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            2
+          ],
+          "paragraph_texts_verbatim": [
+            "${auditYear}年存货监盘计划"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/bs_date",
+          "token": "${bsDate}",
+          "alias_display_only": "资产负债表日",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/bs_date",
+          "value_type": "date",
+          "mode": "editable",
+          "json_pointer": "/bsDate",
+          "html_field_key": "bsDate",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            4
+          ],
+          "paragraph_texts_verbatim": [
+            "根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，我所决定对该公司存货进行监盘，特制定本监盘计划。"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/purpose",
+          "token": "${purpose}",
+          "alias_display_only": "监盘目的",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/purpose",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/purpose",
+          "html_field_key": "purpose",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            6
+          ],
+          "paragraph_texts_verbatim": [
+            "${purpose}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/scope",
+          "token": "${scope}",
+          "alias_display_only": "监盘范围",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/scope",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/scope",
+          "html_field_key": "scope",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            8
+          ],
+          "paragraph_texts_verbatim": [
+            "${scope}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/warehouses",
+          "token": "${warehouses}",
+          "alias_display_only": "监盘地点",
+          "carrier": "field_sdt_block",
+          "sdt_tag": "gt:block:f2.stocktake.plan:plan/warehouses",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/warehouses",
+          "html_field_key": "warehouses",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            10
+          ],
+          "paragraph_texts_verbatim": [
+            "${warehouses}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/count_date",
+          "token": "${countDate}",
+          "alias_display_only": "监盘时间",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/count_date",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/countDate",
+          "html_field_key": "countDate",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            12
+          ],
+          "paragraph_texts_verbatim": [
+            "${countDate}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/auditors",
+          "token": "${auditors}",
+          "alias_display_only": "项目组监盘人员",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/auditors",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/auditors",
+          "html_field_key": "auditors",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            14
+          ],
+          "paragraph_texts_verbatim": [
+            "项目组监盘人员：${auditors}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/client_staff",
+          "token": "${clientStaff}",
+          "alias_display_only": "被审计单位配合人员",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/client_staff",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/clientStaff",
+          "html_field_key": "clientStaff",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            15
+          ],
+          "paragraph_texts_verbatim": [
+            "被审计单位配合人员：${clientStaff}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/assignment",
+          "token": "${assignment}",
+          "alias_display_only": "分工",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/assignment",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/assignment",
+          "html_field_key": "assignment",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            17
+          ],
+          "paragraph_texts_verbatim": [
+            "${assignment}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/prep",
+          "token": "${prep}",
+          "alias_display_only": "监盘前准备工作",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/prep",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/prep",
+          "html_field_key": "prep",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            19
+          ],
+          "paragraph_texts_verbatim": [
+            "${prep}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/inventory_composition",
+          "token": "${inventoryComposition}",
+          "alias_display_only": "存货构成",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/inventory_composition",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/inventoryComposition",
+          "html_field_key": "inventoryComposition",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            21
+          ],
+          "paragraph_texts_verbatim": [
+            "${inventoryComposition}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/count_method",
+          "token": "${countMethod}",
+          "alias_display_only": "监盘方式",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/count_method",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/countMethod",
+          "html_field_key": "countMethod",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            23
+          ],
+          "paragraph_texts_verbatim": [
+            "${countMethod}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/requirements",
+          "token": "${requirements}",
+          "alias_display_only": "监盘要求",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/requirements",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/requirements",
+          "html_field_key": "requirements",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            26
+          ],
+          "paragraph_texts_verbatim": [
+            "${requirements}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/special_notes",
+          "token": "${specialNotes}",
+          "alias_display_only": "特别关注事项",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/special_notes",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/specialNotes",
+          "html_field_key": "specialNotes",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            28
+          ],
+          "paragraph_texts_verbatim": [
+            "${specialNotes}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/team_name",
+          "token": "${teamName}",
+          "alias_display_only": "审计小组",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/team_name",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/teamName",
+          "html_field_key": "teamName",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            31
+          ],
+          "paragraph_texts_verbatim": [
+            "${teamName}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "plan/plan_date",
+          "token": "${planDate}",
+          "alias_display_only": "计划日期",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.plan:plan/plan_date",
+          "value_type": "date",
+          "mode": "editable",
+          "json_pointer": "/planDate",
+          "html_field_key": "planDate",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            32
+          ],
+          "paragraph_texts_verbatim": [
+            "${planDate}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        }
+      ]
+    },
+    {
+      "lane_entry_key": "word-lane/f2-23-stocktake-summary",
+      "lane_entry_key_is_not_a_manifest_entry_id": true,
+      "wp_code": "F2-23",
+      "sheet_code": "F2-23",
+      "document_type": "docx",
+      "template_ref": "F/F2-23 存货监盘小结.docx",
+      "template_size": 37335,
+      "template_sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+      "template_normalized_structure_hash": "9aacc31e205bdf5b905f92456ceea0fd5e017f91627b062701acb193a45c4623",
+      "manifest_entry_state": "absent_from_source_manifest",
+      "manifest_entry_absence_recipe": "backend/data/workpaper_sync_entry_manifest.json 里 document_type=='docx' 的 entry 现算 7 条，其中 wp_code_patterns 有 F 前缀的 0 条 ⇒ 本 lane 无 entry",
+      "manifest_entry_absence_source_refs": [
+        "backend/data/workpaper_sync_entry_manifest.json",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts#L67",
+        "audit-platform/frontend/src/components/workpaper/wpPopupDocxConfigs.ts"
+      ],
+      "commit_entry_id_expression": "opaque_entry_id(wp_code=f\"{wp_code or wp_id}#{_SHEET_CODE}\", wp_id=wp_id)",
+      "commit_entry_id_materialized_form": "opaque:{wp_code}#F2-23",
+      "wired_writer": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+      "wired_writer_reason_tag": "f2_st_summary_sync_from_oo",
+      "second_pipeline_endpoints": [
+        "POST /api/workpapers/{wp_id}/f2-st/summary-sync-to-oo",
+        "POST /api/workpapers/{wp_id}/f2-st/summary-sync-from-oo"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "item_id": "F2-23-fields",
+        "payload_column": "remark",
+        "shape": "json_object_keyed_by_html_field_key",
+        "writer": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py::_save_fields",
+        "reader": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py::_load_fields",
+        "field_key_owner": "backend/app/services/f2_stocktake_summary_sync.py"
+      },
+      "html_counterpart_source_refs": [
+        "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+        "backend/app/services/f2_stocktake_summary_sync.py",
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
+        "backend/wp_templates/F/F2-23 存货监盘小结.docx"
+      ],
+      "authority_model": {
+        "value": "projection_contract",
+        "definition_payload": {
+          "schema_version": "authority-model-definition:v1",
+          "entry_lane_key": "word-lane/f2-23-stocktake-summary",
+          "authority_model": "projection_contract",
+          "document_type": "docx",
+          "contract_id": "f2.stocktake.summary",
+          "why": "逐字段 per-entry contract 已发布且载体是 tagged SDT ⇒ 结构化岛按契约投影；authority model 只能是 projection_contract（registry.assert_authority_model_contract_pairing 对 custom/opaque 明禁携带 SyncContract）。SDT 外自由正文的保留由 AC 7.3 / 7.9 与 verify_word_only_regions 承担，不靠把 authority model 降级成 opaque。",
+          "supersedes_premise": "两个 writer 现用 AuthorityModel.opaque_single_onlyoffice，其 docstring 的理由是「manifest 里 F2 entry 的 capability=single_onlyoffice」；该 capability 实为 workpaper_sync_entry_overlay.json 的组件级默认值（F 循环 slice 的 BP-6），不是逐 entry 裁决 ⇒ 前提失效（F 循环 slice 的 BP-9 点名要求本任务重新论证）。"
+        },
+        "definition_sha256": "033c2fb4539c659c9527ba1d688b8646cffd9e7f782c22063b732ef9ee8dd6d7",
+        "db_published": false,
+        "blocked_by": [
+          "BP-10"
+        ],
+        "currently_used_by_writer": "opaque_single_onlyoffice",
+        "switch_condition": "bundle 发布 + adapter 注册后，writer 的 authority_model 必须同批改成 projection_contract；本轮不改生产代码（Task 60 正文：Task 61 全场景通过后才删除第二流程）"
+      },
+      "template_definition": {
+        "payload": {
+          "schema_version": "template-definition:v1",
+          "template_id": "F2-23",
+          "template_relative_path": "F/F2-23 存货监盘小结.docx",
+          "template_sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+          "normalized_structure_hash": "9aacc31e205bdf5b905f92456ceea0fd5e017f91627b062701acb193a45c4623",
+          "document_type": "docx"
+        },
+        "definition_sha256": "e9ba184095b9934c300e1aba7dac299d9eb6513dc38675dbe3d42c05fedf1cec",
+        "recipe": "canonical_digest(word_instrumentation.build_word_template_payload(spec, template_sha256, structure_hash))",
+        "db_published": false
+      },
+      "instrumentation_definition": {
+        "payload": {
+          "schema_version": "instrumentation-definition:v1",
+          "entry_id": "f2.stocktake.summary",
+          "template_id": "F2-23",
+          "template_definition_sha256": "e9ba184095b9934c300e1aba7dac299d9eb6513dc38675dbe3d42c05fedf1cec",
+          "template_sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+          "instrumentation_version": "1.0.0",
+          "identity_schema_version": "1.0.0",
+          "document_type": "docx",
+          "identity_carriers": [
+            "field_sdt_block",
+            "field_sdt_inline"
+          ],
+          "identity_anchors": [
+            "w_tag"
+          ],
+          "lock_policy": "no_w_lock_injected",
+          "sdt_tags": [
+            "gt:block:f2.stocktake.summary:summary/conclusion",
+            "gt:field:f2.stocktake.summary:summary/assignment",
+            "gt:field:f2.stocktake.summary:summary/audit_year",
+            "gt:field:f2.stocktake.summary:summary/auditors",
+            "gt:field:f2.stocktake.summary:summary/bs_date",
+            "gt:field:f2.stocktake.summary:summary/client_staff",
+            "gt:field:f2.stocktake.summary:summary/conclusion",
+            "gt:field:f2.stocktake.summary:summary/count_date",
+            "gt:field:f2.stocktake.summary:summary/count_method",
+            "gt:field:f2.stocktake.summary:summary/entity_name",
+            "gt:field:f2.stocktake.summary:summary/purpose",
+            "gt:field:f2.stocktake.summary:summary/result_by_location",
+            "gt:field:f2.stocktake.summary:summary/scope",
+            "gt:field:f2.stocktake.summary:summary/summary_block",
+            "gt:field:f2.stocktake.summary:summary/summary_date",
+            "gt:field:f2.stocktake.summary:summary/team_name",
+            "gt:field:f2.stocktake.summary:summary/warehouses"
+          ],
+          "row_uuids": [],
+          "probe_onlyoffice_build": "9.4.0-129"
+        },
+        "definition_sha256": "c6c37aa7000e7c7bff3471e044c58647c9f2d5bbd6496bf4f01d04c016c08941",
+        "recipe": "canonical_digest(word_instrumentation.build_word_instrumentation_payload(spec, template_definition_sha256, template_sha256, gate))",
+        "db_published": false
+      },
+      "instrumentation_spec": {
+        "entry_id": "f2.stocktake.summary",
+        "template_id": "F2-23",
+        "template_relative_path": "F/F2-23 存货监盘小结.docx",
+        "carriers": [
+          "field_sdt_block",
+          "field_sdt_inline"
+        ],
+        "expected_tags": [
+          "gt:block:f2.stocktake.summary:summary/conclusion",
+          "gt:field:f2.stocktake.summary:summary/assignment",
+          "gt:field:f2.stocktake.summary:summary/audit_year",
+          "gt:field:f2.stocktake.summary:summary/auditors",
+          "gt:field:f2.stocktake.summary:summary/bs_date",
+          "gt:field:f2.stocktake.summary:summary/client_staff",
+          "gt:field:f2.stocktake.summary:summary/conclusion",
+          "gt:field:f2.stocktake.summary:summary/count_date",
+          "gt:field:f2.stocktake.summary:summary/count_method",
+          "gt:field:f2.stocktake.summary:summary/entity_name",
+          "gt:field:f2.stocktake.summary:summary/purpose",
+          "gt:field:f2.stocktake.summary:summary/result_by_location",
+          "gt:field:f2.stocktake.summary:summary/scope",
+          "gt:field:f2.stocktake.summary:summary/summary_block",
+          "gt:field:f2.stocktake.summary:summary/summary_date",
+          "gt:field:f2.stocktake.summary:summary/team_name",
+          "gt:field:f2.stocktake.summary:summary/warehouses"
+        ],
+        "expected_instances": {
+          "gt:block:f2.stocktake.summary:summary/conclusion": 1,
+          "gt:field:f2.stocktake.summary:summary/assignment": 1,
+          "gt:field:f2.stocktake.summary:summary/audit_year": 1,
+          "gt:field:f2.stocktake.summary:summary/auditors": 1,
+          "gt:field:f2.stocktake.summary:summary/bs_date": 1,
+          "gt:field:f2.stocktake.summary:summary/client_staff": 1,
+          "gt:field:f2.stocktake.summary:summary/conclusion": 1,
+          "gt:field:f2.stocktake.summary:summary/count_date": 1,
+          "gt:field:f2.stocktake.summary:summary/count_method": 1,
+          "gt:field:f2.stocktake.summary:summary/entity_name": 2,
+          "gt:field:f2.stocktake.summary:summary/purpose": 1,
+          "gt:field:f2.stocktake.summary:summary/result_by_location": 1,
+          "gt:field:f2.stocktake.summary:summary/scope": 1,
+          "gt:field:f2.stocktake.summary:summary/summary_block": 1,
+          "gt:field:f2.stocktake.summary:summary/summary_date": 1,
+          "gt:field:f2.stocktake.summary:summary/team_name": 1,
+          "gt:field:f2.stocktake.summary:summary/warehouses": 1
+        },
+        "row_injections": 0,
+        "row_injections_why_zero": "本文档 w:tbl / w:tr 计数为 0（逐段现算，见 field_evidence 的 negative_claims），且 Task 6 的 downstream_gate 把 row_sdt 列为 carriers_blocked ⇒ 行载体在本 entry 上既无对象也不许用"
+      },
+      "contract": {
+        "contract_id": "f2.stocktake.summary",
+        "staged_path": "backend/data/workpaper_sync_word_contracts/f2.stocktake.summary.json",
+        "review_status": "reviewed",
+        "canonical_sha256": "3d13ceb0dce485f99145d2b0bed4d358c4298cc52b1bafd8f1150f4d98f78c9b",
+        "field_count": 16,
+        "installation": {
+          "state": "staged_outside_production_inventory",
+          "required_production_path": "backend/data/workpaper_sync_contracts/f2.stocktake.summary.json",
+          "blocked_by": [
+            "BP-10"
+          ],
+          "why": "contracts.available_contract_ids() 扫生产目录，且 test_task13_contract_registry.py::test_contract_directory_matches_the_delivery_ledger 要求「目录 ↔ registry.DELIVERED_PER_ENTRY_CONTRACTS 双向等值」且登记表每行 entry_id 必须命中 source-backed manifest。本 lane 在 manifest 里没有 entry ⇒ 现在装进生产目录只能二选一地假绿（登记表缺行，或伪造 manifest entry_id）。",
+          "required_ledger_row": {
+            "contract_id": "f2.stocktake.summary",
+            "entry_id": "<manifest 里该 lane 的 entry_id —— 尚不存在>",
+            "document_type": "docx",
+            "reason": "Task 60 发布的 F2 Word per-entry 契约；装入生产目录的前置是该 lane 先在 source-backed manifest 里有 entry"
+          }
+        }
+      },
+      "definition_bundle": null,
+      "bundle_slot_plan": {
+        "authority_model": "projection_contract",
+        "authority_model_definition_sha256": "033c2fb4539c659c9527ba1d688b8646cffd9e7f782c22063b732ef9ee8dd6d7",
+        "slots": {
+          "template": {
+            "slot_type": "definition",
+            "slot_ref": null,
+            "slot_digest": "e9ba184095b9934c300e1aba7dac299d9eb6513dc38675dbe3d42c05fedf1cec"
+          },
+          "instrumentation": {
+            "slot_type": "definition",
+            "slot_ref": null,
+            "slot_digest": "c6c37aa7000e7c7bff3471e044c58647c9f2d5bbd6496bf4f01d04c016c08941"
+          },
+          "contract": {
+            "slot_type": "definition",
+            "slot_ref": null,
+            "slot_digest": "3d13ceb0dce485f99145d2b0bed4d358c4298cc52b1bafd8f1150f4d98f78c9b"
+          }
+        },
+        "publishable_now": false,
+        "blocked_by": [
+          "BP-10",
+          "BP-11"
+        ],
+        "gate_proof": "models.validate_bundle_slot 对 slot_type=='definition' 要求 slot_ref 形如 `definition:<uuid>`；DB 未发布 ⇒ 无 uuid ⇒ 本 plan 现在**必然**被门拒绝。守卫正向断言这条拒绝，绝不为凑 non-null 造假 uuid。"
+      },
+      "published_representation": null,
+      "published_representation_blocked_by": [
+        "BP-10",
+        "BP-11",
+        "BP-12"
+      ],
+      "adapter_id": null,
+      "adapter_blocked_by": [
+        "BP-10",
+        "BP-11",
+        "BP-12"
+      ],
+      "canonical_resolver": "word_resolution.resolve_word_canonical_path",
+      "capability": null,
+      "capability_verdict_stage": "word_contract_published_pending_bundle_and_representation",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-10",
+        "BP-11",
+        "BP-12",
+        "BP-13"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下一个都不成立：① html_counterpart_verdict == 'exists'（两个 writer 自己的 INSERT ... ON CONFLICT 写 F2-23-fields）⇒ AC 12.8 禁 single_onlyoffice；② OO 侧承载真实业务正文（33/32 段权威模板 + 逐字段结构化岛）⇒ AC 12.9 的 single_html 不适用；③ 入口在生产源码可达（useF2StocktakeDualMode 打四个端点）⇒ 不是 unreachable；④ AC 12.1 六件前置里 bundle / published representation / adapter / 逐 scenario evidence 四件未交付 ⇒ SR-6 禁 bidirectional。故 capability 记 null + 三字段齐备。",
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "本轮交付 AC 12.1 六件前置里的两件：approved authority model （projection_contract，canonical payload 可复算）与 reviewed per-entry contract（逐字段 source_ref 三边锁，17/16 个 token 全覆盖、无自造字段）。余下四件（non-null approved bundle / Task 15 finalize 的 published representation / 注册 adapter / 逐 scenario evidence）受 BP-10~BP-13 阻断，其中 BP-10 是**结构性**的：本 lane 在 source-backed manifest 里没有 entry，而生产契约目录与 DELIVERED_PER_ENTRY_CONTRACTS 的双向等值判据要求登记行的 entry_id 命中 manifest。",
+        "not_single_html_because": "OO 侧不是空白模板切换入口（AC 12.9 的判据）：权威模板是真实业务正文（F2-22 33 段 / F2-23 32 段，逐段原文已登记在 field_evidence），且 Task 6 的真实 OO 9.4 探针在这两份文档上取到 field/block 载体26/26 与 17/17 全保留。docx 权威册本身就是真实 OO 业务承载。",
+        "not_bidirectional_because": "AC 12.1 六件前置四件未交付（见 reason），且 AC 12.10 / 14.1 要求的服务端 evidence summary 与逐 scenario 产物级测试在本 lane 上一条没有 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task60_f2_word_adapter.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_source_backed_manifest_entry_for_this_lane",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_scenario_run_for_this_lane"
+        ]
+      },
+      "field_evidence": [
+        {
+          "stable_field_key": "summary/entity_name",
+          "token": "${entityName}",
+          "alias_display_only": "被审计单位",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/entity_name",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/entityName",
+          "html_field_key": "entityName",
+          "occurrences_in_document_xml": 2,
+          "paragraph_ordinals": [
+            1,
+            4
+          ],
+          "paragraph_texts_verbatim": [
+            "${entityName}",
+            "根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，项目组对该公司存货实施了监盘，现将监盘情况小结如下。"
+          ],
+          "run_counts_at_injection": [
+            1,
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/audit_year",
+          "token": "${auditYear}",
+          "alias_display_only": "审计年度",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/audit_year",
+          "value_type": "integer",
+          "mode": "editable",
+          "json_pointer": "/auditYear",
+          "html_field_key": "auditYear",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            2
+          ],
+          "paragraph_texts_verbatim": [
+            "${auditYear}年存货监盘小结"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/bs_date",
+          "token": "${bsDate}",
+          "alias_display_only": "资产负债表日",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/bs_date",
+          "value_type": "date",
+          "mode": "editable",
+          "json_pointer": "/bsDate",
+          "html_field_key": "bsDate",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            4
+          ],
+          "paragraph_texts_verbatim": [
+            "根据《中国注册会计师审计准则第1311号——存货监盘》的要求，为了对${entityName}（以下简称该公司或公司）${bsDate}资产负债表上存货的存在性、所有权、品质状况等情况进行验证，项目组对该公司存货实施了监盘，现将监盘情况小结如下。"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/purpose",
+          "token": "${purpose}",
+          "alias_display_only": "监盘目的",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/purpose",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/purpose",
+          "html_field_key": "purpose",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            6
+          ],
+          "paragraph_texts_verbatim": [
+            "${purpose}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/scope",
+          "token": "${scope}",
+          "alias_display_only": "监盘范围",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/scope",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/scope",
+          "html_field_key": "scope",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            8
+          ],
+          "paragraph_texts_verbatim": [
+            "${scope}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/warehouses",
+          "token": "${warehouses}",
+          "alias_display_only": "监盘地点",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/warehouses",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/warehouses",
+          "html_field_key": "warehouses",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            10
+          ],
+          "paragraph_texts_verbatim": [
+            "${warehouses}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/count_date",
+          "token": "${countDate}",
+          "alias_display_only": "监盘时间",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/count_date",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/countDate",
+          "html_field_key": "countDate",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            12
+          ],
+          "paragraph_texts_verbatim": [
+            "${countDate}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/client_staff",
+          "token": "${clientStaff}",
+          "alias_display_only": "盘点人员",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/client_staff",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/clientStaff",
+          "html_field_key": "clientStaff",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            14
+          ],
+          "paragraph_texts_verbatim": [
+            "盘点人员：${clientStaff}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/auditors",
+          "token": "${auditors}",
+          "alias_display_only": "项目组监盘人员",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/auditors",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/auditors",
+          "html_field_key": "auditors",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            15
+          ],
+          "paragraph_texts_verbatim": [
+            "项目组监盘人员：${auditors}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/assignment",
+          "token": "${assignment}",
+          "alias_display_only": "分工",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/assignment",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/assignment",
+          "html_field_key": "assignment",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            17
+          ],
+          "paragraph_texts_verbatim": [
+            "${assignment}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/count_method",
+          "token": "${countMethod}",
+          "alias_display_only": "公司存货盘点方法",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/count_method",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/countMethod",
+          "html_field_key": "countMethod",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            19
+          ],
+          "paragraph_texts_verbatim": [
+            "${countMethod}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/summary_block",
+          "token": "${summaryBlock}",
+          "alias_display_only": "监盘情况汇总",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/summary_block",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/summaryBlock",
+          "html_field_key": "summaryBlock",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            21
+          ],
+          "paragraph_texts_verbatim": [
+            "${summaryBlock}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/result_by_location",
+          "token": "${resultByLocation}",
+          "alias_display_only": "具体监盘情况",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/result_by_location",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/resultByLocation",
+          "html_field_key": "resultByLocation",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            23
+          ],
+          "paragraph_texts_verbatim": [
+            "${resultByLocation}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/conclusion",
+          "token": "${conclusionBlock}",
+          "alias_display_only": "监盘结论",
+          "carrier": "field_sdt_block",
+          "sdt_tag": "gt:block:f2.stocktake.summary:summary/conclusion",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/conclusionBlock",
+          "html_field_key": "conclusionBlock",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            25
+          ],
+          "paragraph_texts_verbatim": [
+            "${conclusionBlock}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/team_name",
+          "token": "${teamName}",
+          "alias_display_only": "审计小组",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/team_name",
+          "value_type": "text",
+          "mode": "editable",
+          "json_pointer": "/teamName",
+          "html_field_key": "teamName",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            30
+          ],
+          "paragraph_texts_verbatim": [
+            "${teamName}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        },
+        {
+          "stable_field_key": "summary/summary_date",
+          "token": "${summaryDate}",
+          "alias_display_only": "小结日期",
+          "carrier": "field_sdt_inline",
+          "sdt_tag": "gt:field:f2.stocktake.summary:summary/summary_date",
+          "value_type": "date",
+          "mode": "editable",
+          "json_pointer": "/summaryDate",
+          "html_field_key": "summaryDate",
+          "occurrences_in_document_xml": 1,
+          "paragraph_ordinals": [
+            31
+          ],
+          "paragraph_texts_verbatim": [
+            "${summaryDate}"
+          ],
+          "run_counts_at_injection": [
+            1
+          ],
+          "negative_claims": {
+            "inside_w_tbl": false,
+            "inside_existing_sdt": false,
+            "document_has_w_tbl": false,
+            "document_has_w_tr": false,
+            "document_has_existing_sdt": false
+          },
+          "verdict": "source_backed",
+          "verdict_recipe": "zipfile 读 backend/wp_templates/F/{docx}!word/document.xml，现算 token 出现次数 / 段落序号 / 段落原文（不 strip）/ run 数，与本节声明逐项等值"
+        }
+      ]
+    }
+  ],
+  "task59_compatibility": {
+    "why": "Task 59 的 engine 守卫用 in-test fixture（test_task59_word_sdt_engine.py 的 plan_contract_payload / plan_spec）而非磁盘契约。本任务发布真契约时必须与它兼容或显式登记差异，否则 Task 59 会被静默打红。",
+    "shared_contract_id": "f2.stocktake.plan",
+    "overlapping_stable_keys": [
+      "plan/purpose",
+      "plan/scope",
+      "plan/entity_name",
+      "plan/bs_date",
+      "plan/warehouses"
+    ],
+    "must_match_on": [
+      "sdt_tag",
+      "value_type",
+      "mode",
+      "instances",
+      "json_pointer_key"
+    ],
+    "registered_differences": [
+      "字段数：fixture 5 个 vs 真契约 17 个（真契约覆盖磁盘上全部 ${token}）",
+      "digests：fixture 用 _digest('f222-template-def') 等占位 vs 真契约用 canonical_digest(真 payload)",
+      "source_ref：fixture 写 `F2-22!p04:${entityName}`（单序号）vs 真契约对两实例字段写 `F2-22!p01+04:${entityName}`（两个序号都列出，AC 7.4「列出全部 OO 位置」）",
+      "json_pointer：fixture 用 /plan/purpose（带 plan 段）vs 真契约用 /purpose（对齐 checklist_responses 的 F2-22-fields 载荷键，见 html_counterpart）"
+    ],
+    "difference_is_not_a_conflict_because": "Task 59 的 fixture 是它自己构造的 payload，不读磁盘契约目录；两者共存不产生第二真源。真契约的 stable key / sdt_tag 命名与 fixture 逐字一致，故 Task 61 接线时 engine 侧无需改动。"
+  },
+  "second_pipeline_deletion_plan": {
+    "policy": "Task 60 正文：「现有 to/from OO endpoint 先委派统一 coordinator，Task 61 全场景通过后才删除第二流程」⇒ **本轮只生成计划，不删任何调用点**。",
+    "delete_files": [],
+    "delete_files_why_empty": "两个 sync 模块目前是该 lane 唯一可用通道；在 adapter/bridge 未接线前删除会让F2-22/F2-23 的在线编辑直接不可用（可用性回退），且 AC 12.7 明确要求「删除前必须有等价证据和 rollback 点」。",
+    "delegate_then_delete": [
+      {
+        "module": "backend/app/routers/wp_render_strategies/_f2_stocktake_plan_sync.py",
+        "endpoints": [
+          "POST /api/workpapers/{wp_id}/f2-st/plan-sync-to-oo",
+          "POST /api/workpapers/{wp_id}/f2-st/plan-sync-from-oo"
+        ],
+        "already_delegated": "commit 侧已走统一 writer：build_content_mutation_service_writer(db).commit_bytes(...)（Task 19）",
+        "still_second_pipeline": [
+          "materialize 侧仍自建：fill_plan_docx / fill_summary_docx 直接从模板复制+占位符替换，不经 MaterializeCoordinator，也不以 current published representation 为底（违反 AC 7.9 的「不得用模板重生成覆盖」）",
+          "extract 侧仍自建：extract_fields_from_docx 用中文章节标题正则切分（`1．监盘目的[：:]`…），不按 w:tag 定位（违反 Requirement 7.1）"
+        ],
+        "delete_after": [
+          "Task 61 全场景通过（真实 OO 9.4 逐 scenario evidence 全绿）",
+          "rollback 点：本记录冻结的 template/instrumentation/contract digest 链"
+        ],
+        "equivalence_evidence_required_by_ac_12_7": [
+          "同一 docx 上 tagged-SDT extract 与现有中文标题正则 extract 的字段级等值报告（逐字段 diff，不是抽样）",
+          "Word-only 正文两次 materialize 前后规范化等值（Property 31）"
+        ]
+      },
+      {
+        "module": "backend/app/routers/wp_render_strategies/_f2_stocktake_summary_sync.py",
+        "endpoints": [
+          "POST /api/workpapers/{wp_id}/f2-st/summary-sync-to-oo",
+          "POST /api/workpapers/{wp_id}/f2-st/summary-sync-from-oo"
+        ],
+        "already_delegated": "commit 侧已走统一 writer：build_content_mutation_service_writer(db).commit_bytes(...)（Task 19）",
+        "still_second_pipeline": [
+          "materialize 侧仍自建：fill_plan_docx / fill_summary_docx 直接从模板复制+占位符替换，不经 MaterializeCoordinator，也不以 current published representation 为底（违反 AC 7.9 的「不得用模板重生成覆盖」）",
+          "extract 侧仍自建：extract_fields_from_docx 用中文章节标题正则切分（`1．监盘目的[：:]`…），不按 w:tag 定位（违反 Requirement 7.1）"
+        ],
+        "delete_after": [
+          "Task 61 全场景通过（真实 OO 9.4 逐 scenario evidence 全绿）",
+          "rollback 点：本记录冻结的 template/instrumentation/contract digest 链"
+        ],
+        "equivalence_evidence_required_by_ac_12_7": [
+          "同一 docx 上 tagged-SDT extract 与现有中文标题正则 extract 的字段级等值报告（逐字段 diff，不是抽样）",
+          "Word-only 正文两次 materialize 前后规范化等值（Property 31）"
+        ]
+      }
+    ],
+    "must_not_delete": [
+      "backend/wp_templates/F/F2-22 存货监盘计划.docx",
+      "backend/wp_templates/F/F2-23 存货监盘小结.docx"
+    ]
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-10",
+      "blocks": [
+        "contract_installation",
+        "definition_bundle",
+        "adapter_registration"
+      ],
+      "what": "F2 Word lane 在 source-backed manifest 里没有 entry ⇒ 生产契约目录与 registry.DELIVERED_PER_ENTRY_CONTRACTS 的双向等值判据无法满足（登记行的 entry_id 必须命中 manifest）。",
+      "status": "open",
+      "must_fix_before": "Task 61 注册 adapter / 装载生产契约",
+      "observable_consequences": [
+        "契约只能 staged 在 workpaper_sync_word_contracts/，不进 contracts.available_contract_ids()",
+        "registry.assert_contract_file_current(RG-11) 会因生产目录无此文件而拒绝注册",
+        "manifest 的 capability_counts / unadjudicated_count 里看不到这两个 entry ⇒ 平台级收口计数漏掉整条 Word lane"
+      ],
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_manifest.json",
+        "backend/tests/workpaper_sync/test_task13_contract_registry.py",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ],
+      "numbering_note": "编号续接 F 循环 slice 的 BP-1..BP-9（本记录消费它们、不改它们）；BP-10 起为 Word lane 新查出的阻断项。"
+    },
+    {
+      "id": "BP-11",
+      "blocks": [
+        "definition_bundle",
+        "published_representation"
+      ],
+      "what": "approved definition bundle 需要 DB 侧 definition 行（typed slot 的 slot_ref 必须形如 `definition:<uuid>`），离线无法产出；本记录只给可复算的 slot digest 计划。",
+      "status": "open",
+      "must_fix_before": "Task 15 / Task 36 finalize published representation",
+      "observable_consequences": [
+        "models.validate_bundle_slot 对 slot_ref=None 的 definition slot 直接抛 BundleIntegrityError（守卫正向断言这条拒绝）",
+        "WordEngineBinding 只能用 offline_candidate_validation 模式；assert_may_publish() 恒抛"
+      ],
+      "source_refs": [
+        "backend/app/services/workpaper_sync/models.py",
+        "backend/app/services/workpaper_sync/word_sdt_engine.py"
+      ]
+    },
+    {
+      "id": "BP-12",
+      "blocks": [
+        "published_representation",
+        "adapter_registration",
+        "descriptor_bridge"
+      ],
+      "what": "本 lane 的 OO 挂载点**存在但不消费 descriptor**：`GtF2StocktakeBundle.vue` 里有一个 mode 门控的 `<GtOnlyOfficeSheet>`（F2-22 / F2-23 是它的两个 tab），而该组件自行请求 `/sheets/{sheet}/onlyoffice-config`、零 descriptor prop、无 durable ack ⇒ AC 11.5 / Property 47 要求的「只消费含 approved bundle 的 descriptor 并暴露可 await 的 forceSave()」在本 lane 上**没有实现**。",
+      "status": "open",
+      "must_fix_before": "Task 61 接 descriptor/bridge 与 recovery UI",
+      "observable_consequences": [
+        "AC 11.5 要求的 forceSave()/ready/dirty/incoming-durable/applied/conflict/recovery-case 事件在本 lane 上无承载者",
+        "前端只有 useF2StocktakeDualMode 的两个 REST 按钮 + 一个自取 config 的 OO 挂载点，无 durable ack 语义",
+        "manifest 扫描器仍发现不到本 lane（BP-10 的同一根因的另一面）：扫描器按 entry 级 descriptor/adapter 形态识别，自取 config 的挂载点不构成 entry"
+      ],
+      "correction_note": "🔴 首版把本项写成「本 lane 没有 OO 组件挂载点」，实测错（见 BP-15）。结论方向不变（descriptor/bridge 仍被阻断、Property 47 仍不宣称通过），但理由从「分母为空」改成「承载者存在且形态相反」——前者会让守卫把 `oo_mount_site_count == 0` 当基线锁死。",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useF2StocktakeDualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+        "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue"
+      ]
+    },
+    {
+      "id": "BP-13",
+      "blocks": [
+        "capability_verdict",
+        "evidence"
+      ],
+      "what": "AC 12.10 / 14.1 要求的服务端 evidence summary 与逐 scenario 产物级测试在本 lane 上一条都没有（sync_test_run_id / required_scenario_set_digest 均为 null）。",
+      "status": "open",
+      "must_fix_before": "把 capability 从 null 改成 bidirectional",
+      "observable_consequences": [
+        "两个 entry 的 verification_state 只能是 UNVERIFIABLE",
+        "Property 69 分母为空 ⇒ 本任务不宣称它通过"
+      ],
+      "source_refs": [
+        "backend/app/services/workpaper_sync/evidence.py",
+        ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/requirements.md"
+      ]
+    },
+    {
+      "id": "BP-14",
+      "blocks": [
+        "html_projection_fidelity"
+      ],
+      "what": "F2-22 的 `${specialNotes}` 是**合并段**：HTML 侧是三个独立字段（remoteWarehouse / fraudRisk / expertNeeded），docx 侧只有一段；现有 extract 用中文标签（「异地」「舞弊」「专家」）正则把它拆回三个字段。",
+      "status": "open",
+      "must_fix_before": "Task 61 用 tagged SDT 取代中文标题正则",
+      "observable_consequences": [
+        "Requirement 7.1 明禁用中文 label 作定位/身份；现有拆分是中文标签依赖",
+        "审计师把「异地」改写成「异地仓库」时 fraudRisk/expertNeeded 会串值或丢值",
+        "本契约按 docx 事实只声明一个 plan/special_notes 字段 ⇒ 与 HTML 侧三字段的映射必须由 Task 61 用三个独立 inline SDT 或显式合并规则解决，不得靠正则"
+      ],
+      "source_refs": [
+        "backend/app/services/f2_stocktake_plan_sync.py",
+        "backend/wp_templates/F/F2-22 存货监盘计划.docx"
+      ]
+    },
+    {
+      "id": "BP-15",
+      "blocks": [
+        "second_pipeline_inventory",
+        "descriptor_bridge"
+      ],
+      "what": "本 lane 的第二流程**不止两个 REST 端点**：还有一条 OO 原生通道 —— `GtF2StocktakeBundle.vue` 的 `<GtOnlyOfficeSheet>` 自取 `/api/workpapers/{wp_id}/sheets/{sheet}/onlyoffice-config`，`wp_onlyoffice_router.post_sheet_onlyoffice_callback` 里另有一段 `_save_wp_code in (\"F2-22\", \"F2-23\") … .docx` 的 fields 回写分支。首版把 BP-12 写成「本 lane 没有 OO 组件挂载点」，因此这条通道整条漏登记。",
+      "status": "open",
+      "must_fix_before": "Task 61 接 descriptor/bridge；Task 66 生成 legacy 删除计划",
+      "observable_consequences": [
+        "AC 12.7 的「删除第二套半闭环」清册若只列两个 REST 端点，则 OO config/callback 这条腿会在 Task 66/72 的删除计划里缺席",
+        "该 callback 分支绕开 per-entry contract：它按 `extract_fields_from_docx` 的中文标题正则取值（同 BP-14 的根因），不经 w:tag",
+        "Property 47 的分母不是 0：挂载点存在但自取 config ⇒ 它是反例而非空集"
+      ],
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+        "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
+        "backend/app/routers/wp_onlyoffice_router.py"
+      ],
+      "numbering_note": "本轮守卫（Task 60 第二段交付）新查出的缺陷，续接 BP-14。处置归属：Task 61 接线 + Task 66 删除计划，不在本任务内改生产代码。"
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "两个 entry 的 template / instrumentation / contract / bundle plan / evidence 逐项独享，不交叉复用（Property 70 / Task 60 正文「每个 F2 entry 保存自身 bundle digest 与 scenario evidence」）。",
+    "assertions": [
+      "两个 contract_id 不同且各自的 canonical_sha256 不同",
+      "两个 template_sha256 / normalized_structure_hash 各不相同",
+      "两个 template_definition_sha256 / instrumentation_definition_sha256 各不相同",
+      "两个 authority_model definition payload 的 entry_lane_key 各指自己",
+      "每个 sdt_tag 的 contract 段等于自己的 contract_id ⇒ 一份文档的 tag 不可能被另一份契约解析（WordEngineBinding.resolve_tag 对 contract 段不符 fail closed）",
+      "两个 entry 的 fields_item_id 不同（F2-22-fields / F2-23-fields）⇒ HTML 侧载荷也不共用"
+    ],
+    "staged_contract_files": [
+      "f2.stocktake.plan.json",
+      "f2.stocktake.summary.json"
+    ],
+    "production_contract_dir_untouched": true
+  },
+  "descriptor_consumption": {
+    "verdict": "mount_site_exists_but_consumes_no_descriptor",
+    "corrected_by": "BP-15",
+    "lane_host": "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue",
+    "oo_mount_component": "GtOnlyOfficeSheet",
+    "oo_mount_site_count": 1,
+    "oo_mount_site_lines": [
+      24
+    ],
+    "oo_mount_is_mode_gated": true,
+    "lane_sheet_codes_are_tabs_of_this_host": [
+      "F2-22",
+      "F2-23"
+    ],
+    "descriptor_props_on_the_mount": [],
+    "oo_component_self_fetches_config": true,
+    "oo_component_self_fetch_line": 172,
+    "router_callback_has_a_lane_specific_docx_branch": true,
+    "why_property_47_is_still_not_claimed": "承载者存在但形态相反：Property 47 要求「挂载组件不自行请求 config，只消费含 approved bundle 的 descriptor，可 await forceSave，且 ready/dirty/saveRequested/incomingDurable/terminal/recoveryCase/error 各有真实触发路径」。现算结果是「挂载点自行请求 config + 零 descriptor prop + 无 durable ack」⇒ 它是**反例**而不是通过项。本任务不接 descriptor/bridge（Task 60 正文把接线排在 bundle/representation 之后），故只登记事实与 BP-15，不宣称 Property 47 通过。"
+  },
+  "properties_verified": {
+    "Property 31": {
+      "claim": "PASS",
+      "denominator": 2,
+      "how": "对两份权威 docx 各跑一次真实往返：instrument_docx_bytes 注入 tagged SDT → materialize_word_projection 写值两次 → verify_word_only_regions 断言 SDT 外正文 / 层级 / 表格形状 / 受保护部件逐 aspect 等价，且 coverage 各项 > 0（防空集恒等价）。"
+    },
+    "Property 32": {
+      "claim": "PASS",
+      "denominator": 2,
+      "how": "`${entityName}` 在两份文档里各出现 2 次（现算）⇒ 同 stable key 两实例。把两处改成不同值后 extract_word_projection 必须产出 duplicate_word_instance 冲突并列出全部 XPath。"
+    },
+    "Property 47": {
+      "claim": "NOT_CLAIMED_CARRIER_IS_A_COUNTEREXAMPLE",
+      "denominator": 1,
+      "why": "本 lane 有 1 个 OO 挂载点（`GtF2StocktakeBundle.vue` 的 `<GtOnlyOfficeSheet>`，现算），但它**自行请求 config**、零 descriptor prop、无 durable ack ⇒ 它是 Property 47 的**反例**而不是通过项（BP-12 / BP-15）。守卫断言前提（挂载点数、self-config 站点、descriptor prop 数全部现算）与判据承载者存在，明确不宣称通过。",
+      "first_version_said": "denominator 0 / 「无挂载点」—— 实测错，已按现算结果更正（BP-15）。"
+    },
+    "Property 69": {
+      "claim": "NOT_CLAIMED_EMPTY_DENOMINATOR",
+      "denominator": 0,
+      "why": "没有任何 bidirectional entry、没有 sync_test_run、没有 required scenario set ⇒ 「服务端重算逐 scenario 实体」无对象。守卫断言前提（verification_state 全 UNVERIFIABLE + reasons 非空 + 计数现算），不宣称通过。"
+    }
+  },
+  "property_denominators": {
+    "not_claimed": [
+      "Property 47",
+      "Property 69"
+    ],
+    "why_not_claimed_is_recorded": "不宣称的两条各有各的理由，不能混成一句：**Property 69** 分母为空（无 bidirectional entry / 无 sync_test_run / 无 required scenario set）——空分母重言式是假绿源；**Property 47** 分母是 1 但承载者是**反例**（挂载点自取 config、零 descriptor）⇒ 也不宣称通过。把两种「不宣称」分别写进产物，后来者才不会把「有承载者」误读成「已通过」。",
+    "empty_denominator": [
+      "Property 69"
+    ],
+    "carrier_is_a_counterexample": [
+      "Property 47"
+    ]
+  },
+  "counters": {
+    "lane_entries": 2,
+    "contracts_published_reviewed": 2,
+    "contracts_installed_into_production_inventory": 0,
+    "authority_models_published": 2,
+    "definition_bundles_published": 0,
+    "published_representations_finalized": 0,
+    "adapters_registered": 0,
+    "capability_verdict_pending": 2,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 0,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "entries_left_unverifiable": 2,
+    "managed_fields_total": 33,
+    "managed_fields_by_entry": {
+      "F2-22": 17,
+      "F2-23": 16
+    },
+    "multi_instance_fields_total": 2,
+    "block_carrier_fields_total": 2,
+    "row_scoped_fields_total": 0,
+    "second_pipeline_endpoints_deleted": 0,
+    "counting_notes": "每一族计数都能从 entries 现算：lane_entries=len(entries)；contracts_published_reviewed=review_status=='reviewed' 的条数；contracts_installed_into_production_inventory 由 contracts.available_contract_ids() 现算（本任务后仍为 0）；authority_models_published=authority_model.definition_sha256 非空条数；definition_bundles_published / published_representations_finalized / adapters_registered 三项由 definition_bundle / published_representation / adapter_id 为 null 的条数取补；capability_verdict_pending=capability 为 null 条数；adjudicated_as_* 四项按 capability 值分桶；entries_left_unverifiable=verification_state=='UNVERIFIABLE' 条数；managed_fields_total 与 managed_fields_by_entry 由 field_evidence 长度求和；multi_instance_fields_total 由 occurrences_in_document_xml>1 计数；block_carrier_fields_total 由 carrier=='field_sdt_block' 计数；row_scoped_fields_total 由 repeaters 长度求和（两份契约都没有 repeaters）；second_pipeline_endpoints_deleted=0 是本轮策略（Task 61 全场景通过后才删）。四个 0 不得解读为「已具备双向能力」。"
+  },
+  "requirements_covered": [
+    "7.3",
+    "7.4",
+    "7.9",
+    "11.5",
+    "12.3",
+    "12.7",
+    "12.10",
+    "14.1"
+  ],
+  "ac_12_3_compliance": {
+    "text_role": "Word pilot SHALL 为 F2-22/F2-23；pilot 未通过 tagged SDT 往返保留前不得批量迁移其他 DOCX",
+    "how": "本任务只处理 F2-22 / F2-23 两份 docx；authoritative_templates.files 现算恰 2 条，两个 lane entry 的 wp_code 恰为 F2-22 / F2-23。平台上另有 5 条 docx manifest entry（A10B/A12B/A16B/A17B/GtWpRenderer）与 45 张 docx 权威册，本任务一条未动 ⇒ 「不得批量迁移其他 DOCX」有可复算判据而不是承诺。"
+  }
+}

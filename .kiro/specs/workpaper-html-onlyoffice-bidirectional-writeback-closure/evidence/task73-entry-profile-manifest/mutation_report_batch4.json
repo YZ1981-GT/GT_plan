@@ -1,0 +1,86 @@
+[
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+    "why": "双向锁死的一半：复核过的取值域与源码推导值必须逐条相等。短路后 overlay 变成一段无人核对的说明文字（AC 1.2 明禁自由文本决定 profile）",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 64.18s (0:01:04)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 67.2
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+    "why": "RG-15 只需 manifest 自身字段，是唯一**无条件**能跑在全量真实 entry 上的交叉判据。不跑它，registry 报告对真实数据又退回零覆盖",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 62.03s (0:01:02)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 64.8
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+    "why": "这正是本任务要修的欠账形态：RG-16/17 只在手搓 fixture 上跑，对真实 manifest 结构性不可达（假绿第①源）",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 59.94s",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 62.6
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift",
+    "why": "算出来了却不上报 = 闭合门永远看不到，Requirement 1.8「可见且阻断」失效",
+    "verdict": "RED",
+    "summary": "3 failed, 286 passed in 61.05s (0:01:01)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestClosureGateConsumesProfileDrift::test_profile_drift_is_a_registered_blocking_fact",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_drift_shrinks_to_the_rg15_layer_under_conformant_facts",
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_report_has_no_missing_profile_and_real_drift"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 63.7
+  }
+]

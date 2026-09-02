@@ -1,0 +1,287 @@
+[
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_close_capture_count_must_be_measured_and_exact",
+    "why": "close-capture 数不再要求实测 ⇒ partial unique 只证明 at-most-one，AC 4.10 要的是 exactly-one",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.43s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_close_capture_count_must_be_measured_and_exact"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_close_capture_count_must_be_measured_and_exact"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_close_capture_count_must_be_measured_and_exact",
+    "why": "实测数与期望不再精确相等 ⇒ 两个 capture 也算通过，「无 successor 时零 capture」也测不出来",
+    "verdict": "RED",
+    "summary": "2 failed, 103 passed in 10.25s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_close_capture_count_must_be_measured_and_exact",
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_zero_capture_scenario_expects_zero_not_one"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_close_capture_count_must_be_measured_and_exact",
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_zero_capture_scenario_expects_zero_not_one"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "download_only / recovery_reject 带 operation/application 不再拦 ⇒ 真库会抛`ck_wpees_download_only_zero_entities`（首轮实测），而离线守卫看不出来",
+    "verdict": "RED",
+    "summary": "3 failed, 102 passed in 10.24s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_download_only_with_entities_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_download_only_with_entities_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "quarantined 场景（standard kind）带 application 不再拦 ⇒ AC 5.6 的「永不创建 application」在库层完全不管，判据只能在写入侧",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.32s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "recovery 场景不绑 case 也放行 ⇒ 「claim 前零 operation」这条无处观测",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.48s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.7
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "声明需要 operation+application 的场景可以两手空空 ⇒ 「一条 applied operation 代表全部场景」的反面：干脆一条都不给",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.81s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "claim 前已存在三实体也放行 ⇒ AC 5.8 的「三者在 claim 成功前均不存在」空转",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.18s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "同 run 内跨场景复用不再检出 ⇒ 一条 applied operation 可以填满 24 个场景（AC 12.10 明令禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.28s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+    "why": "🔴 跨 entry 复制证据不再检出 ⇒ 一个 entry 的 pilot 证据可以复制给另外 177 个",
+    "verdict": "RED",
+    "summary": "2 failed, 103 passed in 10.41s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_rejection_kinds_are_reachable_and_mutually_distinct",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py",
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused",
+    "why": "跨 entry 判据接了但喂空集 ⇒ 纯函数正确、生产路径永远查不到东西（本 spec 的死代码型假绿）",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.85s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.4
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_trace_bundle_rejection_covers_all_three_failure_shapes",
+    "why": "trace bundle 未 published 也算证据 ⇒ 截图/自由文本可以冒充逐 scenario 证据",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.53s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_trace_bundle_rejection_covers_all_three_failure_shapes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_trace_bundle_rejection_covers_all_three_failure_shapes"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.9
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_trace_bundle_rejection_covers_all_three_failure_shapes",
+    "why": "登记的 sha256 与 artifact 行不符也放行 ⇒ trace bundle 可以指向另一份文件",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.67s",
+    "added": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_trace_bundle_rejection_covers_all_three_failure_shapes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestRejectionKindsReachableAndDistinct::test_trace_bundle_rejection_covers_all_three_failure_shapes"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_without_a_trace_bundle_is_refused",
+    "why": "trace 判据不再读真 artifact 行 ⇒ 生产路径上「published + hash 相符」两条都空转。替换体引用一个不存在的名字，调用即 NameError ⇒ 走 harness 的那条路径必红",
+    "verdict": "RED",
+    "summary": "17 failed, 88 passed in 8.43s",
+    "added": [
+      "test_task39_pilot_harness_pg.py::TestCollectionIntegrity::test_no_phase_crashed_during_collection",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_a_run_without_real_onlyoffice_cannot_be_passed",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_finalize_sets_finished_at_and_a_recomputed_result",
+      "test_task39_pilot_harness_pg.py::TestFinalizeWritesOnlyRecomputedResult::test_the_recomputer_saw_the_full_required_set",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_a_run_assessed_against_its_own_bundle_is_not_stale",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_baseline_has_no_bundle_stale_reason",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_bundle_and_authority_change_are_two_axes",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_source_commit_change_still_flows_from_the_recomputer",
+      "test_task39_pilot_harness_pg.py::TestFreshnessAxesOnRealRows::test_typed_child_change_is_reported_on_its_own_axis",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_black_box_scenarios_carry_the_not_executed_error_code",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_every_required_scenario_got_its_own_row",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_no_black_box_scenario_was_recorded_as_passed",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_result_is_derived_by_the_oracle_not_supplied",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_scenario_kind_domain_is_accepted_by_v151",
+      "test_task39_pilot_harness_pg.py::TestScenarioRowsAreRealAndSchemaValid::test_upstream_gap_scenarios_are_failed_with_task32_attribution",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_without_a_trace_bundle_is_refused",
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_borrowing_another_entrys_application_is_refused"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness_pg.py::TestWriteSideFailClosedIsWired::test_a_scenario_without_a_trace_bundle_is_refused"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  }
+]

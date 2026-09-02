@@ -154,17 +154,34 @@ async def get_events_since(
     返回断连期间的事件列表（最多 100 条），按时间 ASC 排序。
 
     Validates: Requirements 1.7, 11.3；R3（项目授权）
+
+    spec workpaper-html-onlyoffice-bidirectional-writeback-closure · Task 35
+    （Requirement 13.2 / Property 53）修两处：
+
+    1. stream key 原来写死 ``"events:stream"``，而写入侧一直是
+       ``event_bus.EVENT_STREAM_KEY``（``"audit:events"``）—— 这个端点读的是一条
+       **没有任何写入方**的 stream，断线补拉恒返回空列表；
+    2. 投影原来只有 ``event_type/project_id/year/account_codes`` 四个扁平字段，
+       ``extra`` 整片丢掉，于是 ``workpaper.content.updated`` 的
+       ``wp_id / revision / operation_id / source / adapter_id / file_sha256``
+       在补拉结果里一个都不在，前端 AC 11.9 的去重与刷新无从恢复。
     """
     # R3: 项目授权（与 /stream 一致，越权 403 脱敏）
     await check_project_access(current_user, project_id, db)
 
     from app.core.redis import redis_client
+    from app.services.event_bus import EVENT_STREAM_KEY
+    from app.services.workpaper_sync.content_events import (
+        belongs_to_project,
+        replay_entry_projection,
+    )
 
     events: list[dict] = []
+    dropped_unparseable = 0
 
     try:
-        # 尝试从 Redis Stream 读取
-        stream_key = "events:stream"
+        # 唯一真源：写入方与读取方共用同一个键常量（不再各写一份字面量）。
+        stream_key = EVENT_STREAM_KEY
 
         if last_event_id:
             # 从指定 ID 之后读取
@@ -187,24 +204,26 @@ async def get_events_since(
         )
 
         for msg_id, data in messages:
-            # 过滤当前项目的事件
-            event_project_id = data.get("project_id", "")
-            if event_project_id and event_project_id != str(project_id):
+            item = replay_entry_projection(msg_id, data)
+            if item is None:
+                # 解析不出来必须显式计数：静默跳过会让「事件被丢弃」在日志与响应里
+                # 都不可见（Requirement 13.9）。
+                dropped_unparseable += 1
                 continue
-
-            event_data = {
-                "event_id": msg_id,
-                "event_type": data.get("event_type", ""),
-                "project_id": event_project_id,
-                "year": int(data["year"]) if data.get("year") else None,
-                "account_codes": json.loads(data.get("account_codes", "[]")) or None,
-                "timestamp": int(msg_id.split("-")[0]) / 1000 if "-" in msg_id else None,
-            }
-            events.append(event_data)
+            # 过滤当前项目的事件（无归属事件不下发到具体项目流）
+            if not belongs_to_project(item, project_id):
+                continue
+            events.append(item)
 
     except Exception as e:
         logger.warning("get_events_since failed (Redis unavailable): %s", e)
         # Redis 不可用时返回空列表（降级）
         return []
 
+    if dropped_unparseable:
+        logger.error(
+            "get_events_since: 丢弃 %s 条无法解析的 Stream 条目 project=%s",
+            dropped_unparseable,
+            project_id,
+        )
     return events

@@ -11,6 +11,7 @@
         />
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f2-inventory-valuation" />
       </div>
 
       <GtOnlyOfficeSheet
@@ -180,6 +181,7 @@ const F2TabRelatedPurchase = defineAsyncComponent(() => import('./f2/valuation/F
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const props = defineProps<{
   wpId: string

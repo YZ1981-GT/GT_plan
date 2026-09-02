@@ -1,0 +1,2210 @@
+{
+  "schema_version": "manifest-slice:v1",
+  "task": "Task 50",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "H 循环（除 H1）Excel 独立 entry 的冻结 manifest slice。按 definition_producer_paradigm 的 12 步流水线逐 entry 执行 step 1~4 与 step 11：① 从 source manifest 按可复算 selection_rule 冻结 9 条独立 entry（H 前缀 xlsx 共 15 条，independent 10 条，减去 pilot H1 得 9 条；另 5 条是 H4/H8 的 parent_duplicate 子入口，按 AC 1.6 不独立计数）；② 冻结 backend/wp_templates/H/ 全 11 个文件的 size + sha256，9 张主模板另冻 normalized_structure_hash；③ 逐 entry 实测 HTML 对端 —— 9/9 都把业务内容落在 checklist_responses（payload 列 remark），故 html_counterpart_verdict 全为 exists；④ 按 AC 12.8 一条都不得标 single_onlyoffice，按 AC 12.1 也都不得标 bidirectional（六件前置未交付）⇒ capability 记 null 并如实计入 unadjudicated=9；⑪ 9 个宿主的模式工具栏挂 GtEntrySyncCapabilityNotice 兑现 AC 1.4。🔴 H 循环与 D/F/G 的最大形态差异在**持久化载体的归属**：写路径分三族（宿主内联 http / useHxFormData 用 api / 子 Tab 自持久化用 api），读路径有 5 条 entry 的载体里**没有** GET /checklist-responses（走 render-config 快照或 render-config 强制刷新）。照抄 F 循环的「持久化 composable 必须自带 GET+PUT 两个端点」判据会对这 5 条必然失配 —— 逐 entry 实测后按实际形态登记，见 h_cycle_form_differences。",
+  "frozen_at": "Task 50（2026-08-31）",
+  "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "sibling_slices": [
+    "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_g_cycle_manifest_slice.json"
+  ],
+  "slice_scope": {
+    "cycle": "H",
+    "document_type": "xlsx",
+    "selection_rule": "source_manifest 的 entries 中同时满足四条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'H' 开头 ③ independent_entry is True ④ entry_id != 'xlsx/gt-h1-fixed-assets'（H1 是 Task 42 的 pilot，任务正文明令排除）。实算：命中 wp_code 前缀 H 的 entry 共 15 条，全部 document_type == 'xlsx'；其中 independent_entry == true 的 10 条、false 的 5 条（H4 的 2 条 + H8 的 3 条 parent_duplicate 子入口）；10 条里 H1 占 1 条 ⇒ 本 slice 9 条。全量 manifest 里 7 条 docx entry 无一条命中 H 前缀，故 H 循环无 Word 通道 entry。",
+    "independent_entry_count": 9,
+    "h_prefixed_entry_total": 15,
+    "h_prefixed_independent_total": 10,
+    "excluded_pilot_entry_count": 1,
+    "parent_duplicate_count": 5,
+    "parent_duplicate_note": "H 循环有 5 条 parent_duplicate 子入口，全部落在本 slice 的两条 entry 名下：H4 的 `xlsx/h4/impairment/h4-tab-impairment` 与 `xlsx/h4/impairment/h4-tab-recoverable`（parent_entry_id = xlsx/gt-h4-engineering-materials，wp_code_pattern H4T），H8 的 `xlsx/h8/impairment/h8-tab-recoverable`、`xlsx/h8/measurement/h8-tab-measurement-annual`、`xlsx/h8/measurement/h8-tab-measurement-monthly`（parent_entry_id = xlsx/gt-h8-right-of-use-assets，wp_code_pattern H8T）。按 AC 1.6 它们复用父 entry 的 adapter、**不得**独立计入已迁移数，故不进 independent_entries。这与 F 循环（parent_duplicate 0 条）、G 循环（0 条）形态不同，与 D 循环（D4 有 31 条）同型但规模小得多。详见 parent_duplicate_summary。",
+    "excluded_from_slice": [
+      {
+        "what": "H1 固定资产的 entry `xlsx/gt-h1-fixed-assets`（宿主 GtH1FixedAssets.vue）",
+        "template_ref": "H/H1 固定资产.xlsx",
+        "reason": "任务正文明令「逐一迁移 H 循环**除 H1 外** Excel 独立 entry」。H1 是本 spec 的四个 pilot 之一（Task 42「H1 分组/动态结构 Excel pilot」），其产物 backend/data/workpaper_sync_contracts/h1.disposal_check.json 是唯一一份 H 循环生产契约。实证边界两条：① 该 contract 的 review.entry_id 属 H1，本 slice 的 9 条 entry 在契约目录里一条都没有（见 property_denominators.property_21 与 cross_entry_isolation）；② H1 的 wp_code_pattern 是 H1F，与本 slice 9 条的 pattern 集合（H2C/H3I/H4E/H5O/H6A/H7B/H8R/H9L/H10A）无交集。**但** H1 的权威模板仍登记在 authoritative_templates（belongs_to_entry=null + excluded_reason），漏登会让「登记集合 == 磁盘实况」这条判据失效。"
+      },
+      {
+        "what": "H0 固定资产循环函证的 confirmation-* 组件族",
+        "template_ref": "H/H0 固定资产循环函证.xlsx",
+        "reason": "H0 走 D0 那套跨循环共享函证模块（wp_code_overrides 里 H0→confirmation-hub 等，与 D0/E0/F0/G0/K0/L0 同一组 componentType），纯 HTML 无 GtOnlyOfficeSheet 挂载点 ⇒ 不在 source manifest 的 186 条 entry 里，归 Task 57。本 slice 不为它伪造 entry，只把模板文件登记进 authoritative_templates。"
+      },
+      {
+        "what": "H4 / H8 的 5 条 parent_duplicate 子入口",
+        "reason": "它们的 independent_entry=false，按 selection_rule 第 ③ 条不进 independent_entries；按 AC 1.6 复用父 entry 的 adapter，不得重复计为已迁移。**不得**把它们并进 independent_entries 凑数（那会让 9 变 14 且与 selection_rule 现算不符）。它们的宿主组件路径与 wp_code_pattern 登记在 parent_duplicate_summary，供 step 9 改线时一并处理。"
+      },
+      {
+        "what": "H 循环的附注披露同步链路（h*NoteSectionMap.ts + h*DisclosureSyncPayload.ts + H*TabDisclosure*.vue 的 syncToNotes）",
+        "reason": "附注同步是 spec `disclosure-sync-path-buildout` 与各 H 循环重建 spec 的交付物，与本 slice 的 OO↔HTML 双向回写是两条独立通道：前者把底稿行推到 disclosure-notes 模块，后者是 GtOnlyOfficeSheet + legacy_sheet_onlyoffice_router。本 slice 不接管附注契约，只核验一件与本任务正文直接相关的事 —— 「动态公司列复用 H7 stable key 范式」在 H 循环内部是否自洽。结论：H7 自己是范式源头且自洽，H8 在附注同步边界上把稳定 key 降级成 label ⇒ 登记 BP-7，见 dynamic_column_identity。"
+      }
+    ]
+  },
+  "independent_entries": [
+    {
+      "entry_id": "xlsx/gt-h2-construction-in-progress",
+      "wp_code_pattern": "H2C",
+      "document_type": "xlsx",
+      "host": "GtH2ConstructionInProgress.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-6"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H2 在建工程.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "host_inline",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+        "write_client": "http",
+        "write_client_import": "import http from '@/utils/http'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L313",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L522",
+        "read_carrier": "render_config_snapshot_passthrough",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+        "endpoint_read": "props.htmlData.responses_snapshot（由父级 render-config 透传，宿主自身不 GET /checklist-responses）",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L463",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L524",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H2-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts#L260",
+        "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": true,
+        "row_identity_positional_defect": "🔴 新增行与载入行的身份都是生成串（非位置），但**四表种子路径**是位置化的：`GtH2ConstructionInProgress.vue#L615-616` 的 `_seedDetailFromPrefill()` 把后端 `detail_prefill` 逐项映射成 `rowId: \\`seed-${i}\\``（i = 数组下标），并写进 primary managed table 的真实键 `H2-2-rows`。种子只在无持久化时写内存态，但用户一保存这些 `seed-{i}` 就成为业务行的持久身份。已登记 BP-6，本任务不改。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H2-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 H2-2-audit-note / H2-2-audit-conclusion（同一 owner 模块的 NOTE_KEY / CONCLUSION_KEY）、H2A 程序表、H2-3~H2-17 各表与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "H2-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts#L204",
+          "what_it_holds": "在建工程明细（H2-2）整表 —— 工程项目名称/预算金额/资金来源/累计投入占预算比例/预计完工时间 + 期初期末与本期增减",
+          "template_relative_path": "H/H2 在建工程.xlsx",
+          "template_sheet": "明细表H2-2",
+          "identity_cell": "A9",
+          "identity_text": "工程项目名称"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L313",
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L522",
+        "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h2_construction_in_progress.py",
+        "backend/wp_templates/H/H2 在建工程.xlsx!明细表H2-2!A9 = '工程项目名称'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH2DualMode.ts",
+        "lines": 157,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h2-dual-mode:",
+        "health_probe_client": "http",
+        "host_consumes_it": true,
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue"
+        ]
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主自己 import `http` 并把结构化 Tab 的录入防抖批量 PUT 到 /api/workpapers/{wp_id}/checklist-responses，primary managed table `H2-2-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ROWS_KEY 在 useH2Detail.ts；模板依据 `H/H2 在建工程.xlsx!明细表H2-2!A9` = '工程项目名称' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice —— AC 12.8 的判据是「有没有 HTML 对端」。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h2-construction-in-progress → GtH2ConstructionInProgress），故不是 unreachable。而 AC 12.1 要求的 approved authority model / 人工审核 per-entry contract / non-null approved bundle / Task 36 finalize 出的 published representation / 注册 adapter / 逐 scenario evidence 六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背一条形态缺陷：四表种子路径的行身份取数组下标（BP-6）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 wp_onlyoffice_router.get_sheet_onlyoffice_config 经 _resolve_wp_file(project_id, wp_code, template_path, visible_sheet=sheet_name) **项目存储优先**解析文件，首开才从权威模板复制；② post_sheet_onlyoffice_callback 把 OO 编辑落盘进那份项目文件，编辑不是丢弃；③ 权威模板含 21 个真实业务 sheet（底稿目录 + H2A 程序表 + 审定表H2-1 + 明细表H2-2 + H2-3~H2-17 + 两份附注披露）。所以问题不是「OO 侧空白」，而是「OO 侧那份文件与 HTML 侧的 checklist_responses 互不投影」。",
+        "not_bidirectional_because": "Wave 5 前置（tasks.md「Tasks 46–57 标准 Excel entry 启用前置」）六件事一件都没落地，且这**不是**裁 single 的理由、只是「还不能标 bidirectional」的理由（AC 12.1 的正向条件未满足）：逐条见 blocking_preconditions BP-1..BP-4。workpaper_sync_contracts/ 下无本 entry 的契约文件，adapters/registry.py 的 DELIVERED_PER_ENTRY_CONTRACTS 四条 pilot（b60/d2/h1/g7）里属 H 循环的那条是 **H1**（已排除的 pilot），不是本 entry；真实 OnlyOffice 9.4 required scenario set 亦未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。此外本 entry 在具备双向前必须先修 BP-6（种子行身份取数组下标 —— stable field key 无法在 roundtrip 中保持）。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "four_table_seed_row_identity_derives_from_array_index"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h2-header-toolbar\"",
+      "ui_toolbar_gate_note": "本宿主的模式工具栏门控是 `v-if=\"showModeSwitch\"`（computed，按 currentSheet 判断），与其余 8 个宿主逐个不同 —— 守卫按本字段声明的 class 锚点逐 entry 定位工具栏区块，不假设全 slice 同形。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h3-investment-property",
+      "wp_code_pattern": "H3I",
+      "document_type": "xlsx",
+      "host": "GtH3InvestmentProperty.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H3 投资性房地产.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "formdata_composable",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts",
+        "write_client": "api",
+        "write_client_import": "import { api } from '@/services/apiProxy'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts#L21",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts#L150",
+        "read_carrier": "formdata_composable",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts#L324",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts#L154",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H3-2-cost-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts#L141",
+        "row_identity_generator_form": "`dc-${Math.random().toString(36).slice(2, 8)}`（载入回填）/ `dc-${Date.now()}`（新增行，useH3DetailCost.ts#L191）",
+        "row_identity_is_positional": false,
+        "row_identity_note": "🔴 载入路径 `_normalize(r, i)` 的第二个实参**是**数组下标，但它绑给的是 `seq`（展示序号，useH3DetailCost.ts#L142 `seq: raw.seq ?? idx + 1`），不是身份字段 `rowId` —— 与 G12 同型。判据必须只取 `rowId:` 自己的值表达式，按整行判会把本 entry 误报成位置化。真实弱点是另一件事：`rowId` 缺失时每次载入生成新串（不稳定），且新增行用 `dc-${Date.now()}` 无随机后缀（同毫秒连加两行会撞 id）—— 两者都属 BP-2 要在 step 6 发布 contract 前处理的范围，不单列 BP。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H3-2-cost-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 是**双计量模式** entry：成本模式与公允价值模式各有一整套 sheet（审定表 H3-1 两张、明细表 H3-2 两张、增减检查表 H3-5 两张、折旧测算表 H3-7 两张），公允侧主表键是 H3-2-fair-rows（owner useH3DetailFair.ts）。计量模式本身持久化在 useH3MeasurementModel.ts。逐字段 contract 属 step 6 的活，本次不伪造；但 contract 必须按 (measurement_model, sheet_code) 两维声明，只写单模式会漏掉一半 sheet。",
+        "measurement_variant": {
+          "why_this_key_exists": "H3 与 H7 是本 slice 里唯二的「同一 wp_code 下两套并列 sheet」entry（成本模式 / 公允价值模式），源模板里两张 sheet 的名字不同（`明细表（成本模式）H3-2` vs `明细表（公允价值模式）H3-2`）但 sheet_code 尾码相同。这与 E 循环的 currency_variant 形态相似但不同源：E1-3 是两张同尾码 sheet **共用**一个持久化键，H3 是两套 sheet **各有**独立键，故不触发 slice_schema.conditional_sections 的 currency_variant_model（decoupling_rule 无适用对象）。",
+          "variants": [
+            {
+              "variant": "cost",
+              "template_sheet": "明细表（成本模式）H3-2",
+              "primary_table": "H3-2-cost-rows",
+              "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts"
+            },
+            {
+              "variant": "fair_value",
+              "template_sheet": "明细表（公允价值模式）H3-2",
+              "primary_table": "H3-2-fair-rows",
+              "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailFair.ts"
+            }
+          ],
+          "switch_source": "audit-platform/frontend/src/components/workpaper/composables/useH3MeasurementModel.ts"
+        },
+        "primary_table": {
+          "item_id": "H3-2-cost-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts",
+          "owner_constant": "ITEM_ID",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts#L73",
+          "what_it_holds": "投资性房地产明细（成本模式 H3-2）整表 —— 投资性房地产类别/名称/原值（未审期初·本年增加·增加方式）+ 累计折旧与减值",
+          "template_relative_path": "H/H3 投资性房地产.xlsx",
+          "template_sheet": "明细表（成本模式）H3-2",
+          "identity_cell": "A9",
+          "identity_text": "投资性房地产类别"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue#L322",
+        "audit-platform/frontend/src/components/workpaper/composables/useH3FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH3MeasurementModel.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h3_investment_property.py",
+        "backend/wp_templates/H/H3 投资性房地产.xlsx!明细表（成本模式）H3-2!A9 = '投资性房地产类别'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH3DualMode.ts",
+        "lines": 114,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h3-dual-mode:",
+        "health_probe_client": "fetch",
+        "host_consumes_it": true,
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue"
+        ]
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useH3FormData 以 `api`（apiProxy）GET/PUT /api/workpapers/{wp_id}/checklist-responses，primary managed table `H3-2-cost-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ITEM_ID 在 useH3DetailCost.ts；模板依据 `H/H3 投资性房地产.xlsx!明细表（成本模式）H3-2!A9` = '投资性房地产类别' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h3-investment-property → GtH3InvestmentProperty），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 22 个真实业务 sheet，其中成本模式与公允价值模式各成一套（审定表/明细表/增减检查表/折旧测算表各两张），本 entry 的 primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。本 entry 还多一重契约复杂度：双计量模式意味着 contract 必须按 (measurement_model, sheet_code) 两维声明，抄单模式形态会漏掉一半 sheet（见 html_counterpart.measurement_variant）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h3-header-toolbar\"",
+      "ui_toolbar_gate_note": "门控是 `v-if=\"currentSheet !== 'H3'\"`（按 sheet 而非 computed），同一区块内还并列一个计量模式 el-segmented —— 通知必须挂在这个区块里，挂到计量模式那个 segmented 之外的兄弟区块会让 AC 1.4 的 DOM 判据落空。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h4-engineering-materials",
+      "wp_code_pattern": "H4E",
+      "document_type": "xlsx",
+      "host": "GtH4EngineeringMaterials.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-6"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H4 工程物资.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "formdata_composable",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts",
+        "write_client": "api",
+        "write_client_import": "import { api } from '@/services/apiProxy'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts#L16",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts#L188",
+        "read_carrier": "formdata_composable",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts#L281",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts#L192",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H4-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L249",
+        "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": true,
+        "row_identity_positional_defect": "🔴 与 H2 同型：载入/新增路径的身份是生成串，但四表种子是位置化的 —— `composables/h4DetailPrefill.ts#L50` 的 `buildH4DetailSeedRows()` 把 `detail_prefill` 逐项映射成 `rowId: \\`seed-${idx}\\``，宿主 `GtH4EngineeringMaterials.vue#L383` 把它写进 primary managed table 的真实键 `H4-2-rows`。已登记 BP-6，本任务不改。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H4-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 H4-2-detail-total / -increase-total / -decrease-total / -impair-total 四个汇总键（同一 owner 模块）、H4-3-rows（调整分录，同模块 H43_ROWS_KEY）、H4-4~H4-9 与两份附注披露的各自键。它还有 2 条 parent_duplicate 子入口（H4T：H4TabImpairment / H4TabRecoverable），按 AC 1.6 复用本 entry 的 adapter。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "H4-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L111",
+          "what_it_holds": "工程物资明细（H4-2）整表 —— 序号/工程物资类别/名称/计量单位 + 原值（未审期初数量金额·本期购入·本期领用）+ 账龄与品质",
+          "template_relative_path": "H/H4 工程物资.xlsx",
+          "template_sheet": "明细表H4-2",
+          "identity_cell": "A8",
+          "identity_text": "序号"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue#L212",
+        "audit-platform/frontend/src/components/workpaper/composables/useH4FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/h4DetailPrefill.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h4_engineering_materials.py",
+        "backend/wp_templates/H/H4 工程物资.xlsx!明细表H4-2!A8 = '序号'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH4DualMode.ts",
+        "lines": 110,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h4-dual-mode:",
+        "health_probe_client": "http",
+        "host_consumes_it": true,
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
+          "audit-platform/frontend/src/components/workpaper/h4/impairment/H4TabImpairment.vue",
+          "audit-platform/frontend/src/components/workpaper/h4/impairment/H4TabRecoverable.vue"
+        ],
+        "consumers_note": "🔴 本 entry 的 legacy composable 是全 slice 唯一有**子 Tab 消费方**的一条（另两个消费方正是它的 2 条 parent_duplicate 子入口）。step 9 改线时必须一并改这两个子 Tab，否则删掉 composable 会打断子入口 —— deletion plan 已按此登记。",
+        "spec_consumer": "audit-platform/frontend/src/components/workpaper/composables/__tests__/useH4DualMode.spec.ts"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useH4FormData 以 `api` GET/PUT /api/workpapers/{wp_id}/checklist-responses，primary managed table `H4-2-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ROWS_KEY 在 useH4Detail.ts；模板依据 `H/H4 工程物资.xlsx!明细表H4-2!A8` = '序号' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h4-engineering-materials → GtH4EngineeringMaterials），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背一条形态缺陷：四表种子行身份取数组下标（BP-6）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 13 个真实业务 sheet（底稿目录 + H4A 程序表 + 审定表H4-1 + 明细表H4-2 + H4-3~H4-9 + 两份附注披露），primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。此外本 entry 在具备双向前必须先修 BP-6（种子行身份取数组下标）。本 entry 还有 2 条 parent_duplicate 子入口共用同一 legacy composable，step 9 改线的对象是 3 个组件而不是 1 个。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "four_table_seed_row_identity_derives_from_array_index"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h4-header-toolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h5-oil-gas-assets",
+      "wp_code_pattern": "H5O",
+      "document_type": "xlsx",
+      "host": "GtH5OilGasAssets.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-8"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H5 油气资产.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "per_tab_formdata_instance",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts",
+        "write_client": "api",
+        "write_client_import": "import { api } from '@/services/apiProxy'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts#L26",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts#L128",
+        "read_carrier": "per_tab_formdata_instance",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts#L303",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts#L132",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "composite_prefix_plus_table_role",
+        "transport_key_shape": "`${ITEM_PREFIX}-rows` ⇒ H5-2-rows（同族还有 `${ITEM_PREFIX}-audit-note` / `-audit-conclusion`）",
+        "transport_key_composition_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L53(ITEM_PREFIX) / #L90(读) / #L190(写)",
+        "transport_key_composition_note": "🔴 本 entry 的键不是字面量常量，而是由模块级前缀常量 `ITEM_PREFIX = 'H5-2'` 拼出 `${ITEM_PREFIX}-rows`。契约里若按字面量 'H5-2-rows' 声明也对，但守卫必须去源码里找**拼接式**（`${ITEM_PREFIX}-rows`），按字面量 grep 会在 useH5Detail.ts 里找不到而假红。",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L166",
+        "row_identity_generator_form": "`row-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`（新增）/ `row-${Math.random().toString(36).slice(2, 10)}`（载入回填，#L108）",
+        "row_identity_is_positional": false,
+        "row_identity_note": "另有一个**固定**身份 `rowId: 'subtotal'`（useH5Detail.ts#L139，合计行，派生只读不落库）。契约里必须把它排除在业务行之外，否则 roundtrip 会把合计行当成一条可编辑明细行推回 OO。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H5-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 H5-1 审定表、H5-3~H5-19 共 17 张检查/测算/监盘表与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "carrier_instantiation_note": "🔴 与 H3/H4/H10 不同：本 entry 的宿主 `GtH5OilGasAssets.vue` **不**实例化 useH5FormData（实测宿主 import 清单里没有它），而是每个子 Tab 各自 `useH5FormData({ wpId, projectId })` 一份（实测 34 个消费方，其中 20 个是 .vue Tab）。宿主只把 `allResponses` 作为 prop 往下传。后果两条：① 同一 wp 在一次会话里会有多个 FormData 实例，各自持有自己的防抖队列 ⇒ step 9 接线时「一个 entry 一个 flush 回调」的假设不成立；② 宿主里既没有 GET 也没有 PUT /checklist-responses，照抄 F 循环的「宿主/载体必须同时出现两个端点」判据会假红。",
+        "primary_table": {
+          "item_id": "H5-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts",
+          "owner_constant": "ITEM_PREFIX",
+          "owner_declaration_kind": "module_constant_prefix",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L53",
+          "owner_composition_expression": "`${ITEM_PREFIX}-rows`",
+          "what_it_holds": "油气资产、累计折耗及减值准备明细（H5-2）整表 —— 油气资产类别/编号/名称 + 原值（未审期初·本期增加金额）+ 折耗与减值",
+          "template_relative_path": "H/H5 油气资产.xlsx",
+          "template_sheet": "明细表H5-2",
+          "identity_cell": "A9",
+          "identity_text": "油气资产类别"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L305",
+        "audit-platform/frontend/src/components/workpaper/composables/useH5FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts",
+        "audit-platform/frontend/src/components/workpaper/h5/core/H5TabDetail.vue",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h5_oil_gas_assets.py",
+        "backend/wp_templates/H/H5 油气资产.xlsx!明细表H5-2!A9 = '油气资产类别'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH5DualMode.ts",
+        "lines": 122,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h5-dual-mode:",
+        "health_probe_client": "fetch",
+        "host_consumes_it": false,
+        "consumers": [],
+        "consumers_note": "🔴 **零消费方**（全前端 src 实扫）。宿主自己在 `GtH5OilGasAssets.vue#L381-L457` 内联了一套等价实现（`currentMode` ref + `switchMode()` + `http.get('/api/workpapers/onlyoffice/health')` + 预拉 onlyoffice-config），与这份 composable 互不相通。属 AC 1.7 的「不可达旧桩」形态（对象是 composable 而不是 entry），已登记 BP-8。"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 各子 Tab 各自实例化 useH5FormData，以 `api` GET/PUT /api/workpapers/{wp_id}/checklist-responses，primary managed table 由 useH5Detail 的模块级前缀常量拼成 `${ITEM_PREFIX}-rows` = H5-2-rows，整表存成一条 item 的 remark（JSON 行数组）；模板依据 `H/H5 油气资产.xlsx!明细表H5-2!A9` = '油气资产类别' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h5-oil-gas-assets → GtH5OilGasAssets），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背一条形态缺陷：legacy dual-mode composable 零消费、宿主内联了第二份实现（BP-8）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 宿主 `GtH5OilGasAssets.vue#L414` 还会**先 GET** `/api/workpapers/{wpId}/sheets/{sheetName}/onlyoffice-config`，只有拉取成功才切模式 —— 也就是说 OO 侧文件的可用性在切换时被真实校验过，不是空白入口；④ 权威模板含 24 个真实业务 sheet，primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。此外本 entry 在 step 9 改线前必须先解决 BP-8：磁盘上有一份零消费的 useH5DualMode.ts，宿主用的是内联的第二份实现 —— 不先判清「哪一份是真载体」就改线，会改到死代码上（宿主行为不变而守卫全绿 = 假绿）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "legacy_dual_mode_composable_has_zero_consumers_host_inlines_a_second_implementation"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h5-header-toolbar\"",
+      "ui_toolbar_gate_note": "门控是 `v-if=\"showHtmlToolbar && currentSheet !== 'H5'\"`（两条件与），全 slice 唯一的复合门控。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+      "wp_code_pattern": "H6A",
+      "document_type": "xlsx",
+      "host": "GtH6AssetDisposalClearing.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-8"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H6 固定资产清理.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "host_inline",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
+        "write_client": "http",
+        "write_client_import": "import http from '@/utils/http'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L167",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L242",
+        "endpoint_write_second_site": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L270",
+        "read_carrier": "render_config_snapshot_passthrough",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
+        "endpoint_read": "props.htmlData.responses_snapshot（由父级 render-config 透传，宿主自身不 GET /checklist-responses）",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L322",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L244",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H6-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L294",
+        "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": false,
+        "row_identity_note": "载入路径同行还有 `seq: raw.seq ?? idx + 1`（useH6Detail.ts#L295），那是展示序号不是身份 —— 与 H3 同型，判据只取 `rowId:` 自己的值表达式。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H6-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 6 个小计键（H6-2-subtotal-gain-loss / -net-book-value / -begin-unadjusted / -end-unadjusted / -begin-audited / -end-audited，同一 owner 模块）、H6-1 审定表、H6-3 调整分录、H6-4 检查表与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "H6-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L119",
+          "what_it_holds": "固定资产清理明细（H6-2）整表 —— 项目 + 未审数（期初数·本期增加·本期减少·期末数）+ 调整后审定数",
+          "template_relative_path": "H/H6 固定资产清理.xlsx",
+          "template_sheet": "明细表H6-2",
+          "identity_cell": "A9",
+          "identity_text": "项目"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L167",
+        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L242",
+        "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h6_asset_disposal_clearing.py",
+        "backend/wp_templates/H/H6 固定资产清理.xlsx!明细表H6-2!A9 = '项目'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH6DualMode.ts",
+        "lines": 115,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h6-dual-mode:",
+        "health_probe_client": "fetch",
+        "host_consumes_it": true,
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue"
+        ]
+      },
+      "orphan_formdata_composable": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH6FormData.ts",
+        "production_consumers": [],
+        "test_only_consumers": [
+          "audit-platform/frontend/src/components/workpaper/__tests__/h6Integration.spec.ts"
+        ],
+        "why_registered": "🔴 磁盘上有一份完整的 useH6FormData（427 行，`api` + GET#L261 + PUT#L172），但生产代码零消费 —— 唯一引用它的是一个 spec 文件。真正在写库的是宿主内联的 `http.put`（#L240 / #L268）。这是「additive 注入即死代码」的教科书形态：光看 useH6FormData 会以为 H6 的载体是它，据此写 contract / 接 adapter 会接到死代码上。已登记 BP-8。"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主自己 import `http` 并把子组件经 inject('saveResponse') 的录入防抖批量 PUT 到 /api/workpapers/{wp_id}/checklist-responses（两处写入点 #L240 / #L268），primary managed table `H6-2-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ROWS_KEY 在 useH6Detail.ts；模板依据 `H/H6 固定资产清理.xlsx!明细表H6-2!A9` = '项目' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h6-asset-disposal-clearing → GtH6AssetDisposalClearing），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背一条形态缺陷：磁盘上另有一份生产零消费的 useH6FormData（BP-8）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 8 个真实业务 sheet（底稿目录 + H6A 程序表 + 审定表H6-1 + 明细表H6-2 + H6-3 + H6-4 + 两份附注披露），primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。此外 step 6 发布 contract 前必须先按 BP-8 判清载体归属：useH6FormData 在生产里零消费，把它当 HTML 侧载体写进 contract 会让整份 contract 描述一条不存在的通道。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "a_second_formdata_composable_exists_with_zero_production_consumers"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h6-header-toolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h7-biological-assets",
+      "wp_code_pattern": "H7B",
+      "document_type": "xlsx",
+      "host": "GtH7BiologicalAssets.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-8"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H7 生产性生物资产.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "per_tab_self_persisting",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue",
+        "write_client": "api",
+        "write_client_import": "import { api } from '@/services/apiProxy'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L174",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L268",
+        "read_carrier": "per_tab_self_persisting",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L250",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "remark_only_with_explicit_null_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L270",
+        "payload_null_placeholder_columns": [
+          "conclusion"
+        ],
+        "payload_null_placeholder_note": "🔴 primary managed table 的写入点是 `items: [{ item_id: itemId, conclusion: null, remark }]` —— `conclusion: null` 是**显式空占位**（「不往这列写内容」），不是双写。守卫判 payload_column_mode 时必须先剔除字面 null / undefined 占位再看剩下哪些列，否则会把本 entry 误判成 dual_write（G 循环 G2 踩过同一个坑）。宿主侧的第二个写入点（`GtH7BiologicalAssets.vue#L601`）反而是真双写，两者不同 —— 见 second_write_path。",
+        "second_write_path": {
+          "why_this_key_exists": "本 entry 是全 slice 唯一有**两个独立写路径、两个不同 HTTP 客户端**的条目。只登记一个会让 contract 漏掉另一半，也会让「载体唯一」的假设在 step 9 接线时破裂。",
+          "paths": [
+            {
+              "carrier": "per_tab_self_persisting",
+              "path": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue",
+              "client": "api",
+              "put_source": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L268",
+              "owns_keys": [
+                "H7-2-cost-rows",
+                "H7-2-cost-note",
+                "H7-2-cost-conclusion"
+              ],
+              "own_state": "Tab 自持一份 `localResponses` Map，与宿主的 `allResponses` 是两份内存态"
+            },
+            {
+              "carrier": "host_inline",
+              "path": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
+              "client": "http",
+              "put_source": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L599",
+              "owns_keys": [
+                "H7-measurement-model",
+                "其余经 inject('saveResponse') 的通用键"
+              ],
+              "second_put_source": "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L519"
+            }
+          ]
+        },
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id_declared_in_the_tab",
+        "transport_key_shape": "H7-2-cost-rows",
+        "transport_key_composition_note": "🔴 键不在 composables 里 —— useH7DetailCost.ts 是一个 26 行的取值 stub（只有 getNum / getString），键与读写逻辑都在 Tab 组件内联。守卫要按 Tab 文件定位，去 composables 里找会找不到而假红。",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L215",
+        "row_identity_generator_form": "`r${Date.now()}${Math.floor(Math.random() * 1000)}`",
+        "row_identity_is_positional": false,
+        "row_identity_note": "另有一个固定身份 `rowId: 'subtotal'`（同文件 #L227，派生合计行，不落库）——与 H5 同型，契约里必须排除。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H7-2-cost-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 也是**双计量模式**（成本 / 公允价值各一套 sheet），公允侧主表键 H7-2-fair-rows 在 H7TabDetailFair.vue。另有 H7-1 审定表两套、H7-3~H7-17 共 15 组键、以及附注披露的 H7-disc-listed-* / H7-disc-soe-* 两族（后者是 H7 stable key 范式的载体，见 dynamic_column_identity）。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "measurement_variant": {
+          "why_this_key_exists": "与 H3 同型：H7 也是「同一 wp_code 下两套并列 sheet」（成本模式 / 公允价值模式），源模板里两张 sheet 名不同（`明细表（成本模式）H7-2` vs `明细表（公允价值模式）H7-2`）但 sheet_code 尾码相同。两套各有独立持久化键与独立 owner 组件，故与 E 循环的 currency_variant（两张同尾码 sheet 共用一个键）不同源，不触发 slice_schema 的 currency_variant_model。",
+          "variants": [
+            {
+              "variant": "cost",
+              "template_sheet": "明细表（成本模式）H7-2",
+              "primary_table": "H7-2-cost-rows",
+              "owner_module": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue"
+            },
+            {
+              "variant": "fair_value",
+              "template_sheet": "明细表（公允价值模式）H7-2",
+              "primary_table": "H7-2-fair-rows",
+              "owner_module": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailFair.vue"
+            }
+          ],
+          "switch_source": "audit-platform/frontend/src/components/workpaper/composables/useH7MeasurementModel.ts"
+        },
+        "primary_table": {
+          "item_id": "H7-2-cost-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue",
+          "owner_constant": null,
+          "owner_declaration_kind": "inline_literal_in_tab_component",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L257",
+          "what_it_holds": "生产性生物资产、累计折旧及减值准备明细（成本模式 H7-2）整表 —— 类别/编号/名称/数量/所在地/成熟期 + 原值（期初·本期增加·本期减少）+ 累计折旧与减值",
+          "template_relative_path": "H/H7 生产性生物资产.xlsx",
+          "template_sheet": "明细表（成本模式）H7-2",
+          "identity_cell": "A9",
+          "identity_text": "生产性生物资产类别"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L372",
+        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L599",
+        "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L250",
+        "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L268",
+        "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h7_biological_assets.py",
+        "backend/wp_templates/H/H7 生产性生物资产.xlsx!明细表（成本模式）H7-2!A9 = '生产性生物资产类别'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH7DualMode.ts",
+        "lines": 98,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h7-dual-mode:",
+        "health_probe_client": "fetch",
+        "host_consumes_it": false,
+        "consumers": [],
+        "consumers_note": "🔴 **零消费方**（全前端 src 实扫）。宿主在 `GtH7BiologicalAssets.vue#L471-L508` 内联了 `currentMode` ref + 切换函数。与 H5 同型，已登记 BP-8。"
+      },
+      "orphan_formdata_composable": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH7FormData.ts",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "why_registered": "🔴 磁盘上有一份 useH7FormData（205 行，`api` + GET#L107 + **POST**#L141），全仓零消费。注意它用的是 `api.post` 而不是 `api.put` —— 与平台其余 8 条 entry 的写法都不同，说明它从未跟着接口演进走。已登记 BP-8。"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— primary managed table `H7-2-cost-rows` 由 Tab 组件 H7TabDetailCost.vue 自己以 `api` GET(#L250)/PUT(#L268) /api/workpapers/{wp_id}/checklist-responses，整表存成一条 item 的 remark（JSON 行数组）；宿主另有一条以 `http` 写入的独立路径（#L597 / #L517）。模板依据 `H/H7 生产性生物资产.xlsx!明细表（成本模式）H7-2!A9` = '生产性生物资产类别' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h7-biological-assets → GtH7BiologicalAssets），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背两条形态缺陷：legacy dual-mode 与 FormData 两个 composable 均零消费（BP-8）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 26 个真实业务 sheet（成本模式与公允价值模式各成一套：审定表/明细表/增加检查表/减少检查表 各两张，另有 H7-8~H7-17 与两份附注披露），primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。本 entry 的额外难点是载体拓扑：两个写路径 × 两个 HTTP 客户端 × 两份内存态（Tab 的 localResponses 与宿主的 allResponses），加上两个零消费的 composable（BP-8）—— step 6 的 contract 与 step 9 的接线必须先把这四件事的归属定下来。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "two_independent_write_paths_with_two_http_clients_and_two_orphan_composables"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h7-header-toolbar\"",
+      "ui_toolbar_gate_note": "门控 `v-if=\"currentSheet !== 'H7'\"`，区块内并列模式切换与计量模式两个 el-segmented。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h8-right-of-use-assets",
+      "wp_code_pattern": "H8R",
+      "document_type": "xlsx",
+      "host": "GtH8RightOfUseAssets.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5",
+        "BP-6",
+        "BP-7",
+        "BP-8"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。🔴 本 entry 是全 slice 形态缺陷最多的一条（BP-5/6/7/8 四条全命中），迁移排序上应放在最后。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H8 使用权资产.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "host_inline",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+        "write_client": "http",
+        "write_client_import": "import http from '@/utils/http'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L341",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L629",
+        "read_carrier": "host_inline_render_config_refetch",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/render-config?force_component_type=h8-right-of-use-assets（宿主 fetchResponsesFromServer()，**不是** GET /checklist-responses）",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L535",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "endpoint_read_note": "🔴 本 entry 与 H9 的读路径是**render-config 强制刷新**：宿主用 `http.get('/api/workpapers/{wpId}/render-config', { params: { force_component_type } })`，再从返回的 `sheets[].html_data.responses_snapshot` 里合并出 allResponses。也就是说 GET /checklist-responses 在本 entry 的载体里根本不出现 —— 契约的读端点必须按此登记，写死 `/checklist-responses` 的双端点判据会假红。",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L631",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H8-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "_id()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts#L229",
+        "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": true,
+        "row_identity_positional_defect": "🔴 与 H2/H4 同型但更糟：`GtH8RightOfUseAssets.vue#L577-578` 的四表种子把 `detail_prefill` 逐项映射成 `rowId: \\`seed-${idx}\\``（数组下标），而且它写的键是 **`H8-2-detail-prefill`** —— 全仓唯一一次出现（只有写没有读），primary managed table 的真实键是 `H8-2-rows`。两条缺陷叠加：位置化身份（BP-6）+ 种子写进无人读的键（BP-5）。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H8-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 H8-2-initial-total、H8-1 审定表的 7 个键（H8-1-cost-audited-total / -dep-audited-total / -impair-audited-total / -net-audited / -cost-rows / -dep-rows / -impair-rows，全在 useH8Detail.ts）、H8-8-dep-rows、H8-adj-tb-amount-{ending,opening} 两个 TB 核对种子键、以及附注披露的 H8-listed-* / 国企侧各族键。它还有 3 条 parent_duplicate 子入口（H8T）。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "orphan_seed_key": {
+          "key": "H8-2-detail-prefill",
+          "write_site": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L588",
+          "read_sites": [],
+          "how_verified": "全仓（前端 src 的 .ts/.vue + backend/app 的 .py）逐文件搜字面量 `H8-2-detail-prefill`，命中总数 = 1，即写入点自身。",
+          "consequence": "H8 的四表明细种子从未被任何消费方读到 ⇒ 该能力是结构性死代码（「additive 注入即死代码」）。已登记 BP-5。"
+        },
+        "primary_table": {
+          "item_id": "H8-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts#L148",
+          "what_it_holds": "使用权资产、累计折旧及减值准备明细（H8-2）整表 —— 使用权资产类别/名称/编号 + 原值（期初未审·本期租入等增加）+ 累计折旧与减值",
+          "template_relative_path": "H/H8 使用权资产.xlsx",
+          "template_sheet": "明细表H8-2",
+          "identity_cell": "A8",
+          "identity_text": "使用权资产类别"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L341",
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L535",
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L629",
+        "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/h8DisclosureSyncPayload.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h8_right_of_use_assets.py",
+        "backend/wp_templates/H/H8 使用权资产.xlsx!明细表H8-2!A8 = '使用权资产类别'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH8DualMode.ts",
+        "lines": 114,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h8-dual-mode:",
+        "health_probe_client": "fetch",
+        "host_consumes_it": false,
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/h8/impairment/H8TabRecoverable.vue"
+        ],
+        "consumers_note": "🔴 全 slice 唯一的「composable 只被子 Tab 消费、宿主自己不用」形态：宿主 `GtH8RightOfUseAssets.vue#L491` 内联了 `currentMode` ref，而 useH8DualMode 的唯一消费方是 parent_duplicate 子入口 H8TabRecoverable.vue。step 9 改线时若按「删 composable + 改宿主」的常规套路走，会漏掉那个子 Tab（宿主里根本没有它的 import）。已登记 BP-8。"
+      },
+      "orphan_formdata_composable": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH8FormData.ts",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "why_registered": "🔴 磁盘上有一份 useH8FormData（505 行，`api` + GET#L298 + PUT#L192），全仓零消费。真正写库的是宿主内联的 `http.put`(#L627)。已登记 BP-8。"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主自己 import `http` 并把录入防抖批量 PUT 到 /api/workpapers/{wp_id}/checklist-responses(#L627)，读则走 render-config 强制刷新(#L533)；primary managed table `H8-2-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ROWS_KEY 在 useH8Detail.ts；模板依据 `H/H8 使用权资产.xlsx!明细表H8-2!A8` = '使用权资产类别' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h8-right-of-use-assets → GtH8RightOfUseAssets），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背四条形态缺陷：种子写进零消费键（BP-5）、种子行身份取数组下标（BP-6）、附注同步把动态类别列 key 降级成 label（BP-7）、legacy composable 归属错位 + FormData 零消费（BP-8）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 权威模板含 20 个真实业务 sheet（底稿目录 + H8A 程序表 + 审定表H8-1 + 明细表H8-2 + H8-3~H8-14，其中 H8-6 初始及后续计量按年/按月两张、H8-8 折旧测算含/不含减值两张 + 上市与国企两份附注披露），primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。本 entry 在具备双向前还必须依次清掉 BP-5（四表种子写进 `H8-2-detail-prefill` 这个零消费键 —— 若把它当 projection 基底，OO 侧会拿到一份 HTML 侧从未渲染过的数据）、BP-6（种子行身份取数组下标）、BP-7（附注同步的动态类别列 key 用 label，与 H7 稳定 key 范式相反，重名类别会撞键）、BP-8（useH8DualMode 只被子 Tab 消费、useH8FormData 零消费）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "four_table_seed_written_to_a_zero_consumer_item_id",
+          "four_table_seed_row_identity_derives_from_array_index",
+          "disclosure_dynamic_column_key_uses_mutable_label"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h8-header-toolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h9-lease-liabilities",
+      "wp_code_pattern": "H9L",
+      "document_type": "xlsx",
+      "host": "GtH9LeaseLiabilities.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-8"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H9 租赁负债.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "host_inline",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+        "write_client": "http",
+        "write_client_import": "import http from '@/utils/http'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L198",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L394",
+        "read_carrier": "host_inline_render_config_refetch",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/render-config?force_component_type=h9-lease-liabilities（宿主 fetchResponsesFromServer()，**不是** GET /checklist-responses）",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L329",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L396",
+        "payload_write_site_note": "写入点是 `items: [{ item_id: itemId, conclusion, remark: updated.remark ?? null }]` —— `conclusion` 是 ES 简写属性（值来自同名局部变量），不是字面 null 占位，故仍是真双写。守卫的 null-占位剔除器只剔字面 null / undefined，不会误剔它。",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H9-2-rows",
+        "row_identity_key": "rowId",
+        "row_identity_generator": "inline template literal",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L172",
+        "row_identity_generator_form": "`row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": false,
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H9-2-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 H9-2-total-end（同 owner 模块）、H9-1 审定表、H9-3 未确认融资费用明细、H9-4 调整分录与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "primary_table": {
+          "item_id": "H9-2-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts",
+          "owner_constant": "ROWS_KEY",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L84",
+          "what_it_holds": "租赁负债明细（H9-2）整表 —— 出租方名称/合同号/租赁资产描述 + 期初余额 + 未审（借方发生·贷方发生·期末余额）",
+          "template_relative_path": "H/H9 租赁负债.xlsx",
+          "template_sheet": "租赁负债明细表H9-2",
+          "identity_cell": "A7",
+          "identity_text": "出租方名称"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L198",
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L329",
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L394",
+        "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h9_lease_liabilities.py",
+        "backend/wp_templates/H/H9 租赁负债.xlsx!租赁负债明细表H9-2!A7 = '出租方名称'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH9DualMode.ts",
+        "lines": 114,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h9-dual-mode:",
+        "health_probe_client": "fetch",
+        "host_consumes_it": false,
+        "consumers": [],
+        "consumers_note": "🔴 **零消费方**。宿主 `GtH9LeaseLiabilities.vue#L188` 的注释逐字写着「双模式: HTML↔OnlyOffice切换（useH9DualMode composable **后续创建**）」，而磁盘上那份 composable 早已存在 —— 注释与实况脱节，宿主内联了自己的 `currentMode` + `switchMode`(#L263-288)。已登记 BP-8。"
+      },
+      "orphan_formdata_composable": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH9FormData.ts",
+        "production_consumers": [],
+        "test_only_consumers": [],
+        "why_registered": "🔴 磁盘上有一份 useH9FormData（496 行，`api` + GET#L295 + PUT#L192），全仓零消费。真正写库的是宿主内联的 `http.put`(#L392)。已登记 BP-8。"
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— 宿主自己 import `http` 并把录入防抖批量 PUT 到 /api/workpapers/{wp_id}/checklist-responses(#L392)，读走 render-config 强制刷新(#L327)；primary managed table `H9-2-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ROWS_KEY 在 useH9Detail.ts；模板依据 `H/H9 租赁负债.xlsx!租赁负债明细表H9-2!A7` = '出租方名称' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h9-lease-liabilities → GtH9LeaseLiabilities），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。本 entry 另背一条形态缺陷：dual-mode 与 FormData 两个 composable 均零消费（BP-8）。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ 宿主 `#L276` 还会先探 `/api/workpapers/onlyoffice/health`，拉取成功才允许切 OO ⇒ OO 侧可用性被真实校验；④ 权威模板含 9 个 sheet（底稿目录 + H9A 程序表 + 审定表H9-1 + 租赁负债明细表H9-2 + 未确认融资费用明细表H9-3 + 调整分录汇总H9-4 + 两份附注披露 + GT_Custom），primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。此外 step 6 / step 9 前必须先按 BP-8 判清载体归属（两个零消费 composable + 宿主内联实现）。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "both_legacy_composables_have_zero_production_consumers"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h9-header-toolbar\"",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    },
+    {
+      "entry_id": "xlsx/gt-h10-asset-disposal-income",
+      "wp_code_pattern": "H10A",
+      "document_type": "xlsx",
+      "host": "GtH10AssetDisposalIncome.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
+      "capability": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4"
+      ],
+      "capability_enum_note": "AC 1.3 的四个枚举值当下没有一个成立（见 adjudication.reason）⇒ 不填枚举值而记 null + capability_verdict_stage，并在 slice_counters.unadjudicated 如实计数。填 single_onlyoffice 会违反 AC 12.8（有 HTML 对端），填 bidirectional 会违反 AC 12.1 与 slice_schema 的 SR-6（五个身份字段全为 null）。",
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": "H/H10 资产处置损益.xlsx",
+      "mount_count": 2,
+      "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "html_counterpart_verdict": "exists",
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "store_kind": "relational_row_per_item_id",
+        "write_carrier": "formdata_composable",
+        "write_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts",
+        "write_client": "api",
+        "write_client_import": "import { api } from '@/services/apiProxy'",
+        "write_client_import_source": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts#L6",
+        "endpoint_write": "PUT /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_write_source": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts#L92",
+        "read_carrier": "formdata_composable",
+        "read_carrier_path": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts",
+        "endpoint_read": "GET /api/workpapers/{wp_id}/checklist-responses",
+        "endpoint_read_source": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts#L44",
+        "endpoint_source": "backend/app/routers/checklist_responses.py#L84 / #L132",
+        "payload_column": "remark",
+        "payload_column_mode": "dual_write_remark_and_conclusion",
+        "payload_write_site": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts#L94",
+        "shape": "json_array_of_row_objects",
+        "transport_key_kind": "literal_item_id",
+        "transport_key_shape": "H10-detail-rows",
+        "transport_key_composition_note": "🔴 本 entry 的主表键**不含 sheet 尾码**（是 `H10-detail-rows` 而不是 `H10-2-rows`），与其余 8 条 entry 的 `H{n}-2-rows` 命名规律不同。按规律推断键名会推错 —— 键必须从 owner 常量 ITEM_ID_ROWS 现读。",
+        "row_identity_key": "id",
+        "row_identity_generator": "generateId()",
+        "row_identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useH10Detail.ts#L48",
+        "row_identity_generator_form": "`h10d-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`",
+        "row_identity_is_positional": false,
+        "row_identity_note": "身份字段名是 `id` 而非 `rowId`（其余 8 条 entry 全是 `rowId`）—— 守卫按 slice 声明的 row_identity_key 逐 entry 取，写死 `rowId` 会把本 entry 判成缺身份。",
+        "forbidden_row_identity_kinds": [
+          "array_index",
+          "ordinal",
+          "position",
+          "mutable_chinese_label"
+        ],
+        "table_keys": [
+          "H10-detail-rows"
+        ],
+        "table_keys_note": "这里只登记 primary managed table（三边锁的对象）。本 entry 另有 H10-1 审定表（useH10Adjudication + h10AdjStorage）、H10-3 调整分录、H10-4 检查表与两份附注披露的各自键。逐字段 contract 属 step 6 的活，本次不伪造。",
+        "extra_client_store": {
+          "kind": "localStorage_draft_fallback",
+          "source": "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts#L97 / #L105",
+          "what": "saveImmediate 重试 3 次仍失败时，把整条 item 写进 localStorage 草稿键（`draftKey(wpId, itemId)`），成功后再删除；restoreDrafts() 在 loadResponses 之后回灌。",
+          "why_registered": "🔴 这是本 entry 独有的**第三个存储**：除 checklist_responses（服务端）与 OO 侧项目文件之外，还有一份浏览器本地草稿。step 6 的 contract 与 step 10 的 scenario 必须把它算进来 —— 否则「HTML 侧内容 == checklist_responses」这个前提在有未同步草稿时不成立，roundtrip 会把草稿里的改动判成 OO 侧的删除。"
+        },
+        "primary_table": {
+          "item_id": "H10-detail-rows",
+          "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useH10Detail.ts",
+          "owner_constant": "ITEM_ID_ROWS",
+          "owner_declaration_kind": "module_constant",
+          "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useH10Detail.ts#L45",
+          "what_it_holds": "资产处置损益明细（H10-2）整表 —— 项目（按处置资产类别的固定行集）× 1~12 月分月发生额",
+          "template_relative_path": "H/H10 资产处置损益.xlsx",
+          "template_sheet": "明细表H10-2",
+          "identity_cell": "A7",
+          "identity_text": "项目"
+        }
+      },
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L150",
+        "audit-platform/frontend/src/components/workpaper/composables/useH10FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH10Detail.ts",
+        "backend/app/routers/checklist_responses.py#L84",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/wp_render_strategies/_h10_asset_disposal_income.py",
+        "backend/wp_templates/H/H10 资产处置损益.xlsx!明细表H10-2!A7 = '项目'"
+      ],
+      "legacy_dual_mode": {
+        "module": "audit-platform/frontend/src/components/workpaper/composables/useH10DualMode.ts",
+        "lines": 112,
+        "wraps_shared_base": false,
+        "localStorage_prefix": "h10-dual-mode:",
+        "health_probe_client": "http",
+        "host_consumes_it": true,
+        "consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue"
+        ]
+      },
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "legacy_reasons": [
+          "template_only_open",
+          "no_durable_forcesave_ack",
+          "missing_adapter"
+        ],
+        "divergence_from_slice": "capability / html_store 两项与本 slice 不一致，见 BP-9"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "step 3 逐 entry 实测：本 entry 的业务内容**真实存在于 HTML 侧** —— useH10FormData 以 `api` GET(#L44)/PUT(#L92) /api/workpapers/{wp_id}/checklist-responses，primary managed table `H10-detail-rows` 整表存成一条 item 的 remark（JSON 行数组），owner 常量 ITEM_ID_ROWS 在 useH10Detail.ts；模板依据 `H/H10 资产处置损益.xlsx!明细表H10-2!A7` = '项目' 已 openpyxl 逐格核验。因此 html_counterpart_verdict == \"exists\"，按 AC 12.8 该 entry **不得**标 single_onlyoffice。同时 OO 侧不是空白模板切换入口（见 not_single_html_because），宿主在 htmlRendererRegistry.ts 有真实入边（componentType h10-asset-disposal-income → GtH10AssetDisposalIncome），故不是 unreachable。而 AC 12.1 要求的六件事尚未交付，故也**不得**标 bidirectional。四个枚举值当下都不成立 ⇒ capability 终态未定，如实计入 slice_counters.unadjudicated。",
+        "not_single_html_because": "OO 侧有真实业务价值，不是「空白模板切换入口」（AC 12.9 的判据）：① 后端 get_sheet_onlyoffice_config 经 _resolve_wp_file 项目存储优先解析；② callback 把编辑落盘；③ useH10DualMode#L66 切 OO 前先 GET `/api/workpapers/{wpId}/sheets/default/onlyoffice-config`，拉取成功才置 currentMode ⇒ OO 侧可用性被真实校验；④ 权威模板含 9 个 sheet（底稿目录 + H10A 程序表 + 审定表H10-1 + 明细表H10-2 + 调整分录汇总H10-3 + 检查表H10-4 + 两份附注披露 + GT_Custom），primary_table 已逐格核验。问题不是「OO 侧空白」，而是两侧互不投影。",
+        "not_bidirectional_because": "AC 12.1 的正向条件一件都没满足（见 BP-1..BP-4），且这**不是**裁 single 的理由。本 entry 的额外契约面是 localStorage 草稿回退（见 html_counterpart.extra_client_store）：step 6 的 contract 与 step 10 的 scenario 必须把「服务端 / OO 侧文件 / 浏览器草稿」三处都算进来。真实 OnlyOffice 9.4 required scenario set 未对本 entry 执行 ⇒ evidence 保持 UNVERIFIABLE。",
+        "criterion_source": "backend/data/workpaper_sync_migration_paradigm.json#adjudication_criteria.verdicts"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "no_instrumentation_candidate_for_this_entry",
+          "no_non_null_approved_definition_bundle",
+          "no_published_result_representation",
+          "no_registered_sync_adapter",
+          "no_real_onlyoffice_94_probe_run_for_this_entry",
+          "a_third_client_side_store_localstorage_draft_is_not_covered_by_any_contract"
+        ]
+      },
+      "ui_gate_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts"
+      ],
+      "ui_toolbar_gate": "class=\"h10-toolbar\"",
+      "ui_toolbar_gate_note": "全 slice 唯一不带 `-header-` 的工具栏 class，且门控是 `v-if=\"isHtmlSheet && currentSheet !== '底稿目录'\"`（按中文 sheet 名排除，其余 8 条按英文 wp_code 排除）。",
+      "dom_guard_ref": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestAc14HonestModeVisibility"
+    }
+  ],
+  "authoritative_templates": {
+    "root": "backend/wp_templates/H",
+    "reference_copy_status": "absent_from_working_tree",
+    "reference_copy_note": "工作树根下没有 `基础数据/致同通用审计程序及底稿模板（2025年修订）/` 目录（Task 46 / 47 / 48 各实测过一次，本任务第四次实测确认仍不存在）⇒ 无法做「权威 vs 参考副本」的双处比对，本 slice 只冻结运行时权威目录的字节。这不是豁免：真源就是 backend/wp_templates/（wp_template_init_service 生成底稿时从这里复制、wp_template_finder 以 _index.json 索引）。",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件（用户可能开着 WPS/Excel）。本次枚举时目录内无锁文件，11 个文件全部登记。",
+    "runtime_index_note": "in_runtime_index 由 backend/wp_templates/_index.json 现算：`H/{name}` 是否出现在 files[].relative_path 里（分隔符归一为 /）。11 个文件**全部**在索引里，且 H 目录内无 docx、无不可达冗余合册 —— 这是 H 循环相对 D/F 循环的一个干净点（F 有 `F2存货.xlsx` 不可达合册与 2 个 docx，D 有 `D4收入底稿.xlsx`），故本 slice 没有 F 的 BP-8 / D 的 BP-8 那类「权威目录内不可达冗余模板」阻断项。",
+    "files": [
+      {
+        "name": "H0 固定资产循环函证.xlsx",
+        "size": 81702,
+        "sha256": "b39df62c02be968c1c510da2e1216fae5d317a2e60a42c2eca9c646d1b6b7dd7",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "H0 固定资产循环函证归跨循环共享的 confirmation-* 组件族（Task 57），在 source manifest 里没有 entry —— 见 slice_scope.excluded_from_slice 第 2 条"
+      },
+      {
+        "name": "H1 固定资产.xlsx",
+        "size": 199413,
+        "sha256": "344f83216b9024e3c3fde7c1ed545eb0026a6cf088a0b0dfd0916e47b64fdc87",
+        "in_runtime_index": true,
+        "belongs_to_entry": null,
+        "excluded_reason": "H1 是 Task 42 的 pilot（h1_grouped_dynamic），任务正文明令排除，其 entry `xlsx/gt-h1-fixed-assets` 不在本 slice 的 independent_entries 里 —— 见 slice_scope.excluded_from_slice 第 1 条。模板仍登记以保住「登记集合 == 磁盘实况」判据"
+      },
+      {
+        "name": "H10 资产处置损益.xlsx",
+        "size": 42334,
+        "sha256": "9f0d2a64dab1fd7661bb512194b4eba9a22f5afe28db38ec64fc22867421ac8a",
+        "normalized_structure_hash": "4504a0bac42b1ea1e22fc7d7adc7df839b70069deceb5c17c9c192ee593155aa",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h10-asset-disposal-income"
+      },
+      {
+        "name": "H2 在建工程.xlsx",
+        "size": 162616,
+        "sha256": "de9426a33e8d51e9351c8dd2393fe8502433d2cf810f30318f254a474ec480fe",
+        "normalized_structure_hash": "15f530571527da67d6770cb838536866840ca329d59427ce0995542afa04ebdb",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h2-construction-in-progress"
+      },
+      {
+        "name": "H3 投资性房地产.xlsx",
+        "size": 146096,
+        "sha256": "6526c9fc186230fa659369a8efa91f2824799f02fc4cfbba8707c40cdbf13038",
+        "normalized_structure_hash": "ec73d52b8f62ca399cf0d6da77003f15016807aee5af5c10ea711d6fe071934a",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h3-investment-property"
+      },
+      {
+        "name": "H4 工程物资.xlsx",
+        "size": 112937,
+        "sha256": "c2c3ee61b33f4a7ca2603359810207bfb14f189c464135e0ede3e0a738c658cc",
+        "normalized_structure_hash": "b13f5dffb20cf69c448d972ce4b3ee8b86b11963a8945585209ce38dd7ffde41",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h4-engineering-materials"
+      },
+      {
+        "name": "H5 油气资产.xlsx",
+        "size": 195306,
+        "sha256": "6dcc109bee6310352a6601d8daa388da21ce16e07fa1fd68c1072d3a302b1905",
+        "normalized_structure_hash": "71b583cfa669b39eb083660ce3a1320c798c9ef70f9ce6932d0dcc1803d8b238",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h5-oil-gas-assets"
+      },
+      {
+        "name": "H6 固定资产清理.xlsx",
+        "size": 48865,
+        "sha256": "c7d0d78a798ce9c3c47aab64ea02ffc93919a9b02474d8801d115c614656e8a8",
+        "normalized_structure_hash": "2bbe9c6546c96749f1863f310b427098a8695c7a856dd991cfa0fd0214eeb5fa",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h6-asset-disposal-clearing"
+      },
+      {
+        "name": "H7 生产性生物资产.xlsx",
+        "size": 225641,
+        "sha256": "df55f0051d9b3a67f894f82392d5f4420c959cd1c68c57a56c5605701db9c8c5",
+        "normalized_structure_hash": "b145772e0d8c030ee96f0be215ba4d633636ff2948e5ce008cbad455ebfefb12",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h7-biological-assets"
+      },
+      {
+        "name": "H8 使用权资产.xlsx",
+        "size": 465476,
+        "sha256": "112053f0681642c371572998a559e4c5362f518265897a36fc90d7f84e666782",
+        "normalized_structure_hash": "84604d74008be9037587a8601410ef67f1576473545cad279408464edaa1add7",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h8-right-of-use-assets"
+      },
+      {
+        "name": "H9 租赁负债.xlsx",
+        "size": 67693,
+        "sha256": "7b1afdb49f190854160548349a24a07a65ac39f2014fbe8c1014b86c92c598a4",
+        "normalized_structure_hash": "c86a8fe4992a910574f963fbc2676601fc2e9c87764ee1f8de52c13f1d556310",
+        "in_runtime_index": true,
+        "belongs_to_entry": "xlsx/gt-h9-lease-liabilities"
+      }
+    ]
+  },
+  "template_resolution_audit": {
+    "why_this_section_exists": "F 循环（BP-5）与 D 循环（BP-5）都查出「整册码回落打开错工作簿」，G 循环也有同型的 sheet 标签缺陷。本任务对 H 循环做了同一项实测，结论是**没有**该缺陷 —— 但「没有」这件事必须落成可复算判据，否则后来者要么重复调查，要么误以为 H 也有。",
+    "how_verified": "以 `backend/app/services/wp_template_finder` 的 `find_template_file` 与 `find_template_file_any` 对 26 个 H 码逐个实跑，比对返回文件名。",
+    "result": "clean",
+    "invariant": "对每个被测的 H 码 `H{n}` 及其子码 `H{n}-{m}`，两个解析函数都返回文件名以 `H{n} ` 开头的那本工作簿（即 belongs_to_entry 对应的权威模板），无一条回落到另一本。",
+    "measured": [
+      { "wp_code": "H2", "resolved": "H2 在建工程.xlsx" },
+      { "wp_code": "H2-1", "resolved": "H2 在建工程.xlsx" },
+      { "wp_code": "H2-2", "resolved": "H2 在建工程.xlsx" },
+      { "wp_code": "H2-16", "resolved": "H2 在建工程.xlsx" },
+      { "wp_code": "H3", "resolved": "H3 投资性房地产.xlsx" },
+      { "wp_code": "H3-2", "resolved": "H3 投资性房地产.xlsx" },
+      { "wp_code": "H4", "resolved": "H4 工程物资.xlsx" },
+      { "wp_code": "H4-2", "resolved": "H4 工程物资.xlsx" },
+      { "wp_code": "H5", "resolved": "H5 油气资产.xlsx" },
+      { "wp_code": "H5-2", "resolved": "H5 油气资产.xlsx" },
+      { "wp_code": "H6", "resolved": "H6 固定资产清理.xlsx" },
+      { "wp_code": "H6-2", "resolved": "H6 固定资产清理.xlsx" },
+      { "wp_code": "H7", "resolved": "H7 生产性生物资产.xlsx" },
+      { "wp_code": "H7-2", "resolved": "H7 生产性生物资产.xlsx" },
+      { "wp_code": "H8", "resolved": "H8 使用权资产.xlsx" },
+      { "wp_code": "H8-2", "resolved": "H8 使用权资产.xlsx" },
+      { "wp_code": "H8-6", "resolved": "H8 使用权资产.xlsx" },
+      { "wp_code": "H9", "resolved": "H9 租赁负债.xlsx" },
+      { "wp_code": "H9-2", "resolved": "H9 租赁负债.xlsx" },
+      { "wp_code": "H10", "resolved": "H10 资产处置损益.xlsx" },
+      { "wp_code": "H10-2", "resolved": "H10 资产处置损益.xlsx" }
+    ],
+    "why_h_is_clean_unlike_f2": "F2 的失效根因是「同一 wp_code 在 _index.json 里有 11 条候选、优先级只由索引顺序决定」。H 循环的索引里每个 H 码**恰好一本**工作簿（11 条索引项对 11 个文件，一一对应），候选集合大小恒为 1 ⇒ 优先级链根本不参与。这不是运气：H 的模板是按循环整册组织的（一个 wp_code 一册），F2 是按 sheet 段拆成 10 册共享一个 wp_code。",
+    "program_table_code_note": "`H2A` 这类程序表码在 `_index.json` 里没有独立条目，两个解析函数都返回 None —— 这是正确的：程序表是 H2 册内的一张 sheet（`在建工程实质性程序表H2A`），wp_code_overrides 把 H2A 映射到 componentType 而不是独立模板文件。守卫对它断言 `resolved is None` 而不是断言解析成功。"
+  },
+  "parent_duplicate_summary": {
+    "note": "H 循环有 5 条 parent_duplicate 子入口，按 AC 1.6 复用父 entry 的 adapter、不得重复计入已迁移数，故不在 independent_entries 里。它们不是「另一个底稿」，而是同一 entry 的子 Tab 被 manifest 的挂载点扫描单独记了一条（因为它们各自也挂 GtOnlyOfficeSheet）。step 9 改线时必须把它们一并改：H4 的两个子 Tab 与父宿主共用 useH4DualMode（父宿主删了 composable 而不改子 Tab 会直接打断子入口），H8 的 H8TabRecoverable 更极端 —— 它是 useH8DualMode 的**唯一**消费方（父宿主内联了自己的实现），按「删 composable + 改宿主」的常规套路走会完全漏掉它。",
+    "children": [
+      {
+        "entry_id": "xlsx/h4/impairment/h4-tab-impairment",
+        "parent_entry_id": "xlsx/gt-h4-engineering-materials",
+        "wp_code_pattern": "H4T",
+        "host_path": "audit-platform/frontend/src/components/workpaper/h4/impairment/H4TabImpairment.vue",
+        "consumes_parent_legacy_composable": "audit-platform/frontend/src/components/workpaper/composables/useH4DualMode.ts"
+      },
+      {
+        "entry_id": "xlsx/h4/impairment/h4-tab-recoverable",
+        "parent_entry_id": "xlsx/gt-h4-engineering-materials",
+        "wp_code_pattern": "H4T",
+        "host_path": "audit-platform/frontend/src/components/workpaper/h4/impairment/H4TabRecoverable.vue",
+        "consumes_parent_legacy_composable": "audit-platform/frontend/src/components/workpaper/composables/useH4DualMode.ts"
+      },
+      {
+        "entry_id": "xlsx/h8/impairment/h8-tab-recoverable",
+        "parent_entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "wp_code_pattern": "H8T",
+        "host_path": "audit-platform/frontend/src/components/workpaper/h8/impairment/H8TabRecoverable.vue",
+        "consumes_parent_legacy_composable": "audit-platform/frontend/src/components/workpaper/composables/useH8DualMode.ts",
+        "note": "🔴 useH8DualMode 的唯一消费方（父宿主不用它）"
+      },
+      {
+        "entry_id": "xlsx/h8/measurement/h8-tab-measurement-annual",
+        "parent_entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "wp_code_pattern": "H8T",
+        "host_path": "audit-platform/frontend/src/components/workpaper/h8/measurement/H8TabMeasurementAnnual.vue",
+        "consumes_parent_legacy_composable": null
+      },
+      {
+        "entry_id": "xlsx/h8/measurement/h8-tab-measurement-monthly",
+        "parent_entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "wp_code_pattern": "H8T",
+        "host_path": "audit-platform/frontend/src/components/workpaper/h8/measurement/H8TabMeasurementMonthly.vue",
+        "consumes_parent_legacy_composable": null
+      }
+    ]
+  },
+  "h_cycle_form_differences": {
+    "why_this_section_exists": "Task 48（F）与 Task 49（G）各自都因为「假设与前一循环同形」返工过一次。H 循环实测出**六处**与 D/F/G 都不同的形态，判据必须逐 entry 从 slice 读声明再回源码核对，而不是写死一个值。这一节把六处差异连同各自的可复核判据写下来，守卫按它组织断言。",
+    "differences": [
+      {
+        "id": "HD-1",
+        "name": "persistence_write_carrier_has_three_families",
+        "what": "写路径归属分三族：`host_inline`（H2/H6/H8/H9，宿主自己 import `http` from '@/utils/http' 并 PUT）· `formdata_composable`（H3/H4/H10，useHxFormData 用 `api` from '@/services/apiProxy'）· 逐 Tab 自持久化（H5 每个子 Tab 各实例化一份 useH5FormData；H7 由 H7TabDetailCost.vue 内联 `api` 读写）。",
+        "why_it_matters": "F 循环 8 条 entry 全是 `useFxFormData` 单一形态，其守卫写的是「持久化 composable 必须自带 GET+PUT」。H 循环里 6 条 entry 的载体不是 composable，照抄必然假红。",
+        "how_to_verify": "按 entry 的 `html_counterpart.write_carrier` + `write_carrier_path` + `write_client` 三个声明去那个文件里找 `{client}.put(\\`...checklist-responses\\`)`，声明与源码不符即红。",
+        "entries_by_family": {
+          "host_inline": [
+            "xlsx/gt-h2-construction-in-progress",
+            "xlsx/gt-h6-asset-disposal-clearing",
+            "xlsx/gt-h8-right-of-use-assets",
+            "xlsx/gt-h9-lease-liabilities"
+          ],
+          "formdata_composable": [
+            "xlsx/gt-h3-investment-property",
+            "xlsx/gt-h4-engineering-materials",
+            "xlsx/gt-h10-asset-disposal-income"
+          ],
+          "per_tab_formdata_instance": [
+            "xlsx/gt-h5-oil-gas-assets"
+          ],
+          "per_tab_self_persisting": [
+            "xlsx/gt-h7-biological-assets"
+          ]
+        }
+      },
+      {
+        "id": "HD-2",
+        "name": "read_path_is_not_always_the_checklist_endpoint",
+        "what": "只有 4 条 entry（H3/H4/H5/H7）的载体里出现 `GET /checklist-responses`；H2/H6 读 `props.htmlData.responses_snapshot`（父级 render-config 透传），H8/H9 读 `GET /api/workpapers/{wpId}/render-config?force_component_type=...` 再从 `sheets[].html_data.responses_snapshot` 合并，H10 两者都有（`/checklist-responses` + render-config）。",
+        "why_it_matters": "「HTML 侧内容在哪读」直接决定 projection 的 substrate。写死 `/checklist-responses` 双端点判据会对 5 条 entry 假红；反过来若只断言「有 PUT 就算有对端」又会放过读路径缺失的情形。",
+        "how_to_verify": "按 entry 的 `read_carrier` + `endpoint_read_source` 声明定位：`formdata_composable` / `per_tab_*` ⇒ 该文件里必须有 `{client}.get(\\`...checklist-responses\\`)`；`render_config_snapshot_passthrough` ⇒ 该文件里必须有 `props.htmlData` 读取且**不得**有 checklist GET；`host_inline_render_config_refetch` ⇒ 必须有 `render-config` 的 GET 且带 `force_component_type`。",
+        "entries_by_read_carrier": {
+          "formdata_composable": [
+            "xlsx/gt-h3-investment-property",
+            "xlsx/gt-h4-engineering-materials",
+            "xlsx/gt-h10-asset-disposal-income"
+          ],
+          "per_tab_formdata_instance": [
+            "xlsx/gt-h5-oil-gas-assets"
+          ],
+          "per_tab_self_persisting": [
+            "xlsx/gt-h7-biological-assets"
+          ],
+          "render_config_snapshot_passthrough": [
+            "xlsx/gt-h2-construction-in-progress",
+            "xlsx/gt-h6-asset-disposal-clearing"
+          ],
+          "host_inline_render_config_refetch": [
+            "xlsx/gt-h8-right-of-use-assets",
+            "xlsx/gt-h9-lease-liabilities"
+          ]
+        }
+      },
+      {
+        "id": "HD-3",
+        "name": "orphan_legacy_composables_on_disk",
+        "what": "3 个 dual-mode composable 零消费（useH5DualMode / useH7DualMode / useH9DualMode），1 个只被子 Tab 消费而宿主不用（useH8DualMode）；4 个 FormData composable 生产零消费（useH6FormData 只被一个 spec 引用、useH7FormData / useH8FormData / useH9FormData 全仓零引用）。对应的 4 个宿主（H5/H7/H8/H9）各自内联了等价实现。",
+        "why_it_matters": "这是「additive 注入即死代码」的教科书形态。若按「文件名对得上就是载体」写 contract 或改线，会接到死代码上：宿主行为一点不变，而守卫因为「文件确实被改了」全绿 —— 假绿第 ① 源。已登记 BP-8。",
+        "how_to_verify": "对 slice 声明的每个 orphan 模块，在 `audit-platform/frontend/src` 全量 .ts/.vue（排除自身）里搜 import 路径字面量，命中数必须与声明的 production_consumers / test_only_consumers 完全一致（**两侧都断言**：声称零消费的真零、声称有消费方的真有）。"
+      },
+      {
+        "id": "HD-4",
+        "name": "primary_table_key_naming_is_not_uniform",
+        "what": "8 条 entry 的主表键是 `H{n}-2-rows`，H10 是 `H10-detail-rows`（不含 sheet 尾码）；H5 的键不是字面量常量而是 `${ITEM_PREFIX}-rows` 拼出来的；H7 的键根本不在 composables 里而是内联在 Tab 组件（useH7DetailCost.ts 是 26 行取值 stub）。身份字段名也不统一：8 条是 `rowId`，H10 是 `id`。",
+        "why_it_matters": "按命名规律推断键或身份字段名会推错三处。契约必须从 owner 常量现读。",
+        "how_to_verify": "按 entry 的 `primary_table.owner_module` + `owner_constant` + `owner_declaration_kind` 三个声明定位：`module_constant` ⇒ 该模块里必须有 `const {CONST} = '{item_id}'`；`module_constant_prefix` ⇒ 必须有前缀常量与 `${CONST}-rows` 拼接式；`inline_literal_in_tab_component` ⇒ 该 Tab 文件里必须出现字面量键。"
+      },
+      {
+        "id": "HD-5",
+        "name": "two_entries_have_dual_measurement_variants",
+        "what": "H3 与 H7 各有成本模式 / 公允价值模式两套并列 sheet（源模板里两张 sheet 名不同但 sheet_code 尾码相同，如 `明细表（成本模式）H3-2` vs `明细表（公允价值模式）H3-2`），两套各有独立持久化键（H3-2-cost-rows / H3-2-fair-rows），计量模式本身另有一个持久化键。",
+        "why_it_matters": "与 E 循环的 currency_variant 形态相似但不同源：E1-3 是两张同尾码 sheet **共用**一个键（故有 variant 切换抹零的风险），H3/H7 是两套 sheet **各有**独立键（故不触发 slice_schema 的 currency_variant_model —— 它的 decoupling_rule 无适用对象）。契约必须按 (measurement_model, sheet_code) 两维声明，只写单模式会漏掉一半 sheet。",
+        "how_to_verify": "openpyxl 读权威模板的 sheetnames，断言两个模式的 sheet 都在；再断言 slice 声明的两个主表键在源码里分属两个不同 owner 模块。"
+      },
+      {
+        "id": "HD-6",
+        "name": "h10_has_a_third_client_side_store",
+        "what": "H10 的 useH10FormData 在 PUT 重试 3 次全败时把整条 item 写进 localStorage 草稿键，restoreDrafts() 在下次加载后回灌。",
+        "why_it_matters": "「HTML 侧内容 == checklist_responses」这个前提在有未同步草稿时不成立 —— roundtrip 会把草稿里的改动判成 OO 侧的删除。step 6 的 contract 与 step 10 的 scenario 必须把三处存储都算进来。",
+        "how_to_verify": "在 useH10FormData.ts 里断言 `localStorage.setItem(draftKey(...))` 与 `restoreDrafts` 两处都存在；其余 8 条 entry 的载体里**不得**出现 draft 形态的 localStorage 写入（防把 H10 的特例当通例登记）。"
+      }
+    ]
+  },
+  "dynamic_column_identity": {
+    "why_this_section_exists": "任务正文的第一条要求是「动态公司列复用 H7 stable key 范式；不硬编码列数/行数」。这一节把两件事写成可复核的结构判据：① H7 自己那份范式的实现在哪、判据是什么（它是全平台的范式源头，G7/D4/I1/E1 的注释都引用它）；② H 循环内部是否有背离范式的地方 —— 实测有一处（H8 在附注同步边界把稳定 key 降级成可变 label），已登记 BP-7。**判据是结构性的，不是 grep 字符串**：「不硬编码」这件事必须落成「key 由 {prefix}_{seq} 构成 + seq 取 max+1 不复用 + 合计列对动态数组 reduce」三个可验证的形态要素，缺一即红。",
+    "paradigm_source": {
+      "name": "h7_stable_slot_seq_key",
+      "module": "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts",
+      "why_it_is_the_paradigm": "源模板 `H7 生产性生物资产.xlsx!附注披露信息（上市公司）` 的两级表头下，四个产业各自的默认叶子列名都是同一个源模板字面 `类别`（H7_DEFAULT_CATEGORY_LABEL）—— 用 label 作 key 必然四列撞成一列。H7 因此改用 `{industryKey}_{seq}`，成为平台此后所有动态列/动态行的范式（g7SlotColumns.ts / d4DisclosureModel.ts / i1SoeDisclosureModel.ts / e1CurrencyScope.ts / e1RestrictedScope.ts 的注释都逐字引用「H7 已踩」）。",
+      "structural_requirements": [
+        {
+          "id": "SK-1",
+          "requirement": "列 key 由稳定前缀 + 序号构成，label 独立可改而 key 不变",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts#L50-L57(interface H7ListedCategory: key/label/industry 三字段分离)",
+          "how_to_verify": "interface 里 `key` 与 `label` 是两个字段；构造点 `createDefaultH7Categories()`(#L60) 用 `${ind.key}_1` 而不是 `key: label`"
+        },
+        {
+          "id": "SK-2",
+          "requirement": "新序号取该前缀下现有最大 seq + 1，**不复用**已删序号",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts#L74-L86(nextH7CategoryKey)",
+          "how_to_verify": "函数体里出现 `max` 累计与 `${prefix}${max + 1}`(#L85)；**不得**出现 `length + 1` / `${i}` / `${idx}`（那是复用已删序号，历史金额会串到新列）",
+          "sibling_implementation": "audit-platform/frontend/src/components/workpaper/composables/h7SoeDisclosureModel.ts#L104-L115(nextSoeCategoryId，国企侧同形)"
+        },
+        {
+          "id": "SK-3",
+          "requirement": "列数由数据决定 —— 合计列对动态 categories 数组 reduce，不写死列数",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts#L295(h7TotalCellValue: categories.reduce)",
+          "how_to_verify": "合计取值函数以 `categories.reduce(...)` 遍历，而不是对固定数量的列名求和；全 H 循环源码里不得出现 `公司1..公司N` / `单位N` 之类的横向展开字面量（实测 0 处，唯一含「公司5%以上」的行是 useH8RelatedParty.ts#L23 的关联方问卷选项文本，不是列名）"
+        },
+        {
+          "id": "SK-4",
+          "requirement": "动态区骨架行数不写死 —— 行模型由源模板派生的声明式数组驱动，不用 `blankRows(p, 3|5|10)` 预置空占位",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts#L118-L200(H7_COST_MOVEMENT_ROWS 34 行 / H7_FAIR_MOVEMENT_ROWS 11 行，各行带 kind/indent/sumOf/endOf 派生规则，逐行对应源模板 R11–R44 / R53–R64)",
+          "how_to_verify": "全 H 循环源码里不得出现 `blankRows(<expr>, <整数字面量>)` 形态（实测 0 处）"
+        }
+      ],
+      "measured_conformance": "H7 自身 4/4 满足（SK-1..SK-4），是范式的正例。"
+    },
+    "deviations": [
+      {
+        "id": "DV-1",
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "violates": "SK-1",
+        "what": "H8 的**底稿内**动态类别列 key 是稳定的（`useH8Disclosure.ts#L166` 的 `cat_${Date.now().toString(36)}`，与 label 解耦），但在**附注同步边界**上被降级成 label：`h8DisclosureSyncPayload.ts#L51` 的 `cats.map((c) => ({ key: c.label, label: c.label, ... }))` 与 `#L110` 的 `row[c.label] = h8ListedCellValue(state.movement, def, c.key)` —— 列头 key 与行单元格键双双用 `c.label`，而取值仍按 `c.key`。",
+        "consequence": "两个类别 label 相同时（`useH8Disclosure.addCategory(label)` 直接收用户输入，默认列里已经有一个叫「其他」的，审计师再加一个「其他」就重名）：① `row[c.label]` 后者覆盖前者，附注里丢一列数据；② `columns` 数组出现两个同 key 的 ColumnDef，后端列头元数据无法区分。这正是 H7 注释里「用 label 作 key 会撞键（H1/H8 那样）」逐字点名的形态。",
+        "scope_note": "只影响底稿→附注的同步载荷，不影响底稿内的取值（底稿内一直按 `c.key`）。所以它不是「H8 的动态列没有稳定 key」，而是「稳定 key 在跨模块边界上被丢弃」。",
+        "exhaustive": "全 H 循环（排除 pilot H1）剥注释后逐行扫 `key: X.label` 与 `row[X.label]` 两种形态，命中总数各 1，全部落在 h8DisclosureSyncPayload.ts —— 即本 slice 内**仅此一处**背离。H1 的同型缺陷在 h1DisclosureSyncPayload.ts#L104，属已排除的 pilot，不在本 slice 分母内。",
+        "registered_as": "BP-7"
+      }
+    ],
+    "hardcoded_scan_result": {
+      "why_this_key_exists": "「不硬编码列数/行数」若只写在文档里就是散文。这里把扫描口径与实测结果冻结下来，守卫按同一口径现扫并与本结果等值比对 —— 将来有人写死列数会立刻打红。",
+      "scanned_scope": "audit-platform/frontend/src/components/workpaper 下的 h2..h10 子目录全部 .ts/.vue + composables 里匹配 `(use)?[hH]{2..10}` 的 .ts + GtH*.vue（排除 GtH1FixedAssets.vue），实测 521 个文件",
+      "patterns": {
+        "blankRows_with_integer_literal": 0,
+        "horizontal_company_column_literals": 0,
+        "column_key_is_label": 1,
+        "row_cell_key_is_label": 1
+      },
+      "horizontal_company_column_literals_note": "扫 `公司[1-9]` / `单位[1-9]` / `项目[1-9]` 三种横向展开字面量，命中 0 处列名。唯一的字面命中是 `useH8RelatedParty.ts#L23` 的关联方问卷选项文本「持有公司5%以上股份的法人或其他组织及其一致行动人」—— 那是业务枚举项不是列名，故不计入。"
+    }
+  },
+  "dynamic_row_identity": {
+    "why_this_section_exists": "本 slice 的 9 条 entry 全部含「行数由业务数据决定」的动态行表（明细表 / 测算表 / 检查表），触发 slice_schema.conditional_sections 的 dynamic_row_identity。写下来的直接用途有三条：① H 循环的身份字段名**不统一**（8 条 rowId / H10 是 id），照抄任一条会把另一条判成缺身份；② 三条 entry（H2/H4/H8）的**四表种子路径**把身份取成数组下标，这是 stable field key 在 roundtrip 中无法保持的直接原因，必须在 step 6 发布契约前修掉；③ 两条 entry（H5/H7）有固定身份 `rowId: 'subtotal'` 的派生合计行，契约必须把它排除在业务行之外。",
+    "source_of_truth": "各 owner 模块 / Tab 组件的源码（本节每行都带 source_ref 指到具体文件与行号），不是本文件的自述",
+    "forbidden_identity_kinds": [
+      "array_index",
+      "ordinal",
+      "position",
+      "mutable_chinese_label"
+    ],
+    "tables": [
+      {
+        "table_key": "H2-2-rows",
+        "entry_id": "xlsx/gt-h2-construction-in-progress",
+        "persistence_key": "H2-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_prefill_array_index_seed",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH2Detail.ts#L260"
+        }
+      },
+      {
+        "table_key": "H3-2-cost-rows",
+        "entry_id": "xlsx/gt-h3-investment-property",
+        "persistence_key": "H3-2-cost-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts#L141"
+        }
+      },
+      {
+        "table_key": "H4-2-rows",
+        "entry_id": "xlsx/gt-h4-engineering-materials",
+        "persistence_key": "H4-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_prefill_array_index_seed",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH4Detail.ts#L249"
+        }
+      },
+      {
+        "table_key": "H5-2-rows",
+        "entry_id": "xlsx/gt-h5-oil-gas-assets",
+        "persistence_key": "`${ITEM_PREFIX}-rows`（ITEM_PREFIX = 'H5-2'）",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_fixed_subtotal_row",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH5Detail.ts#L166"
+        }
+      },
+      {
+        "table_key": "H6-2-rows",
+        "entry_id": "xlsx/gt-h6-asset-disposal-clearing",
+        "persistence_key": "H6-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L294"
+        }
+      },
+      {
+        "table_key": "H7-2-cost-rows",
+        "entry_id": "xlsx/gt-h7-biological-assets",
+        "persistence_key": "H7-2-cost-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_fixed_subtotal_row",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/h7/core/H7TabDetailCost.vue#L215"
+        }
+      },
+      {
+        "table_key": "H8-2-rows",
+        "entry_id": "xlsx/gt-h8-right-of-use-assets",
+        "persistence_key": "H8-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string_with_prefill_array_index_seed",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts#L229"
+        }
+      },
+      {
+        "table_key": "H9-2-rows",
+        "entry_id": "xlsx/gt-h9-lease-liabilities",
+        "persistence_key": "H9-2-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH9Detail.ts#L172"
+        }
+      },
+      {
+        "table_key": "H10-detail-rows",
+        "entry_id": "xlsx/gt-h10-asset-disposal-income",
+        "persistence_key": "H10-detail-rows",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "id",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useH10Detail.ts#L48"
+        }
+      }
+    ],
+    "positional_identity_inventory": {
+      "why_this_key_exists": "「哪些地方把行身份取成位置」必须是**穷举且可复算**的清单，否则守卫只能对声明过的三条打红，新出现的第四条不会被发现。这里冻结扫描口径与全部命中，并按三族分类 —— 只有第 A 族是真缺陷（BP-6），B/C 两族写下来是为了让判据分得开（不分开会把 H3/H6 的展示序号误判成位置化身份，G12 踩过同一个坑）。",
+      "scan_recipe": "对 h2..h10 子目录 + composables 里匹配 `(use)?[hH]{2..10}` 的 .ts + GtH*.vue（排除 GtH1FixedAssets.vue）共 521 个文件，逐行取 `rowId:` / `rowKey:` / `id:` **自己的值表达式**（到同层逗号止，模板串内不计括号），再判是否命中 `${i}` / `${idx}` / `${index}` / `${seq}` / `?? i + 1` / `|| i + 1` / `?? String(i` / `indexOf(`。实测命中 17 条。",
+      "total_hits": 17,
+      "family_a_true_defect_primary_table_seed": {
+        "count": 3,
+        "why_defect": "身份值**整体**由数组下标构成（`seed-${i}`），且写入的是 primary managed table 的键 ⇒ 用户一保存，下标就成了业务行的持久身份。后端 prefill 的顺序/条数一变（`tb_balance` 新增一个叶子子科目就会变），同一业务行拿到不同 rowId，或不同业务行继承同一个旧 rowId。",
+        "why_writes_to_key_site_is_separate": "🔴 「位置化身份在哪构造」与「结果写进哪个键」不一定同文件：H2/H8 的构造与写入都在宿主里，H4 的构造在纯函数 `h4DetailPrefill.ts` 而写入在宿主 `GtH4EngineeringMaterials.vue`。判据若假设同文件，会对 H4 报「源码里找不到声明的写入键」这种无归因的红。故逐条另记 writes_to_key_site。",
+        "hits": [
+          {
+            "source_ref": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L616",
+            "expr": "rowId: `seed-${i}`",
+            "writes_to_key": "H2-2-rows",
+            "writes_to_key_site": "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+            "entry_id": "xlsx/gt-h2-construction-in-progress"
+          },
+          {
+            "source_ref": "audit-platform/frontend/src/components/workpaper/composables/h4DetailPrefill.ts#L50",
+            "expr": "rowId: `seed-${idx}`",
+            "writes_to_key": "H4-2-rows",
+            "writes_to_key_site": "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue#L383",
+            "writes_to_key_site_note": "构造在纯函数 buildH4DetailSeedRows 里，写入在宿主 onMounted 的 nextTick 回调里 —— 两处不同文件。",
+            "entry_id": "xlsx/gt-h4-engineering-materials"
+          },
+          {
+            "source_ref": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L578",
+            "expr": "rowId: `seed-${idx}`",
+            "writes_to_key": "H8-2-detail-prefill",
+            "writes_to_key_site": "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L588",
+            "writes_to_key_note": "🔴 零消费键，见 BP-5 —— 位置化身份与死键两条缺陷叠加。",
+            "entry_id": "xlsx/gt-h8-right-of-use-assets"
+          }
+        ],
+        "registered_as": "BP-6"
+      },
+      "family_b_index_only_as_prefix_into_a_random_generator": {
+        "count": 6,
+        "why_not_family_a": "形如 `r.rowId || newRowId(\\`mort-${i}\\`)` —— 下标只进**前缀**，`newRowId(prefix)` 返回 `${prefix}-${Date.now().toString(36)}-${Math.random()...}`（h2ListedDisclosureModel.ts#L41 / h6DisclosureModel.ts#L44），最终值全局唯一、不会两行撞键。真实弱点是**不稳定**：`r.rowId` 缺失时每次载入生成新值，与 F 循环 BP-7 后半段同型。落在附注披露的抵押/项目/明细行上，不是 primary managed table。",
+        "hits": [
+          "audit-platform/frontend/src/components/workpaper/composables/h2ListedDisclosureModel.ts#L275",
+          "audit-platform/frontend/src/components/workpaper/composables/h2ListedDisclosureModel.ts#L309",
+          "audit-platform/frontend/src/components/workpaper/composables/h2ListedDisclosureModel.ts#L331",
+          "audit-platform/frontend/src/components/workpaper/composables/h2SoeDisclosureModel.ts#L160",
+          "audit-platform/frontend/src/components/workpaper/composables/h6DisclosureModel.ts#L223",
+          "audit-platform/frontend/src/components/workpaper/h2/core/H2TabDisclosureListed.vue#L686"
+        ],
+        "registered_as": "BP-6（同一条阻断项的第二档，must_fix_before 不同：这一族只在把附注披露表纳入 projection 契约时才必须修）"
+      },
+      "family_c_index_as_fallback_on_non_primary_derived_tables": {
+        "count": 8,
+        "why_not_family_a": "落在派生/固定行集表上（现金流预测年度行、月度行、盘点地点行、附注固定行集），且多数以业务键优先、下标只作兜底（如 `cf-${c.year || i + 1}` 里 year 是自然键）。这些表不是 primary managed table，行集由源模板固定或由业务字段决定。",
+        "hits": [
+          "audit-platform/frontend/src/components/workpaper/composables/h4StocktakePlanModel.ts#L100",
+          "audit-platform/frontend/src/components/workpaper/composables/useH2Impairment.ts#L692",
+          "audit-platform/frontend/src/components/workpaper/composables/useH2InterestCap.ts#L145",
+          "audit-platform/frontend/src/components/workpaper/composables/useH3AdditionCheck.ts#L181",
+          "audit-platform/frontend/src/components/workpaper/composables/useH3Disclosure.ts#L118",
+          "audit-platform/frontend/src/components/workpaper/composables/useH3Disclosure.ts#L202",
+          "audit-platform/frontend/src/components/workpaper/composables/useH4Recoverable.ts#L313",
+          "audit-platform/frontend/src/components/workpaper/composables/useH8Recoverable.ts#L272"
+        ],
+        "registered_as": null,
+        "not_registered_reason": "不阻断本 slice 的任何 capability 目标：这些表要么不进 projection（派生只读），要么行集由源模板固定（行身份可由行 key 而非 rowId 承载）。step 6 若把某张纳入契约，届时再逐张评估。"
+      },
+      "false_positive_guard": {
+        "why_this_key_exists": "整行判会把 `seq: raw.seq ?? idx + 1` 误判成位置化行身份 —— 那是**展示序号**（每次重排都会重算），不是身份字段。G 循环在 G12 上踩过这个坑，H 循环有三处同型。",
+        "must_not_be_flagged": [
+          "audit-platform/frontend/src/components/workpaper/composables/useH3DetailCost.ts#L142(seq: raw.seq ?? idx + 1)",
+          "audit-platform/frontend/src/components/workpaper/composables/useH3DetailFair.ts#L111(seq: raw.seq ?? idx + 1)",
+          "audit-platform/frontend/src/components/workpaper/composables/useH6Detail.ts#L295(seq: raw.seq ?? idx + 1)"
+        ],
+        "how": "判据只取身份字段自己的值表达式（到同层逗号止），不看整行。"
+      }
+    }
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-1",
+      "blocks": "bidirectional",
+      "what": "9 个 entry 都没有 Task 17 的 non-current instrumentation candidate",
+      "consequence": "Task 36 的 ExcelEntryFinalizeGate.finalize_candidate 无 candidate 可 finalize ⇒ 不可能产出 published representation ⇒ resolver/room/current/evidence 拿不到身份",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "Task 50 的正文范围是 H 循环 entry 的枚举/裁决/对端调查与 UI 义务，不含跑 Task 17 的 instrumentation 与 Task 36 的 finalize（两者各有自己的任务与门）。伪造 candidate finalize 是范式 step 4 明令禁止的行为（AP-5）。",
+      "must_fix_before": "把任一 H entry 标 bidirectional 或注册 adapter 之前",
+      "owner_task": "Task 17 + Task 36",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/excel_entry_gate.py",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ]
+    },
+    {
+      "id": "BP-2",
+      "blocks": "bidirectional",
+      "what": "9 个 entry 全部没有人工审核的 per-entry contract。workpaper_sync_contracts/ 下 5 个文件（_example.candidate.json / b60.hour_budget / d2.receivable_detail / g7.soe_subsidiary_disclosure / h1.disposal_check）里属 H 循环的那一条是 **h1.disposal_check**，而 H1 正是本 slice 排除的 pilot ⇒ 本 slice 9 条 entry 的 contract 数为 0。",
+      "consequence": "projection_contract bundle 的 contract slot 必须是 approved definition，缺失即 PerEntryContractUnapprovedError；typed null marker 不得冒充。且 H 循环的载体拓扑（三族写路径 / 五种读路径 / 两条 entry 双计量模式 / H7 双写路径 / H10 三处存储）要求契约逐 entry 按各自形态声明，抄任一条的形态都会漏。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 6 要求逐 entry 人工审核发布，且 cross_entry_rule 明令不得跨 entry 复用别人的 contract_id —— 9 条 entry 要 9 份独立契约，逐字段带 source_ref（xlsx 还要 cell）。这是独立工作量，且 H 循环 9 本工作簿共约 152 个 sheet。",
+      "must_fix_before": "把任一 H entry 标 bidirectional 之前",
+      "owner_task": "Task 50 后续（step 6，逐 entry 人工审核发布）",
+      "source_refs": [
+        "backend/data/workpaper_sync_contracts",
+        "backend/app/services/workpaper_sync/contracts.py"
+      ]
+    },
+    {
+      "id": "BP-3",
+      "blocks": "bidirectional",
+      "what": "9 个 entry 都没有 approved authority model，也没有 non-null approved definition bundle",
+      "consequence": "Requirement 2.3：bundle 的 typed slots 不得用 SQL NULL / 空串 / 全零 hash 代替。缺 bundle 时 registry.assert_bundle_usable 会拒绝注册。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "step 5 / step 7 的活，且顺序不可颠倒（template → instrumentation → contract → bundle → representation），BP-2 未兑现时 bundle 的 contract slot 无处可取。",
+      "must_fix_before": "把任一 H entry 标 bidirectional 之前",
+      "owner_task": "Task 50 后续（step 5 / step 7）",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/adapters/registry.py",
+        "backend/app/services/workpaper_sync/excel_entry_gate.py"
+      ]
+    },
+    {
+      "id": "BP-4",
+      "blocks": "bidirectional",
+      "what": "没有为任一 H entry 跑过真实 OnlyOffice 9.4 的 required scenario set",
+      "consequence": "AC 12.12：任一缺失、失败、UNVERIFIABLE 均保持未验收；9 条 evidence 只能是 UNVERIFIABLE",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "真实 OO 9.4 探针需要 onlyoffice 容器 + 项目数据 + 逐 scenario 的 operation/application id 回收，属 Task 44 同型的独立 gate；H 循环侧（除 Task 42 的 H1 pilot）尚未立项。本任务不用「跑不了」当豁免，而是如实把 verification_state 记为 UNVERIFIABLE 并附非空 unverifiable_reasons。",
+      "must_fix_before": "把任一 H entry 从 UNVERIFIABLE 提为 VERIFIED 之前",
+      "owner_task": "待立项（Task 44 同型的 H 循环 OO 9.4 gate）",
+      "source_refs": [
+        "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py"
+      ]
+    },
+    {
+      "id": "BP-5",
+      "blocks": "xlsx/gt-h8-right-of-use-assets 的 bidirectional",
+      "what": "H8 的四表明细种子写进一个**零消费方**的 item_id：`GtH8RightOfUseAssets.vue#L588` 把 `detail_prefill` 映射结果写成 `H8-2-detail-prefill`，而该字面量在全仓（前端 src 的 .ts/.vue + backend/app 的 .py）只出现 1 次 —— 就是这个写入点本身。primary managed table 的真实键是 `H8-2-rows`（useH8Detail.ts#L148 的 ROWS_KEY）。",
+      "consequence": "H8 的「从 tb_balance 叶子子科目自动种子明细表」这项能力是**结构性死代码**：种子写进内存 Map 后没有任何消费方读它，HTML 侧永远看不到自动取数的行。对本 spec 的直接影响是 projection 的 substrate 判断会出错 —— 若按「种子存在」设计 OO↔HTML 投影，OO 侧会拿到一份 HTML 侧从未渲染过的数据。",
+      "observable_consequences": [
+        "同一份 render 输出里，H2（写 `H2-2-rows`）与 H4（写 `H4-2-rows`）的种子会出现在结构化视图里，H8 的不会 —— 三者代码结构几乎一样，差别只在写入的键名",
+        "`backend/app/services/d_cycle_extraction/presets.py#L569` 明确把 H8 的取数锚点登记为 `H8-2-rows`（「明细表合同级原值 → tb_balance 1901 叶子子子科目（_build_h8_detail_prefill）」）—— 后端登记的锚点与前端实际写入的键不一致",
+        "`_build_h8_detail_prefill` 在后端每次 render 都会跑（含 tb_balance 查询），产出被丢弃 = 无谓开销"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改它有两条路且都超出本任务范围：① 把写入键改成 `H8-2-rows` —— 但要先确认 useH8Detail 的 watch/seed 逻辑对「无持久化时收到内存种子」的处理与 H2/H4 一致，否则会把用户已有数据覆盖（Persist-First 语义要逐条核）；② 给 `H8-2-detail-prefill` 加消费方。两者都要动 H8 的取数与持久化路径，属 H8 四表取数域的改动，本任务的义务是把它查出来、落成可复核的 source_ref 并阻断 bidirectional。",
+      "must_fix_before": "把 xlsx/gt-h8-right-of-use-assets 标 bidirectional 之前（也在 step 6 为它发布 contract 之前 —— 契约里必须写清 HTML 侧到底有没有种子行）",
+      "owner_task": "待立项（H8 四表明细种子接线修复）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue",
+        "audit-platform/frontend/src/components/workpaper/composables/useH8Detail.ts",
+        "backend/app/routers/wp_render_strategies/_h8_right_of_use_assets.py",
+        "backend/app/services/d_cycle_extraction/presets.py"
+      ]
+    },
+    {
+      "id": "BP-6",
+      "blocks": "H2 / H4 / H8 的 bidirectional 与 stable field key 可保持性",
+      "what": "三条 entry 的四表种子路径把行身份整体取成数组下标：`GtH2ConstructionInProgress.vue#L616` 的 `rowId: \\`seed-${i}\\``、`composables/h4DetailPrefill.ts#L50` 的 `rowId: \\`seed-${idx}\\``、`GtH8RightOfUseAssets.vue#L578` 的 `rowId: \\`seed-${idx}\\``。三者都命中 forbidden_row_identity_kinds 的 array_index。另有一族 6 处把下标当**前缀**喂给随机 id 生成器（附注披露表，见 dynamic_row_identity.positional_identity_inventory.family_b），值唯一但每次载入不稳定。",
+      "consequence": "行身份一旦由位置派生，后端 prefill 的顺序/条数变化（`tb_balance` 新增或删除一个叶子子科目就会变）会让同一业务行在两次种子之间拿到不同 rowId，或让不同业务行继承同一个旧 rowId ⇒ stable field key 在 roundtrip 中无法保持 ⇒ Task 36 的 visible-equivalence 与 roundtrip 校验会把「用户没动的行」判成改动，或反过来把改动吞掉。",
+      "observable_consequences": [
+        "H2/H4：种子后用户保存 ⇒ `seed-0..seed-N` 成为持久身份；下一年度 tb_balance 多一个在建工程项目且排序在前，则 `seed-0` 指向的业务行整体错位",
+        "H8：同样的位置化身份写进的是零消费键（BP-5），所以当下无可观察后果 —— 但一旦 BP-5 被修成写 `H8-2-rows`，这条缺陷立刻变成 H2/H4 那样的真实错位。两条必须一起修，不能只修 BP-5"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改行身份派生逻辑会影响既存持久化数据的读取（已保存过 `seed-{i}` 的项目需要一次性回填稳定 id，且回填规则要保证同一行在回填前后被认定为同一行），属数据迁移而非本任务的枚举/裁决范围。稳定化的正确做法是拿业务自然键（H2 用工程项目名称 / H4 用工程物资名称+类别 / H8 用 account_code）参与身份派生，这需要逐 entry 确认自然键的唯一性 —— 属 step 6 发布契约时的工作。",
+      "must_fix_before": "把 xlsx/gt-h2-construction-in-progress、xlsx/gt-h4-engineering-materials 或 xlsx/gt-h8-right-of-use-assets 标 bidirectional 之前（也在 step 6 为这三条发布 contract 之前）；family_b 的 6 处只在把附注披露表纳入 projection 契约时才必须修",
+      "owner_task": "待立项（H2/H4/H8 四表种子行身份稳定化 + 存量 seed-{i} 回填）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue",
+        "audit-platform/frontend/src/components/workpaper/composables/h4DetailPrefill.ts",
+        "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue"
+      ]
+    },
+    {
+      "id": "BP-7",
+      "blocks": "xlsx/gt-h8-right-of-use-assets 的 bidirectional 与附注同步的列身份稳定性",
+      "what": "H8 在**附注同步边界**上把稳定的动态类别列 key 降级成可变 label：`composables/h8DisclosureSyncPayload.ts#L51` 的 `cats.map((c) => ({ key: c.label, label: c.label, format: 'amount' }))` 与 `#L110` 的 `row[c.label] = h8ListedCellValue(state.movement, def, c.key)`。底稿内的 key 是稳定的（`useH8Disclosure.ts#L166` 的 `cat_${Date.now().toString(36)}`），取值也按 `c.key` —— 只有推给附注的载荷用了 label。这与本任务正文要求复用的 H7 稳定 key 范式（`{industryKey}_{seq}`，h7ListedDisclosureModel.ts#L74-L86）正相反，且 H7 的注释逐字点名「不能用 `key: label`（H1/H8 那样）」。",
+      "consequence": "两个类别 label 相同即撞键。`useH8Disclosure.addCategory(label)` 直接收用户输入的名称，而默认列里已有一个「其他」⇒ 审计师再加一个「其他」就重名：① `row[c.label]` 后写覆盖先写，附注里丢一列金额；② `columns` 数组出现两个同 key 的 ColumnDef，后端列头元数据无法区分两列。",
+      "observable_consequences": [
+        "H8 上市附注「使用权资产变动表」在有重名类别时列数与底稿不一致（底稿 N 列 / 附注 N-1 列），且丢的那一列是**先建**的那个（后写覆盖）",
+        "改类别名会改附注载荷的列 key ⇒ 附注侧按 key 索引的历史 cell/备注串到别的列上（与 e1RestrictedScope.ts#L624 记录的同型缺陷一致）",
+        "H7 侧同一件事是对的（h7DisclosureSyncPayload.buildH7ListedColumns 按 category.key 建列），两者形态直接对照可复核"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改它要同时动三处：`buildH8ListedColumns` 的列 key、`buildH8ListedSubTableData` 的 `row[...]` 键、以及附注侧按旧 key（label）索引的存量 `sub_table_data` —— 后者是数据迁移。附注同步链路是 spec `disclosure-sync-path-buildout` 与 H8 重建 spec 的交付物（见 slice_scope.excluded_from_slice 第 4 条），本 slice 明令不接管其契约。本任务的义务是把它查出来、给出与 H7 正例的对照判据并阻断 bidirectional。",
+      "must_fix_before": "把 xlsx/gt-h8-right-of-use-assets 的附注披露表纳入 projection 契约之前，以及把该 entry 标 bidirectional 之前",
+      "owner_task": "待立项（H8 附注同步列 key 稳定化 + 存量 sub_table_data 键迁移），与 H1 的 h1DisclosureSyncPayload.ts#L104 同型，应并为一个 spec",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/h8DisclosureSyncPayload.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH8Disclosure.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/h7ListedDisclosureModel.ts"
+      ]
+    },
+    {
+      "id": "BP-8",
+      "blocks": "H5 / H6 / H7 / H8 / H9 的 step 9 宿主改线（进而阻断 bidirectional）",
+      "what": "五条 entry 各自在磁盘上有一份**生产零消费**的 legacy 载体，而宿主用的是内联的第二份实现：dual-mode 侧 —— useH5DualMode（0 消费）/ useH7DualMode（0）/ useH9DualMode（0）/ useH8DualMode（唯一消费方是 parent_duplicate 子入口 H8TabRecoverable.vue，父宿主不用）；FormData 侧 —— useH6FormData（生产 0，仅一个 spec 引用）/ useH7FormData（0，且用 `api.post` 而非 put）/ useH8FormData（0）/ useH9FormData（0）。",
+      "consequence": "这是「additive 注入即死代码」的教科书形态，对本 spec 的具体危害是 step 6 与 step 9 会接到死代码上：按文件名认载体 ⇒ contract 描述一条不存在的通道、adapter 挂到没人调用的 composable ⇒ 宿主行为一点不变，而守卫因为「文件确实被改了」全绿 = 假绿第 ① 源。",
+      "observable_consequences": [
+        "useH9DualMode 存在，而宿主 `GtH9LeaseLiabilities.vue#L188` 的注释仍逐字写着「useH9DualMode composable **后续创建**」—— 注释与磁盘实况脱节，说明它从来没被接上过",
+        "useH7FormData 用的是 `api.post('/checklist-responses')`，而平台其余 8 条 entry 全是 `api.put` / `http.put` —— 它没跟着接口演进走，进一步印证零消费",
+        "useH8DualMode 的唯一消费方是子 Tab：按「删 composable + 改宿主」的常规套路走会完全漏掉它（宿主里根本没有它的 import），删掉即打断 H8 的可收回金额子入口"
+      ],
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "按 AC 1.7「不可达旧桩 SHALL 删除」它们该删，但删除动作归 Task 66（生成清册）/ Task 72（执行删除），且删除对象是 composable 而不是 entry（AC 1.7 的字面对象是「入口」）—— 本任务的义务是把归属查清、落成两侧都可复核的消费方清单（声称零消费的真零、声称有消费方的真有）并写进 deletion plan。此外「宿主内联实现」这一半不能简单删：它是当前唯一真载体，要先有 bridge adapter 才能替换。",
+      "must_fix_before": "Task 72 的 Stage B 精确删除；以及为这五条 entry 注册 adapter（step 9）之前",
+      "owner_task": "Task 66 / Task 72",
+      "source_refs": [
+        "backend/data/workpaper_sync_h_cycle_deletion_plan.json",
+        "audit-platform/frontend/src/components/workpaper/composables/useH5DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH7DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH8DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH9DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH6FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH7FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH8FormData.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useH9FormData.ts"
+      ]
+    },
+    {
+      "id": "BP-9",
+      "blocks": "slice 与 source manifest 的一致性",
+      "what": "source manifest 里 9 条 H entry 的 `capability` 仍是 'single_onlyoffice'、`html_store` 仍是 'unresolved'，与本 slice 重裁后的结论（capability=null / verdict=exists）不一致。这两个值不是逐 entry 裁决，而是 workpaper_sync_entry_overlay.json 的 defaults_by_component.GtOnlyOfficeSheet **组件级默认值**。",
+      "consequence": "manifest 的 capability 统计当前反映的是 overlay 默认值而非裁决结果；本 slice 的守卫因此断言「两者**必须**不一致且该不一致已登记」，而不是断言相等 —— 后者会把 overlay 默认值当成裁决真源。",
+      "status": "REGISTERED_NOT_FIXED",
+      "why_not_fixed_here": "改 overlay 的 defaults_by_component 会同时翻掉 180 条 GtOnlyOfficeSheet entry 的 capability（远超 H 循环），还要改 approved_source_digest 并重生成 manifest —— manifest_digest 变化会波及 Task 73 / closure check / legacy baseline 等多个并发在途的判据。任务正文明令 workpaper_sync_entry_overlay.json / workpaper_sync_entry_manifest.json 只读（source-backed 生成物，手改等于伪造）。",
+      "must_fix_before": "Task 67 的 structural pre-reconcile 消费 manifest capability 统计之前",
+      "owner_task": "待立项（overlay per-entry override + 重生成 manifest），与 D/F/G 三个 slice 的同名阻断项是同一件事",
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_overlay.json",
+        "backend/data/workpaper_sync_entry_manifest.json"
+      ]
+    },
+    {
+      "id": "BP-10",
+      "blocks": "AC 1.4 / AC 1.5 的 UI 义务完全收口",
+      "what": "本次已兑现 AC 1.4 的「显示可操作原因」（9 个宿主的模式工具栏挂 GtEntrySyncCapabilityNotice，常显一行摘要 + tooltip 完整原因）。仍未删除的是 9 个 entry 级 legacy dual-mode composable（其中 4 个已是零消费/错位消费，见 BP-8）与宿主内联的第二份实现。",
+      "consequence": "AC 1.5 的触发条件是「入口被裁决为纯 OO 或纯 HTML」—— 重裁后这 9 个 entry 都不是 single_*，所以 AC 1.5 不适用，切换按钮也不该被收掉（OO 侧是真实可用的独立编辑通道，H5/H9/H10 甚至在切换前会先探 health 或预拉 onlyoffice-config）。真正待做的是 legacy composable 删除，归 Task 66 / Task 72。",
+      "status": "PARTIALLY_FIXED_AC_1_4_DONE",
+      "why_not_fixed_here": "legacy composable 的删除有专门的任务（Task 66 生成清册 / Task 72 执行删除）与专门的七步范式（legacy_deletion_paradigm）；本任务只按 step 11 兑现「显示可操作原因」并把清册落成 deletion plan。",
+      "must_fix_before": "Task 72 的 Stage B 精确删除",
+      "owner_task": "Task 66 / Task 72",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "backend/data/workpaper_sync_h_cycle_deletion_plan.json"
+      ]
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+    "assertions": [
+      "本 slice 的 9 条 entry 与 D slice 的 7 条、E slice 的 1 条、F slice 的 8 条、G slice 的 17 条均无交集",
+      "9 条 entry 在 workpaper_sync_contracts/ 下都没有文件 —— 未交付 contract 的 entry 不伪造 contract，也不借用 b60.hour_budget / d2.receivable_detail / g7.soe_subsidiary_disclosure / h1.disposal_check 四条 pilot 中的任何一条；特别是 **h1.disposal_check 属同循环的 H1 pilot，最容易被误借**，守卫对它单独断言 review.entry_id == 'xlsx/gt-h1-fixed-assets' 且不属本 slice",
+      "9 条 entry 的 template_ref 逐条不同、primary managed table 逐条不同、html_counterpart 的 write_carrier/read_carrier 组合逐条登记 —— 不存在「一条 entry 的对端结论被另一条借用」；H3 与 H7 虽同为双计量模式，两者的主表键（H3-2-cost-rows / H7-2-cost-rows）与 owner 模块（useH3DetailCost.ts / H7TabDetailCost.vue）完全不同",
+      "9 条 entry 的 evidence.contract_test 都指向本 Task 50 的守卫文件，sync_test_run_id / required_scenario_set_digest 全为 null，不引用任何 pilot 的 scenario 实体或 evidence id",
+      "authoritative_templates 的 11 条记录里，belongs_to_entry 非 null 的 9 条一一对应 9 个 entry（无一对多、无多对一 —— H 循环一个 wp_code 一本工作簿，这与 F 的 F2 一册跨两 entry、G 的 G4/G6 一册服务三 entry 都不同），其余 2 条（H0 函证 / H1 pilot）全带 excluded_reason",
+      "5 条 parent_duplicate 子入口按 AC 1.6 复用父 entry 的 adapter，不独立计入 independent_entry_count；它们的 entry_id 只出现在 parent_duplicate_summary 里，不出现在 independent_entries 里",
+      "deletion plan 的 9 条 entry_id 与 9 个 legacy composable 路径全局去重，且与 D/E/F/G 四份 deletion plan 的 composable 路径无交集（H 循环 9 个 dual-mode composable 无一 wraps 共享基类 useWorkpaperEntryDualMode，故也不会与 D/M/J 那些 wrapper 撞车）"
+    ]
+  },
+  "honest_adjudication_summary": {
+    "total_independent": 9,
+    "pilot_contract_published": 0,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 0,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "capability_verdict_pending": 9,
+    "html_counterpart_exists": 9,
+    "html_counterpart_none": 0,
+    "finalized_published_representations": 0,
+    "entries_left_unverifiable": 9,
+    "parent_duplicate_children": 5,
+    "entries_with_host_inline_write_carrier": 4,
+    "entries_with_formdata_composable_write_carrier": 3,
+    "entries_with_per_tab_write_carrier": 2,
+    "entries_without_checklist_get_in_their_carrier": 4,
+    "entries_with_dual_measurement_variants": 2,
+    "entries_with_positional_seed_row_identity": 3,
+    "entries_with_orphan_legacy_composable": 5,
+    "entries_with_label_as_dynamic_column_key": 1,
+    "authoritative_template_files": 11,
+    "reason": "9 条 entry 逐条实测都有 HTML 对端（checklist_responses + remark 列 + 逐 entry 各自的载体形态与传输键），按 AC 12.8 一条都不能标 single_onlyoffice；OO 侧有真实业务价值且入口可达（9 个 componentType 在 htmlRendererRegistry 有真实入边，其中 H5/H9/H10 切换前还会真实探测 OO 可用性），故也不是 single_html / unreachable；AC 12.1 的六件前置一件未交付（唯一一份 H 循环生产契约 h1.disposal_check 属已排除的 H1 pilot），故不得标 bidirectional。四个枚举值当下都不成立 ⇒ capability 记 null 并如实计入 unadjudicated=9。**unadjudicated=9 不是欠账新增，而是「本 slice 有 9 条 entry 的 capability 终态尚未确定」的实况**：缺什么已逐条落在 blocking_preconditions（BP-1..BP-4 是共性前置，BP-5/BP-6/BP-7/BP-8 是本次新查出的 H 循环形态缺陷，BP-9/BP-10 是与 D/F/G 同源的平台级项）。",
+    "slice_counters": {
+      "unadjudicated": 9,
+      "fake_bidirectional_claimed_verified": 0,
+      "bidirectional_unverified": 0,
+      "stale_evidence": 0,
+      "note": "unadjudicated=9 的含义是「本 slice 有 9 条 entry 的 capability 终态尚未确定」，缺什么已逐条落在 blocking_preconditions。fake_bidirectional_claimed_verified=0 的分母是真的：9 条 evidence.verification_state 全为 UNVERIFIABLE 且各带非空 unverifiable_reasons，没有一条声称 VERIFIED。bidirectional_unverified=0 的分母也是真的：capability 为 bidirectional 的条目数是 0。stale_evidence=0 同理 —— 没有任何 entry 挂着 sync_test_run_id 或 required_scenario_set_digest，故不存在「evidence 比 definition 旧」的对象。四个 0 都不得解读为「已具备双向能力」。"
+    }
+  },
+  "properties_verified": [
+    22,
+    23,
+    69,
+    70
+  ],
+  "requirements_covered": [
+    "1.4",
+    "1.6",
+    "6.4",
+    "6.5",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ],
+  "property_denominators": {
+    "why_this_key_exists": "Task 46 首轮把「没有 contract → Property 通过」写成结论，那是空分母重言式（同 spec 的 Task 20 专门写代码拒绝这种论证：WriterGateError \"...would be evaluated over an empty denominator (a tautology)\"）。本 slice 把每条 Property 的分母是什么、验了什么、哪部分不宣称通过逐条写下来，守卫按同一划分组织断言。",
+    "property_22": {
+      "what_it_asserts": "动态列 key 与 label 解耦 —— 重命名公司 label 不改变 `{slot}_{seq}` key；重复 label 不发生键冲突（design.md §Property 22，Validates Requirements 6.4）",
+      "h_cycle_denominator": "非空 —— H 循环是这条 Property 的**范式源头**：h7ListedDisclosureModel.ts 的 `{industryKey}_{seq}` + nextH7CategoryKey(max+1) + h7TotalCellValue 对动态数组 reduce，加国企侧 h7SoeDisclosureModel.ts 的 nextSoeCategoryId 同形实现；反例分母是 h8DisclosureSyncPayload.ts 的 2 处 label-as-key。",
+      "how_handled": "守卫在真分母上双向验：**正例**逐条断言 SK-1..SK-4 四个结构要素在 h7ListedDisclosureModel.ts 里成立（interface 的 key/label 分离、`${prefix}${max + 1}`、categories.reduce、行模型来自声明式数组）；**反例**穷举全 H 循环（剥注释后）`key: X.label` 与 `row[X.label]` 两种形态，命中集合必须**恰好等于** slice 声明的 2 处（多一处 = 新增背离，少一处 = 已修好但登记未删，两个方向都打红）。另断言 `blankRows(expr, 整数字面量)` 与 `公司[1-9]` 横向列字面量在全 H 循环为 0 处。这不是「没有动态列所以通过」。",
+      "not_claimed_passing": false,
+      "not_claimed_passing_part": "「重命名 label 后运行态数据不丢落点」的**浏览器级**验证 —— 本文件只验源码结构与穷举扫描，真实 DOM 行为归 H 循环 OO 9.4 gate（BP-4）。"
+    },
+    "property_23": {
+      "what_it_asserts": "动态行身份不使用下标 —— 删除/重排/再新增后旧 row_uuid 不复用，原行数据不串到新行（design.md §Property 23，Validates Requirements 6.5）",
+      "h_cycle_denominator": "非空 —— 9 条 entry 的 primary managed table 各有一个行身份构造点（9 个 source_ref），加 17 条位置化命中的三族分类清单，加 3 条必须**不被**误报的展示序号（seq）站点。",
+      "how_handled": "守卫真验四件事：① 9 个声明的行身份生成器在源码里真实存在且形态与声明一致（`rowId` 八条 / `id` 一条 —— 写死任一个都会把另一族判错）；② 位置化扫描按「只取身份字段自己的值表达式」口径现扫，命中总数与三族划分必须与 slice 声明**逐条等值**（新增第 18 条即红）；③ family_a 的 3 条真缺陷各自的 `writes_to_key` 在源码里可复核（其中 H8 那条写的是零消费键，与 BP-5 交叉锁死）；④ 反向自检：3 个 `seq: raw.seq ?? idx + 1` 站点**不得**被判据点名（否则判据回到「整行判」的错口径）。这不是「没有动态行所以通过」。",
+      "not_claimed_passing": false,
+      "not_claimed_passing_part": "「删除/重排/再新增后旧 uuid 不复用」的**运行态**验证 —— 需要真实 OO 9.4 与浏览器操作序列，归 BP-4。本文件验的是「身份是否由位置派生」这个静态前提。"
+    },
+    "property_69": {
+      "what_it_asserts": "evidence 由逐 scenario 实体与服务端重算闭合",
+      "h_cycle_denominator": "非空但全为负向 —— 9 条 evidence 全是 UNVERIFIABLE，分母是「UNVERIFIABLE 必须带非空 unverifiable_reasons」与「声称 VERIFIED 必须有 sync_test_run_id + required_scenario_set_digest」两条蕴含关系，外加 honest_adjudication_summary 的 18 个计数与 slice_counters 四类计数的现算等值。",
+      "how_handled": "守卫按 SR-7 断言 9 条 UNVERIFIABLE 各带非空 reasons；按「VERIFIED ⇒ 有 run id + digest」断言无一条空口声称已验收；把 summary 的 18 个计数逐项从 independent_entries 现算并等值比对（抄错或凑数即红）。逐 scenario evidence 实体的正向闭合由 Task 44 同型的 OO 9.4 gate 承载，本文件**不宣称那部分通过**，已登记 BP-4。",
+      "not_claimed_passing_part": "逐 scenario evidence 实体的正向闭合（需真实 OO 9.4 探针）"
+    },
+    "property_70": {
+      "what_it_asserts": "scenario / evidence / contract / bundle / candidate 不得跨 entry 或跨场景复用",
+      "h_cycle_denominator": "非空 —— 9 条 H entry × (D 7 + E 1 + F 8 + G 17) 的集合不相交判据、9 条 entry 的 contract 归属判据（含**同循环 pilot h1.disposal_check 不得被借用**这条最容易破的）、11 条模板 belongs_to_entry 的单射判据、5 条 parent_duplicate 子入口不得混入 independent_entries 的判据、deletion plan 的去重判据。",
+      "how_handled": "守卫真验：五个 slice 的 entry 集合两两不相交；契约目录里没有任何文件的 review.entry_id 属本 slice 9 条，且 h1.disposal_check 的 review.entry_id 真是 H1（不是「H 循环随便一条」）；authoritative_templates 的 belongs_to_entry 非 null 项在 9 个 entry 上是单射且**满射**（H 循环一册对一 entry，故可比 F/G 更严）；5 条 parent_duplicate entry_id 与 9 条 independent entry_id 无交集；deletion plan 的 entry_id 与 legacy composable 路径全局去重。",
+      "not_claimed_passing": false
+    },
+    "property_20_and_21_not_claimed": {
+      "why_here": "Task 50 的正文只点名 Property 22 / 23 / 69 / 70，但 Task 46/48/49 的守卫都额外核了 Property 20（generated col 占位不可注册生产 adapter）与 Property 21（contract 字段完整）的**前提**。本 slice 沿用同一做法但明确不宣称通过：H 循环已发布的 per-entry contract 数 = 0（唯一一份 h1.disposal_check 属已排除的 pilot）⇒ 分母为空。守卫只断言两件可复核的事：① 「本 slice 9 条 entry 的 contract 数 = 0」这个前提成立（逐文件读 review.entry_id 判断，不是数文件个数）；② 承载字段级判据的 pilot 守卫文件真存在（test_task13_contract_registry.py / test_task42_h1_grouped_dynamic_pilot.py）。前提一旦不成立（有人给 H entry 发了契约），守卫立刻打红，要求在此补齐字段级判据。",
+      "not_claimed_passing": true
+    }
+  },
+  "paradigm_schema_conflict": {
+    "what": "范式 JSON 的 slice_schema.applies_to_tasks 是 [48..57]，effective_from_task_48 明文把 html_counterpart_verdict / html_counterpart_source_refs 与阻断项的 status / must_fix_before / source_refs 列为 Task 48 起强制 —— 本 slice 全部满足。SR-3 的蕴含式（G1 收口后）显式接纳「capability 为 null + required_pending_verdict_fields 三字段齐备」的待裁决态，SR-9 要求待裁决条目数与 slice_counters.unadjudicated 相等 —— 本 slice 9 == 9。",
+    "how_resolved_here": "沿用 D（Task 46 收口）/ F（Task 48）/ G（Task 49）已确立的诚实形态：capability 记 null + capability_verdict_stage + capability_target + 非空 capability_target_blocked_by，并如实计入 slice_counters.unadjudicated=9。这四个字段合起来表达的是「终态未定，缺什么已逐条登记」，不是「允许留空」。本任务**未**修改范式 JSON、未扩充 capability_enum、未改动 D/E/F/G 四个 slice 的字节。",
+    "residual_inconsistency": null,
+    "known_red_it_causes": {
+      "status": "none",
+      "why": "G1 收口（SR-3 改成蕴含式 + 新增 SR-9）已把待裁决态变成范式的合法一等公民，`test_slice_schema_validator_coverage.py` 的 `_UNJUDGED_SLICES` 为空且本 slice 不往里加豁免 —— 新增 slice 自动进入 `scan_glob` 分母，通不过校验即直接 FAIL。实测本 slice 经 `slice_schema.validator` 违规数 **0**。",
+      "locked_by": "backend/tests/workpaper_sync/test_task50_h_cycle_migration.py::TestParadigmCompliance::test_the_slice_passes_the_paradigm_nominated_validator —— 判据带反向自检（抽掉 capability_verdict_stage 后校验器必须点名它，防被短路成恒返回空列表）。"
+    },
+    "sibling_slice_conflicts": "与 F / G 两个 slice 无字段级冲突（本 slice 是它们的同构变体：把 F 的 composite_transport_keys 换成 h_cycle_form_differences + dynamic_column_identity，因为 H 循环的形态差异在**载体归属与动态列 key**上而不在传输键拼法上）。与 D slice 同样无冲突。与 E slice 的形态差异是 capability：E slice 填 'single_onlyoffice' 且 html_store 未解，属 AP-1 known_debt_inventory 的第 8 条，owner 是 E 循环回填任务；本任务未改 E slice 字节。"
+  }
+}

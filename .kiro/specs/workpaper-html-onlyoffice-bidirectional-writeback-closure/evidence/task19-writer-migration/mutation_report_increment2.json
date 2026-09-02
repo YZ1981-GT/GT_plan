@@ -1,0 +1,387 @@
+[
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[WpMigrationService.rollback]",
+    "why": "给失败路径塞一个裸 `db.commit()` ⇒ 回滚的唯一提交出口不再唯一。挑失败分支注入是刻意的：成功路径的 commit 会被「恰一处 commit_projection」那条顺带发现，而失败分支的第二次提交只有这条否定式判据能拦（它会把调用方尚未完成的其它写入一起提交）",
+    "verdict": "RED",
+    "summary": "4 failed, 252 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.25s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_the_template_rollback_refuses_a_workpaper_that_no_longer_exists",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[WpMigrationService.rollback]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.7
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_projection_lane_capability_is_declared_at_the_call_site[WpMigrationService.rollback]",
+    "why": "把调用点声明的 capability 换掉 ⇒ 声明侧那道拒绝（`HtmlOnlyCommitPlan.__post_init__`）虽然会在运行时抛，但**结构判据**必须先钉住「调用点确实自己声明」。这条同时证明装配层没有替调用方写死 capability —— 写死了，换调用点的值就再也影响不到任何东西",
+    "verdict": "RED",
+    "summary": "2 failed, 254 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.43s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_projection_lane_capability_is_declared_at_the_call_site[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_projection_lane_capability_is_declared_at_the_call_site[WpMigrationService.rollback]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 75.9
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_projection_writer_routes_through_the_unified_entry[WpMigrationService.rollback]",
+    "why": "把回滚的 `source` 换回 `html` ⇒ 一次回滚在 evidence 与 timeline 里与一次用户编辑不可区分（Requirement 2.3 点名 source 必须落库）。这条是 lane 的 source 从写死改成透传之后**唯一**能证明「透传真的被用上了」的判据",
+    "verdict": "RED",
+    "summary": "2 failed, 254 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.32s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_projection_writer_routes_through_the_unified_entry[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_projection_writer_routes_through_the_unified_entry[WpMigrationService.rollback]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 75.7
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_projection_lane_records_the_real_source",
+    "why": "把 lane 里 content version 的 source 改回写死 ⇒ 回归到改造前的形态：plan 上带着`rollback`，落库却是 `html`。判据钉在 `str(plan.source)` 这个表达式上而不是「有没有 source 参数」—— 后者被写死值满足",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 73.98s (0:01:13)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_projection_lane_records_the_real_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_projection_lane_records_the_real_source"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 77.6
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_projection_lane_records_the_real_source",
+    "why": "把 lane 的**默认** source 从 `html` 改成 `rollback` ⇒ `wp_html_save` 的每一次普通保存都被记成回滚。新增一个带默认值的字段最容易的假绿方式就是默认值写错，而只断言「rollback 能传进来」不会发现它",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 75.25s (0:01:15)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_projection_lane_records_the_real_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_projection_lane_records_the_real_source"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 78.8
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload",
+    "why": "把期望 revision 钉死成 0 ⇒ 乐观锁恒不匹配（或在新底稿上恒匹配），CAS 的并发裁决失效。真实执行判据断言它等于**回滚前**读到的那个值(7)，所以任何常量都打红",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 73.57s (0:01:13)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 77.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload",
+    "why": "在写完内容之后再读一次期望 revision ⇒ 拿自己刚写的那一版当期望值，乐观锁恒真（这正是本 spec 在 `wp_html_save` 里消灭过的形态）。判据必须断言**所有** revision 读取都早于 UPDATE，只看第一次读取的话这条注入会 GREEN —— 单行锚点，跨行锚点在 CRLF 工作树上必 ANCHOR-MISS",
+    "verdict": "RED",
+    "summary": "8 failed, 245 passed, 1 xfailed, 2 xpassed, 6 warnings, 3 errors in 72.34s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_projection_writer_routes_through_the_unified_entry[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_the_projection_lane_capability_is_declared_at_the_call_site[WpMigrationService.rollback]",
+      "test_task19_writer_migration.py::test_the_template_rollback_refuses_a_workpaper_that_no_longer_exists",
+      "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_template_rollback_still_restores_the_snapshot_payload"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.8
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_version_trail_rollback_commits_after_its_snapshot_row",
+    "why": "把 rollback 快照行的写入挪到唯一提交出口**之后**（用注入等价形态：多一处 `db.add` 落在 commit 之后）⇒ 它落到下一个事务，而 router 不一定再提交一次，「回滚到哪个版本」的审计记录静默丢失（Requirement 13.1）",
+    "verdict": "RED",
+    "summary": "8 failed, 245 passed, 1 xfailed, 2 xpassed, 6 warnings, 3 errors in 70.11s (0:01:10)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[VersionTrailService.rollback_to_snapshot]",
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[VersionTrailService.rollback_to_snapshot]",
+      "test_task19_writer_migration.py::test_projection_writer_routes_through_the_unified_entry[VersionTrailService.rollback_to_snapshot]",
+      "test_task19_writer_migration.py::test_the_projection_lane_capability_is_declared_at_the_call_site[VersionTrailService.rollback_to_snapshot]",
+      "test_task19_writer_migration.py::test_the_version_trail_rollback_commits_after_its_snapshot_row",
+      "test_task19_writer_migration.py::test_the_version_trail_rollback_keeps_delete_before_insert",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_version_trail_rollback_commits_after_its_snapshot_row"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 73.7
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_projection_writer_routes_through_the_unified_entry[VersionTrailService.rollback_to_snapshot]",
+    "why": "把恢复内容换成空载荷 ⇒ content version 的 projection digest 与实际落库的`checklist_responses` 无关，任何两次回滚都算出同一个 hash（内容寻址身份失效，历史读取再也分不出版本）",
+    "verdict": "GREEN",
+    "summary": "256 passed, 1 xfailed, 2 xpassed, 6 warnings in 69.28s (0:01:09)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 72.7
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_f2_writer_submits_the_docx_body_not_the_fields_json[F2-22]",
+    "why": "把权威载荷从 docx 本体换成 fields JSON 串 ⇒ `single_onlyoffice` 的权威内容变成派生投影（Requirement 2.11 / Property 50 明令禁止），且 representation 指向一个打不开的「docx」。`payload` 这个局部变量名正好就是 fields 的 JSON —— 这类混用在评审里极难看出来，必须有判据",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 68.72s (0:01:08)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_f2_writer_submits_the_docx_body_not_the_fields_json[F2-22]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_f2_writer_submits_the_docx_body_not_the_fields_json[F2-22]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 72.0
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_f2_writer_submits_the_docx_body_not_the_fields_json[F2-23]",
+    "why": "把 authority model 换成 custom ⇒ 两者都是「OOXML 本体即权威」，不会造成数据损坏，但 evidence 的 authority-model 分桶失真：F2 是纯 OO 入口（没有 HTML 对端），custom 是平台生成的 xlsx 底稿。分桶错了，「哪些 entry 需要 HTML 对端」这个问题就再也答不对",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 68.42s (0:01:08)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_f2_writer_submits_the_docx_body_not_the_fields_json[F2-23]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_f2_writer_submits_the_docx_body_not_the_fields_json[F2-23]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 71.7
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope",
+    "why": "去掉 entry_id 里的 sheet code ⇒ F2-22 与 F2-23（同一底稿的两份不同 docx）落到同一个 entry scope，互相顶掉对方的 entry pointer 与 representation generation。从此按 F2-22 的历史版本下载会拿到 F2-23 的文件 —— 而两边各自的保存都「成功」",
+    "verdict": "GREEN",
+    "summary": "256 passed, 1 xfailed, 2 xpassed, 6 warnings in 71.27s (0:01:11)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 74.6
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_f2_conflict_is_translated_before_the_broad_catch[F2-22]",
+    "why": "把窄捕获换成一个**永不匹配** `_save_fields` 冲突的异常类型 ⇒ `RevisionConflictError` 落到下面那条 `except Exception`，用户拿到 500「结构化落库失败」而不是409「请重新打开再同步」：原因是错的，也无法自助恢复（Requirement 5.12）",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.05s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_f2_conflict_is_translated_before_the_broad_catch[F2-22]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_f2_conflict_is_translated_before_the_broad_catch[F2-22]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 75.4
+  },
+  {
+    "id": "M38",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[_f2_stocktake_summary_sync::_save_fields]",
+    "why": "把 F2 原来那个裸 `db.commit()` 写回去 ⇒ fields 行先自己提交一次，随后 docx 的content version 再提交一次：一次业务写入落在两个事务里，中间崩溃就留下「结构化视图已更新、权威 docx 没有对应版本」的分叉（Requirement 2.4 / 13.1）",
+    "verdict": "RED",
+    "summary": "3 failed, 253 passed, 1 xfailed, 2 xpassed, 6 warnings in 104.16s (0:01:44)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[_f2_stocktake_summary_sync::_save_fields]",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[_f2_stocktake_summary_sync::_save_fields]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 107.6
+  },
+  {
+    "id": "M39",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope",
+    "why": "把 F2-22 模块的 sheet code 改成 F2-23 ⇒ 两个模块的 entry_id 与 docx 缓存文件名全部相同（读的是对方的文件、写的是对方的 entry）。这条同时是「两处共用同一个常量」的 falsifier：若文件名仍是各写一遍字面量，改常量不会让两者一起变",
+    "verdict": "RED",
+    "summary": "1 failed, 255 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.57s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_two_f2_sheets_do_not_share_one_entry_scope"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py"
+    ],
+    "restored": true,
+    "seconds": 76.0
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpStorageService.save_version]",
+    "why": "把备份动作自增计数器的行为写回去 ⇒ 「版本 7」与「版本 6」逐字节相同（伪版本），且第四个写入方回来争抢同一列。它同时是清册期望集合搬动的 falsifier：只把`save_version` 从 `legacy_version_writers` 里删掉而不搬生产，本条会 GREEN",
+    "verdict": "RED",
+    "summary": "4 failed, 252 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.74s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpStorageService.save_version]",
+      "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpStorageService.save_version]"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 76.2
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version",
+    "why": "把快照名换回已冻结的 `file_version` ⇒ 计数器不动了，`{stem}_v11_*.xlsx` 每次保存都在同一个前缀下堆积、时间戳成为唯一区分，且与真正在动的 `content_revision` 对不上号：拿到一份备份也说不出它是哪个业务版本",
+    "verdict": "RED",
+    "summary": "3 failed, 253 passed, 1 xfailed, 2 xpassed, 6 warnings in 72.26s (0:01:12)",
+    "added": [
+      "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_inventory_on_disk_matches_the_ast"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.6
+  },
+  {
+    "id": "M42",
+    "side": "be",
+    "want": "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version",
+    "why": "加回一次 `flush()` ⇒ 备份动作又把调用方尚未完成的写入推进数据库。它不改内容，所以「零 version 写」那条判据满足不了这一点，必须单独钉住「不动事务」",
+    "verdict": "RED",
+    "summary": "5 failed, 248 passed, 1 xfailed, 2 xpassed, 6 warnings, 3 errors in 71.80s (0:01:11)",
+    "added": [
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_direct_commit[WpStorageService.save_version]",
+      "test_task19_writer_migration.py::test_migrated_writer_owns_no_private_version_counter[WpStorageService.save_version]",
+      "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version",
+      "test_workpaper_writer_inventory.py::test_dropping_a_row_cannot_make_the_gate_greener",
+      "test_workpaper_writer_inventory.py::test_stale_inventory_is_rejected_rather_than_evaluated"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task19_writer_migration.py::test_the_storage_snapshot_no_longer_invents_a_version"
+    ],
+    "added_files": [
+      "test_task19_writer_migration.py",
+      "test_workpaper_writer_inventory.py"
+    ],
+    "restored": true,
+    "seconds": 75.4
+  }
+]

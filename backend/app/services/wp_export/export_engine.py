@@ -584,10 +584,18 @@ class WpExportEngine:
         `wp_download_service` / `wp_render_config_helpers` / `wp_xlsx_export_service`
         各写一份（4 套并存），且都漏了「`file_path` 为空串时 `Path('')` 判 True」
         这个 Python 语义坑。现在只留声明式委托，路径形态归一由共享件负责。
+
+        🔴 Task 12（Requirement 9.5 / Property 41）：显式声明
+        `expected_document_type="docx"`。改造前这里没有类型门，而
+        `find_template_file_any()` 的子码判据写死 `^A\\d+-\\d+` ⇒ B/S 子码会回退到
+        **父级 XLSX**，被 `Document(str(path))` 当 docx 打开 ⇒ 导出损坏。现在类型不符
+        返回 `type_mismatch` 且 `path is None`，`_export_docx` 走「新建空白文档」分支。
         """
         from app.services.wp_export.wp_file_resolver import resolve_wp_file
 
-        return resolve_wp_file(file_path, wp_code=wp_code).path
+        return resolve_wp_file(
+            file_path, wp_code=wp_code, expected_document_type="docx"
+        ).path
 
     def _fill_docx_content(self, doc: Document, wp: WorkingPaper) -> None:
         """将 parsed_data 中的文字内容填充到 docx 文档。"""

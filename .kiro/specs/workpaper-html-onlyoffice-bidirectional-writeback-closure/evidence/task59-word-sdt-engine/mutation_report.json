@@ -1,0 +1,958 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry",
+    "why": "把 substrate 准入门整条摘掉 ⇒ quarantined / candidate / 未 durable incoming 全部放行。替换成 `_ = dict(` 保持括号与后续参数行语法合法（整行删除会让参数行悬空 → IndentationError → collection error → 被误判成 WRONG-TEST）",
+    "verdict": "RED",
+    "summary": "3 failed, 105 passed in 8.80s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_upgrade_candidate_is_never_an_engine_substrate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_upgrade_candidate_is_never_an_engine_substrate"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestNoParagraphOrRegexFallback::test_read_gate_order_puts_admission_before_any_parsing",
+    "why": "🔴 判定顺序不可交换：把准入门挪到 OOXML 安全门**之后** ⇒ 非 DOCX 字节先撞 `ooxml_structure_invalid`，「quarantined 永不进 engine」落在永久不可达分支（本 spec 已实测同形态 3 次）。守卫刻意用一份**不是 zip** 的 artifact，所以顺序一换就打红。\n🔴 首轮用 `kind=move` 判 ANCHOR-MISS（两个锚点落在同一块内，因为 `block_open` 与 `anchor` 同一行），已把门顺序改成显式声明元组 `READ_GATE_ORDER`，于是「换顺序」成为一条可单行变异的真实改动",
+    "verdict": "RED",
+    "summary": "4 failed, 104 passed in 8.59s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestNoParagraphOrRegexFallback::test_read_gate_order_puts_admission_before_any_parsing",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_upgrade_candidate_is_never_an_engine_substrate"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestNoParagraphOrRegexFallback::test_read_gate_order_puts_admission_before_any_parsing",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_upgrade_candidate_is_never_an_engine_substrate"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle",
+    "why": "离线模式也能读 published representation ⇒ 「缺 approved bundle 时只能离线验证 candidate」这条边界失守，`word_approved_bundle_required` 变不可达",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.32s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_offline_binding_can_never_publish",
+    "why": "`assert_may_publish` 恒通过 ⇒ 离线态可以走发布路径。与 M03 是两个不同位置（调用点 vs 判据体），两处都要各自可被抓到",
+    "verdict": "RED",
+    "summary": "3 failed, 105 passed in 9.01s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_offline_binding_can_never_publish",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_offline_binding_can_never_publish",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_offline_mode_must_not_carry_a_bundle",
+    "why": "离线模式允许携带 bundle ⇒ 两个模式不再互斥，「离线」会变成「有时候也能发布」",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.66s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_offline_mode_must_not_carry_a_bundle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_offline_mode_must_not_carry_a_bundle"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestNoParagraphOrRegexFallback::test_tag_pattern_has_no_second_source_in_the_engine",
+    "why": "🔴 复制一份**字符完全相同**的正则 ⇒ tag 形态出现第二真源。\n首轮此条判 GREEN：守卫原先用 `WE.SDT_TAG_PATTERN is C._SDT_TAG_RE`，而 `re` 模块对 `(pattern, flags)` 有编译缓存 ⇒ `re.compile(<同串>)` 返回的就是**同一个对象**，`is` 照样成立。已改成 AST 结构判据（必须 import 那一份 + engine 内零 `*.compile(...)` 调用）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.22s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestNoParagraphOrRegexFallback::test_tag_pattern_has_no_second_source_in_the_engine"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestNoParagraphOrRegexFallback::test_tag_pattern_has_no_second_source_in_the_engine"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+    "why": "🔴 登记一个**从未被抛出**的 error_code ⇒ 「实测集合与登记清单双向锁死」必须打红。这正是本任务首轮实测到的假绿形态（曾声明过一个死类型 `WordOnlyRegionDriftError`），已按判据删掉",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.30s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_removing_the_tag_fails_closed",
+    "why": "🔴 Property 30 的核心：缺 tag 不再 fail closed ⇒ 只剩 placeholder 文本的原始模板会被当成「读到 0 个字段」静默通过，而 Requirement 7.8 要求 operation error + 保留 Word 文件版本",
+    "verdict": "RED",
+    "summary": "4 failed, 104 passed in 8.23s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_placeholder_text_alone_is_not_a_protocol",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_removing_the_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_incoming_bytes_survive_a_failed_extract"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_placeholder_text_alone_is_not_a_protocol",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_removing_the_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_incoming_bytes_survive_a_failed_extract"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.6
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_unregistered_tag_fails_closed",
+    "why": "未登记 tag 不再 fail closed ⇒ 正是 Requirement 6.20 / 7.1 禁止的「降级到位置/标题猜测」。\n🔴 替换体用 `_ = (` 而不是 `return ...`：后者会让紧跟的 f-string 参数行悬空 → IndentationError → collection error → 被误判成 WRONG-TEST（首轮实测 2 errors）。`_ = (` 保持括号配对与后续行语法合法",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.68s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_unregistered_tag_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_unregistered_tag_fails_closed"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.9
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_instance_count_drift_fails_closed",
+    "why": "`instances='one'` 却出现两个实例时不再拒 ⇒ Requirement 7.10 的「字段实例计数」检测失效，模板漂移/SDT 被复制静默通过",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.16s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_instance_count_drift_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_instance_count_drift_fails_closed"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.3
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_hierarchy_flattening_fails_closed",
+    "why": "block 容器被删后内层 field 的层级漂移不再打红 ⇒ 「区块内字段」的归属靠位置猜（Requirement 7.5 / Property 30）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.22s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_hierarchy_flattening_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_hierarchy_flattening_fails_closed"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_row_scoped_tag_outside_a_table_is_hierarchy_drift",
+    "why": "行域 tag 跑到表格外也放行 ⇒ 读到的值不再属于任何行，而行身份正是靠单元格内field SDT 承载的（Requirement 7.2）",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.36s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_row_scoped_tag_outside_a_table_is_hierarchy_drift"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_row_scoped_tag_outside_a_table_is_hierarchy_drift"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_materialize_writes_nothing_when_row_identity_is_absent",
+    "why": "要写的行 UUID 不存在时不再拒 ⇒ 会按位置落到某一行上（Requirement 7.2 明令禁止用表格行号识别）。守卫同时断言**一个字节都没落盘**",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.06s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_materialize_writes_nothing_when_row_identity_is_absent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_materialize_writes_nothing_when_row_identity_is_absent"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_divergent_values_produce_a_conflict_listing_every_xpath",
+    "why": "🔴 Property 32：同 stable tag 多实例异值时不再产生 duplicate conflict ⇒ engine 自行选了第一个实例的值，审计师看不到另一处的不同值",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.30s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_divergent_values_produce_a_conflict_listing_every_xpath"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_divergent_values_produce_a_conflict_listing_every_xpath"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal",
+    "why": "🔴 block 容器不再被识别为容器 ⇒ 整块覆盖 `w:sdtContent`，内层 inline SDT 连 tag 一起被抹掉。首轮实测正是这个形态（`written_tags` 里同时出现容器 tag 与内层 tag），因为容器分类与反向替换的 span 重叠",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.19s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.3
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_multiline_values_round_trip",
+    "why": "🔴 `w:br` 不再读成 `\\n` ⇒ 「A\\nB」写进去读回来是「AB」，多行值的反读等值门在真实数据上必红。首轮实测就是它（design §Word extract 明写要保留换行）",
+    "verdict": "RED",
+    "summary": "3 failed, 105 passed in 7.95s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_multiline_values_round_trip"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_multiline_values_round_trip"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.0
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_two_collector_disagreement_fails_closed",
+    "why": "两个采集口径（ElementTree 遍历 vs 字节 span 扫描）实例数不一致时不再 fail closed ⇒ 会 IndexError 或读到错位的值。\n🔴 首轮此条判 GREEN：真实数据上两个口径一直一致 ⇒ 分支不可达（假绿第④源）。所有能造出分歧的畸形 XML 都被更早的 `_fingerprint_or_fail` 拦掉，故改用**故障注入**（monkeypatch `_sdt_texts_by_tag` 截短一个实例）让它可达",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.24s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_two_collector_disagreement_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_two_collector_disagreement_fails_closed"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.4
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_row_identity_loss_is_detected_on_the_gt_scheme",
+    "why": "🔴 行身份保留判据恒真 ⇒ 回到「借用 `word_sdt_fingerprint.row_uuid_set`」的空集恒等价形态（那一格认旧 `gtsdt/v1` 方案，在 `gt:` 方案下两侧恒空）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.35s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_row_identity_loss_is_detected_on_the_gt_scheme"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_row_identity_loss_is_detected_on_the_gt_scheme"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.5
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication",
+    "why": "**非 text** 字段的类型化等值口径退化成「一律相等」⇒ AC 8.11 的反读等值门对金额/日期恒通过。\n🔴 首轮此条判 GREEN：守卫的 fixture 五个字段全是 text，这条 `return` 落在从未被执行的分支上。已给 F2-22 契约补了真实的 `${bsDate}` 占位作 `value_type=date` 字段，并让不等值用例对**日期**说谎",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.07s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.3
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_carrier_contract_digest_drift_is_stale",
+    "why": "Tier A 的文件 digest 比对被短路 ⇒ 载体裁决契约或 fingerprint 模块改了也照旧放行（Requirement 14.16 / Property 71）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.66s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_carrier_contract_digest_drift_is_stale"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_carrier_contract_digest_drift_is_stale"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale",
+    "why": "OO build / source_commit / runner 三项漂移不再 stale ⇒ 旧证据被无限保鲜",
+    "verdict": "RED",
+    "summary": "3 failed, 105 passed in 8.49s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale[onlyoffice_build]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale[runner]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale[source_commit]"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale[onlyoffice_build]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale[runner]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_environment_drift_is_stale[source_commit]"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 11.8
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_probe_template_digest_drift_is_stale",
+    "why": "probe 文档模板 digest 在契约与基线之间不一致时不再 stale ⇒ 换了模板还沿用旧裁决",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 9.77s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_probe_template_digest_drift_is_stale"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_probe_template_digest_drift_is_stale"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 13.4
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_token_occurrence_drift_fails_closed",
+    "why": "🔴 一次性 token 的命中数不再与声明值锁死 ⇒ 缺失/重复/漂移全部静默通过，「按段落序号挑一个」这条禁令失守（Requirement 7.1）",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.73s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_missing_token_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_token_occurrence_drift_fails_closed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_missing_token_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_token_occurrence_drift_fails_closed"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_stream_is_byte_identical",
+    "why": "🔴 `\"<w:t\"` 退回裸前缀匹配 ⇒ `w:sdtPr` 里的 `<w:tag w:val=…/>` 被当成文本节点开头，一路吞到下一个 `</w:t>`，把整段 XML 算成「可见文本」。首轮实测：注入 `${purpose}` 后可见文本从 546 涨到 632 字符",
+    "verdict": "RED",
+    "summary": "2 failed, 106 passed in 8.58s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_instrumentation_equivalence_coverage_is_not_empty",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_stream_is_byte_identical"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_stream_is_byte_identical"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_change_inside_an_sdt_is_still_rejected",
+    "why": "可见文本流不变量被撤 ⇒ 注入可以顺手改掉可见字符。它是三层判据里最强的一条，撤掉后只剩逐 aspect 比对 —— 而 SDT **内部**的文本改动在逐 aspect 口径下完全看不见（`outside_sdt_text` 不含它、`sdt_tag_set` 也不含它）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.71s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_change_inside_an_sdt_is_still_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_change_inside_an_sdt_is_still_rejected"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_swallowing_a_free_text_paragraph_is_rejected",
+    "why": "SDT 外正文的增删不再逐块用声明 token 解释 ⇒ 「注入顺手吞掉一整段自由正文」会照样绿。真实缺陷形态是 31 块掉到 26 块（整个 run 被包进 SDT）。\n🔴 首轮此条判 GREEN：没有任何用例构造**未被 token 解释**的 outside 差异。补的反例刻意让可见文本流不变，否则会被更前面那条不变量顺手挡掉、本判据仍不可达",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.77s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_swallowing_a_free_text_paragraph_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_swallowing_a_free_text_paragraph_is_rejected"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_document_part_changed_is_enforced_not_just_observed",
+    "why": "`word/document.xml` 之外的部件被改动时不再拒 ⇒ 批注/修订/图片/页眉页脚/styles/customXml 可以静默丢失（Requirement 7.3 / 9.9）。\n🔴 首轮此条判 GREEN：`instrument_docx_bytes` 结构上只写一个部件 ⇒ 这条防御判据在公开 API 上不可达。已抽成公开 `assert_only_document_part_changed`，守卫直接喂反例",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.56s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_document_part_changed_is_enforced_not_just_observed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_document_part_changed_is_enforced_not_just_observed"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_w_lock_is_injected",
+    "why": "允许注入 `w:lock` ⇒ OO 无法删除 SDT，等于替载体作弊，Task 6 的`no_w_lock_injected` 前提不再成立、载体保留结论失效。\n🔴 首轮此条判 GREEN：守卫只断言产物里没有 `w:lock`（观察），而 `_sdt_wrapper` 本来就不写锁 ⇒ 判据不可达。已抽成公开 `assert_no_sdt_lock` 并补反面用例",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.60s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_w_lock_is_injected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_w_lock_is_injected"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_readback_detects_a_lost_instance_not_just_a_lost_tag",
+    "why": "🔴 反读只比 tag **集合**不比实例计数 ⇒ 同 tag 少一个实例时集合完全相同、判绿（Requirement 7.10）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.56s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_readback_detects_a_lost_instance_not_just_a_lost_tag"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_readback_detects_a_lost_instance_not_just_a_lost_tag"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.1
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_is_not_finalizable_without_approved_children",
+    "why": "🔴 candidate 带上伪造的 target contract ⇒ 本任务「不得为任何 entry 伪造 contract/bundle」的否定式承诺失守，`ck_wpruc_ready_requires_bundle` 之后就能被 finalize。两处同形态锚点用 scope 相对定位到**写库那一处**",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.52s",
+    "added": [
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_is_not_finalizable_without_approved_children"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_is_not_finalizable_without_approved_children"
+    ],
+    "added_files": [
+      "test_task59_word_candidate_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.9
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+    "why": "Task 6 的 `lock_policy` 变化不再打红 ⇒ 本模块的注入判据建立在「无 w:lock」前提上，policy 改了必须重新取证。\n🔴 首轮此条判 GREEN：磁盘契约里这个值恒为 `no_w_lock_injected` ⇒ 判据在 `load()` 内部结构不可达。已抽成公开 `assert_probe_lock_policy` 并补三个错误取值的反面用例",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.60s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.0
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_missing_evidence_is_stale_not_skipped",
+    "why": "evidence 文件缺失时不再 stale ⇒ 「缺失即 stale，不得跳过」失守。本条同时验证守卫没有把它写成 skip（skip 等于删掉判据）",
+    "verdict": "RED",
+    "summary": "1 failed, 107 passed in 8.74s",
+    "added": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_missing_evidence_is_stale_not_skipped"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_missing_evidence_is_stale_not_skipped"
+    ],
+    "added_files": [
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 12.2
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+    "why": "手改基线里的 OO build ⇒ 与 Task 6 契约的 `environment.oo_build` 不再一致，gate 必须 fail closed。验证守卫是**真跑一次** loader 再比对，而不是读 JSON 字符串（假绿第②源在清册守卫上最危险）",
+    "verdict": "RED",
+    "summary": "3 failed, 36 passed, 69 errors in 7.71s",
+    "added": [
+      "test_task59_word_candidate_pg.py::TestAuthorityTemplateIsUntouched::test_row_carrier_spec_is_still_declared",
+      "test_task59_word_candidate_pg.py::TestAuthorityTemplateIsUntouched::test_templates_are_byte_identical_after_the_run",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_database_revision_is_unchanged",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_no_new_content_version_was_created",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_outcome_snapshot_agrees_with_the_database",
+      "test_task59_word_candidate_pg.py::TestBoundary2CurrentPointerUnchanged::test_candidate_is_not_the_pointer",
+      "test_task59_word_candidate_pg.py::TestBoundary2CurrentPointerUnchanged::test_pointer_is_unchanged",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_artifact_is_isolated_in_the_candidate_namespace",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_is_not_finalizable_without_approved_children",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_reports_zero_representation_delta",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_representation_rows_are_byte_identical",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_both_read_intents_were_actually_exercised",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_no_outbox_event_claims_a_content_change",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_resolver_never_returns_the_candidate_artifact",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_resolver_returns_the_same_identity",
+      "test_task59_word_candidate_pg.py::TestCandidateOnlySurfaceIsBlockedOnRealRepository::test_publication_surface_raises_with_its_own_error_code",
+      "test_task59_word_candidate_pg.py::TestHarness::test_candidate_was_actually_registered",
+      "test_task59_word_candidate_pg.py::TestHarness::test_definitions_were_actually_published",
+      "test_task59_word_candidate_pg.py::TestHarness::test_no_collection_errors",
+      "test_task59_word_sdt_engine.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_suite",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_deficiency_fixture_covers_tables_and_row_identity",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_instrumentation_equivalence_coverage_is_not_empty",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_plan_fixture_covers_every_word_only_aspect",
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_baseline_extract_reads_every_declared_field",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_foreign_contract_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_hierarchy_flattening_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_instance_count_drift_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_removing_the_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_row_scoped_tag_outside_a_table_is_hierarchy_drift",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_two_collector_disagreement_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_unregistered_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_protected_part_regression_is_detected",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_row_identity_loss_is_detected_on_the_gt_scheme",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_two_materialize_passes_keep_every_non_sdt_node",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_word_only_drift_is_detected",
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_divergent_values_produce_a_conflict_listing_every_xpath",
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_identical_values_merge_into_one_field",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_incoming_bytes_survive_a_failed_extract",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_materialize_writes_nothing_when_row_identity_is_absent",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_multiline_values_round_trip",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_rematerialize_uses_incoming_as_read_only_substrate",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_instrumentation_payload_has_no_contract_or_bundle_backreference",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_instrumentation_payload_rejects_a_blocked_carrier",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_offline_candidate_validation_reports_publish_blocked",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_missing_evidence_is_stale_not_skipped",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_probe_gate_identity_records_requirement_14_16_fields",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[alias_display_name]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[paragraph_index]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[run_index]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[sdt_id]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_row_sdt_carrier_is_blocked_and_field_carriers_allowed",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+      "test_task59_word_sdt_engine.py::TestRowInventoryIsHonest::test_a_new_row_without_identity_increases_the_count",
+      "test_task59_word_sdt_engine.py::TestRowInventoryIsHonest::test_header_row_is_reported_as_unidentified",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_double_instrumentation_is_refused",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_missing_token_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_sdt_id_is_written",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_w_lock_is_injected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_document_part_changed_is_enforced_not_just_observed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_the_document_part_changes",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_readback_detects_a_lost_instance_not_just_a_lost_tag",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_swallowing_a_free_text_paragraph_is_rejected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_token_occurrence_drift_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_change_inside_an_sdt_is_still_rejected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_stream_is_byte_identical"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files"
+    ],
+    "added_files": [
+      "test_task59_word_candidate_pg.py",
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 10.9
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+    "why": "手改 `word_sdt_fingerprint` 模块的基线 digest ⇒ Tier A 必须打红。该模块是全部载体事实的采集器，它变了裁决就得重取证",
+    "verdict": "RED",
+    "summary": "3 failed, 36 passed, 69 errors in 7.82s",
+    "added": [
+      "test_task59_word_candidate_pg.py::TestAuthorityTemplateIsUntouched::test_row_carrier_spec_is_still_declared",
+      "test_task59_word_candidate_pg.py::TestAuthorityTemplateIsUntouched::test_templates_are_byte_identical_after_the_run",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_database_revision_is_unchanged",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_no_new_content_version_was_created",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_outcome_snapshot_agrees_with_the_database",
+      "test_task59_word_candidate_pg.py::TestBoundary2CurrentPointerUnchanged::test_candidate_is_not_the_pointer",
+      "test_task59_word_candidate_pg.py::TestBoundary2CurrentPointerUnchanged::test_pointer_is_unchanged",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_artifact_is_isolated_in_the_candidate_namespace",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_is_not_finalizable_without_approved_children",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_reports_zero_representation_delta",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_representation_rows_are_byte_identical",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_both_read_intents_were_actually_exercised",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_no_outbox_event_claims_a_content_change",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_resolver_never_returns_the_candidate_artifact",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_resolver_returns_the_same_identity",
+      "test_task59_word_candidate_pg.py::TestCandidateOnlySurfaceIsBlockedOnRealRepository::test_publication_surface_raises_with_its_own_error_code",
+      "test_task59_word_candidate_pg.py::TestHarness::test_candidate_was_actually_registered",
+      "test_task59_word_candidate_pg.py::TestHarness::test_definitions_were_actually_published",
+      "test_task59_word_candidate_pg.py::TestHarness::test_no_collection_errors",
+      "test_task59_word_sdt_engine.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_suite",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_deficiency_fixture_covers_tables_and_row_identity",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_instrumentation_equivalence_coverage_is_not_empty",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_plan_fixture_covers_every_word_only_aspect",
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_baseline_extract_reads_every_declared_field",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_foreign_contract_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_hierarchy_flattening_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_instance_count_drift_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_removing_the_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_row_scoped_tag_outside_a_table_is_hierarchy_drift",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_two_collector_disagreement_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_unregistered_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_protected_part_regression_is_detected",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_row_identity_loss_is_detected_on_the_gt_scheme",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_two_materialize_passes_keep_every_non_sdt_node",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_word_only_drift_is_detected",
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_divergent_values_produce_a_conflict_listing_every_xpath",
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_identical_values_merge_into_one_field",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_incoming_bytes_survive_a_failed_extract",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_materialize_writes_nothing_when_row_identity_is_absent",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_multiline_values_round_trip",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_rematerialize_uses_incoming_as_read_only_substrate",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_instrumentation_payload_has_no_contract_or_bundle_backreference",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_instrumentation_payload_rejects_a_blocked_carrier",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_offline_candidate_validation_reports_publish_blocked",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_missing_evidence_is_stale_not_skipped",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_probe_gate_identity_records_requirement_14_16_fields",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[alias_display_name]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[paragraph_index]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[run_index]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[sdt_id]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_row_sdt_carrier_is_blocked_and_field_carriers_allowed",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+      "test_task59_word_sdt_engine.py::TestRowInventoryIsHonest::test_a_new_row_without_identity_increases_the_count",
+      "test_task59_word_sdt_engine.py::TestRowInventoryIsHonest::test_header_row_is_reported_as_unidentified",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_double_instrumentation_is_refused",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_missing_token_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_sdt_id_is_written",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_w_lock_is_injected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_document_part_changed_is_enforced_not_just_observed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_the_document_part_changes",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_readback_detects_a_lost_instance_not_just_a_lost_tag",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_swallowing_a_free_text_paragraph_is_rejected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_token_occurrence_drift_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_change_inside_an_sdt_is_still_rejected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_stream_is_byte_identical"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files"
+    ],
+    "added_files": [
+      "test_task59_word_candidate_pg.py",
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 10.9
+  },
+  {
+    "id": "M35",
+    "side": "be",
+    "want": "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+    "why": "手改 source_commit ⇒ 与契约不一致必须 stale。Requirement 14.16 明列「runner/source commit 变化后按 stale policy 失效」",
+    "verdict": "RED",
+    "summary": "3 failed, 36 passed, 69 errors in 7.67s",
+    "added": [
+      "test_task59_word_candidate_pg.py::TestAuthorityTemplateIsUntouched::test_row_carrier_spec_is_still_declared",
+      "test_task59_word_candidate_pg.py::TestAuthorityTemplateIsUntouched::test_templates_are_byte_identical_after_the_run",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_database_revision_is_unchanged",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_no_new_content_version_was_created",
+      "test_task59_word_candidate_pg.py::TestBoundary1ContentRevisionUnchanged::test_outcome_snapshot_agrees_with_the_database",
+      "test_task59_word_candidate_pg.py::TestBoundary2CurrentPointerUnchanged::test_candidate_is_not_the_pointer",
+      "test_task59_word_candidate_pg.py::TestBoundary2CurrentPointerUnchanged::test_pointer_is_unchanged",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_artifact_is_isolated_in_the_candidate_namespace",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_is_not_finalizable_without_approved_children",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_candidate_reports_zero_representation_delta",
+      "test_task59_word_candidate_pg.py::TestBoundary3NoPublishedRepresentation::test_representation_rows_are_byte_identical",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_both_read_intents_were_actually_exercised",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_no_outbox_event_claims_a_content_change",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_resolver_never_returns_the_candidate_artifact",
+      "test_task59_word_candidate_pg.py::TestBoundary4ResolverVisibilityUnchanged::test_resolver_returns_the_same_identity",
+      "test_task59_word_candidate_pg.py::TestCandidateOnlySurfaceIsBlockedOnRealRepository::test_publication_surface_raises_with_its_own_error_code",
+      "test_task59_word_candidate_pg.py::TestHarness::test_candidate_was_actually_registered",
+      "test_task59_word_candidate_pg.py::TestHarness::test_definitions_were_actually_published",
+      "test_task59_word_candidate_pg.py::TestHarness::test_no_collection_errors",
+      "test_task59_word_sdt_engine.py::TestAuthorityTemplatesAreReadOnly::test_templates_are_byte_identical_after_the_whole_suite",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_deficiency_fixture_covers_tables_and_row_identity",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_instrumentation_equivalence_coverage_is_not_empty",
+      "test_task59_word_sdt_engine.py::TestCoverageIsNotEmpty::test_plan_fixture_covers_every_word_only_aspect",
+      "test_task59_word_sdt_engine.py::TestFailureKindsDistinctAndReachable::test_every_engine_failure_kind_is_reachable",
+      "test_task59_word_sdt_engine.py::TestProperty28FrozenDefinitionDrift::test_published_representation_substrate_needs_an_approved_bundle",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_baseline_extract_reads_every_declared_field",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_foreign_contract_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_hierarchy_flattening_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_instance_count_drift_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_removing_the_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_row_scoped_tag_outside_a_table_is_hierarchy_drift",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_two_collector_disagreement_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty30TagOnly::test_unregistered_tag_fails_closed",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_protected_part_regression_is_detected",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_row_identity_loss_is_detected_on_the_gt_scheme",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_two_materialize_passes_keep_every_non_sdt_node",
+      "test_task59_word_sdt_engine.py::TestProperty31WordOnlyPreserved::test_word_only_drift_is_detected",
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_divergent_values_produce_a_conflict_listing_every_xpath",
+      "test_task59_word_sdt_engine.py::TestProperty32DuplicateWordInstances::test_identical_values_merge_into_one_field",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_incoming_bytes_survive_a_failed_extract",
+      "test_task59_word_sdt_engine.py::TestProperty34NoDegradation::test_materialize_writes_nothing_when_row_identity_is_absent",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_managed_projection_mismatch_blocks_publication",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_materialize_extract_roundtrip_is_type_equal",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_multiline_values_round_trip",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-quarantined-QuarantinedIncomingError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_quarantined_and_non_durable_incoming_are_rejected_at_the_entry[incoming-staged-IncomingNotDurableError]",
+      "test_task59_word_sdt_engine.py::TestProperty65ProjectionEquivalence::test_rematerialize_uses_incoming_as_read_only_substrate",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_instrumentation_payload_has_no_contract_or_bundle_backreference",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_instrumentation_payload_rejects_a_blocked_carrier",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_offline_candidate_validation_reports_publish_blocked",
+      "test_task59_word_sdt_engine.py::TestProperty67CandidateOnly::test_upgrader_wraps_a_bare_repository_unconditionally",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_missing_evidence_is_stale_not_skipped",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_probe_gate_identity_records_requirement_14_16_fields",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[alias_display_name]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[paragraph_index]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[run_index]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_pseudo_anchors_are_blocked[sdt_id]",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_row_sdt_carrier_is_blocked_and_field_carriers_allowed",
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files",
+      "test_task59_word_sdt_engine.py::TestRowInventoryIsHonest::test_a_new_row_without_identity_increases_the_count",
+      "test_task59_word_sdt_engine.py::TestRowInventoryIsHonest::test_header_row_is_reported_as_unidentified",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_double_instrumentation_is_refused",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_missing_token_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_sdt_id_is_written",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_no_w_lock_is_injected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_document_part_changed_is_enforced_not_just_observed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_only_the_document_part_changes",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_readback_detects_a_lost_instance_not_just_a_lost_tag",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_swallowing_a_free_text_paragraph_is_rejected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_token_occurrence_drift_fails_closed",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_change_inside_an_sdt_is_still_rejected",
+      "test_task59_word_sdt_engine.py::TestZipLevelInstrumentation::test_visible_text_stream_is_byte_identical"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task59_word_sdt_engine.py::TestProperty71ProbeGateFreshness::test_tier_a_and_tier_b_are_enforced_against_real_files"
+    ],
+    "added_files": [
+      "test_task59_word_candidate_pg.py",
+      "test_task59_word_sdt_engine.py"
+    ],
+    "restored": true,
+    "seconds": 10.9
+  }
+]

@@ -11,7 +11,8 @@
  */
 import { toRef, computed } from 'vue'
 import { defineAsyncComponent } from 'vue'
-import { useB60DualMode } from './composables/useB60DualMode'
+// Task 45: legacy useB60DualMode deleted — pilot host now delegates to sync bridge.
+import { usePilotBridgeAdapter } from '../sync/usePilotBridgeAdapter'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('../GtOnlyOfficeSheet.vue'))
@@ -37,32 +38,31 @@ const canOnline = computed(() => !!props.wpId)
 const {
   currentMode,
   isOoAvailable,
-  checking,
   switching,
   onModeChange,
-} = useB60DualMode({
+} = usePilotBridgeAdapter({
+  entryId: 'xlsx/b60/gt-b60-bundle',
   wpId: toRef(props, 'wpId'),
   sheetName: toRef(props, 'sheetName'),
-  structuredLabel: props.structuredLabel,
 })
 
 const modeOptions = computed(() => [
-  { label: props.structuredLabel, value: 'structured' as const },
+  { label: props.structuredLabel, value: 'html' as const },
   { label: '在线编辑', value: 'onlyoffice' as const, disabled: !canOnline.value || !isOoAvailable.value },
 ])
 
 // OnlyOffice 就绪状态提示
 const ooStatus = computed(() => {
   if (!canOnline.value) return { type: 'info' as const, text: '在线编辑需先生成该子底稿' }
-  if (checking.value || switching.value) return { type: 'info' as const, text: 'OnlyOffice 拉取中…' }
-  if (isOoAvailable.value) return { type: 'success' as const, text: 'OnlyOffice 拉取成功' }
+  if (switching.value) return { type: 'info' as const, text: '切换中…' }
+  if (isOoAvailable.value) return { type: 'success' as const, text: '在线编辑就绪' }
   return { type: 'warning' as const, text: 'OnlyOffice 不可用（在线编辑已禁用）' }
 })
 
 // 无结构化视图时直接强制在线编辑；无 wpId 时强制结构化
 const effectiveMode = computed(() => {
   if (!props.hasStructured) return 'onlyoffice'
-  if (!canOnline.value) return 'structured'
+  if (!canOnline.value) return 'html'
   return currentMode.value
 })
 </script>
@@ -82,7 +82,7 @@ const effectiveMode = computed(() => {
     </div>
 
     <!-- 结构化视图 -->
-    <div v-if="effectiveMode === 'structured'" class="pane-structured">
+    <div v-if="effectiveMode === 'html'" class="pane-structured">
       <slot />
     </div>
 

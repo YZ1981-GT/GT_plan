@@ -1,0 +1,88 @@
+{
+  "adapter_id": "h1.disposal_check",
+  "aggregate_result_without_real_onlyoffice": "failed (UNVERIFIABLE 黑盒场景)",
+  "capability_enabled": false,
+  "digests": {
+    "authority_model_definition": "bad2e813869f46fcfe1bdebd337bccf52170e8fb37d976b3393cb8c9222f2f04",
+    "contract_canonical": "15dea471349e9047c4fe762ed91ae7a18baa686c73aa3129e1cd9f85e846df4b",
+    "instrumentation_definition": "1bccb2d955ec9224564f8aa4d5b2a2cf96d436026463070c96be8e5737f80496",
+    "normalized_structure_hash": "20165b7da28a3712fc511d9b001c8f979a6153bc1a1cb2d1449ef3d83673bedd",
+    "template_definition": "ef2e9042958aa94766b6d6d12fb9deee4ea909a64ee0944fce486ae570a916a1"
+  },
+  "entry_id": "xlsx/gt-h1-fixed-assets",
+  "finalize_status": "blocked_by_UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER",
+  "pilot_class": "h1_grouped_dynamic",
+  "property_oracle_landing": {
+    "P22": [
+      "different_field_merge"
+    ],
+    "P23": [
+      "different_field_merge",
+      "same_field_conflict_resolve"
+    ],
+    "P27": [
+      "different_field_merge",
+      "same_field_conflict_resolve"
+    ],
+    "P49": [
+      "identity_retention"
+    ],
+    "P66": [
+      "identity_retention"
+    ],
+    "P69": [
+      "single_participant_close"
+    ]
+  },
+  "registered_upstream_debts": {
+    "UPSTREAM_DEBT_DISPOSAL_METHOD_ENUM_DOMAIN_SPLIT": "Task 42 欠账：`E 减少方式` 的枚举值域在权威模板与前端之间分叉 —— 模板 E13:E27 的数据验证是 `处置 / 其他减少`（会计科目变动口径），前端 H1TabDisposalCheck.vue 的下拉是 `出售 / 报废 / 损毁 / 捐赠 / 盘亏 / 其他`（业务处置方式口径），两者互不为子集。契约以源 xlsx 为准且不自造映射（Requirement 6.1 禁止无来源自造字段；自造 出售→处置 会让 OO 写回的值静默改变审计含义）。⇒ OO 侧按模板 DV 选值、HTML 侧按业务口径选值时，同一格会形成 enum 值域外的取值。修法二选一：把模板 DV 扩成业务口径的六项（须致同模板 owner 裁决），或在前端把业务口径收敛到模板两项并把细分方式挪到独立列。owner 建议归 H1 底稿 owner（模板/前端口径统一），engine 侧不做兼容层",
+    "UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY": "Task 42 欠账（Task 41 首次登记，本 entry 同样命中）：`evidence.derive_for_manifest_entry` 只在 `scenario_profile.mount_cardinality == \"dynamic\"` 时追加 DYNAMIC_SCENARIOS，而该字段量的是**前端宿主挂载基数**（v-for 挂几个 OO 编辑器），不是「受管表有没有动态行/动态列」。实测全 manifest 186 条里只有 1 条为 dynamic 且是 docx ⇒ `dynamic_row_add_delete_reorder_copy`（AC 6.9）与 `dynamic_column_stable_keys`（AC 6.4）对**任何 xlsx entry** 都进不了 required set，包括本 H1 pilot —— 而本 pilot 的契约恰恰声明了 row_identity + delete_policy，且源表有 7 列共用 3 个重复叶子 label。修法需要把 contract 的 row_identity / 列 identity 声明喂进 required-set 推导（会改动 B60/D2/G7 的 required digest），属设计级变更。owner 建议归 evidence 推导侧（Task 39 后续）；在此之前 Property 22/23/27 落在 merge 家族两条场景上，并在真实契约形态上跑 oracle",
+    "UPSTREAM_DEBT_FOUR_LEVEL_HEADER_NOT_EXPRESSIBLE": "Task 42 欠账：per-entry contract 的 `header_rows` 值域被 `contracts._parse_table` 硬限为 1..3，且 Task 13 的 test_task13_contract_registry.py 用 parametrize([0, 4, \"2\", True]) 把 4 显式锁死为被拒 ⇒ H1 工作簿里分组最深的 `明细表H1-2`（表头物理占 4 行 9/10/11/12，例如 E 列路径 固定资产原值>未审数>本期增加>金额）**表达不了**。把 anchor 下移到行 10 可以凑到 3，但会丢掉最外层分组（固定资产原值/累计折旧/减值准备），即把列结构压扁。本 pilot 因此选 schema 域内分组最深的 `减少检查表H1-8`（三级，header_rows=3 取到上界），而真实库里唯一有载荷的 H1-2（9,026 字节 H1-2-rows）暂不进契约。修法：把 header_rows 值域扩到 1..4 并同步 Task 13 的边界参数化与 design §Contract schema / Requirement 6.3 的措辞。owner 建议归 contract schema 侧（Task 13 后续）",
+    "UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER": "Task 42 欠账（与 Task 40/41 同一条）：缺「published representation artifact → FrozenEntryDefinitions」的公共观测器。`excel_entry_gate.ExcelEntryDefinitionLoader.load()` 的 identity_inventory / observed_structure / observed_business_sheets / observed_dynamic_columns 四个入参今天只能由 Task 17 的 candidate evidence 在 finalize 时刻提供；请求时刻没有等价来源。⇒ 请求路径上的 adapter 组装只能 fail closed。owner 建议归 engine 侧（Task 38 后续）"
+  },
+  "required_scenario_set": {
+    "digest": "319d10b4d610df67b105761f48abd78c1db6bd7f69d722f286b559addd8f67f7",
+    "distinct_from_other_pilots": true,
+    "dynamic_family_excluded": [
+      "dynamic_row_add_delete_reorder_copy",
+      "dynamic_column_stable_keys"
+    ],
+    "other_pilots_digests": {
+      "xlsx/b60/gt-b60-bundle": "984681c2c537d0ec064889de625323f79152f6a7c8a27794961de2f46a796ce6",
+      "xlsx/gt-d2-accounts-receivable": "76d494560e931d51ef91c328e97348cf5d5a274599be8338c428f26aba590fdc"
+    },
+    "scenario_ids": [
+      "authorization_first_recovery_claim",
+      "b_close_after_a_forcesave_terminal",
+      "b_close_before_a_forcesave_terminal",
+      "browser_crash_no_userdata_recovery_case",
+      "close_leader_revoked_no_successor_recovery_required",
+      "close_leader_revoked_successor_exactly_one",
+      "close_reconciler_reentrant_exactly_one_capture",
+      "cross_participant_idempotency_409",
+      "different_field_merge",
+      "download_only_zero_three_entities",
+      "frozen_base_status_6_2_dedupe",
+      "html_to_oo",
+      "identity_retention",
+      "oo_to_html",
+      "opaque_version_rollback_no_numeric_collision",
+      "quarantined_rejects_application_and_engine",
+      "refresh_required_reopen",
+      "rollback",
+      "same_application_higher_sequence_fold",
+      "same_field_conflict_resolve",
+      "single_participant_close",
+      "two_user_close_order_a_then_b",
+      "two_user_close_order_b_then_a",
+      "wrong_prior_confirmation_bundle_fence_contributor_rejected"
+    ],
+    "scenario_profile_digest": "ea224b8a4aac1d69f75cb5335a9c3323fbc2eeefa62c4ed3a89fc56950ff35f9",
+    "size": 24
+  },
+  "template_sha256": "344f83216b9024e3c3fde7c1ed545eb0026a6cf088a0b0dfd0916e47b64fdc87",
+  "wp_code_family": "H1",
+  "wp_code_patterns": [
+    "H1F"
+  ]
+}

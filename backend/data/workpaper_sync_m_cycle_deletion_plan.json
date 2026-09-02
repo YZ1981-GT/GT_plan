@@ -1,0 +1,1478 @@
+{
+ "schema_version": "m-cycle-deletion-plan:v1",
+ "task": "Task 55",
+ "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+ "description": "M 循环（权益循环）的 legacy dual-mode 删除清册。🔴 与前九轮的三处形态差异：① 删除对象只有**两类**（11 个一阶 orphan 直接删 + 9 个在用封装须先改线），**没有** inert 开关代码块（L 有 4 处）、**没有**宿主内联实现（H 有 4 处 / K 有 7 处）；② 共享基类的边**会收缩**（29 → 19），与 L 的「前后不变」相反；③ 多一类**不能靠删除解决**的欠账 —— 9 处 OO sheet 名映射指向不存在的 tab（BP-4），改线时必须**修**而不是搬。",
+ "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+ "adjudication_source_of_truth": "backend/data/workpaper_sync_m_cycle_manifest_slice.json#independent_entries",
+ "orphan_source_of_truth": "backend/data/workpaper_sync_m_cycle_manifest_slice.json#orphan_dual_mode_inventory",
+ "switch_source_of_truth": "backend/data/workpaper_sync_m_cycle_manifest_slice.json#mode_switch_resolution",
+ "protected_source_of_truth": "backend/data/workpaper_sync_m_cycle_manifest_slice.json#protected_formula_and_classification_summary",
+ "sibling_slices": [
+  "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_g_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_h_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_i_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_j_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_k_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_l_cycle_manifest_slice.json"
+ ],
+ "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+ "pilot_already_migrated": null,
+ "pilot_already_migrated_note": "🔴 M 循环**没有** pilot，故本键为 null。实证：四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的顶层 `review.entry_id` 得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 M。",
+ "why_this_plan_has_two_deletion_object_classes": {
+  "statement": "本清册的删除对象分两类：① orphan 11 个文件（直接删，零副作用）；② 在用封装 9 个文件（须先改线）。共享基类保留。",
+  "why": "M 循环的 dual-mode 承载是**成对孪生**（MD-1）：每条 entry 一个自带完整实现的 orphan + 一个薄封装共享基类的活模块。orphan 删了行为不变；活模块删了会让模式切换与 OO tab 定位同时失效。",
+  "why_no_inert_switch_class_unlike_l": "🔴 L 循环有 4 个 inert 开关代码块要删。M 循环 **0 个**：现算 10 个宿主里 9 个的 `el-segmented` 都有 mode 门控 `v-if` 且 `v-else` 下真挂 `GtOnlyOfficeSheet`（可兑现），剩下 1 个（M9）连 `el-segmented` 都没有。**不要**照抄 L 那个 `inert_switch_blocks_to_remove` 容器 —— 它在 M 上恒空。",
+  "why_no_host_inlined_class_unlike_k_and_h": "🔴 H 循环有 4 个宿主内联等价实现、K 循环有 7 个。M 循环 **0 个**：现算 10 个 `GtM*.vue` 里 `const dualMode = (() =>` 命中各 0，全部走 `import { useM{n}EntryDualMode } from './composables/…'` 的显式模块边。",
+  "why_step_5_applies_only_to_orphans": "🔴 legacy_deletion_paradigm 的 step 5（unify_mode_values / 统一键前缀）在 M 上**只对 orphan 生效**：10 个 orphan 各声明一份 `m{n}-dual-mode` 键与自己的 mode 枚举（M1~M4 仍是 `'structured'`），而 9 个活封装**零键**（共享基类把 mode 存内存 ref）。抄 L 的「活载体键要迁移」会去找一个不存在的东西。",
+  "why_there_is_a_third_class_that_is_not_deletion": "🔴 BP-4 的 9 处错映射**不能靠删除解决** —— 它们在活模块里，改线时必须逐对与 openpyxl 真读的 sheet 名比对后再迁。本清册用 `entries[].oo_sheet_map_must_be_fixed_not_deleted` 逐条冻结这件事。",
+  "verification_recipe": "① 对 11 个 orphan 断言 statement-position 生产边与测试边各为 0，**且声明的 `production_consumers` 等于现算值**（两侧都验 —— 只验现算 0 时「声明 1、实际 0」能过）；② 对 9 个活模块断言各恰 1 条生产边且指向声明的宿主；③ 断言共享基类边 29 条、M 域 10 条、改线后剩 19 条（**不是** 0、也**不是**不变）；④ 断言 inert 容器与宿主内联容器恒空（现算 inert 0 / 内联 0）；⑤ 断言 SHEET_MAP 缺陷数现算 == 11（活 9 / orphan 2）。"
+ },
+ "shared_base_preserved": {
+  "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+  "lines": 65,
+  "reason": "共享基类被非 M 模块使用，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+  "statement_position_consumers": 29,
+  "m_cycle_consumers": 10,
+  "non_m_consumers": 19,
+  "remaining_after_this_plan": 19,
+  "remaining_after_this_plan_recipe": "🔴 29 − 10 = 19 —— M 循环对共享基类贡献 10 条边（每条 entry 的 Entry 封装各 1 条），故本清册执行后该计数**收缩**。这与 L 循环（29 → 29，贡献 0 条）形成对照：判据不得照抄 L 那条「删完不变」。",
+  "verification_recipe": "两侧都验：① 现算窄口径 statement 边总数 == 29（生产 26 + 测试 3）且其中 M 路径条数 == 10；② 现算宽口径 token 文件数 == 33，差集恰为 4 个（基类自身 + generated baseline 的双引号 JSON snippet + 两处非 statement 提及）。",
+  "persists_mode_to_localstorage": false,
+  "calls_legacy_health_endpoint": true,
+  "why_health_endpoint_stays": "🔴 10 个 orphan 各自直调 `/api/workpapers/onlyoffice/health`，删掉它们会让**该端点的直调点从 10 降到 1**（只剩共享基类里那一处），**不是**降到 0 —— 基类不删。判据不得写成「删完剩 0」。"
+ },
+ "orphan_dual_mode_to_delete": {
+  "why_this_key_exists": "🔴 按 AC 1.7「不可达旧桩 SHALL 删除；不得以豁免或 `DEPRECATED` 注释长期保留」。这 11 个文件生产边与测试边各为 0，删除零副作用，**不需要**等 step 9。",
+  "in_scope_of_this_deletion_plan": true,
+  "ac_reference": "1.7",
+  "can_delete_before_step_9": true,
+  "can_delete_before_step_9_why": "生产边与测试边都为 0 ⇒ 删除不改变任何运行时行为，也不需要先改任何消费方。",
+  "modules": [
+   {
+    "id": "OD-1",
+    "wp_code": "M10",
+    "entry_id": "xlsx/gt-m10-other-equity-instruments",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m10-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。",
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "OD-2",
+    "wp_code": "M1",
+    "entry_id": "xlsx/gt-m1-dividends-payable",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m1-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。另注：mode 枚举仍是 `'structured' | 'onlyoffice'`（含 `structured`）⇒ 属 BP-6。",
+    "registered_as": [
+     "BP-5",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "OD-3",
+    "wp_code": "M2",
+    "entry_id": "xlsx/gt-m2-paid-in-capital",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m2-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。另注：mode 枚举仍是 `'structured' | 'onlyoffice'`（含 `structured`）⇒ 属 BP-6。",
+    "registered_as": [
+     "BP-5",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "OD-4",
+    "wp_code": "M3",
+    "entry_id": "xlsx/gt-m3-treasury-stock",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m3-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。另注：mode 枚举仍是 `'structured' | 'onlyoffice'`（含 `structured`）⇒ 属 BP-6。",
+    "registered_as": [
+     "BP-5",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "OD-5",
+    "wp_code": "M4",
+    "entry_id": "xlsx/gt-m4-capital-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts",
+    "lines": 188,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'structured' | 'onlyoffice'",
+    "storage_literal": "m4-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。另注：mode 枚举仍是 `'structured' | 'onlyoffice'`（含 `structured`）⇒ 属 BP-6。",
+    "registered_as": [
+     "BP-5",
+     "BP-6"
+    ]
+   },
+   {
+    "id": "OD-6",
+    "wp_code": "M5",
+    "entry_id": "xlsx/gt-m5-surplus-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m5-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。",
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "OD-7",
+    "wp_code": "M6",
+    "entry_id": "xlsx/gt-m6-retained-earnings",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m6-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。",
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "OD-8",
+    "wp_code": "M7",
+    "entry_id": "xlsx/gt-m7-special-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m7-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。",
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "OD-9",
+    "wp_code": "M8",
+    "entry_id": "xlsx/gt-m8-general-risk-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m8-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。",
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "OD-10",
+    "wp_code": "M9",
+    "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+    "lines": 186,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "'html' | 'onlyoffice'",
+    "storage_literal": "m9-dual-mode",
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [
+     "/api/workpapers/onlyoffice/health"
+    ],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 内容完整（含 `checkOOHealth` / `switchMode` / `modeOptions` / localStorage 持久化），改线时最容易误接。",
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "OD-11",
+    "wp_code": "M9",
+    "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+    "lines": 43,
+    "orphan_order": "first_order",
+    "production_consumers": 0,
+    "test_only_consumers": 0,
+    "barrel_only_reachable_via": null,
+    "mode_enum": "WorkpaperRenderMode",
+    "storage_literal": null,
+    "wp_id_scoped": true,
+    "legacy_endpoints_called": [],
+    "action": "delete",
+    "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。",
+    "blocking_risk": "none",
+    "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。",
+    "extra_hazard": "🔴 它是**唯一一个 orphan 的 Entry 封装** —— 与其余 9 个活封装同构（薄封装共享基类），M9 宿主却根本没 import 它。改线时最容易误接：形态一样、名字一样、但它的 `M9_SHEET_MAP` 有 2 对错映射（`其他综合收益实质性程序表M9A` 少一个空格、`OCI核对表M9-4` 与真名 `其他综合收益核对表M9-4` 不同）。",
+    "registered_as": [
+     "BP-5",
+     "BP-4"
+    ]
+   }
+  ],
+  "counters": {
+   "modules_to_delete": 11,
+   "total_lines": 1911,
+   "entry_wrapper_twins_among_them": 1,
+   "modules_calling_legacy_health_endpoint": 10,
+   "modules_calling_legacy_config_endpoint": 0,
+   "modules_with_structured_mode_value": 4,
+   "modules_with_storage_key": 10,
+   "modules_not_scoped_to_wp_id": 0,
+   "wp_codes_with_two_orphans": [
+    "M9"
+   ],
+   "counting_recipe": "守卫从 modules[] 现算：len == 11；Σ lines；health 端点计数按逐模块 legacy_endpoints_called 现算；config 端点计数为 0（现算证明）；structured 模式值计数按 mode_enum 含 `structured` 现算；`wp_codes_with_two_orphans` 由「同一 wp_code 出现两次」现算（应恰为 ['M9']）。**两侧都验**：声明的 `production_consumers` 也要等于现算边数。"
+  }
+ },
+ "live_dual_mode_to_rewire_then_delete": {
+  "why_this_key_exists": "9 个活封装各有 1 条真实生产边（宿主 import）⇒ 它们**不是** orphan，不能按 AC 1.7 直接删。",
+  "in_scope_of_this_deletion_plan": true,
+  "can_delete_before_step_9": false,
+  "can_delete_before_step_9_why": "🔴 与 L 循环相反。L5~L8 的 composable 承载的是 **inert** 开关（删了没有可观察后果），故那份清册写 `can_delete_before_step_9: true`。M 的 9 个活封装承载的是**真能兑现**的开关，并且是 `resolveOoSheetName` 的唯一实现方 —— 删了模式切换消失、OO 也定位不到 tab ⇒ 必须先改线。",
+  "modules": [
+   {
+    "id": "LM-1",
+    "wp_code": "M10",
+    "entry_id": "xlsx/gt-m10-other-equity-instruments",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+    "lines": 44,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L141"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 9,
+    "sheet_map_pairs_missing_from_workbook": 3,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5",
+     "BP-4"
+    ]
+   },
+   {
+    "id": "LM-2",
+    "wp_code": "M1",
+    "entry_id": "xlsx/gt-m1-dividends-payable",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts",
+    "lines": 45,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L149"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 10,
+    "sheet_map_pairs_missing_from_workbook": 0,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "LM-3",
+    "wp_code": "M2",
+    "entry_id": "xlsx/gt-m2-paid-in-capital",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+    "lines": 45,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L142"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 9,
+    "sheet_map_pairs_missing_from_workbook": 3,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5",
+     "BP-4"
+    ]
+   },
+   {
+    "id": "LM-4",
+    "wp_code": "M3",
+    "entry_id": "xlsx/gt-m3-treasury-stock",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+    "lines": 43,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L133"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 8,
+    "sheet_map_pairs_missing_from_workbook": 1,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5",
+     "BP-4"
+    ]
+   },
+   {
+    "id": "LM-5",
+    "wp_code": "M4",
+    "entry_id": "xlsx/gt-m4-capital-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+    "lines": 43,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L134"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 8,
+    "sheet_map_pairs_missing_from_workbook": 1,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5",
+     "BP-4"
+    ]
+   },
+   {
+    "id": "LM-6",
+    "wp_code": "M5",
+    "entry_id": "xlsx/gt-m5-surplus-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts",
+    "lines": 44,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L142"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 9,
+    "sheet_map_pairs_missing_from_workbook": 0,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "LM-7",
+    "wp_code": "M6",
+    "entry_id": "xlsx/gt-m6-retained-earnings",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts",
+    "lines": 43,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L139"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 6,
+    "sheet_map_pairs_missing_from_workbook": 0,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5"
+    ]
+   },
+   {
+    "id": "LM-8",
+    "wp_code": "M7",
+    "entry_id": "xlsx/gt-m7-special-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+    "lines": 44,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L142"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 9,
+    "sheet_map_pairs_missing_from_workbook": 1,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5",
+     "BP-4"
+    ]
+   },
+   {
+    "id": "LM-9",
+    "wp_code": "M8",
+    "entry_id": "xlsx/gt-m8-general-risk-reserve",
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts",
+    "lines": 45,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L139"
+    ],
+    "test_only_consumers": [],
+    "consumer_is_host": true,
+    "consumer_is_child_tab": false,
+    "delegates_to_shared_base": true,
+    "sheet_map_pairs": 8,
+    "sheet_map_pairs_missing_from_workbook": 0,
+    "storage_literal": null,
+    "legacy_endpoints_called": [],
+    "legacy_endpoint_reached_transitively_via_shared_base": true,
+    "switch_is_redeemable": true,
+    "action": "rewire_then_delete",
+    "action_why": "它是宿主唯一的 dual-mode 载体（也是 `resolveOoSheetName` 的唯一实现方）⇒ 删了模式切换与 OO tab 定位同时失效，必须先把宿主改线到 sync bridge。",
+    "can_delete_before_step_9": false,
+    "registered_as": [
+     "BP-5"
+    ]
+   }
+  ],
+  "counters": {
+   "modules_to_delete": 9,
+   "total_lines": 396,
+   "modules_consumed_by_host": 9,
+   "modules_consumed_by_child_tab": 0,
+   "modules_calling_legacy_health_endpoint_directly": 0,
+   "modules_reaching_legacy_health_endpoint_via_shared_base": 9,
+   "modules_with_storage_key": 0,
+   "modules_with_sheet_map_defects": 5,
+   "sheet_map_pairs_total": 76,
+   "sheet_map_pairs_missing_from_workbook": 9,
+   "counting_recipe": "守卫从 modules[] 现算：len == 9；Σ lines；逐模块断言其唯一生产边的路径落在 `components/workpaper/GtM{n}*.vue` 上（`consumer_is_host` 为真、`consumer_is_child_tab` 为假 —— 与 L 相反）；断言各模块**自身**不含 legacy health 端点字面量（现算 0）而共享基类含（现算 1）；断言 sheet_map 缺陷模块数 == 5。"
+  }
+ },
+ "oo_sheet_map_defects_to_fix_not_delete": {
+  "why_this_key_exists": "🔴 前九轮的清册只有「删」与「改线」两种动作。M 循环多一类：**修**。11 处 SHEET_MAP 错映射既不能删（活模块要用）也不能原样搬（会把缺陷带到 bridge 侧）。",
+  "in_scope_of_this_deletion_plan": false,
+  "in_scope_note": "本节**不是**删除动作，登记在此是因为它与「改线时搬什么」直接耦合。执行归属同为 Task 66 / 72。",
+  "ac_reference": "6.10",
+  "defects": [
+   {
+    "wp_code": "M2",
+    "entry_id": "xlsx/gt-m2-paid-in-capital",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts#L16",
+    "module_is_orphan": false,
+    "declared_pairs": 9,
+    "missing": [
+     {
+      "sheet_code": "procedure",
+      "declared": "实收资本实质性程序表M2A",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "M2-2",
+      "declared": "明细表M2-2",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "M2-5",
+      "declared": "检查表M2-5",
+      "nearest_real": [
+       "实收资本（股本）检查表M2-5"
+      ]
+     }
+    ],
+    "fix_recipe": "把每个 value 换成 openpyxl 真读的 sheet 名（**含前导/尾随空格**），或改成「按去空格去括号的规范化键查真 sheet 名」的解析函数 —— 后者更抗源模板改名，但必须在 sheet 名集合上做唯一性校验（M2 的两张同码明细表就是唯一性会失败的例子）。"
+   },
+   {
+    "wp_code": "M3",
+    "entry_id": "xlsx/gt-m3-treasury-stock",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts#L16",
+    "module_is_orphan": false,
+    "declared_pairs": 8,
+    "missing": [
+     {
+      "sheet_code": "procedure",
+      "declared": "库存股实质性程序表M3A",
+      "nearest_real": []
+     }
+    ],
+    "fix_recipe": "把每个 value 换成 openpyxl 真读的 sheet 名（**含前导/尾随空格**），或改成「按去空格去括号的规范化键查真 sheet 名」的解析函数 —— 后者更抗源模板改名，但必须在 sheet 名集合上做唯一性校验（M2 的两张同码明细表就是唯一性会失败的例子）。"
+   },
+   {
+    "wp_code": "M4",
+    "entry_id": "xlsx/gt-m4-capital-reserve",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts#L16",
+    "module_is_orphan": false,
+    "declared_pairs": 8,
+    "missing": [
+     {
+      "sheet_code": "procedure",
+      "declared": "资本公积实质性程序表M4A",
+      "nearest_real": []
+     }
+    ],
+    "fix_recipe": "把每个 value 换成 openpyxl 真读的 sheet 名（**含前导/尾随空格**），或改成「按去空格去括号的规范化键查真 sheet 名」的解析函数 —— 后者更抗源模板改名，但必须在 sheet 名集合上做唯一性校验（M2 的两张同码明细表就是唯一性会失败的例子）。"
+   },
+   {
+    "wp_code": "M7",
+    "entry_id": "xlsx/gt-m7-special-reserve",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts#L16",
+    "module_is_orphan": false,
+    "declared_pairs": 9,
+    "missing": [
+     {
+      "sheet_code": "procedure",
+      "declared": "专项储备实质性程序表M7A",
+      "nearest_real": []
+     }
+    ],
+    "fix_recipe": "把每个 value 换成 openpyxl 真读的 sheet 名（**含前导/尾随空格**），或改成「按去空格去括号的规范化键查真 sheet 名」的解析函数 —— 后者更抗源模板改名，但必须在 sheet 名集合上做唯一性校验（M2 的两张同码明细表就是唯一性会失败的例子）。"
+   },
+   {
+    "wp_code": "M9",
+    "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts#L16",
+    "module_is_orphan": true,
+    "declared_pairs": 8,
+    "missing": [
+     {
+      "sheet_code": "procedure",
+      "declared": "其他综合收益实质性程序表M9A",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "M9-4",
+      "declared": "OCI核对表M9-4",
+      "nearest_real": []
+     }
+    ],
+    "fix_recipe": "把每个 value 换成 openpyxl 真读的 sheet 名（**含前导/尾随空格**），或改成「按去空格去括号的规范化键查真 sheet 名」的解析函数 —— 后者更抗源模板改名，但必须在 sheet 名集合上做唯一性校验（M2 的两张同码明细表就是唯一性会失败的例子）。"
+   },
+   {
+    "wp_code": "M10",
+    "entry_id": "xlsx/gt-m10-other-equity-instruments",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts",
+    "declaration_site": "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts#L16",
+    "module_is_orphan": false,
+    "declared_pairs": 9,
+    "missing": [
+     {
+      "sheet_code": "procedure",
+      "declared": "其他权益工具实质性程序表M10A",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "disclosure-listed",
+      "declared": "附注披露信息（上市公司）",
+      "nearest_real": []
+     },
+     {
+      "sheet_code": "disclosure-soe",
+      "declared": "附注披露信息（国有企业）",
+      "nearest_real": []
+     }
+    ],
+    "fix_recipe": "把每个 value 换成 openpyxl 真读的 sheet 名（**含前导/尾随空格**），或改成「按去空格去括号的规范化键查真 sheet 名」的解析函数 —— 后者更抗源模板改名，但必须在 sheet 名集合上做唯一性校验（M2 的两张同码明细表就是唯一性会失败的例子）。"
+   }
+  ],
+  "counters": {
+   "entries_with_defects": 6,
+   "defect_pairs_total": 11,
+   "defect_pairs_in_live_modules": 9,
+   "defect_pairs_in_orphan_modules": 2,
+   "declared_pairs_total": 84,
+   "fallback_literals_hitting_a_real_sheet": 10,
+   "counting_recipe": "守卫从 defects[] 现算三个缺陷计数并与 counters 等值；再独立从源码 + openpyxl 现算一遍（84 对声明、11 对缺陷）；反向判据：10 条 fallback 字面量必须**全部命中**真 sheet（现算 10）——证明比对器不是恒判不存在。"
+  }
+ },
+ "entries": [
+  {
+   "entry_id": "xlsx/gt-m1-dividends-payable",
+   "wp_code_pattern": "M1D",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M1 实测**有** HTML 对端（checklist_responses + `M1-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M1 应付股利（利润）.xlsx`（11 张 sheet、338 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM1FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM1EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M1 的活封装 `useM1EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L149']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M1 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m1-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m1-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 0,
+   "oo_sheet_map_must_be_fixed_not_deleted": "M1 的 SHEET_MAP 10 对全部命中真 sheet，可原样迁移。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM1DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m1-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM1DividendsPayable.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m2-paid-in-capital",
+   "wp_code_pattern": "M2P",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M2 实测**有** HTML 对端（checklist_responses + `M2-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M2 实收资本（股本）.xlsx`（11 张 sheet、574 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM2FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM2EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M2 的活封装 `useM2EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L142']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M2 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m2-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m2-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 3,
+   "oo_sheet_map_must_be_fixed_not_deleted": "🔴 M2 的 `M2_SHEET_MAP` 有 3 对指向不存在的 sheet（BP-4）。改线时**不得**把这张表原样搬到 bridge 侧 —— 那会把缺陷带过去。必须逐对与 openpyxl 真读的 sheet 名比对后再迁。",
+   "sheet_granularity_collapse_to_fix": [
+    "M2-2"
+   ],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM2DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m2-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM2PaidInCapital.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-8：把折叠的 dispatch code 拆开（本版 vs 修订前 / 上市 vs 非上市）。",
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m3-treasury-stock",
+   "wp_code_pattern": "M3T",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M3 实测**有** HTML 对端（checklist_responses + `M3-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M3 库存股.xlsx`（10 张 sheet、255 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM3FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM3EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M3 的活封装 `useM3EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L133']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M3 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m3-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m3-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 1,
+   "oo_sheet_map_must_be_fixed_not_deleted": "🔴 M3 的 `M3_SHEET_MAP` 有 1 对指向不存在的 sheet（BP-4）。改线时**不得**把这张表原样搬到 bridge 侧 —— 那会把缺陷带过去。必须逐对与 openpyxl 真读的 sheet 名比对后再迁。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM3DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m3-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM3TreasuryStock.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m4-capital-reserve",
+   "wp_code_pattern": "M4C",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M4 实测**有** HTML 对端（checklist_responses + `M4-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M4 资本公积.xlsx`（9 张 sheet、193 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L85",
+    "audit-platform/frontend/src/components/workpaper/composables/useM4FormData.ts#L120",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM4EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M4 的活封装 `useM4EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L134']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M4 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m4-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m4-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 1,
+   "oo_sheet_map_must_be_fixed_not_deleted": "🔴 M4 的 `M4_SHEET_MAP` 有 1 对指向不存在的 sheet（BP-4）。改线时**不得**把这张表原样搬到 bridge 侧 —— 那会把缺陷带过去。必须逐对与 openpyxl 真读的 sheet 名比对后再迁。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM4DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m4-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM4CapitalReserve.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m5-surplus-reserve",
+   "wp_code_pattern": "M5S",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M5 实测**有** HTML 对端（checklist_responses + `M5-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M5 盈余公积.xlsx`（10 张 sheet、193 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM5FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM5EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M5 的活封装 `useM5EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L142']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M5 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m5-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m5-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 0,
+   "oo_sheet_map_must_be_fixed_not_deleted": "M5 的 SHEET_MAP 9 对全部命中真 sheet，可原样迁移。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM5DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m5-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM5SurplusReserve.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m6-retained-earnings",
+   "wp_code_pattern": "M6R",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M6 实测**有** HTML 对端（checklist_responses + `M6-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM6FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M6 未分配利润.xlsx`（10 张 sheet、175 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L47",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L93",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useM6FormData.ts#L124",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM6EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M6 的活封装 `useM6EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L139']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M6 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m6-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m6-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 0,
+   "oo_sheet_map_must_be_fixed_not_deleted": "M6 的 SHEET_MAP 6 对全部命中真 sheet，可原样迁移。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM6DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m6-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM6RetainedEarnings.vue#L34`。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m7-special-reserve",
+   "wp_code_pattern": "M7S",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M7 实测**有** HTML 对端（checklist_responses + `M7-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM7FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M7 专项储备.xlsx`（10 张 sheet、233 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L45",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L91",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L87",
+    "audit-platform/frontend/src/components/workpaper/composables/useM7FormData.ts#L124",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM7EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M7 的活封装 `useM7EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L142']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M7 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m7-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m7-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 1,
+   "oo_sheet_map_must_be_fixed_not_deleted": "🔴 M7 的 `M7_SHEET_MAP` 有 1 对指向不存在的 sheet（BP-4）。改线时**不得**把这张表原样搬到 bridge 侧 —— 那会把缺陷带过去。必须逐对与 openpyxl 真读的 sheet 名比对后再迁。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM7DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m7-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM7SpecialReserve.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m8-general-risk-reserve",
+   "wp_code_pattern": "M8G",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M8 实测**有** HTML 对端（checklist_responses + `M8-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM8FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M8 一般风险准备.xlsx`（11 张 sheet、227 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L48",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L94",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L90",
+    "audit-platform/frontend/src/components/workpaper/composables/useM8FormData.ts#L127",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM8EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M8 的活封装 `useM8EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L139']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M8 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m8-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m8-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 0,
+   "oo_sheet_map_must_be_fixed_not_deleted": "M8 的 SHEET_MAP 8 对全部命中真 sheet，可原样迁移。",
+   "sheet_granularity_collapse_to_fix": [
+    "procedure"
+   ],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM8DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m8-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM8GeneralRiskReserve.vue#L19`。",
+   "extra_defect_actions": [
+    "BP-8：把折叠的 dispatch code 拆开（本版 vs 修订前 / 上市 vs 非上市）。",
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m9-other-comprehensive-income",
+   "wp_code_pattern": "M9O",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM9OtherComprehensiveIncome.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M9 实测**有** HTML 对端（checklist_responses + `M9-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM9FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M9 其他综合收益.xlsx`（9 张 sheet、470 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L46",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L92",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9FormData.ts#L125",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "none",
+   "switch_is_redeemable": false,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [],
+   "live_composables_note": "🔴 M9 **没有**活封装 —— `useM9EntryDualMode.ts` 的生产边与测试边各 0，两个孪生都是死桩，都按 AC 1.7 直接删。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M9 的裁决是 `no_switch_at_all`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m9-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m9-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 2,
+   "oo_sheet_map_must_be_fixed_not_deleted": "🔴 M9 的 `M9_SHEET_MAP` 有 2 对指向不存在的 sheet（BP-4）。改线时**不得**把这张表原样搬到 bridge 侧 —— 那会把缺陷带过去。必须逐对与 openpyxl 真读的 sheet 名比对后再迁。",
+   "sheet_granularity_collapse_to_fix": [],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM9DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useM9EntryDualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m9-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。🔴 M9 **没有**模式工具条（`el-segmented` 现算 0）⇒ 没有现成锚点，需在宿主根节点下新建常显说明位（不得只用 `el-tooltip`：EP teleport + 仅 hover 才进 DOM）。",
+   "extra_defect_actions": [
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  },
+  {
+   "entry_id": "xlsx/gt-m10-other-equity-instruments",
+   "wp_code_pattern": "M10O",
+   "host_component": "audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue",
+   "capability_adjudication": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "html_counterpart_verdict": "exists",
+   "adjudication_reason": "M10 实测**有** HTML 对端（checklist_responses + `M10-{sheet}-{field}` item_id 命名空间 + per-cycle 持久化 composable `useM10FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `M10 其他权益工具.xlsx`（11 张 sheet、279 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L42",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L88",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L84",
+    "audit-platform/frontend/src/components/workpaper/composables/useM10FormData.ts#L119",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "dual_mode_carrier_kind": "per_entry_wrapper_over_shared_base",
+   "switch_is_redeemable": true,
+   "orphan_files_to_delete_now": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts"
+   ],
+   "live_composables_to_rewire_then_delete": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10EntryDualMode.ts"
+   ],
+   "live_composables_note": "🔴 M10 的活封装 `useM10EntryDualMode.ts` 有 1 条生产边（['audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L141']）⇒ **不是** orphan，必须先改线。",
+   "host_inlined_block_to_remove": null,
+   "host_inlined_block_note": "🔴 M 循环**没有**宿主内联 IIFE（现算 10 个宿主里 `const dualMode = (() =>` 命中各 0）—— 与 H（4 处）/ K（7 处）不同，本键恒为 null。",
+   "inert_switch_block_to_remove": null,
+   "inert_switch_block_note": "🔴 M 循环**没有** inert 开关（现算 inert 数 0）—— 与 L（4 处）不同，本键恒为 null。M10 的裁决是 `switch_redeemable`。",
+   "legacy_endpoints_to_remove": [
+    "/api/workpapers/onlyoffice/health（经共享基类，删 orphan 后仍在基类里 —— 基类不删）"
+   ],
+   "localStorage_prefix": null,
+   "localStorage_prefix_note": "🔴 活路径**无键** —— 共享基类把 mode 存内存 `ref`。只有 orphan 孪生自带 `m10-dual-mode`（wpId 分区）。legacy_deletion_paradigm 的 step 5（统一键前缀）在 M 上只对 orphan 生效。",
+   "orphan_twin_localStorage_literal": "m10-dual-mode",
+   "oo_sheet_map_pairs_missing_from_workbook": 3,
+   "oo_sheet_map_must_be_fixed_not_deleted": "🔴 M10 的 `M10_SHEET_MAP` 有 3 对指向不存在的 sheet（BP-4）。改线时**不得**把这张表原样搬到 bridge 侧 —— 那会把缺陷带过去。必须逐对与 openpyxl 真读的 sheet 名比对后再迁。",
+   "sheet_granularity_collapse_to_fix": [
+    "procedure"
+   ],
+   "action": "wire_to_bridge_after_unblocking",
+   "action_detail": "本任务**不执行**改线（step 9 属 Task 66 plan / Task 72 execute）。本条只冻结「改线时要删什么、要保留什么、不得接到什么、不得原样搬什么」。",
+   "must_fix_before_wiring": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-5",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11",
+    "BP-12"
+   ],
+   "must_not_wire_to": [
+    "audit-platform/frontend/src/components/workpaper/composables/useM10DualMode.ts"
+   ],
+   "must_not_wire_to_why": "这些文件是 orphan（无人 import）**但内容完整**，改线时最容易误接：`currentMode` / `modeOptions` / `switchMode` 全在、`m10-dual-mode` 键也在，接上去看起来能跑，但它绕过 sync bridge、直调 legacy health 端点，等于把刚删掉的 legacy 又请回来（`no_dual_path` 约束）。",
+   "extra_ui_action_required": "BP-7：挂 AC 1.4 的单一真源提示组件 `GtEntrySyncCapabilityNotice`。锚点是宿主的模式工具条 `audit-platform/frontend/src/components/workpaper/GtM10OtherEquityInstruments.vue#L30`。",
+   "extra_defect_actions": [
+    "BP-12：修 `name.includes('国有企业')` → 与真 sheet 名「国企」对齐，否则 `M10TabDisclosureSoe` 永不渲染。",
+    "BP-8：把折叠的 dispatch code 拆开（本版 vs 修订前 / 上市 vs 非上市）。",
+    "BP-10：把 `itemId: …row-${n}…` 的位置化持久化键换成稳定行身份（内存里已有熵键，直接用它即可）。",
+    "BP-11：公式重算列与分类/汇总派生值不得声明为 contract 的 `editable`；发布 contract 时必须落 `mode=formula` / `auto_source` + `formula_mask`。"
+   ]
+  }
+ ],
+ "excluded_from_plan": [
+  {
+   "what": "M0（权益循环函证或汇总册）",
+   "reason": "🔴 **不存在** —— 与 L 的 L0 形成对照；`backend/wp_templates/M/` 下无 M0 册、manifest 里无 m0 entry。",
+   "verified_how": "对 manifest 全量 entry 现算 `'m0' in entry_id.lower()` == 0；`_index.json` 里 `M/M0` 条目现算 0。"
+  },
+  {
+   "what": "共享基类 `audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts`",
+   "reason": "被 19 条非 M 边使用，shared_base_preserved 约束不删。",
+   "verified_how": "现算窄口径 statement 边 == 29，其中 M 路径 10 条、非 M 路径 19 条。"
+  },
+  {
+   "what": "3 张「修订前」Q 表（一般风险准备实质性程序表 Q8A  (修订前) / 其他权益工具实质性程序表 Q10A (修订前) / 未分配利润实质性程序表 Q6A  (修订前)）",
+   "reason": "它们是权威模板里的 sheet，**不是**要删的前端文件。🔴 但 M8 / M10 把它们折叠到本版程序表的 dispatch code 上（BP-8），那两处宿主判定顺序需要修 —— 登记在 `entries[].extra_defect_actions` 里，不在本清册的删除范围。",
+   "verified_how": "复刻宿主 dispatch 顺序对这 3 张真 sheet 名跑一遍：M6 → `skip-q6a`（专用分支）、M8 → `procedure`、M10 → `procedure`（后两者折叠）。"
+  },
+  {
+   "what": "M8 的 `针对性测试M8-5-删除` sheet",
+   "reason": "🔴 名字里带「删除」是**源模板作者的标注**，不是本 spec 的删除对象。它落 OO 兜底（无 HTML 组件），这是正确处置 —— 不得据此裁 single 或真删 sheet。",
+   "verified_how": "openpyxl 现读该 sheet 名含「删除」；复刻 dispatch 后它不命中任何分支 ⇒ 落 OO。"
+  },
+  {
+   "what": "M3 的 `参考－会计规定` sheet",
+   "reason": "纯参考页，落 OO 兜底是正确处置。",
+   "verified_how": "openpyxl 现读该 sheet 名以「参考」开头；复刻 dispatch 后落 OO。"
+  }
+ ],
+ "counters": {
+  "entries": 10,
+  "orphan_dual_mode_to_delete": 11,
+  "orphan_dual_mode_lines_total": 1911,
+  "live_dual_mode_to_delete": 9,
+  "live_dual_mode_lines_total": 396,
+  "dual_mode_module_files_total": 20,
+  "orphan_barrel_reexports_to_drop": 0,
+  "hosts_with_inlined_second_implementation": 0,
+  "host_inlined_blocks_to_remove": 0,
+  "inert_switch_blocks_to_remove": 0,
+  "entries_with_redeemable_switch": 9,
+  "entries_with_inert_switch": 0,
+  "entries_with_no_switch_at_all": 1,
+  "entries_with_two_orphan_twins": 1,
+  "localStorage_prefix_declaration_sites": 10,
+  "entries_with_extra_ui_action_required": 10,
+  "entries_with_must_fix_before_wiring": 10,
+  "entries_with_must_not_wire_to": 10,
+  "entries_without_any_ui_gate_anchor": 1,
+  "entries_with_sheet_map_defects": 6,
+  "oo_sheet_map_defect_pairs_total": 11,
+  "shared_base_consumers_before": 29,
+  "shared_base_consumers_after": 19,
+  "legacy_health_endpoint_call_sites_before": 11,
+  "legacy_health_endpoint_call_sites_after": 1,
+  "test_files_requiring_sync_change": 0,
+  "counting_recipe": "守卫从各节现算全部计数并与本键等值比对（抄错或凑数即红）：entries = len(entries) == 10；orphan_dual_mode_to_delete = len(orphan_dual_mode_to_delete.modules) == 11；live_dual_mode_to_delete = len(live_dual_mode_to_rewire_then_delete.modules) == 9；dual_mode_module_files_total = 两者之和 == 20；inert / 内联两项恒 0（现算证明，不是「没写就当 0」）；legacy_health 站点 before = orphan 里调该端点的数 + 共享基类 1 == 11，after == 1（**不是** 0）；shared_base after = 29 − 10 == 19。"
+ },
+ "properties_verified": [
+  {
+   "property": 24,
+   "validates_requirement": "6.6",
+   "claim": "partial"
+  },
+  {
+   "property": 28,
+   "validates_requirement": "6.10",
+   "claim": "partial"
+  },
+  {
+   "property": 69,
+   "validates_requirement": "12.10",
+   "claim": "negative_direction_full"
+  },
+  {
+   "property": 70,
+   "validates_requirement": "12.12",
+   "claim": "full"
+  }
+ ],
+ "requirements_covered": [
+  "1.3",
+  "1.4",
+  "1.5",
+  "1.7",
+  "6.6",
+  "6.10",
+  "12.1",
+  "12.4",
+  "12.8",
+  "12.9",
+  "12.10",
+  "12.11",
+  "12.12",
+  "14.1"
+ ]
+}

@@ -25,6 +25,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from tests._unified_content_commit_stub import stub_unified_content_commit
+
 from app.services.version_trail_service import (
     DiffResult,
     SnapshotMeta,
@@ -312,9 +314,17 @@ class TestProperty4RollbackRestoresState:
         db.add = lambda obj: added_objects.append(obj)
         db.flush = AsyncMock()
 
+        # 🔴 Task 19：`rollback_to_snapshot` 现在经 `ContentMutationService` 的统一入口
+        #    提交（Requirement 2.2）。那条 lane 是真协议（内容寻址 artifact + entry
+        #    representation 事实查询 + `content_revision` CAS + 单事务自证），`AsyncMock`
+        #    session 满足不了它：mock 的 `scalar_one()` 恒真 ⇒ 「该 entry 已有
+        #    representation」判据恒成立，抛 `HtmlOnlyEntryHasRepresentationError`。
+        #    本用例的被测对象是**恢复语义**（INSERT 参数与快照逐字段一致），lane 本身由
+        #    workpaper_sync/test_task15/18/19 在真库与真实执行下验证 —— 所以这里把提交
+        #    边界换成记录式替身，而不是把断言改松。
         with patch(
             "app.services.version_trail_service.WorkpaperSnapshot"
-        ) as MockSnapshot:
+        ) as MockSnapshot, stub_unified_content_commit():
             mock_instance = MagicMock()
             mock_instance.id = uuid.uuid4()
             mock_instance.snapshot_type = "rollback"
@@ -403,9 +413,11 @@ class TestProperty5RollbackCreatesSnapshot:
         db.add = lambda obj: added_objects.append(obj)
         db.flush = AsyncMock()
 
+        # Task 19：同上 —— 统一提交边界换成替身，被测对象仍是「回滚恰创建一条
+        # snapshot_type='rollback' 记录」。
         with patch(
             "app.services.version_trail_service.WorkpaperSnapshot"
-        ) as MockSnapshot:
+        ) as MockSnapshot, stub_unified_content_commit():
             mock_instance = MagicMock()
             mock_instance.id = uuid.uuid4()
             mock_instance.snapshot_type = "rollback"

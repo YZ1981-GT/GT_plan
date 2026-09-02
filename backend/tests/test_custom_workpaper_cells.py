@@ -140,10 +140,33 @@ class TestEndpointWriteOrder:
             f"实测 write_cells_to_xlsx@{i_xlsx} > refresh_custom_projection@{i_proj}"
         )
 
-    def test_file_version_incremented(self):
-        """与既有 univer-save 的版本语义一致（R3.3）。"""
+    def test_the_business_version_advances_through_the_unified_boundary(self):
+        """写入后必须推进**唯一** business content revision（R3.3 的迁移后形态）。
+
+        🔴 原判据是 `re.search(r"file_version\\s*=", body)`（「写入后未递增
+        file_version」）。spec
+        `workpaper-html-onlyoffice-bidirectional-writeback-closure` Task 19 把这个端点
+        迁进了统一 revision 域：`working_paper.file_version` 不再由一个 JSON projection
+        端点推进（Requirement 2.1 禁止它充当跨通道同步版本），版本改由
+        `ContentMutationService.commit(...)` 的 CAS 唯一推进。
+
+        期望值随生产一起搬是合法的，**因为所有者同时搬走了**：
+        `backend/tests/workpaper_sync/test_task19_writer_migration.py` 逐条断言
+        「零私有计数器 + 零裸 commit + 真接线 + 权威载荷是 xlsx 本体」。单独把这条
+        改成恒真会被那四条打红。
+        """
         body = _strip_comments(_func_body(_read(_CELLS_ROUTER), "update_custom_cells"))
-        assert re.search(r"file_version\s*=", body), "写入后未递增 file_version"
+        assert not re.search(r"\bfile_version\s*=\s*", body), (
+            "端点又自己推进 file_version 了 —— business content revision 只由 "
+            "ContentMutationService 推进（Requirement 2.1 / Property 61）"
+        )
+        assert "build_content_mutation_service_writer(" in body, (
+            "端点没有装配统一提交入口"
+        )
+        assert "commit_bytes(" in body, "端点没有经统一入口提交权威内容"
+        assert "receipt.revision" in body, (
+            "响应必须回传 CAS 实际推进到的 revision（不是请求开始时算的期望值）"
+        )
 
     def test_xlsx_write_failure_not_swallowed(self):
         """写盘失败必须让请求失败 —— xlsx 是权威，写不进去不能报成功。"""

@@ -112,6 +112,16 @@ def read_sheet_values(
 
 
 def list_sheet_names(path: str | Path) -> list[str]:
+    """枚举业务 sheet 名（顺序即 workbook tab 顺序）。
+
+    平台注入的隐藏 metadata sheet（`_GT_SYNC`）在此**显式排除**：本函数是底稿模板
+    diff、程序表抽取、审定表抽取、细则引擎、通用处理器与裁决导出六处业务枚举的共同
+    入口，Requirement 6.17 要求 instrumentation 的隐藏元数据 sheet 不得出现在业务
+    导入/报表/枚举结果里。排除名单的单一真源见
+    :mod:`app.services.excel_metadata_sheet_policy`。
+    """
+    from app.services.excel_metadata_sheet_policy import exclude_metadata_sheets
+
     fp = Path(path)
     if not fp.exists():
         return []
@@ -119,13 +129,13 @@ def list_sheet_names(path: str | Path) -> list[str]:
         try:
             from python_calamine import CalamineWorkbook
 
-            return list(CalamineWorkbook.from_path(str(fp)).sheet_names)
+            return exclude_metadata_sheets(CalamineWorkbook.from_path(str(fp)).sheet_names)
         except Exception as exc:
             logger.warning("list_sheet_names calamine 失败，降级 openpyxl: %s", exc)
     import openpyxl
 
     wb = openpyxl.load_workbook(str(fp), read_only=True, data_only=True)
     try:
-        return list(wb.sheetnames)
+        return exclude_metadata_sheets(wb.sheetnames)
     finally:
         wb.close()

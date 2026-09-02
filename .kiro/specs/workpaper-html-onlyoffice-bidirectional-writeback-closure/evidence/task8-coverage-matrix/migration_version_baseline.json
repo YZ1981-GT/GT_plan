@@ -1,0 +1,186 @@
+{
+  "captured_at": "2026-08-24T16:44:37.915208+00:00",
+  "database": {
+    "applied_migrations_summary": [
+      {
+        "applied_rows": 150,
+        "last_applied_at": "2026-08-23T04:01:14.015452",
+        "max_applied_version": "150"
+      }
+    ],
+    "applied_migrations_tail": [
+      {
+        "applied_at": "2026-08-23T04:01:14.015452",
+        "filename": "V150__ai_chat_message_seq_default_backfill.sql",
+        "version": "150"
+      },
+      {
+        "applied_at": "2026-08-23T04:01:14.001215",
+        "filename": "V149__ai_chat_mcp_scoped_tokens.sql",
+        "version": "149"
+      },
+      {
+        "applied_at": "2026-08-22T03:11:29.273075",
+        "filename": "V148__add_address_coordinate_source_type.sql",
+        "version": "148"
+      },
+      {
+        "applied_at": "2026-08-21T18:19:05.183850",
+        "filename": "V147__ai_chat_persistence_runs_and_session_key.sql",
+        "version": "147"
+      },
+      {
+        "applied_at": "2026-08-09T13:16:12.905984",
+        "filename": "V146__procedure_instance_suggestion_state.sql",
+        "version": "146"
+      },
+      {
+        "applied_at": "2026-08-06T04:21:47.565946",
+        "filename": "V145__report_config_dual_family_rou_lease.sql",
+        "version": "145"
+      },
+      {
+        "applied_at": "2026-08-05T11:10:31.940590",
+        "filename": "V144__fix_report_config_bs014_bs052_bs066.sql",
+        "version": "144"
+      },
+      {
+        "applied_at": "2026-08-05T00:30:40.485172",
+        "filename": "V143__deliverable_version_drift_report.sql",
+        "version": "143"
+      },
+      {
+        "applied_at": "2026-08-04T15:08:00.985948",
+        "filename": "V142__deliverable_version_editor_identity.sql",
+        "version": "142"
+      },
+      {
+        "applied_at": "2026-08-04T14:01:35.336735",
+        "filename": "V141__deliverable_section_rendered_block_hash.sql",
+        "version": "141"
+      },
+      {
+        "applied_at": "2026-08-04T08:29:04.028673",
+        "filename": "V140__sampled_vouchers_manual_scope_unique.sql",
+        "version": "140"
+      },
+      {
+        "applied_at": "2026-08-04T08:27:14.813761",
+        "filename": "V139__sampling_registry_batch_binding.sql",
+        "version": "139"
+      },
+      {
+        "applied_at": "2026-08-04T05:45:17.786035",
+        "filename": "V138__fix_report_config_equity_and_asset_codes.sql",
+        "version": "138"
+      },
+      {
+        "applied_at": "2026-08-03T06:55:33.917257",
+        "filename": "V137__fix_report_config_g_cycle_account_codes.sql",
+        "version": "137"
+      },
+      {
+        "applied_at": "2026-08-03T03:09:07.629080",
+        "filename": "V136__fix_report_config_bs082_bs117_special_reserve.sql",
+        "version": "136"
+      }
+    ],
+    "file_path_extension_distribution": [
+      {
+        "rows": 1246,
+        "tail": ".xlsx"
+      },
+      {
+        "rows": 2,
+        "tail": ".docx"
+      }
+    ],
+    "file_version_distribution": [
+      {
+        "file_version": 1,
+        "rows": 2790
+      },
+      {
+        "file_version": 2,
+        "rows": 14
+      },
+      {
+        "file_version": 3,
+        "rows": 4
+      },
+      {
+        "file_version": 6,
+        "rows": 1
+      },
+      {
+        "file_version": 7,
+        "rows": 1
+      },
+      {
+        "file_version": 8,
+        "rows": 1
+      },
+      {
+        "file_version": 10,
+        "rows": 1
+      }
+    ],
+    "file_version_summary": [
+      {
+        "max_version": 10,
+        "min_version": 1,
+        "null_version": 0,
+        "total": 2812,
+        "with_file_path": 1248
+      }
+    ],
+    "parsed_data_version_presence": [
+      {
+        "null_parsed_data": 2292,
+        "total": 2812,
+        "with_content_revision": 0,
+        "with_migrated_at": 0,
+        "with_private_version": 8
+      }
+    ],
+    "private_version_distribution": [
+      {
+        "private_version": "1",
+        "rows": 3
+      },
+      {
+        "private_version": "2",
+        "rows": 3
+      },
+      {
+        "private_version": "4",
+        "rows": 1
+      },
+      {
+        "private_version": "5",
+        "rows": 1
+      }
+    ]
+  },
+  "forbidden_paths": [
+    "backend/data/amount_input_migration_status.json"
+  ],
+  "forbidden_paths_touched": [],
+  "generated_by": "backend/scripts/diagnose/probe_task8_migration_version_baseline.py",
+  "migrations": {
+    "distinct_forward_versions": 150,
+    "duplicate_version_numbers": {},
+    "forward_file_count": 150,
+    "forward_versions_without_rollback_count": 42,
+    "max_forward_version": 150,
+    "missing_version_numbers": [],
+    "next_free_version": 151,
+    "non_versioned_sql_files": [],
+    "rollback_file_count": 108,
+    "rollback_paired_count": 108,
+    "rollback_versions_without_forward": []
+  },
+  "read_only": true,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": "Wave 0 Task 8"
+}

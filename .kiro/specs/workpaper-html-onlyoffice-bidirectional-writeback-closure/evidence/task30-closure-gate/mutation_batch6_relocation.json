@@ -1,0 +1,111 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task30_closure_gate.py",
+    "backend/tests/workpaper_sync/test_task30_closure_gate_pg.py",
+    "backend/tests/workpaper_sync/test_task21_room_service.py",
+    "backend/tests/workpaper_sync/test_task22_callback_claim.py",
+    "backend/tests/workpaper_sync/test_task24_close_intent.py",
+    "-q",
+    "--no-header",
+    "-p",
+    "no:cacheprovider",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 4
+  },
+  "mutations": [
+    {
+      "id": "M24",
+      "path": "backend/scripts/check/check_workpaper_writer_revision_gate.py",
+      "want": "test_task30_closure_gate.py::test_the_gate_still_counts_the_criterion_its_owner_verifies_zero_with",
+      "why": "把已移交出去的 criterion 短路成 `if False`：key 还在、计数恒为零，报告与「已清零」逐字相同。这是本 spec 反复付过代价的 fail-open 形态，必须由行为级判据（真喂一条多 resolver 行）而不是「键是否存在」抓到。裁决归属两跳（Task 20 → 30 → 71）都不改变这一点 —— 归属换人，计算不能离场。",
+      "verdict": "RED",
+      "summary": "4 failed, 319 passed, 1 skipped, 1 warning in 53.82s",
+      "added": [
+        "test_task30_closure_gate.py::test_owner_named_rows_match_the_gate_report",
+        "test_task30_closure_gate.py::test_recomputation_and_the_gate_agree_on_the_multi_resolver_rows",
+        "test_task30_closure_gate.py::test_the_criterion_is_either_cleared_or_its_blocker_is_registered",
+        "test_task30_closure_gate.py::test_the_gate_still_counts_the_criterion_its_owner_verifies_zero_with"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_owner_named_rows_match_the_gate_report",
+        "test_task30_closure_gate.py::test_recomputation_and_the_gate_agree_on_the_multi_resolver_rows",
+        "test_task30_closure_gate.py::test_the_gate_still_counts_the_criterion_its_owner_verifies_zero_with"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "ec06b9a62e75164fd9d17216917ccf2b17eae801501ae4354986e0ac5a83c734",
+      "seconds": 58.0
+    },
+    {
+      "id": "M25",
+      "path": "backend/data/workpaper_resolver_migration_matrix.json",
+      "want": "test_task30_closure_gate.py::test_the_registered_blocker_points_at_a_task_that_really_gates_publication",
+      "why": "把阻塞登记指向不存在的任务号。没有这条判据时，`blocking_task` 可以是任意数字、`reason` 可以是任意散文，「为什么这 4 行迁不了」下一轮又要从头查。",
+      "verdict": "RED",
+      "summary": "1 failed, 323 passed, 1 warning in 53.37s",
+      "added": [
+        "test_task30_closure_gate.py::test_the_registered_blocker_points_at_a_task_that_really_gates_publication"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_the_registered_blocker_points_at_a_task_that_really_gates_publication"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fa88a70f3db48dd32fef3653f3c293dd4cb271085dfc216d9125261567a947a7",
+      "seconds": 57.4
+    },
+    {
+      "id": "M31",
+      "path": "backend/data/workpaper_resolver_migration_matrix.json",
+      "want": "test_task30_closure_gate.py::test_the_criterion_is_either_cleared_or_its_blocker_is_registered",
+      "why": "把矩阵登记的**裁决归属**改回上一跳（Task 30），而 tasks.md 已把它交给 Task 71。没有这条变异，`adjudication_owner_task` 就是一个无人消费的新字段（本 spec 的假绿第①源：additive 注入即死代码）—— 加了字段、守卫全绿、doc 与登记可以各说各话。判据必须把 doc 派生的归属与矩阵登记双向锁死。",
+      "verdict": "RED",
+      "summary": "1 failed, 323 passed, 1 warning in 50.62s",
+      "added": [
+        "test_task30_closure_gate.py::test_the_criterion_is_either_cleared_or_its_blocker_is_registered"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_the_criterion_is_either_cleared_or_its_blocker_is_registered"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "fa88a70f3db48dd32fef3653f3c293dd4cb271085dfc216d9125261567a947a7",
+      "seconds": 54.4
+    },
+    {
+      "id": "M32",
+      "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md",
+      "want": "test_task30_closure_gate.py::test_relocating_the_criterion_did_not_invert_the_wave_order",
+      "why": "把 criterion 的归属方（Wave 7 的 Task 71）挂进 `bulk_adapters` gate —— 这正是「把 Task 30 原文那句『bulk_adapters gate 亦不得放行 bulk adapter 迁移』原样搬到Task 71」的结构后果：Wave 5 的 bulk adapter 迁移会依赖 Wave 7，与它要修的那个环同形。移交方向的安全性必须是按依赖图算出来的事实，而不是散文里那句「方向不成环」。",
+      "verdict": "RED",
+      "summary": "1 failed, 323 passed, 1 warning in 51.31s",
+      "added": [
+        "test_task30_closure_gate.py::test_relocating_the_criterion_did_not_invert_the_wave_order"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task30_closure_gate.py::test_relocating_the_criterion_did_not_invert_the_wave_order"
+      ],
+      "added_files": [
+        "test_task30_closure_gate.py"
+      ],
+      "restored": true,
+      "restored_sha256": "3bf5d2847d814996674a1eca06b9654e4a81e0c67f43f393f69891b2f082e2c0",
+      "seconds": 55.0
+    }
+  ]
+}

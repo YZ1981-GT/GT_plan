@@ -1,0 +1,2990 @@
+{
+ "schema_version": "manifest-slice:v1",
+ "task": "Task 56",
+ "spec": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/",
+ "description": "N 循环（税项循环）Excel 独立 entry 迁移 slice。5 条独立 entry（N1 递延所得税资产 / N2 应交税费 / N3 递延所得税负债 / N4 税金及附加 / N5 所得税费用）+ 4 条挂在 N1 下的 parent_duplicate 子入口。🔴 本轮 tasks.md 点名三件事：真实传输键（transport_key_resolution）、动态 identity（dynamic_row_identity + Property 23）、纯 OO entry（AC 12.8）。第三件的实证结论是 **N 循环没有纯 OO entry**：5 条逐一现读 owner 常量（`ITEM_PREFIX`）、读写站点与后端路由三边，全部 `html_counterpart_verdict == \"exists\"` ⇒ AC 12.8 禁止 single_onlyoffice。「无对端不伪造映射」在本轮是**反向落法**：既不为凑数字硬裁 single，也不为凑双向给这 5 条造字段映射。5 条全部落待裁决态（capability 为 null + 三字段齐备），如实计入 unadjudicated。本 slice 相对前十轮有 8 处形态差异（见 n_cycle_form_differences），其中「parent_duplicate 条件节触发」「宿主内联 inert 开关」「宿主直调 legacy health 端点」「orphan 不止 dual-mode」四处会让照抄 M/L 的判据直接假红。",
+ "frozen_at": "2026-08-16",
+ "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+ "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+ "sibling_slices": [
+  "backend/data/workpaper_sync_abcs_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_g_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_h_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_i_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_j_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_k_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_l_cycle_manifest_slice.json",
+  "backend/data/workpaper_sync_m_cycle_manifest_slice.json"
+ ],
+ "slice_scope": {
+  "cycle": "N",
+  "document_type": "xlsx",
+  "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'N' 开头 ③ independent_entry == true。守卫按本规则从 manifest **现算**集合并与 independent_entries 做等值比对，多写一条（凑数）或少写一条（漏迁）都红。实算：命中 N 前缀的 entry 共 9 条，其中 independent_entry 为 true 的 5 条 ⇒ 本 slice 恰 5 条；余下 4 条是 parent_duplicate 子入口（parent_entry_id 全指向 N1），按 AC 1.6 不独立计数。",
+  "independent_entry_count": 5,
+  "n_prefixed_entry_total": 9,
+  "n_prefixed_independent_total": 5,
+  "excluded_pilot_entry_count": 0,
+  "parent_duplicate_count": 4,
+  "parent_duplicate_note": "🔴 N 循环 parent_duplicate 子入口 **4 条**，全部挂在 N1 下（`xlsx/n1/calc/n1-tab-calc-table` / `xlsx/n1/core/n1-tab-adjudication` / `xlsx/n1/core/n1-tab-adjustment` / `xlsx/n1/core/n1-tab-detail`）。来源是 overlay 的 `parent_rules` 里 `components/workpaper/n1/*.vue` 那一条 —— 这 4 个子 Tab 各自在模板里挂了一个 `GtOnlyOfficeSheet`，而 n1 子树里另外 10 个组件没有 ⇒ 只有它们进了 manifest。故 `slice_schema.conditional_sections` 的 `parent_duplicate_summary` **触发**，本 slice 写该节。🔴 与 K/L/M 三轮（各 0 条、各写了「未触发条件节必须缺席」的判据）**相反** —— 照抄那条判据到 N 上必假红。",
+  "excluded_from_slice": [
+   {
+    "what": "N0（税项循环函证或汇总册）",
+    "reason": "🔴 **不存在** —— `backend/wp_templates/N/` 下只有 N1~N5 五本册、`_index.json` 里 `N/` 前缀条目现算 5 条、manifest 全量 entry 里 `'n0' in entry_id.lower()` 命中 0 ⇒ 排除集为空（如实登记 0）。与 K/L 两轮不同（那两轮各有一本 K0/L0 函证册在 `_index.json` 里却无 entry）。",
+    "verified_how": "① 对 manifest 全量 entry 现算 `'n0' in entry_id.lower()` == 0；② `_index.json` 里 `relative_path` 以 `N\\` 开头的条目现算 5 条、与磁盘 5 本册集合相等；③ 模板册数 5 == entry 数 5，`belongs_to_entry` 无一为 null。"
+   },
+   {
+    "what": "四个 pilot entry（B60 / D2 / H1 / G7）",
+    "reason": "Tasks 40–43 已单独迁移，Task 45 已删其 legacy 并冻结范式；不重复计数。",
+    "verified_how": "逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的顶层 `review.entry_id`，实得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 N ⇒ 本 slice 的 excluded_pilot_entry_count == 0。🔴 契约归属按 `review.entry_id` 判，不按文件名猜。目录里第 5 个文件 `_example.candidate.json` 的 `review_status == 'candidate'` 且 `review.entry_id` 为 **null** —— 它是反例分母，守卫**不得**要求它的 entry_id 非空。"
+   },
+   {
+    "what": "N 循环的非 xlsx entry",
+    "reason": "本 slice 只覆盖 Excel 独立 entry（Wave 5 的 Excel lane）。",
+    "verified_how": "现算 N 前缀 entry 的 document_type 分布，9 条全是 xlsx ⇒ 排除集为空。"
+   },
+   {
+    "what": "N 循环的 4 条 parent_duplicate 子入口",
+    "reason": "AC 1.6 要求它们复用父 entry 的 adapter 而不独立计数 —— 但**不是不写**：它们进 `parent_duplicate_summary` 节逐条登记。",
+    "verified_how": "现算 `parent_entry_id ∈ 5 条 N entry_id` 的条数 == 4，且 `independent_entry` 全为 False、`migration_state` 全为 `parent_duplicate`。"
+   },
+   {
+    "what": "共享基类 `audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts`",
+    "reason": "被 25 条非 N 生产边使用，`shared_base_preserved` 约束不删。🔴 N 域只贡献 **1 条**边（N2 的薄封装），改线后从 26 条生产边收缩到 25 条 ——与 M（贡献 10 条、29→19）和 L（贡献 0 条、前后不变）都不同。",
+    "verified_how": "现算窄口径 statement 边 == 26 生产 + 1 测试 = 27 条，其中 N 路径 1 条。🔴 M 那轮同口径冻结的是 29 —— 平台边集已漂移，**必须每轮现算**。"
+   },
+   {
+    "what": "共享 sheet 路由 `audit-platform/frontend/src/components/workpaper/composables/shared/cycleSheetRouting.ts`",
+    "reason": "跨循环共用的纯函数工厂（N2/N4/N5 在用，另有 D2 等非 N 消费方），不删。N1/N3 **未采用**它（BP-10）。",
+    "verified_how": "现算 `makeCycleSheetRouter` 的 statement 消费方；断言 N2/N4/N5 的 routing 模块各 1 条边、N1/N3 宿主 0 条边。"
+   }
+  ]
+ },
+ "independent_entries": [
+  {
+   "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+   "wp_code_pattern": "N1D",
+   "document_type": "xlsx",
+   "host": "GtN1DeferredTaxAssets.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue",
+   "account_scope": "1811 递延所得税资产（资产类/借方）",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L204",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L208",
+    "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "N1-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "N1-",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L204",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L208",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "second_write_channel": "trial_balance 回写（审定数 → 四表）",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L459",
+    "how_resolved": "N1 的业务内容由 per-entry 持久化 composable `useN1FormData.ts` 承载：`const ITEM_PREFIX = 'N1-'`（#L61）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L208）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L204）、`api.put(...)` 写（#L290）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L459），required scenario set 必须把它建模进去。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "N1 递延所得税资产.xlsx",
+    "root": "backend/wp_templates/N",
+    "sha256": "2ca3ebbcd6f65c91da37bc576bb1af071543bf54d10b05d71c1216d2993386b5",
+    "size": 125085,
+    "sheet_count": 10,
+    "in_runtime_index": true,
+    "index_wp_code": "N1",
+    "formula_cells": 593,
+    "sheets_with_formula": 8
+   },
+   "mount_count": 2,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L13",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     13
+    ],
+    "oo_mount_sites": [
+     26,
+     120
+    ],
+    "mode_gated_oo_mount_sites": [
+     26
+    ],
+    "mounts_ac14_notice": false,
+    "claims_bidirectional_in_template": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_composable_three_modes",
+    "site": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L286",
+    "import_site": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L158",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts",
+    "module_is_orphan": false,
+    "module_lines": 257,
+    "orphan_twin": null,
+    "localStorage_prefix": "n1-dual-mode",
+    "localStorage_prefix_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts#L47",
+    "storage_key_is_wp_scoped": true,
+    "storage_key_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts#L80",
+    "mode_values": [
+     "structured",
+     "matrix",
+     "onlyoffice"
+    ],
+    "calls_legacy_health_endpoint": true,
+    "calls_legacy_health_endpoint_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts#L50",
+    "calls_legacy_config_endpoint": true,
+    "calls_legacy_config_endpoint_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts#L151",
+    "switch_verdict": "redeemable"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 10,
+    "sheets_covered_by_html_child": 8,
+    "sheets_rendered_by_program_console": 1,
+    "sheets_falling_through_to_oo": [
+     "GT_Custom"
+    ],
+    "per_sheet": [
+     {
+      "sheet": "底稿目录",
+      "normalized": "index",
+      "classification": "html_child",
+      "renderer": "n1/core/N1TabIndex.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税资产审计程序表的N1A",
+      "normalized": "procedure",
+      "classification": "html_program_console",
+      "renderer": "GtAProgramConsole.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税资产审定表N1-1",
+      "normalized": "N1-1",
+      "classification": "html_child",
+      "renderer": "n1/core/N1TabAdjudication.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（上市公司）",
+      "normalized": "disclosure-listed",
+      "classification": "html_child",
+      "renderer": "n1/core/N1TabDisclosureListed.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（国企）",
+      "normalized": "disclosure-soe",
+      "classification": "html_child",
+      "renderer": "n1/core/N1TabDisclosureSoe.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税资产明细表N1-2",
+      "normalized": "N1-2",
+      "classification": "html_child",
+      "renderer": "n1/core/N1TabDetail.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "调整分录汇总N1-3",
+      "normalized": "N1-3",
+      "classification": "html_child",
+      "renderer": "n1/core/N1TabAdjustment.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税资产（负债）测算表N1-4",
+      "normalized": "N1-4",
+      "classification": "html_child",
+      "renderer": "n1/calc/N1TabCalcTable.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "可用以后年度税前利润弥补的亏损检查表的N1-5",
+      "normalized": "N1-5",
+      "classification": "html_child",
+      "renderer": "n1/calc/N1TabLossCheck.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "GT_Custom",
+      "normalized": "skip",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "gt_custom_config_sheet"
+     }
+    ],
+    "router_kind": "host_inline_regex",
+    "router_module": null
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "N1 实测**有** HTML 对端（checklist_responses + `N1-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN1FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N1 递延所得税资产.xlsx`（10 张 sheet、593 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `N1 递延所得税资产.xlsx` 共 10 张 sheet，其中 8 张带公式、公式格合计 593 个，不是「空白模板切换入口」；且 1 张 sheet **只有** OO 承载（无 HTML 子组件）。AC 12.9 的判据（无 OO 业务价值）不成立。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-n` 在 backend/app/services/workpaper_sync/adapters/registry.py 命中 0）。SR-6 硬性禁止。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task56_n_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-6：本循环有 8 个零生产边 orphan composable（含 dual-mode 孪生与 V1/V2 孪生），接 adapter 时若接到 orphan 上，宿主行为不变而契约按从未存在的键形态生成。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-8：动态行表用数组位置/下标作持久化身份 ⇒ 删行重排后历史数据串行（AC 6.5 / Property 23）。",
+     "BP-9：manifest mirror 的 capability/html_store 来自 overlay 默认值，不是逐 entry 裁决。",
+     "BP-10：宿主未采用共享 sheet 路由，wp_code 正则前置于披露判定（与 shared 模块存在的理由同形）。",
+     "BP-11：sheet 名含脏字面量与跨册码碰撞（`N4A ` 尾随空格 / `附注披露信息（国企` 缺右括号 / `N3A` 一码两册），按码定位 OO sheet 会跨册错位。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-n2-taxes-payable",
+   "wp_code_pattern": "N2T",
+   "document_type": "xlsx",
+   "host": "GtN2TaxesPayable.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue",
+   "account_scope": "2221 应交税费（负债类/贷方）",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L85",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L89",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L120",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "N2-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "N2-",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L85",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L89",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L120",
+    "second_write_channel": "trial_balance 回写（审定数 → 四表）",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L292",
+    "how_resolved": "N2 的业务内容由 per-entry 持久化 composable `useN2FormData.ts` 承载：`const ITEM_PREFIX = 'N2-'`（#L43）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L89）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L85）、`api.put(...)` 写（#L120）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L292），required scenario set 必须把它建模进去。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "N2 应交税费.xlsx",
+    "root": "backend/wp_templates/N",
+    "sha256": "24e92c2353b2abd6d89537361f195b490977757b9b49896285beb0661a6443b1",
+    "size": 159454,
+    "sheet_count": 18,
+    "in_runtime_index": true,
+    "index_wp_code": "N2",
+    "formula_cells": 710,
+    "sheets_with_formula": 16
+   },
+   "mount_count": 3,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L6",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     6
+    ],
+    "oo_mount_sites": [
+     15,
+     27,
+     197
+    ],
+    "mode_gated_oo_mount_sites": [
+     15
+    ],
+    "mounts_ac14_notice": false,
+    "claims_bidirectional_in_template": false
+   },
+   "dual_mode_carrier": {
+    "kind": "per_entry_wrapper_over_shared_base",
+    "site": "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L312",
+    "import_site": "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L228",
+    "module": "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts",
+    "module_is_orphan": false,
+    "module_lines": 17,
+    "orphan_twin": null,
+    "localStorage_prefix": null,
+    "localStorage_prefix_source_ref": null,
+    "storage_key_is_wp_scoped": null,
+    "storage_key_source_ref": null,
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "calls_legacy_health_endpoint": false,
+    "calls_legacy_health_endpoint_source_ref": null,
+    "calls_legacy_config_endpoint": false,
+    "calls_legacy_config_endpoint_source_ref": null,
+    "switch_verdict": "redeemable"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 18,
+    "sheets_covered_by_html_child": 14,
+    "sheets_rendered_by_program_console": 0,
+    "sheets_falling_through_to_oo": [
+     "应交税费审计程序表N2A",
+     "应交税费审计程序表O1A （原底稿）",
+     "出口退税额复核示例",
+     "GT_Custom"
+    ],
+    "per_sheet": [
+     {
+      "sheet": "底稿目录",
+      "normalized": "底稿目录",
+      "classification": "html_child",
+      "renderer": "n2/core/N2TabIndex.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "应交税费审计程序表N2A",
+      "normalized": "N2A",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "program_sheet_not_html_migrated"
+     },
+     {
+      "sheet": "应交税费审计程序表O1A （原底稿）",
+      "normalized": "应交税费审计程序表O1A （原底稿）",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "pre_revision_original_sheet"
+     },
+     {
+      "sheet": "应交税费审定表N2-1",
+      "normalized": "N2-1",
+      "classification": "html_child",
+      "renderer": "n2/core/N2TabAdjudication.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（上市公司）",
+      "normalized": "附注(上市)",
+      "classification": "html_child",
+      "renderer": "n2/core/N2TabDisclosureListed.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（国企）",
+      "normalized": "附注(国企)",
+      "classification": "html_child",
+      "renderer": "n2/core/N2TabDisclosureSoe.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "应交税费明细表N2-2",
+      "normalized": "N2-2",
+      "classification": "html_child",
+      "renderer": "n2/core/N2TabDetail.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "调整分录汇总表N2-3",
+      "normalized": "N2-3",
+      "classification": "html_child",
+      "renderer": "n2/core/N2TabAdjustment.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "税收政策检查N2-4",
+      "normalized": "N2-4",
+      "classification": "html_child",
+      "renderer": "n2/inspection/N2TabPolicyCheck.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "应交税金认定表N2-5",
+      "normalized": "N2-5",
+      "classification": "html_child",
+      "renderer": "n2/inspection/N2TabRecognition.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "增值税测算表N2-6",
+      "normalized": "N2-6",
+      "classification": "html_child",
+      "renderer": "n2/calc/N2TabVatCalc.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "出口退税核对表N2-7",
+      "normalized": "N2-7",
+      "classification": "html_child",
+      "renderer": "n2/calc/N2TabExportRefund.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "应交其他税费测算表N2-8",
+      "normalized": "N2-8",
+      "classification": "html_child",
+      "renderer": "n2/calc/N2TabOtherTaxCalc.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "房产税测算表N2-9",
+      "normalized": "N2-9",
+      "classification": "html_child",
+      "renderer": "n2/calc/N2TabPropertyTax.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "土地增值税测算表N2-10",
+      "normalized": "N2-10",
+      "classification": "html_child",
+      "renderer": "n2/calc/N2TabLvt.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "应交税费检查表N2-11",
+      "normalized": "N2-11",
+      "classification": "html_child",
+      "renderer": "n2/inspection/N2TabTaxCheck.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "出口退税额复核示例",
+      "normalized": "出口退税额复核示例",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "reference_example_sheet"
+     },
+     {
+      "sheet": "GT_Custom",
+      "normalized": "GT_Custom",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "gt_custom_config_sheet"
+     }
+    ],
+    "router_kind": "shared_cycle_sheet_router",
+    "router_module": "audit-platform/frontend/src/components/workpaper/composables/n2SheetRouting.ts"
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "N2 实测**有** HTML 对端（checklist_responses + `N2-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN2FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N2 应交税费.xlsx`（18 张 sheet、710 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `N2 应交税费.xlsx` 共 18 张 sheet，其中 16 张带公式、公式格合计 710 个，不是「空白模板切换入口」；且 4 张 sheet **只有** OO 承载（无 HTML 子组件）。AC 12.9 的判据（无 OO 业务价值）不成立。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-n` 在 backend/app/services/workpaper_sync/adapters/registry.py 命中 0）。SR-6 硬性禁止。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task56_n_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-6：本循环有 8 个零生产边 orphan composable（含 dual-mode 孪生与 V1/V2 孪生），接 adapter 时若接到 orphan 上，宿主行为不变而契约按从未存在的键形态生成。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-8：动态行表用数组位置/下标作持久化身份 ⇒ 删行重排后历史数据串行（AC 6.5 / Property 23）。",
+     "BP-9：manifest mirror 的 capability/html_store 来自 overlay 默认值，不是逐 entry 裁决。",
+     "BP-11：sheet 名含脏字面量与跨册码碰撞（`N4A ` 尾随空格 / `附注披露信息（国企` 缺右括号 / `N3A` 一码两册），按码定位 OO sheet 会跨册错位。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-n3-deferred-tax-liabilities",
+   "wp_code_pattern": "N3D",
+   "document_type": "xlsx",
+   "host": "GtN3DeferredTaxLiabilities.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue",
+   "account_scope": "2901 递延所得税负债（负债类/贷方）",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-4",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-10",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L100",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L104",
+    "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L135",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "N3-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "N3-",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L100",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L104",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L135",
+    "second_write_channel": "trial_balance 回写（审定数 → 四表）",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L307",
+    "how_resolved": "N3 的业务内容由 per-entry 持久化 composable `useN3FormData.ts` 承载：`const ITEM_PREFIX = 'N3-'`（#L43）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L104）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L100）、`api.put(...)` 写（#L135）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L307），required scenario set 必须把它建模进去。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "N3 递延所得税负债.xlsx",
+    "root": "backend/wp_templates/N",
+    "sha256": "dd3759ffa5859716e07cf8cffb35594122cf1bd999cedd24bc84a3f3ab77ac5f",
+    "size": 89735,
+    "sheet_count": 6,
+    "in_runtime_index": true,
+    "index_wp_code": "N3",
+    "formula_cells": 162,
+    "sheets_with_formula": 4
+   },
+   "mount_count": 3,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L6",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     6
+    ],
+    "oo_mount_sites": [
+     20,
+     30,
+     97
+    ],
+    "mode_gated_oo_mount_sites": [
+     20
+    ],
+    "mounts_ac14_notice": false,
+    "claims_bidirectional_in_template": false
+   },
+   "dual_mode_carrier": {
+    "kind": "host_inline_real",
+    "site": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L168",
+    "import_site": null,
+    "module": null,
+    "module_is_orphan": null,
+    "module_lines": null,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts",
+    "localStorage_prefix": null,
+    "localStorage_prefix_source_ref": null,
+    "storage_key_is_wp_scoped": null,
+    "storage_key_source_ref": null,
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "calls_legacy_health_endpoint": true,
+    "calls_legacy_health_endpoint_source_ref": "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L180",
+    "calls_legacy_config_endpoint": false,
+    "calls_legacy_config_endpoint_source_ref": null,
+    "switch_verdict": "redeemable"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 6,
+    "sheets_covered_by_html_child": 4,
+    "sheets_rendered_by_program_console": 0,
+    "sheets_falling_through_to_oo": [
+     "递延所得税负债审计程序表的N3A",
+     "GT_Custom"
+    ],
+    "per_sheet": [
+     {
+      "sheet": "底稿目录",
+      "normalized": "底稿目录",
+      "classification": "html_child",
+      "renderer": "n3/core/N3TabIndex.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税负债审计程序表的N3A",
+      "normalized": "N3A",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "program_sheet_not_html_migrated"
+     },
+     {
+      "sheet": "递延所得税负债审定表N3-1",
+      "normalized": "N3-1",
+      "classification": "html_child",
+      "renderer": "n3/core/N3TabAdjudication.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税负债明细表N3-2",
+      "normalized": "N3-2",
+      "classification": "html_child",
+      "renderer": "n3/core/N3TabDetail.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "调整分录汇总表N3-3",
+      "normalized": "N3-3",
+      "classification": "html_child",
+      "renderer": "n3/core/N3TabAdjustment.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "GT_Custom",
+      "normalized": "GT_Custom",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "gt_custom_config_sheet"
+     }
+    ],
+    "router_kind": "host_inline_regex",
+    "router_module": null
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "N3 实测**有** HTML 对端（checklist_responses + `N3-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN3FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N3 递延所得税负债.xlsx`（6 张 sheet、162 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `N3 递延所得税负债.xlsx` 共 6 张 sheet，其中 4 张带公式、公式格合计 162 个，不是「空白模板切换入口」；且 2 张 sheet **只有** OO 承载（无 HTML 子组件）。AC 12.9 的判据（无 OO 业务价值）不成立。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-n` 在 backend/app/services/workpaper_sync/adapters/registry.py 命中 0）。SR-6 硬性禁止。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task56_n_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-4：宿主直调 legacy `/api/workpapers/onlyoffice/health`，违反范式 step 6。",
+     "BP-6：本循环有 8 个零生产边 orphan composable（含 dual-mode 孪生与 V1/V2 孪生），接 adapter 时若接到 orphan 上，宿主行为不变而契约按从未存在的键形态生成。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-9：manifest mirror 的 capability/html_store 来自 overlay 默认值，不是逐 entry 裁决。",
+     "BP-10：宿主未采用共享 sheet 路由，wp_code 正则前置于披露判定（与 shared 模块存在的理由同形）。",
+     "BP-11：sheet 名含脏字面量与跨册码碰撞（`N4A ` 尾随空格 / `附注披露信息（国企` 缺右括号 / `N3A` 一码两册），按码定位 OO sheet 会跨册错位。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+   "wp_code_pattern": "N4T",
+   "document_type": "xlsx",
+   "host": "GtN4TaxesAndSurcharges.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue",
+   "account_scope": "6403 税金及附加（损益类/借方）",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-9",
+    "BP-11"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L260",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L263",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L125",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "N4-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "N4-",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L260",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L263",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L125",
+    "second_write_channel": "trial_balance 回写（审定数 → 四表）",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L375",
+    "how_resolved": "N4 的业务内容由 per-entry 持久化 composable `useN4FormData.ts` 承载：`const ITEM_PREFIX = 'N4-'`（#L63）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L263）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L260）、`api.put(...)` 写（#L125）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L375），required scenario set 必须把它建模进去。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "N4 税金及附加.xlsx",
+    "root": "backend/wp_templates/N",
+    "sha256": "ae2ae9e1b290b11afe41be1e12156df20c47bc64644a293a5d5547bc35dd8c73",
+    "size": 55903,
+    "sheet_count": 9,
+    "in_runtime_index": true,
+    "index_wp_code": "N4",
+    "formula_cells": 236,
+    "sheets_with_formula": 7
+   },
+   "mount_count": 3,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L6",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     6
+    ],
+    "oo_mount_sites": [
+     16,
+     35,
+     111
+    ],
+    "mode_gated_oo_mount_sites": [
+     16
+    ],
+    "mounts_ac14_notice": false,
+    "claims_bidirectional_in_template": false
+   },
+   "dual_mode_carrier": {
+    "kind": "host_inline_inert",
+    "site": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L196",
+    "import_site": null,
+    "module": null,
+    "module_is_orphan": null,
+    "module_lines": null,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts",
+    "localStorage_prefix": null,
+    "localStorage_prefix_source_ref": null,
+    "storage_key_is_wp_scoped": null,
+    "storage_key_source_ref": null,
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "calls_legacy_health_endpoint": false,
+    "calls_legacy_health_endpoint_source_ref": null,
+    "calls_legacy_config_endpoint": false,
+    "calls_legacy_config_endpoint_source_ref": null,
+    "switch_verdict": "inert"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 9,
+    "sheets_covered_by_html_child": 6,
+    "sheets_rendered_by_program_console": 1,
+    "sheets_falling_through_to_oo": [
+     "税金及附加审计程序表O2A（原底稿）",
+     "GT_Custom"
+    ],
+    "per_sheet": [
+     {
+      "sheet": "底稿目录",
+      "normalized": "底稿目录",
+      "classification": "html_child",
+      "renderer": "n4/core/N4TabIndex.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "税金及附加审计程序表N4A ",
+      "normalized": "N4A",
+      "classification": "html_program_console",
+      "renderer": "GtCycleAProgramRouter.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "税金及附加审计程序表O2A（原底稿）",
+      "normalized": "O2A",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "pre_revision_original_sheet"
+     },
+     {
+      "sheet": "税金及附加审定表N4-1",
+      "normalized": "N4-1",
+      "classification": "html_child",
+      "renderer": "n4/core/N4TabAdjudication.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（上市公司）",
+      "normalized": "附注(上市)",
+      "classification": "html_child",
+      "renderer": "n4/core/N4TabDisclosureListed.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（国企）",
+      "normalized": "附注(国企)",
+      "classification": "html_child",
+      "renderer": "n4/core/N4TabDisclosureSoe.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "税金及附加明细表N4-2",
+      "normalized": "N4-2",
+      "classification": "html_child",
+      "renderer": "n4/core/N4TabDetail.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "调整分录汇总表N4-3",
+      "normalized": "N4-3",
+      "classification": "html_child",
+      "renderer": "n4/core/N4TabAdjustment.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "GT_Custom",
+      "normalized": "GT_Custom",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "gt_custom_config_sheet"
+     }
+    ],
+    "router_kind": "shared_cycle_sheet_router",
+    "router_module": "audit-platform/frontend/src/components/workpaper/composables/n4SheetRouting.ts"
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "N4 实测**有** HTML 对端（checklist_responses + `N4-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN4FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N4 税金及附加.xlsx`（9 张 sheet、236 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `N4 税金及附加.xlsx` 共 9 张 sheet，其中 7 张带公式、公式格合计 236 个，不是「空白模板切换入口」；且 2 张 sheet **只有** OO 承载（无 HTML 子组件）。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 本 entry 的模式开关是 **inert**（`onModeChange: () => {}`），但「开关坏了」**不是**裁 single_html 的理由 —— AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就此定论，本条同理）；该修的是开关，不是把 OO 入口删掉。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-n` 在 backend/app/services/workpaper_sync/adapters/registry.py 命中 0）。SR-6 硬性禁止。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task56_n_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-5：模式开关 inert（`onModeChange: () => {}`）⇒ mode 门控的 OO 挂载是结构性死代码。",
+     "BP-6：本循环有 8 个零生产边 orphan composable（含 dual-mode 孪生与 V1/V2 孪生），接 adapter 时若接到 orphan 上，宿主行为不变而契约按从未存在的键形态生成。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-9：manifest mirror 的 capability/html_store 来自 overlay 默认值，不是逐 entry 裁决。",
+     "BP-11：sheet 名含脏字面量与跨册码碰撞（`N4A ` 尾随空格 / `附注披露信息（国企` 缺右括号 / `N3A` 一码两册），按码定位 OO sheet 会跨册错位。"
+    ]
+   }
+  },
+  {
+   "entry_id": "xlsx/gt-n5-income-tax-expense",
+   "wp_code_pattern": "N5I",
+   "document_type": "xlsx",
+   "host": "GtN5IncomeTaxExpense.vue",
+   "host_path": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue",
+   "account_scope": "6801 所得税费用（损益类/借方）",
+   "capability": null,
+   "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+   "capability_target": "bidirectional",
+   "capability_target_blocked_by": [
+    "BP-1",
+    "BP-2",
+    "BP-3",
+    "BP-5",
+    "BP-6",
+    "BP-7",
+    "BP-8",
+    "BP-9",
+    "BP-11",
+    "BP-12"
+   ],
+   "html_counterpart_verdict": "exists",
+   "html_counterpart_source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L105",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L109",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L180",
+    "backend/app/routers/checklist_responses.py#L84",
+    "backend/app/routers/checklist_responses.py#L132"
+   ],
+   "html_counterpart": {
+    "store": "checklist_responses",
+    "table_keys": [
+     "N5-{sheet}-{field}"
+    ],
+    "row_identity_key": "item_id",
+    "item_id_prefix": "N5-",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
+    "read_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L105",
+    "namespace_filter_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L109",
+    "write_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L180",
+    "second_write_channel": "trial_balance 回写（审定数 → 四表）",
+    "second_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L335",
+    "how_resolved": "N5 的业务内容由 per-entry 持久化 composable `useN5FormData.ts` 承载：`const ITEM_PREFIX = 'N5-'`（#L60）划出命名空间、load 侧按 `item_id.startsWith(ITEM_PREFIX)` 过滤（#L109）、`api.get('/api/workpapers/${wpId}/checklist-responses')` 读（#L105）、`api.put(...)` 写（#L180）；后端 `checklist_responses.py` 的 `@router.get(\"\")`（#L84）与 `@router.put(\"\")`（#L132）真实存在。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists，AC 12.8 禁止 single_onlyoffice。🔴 与 K/J 循环不同，这里**不经** `useChecklistPersistence` 共享适配器（N 域现算命中 0）；与 M 循环同为 per-entry FormData 模块，但 N 多一条 `trial-balance/writeback` 写路径（#L335），required scenario set 必须把它建模进去。"
+   },
+   "migration_state": "legacy_fake_bidirectional",
+   "adapter_id": null,
+   "authority_model": null,
+   "definition_bundle": null,
+   "instrumentation_candidate": null,
+   "published_representation": null,
+   "template_ref": {
+    "workbook": "N5 所得税费用.xlsx",
+    "root": "backend/wp_templates/N",
+    "sha256": "0fa060b214a7eed83bf53e5153752abdb765cc1da922506d6d539d3003f8bd3d",
+    "size": 124437,
+    "sheet_count": 16,
+    "in_runtime_index": true,
+    "index_wp_code": "N5",
+    "formula_cells": 484,
+    "sheets_with_formula": 14
+   },
+   "mount_count": 4,
+   "scenario_profile_id": null,
+   "editability": "editable",
+   "room_model": "shared",
+   "canonical_resolver": "legacy_sheet_onlyoffice_router",
+   "manifest_mirror": {
+    "capability": "single_onlyoffice",
+    "html_store": "unresolved",
+    "why_not_adopted": "BP-9：这两个值来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，不是逐 entry 裁决（AP-3）。本 slice 的 `capability` 为 null、`html_counterpart_verdict` 为 exists ⇒ 与 mirror **必然不一致**，守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+   },
+   "ui_toolbar_gate": {
+    "anchor": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L6",
+    "anchor_absent_because": null,
+    "segmented_sites_in_gate": [
+     6
+    ],
+    "oo_mount_sites": [
+     16,
+     26,
+     36,
+     181
+    ],
+    "mode_gated_oo_mount_sites": [
+     16
+    ],
+    "mounts_ac14_notice": false,
+    "claims_bidirectional_in_template": false
+   },
+   "dual_mode_carrier": {
+    "kind": "host_inline_inert",
+    "site": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L278",
+    "import_site": null,
+    "module": null,
+    "module_is_orphan": null,
+    "module_lines": null,
+    "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts",
+    "localStorage_prefix": null,
+    "localStorage_prefix_source_ref": null,
+    "storage_key_is_wp_scoped": null,
+    "storage_key_source_ref": null,
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "calls_legacy_health_endpoint": false,
+    "calls_legacy_health_endpoint_source_ref": null,
+    "calls_legacy_config_endpoint": false,
+    "calls_legacy_config_endpoint_source_ref": null,
+    "switch_verdict": "inert"
+   },
+   "sheet_granularity": {
+    "authoritative_sheet_count": 16,
+    "sheets_covered_by_html_child": 13,
+    "sheets_rendered_by_program_console": 0,
+    "sheets_falling_through_to_oo": [
+     "所得税审计程序表N5A",
+     "所得税审计程序表N3A (原底稿)",
+     "GT_Custom"
+    ],
+    "per_sheet": [
+     {
+      "sheet": "底稿目录",
+      "normalized": "底稿目录",
+      "classification": "html_child",
+      "renderer": "n5/core/N5TabIndex.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "所得税审计程序表N5A",
+      "normalized": "N5A",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "program_sheet_not_html_migrated"
+     },
+     {
+      "sheet": "所得税审计程序表N3A (原底稿)",
+      "normalized": "N3A",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "pre_revision_original_sheet"
+     },
+     {
+      "sheet": "所得税费用审定表N5-1",
+      "normalized": "N5-1",
+      "classification": "html_child",
+      "renderer": "n5/core/N5TabAdjudication.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（上市公司）",
+      "normalized": "附注(上市)",
+      "classification": "html_child",
+      "renderer": "n5/core/N5TabDisclosureListed.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "附注披露信息（国企",
+      "normalized": "附注(国企)",
+      "classification": "html_child",
+      "renderer": "n5/core/N5TabDisclosureSoe.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "所得税费用明细表N5-2",
+      "normalized": "N5-2",
+      "classification": "html_child",
+      "renderer": "n5/core/N5TabDetail.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "调整分录汇总表N5-3",
+      "normalized": "N5-3",
+      "classification": "html_child",
+      "renderer": "n5/core/N5TabAdjustment.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "当期所得税费用计算表N5-4",
+      "normalized": "N5-4",
+      "classification": "html_child",
+      "renderer": "n5/calc/N5TabCurrentTaxCalc.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "纳税调整明细表N5-5",
+      "normalized": "N5-5",
+      "classification": "html_child",
+      "renderer": "n5/calc/N5TabTaxAdjustment.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "税收优惠明细表N5-6",
+      "normalized": "N5-6",
+      "classification": "html_child",
+      "renderer": "n5/benefit/N5TabTaxBenefit.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "加计扣除研发费用情况明细表N5-6-1",
+      "normalized": "N5-6-1",
+      "classification": "html_child",
+      "renderer": "n5/benefit/N5TabRdSuperDeduction.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "高新技术企业认定条件检查表N5-6-2",
+      "normalized": "N5-6-2",
+      "classification": "html_child",
+      "renderer": "n5/benefit/N5TabHighTechCheck.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "财产损失明细表N5-7",
+      "normalized": "N5-7",
+      "classification": "html_child",
+      "renderer": "n5/benefit/N5TabPropertyLoss.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "递延所得税费用核对表N5-8",
+      "normalized": "N5-8",
+      "classification": "html_child",
+      "renderer": "n5/calc/N5TabDeferredReconcile.vue",
+      "oo_reason": null
+     },
+     {
+      "sheet": "GT_Custom",
+      "normalized": "GT_Custom",
+      "classification": "oo_fallthrough",
+      "renderer": null,
+      "oo_reason": "gt_custom_config_sheet"
+     }
+    ],
+    "router_kind": "shared_cycle_sheet_router",
+    "router_module": "audit-platform/frontend/src/components/workpaper/composables/n5SheetRouting.ts"
+   },
+   "adjudication": {
+    "honest_capability": null,
+    "reason": "N5 实测**有** HTML 对端（checklist_responses + `N5-{sheet}-{field}` item_id 命名空间 + per-entry 持久化 composable `useN5FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `N5 所得税费用.xlsx`（16 张 sheet、484 个公式格，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 `audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts` 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+    "not_single_html_because": "OO 侧有真实业务价值：权威模板 `N5 所得税费用.xlsx` 共 16 张 sheet，其中 14 张带公式、公式格合计 484 个，不是「空白模板切换入口」；且 3 张 sheet **只有** OO 承载（无 HTML 子组件）。AC 12.9 的判据（无 OO 业务价值）不成立。🔴 本 entry 的模式开关是 **inert**（`onModeChange: () => {}`），但「开关坏了」**不是**裁 single_html 的理由 —— AC 12.9 问的是 OO 侧有没有业务内容（Task 54 已就此定论，本条同理）；该修的是开关，不是把 OO 入口删掉。",
+    "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter（现算 `xlsx/gt-n` 在 backend/app/services/workpaper_sync/adapters/registry.py 命中 0）。SR-6 硬性禁止。"
+   },
+   "evidence": {
+    "browser_case": null,
+    "contract_test": "backend/tests/workpaper_sync/test_task56_n_cycle_migration.py",
+    "sync_test_run_id": null,
+    "required_scenario_set_digest": null,
+    "verification_state": "UNVERIFIABLE",
+    "unverifiable_reasons": [
+     "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+     "BP-2：无 Task 36 finalize 出的 published representation。",
+     "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+     "BP-5：模式开关 inert（`onModeChange: () => {}`）⇒ mode 门控的 OO 挂载是结构性死代码。",
+     "BP-6：本循环有 8 个零生产边 orphan composable（含 dual-mode 孪生与 V1/V2 孪生），接 adapter 时若接到 orphan 上，宿主行为不变而契约按从未存在的键形态生成。",
+     "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。",
+     "BP-8：动态行表用数组位置/下标作持久化身份 ⇒ 删行重排后历史数据串行（AC 6.5 / Property 23）。",
+     "BP-9：manifest mirror 的 capability/html_store 来自 overlay 默认值，不是逐 entry 裁决。",
+     "BP-11：sheet 名含脏字面量与跨册码碰撞（`N4A ` 尾随空格 / `附注披露信息（国企` 缺右括号 / `N3A` 一码两册），按码定位 OO sheet 会跨册错位。",
+     "BP-12：本 entry 的取数跨 4 个外部 item_id 命名空间（N1-/N3-/I6-/I2-/A-），required scenario set 必须把跨 entry 只读依赖建模进去，否则单 entry 场景集不完整。"
+    ]
+   }
+  }
+ ],
+ "parent_duplicate_summary": {
+  "note": "🔴 N 循环有 4 条 parent_duplicate 子入口，全部挂在 N1（`xlsx/gt-n1-deferred-tax-assets`）下。按 AC 1.6 它们复用父 entry 的 adapter、不独立计数，也不单独发布 contract / bundle / candidate / evidence。为什么它们会被 generator 枚举出来：每个都在自己的模板里挂了一个 `GtOnlyOfficeSheet`（作为子 Tab 内的 OO 兜底），而 n1 子树里另外 10 个组件（N1TabIndex / N1TabLossCheck / N1LossJudgmentMatrix / N1TabDisclosureListed / N1TabDisclosureSoe / N1PreparationHandbookDialog / N1DisclosureConsistencyPanel / N1DisclosureSegmentTable 等）都没有 ⇒ 只有这 4 个进了 manifest。🔴 它们**没有自己的写路径**：4 个子组件里 `http.put` / `api.put` 现算命中 0，全部经父 entry 的 `useN1FormData` 写库 —— 与 J1-8 那条子入口（自己 `http.put` 直写，构成父 entry 写路径双轨）**不同**，照抄 J 的「第二写路径」判据在 N 上必假红。",
+  "children": [
+   {
+    "entry_id": "xlsx/n1/calc/n1-tab-calc-table",
+    "parent_entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "host_path": "audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue",
+    "wp_code_patterns": [
+     "N1-4",
+     "N1T"
+    ],
+    "independent_entry": false,
+    "own_oo_mount_site": "audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue#L8",
+    "own_transport_keys": [
+     "N1-2-detail-rows",
+     "N1-3-entries",
+     "N1-5-rows",
+     "N1-4-total-deferred-tax-asset",
+     "N1-4-total-deferred-tax-liability"
+    ],
+    "own_write_channel": "父 entry 的 useN1FormData（子组件无自己的 http.put）",
+    "own_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue#L508",
+    "inbound_edge": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L171"
+   },
+   {
+    "entry_id": "xlsx/n1/core/n1-tab-adjudication",
+    "parent_entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "host_path": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjudication.vue",
+    "wp_code_patterns": [
+     "N1-1",
+     "N1T"
+    ],
+    "independent_entry": false,
+    "own_oo_mount_site": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjudication.vue#L8",
+    "own_transport_keys": [
+     "N1-1-adj-{index}",
+     "N1-1-total-audited",
+     "N1-1-total-begin"
+    ],
+    "own_write_channel": "父 entry 的 useN1FormData（子组件无自己的 http.put）",
+    "own_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjudication.vue#L432",
+    "inbound_edge": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L164"
+   },
+   {
+    "entry_id": "xlsx/n1/core/n1-tab-adjustment",
+    "parent_entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "host_path": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjustment.vue",
+    "wp_code_patterns": [
+     "N1-3",
+     "N1T"
+    ],
+    "independent_entry": false,
+    "own_oo_mount_site": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjustment.vue#L6",
+    "own_transport_keys": [
+     "N1-3-entries",
+     "N1-1-aje-net",
+     "N1-1-rje-net"
+    ],
+    "own_write_channel": "父 entry 的 useN1FormData（子组件无自己的 http.put）",
+    "own_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjustment.vue#L310",
+    "inbound_edge": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L166"
+   },
+   {
+    "entry_id": "xlsx/n1/core/n1-tab-detail",
+    "parent_entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "host_path": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabDetail.vue",
+    "wp_code_patterns": [
+     "N1-2",
+     "N1T"
+    ],
+    "independent_entry": false,
+    "own_oo_mount_site": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabDetail.vue#L8",
+    "own_transport_keys": [
+     "N1-1-total-audited"
+    ],
+    "own_write_channel": "父 entry 的 useN1FormData（子组件无自己的 http.put）",
+    "own_write_channel_source_ref": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabDetail.vue#L344",
+    "inbound_edge": "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L165"
+   }
+  ],
+  "counters": {
+   "children_total": 4,
+   "children_with_own_write_channel": 0,
+   "children_with_own_oo_mount": 4,
+   "children_under_n1": 4,
+   "n1_subtree_components_total": 12,
+   "n1_subtree_components_without_oo_mount": 8
+  }
+ },
+ "authoritative_templates": {
+  "root": "backend/wp_templates/N",
+  "why_this_root": "唯一权威目录（`wp_template_init_service` 运行时从这里复制、`wp_template_finder` 以 `_index.json` 索引）；`基础数据/…` 参考副本在本机**不存在**（`is_dir()` 现算 False），故本轮无「参考副本已落后」的比对项。",
+  "reference_copy_status": "absent_on_this_machine",
+  "reference_copy_note": "🔴 M 那轮的 `reference_copy_status` 也是 absent；但判据必须**现算** `is_dir()`，不得照抄结论 —— 参考副本一旦被谁拉回来，两处不一致必须能被发现。",
+  "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件；本轮现算锁文件 0 个。",
+  "formula_scan_policy": "openpyxl `data_only=False` 逐格读，`isinstance(v, str) and v.startswith('=')` 计数。🔴 `data_only=True` 会得到 0（缓存值），守卫必须显式断言这一点，证明扫描口径是判据不是巧合。",
+  "files": [
+   {
+    "name": "N1 递延所得税资产.xlsx",
+    "size": 125085,
+    "sha256": "2ca3ebbcd6f65c91da37bc576bb1af071543bf54d10b05d71c1216d2993386b5",
+    "sheet_count": 10,
+    "formula_cells": 593,
+    "sheets_with_formula": 8,
+    "belongs_to_entry": "xlsx/gt-n1-deferred-tax-assets",
+    "index_wp_code": "N1",
+    "sheet_names": [
+     "底稿目录",
+     "递延所得税资产审计程序表的N1A",
+     "递延所得税资产审定表N1-1",
+     "附注披露信息（上市公司）",
+     "附注披露信息（国企）",
+     "递延所得税资产明细表N1-2",
+     "调整分录汇总N1-3",
+     "递延所得税资产（负债）测算表N1-4",
+     "可用以后年度税前利润弥补的亏损检查表的N1-5",
+     "GT_Custom"
+    ]
+   },
+   {
+    "name": "N2 应交税费.xlsx",
+    "size": 159454,
+    "sha256": "24e92c2353b2abd6d89537361f195b490977757b9b49896285beb0661a6443b1",
+    "sheet_count": 18,
+    "formula_cells": 710,
+    "sheets_with_formula": 16,
+    "belongs_to_entry": "xlsx/gt-n2-taxes-payable",
+    "index_wp_code": "N2",
+    "sheet_names": [
+     "底稿目录",
+     "应交税费审计程序表N2A",
+     "应交税费审计程序表O1A （原底稿）",
+     "应交税费审定表N2-1",
+     "附注披露信息（上市公司）",
+     "附注披露信息（国企）",
+     "应交税费明细表N2-2",
+     "调整分录汇总表N2-3",
+     "税收政策检查N2-4",
+     "应交税金认定表N2-5",
+     "增值税测算表N2-6",
+     "出口退税核对表N2-7",
+     "应交其他税费测算表N2-8",
+     "房产税测算表N2-9",
+     "土地增值税测算表N2-10",
+     "应交税费检查表N2-11",
+     "出口退税额复核示例",
+     "GT_Custom"
+    ]
+   },
+   {
+    "name": "N3 递延所得税负债.xlsx",
+    "size": 89735,
+    "sha256": "dd3759ffa5859716e07cf8cffb35594122cf1bd999cedd24bc84a3f3ab77ac5f",
+    "sheet_count": 6,
+    "formula_cells": 162,
+    "sheets_with_formula": 4,
+    "belongs_to_entry": "xlsx/gt-n3-deferred-tax-liabilities",
+    "index_wp_code": "N3",
+    "sheet_names": [
+     "底稿目录",
+     "递延所得税负债审计程序表的N3A",
+     "递延所得税负债审定表N3-1",
+     "递延所得税负债明细表N3-2",
+     "调整分录汇总表N3-3",
+     "GT_Custom"
+    ]
+   },
+   {
+    "name": "N4 税金及附加.xlsx",
+    "size": 55903,
+    "sha256": "ae2ae9e1b290b11afe41be1e12156df20c47bc64644a293a5d5547bc35dd8c73",
+    "sheet_count": 9,
+    "formula_cells": 236,
+    "sheets_with_formula": 7,
+    "belongs_to_entry": "xlsx/gt-n4-taxes-and-surcharges",
+    "index_wp_code": "N4",
+    "sheet_names": [
+     "底稿目录",
+     "税金及附加审计程序表N4A ",
+     "税金及附加审计程序表O2A（原底稿）",
+     "税金及附加审定表N4-1",
+     "附注披露信息（上市公司）",
+     "附注披露信息（国企）",
+     "税金及附加明细表N4-2",
+     "调整分录汇总表N4-3",
+     "GT_Custom"
+    ]
+   },
+   {
+    "name": "N5 所得税费用.xlsx",
+    "size": 124437,
+    "sha256": "0fa060b214a7eed83bf53e5153752abdb765cc1da922506d6d539d3003f8bd3d",
+    "sheet_count": 16,
+    "formula_cells": 484,
+    "sheets_with_formula": 14,
+    "belongs_to_entry": "xlsx/gt-n5-income-tax-expense",
+    "index_wp_code": "N5",
+    "sheet_names": [
+     "底稿目录",
+     "所得税审计程序表N5A",
+     "所得税审计程序表N3A (原底稿)",
+     "所得税费用审定表N5-1",
+     "附注披露信息（上市公司）",
+     "附注披露信息（国企",
+     "所得税费用明细表N5-2",
+     "调整分录汇总表N5-3",
+     "当期所得税费用计算表N5-4",
+     "纳税调整明细表N5-5",
+     "税收优惠明细表N5-6",
+     "加计扣除研发费用情况明细表N5-6-1",
+     "高新技术企业认定条件检查表N5-6-2",
+     "财产损失明细表N5-7",
+     "递延所得税费用核对表N5-8",
+     "GT_Custom"
+    ]
+   }
+  ]
+ },
+ "n_cycle_form_differences": [
+  {
+   "id": "ND-1",
+   "what": "`parent_duplicate_summary` 条件节**触发**（4 条子入口，全挂 N1）",
+   "why_not_copyable": "D/E/F/G/H/I/K/L/M 九轮里只有 D（31 条）/ H（5 条）/ J（1 条）触发过；K/L/M 三轮连续 0 条并各自写了「未触发的条件节必须缺席」的判据。照抄那条判据到 N 上必假红 —— N 有 4 条。",
+   "recompute_recipe": "现算 manifest 里 `parent_entry_id ∈ 5 条 N entry_id` 的条数 == 4，且 `independent_entry` 全为 False；overlay 的 `parent_rules` 里有 `components/workpaper/n1/*.vue` 一条。",
+   "value": 4
+  },
+  {
+   "id": "ND-2",
+   "what": "**三种 dual-mode 载体并存**：per-entry composable（N1，257 行，三模式含 matrix）/ 薄封装共享基类（N2，17 行）/ 宿主内联（N3 真实、N4+N5 空实现）",
+   "why_not_copyable": "M 十条 entry 全是 `per_entry_wrapper_over_shared_base` 一种形态；L 是 inert 载体 + 共享 cycle carrier 两种。按「每条 entry 都有一个 `use{Code}EntryDualMode.ts`」去找，N 只找到 0 个（N 域没有任何 `*EntryDualMode.ts`）。",
+   "recompute_recipe": "逐宿主现算：`imports use N{n}DualMode` 的行号集合 + `const dualMode = {` 的行号集合，两者必须恰好互补（不重不漏）。",
+   "value": 3
+  },
+  {
+   "id": "ND-3",
+   "what": "**2 条 inert 开关（N4/N5）是宿主内联的空实现**，其 mode 门控的 OO 挂载点是结构性死代码",
+   "why_not_copyable": "L 的 inert 是「载体模块不可达」；N 的 inert 是「载体就在宿主里，但回调是 `() => {}`」。按「载体是否 orphan」判 inert 会把 N4/N5 判成 redeemable（它们的载体根本不是模块）。",
+   "recompute_recipe": "现算宿主里 `onModeChange:\\s*\\(\\)\\s*=>\\s*\\{\\s*\\}` 命中 == 2 条 entry，且这两条宿主的 `currentMode` 只有 `ref('html')` 一处赋值（无 `.value =`）。",
+   "value": 2
+  },
+  {
+   "id": "ND-4",
+   "what": "**宿主直调 legacy health 端点 1 处**（N3 宿主 #L180）",
+   "why_not_copyable": "M/L 两轮的 `hosts_calling_legacy_health_endpoint_directly` 都是 0，并各写了一条「无宿主直调」的判据。照抄到 N 必假红。范式 step 6 明文禁止宿主直调 `/api/workpapers/onlyoffice/health`。",
+   "recompute_recipe": "逐宿主现算 `/api/workpapers/onlyoffice/health` 命中行号；N3 == [180]，其余四条 == []。",
+   "value": 1
+  },
+  {
+   "id": "ND-5",
+   "what": "**orphan 不止 dual-mode**：8 个零生产边 N composable / 1,325 行，含 `useN4AdjudicationV2.ts`(288) + `useN4DetailV2.ts`(281) 这对 **V1/V2 孪生**",
+   "why_not_copyable": "M 的 orphan 全是 `use M{n}DualMode.ts` 孪生（11 个，形态同构）；只扫 `use N*DualMode.ts` 会漏掉 5 个非 dual-mode 的 orphan，其中 `useN4AdjudicationV2.ts` 还声明了生产从未写过的键 `N4-1-rows-v2`（与 J 的 TK-6 同型的接线陷阱）。",
+   "recompute_recipe": "对 `composables/` 下全部 `^(useN[1-5]|n[1-5])` 模块现算 statement 边，生产边 == 0 的集合与声明集合做**有序等值 + 无重复**双断言。",
+   "value": 8
+  },
+  {
+   "id": "ND-6",
+   "what": "sheet 名含两处脏字面量：`税金及附加审计程序表N4A `（**尾随空格**）与 `附注披露信息（国企`（**缺右括号**）",
+   "why_not_copyable": "M 那轮的脏字面量是**前导**空格（`' 实收资本实质性程序表 M2A'`）；N 是尾随空格 + 缺括号。strip 掉尾随空格会让 N4A 的 sheet 名映射类缺陷凭空消失；披露判定若用「全等 `附注披露信息（国企）`」，N5 的国企披露 Tab 永远挂不上。",
+   "recompute_recipe": "openpyxl 现读 5 本册 sheet 名（**不得 strip**），断言 `'税金及附加审计程序表N4A ' in N4.sheetnames` 且它 != 其 strip 版；断言 `'附注披露信息（国企' in N5.sheetnames` 且 `'附注披露信息（国企）' not in`。",
+   "value": 2
+  },
+  {
+   "id": "ND-7",
+   "what": "**跨册 sheet 码碰撞**：`N3A` 一码两册（N3 册的 `递延所得税负债审计程序表的N3A` 与 N5 册的 `所得税审计程序表N3A (原底稿)`）；另有 `O1A` 在 N2 册、`O2A` 在 N4 册",
+   "why_not_copyable": "M/L 的 sheet 码都不跨册。按「码 → 册」定位 OO sheet 会把 N5 的 N3A 打开成 N3 的册。N5 的路由把 `N3A` 显式排除到 OO 兜底（`n5SheetRouting.ts#L39`）正是这条碰撞留下的痕迹。",
+   "recompute_recipe": "对 5 本册全部 sheet 名现算「码 → 册集合」映射，断言 `N3A` 的册集合大小 == 2；断言 `O1A` 只在 N2 册、`O2A` 只在 N4 册（O 码出现在 N 册）。",
+   "value": 3
+  },
+  {
+   "id": "ND-8",
+   "what": "位置化**持久化键**只有 1 族 3 处（`${ITEM_PREFIX}-${index}`，无 `row-` 中缀）；系统性形态在**整表 JSON 数组按位置寻址**（48 处）",
+   "why_not_copyable": "M 的扫描器是 ``itemId:\\s*`…row-\\$\\{(n|i|idx|index)\\}…` ``，在 N 上 **0 命中** ⇒ 会把 N 判成「无位置化缺陷」。同时 N 有两张**干净**的表（N3-2 / N4-2 有持久化稳定 id），所以「本循环全表有缺陷」这类 M 式结论在 N 上是错的。",
+   "recompute_recipe": "两族分开现算：持久化键族 == 3（含 `${ITEM_PREFIX}-${index}` 形态）、M 式 `row-${n}` 形态现算 == 0（反向证明扫描器换了口径）；5 张表逐表判 DEFECT/CLEAN，3/2。",
+   "value": 3
+  }
+ ],
+ "orphan_dual_mode_inventory": {
+  "why_this_key_exists": "登记本循环 dual-mode 载体的可达性与 orphan 全集（AC 1.7 的删除依据）。",
+  "scan_recipe": "① dual-mode 模块集合 = `composables/useN[1-5]DualMode.ts`（现算 5 个）；② 可达性用**statement-position import 路径字面量**判（`from '…'` 可独占一行，多行 import 必须认；排除**双引号字符串内**的匹配 —— `workpaperSyncLegacyBaseline.generated.ts` 的 JSON `\"snippet\"` 含完整 `from '...'` 形态）；③ 路径解析按**路径**而非 stem 相等（`useN1DualMode` 与 `useN1DualMode.ts` 同一个，但 `n1/useN1DualMode.ts` 不是）；④ orphan 判定用**可达性**而非入度（无 barrel ⇒ 一阶等于全部）。",
+  "orphan_order_recipe": "N 域**没有 barrel**（`composables/index.ts` 现算不存在）⇒ 全部 orphan 都是一阶；二阶 orphan（只被别的 orphan 引用）现算 0。判据两侧都验：既算一阶数，也算二阶数。",
+  "n_cycle_specific_note": "🔴 与 M 的关键差别：M 的 orphan 全是 dual-mode 孪生；N 的 orphan 里有 5 个**不是** dual-mode（两个 V1/V2 业务孪生 + 一个 AI 模块 + 两个类型/常量模块）。只扫 `use N*DualMode.ts` 会把 orphan 数报成 3 而真值是 8。",
+  "modules": [
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts",
+    "lines": 184,
+    "production_consumers": [],
+    "test_consumers": [],
+    "order": "first",
+    "localStorage_key": "n3-dual-mode",
+    "localStorage_key_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts#L39",
+    "storage_key_is_wp_scoped": false,
+    "calls_legacy_health_endpoint": true,
+    "calls_legacy_health_endpoint_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts#L42",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "live_counterpart": "宿主内联（GtN3DeferredTaxLiabilities.vue#L168）"
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts",
+    "lines": 184,
+    "production_consumers": [],
+    "test_consumers": [],
+    "order": "first",
+    "localStorage_key": "n4-dual-mode",
+    "localStorage_key_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts#L39",
+    "storage_key_is_wp_scoped": false,
+    "calls_legacy_health_endpoint": true,
+    "calls_legacy_health_endpoint_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts#L42",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "live_counterpart": "宿主内联且 inert（GtN4TaxesAndSurcharges.vue#L196）"
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts",
+    "lines": 184,
+    "production_consumers": [],
+    "test_consumers": [],
+    "order": "first",
+    "localStorage_key": "n5-dual-mode",
+    "localStorage_key_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts#L39",
+    "storage_key_is_wp_scoped": false,
+    "calls_legacy_health_endpoint": true,
+    "calls_legacy_health_endpoint_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts#L42",
+    "mode_values": [
+     "html",
+     "onlyoffice"
+    ],
+    "live_counterpart": "宿主内联且 inert（GtN5IncomeTaxExpense.vue#L278）"
+   }
+  ],
+  "live_modules": [
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN1DualMode.ts",
+    "lines": 257,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L158",
+     "audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue#L511",
+     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjudication.vue#L435",
+     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjustment.vue#L311",
+     "audit-platform/frontend/src/components/workpaper/n1/core/N1TabDetail.vue#L348"
+    ],
+    "localStorage_key": "n1-dual-mode",
+    "storage_key_is_wp_scoped": true
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts",
+    "lines": 17,
+    "production_consumers": [
+     "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L228"
+    ],
+    "localStorage_key": null,
+    "storage_key_is_wp_scoped": null
+   }
+  ],
+  "orphan_non_dual_mode_modules": [
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts",
+    "lines": 288,
+    "kind": "v1_v2_twin",
+    "live_twin": "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts",
+    "fabricated_key": "N4-1-rows-v2",
+    "fabricated_key_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts#L66",
+    "why_it_matters": "🔴 与 J 的 TK-6 同型：这个从未被引用的模块声明了一套**生产从未写过**的键形态（`N4-1-rows-v2`，而生产写的是 V1 的 `N4-1-rows`）。若 Task 72 把 adapter 接到它上面，宿主行为一点不变（不可达）、契约字段却会按一套从未存在过的键生成，而常规守卫全绿。",
+    "production_consumers": 0,
+    "test_consumers": []
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN4DetailV2.ts",
+    "lines": 281,
+    "kind": "v1_v2_twin",
+    "live_twin": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts",
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "why_it_matters": "同上（V2 孪生），键形态与 V1 相同（`N4-2-detail-rows`）故无伪造键，但仍是 1,308 行 orphan 里的一部分。",
+    "production_consumers": 0,
+    "test_consumers": []
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useN5AiAssist.ts",
+    "lines": 85,
+    "kind": "orphan_feature_module",
+    "live_twin": null,
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "why_it_matters": "AI 辅助模块零生产边；N3/N4 的 AI 调用都写在组件里直调 `/ai/generate-text`（N3TabAdjudication#L751 等），没有走这个模块。",
+    "production_consumers": 0,
+    "test_consumers": []
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/n1DisclosureSegmentTypes.ts",
+    "lines": 20,
+    "kind": "orphan_type_module",
+    "live_twin": null,
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "why_it_matters": "纯类型声明，零生产边。登记它是为了让 orphan 计数有可复核的全集（不是只挑 dual-mode 那三个）。",
+    "production_consumers": 0,
+    "test_consumers": []
+   },
+   {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/n2VatSourceConstants.ts",
+    "lines": 99,
+    "kind": "orphan_constant_module",
+    "live_twin": null,
+    "fabricated_key": null,
+    "fabricated_key_source_ref": null,
+    "why_it_matters": "与 `useN2VatSourceCalc.ts` / `useN2VatSourceEngine.ts` 同族；后两者有生产边（互相引用 + N2TabVatCalc），本模块无。",
+    "production_consumers": 0,
+    "test_consumers": []
+   }
+  ],
+  "shared_base_preserved": {
+   "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+   "why_preserved": "被 25 条非 N 生产边使用（B22/B50/D1/D3~D7/G2/J1/J2/J3/M1~M10），legacy_deletion_paradigm 的 `shared_base_preserved` 约束不删。",
+   "statement_production_consumers": 26,
+   "statement_test_consumers": 1,
+   "statement_consumers_total": 27,
+   "n_cycle_consumers": 1,
+   "n_cycle_consumer_sites": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN2DualMode.ts#L2"
+   ],
+   "consumers_after_rewiring": 25,
+   "mode_storage": "内存 ref（`const mode = ref<WorkpaperRenderMode>('html')`），**不落 localStorage**",
+   "calls_legacy_health_endpoint": true,
+   "recompute_note": "🔴 **不得照抄 M 那轮的 29**：同口径本轮现算 26 生产 + 1 测试 = 27，平台边集在两轮之间已漂移。任何「共享基类边数」都必须**每轮现算**，把上一轮的数字抄下来就是把守卫锁死在过期基线上。"
+  },
+  "counters": {
+   "dual_mode_module_files_total": 5,
+   "orphan_dual_mode_modules": 3,
+   "orphan_dual_mode_first_order": 3,
+   "orphan_dual_mode_second_order": 0,
+   "orphan_barrels": 0,
+   "orphan_dual_mode_lines_total": 552,
+   "live_dual_mode_modules": 2,
+   "live_dual_mode_lines_total": 274,
+   "orphan_non_dual_mode_modules": 5,
+   "orphan_non_dual_mode_lines_total": 773,
+   "orphan_modules_total": 8,
+   "orphan_lines_total": 1325,
+   "orphan_v1_v2_twins": 2,
+   "orphan_modules_with_fabricated_key_shape": 1,
+   "orphan_modules_calling_legacy_health_endpoint": 3,
+   "live_modules_calling_legacy_health_endpoint": 1,
+   "dual_mode_modules_calling_legacy_config_endpoint": 1,
+   "orphan_modules_with_storage_key": 3,
+   "live_modules_with_storage_key": 1,
+   "orphan_modules_with_wp_unscoped_storage_key": 3,
+   "live_modules_with_wp_unscoped_storage_key": 0,
+   "hosts_with_inline_dual_mode": 3,
+   "hosts_calling_legacy_health_endpoint_directly": 1,
+   "shared_base_statement_consumers": 27,
+   "shared_base_n_cycle_consumers": 1,
+   "shared_base_consumers_after_rewiring": 25,
+   "hosts_with_inline_dual_mode_object_literal": 2
+  }
+ },
+ "mode_switch_resolution": {
+  "why_this_key_exists": "AC 1.4 / 1.5 的义务判据要落到「开关到底能不能兑现」上。N 循环**同时存在三种结论**（redeemable / inert / 无第三类），且 inert 的两条是**宿主内联的空实现**，不是 L 那种「载体不可达」——判据形态不同，照抄 L/M 都会假红。",
+  "verdict": "mixed_three_redeemable_two_inert",
+  "verdict_is_binary": false,
+  "verdict_allowed_values": [
+   "redeemable",
+   "inert",
+   "no_switch"
+  ],
+  "verdict_why_not_a_single_enum_value": "5 条 entry 里 3 条（N1/N2/N3）的开关切过去真会渲染 OO 编辑器，2 条（N4/N5）的 `onModeChange` 是空实现 ⇒ 一个枚举值无法如实描述本 slice。",
+  "per_entry_verdict": {
+   "xlsx/gt-n1-deferred-tax-assets": "redeemable",
+   "xlsx/gt-n2-taxes-payable": "redeemable",
+   "xlsx/gt-n3-deferred-tax-liabilities": "redeemable",
+   "xlsx/gt-n4-taxes-and-surcharges": "inert",
+   "xlsx/gt-n5-income-tax-expense": "inert"
+  },
+  "redeemable_three_elements": "① 宿主模板里有 `<el-segmented>`；② 有一个由 mode 门控的 `<GtOnlyOfficeSheet>` 挂载点；③ 切换回调真的会改 mode（不是 `() => {}`）。三要素缺一即非 redeemable。",
+  "inert_evidence": [
+   {
+    "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+    "inline_carrier_site": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L196",
+    "noop_callback_site": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L203",
+    "mode_ref_site": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L197",
+    "mode_gated_oo_mount_site": "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L16",
+    "why_inert": "`onModeChange: () => {}` ⇒ `currentMode` 永远是 'html' ⇒ #L17 那个 `v-if=\"isHtmlSheet && dualMode.currentMode.value === 'onlyoffice'\"` 的挂载点**结构性不可达**（死代码），而 `<el-segmented>` 仍然显示两个可点选项 —— 这正是 AC 1.4 禁止的「以双模式成功态呈现假双向」。",
+    "orphan_twin_that_would_fix_it": "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts"
+   },
+   {
+    "entry_id": "xlsx/gt-n5-income-tax-expense",
+    "inline_carrier_site": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L278",
+    "noop_callback_site": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L285",
+    "mode_ref_site": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L279",
+    "mode_gated_oo_mount_site": "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L16",
+    "why_inert": "与 N4 逐字同形（同一段被复制的内联对象字面量）。",
+    "orphan_twin_that_would_fix_it": "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts"
+   }
+  ],
+  "why_this_is_not_a_reason_to_adjudicate_single": "🔴 「开关坏了」不是 AC 12.9 的判据。AC 12.9 问的是「无 OO 业务价值」，而 N4/N5 的权威册分别有 9 / 16 张 sheet、236 / 484 个公式格，且各有 2 / 3 张 sheet **只有** OO 承载。该修的是空实现（把 orphan 孪生接上或改内联实现），不是把 OO 入口删掉。Task 54 已就「开关坏了不是理由」定论，本条同理。",
+  "live_ac_is_1_4": "🔴 AC 1.5 的触发条件是「入口**被裁决**为纯 OO 或纯 HTML」。本 slice 5 条 entry 的 capability 全为 null（待裁决），无一条被裁为 single_* ⇒ AC 1.5 **不适用**。生效的是 AC 1.4：5 条 entry 都没注册 adapter，界面却给出可点的模式切换；平台已有单一真源 `components/workpaper/sync/workpaperEntrySyncNotice.ts` + `GtEntrySyncCapabilityNotice.vue`（现算 41 个生产消费方，D/F/G/H 域都挂了），**N 域 0/5 挂载** ⇒ BP-7。只放 `el-tooltip` 不算满足（EP teleport + 仅 hover 才进 DOM），必须常显摘要 + tooltip 细节。",
+  "ac14_notice_single_source": {
+   "ts": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+   "vue": "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+   "label_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L55",
+   "summary_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L58",
+   "reason_constant_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L67",
+   "registered_entry_ids_source_ref": "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L52",
+   "registered_entry_ids_is_empty": true,
+   "production_consumers": 41,
+   "n_cycle_consumers": 0
+  },
+  "counters": {
+   "entries_with_redeemable_switch": 3,
+   "entries_with_inert_switch": 2,
+   "entries_with_no_switch_at_all": 0,
+   "entries_mounting_the_ac14_notice": 0,
+   "hosts_with_segmented_site": 5,
+   "hosts_with_oo_mount": 5,
+   "hosts_claiming_bidirectional_in_template": 0
+  }
+ },
+ "sheet_granularity_and_router_audit": {
+  "why_this_key_exists": "AC 12.4 要求逐 entry 推进；本节把「每张权威 sheet 到底由谁渲染」逐张冻结，并给出可复算的分类 recipe。🔴 与 M 的关键差别：N 有两张 sheet 由**程序表路由**渲染（HTML，但不参与双模式切换）——只按 `isHtmlSheet()` 分两类会把它们错记成 OO 兜底。",
+  "classification_enum": [
+   "html_child",
+   "html_program_console",
+   "oo_fallthrough"
+  ],
+  "classification_recipe": "① sheet 名集合 = openpyxl 现读（**不 strip**、跳 `~$` 锁文件）；② 归一键 = 逐宿主的真实判定逻辑：N1/N3 是宿主内联正则、N2/N4/N5 是 `composables/shared/cycleSheetRouting.ts` 的 `makeCycleSheetRouter`（守卫按源码现读的 `codeRe` / `htmlCodeRe` / `bareCodes` / `SOE_TOKENS` 做 Python 侧等价复算）；③ `html_program_console` = 归一键落在宿主的程序表分支（N1 的 `procedure` → `GtAProgramConsole`、N4 的 `N4A` → `GtCycleAProgramRouter`）；④ 其余 `isHtmlSheet()` 为真的是 `html_child`，为假的是 `oo_fallthrough`。",
+  "oo_fallthrough_classification": {
+   "enum": [
+    "gt_custom_config_sheet",
+    "program_sheet_not_html_migrated",
+    "pre_revision_original_sheet",
+    "reference_example_sheet"
+   ],
+   "counts": {
+    "gt_custom_config_sheet": 5,
+    "program_sheet_not_html_migrated": 3,
+    "pre_revision_original_sheet": 3,
+    "reference_example_sheet": 1
+   },
+   "note": "四类穷举、无 `other` 兜底桶。任何新 sheet 落不进这四类即打红（fail closed）。"
+  },
+  "sheet_code_collision_audit": {
+   "why": "ND-7：跨册 sheet 码碰撞会让「按码定位 OO sheet」跨册错位。",
+   "collisions": [
+    {
+     "code": "N3A",
+     "workbooks": [
+      "N3 递延所得税负债.xlsx",
+      "N5 所得税费用.xlsx"
+     ],
+     "sheets": [
+      "递延所得税负债审计程序表的N3A",
+      "所得税审计程序表N3A (原底稿)"
+     ],
+     "handled_by": "audit-platform/frontend/src/components/workpaper/composables/n5SheetRouting.ts#L39（N5 侧把 N3A 显式排除到 OO 兜底）"
+    }
+   ],
+   "foreign_letter_codes_in_n_workbooks": [
+    {
+     "code": "O1A",
+     "workbook": "N2 应交税费.xlsx",
+     "sheet": "应交税费审计程序表O1A （原底稿）"
+    },
+    {
+     "code": "O2A",
+     "workbook": "N4 税金及附加.xlsx",
+     "sheet": "税金及附加审计程序表O2A（原底稿）"
+    }
+   ],
+   "counters": {
+    "colliding_codes": 1,
+    "colliding_workbooks": 2,
+    "foreign_letter_codes": 2
+   }
+  },
+  "dirty_sheet_name_literals": [
+   {
+    "workbook": "N4 税金及附加.xlsx",
+    "sheet": "税金及附加审计程序表N4A ",
+    "defect": "trailing_space",
+    "why_it_matters": "strip 后与 `税金及附加审计程序表N4A` 不同 —— 守卫若 strip，「OO sheet 名映射错位」这类缺陷会凭空消失"
+   },
+   {
+    "workbook": "N5 所得税费用.xlsx",
+    "sheet": "附注披露信息（国企",
+    "defect": "missing_closing_paren",
+    "why_it_matters": "若披露判定写成全等 `附注披露信息（国企）`，N5 的国企披露 Tab 永远挂不上；现行实现用「包含 `国企`」故命中（`cycleSheetRouting.ts` 的 SOE_TOKENS）"
+   }
+  ],
+  "counters": {
+   "authoritative_sheets_total": 59,
+   "sheets_covered_by_html_child": 45,
+   "sheets_rendered_by_program_console": 2,
+   "sheets_covered_by_html_side_total": 47,
+   "sheets_falling_through_to_oo": 12,
+   "dual_mode_switchable_sheets": 45,
+   "hosts_using_shared_cycle_sheet_router": 3,
+   "hosts_using_host_inline_regex": 2,
+   "dirty_sheet_name_literals": 2
+  },
+  "verdict": "5 本册共 59 张 sheet：45 张由 HTML 专属子组件渲染、2 张由程序表路由渲染（也是 HTML）、12 张落 OO 兜底。OO 侧因此有真实且**不可替代**的业务承载（5 张 GT_Custom 配置表 + 3 张未 HTML 化的程序表 + 3 张修订前原底稿 + 1 张参考示例）⇒ AC 12.9 的 single_html 判据不成立。🔴 但「有 OO 承载」不等于「OO 可定位」：N4A 的尾随空格与 N3A 的跨册碰撞（BP-11）意味着按码解析 sheet 名会错位 —— 这是缺陷登记，不是裁决理由。"
+ },
+ "transport_key_resolution": {
+  "why_this_key_exists": "🔴 直接兑现 tasks.md 的 Task 56 正文「核验真实传输键」。判据要求：**从 owner 常量现读，禁按命名规律推断**。本节把 N 循环每个持久化区块的 owner 声明、键集合、派生方式、身份字段、落库路径逐条冻结，并把「按规律猜会猜错」的反例一并登记（分母不为空才能证明那条要求不是口号）。",
+  "how_to_verify": "守卫对每条 declaration：① 打开 `owner_module` 现读 `owner_constant` 的字面量；② 按 `derivation` 现算键集合并与 `keys` 等值比对（有序 + 无重复双断言）；③ 断言 `identity_field` 真出现在该模块的行对象构造处；④ 对 `persisted_via` 声明的路径断言该文件里真有对应的 PUT 站点；⑤ 对 `nonexistent_guessed_keys` 反向断言：这些串在全 N 域生产源码里命中数为 0。",
+  "forbidden_shortcuts": [
+   "只 grep 键字符串存在 —— 注释里的旧键与 orphan 模块里的伪造键也会命中",
+   "按 `{wp_code}-rows` 命名规律推断 —— N1-1 的键是 `N1-1-adj-{index}`、N2-8 是 `N2-8-manual-rows`、N5-6-1 是 `N5-6-1-rd-projects`，三者与该规律都不同构",
+   "把 orphan 载体拼出的键当真实形态（`useN4AdjudicationV2.ts` 的 `N4-1-rows-v2` 生产从未写过）",
+   "把 `{code}-` 前缀当成「所有键都以它开头」—— N5 另有 5 个 `N5-cross-*` 跨表键，且 N5 会**读** `N1-` / `N3-` / `I6-` / `I2-` / `A-` 五个外部命名空间"
+  ],
+  "declarations": [
+   {
+    "id": "TK-1",
+    "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "block": "N1 全册（entry 级命名空间）",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_value": "N1-",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L61",
+    "declaration_kind": "module_constant_plus_two_segment_derivation",
+    "derivation": "`${ITEM_PREFIX}${sheet}-${field}`（#L315 / #L336），sheet/field 由调用点给出",
+    "identity_field": "item_id",
+    "persisted_via": "api.put(/checklist-responses)",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1FormData.ts#L290",
+    "status": "resolved"
+   },
+   {
+    "id": "TK-2",
+    "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "block": "N1-1 审定表（7 类固定骨架，位置化键）",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_value": "N1-1-adj",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L117",
+    "declaration_kind": "module_constant_plus_index_derivation",
+    "derivation": "`${ITEM_PREFIX}-${index}`，index 是 `N1_ADJUDICATION_CATEGORIES`（#L107，7 项）的**数组下标**",
+    "keys": [
+     "N1-1-adj-{index}"
+    ],
+    "keys_are_runtime_derived": true,
+    "keys_are_runtime_derived_note": "🔴 这里的 `keys` 是**模板形态**不是字面量：`N1-1-adj-0` … `N1-1-adj-6` 在源码里一个都不存在（它们由 `${ITEM_PREFIX}-${index}` 运行时拼出）。守卫因此不能对它们做「字面量至少 1 命中」的判据 —— 那会恒假。改成两条：① 模板串本身在 owner 模块里命中；② 展开数 == `N1_ADJUDICATION_CATEGORIES` 现算长度（7）。",
+    "key_expansion": [
+     "N1-1-adj-0",
+     "N1-1-adj-1",
+     "N1-1-adj-2",
+     "N1-1-adj-3",
+     "N1-1-adj-4",
+     "N1-1-adj-5",
+     "N1-1-adj-6"
+    ],
+    "key_expansion_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L107",
+    "key_order_matters": true,
+    "key_order_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L107 的常量数组顺序",
+    "identity_field": null,
+    "identity_field_note": "行对象没有身份字段，身份就是下标 —— 见 dynamic_row_identity 的 family B",
+    "identity_defect": "positional_persistence_key",
+    "identity_defect_detail": "🔴 读（#L130 / #L163）与写（#L429）三处都用 `${ITEM_PREFIX}-${index}`。现状下 7 类是源模板 A7~A13 的固定骨架，所以下标**暂时**稳定；但一旦源模板增删一类、或前端插入自定义行，全部历史数据整体左移/右移，且没有任何守卫会红。AC 6.5 明文要求「动态行 SHALL 使用模板行 key 或 row_uuid；不得使用数组下标作为持久化身份」——这里唯一可用的稳定键（`category` 字符串）就在同一行的 `cat` 变量里，却没有被用上。",
+    "persisted_via": "父 entry 的 useN1FormData.debouncedSave",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+    "extra_keys_in_same_tab": [
+     "N1-1-total-audited",
+     "N1-1-total-begin"
+    ],
+    "extra_keys_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L442",
+    "registered_as": "BP-8",
+    "status": "resolved_with_defect"
+   },
+   {
+    "id": "TK-3",
+    "entry_id": "xlsx/gt-n2-taxes-payable",
+    "block": "N2 全册 + 6 张整表 JSON 行表",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_value": "N2-",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN2FormData.ts#L43",
+    "declaration_kind": "module_constant_plus_per_tab_literal_table_keys",
+    "derivation": "entry 级前缀派生 + 各 calc/inspection composable 各自的字面量表键常量",
+    "keys": [
+     "N2-1-adjudication-rows",
+     "N2-2-detail-rows",
+     "N2-3-entries",
+     "N2-6-vat-rows",
+     "N2-8-manual-rows",
+     "N2-9-property-rows",
+     "N2-10-lvt-rows"
+    ],
+    "key_order_matters": false,
+    "keys_owner_sources": [
+     "audit-platform/frontend/src/components/workpaper/composables/useN2CrossSheet.ts#L98",
+     "audit-platform/frontend/src/components/workpaper/composables/useN2Detail.ts#L197",
+     "audit-platform/frontend/src/components/workpaper/n2/core/N2TabAdjustment.vue#L326",
+     "audit-platform/frontend/src/components/workpaper/composables/useN2VatCalc.ts#L105",
+     "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L120",
+     "audit-platform/frontend/src/components/workpaper/composables/useN2PropertyTax.ts#L108",
+     "audit-platform/frontend/src/components/workpaper/composables/useN2Lvt.ts#L154"
+    ],
+    "identity_field": "key",
+    "identity_field_source": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L277",
+    "identity_defect": "positional_render_key_with_zero_consumers",
+    "identity_defect_detail": "🔴 `key: `manual-${idx}``（#L277）是 `CalcRow` 展示投影上的位置化身份字段，而 `N2TabOtherTaxCalc.vue` 里 **`:key` 现算命中 0** ⇒ 这个身份字段当前**无消费方**。两面都要说清：它现在不会造成串行（没人用），但它是一条 additive 死声明，谁一接上就是位置化身份。持久化侧的真实身份是**数组位置**（`updateManualRow(index, …)` #L348 直接按下标写 `manualRows`）。",
+    "persisted_via": "各 composable 的 saveField → useN2FormData.debouncedSave",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L356",
+    "registered_as": "BP-8",
+    "status": "resolved_with_defect"
+   },
+   {
+    "id": "TK-4",
+    "entry_id": "xlsx/gt-n3-deferred-tax-liabilities",
+    "block": "N3 全册 + N3-2 明细表（**干净的反例**）",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_value": "N3-",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN3FormData.ts#L43",
+    "declaration_kind": "module_constant_plus_literal_table_key",
+    "derivation": "entry 级前缀派生 + `N3-2-rows` 字面量（useN3Detail#L127）",
+    "keys": [
+     "N3-2-rows",
+     "N3-3-entries"
+    ],
+    "key_order_matters": false,
+    "keys_owner_sources": [
+     "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L127",
+     "audit-platform/frontend/src/components/workpaper/n3/core/N3TabAdjustment.vue#L390"
+    ],
+    "identity_field": "id",
+    "identity_field_source": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L151",
+    "identity_generator": "generateRowId",
+    "identity_generator_source": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L91",
+    "identity_generator_form": "`row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`",
+    "identity_defect": null,
+    "identity_defect_note": "🔴 **这是本 slice 的反向分母**：N3-2 的行身份是持久化的稳定 id（`id: r.id || generateRowId()` #L151），删改都按 `rowId` 寻址（`removeRow(rowId: string)` #L267 / `updateCell(rowId, …)` #L278），**不是**按下标。没有它，「本循环有位置化身份缺陷」这条结论就是恒真的空话。",
+    "persisted_via": "useN3FormData.debouncedSave",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L236",
+    "status": "resolved"
+   },
+   {
+    "id": "TK-5",
+    "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+    "block": "N4 全册 + N4-1/N4-2 + 跨表键（V1 live / V2 orphan 两套声明）",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_value": "N4-",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN4FormData.ts#L63",
+    "declaration_kind": "module_constant_plus_v1_literal_keys_plus_one_cross_key",
+    "derivation": "entry 级前缀派生 + V1 的 `N4-1-rows` / `N4-2-detail-rows` + `N4-cross-n2-accrual`",
+    "keys": [
+     "N4-1-rows",
+     "N4-2-detail-rows",
+     "N4-3-entries",
+     "N4-cross-n2-accrual"
+    ],
+    "key_order_matters": false,
+    "keys_owner_sources": [
+     "audit-platform/frontend/src/components/workpaper/composables/useN4CrossSheet.ts#L222",
+     "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L88",
+     "audit-platform/frontend/src/components/workpaper/n4/core/N4TabAdjustment.vue#L268",
+     "audit-platform/frontend/src/components/workpaper/composables/useN4CrossSheet.ts#L159"
+    ],
+    "identity_field": "id",
+    "identity_field_source": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L223",
+    "identity_defect": null,
+    "second_declaration_module": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts",
+    "second_declaration_constant": "ROWS_KEY",
+    "second_declaration_source": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts#L66",
+    "second_declaration_value": "N4-1-rows-v2",
+    "second_declaration_verdict": "FABRICATED_KEY_SHAPE_NEVER_WRITTEN_IN_PRODUCTION",
+    "second_declaration_verdict_detail": "🔴 `useN4AdjudicationV2.ts` 零生产边（orphan），它声明的 `N4-1-rows-v2` 在全 N 域生产源码里**只出现在它自己里**；生产真实写的是 V1 的 `N4-1-rows`。与 J 的 TK-6 同型 ——接 adapter 时接错模块，契约会按一套从未存在过的键形态生成而宿主行为不变。",
+    "persisted_via": "useN4FormData.debouncedSave / useN4CrossSheet 自己的 api.put",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN4CrossSheet.ts#L157",
+    "registered_as": "BP-6",
+    "status": "resolved_with_defect"
+   },
+   {
+    "id": "TK-6",
+    "entry_id": "xlsx/gt-n5-income-tax-expense",
+    "block": "N5 全册 + 5 张 JSON 行表 + 5 个 `N5-cross-*` 写键 + 5 个外部只读命名空间",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts",
+    "owner_constant": "ITEM_PREFIX",
+    "owner_constant_value": "N5-",
+    "owner_constant_source": "audit-platform/frontend/src/components/workpaper/composables/useN5FormData.ts#L60",
+    "declaration_kind": "module_constant_plus_literal_table_keys_plus_five_cross_keys",
+    "derivation": "entry 级前缀派生 + 各 calc/benefit composable 的字面量表键 + `useN5CrossSheet._persistCrossData` 的 5 个字面量参数",
+    "keys": [
+     "N5-3-entries",
+     "N5-4-calc-rows",
+     "N5-5-adjustment-rows",
+     "N5-6-1-rd-projects",
+     "N5-8-reconcile-rows",
+     "N5-cross-n1-change",
+     "N5-cross-n3-change",
+     "N5-cross-i6-expensed",
+     "N5-cross-i2-capitalized",
+     "N5-cross-a-profit"
+    ],
+    "key_order_matters": false,
+    "keys_owner_sources": [
+     "audit-platform/frontend/src/components/workpaper/n5/core/N5TabAdjustment.vue#L202",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5CurrentTaxCalc.ts#L170",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L97",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5RdSuperDeduction.ts#L103",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5DeferredReconcile.ts#L153",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L175",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L186",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L440",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L468",
+     "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L499"
+    ],
+    "identity_field": null,
+    "identity_field_note": "N5-5 的行对象**没有**身份字段：`index: i + 1` 在每次 load 时按数组位置重算（#L107），改行按 `updateRow(rowIndex, …)`（#L184）、删行按 `filter((r, i) => i !== rowIndex …)`（#L220）",
+    "identity_defect": "array_position_no_identity_field",
+    "identity_defect_detail": "🔴 整表 JSON 数组存 `N5-5-adjustment-rows`，行身份**就是数组下标**，连兜底 id 都没有。删中间一行后，后续行的 `index` 全部左移，历史 remark/税额串到另一个调整项。同族还有 N5-8（`removeRow(rowIndex)` #L269）与 N5-6-1（`removeProject(rowIndex)` #L240）。",
+    "foreign_namespaces_read": [
+     {
+      "key": "N1-1-total-begin",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L374"
+     },
+     {
+      "key": "N1-1-total-audited",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L375"
+     },
+     {
+      "key": "N3-1-change-total",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L405"
+     },
+     {
+      "key": "N3-1-end-balance-total",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L406"
+     },
+     {
+      "key": "I6-1-audited-total",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L436"
+     },
+     {
+      "key": "I2-1-audited-total",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L464"
+     },
+     {
+      "key": "A-profit-total",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L494"
+     },
+     {
+      "key": "A-accounting-profit",
+      "site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L494"
+     }
+    ],
+    "foreign_namespaces_verdict": "READ_ONLY_NOT_A_NAMESPACE_VIOLATION",
+    "foreign_namespaces_verdict_detail": "🔴 Property 70 问的是「contract / bundle / candidate / evidence / scenario 不得跨 entry 复用」，**不是**「不得读别的 entry 的数」。N5 对 8 个外部 item_id 全是 GET 侧读（`responses.find(r => r.item_id === …)`），写只写自己的 `N5-cross-*` ⇒ 命名空间没有被污染，5 个 `N{n}-` 前缀仍两两不互为前缀。但它确实让 N5 的 required scenario set 必须把跨 entry 只读依赖建模进去（BP-12），否则「单 entry 场景集」会漏掉「上游 entry 改数 → 本 entry 派生值变化」这一整类场景。",
+    "persisted_via": "useN5FormData.debouncedSave / useN5CrossSheet 自己的 api.put",
+    "persist_site": "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L196",
+    "registered_as": "BP-8 + BP-12",
+    "status": "resolved_with_defect"
+   }
+  ],
+  "nonexistent_guessed_keys": [
+   "N1-1-rows",
+   "N1-1-adjudication-rows",
+   "N2-1-rows",
+   "N3-1-rows",
+   "N4-1-adjudication-rows",
+   "N5-1-rows",
+   "N5-5-rows",
+   "N4-1-rows-v3"
+  ],
+  "nonexistent_guessed_keys_note": "🔴 这 8 个「按命名规律该有」的键在全 N 域 135 个生产文件里命中数各为 0。这是「禁按命名规律推断」那条要求的**非空反向分母** —— 没有它，「我们现读了 owner 常量」只是自述。判据两侧都验：8 个各 0 命中，且 declarations 里登记的每个键至少 1 命中。🔴 `N4-1-rows-v2` **不在**本清单里：它命中 1 次（orphan 模块自己），是「伪造键形态」而不是「不存在的键」，两类不能混。",
+  "shared_adapter_absent": {
+   "what": "N 域**不经** `useChecklistPersistence` 共享持久化适配器",
+   "recomputed_hits": 0,
+   "why_it_matters": "K/J 循环的判据是「宿主 → useChecklistPersistence → PUT」三段式；照抄到 N 上会 0 命中而被误读成「N 没有持久化」。N 的形态是逐 entry 一份 `useN{n}FormData.ts` 自带 api.get/api.put。"
+  },
+  "summary": {
+   "declarations_total": 6,
+   "entry_scoped_declarations": 6,
+   "declarations_resolved_clean": 2,
+   "declarations_resolved_with_defect": 4,
+   "declarations_with_two_source_declarations": 1,
+   "counting_note": "🔴 按维度现算并等值比对：TK-1..TK-6 共 6 条，全部 entry_scoped；status == 'resolved' 的 TK-1/TK-4 共 2 条；'resolved_with_defect' 的 TK-2/TK-3/TK-5/TK-6 共 4 条；second_declaration_module 非空的 TK-5 共 1 条。"
+  }
+ },
+ "dynamic_row_identity": {
+  "why_this_section_exists": "本 slice 的 5 条 entry 全部含「行数由业务数据决定」的动态行表，触发 `slice_schema.conditional_sections` 的 `dynamic_row_identity`。🔴 Property 23 是本轮 tasks.md **正式点名**项（前几轮只作 partial 顺带核），故判据按它自己的原文（「删除/重排/再新增后旧 row_uuid 不复用，原行数据不串到新行」）分两族穷举，并保留干净反例作反向分母。",
+  "source_of_truth": "各 owner composable 的源码（本节每行都带 source_ref 指到具体文件与行号），不是本文件的自述",
+  "forbidden_identity_kinds": [
+   "array_index",
+   "display_sequence",
+   "label_text",
+   "positional_persistence_key"
+  ],
+  "kind_semantics_note": "🔴 `tables[].row_identity.kind` 描述该表的**主身份机制**（沿用 I/J/K/L/M 五轮的既定口径）。N 循环的主形态与 M **不同**：M 是 44 处 `itemId: `…row-${n}…`` 的持久化键，N 只有 3 处（`${ITEM_PREFIX}-${index}`，**无 `row-` 中缀**）—— 照抄 M 的扫描器在 N 上是 **0 命中**，会把 N 判成「无缺陷」。N 的系统性形态在**整表 JSON 数组按位置寻址**（family C，48 处），它本身只是形态清册，是否构成缺陷逐表判（有稳定 id 兜底的不算）。",
+  "tables": [
+   {
+    "table_key": "n1_adjudication_rows",
+    "entry_id": "xlsx/gt-n1-deferred-tax-assets",
+    "persistence_key": "N1-1-adj-{index}",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L107（7 类固定骨架）",
+    "row_identity": {
+     "kind": "fixed_skeleton_in_memory_positional_index_in_store",
+     "identity_field": null,
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L129",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L130",
+     "stable_alternative_available": "category（同一行的 `cat` 变量）",
+     "violates_forbidden_identity_kind": "positional_persistence_key",
+     "why_kind_is_compound": "🔴 `kind` 不直接写 `positional_persistence_key` 是因为范式校验器（`validate_slice_against_schema`）把 `forbidden_identity_kinds` 的**字面值**当成非法声明拒收 —— 直接写会让整份 slice 过不了校验，于是作者的现实选择只剩「改成一个含糊的干净词」（= 藏起缺陷）。M 那轮用的是同一条出路（`generated_opaque_in_memory_positional_in_store`）。本 slice 把两层如实分开写在 kind 里，**并**用 `violates_forbidden_identity_kind` 显式点名它违反的那个禁用值，本轮守卫对该字段有独立判据（缺了即红）—— 这样既过校验器，又不丢诚实度。"
+    },
+    "registered_as": [
+     "BP-8"
+    ],
+    "verdict": "DEFECT"
+   },
+   {
+    "table_key": "n2_manual_tax_rows",
+    "entry_id": "xlsx/gt-n2-taxes-payable",
+    "persistence_key": "N2-8-manual-rows",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L126（4 个默认手工行，可增删）",
+    "row_identity": {
+     "kind": "positional_render_key_zero_consumers_array_position_in_store",
+     "identity_field": "key",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L277",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L356",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L348",
+     "render_consumers": [],
+     "violates_forbidden_identity_kind": "array_index"
+    },
+    "registered_as": [
+     "BP-8"
+    ],
+    "verdict": "DEFECT"
+   },
+   {
+    "table_key": "n3_detail_rows",
+    "entry_id": "xlsx/gt-n3-deferred-tax-liabilities",
+    "persistence_key": "N3-2-rows",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L99（10 项默认，可增删）",
+    "row_identity": {
+     "kind": "generated_opaque_persisted",
+     "identity_field": "id",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L151",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L236",
+     "generator_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L91",
+     "addressing_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L267"
+    },
+    "registered_as": [],
+    "verdict": "CLEAN"
+   },
+   {
+    "table_key": "n4_detail_rows",
+    "entry_id": "xlsx/gt-n4-taxes-and-surcharges",
+    "persistence_key": "N4-2-detail-rows",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts（税种明细，可增删）",
+    "row_identity": {
+     "kind": "generated_opaque_persisted",
+     "identity_field": "rowKey",
+     "identity_field_note": "🔴 N4-2 的身份字段叫 `rowKey` 而 N3-2 叫 `id` —— 把字段名写死成 `id` 会让判据在 N4 上恒真（找不到就跳过）。",
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L223",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L292",
+     "generator_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L223",
+     "addressing_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L245"
+    },
+    "registered_as": [],
+    "verdict": "CLEAN"
+   },
+   {
+    "table_key": "n5_tax_adjustment_rows",
+    "entry_id": "xlsx/gt-n5-income-tax-expense",
+    "persistence_key": "N5-5-adjustment-rows",
+    "row_count_source": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L104（默认行 + 可增删）",
+    "row_identity": {
+     "kind": "array_position_no_identity_field",
+     "identity_field": null,
+     "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L107",
+     "persistence_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L238",
+     "index_binding_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L190",
+     "removal_source_ref": "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L220",
+     "violates_forbidden_identity_kind": "array_index"
+    },
+    "registered_as": [
+     "BP-8"
+    ],
+    "verdict": "DEFECT"
+   }
+  ],
+  "positional_identity_inventory": {
+   "scan_recipe": "三族分开穷举（剥注释、保留行号，分母 = N 域 135 个生产文件）：① 渲染键族 —— `(rowId|rowKey|id|key)\\s*:\\s*<值>` 且值里含下标 token 且不含 `Date.now`；② 持久化键族 —— item_id 模板里含 `${n|i|idx|index}`（含 `${ITEM_PREFIX}-${index}` 形态）；③ 数组位置寻址族 —— 五条正则的并集（按下标 update / 按下标 remove / 数组槽写 / 按下标 filter / 按下标 splice）。反向判据：展示序号族（`seq: idx + 1`）**不计入**缺陷；熵键族单列。",
+   "render_key_family": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L277",
+     "key": "key",
+     "value": "`manual-${idx}`",
+     "consumers_in_template": 0,
+     "note": "展示投影 CalcRow 上的位置化身份字段，`N2TabOtherTaxCalc.vue` 里 `:key` 现算 0 命中 ⇒ 当前无消费方（additive 死声明），一接上就是位置化身份"
+    }
+   ],
+   "persistence_key_family": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L130",
+     "item_id_template": "${ITEM_PREFIX}-${i}",
+     "direction": "read"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L163",
+     "item_id_template": "${ITEM_PREFIX}-${i}",
+     "direction": "read"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+     "item_id_template": "${ITEM_PREFIX}-${index}",
+     "direction": "write"
+    }
+   ],
+   "array_addressing_family_recipe": "五条正则：`function (?:update|set)\\w*\\(\\s*(?:rowIndex|index|idx)\\s*:` · `function remove\\w*\\(\\s*(?:rowIndex|index|idx)\\s*:` · `\\b(?:currentRows|rows|list|items)\\s*\\[\\s*(?:rowIndex|index|idx|i)\\s*\\]` · `\\.filter\\(\\s*\\([^)]*\\bi\\b[^)]*\\)\\s*=>[^\\n]*\\bi\\s*!==` · `\\.splice\\(\\s*(?:rowIndex|index|idx|i)\\s*,`",
+   "array_addressing_family_counts": {
+    "update_by_row_index": 9,
+    "remove_by_row_index": 10,
+    "array_slot_write": 7,
+    "filter_by_index": 13,
+    "splice_by_index": 9
+   },
+   "display_sequence_family": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN1Detail.ts#L229",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L145",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L167",
+    "audit-platform/frontend/src/components/workpaper/n1/core/N1TabIndex.vue#L210",
+    "audit-platform/frontend/src/components/workpaper/n3/core/N3TabIndex.vue#L204",
+    "audit-platform/frontend/src/components/workpaper/n4/core/N4TabAdjustment.vue#L329",
+    "audit-platform/frontend/src/components/workpaper/n4/core/N4TabIndex.vue#L207",
+    "audit-platform/frontend/src/components/workpaper/n5/core/N5TabIndex.vue#L215"
+   ],
+   "generated_opaque_family": [
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN2Detail.ts#L48",
+     "prefix": "row"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN2Lvt.ts#L123",
+     "prefix": "lvt"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN2PropertyTax.ts#L80",
+     "prefix": "prop"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN3Detail.ts#L92",
+     "prefix": "row"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN4Adjudication.ts#L286",
+     "prefix": "row"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts#L229",
+     "prefix": "custom"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN4Detail.ts#L223",
+     "prefix": "row"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/composables/useN4DetailV2.ts#L220",
+     "prefix": "custom"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/n1/calc/N1TabCalcTable.vue#L865",
+     "prefix": "adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/n1/core/N1TabAdjustment.vue#L486",
+     "prefix": "adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/n2/core/N2TabAdjustment.vue#L414",
+     "prefix": "adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/n3/core/N3TabAdjustment.vue#L485",
+     "prefix": "adj"
+    },
+    {
+     "site": "audit-platform/frontend/src/components/workpaper/n5/core/N5TabDetail.vue#L214",
+     "prefix": "dyn"
+    }
+   ],
+   "counters": {
+    "render_key_hits": 1,
+    "render_key_consumers": 0,
+    "persistence_key_hits": 3,
+    "array_addressing_sites": 48,
+    "display_sequence_sites": 8,
+    "generated_opaque_sites": 13,
+    "defect_hits_total": 4,
+    "tables_total": 5,
+    "tables_with_defect": 3,
+    "tables_clean": 2,
+    "entries_with_positional_identity_defects": 3,
+    "entries_without_positional_identity_defects": 2,
+    "files_with_positional_identity_defect": 2
+   },
+   "counters_note": "🔴 `defect_hits_total = render_key_hits + persistence_key_hits = 1 + 3 = 4`。`array_addressing_sites`（48）**不计入** defect_hits —— 它是形态清册，有稳定 id 兜底的表（N3-2 / N4-2）按位置 splice 也不构成串行。缺陷的判定单位是**表**（5 张里 3 张 DEFECT / 2 张 CLEAN），不是站点。"
+  },
+  "hardcoded_pattern_scan": {
+   "recipe": "六族硬编码正则逐文件现算（剥注释、保留行号）；「0 命中」也要落成判据并用变异证明它是非空跑。",
+   "patterns": {
+    "blankRows_literal_count": "blankRows\\s*\\([^,)]*,\\s*\\d+\\s*\\)",
+    "horizontal_company_column_literals": "['\\\"]公司[1-9]['\\\"]|['\\\"]单位[1-9]['\\\"]",
+    "column_key_uses_label": "key:\\s*(?:col\\.|c\\.)?label\\b",
+    "row_cell_key_uses_label": "\\[\\s*(?:row|r)\\.label\\s*\\]",
+    "seed_placeholder_literal": "['\\\"]项目[1-9N]['\\\"]",
+    "positional_row_id_template": "`row-\\$\\{\\s*(?:i|idx|index)\\s*\\}`"
+   },
+   "hits": {
+    "blankRows_literal_count": [],
+    "horizontal_company_column_literals": [],
+    "column_key_uses_label": [],
+    "row_cell_key_uses_label": [],
+    "seed_placeholder_literal": [],
+    "positional_row_id_template": []
+   },
+   "counters": {
+    "hardcoded_pattern_hits_total": 0,
+    "hardcoded_patterns_at_zero": 6,
+    "hardcoded_patterns_total": 6
+   },
+   "why_zero_is_a_judgement": "六族全 0 命中。这是**判据**不是缺席：扫描分母是 N 域 135 个生产文件（现算，非空），且同一套正则在 G/H/I/K 循环上有过非 0 命中。变异脚本会往真源码里注入一处 `blankRows(p, 3)` 与一处 `` `row-${idx}` `` 证明这两族不是恒 0。"
+  }
+ },
+ "blocking_preconditions": [
+  {
+   "id": "BP-1",
+   "blocks": [
+    "step_5",
+    "step_6",
+    "step_7",
+    "bidirectional"
+   ],
+   "what": "5 条 entry 都没有 approved authority model / reviewed per-entry contract / non-null approved definition bundle。",
+   "status": "open",
+   "must_fix_before": "任一 N entry 标 bidirectional（AC 12.1 / SR-6）",
+   "source_refs": [
+    "backend/data/workpaper_sync_contracts",
+    "backend/app/services/workpaper_sync/contracts.py",
+    "backend/app/services/workpaper_sync/definitions.py"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "observable_consequences": [
+    "`backend/data/workpaper_sync_contracts/` 下逐文件读 `review.entry_id`，无一条属本 slice（现算命中 0）。",
+    "5 条 entry 的 `authority_model` / `definition_bundle` 全为 null。"
+   ]
+  },
+  {
+   "id": "BP-2",
+   "blocks": [
+    "step_8",
+    "bidirectional"
+   ],
+   "what": "没有经 Task 36 `ExcelEntryFinalizeGate.finalize_candidate` finalize 出的 published representation generation。",
+   "status": "open",
+   "must_fix_before": "任一 N entry 标 bidirectional",
+   "source_refs": [
+    "backend/app/services/workpaper_sync/excel_entry_gate.py",
+    "backend/app/services/workpaper_sync/materialize_coordinator.py"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "5 条 entry 的 `instrumentation_candidate` / `published_representation` 全为 null；canonical resolver 仍是 legacy_sheet_onlyoffice_router。"
+  },
+  {
+   "id": "BP-3",
+   "blocks": [
+    "step_10",
+    "bidirectional"
+   ],
+   "what": "真实 OnlyOffice 9.4 探针未对任何 N entry 执行 ⇒ 无逐 scenario evidence。",
+   "status": "open",
+   "must_fix_before": "evidence.verification_state 脱离 UNVERIFIABLE",
+   "source_refs": [
+    "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py",
+    "backend/app/services/workpaper_sync/evidence.py"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "5 条 entry 的 `sync_test_run_id` / `required_scenario_set_digest` 全为 null。"
+  },
+  {
+   "id": "BP-4",
+   "blocks": [
+    "step_6",
+    "step_9"
+   ],
+   "what": "N3 宿主**直调** legacy 端点 `/api/workpapers/onlyoffice/health`（#L180），违反 legacy_deletion_paradigm 的 step 6（这两个端点的调用只能通过 sync bridge 的 materialize 协议）。",
+   "status": "open",
+   "must_fix_before": "N3 宿主改线到 sync bridge",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L180",
+    "backend/data/workpaper_sync_migration_paradigm.json#/paradigm/steps/5"
+   ],
+   "entries": [
+    "xlsx/gt-n3-deferred-tax-liabilities"
+   ],
+   "consequence": "宿主内联的健康检查绕过 bridge；改线时若只删 composable 而不动宿主，这条调用会残留。"
+  },
+  {
+   "id": "BP-5",
+   "blocks": [
+    "step_11"
+   ],
+   "what": "N4 / N5 的模式开关是**空实现**（`onModeChange: () => {}`）⇒ `currentMode` 恒为 'html'，mode 门控的 `<GtOnlyOfficeSheet>` 挂载点结构性不可达，而 `<el-segmented>` 仍显示两个可点选项。",
+   "status": "open",
+   "must_fix_before": "AC 1.4 的义务判据落地（要么把 orphan 孪生接上、要么收掉不可兑现的选项）",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L203",
+    "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L285",
+    "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L16",
+    "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L16"
+   ],
+   "entries": [
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "observable_consequences": [
+    "点「OnlyOffice」无任何反应（无渲染、无报错、无 toast）。",
+    "两条 entry 的 mode 门控 OO 挂载点在任何交互下都不进 DOM。"
+   ]
+  },
+  {
+   "id": "BP-6",
+   "blocks": [
+    "step_9"
+   ],
+   "what": "本循环有 8 个零生产边 orphan composable（1,325 行），其中 `useN4AdjudicationV2.ts` 声明了**生产从未写过**的键 `N4-1-rows-v2`；接 adapter 时若接到 orphan 上，宿主行为一点不变而契约字段会按一套从未存在过的键形态生成。",
+   "status": "open",
+   "must_fix_before": "adapter 接线（必须接 live 载体，且 orphan 按 AC 1.7 删除）",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN3DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5DualMode.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4AdjudicationV2.ts#L66",
+    "audit-platform/frontend/src/components/workpaper/composables/useN4DetailV2.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5AiAssist.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/n1DisclosureSegmentTypes.ts",
+    "audit-platform/frontend/src/components/workpaper/composables/n2VatSourceConstants.ts"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "8 个模块的 statement 生产边现算全为 0；`N4-1-rows-v2` 在全 N 域只命中 1 次（orphan 模块自己）。"
+  },
+  {
+   "id": "BP-7",
+   "blocks": [
+    "step_11"
+   ],
+   "what": "AC 1.4 的提示组件 `GtEntrySyncCapabilityNotice.vue` 在 N 域 **0/5 挂载**（平台现算 41 个生产消费方，D/F/G/H 域都挂了）⇒ 5 条 entry 都没注册 adapter，界面却给出可点的模式切换而不显示可操作原因。",
+   "status": "open",
+   "must_fix_before": "step 11 的 DOM 级判据有对象（常显摘要 + tooltip 细节；只放 el-tooltip 不算满足）",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts#L55",
+    "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "5 条宿主里 `GtEntrySyncCapabilityNotice` 现算命中 0；`SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现算为空数组。"
+  },
+  {
+   "id": "BP-8",
+   "blocks": [
+    "step_6",
+    "bidirectional"
+   ],
+   "what": "3 张动态行表用数组位置/下标作持久化身份（N1-1 的 `N1-1-adj-{index}`、N2-8 的按下标写 `manualRows`、N5-5 的无身份字段整表 JSON）⇒ 删行重排后历史数据串行（AC 6.5 / Property 23）。",
+   "status": "open",
+   "must_fix_before": "为这三张表补 contract 的 row identity 声明（模板行 key 或 row_uuid）",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN1Adjudication.ts#L429",
+    "audit-platform/frontend/src/components/workpaper/composables/useN2OtherTaxCalc.ts#L348",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L190",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5TaxAdjustment.ts#L220"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "持久化键族现算 3 处、渲染键族 1 处；5 张表里 3 张 DEFECT、2 张 CLEAN（N3-2 / N4-2 有持久化稳定 id ⇒ 反向分母非空）。"
+  },
+  {
+   "id": "BP-9",
+   "blocks": [
+    "step_1",
+    "step_4"
+   ],
+   "what": "manifest mirror 的 `capability: single_onlyoffice` 与 `html_store: unresolved` 来自 overlay 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值，**不是逐 entry 裁决**（AP-3）。",
+   "status": "open",
+   "must_fix_before": "manifest 生成器按逐 entry 裁决产出 capability / html_store",
+   "source_refs": [
+    "backend/data/workpaper_sync_entry_overlay.json",
+    "backend/data/workpaper_sync_entry_manifest.json"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "本 slice 的 capability 为 null、html_counterpart_verdict 为 exists ⇒ 与 mirror **必然不一致**；守卫断言「不一致且已登记 BP-9」，不是断言相等。"
+  },
+  {
+   "id": "BP-10",
+   "blocks": [
+    "step_9"
+   ],
+   "what": "N1 / N3 宿主**未采用**共享 sheet 路由 `composables/shared/cycleSheetRouting.ts`，wp_code 正则**前置于**披露判定（N1 宿主 #L247 的 `/N1-[1-5]/` 在披露判定之前）——与该共享模块存在的理由（D2 实测：披露 tab 名尾部带 wp_code 时披露组件永远挂不上）同形。",
+   "status": "open",
+   "must_fix_before": "N1/N3 宿主改用共享路由",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L247",
+    "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L201",
+    "audit-platform/frontend/src/components/workpaper/composables/shared/cycleSheetRouting.ts#L52"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n3-deferred-tax-liabilities"
+   ],
+   "consequence": "现状下 N1/N3 的披露 tab 名不带 N1-x/N3-x 后缀 ⇒ **暂未**中招（latent）；一旦源模板给披露 tab 加编码后缀，披露组件静默挂不上，且无守卫会红。"
+  },
+  {
+   "id": "BP-11",
+   "blocks": [
+    "step_2",
+    "step_9"
+   ],
+   "what": "sheet 名含脏字面量（`税金及附加审计程序表N4A ` 尾随空格 / `附注披露信息（国企` 缺右括号）与跨册码碰撞（`N3A` 一码两册，另有 `O1A`/`O2A` 出现在 N 册）⇒ 按码定位 OO sheet 会跨册错位、strip 会让缺陷凭空消失。",
+   "status": "open",
+   "must_fix_before": "OO sheet 名解析改为「册 + 精确 sheet 名」而非「码」",
+   "source_refs": [
+    "backend/wp_templates/N/N4 税金及附加.xlsx",
+    "backend/wp_templates/N/N5 所得税费用.xlsx",
+    "backend/wp_templates/N/N3 递延所得税负债.xlsx",
+    "audit-platform/frontend/src/components/workpaper/composables/n5SheetRouting.ts#L39"
+   ],
+   "entries": [
+    "xlsx/gt-n1-deferred-tax-assets",
+    "xlsx/gt-n2-taxes-payable",
+    "xlsx/gt-n3-deferred-tax-liabilities",
+    "xlsx/gt-n4-taxes-and-surcharges",
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "observable_consequences": [
+    "`'税金及附加审计程序表N4A ' != '税金及附加审计程序表N4A'`（现读带尾随空格）。",
+    "`'附注披露信息（国企）' not in N5.sheetnames`，真名缺右括号。",
+    "`N3A` 的册集合大小现算 == 2。"
+   ]
+  },
+  {
+   "id": "BP-12",
+   "blocks": [
+    "step_10"
+   ],
+   "what": "N5 的取数跨 4 个外部 entry 的 item_id 命名空间（`N1-` / `N3-` / `I6-` / `I2-` / `A-`，共 8 个键，全为只读）⇒ required scenario set 必须把跨 entry 只读依赖建模进去，否则「单 entry 场景集」会漏掉「上游 entry 改数 → 本 entry 派生值变化」这一整类场景。",
+   "status": "open",
+   "must_fix_before": "N5 的 required scenario set 定稿",
+   "source_refs": [
+    "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L374",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L405",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L436",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L464",
+    "audit-platform/frontend/src/components/workpaper/composables/useN5CrossSheet.ts#L494"
+   ],
+   "entries": [
+    "xlsx/gt-n5-income-tax-expense"
+   ],
+   "consequence": "8 个外部键全是 GET 侧读（`responses.find(r => r.item_id === …)`）；写只写自己的 5 个 `N5-cross-*` ⇒ 命名空间未被污染（Property 70 不破），但场景集完整性受影响。"
+  }
+ ],
+ "cross_entry_isolation": {
+  "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+  "assertions": [
+   "11 份 slice（D/E/F/G/H/I/J/K/L/M/N）的 entry 集合两两不相交 —— 配对数由 C(11,2) **现算**，不写死（M 那轮 10 份 45 对，本轮 11 份 55 对）。",
+   "契约目录里没有任何文件的 `review.entry_id` 属本 slice（逐文件读顶层 `review.entry_id`，不数文件个数）。",
+   "四条 pilot 契约的 `review.entry_id` 分别真是 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets。",
+   "第 5 个契约文件 `_example.candidate.json` 的 `review_status == 'candidate'` 且 `review.entry_id` 为 null —— 反例分母，不得要求其非空。",
+   "5 本模板的 `belongs_to_entry` 是到本 slice entry_id 的**双射**（无 null、无重复）。",
+   "5 条 entry 的 `template_ref.workbook` 集合大小 == 5、`sha256` 集合大小 == 5。",
+   "5 个 `N{n}-` item_id 前缀两两不同，且两两**不互为前缀**（`N1-` 与 `N1-1-adj` 的关系是「同 entry 内的子命名空间」不是跨 entry 冲突；跨 entry 的 5 个前缀都以 `-` 收尾且第二字符互不相同）。",
+   "registry 里现算 N adapter 数 == 0（`xlsx/gt-n` 在 backend/app/services/workpaper_sync/adapters/registry.py 命中 0），且四条 pilot adapter **确实**在 registry 里（反向：证明判据非空跑）。",
+   "N5 对 8 个外部 item_id 的引用**全为只读**（GET 侧 `responses.find`），写只写自己的 5 个 `N5-cross-*` ⇒ 不构成命名空间污染（见 transport_key_resolution 的 TK-6）。",
+   "deletion plan 的删除路径与其余十份 slice 的删除路径不相交。"
+  ],
+  "contract_scan_recipe": "🔴 契约目录共 5 个文件，其中 **生产契约 4 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）+ **candidate 1 份**（`_example.candidate.json`，`review_status == \"candidate\"`、`review.entry_id` 为 null）。判归属一律读 `review.entry_id`，**不按文件名猜**（`g7.soe_subsidiary_disclosure.json` 的 entry_id 是 `xlsx/gt-g7-long-term-equity-main`，两者不同构）。",
+  "production_contract_files": [
+   "b60.hour_budget.json",
+   "d2.receivable_detail.json",
+   "g7.soe_subsidiary_disclosure.json",
+   "h1.disposal_check.json"
+  ],
+  "candidate_contract_files": [
+   "_example.candidate.json"
+  ],
+  "pairwise_recipe": "配对数 = C(len(slices), 2)。本轮 slice 数 12 ⇒ 66 对。🔴 守卫必须**现算** `len(slices) * (len(slices) - 1) // 2` 并与实际比较的对数相等，不得写死 66 —— 上一版写「11 ⇒ 55，下一轮（Task 57 的 A/B/C/S）会再变」，Task 57 已落盘 `workpaper_sync_abcs_cycle_manifest_slice.json`（46 条 entry），故此处的**事实陈述**随之更新；判据强度（现算而非写死）一字未动。",
+  "item_id_prefixes": {
+   "N1": "N1-",
+   "N2": "N2-",
+   "N3": "N3-",
+   "N4": "N4-",
+   "N5": "N5-"
+  }
+ },
+ "honest_adjudication_summary": {
+  "total_independent": 5,
+  "pilot_contract_published": 0,
+  "adjudicated_as_bidirectional": 0,
+  "adjudicated_as_single_onlyoffice": 0,
+  "adjudicated_as_single_html": 0,
+  "adjudicated_as_unreachable": 0,
+  "capability_verdict_pending": 5,
+  "html_counterpart_exists": 5,
+  "html_counterpart_none": 0,
+  "finalized_published_representations": 0,
+  "entries_left_unverifiable": 5,
+  "parent_duplicate_children": 4,
+  "reachable_hosts_in_cycle": 5,
+  "authoritative_template_files": 5,
+  "template_files_with_owner_entry": 5,
+  "template_files_without_owner_entry": 0,
+  "authoritative_template_sheets_total": 59,
+  "authoritative_template_sheets_owned": 59,
+  "authoritative_formula_cells_total": 2185,
+  "authoritative_sheets_with_formula": 49,
+  "per_entry_persistence_modules": 5,
+  "hosts_importing_shared_checklist_persistence": 0,
+  "n_production_files_scanned": 135,
+  "transport_key_declarations": 6,
+  "transport_key_declarations_with_defect": 4,
+  "transport_key_nonexistent_guessed_keys": 8,
+  "n_cycle_form_differences": 8,
+  "blocking_preconditions_total": 12,
+  "authoritative_sheets_total": 59,
+  "sheets_covered_by_html_child": 45,
+  "sheets_rendered_by_program_console": 2,
+  "sheets_covered_by_html_side_total": 47,
+  "sheets_falling_through_to_oo": 12,
+  "dual_mode_switchable_sheets": 45,
+  "hosts_using_shared_cycle_sheet_router": 3,
+  "hosts_using_host_inline_regex": 2,
+  "dirty_sheet_name_literals": 2,
+  "dual_mode_module_files_total": 5,
+  "orphan_dual_mode_modules": 3,
+  "orphan_dual_mode_first_order": 3,
+  "orphan_dual_mode_second_order": 0,
+  "orphan_barrels": 0,
+  "orphan_dual_mode_lines_total": 552,
+  "live_dual_mode_modules": 2,
+  "live_dual_mode_lines_total": 274,
+  "orphan_non_dual_mode_modules": 5,
+  "orphan_non_dual_mode_lines_total": 773,
+  "orphan_modules_total": 8,
+  "orphan_lines_total": 1325,
+  "orphan_v1_v2_twins": 2,
+  "orphan_modules_with_fabricated_key_shape": 1,
+  "orphan_modules_calling_legacy_health_endpoint": 3,
+  "live_modules_calling_legacy_health_endpoint": 1,
+  "dual_mode_modules_calling_legacy_config_endpoint": 1,
+  "orphan_modules_with_storage_key": 3,
+  "live_modules_with_storage_key": 1,
+  "orphan_modules_with_wp_unscoped_storage_key": 3,
+  "live_modules_with_wp_unscoped_storage_key": 0,
+  "hosts_with_inline_dual_mode": 3,
+  "hosts_calling_legacy_health_endpoint_directly": 1,
+  "shared_base_statement_consumers": 27,
+  "shared_base_n_cycle_consumers": 1,
+  "shared_base_consumers_after_rewiring": 25,
+  "hosts_with_inline_dual_mode_object_literal": 2,
+  "entries_with_redeemable_switch": 3,
+  "entries_with_inert_switch": 2,
+  "entries_with_no_switch_at_all": 0,
+  "entries_mounting_the_ac14_notice": 0,
+  "hosts_with_segmented_site": 5,
+  "hosts_with_oo_mount": 5,
+  "hosts_claiming_bidirectional_in_template": 0,
+  "positional_identity_render_key_hits": 1,
+  "positional_identity_render_key_consumers": 0,
+  "positional_identity_persistence_key_hits": 3,
+  "positional_identity_array_addressing_sites": 48,
+  "positional_identity_display_sequence_sites": 8,
+  "positional_identity_generated_opaque_sites": 13,
+  "positional_identity_defect_hits_total": 4,
+  "tables_total": 5,
+  "tables_with_defect": 3,
+  "tables_clean": 2,
+  "entries_with_positional_identity_defects": 3,
+  "entries_without_positional_identity_defects": 2,
+  "files_with_positional_identity_defect": 2,
+  "hardcoded_pattern_hits_total": 0,
+  "hardcoded_patterns_at_zero": 6,
+  "hardcoded_patterns_total": 6,
+  "dynamic_row_identity_tables": 5,
+  "counting_notes": {
+   "why_this_key_exists": "计数一律从来源节现算，禁写死数字。本键逐条说明「哪个计数从哪一节算出来」，守卫按本映射把 summary 的**每一族**计数都做等值比对 —— 漏一族就等于那族可以随便填（Task 54 的 M28/M29 教训）。🔴 守卫另有一条元判据：`counting_notes` 的各族并集必须**覆盖** summary 的全部非平凡键（覆盖不全即红）。",
+   "from_independent_entries": [
+    "total_independent",
+    "capability_verdict_pending",
+    "html_counterpart_exists",
+    "html_counterpart_none",
+    "adjudicated_as_bidirectional",
+    "adjudicated_as_single_onlyoffice",
+    "adjudicated_as_single_html",
+    "adjudicated_as_unreachable",
+    "entries_left_unverifiable",
+    "finalized_published_representations",
+    "pilot_contract_published",
+    "reachable_hosts_in_cycle",
+    "per_entry_persistence_modules"
+   ],
+   "from_authoritative_templates": [
+    "authoritative_template_files",
+    "template_files_with_owner_entry",
+    "template_files_without_owner_entry",
+    "authoritative_template_sheets_total",
+    "authoritative_template_sheets_owned",
+    "authoritative_formula_cells_total",
+    "authoritative_sheets_with_formula"
+   ],
+   "from_sheet_granularity_and_router_audit": [
+    "authoritative_sheets_total",
+    "dirty_sheet_name_literals",
+    "dual_mode_switchable_sheets",
+    "hosts_using_host_inline_regex",
+    "hosts_using_shared_cycle_sheet_router",
+    "sheets_covered_by_html_child",
+    "sheets_covered_by_html_side_total",
+    "sheets_falling_through_to_oo",
+    "sheets_rendered_by_program_console"
+   ],
+   "from_orphan_dual_mode_inventory": [
+    "dual_mode_module_files_total",
+    "dual_mode_modules_calling_legacy_config_endpoint",
+    "hosts_calling_legacy_health_endpoint_directly",
+    "hosts_with_inline_dual_mode",
+    "hosts_with_inline_dual_mode_object_literal",
+    "live_dual_mode_lines_total",
+    "live_dual_mode_modules",
+    "live_modules_calling_legacy_health_endpoint",
+    "live_modules_with_storage_key",
+    "live_modules_with_wp_unscoped_storage_key",
+    "orphan_barrels",
+    "orphan_dual_mode_first_order",
+    "orphan_dual_mode_lines_total",
+    "orphan_dual_mode_modules",
+    "orphan_dual_mode_second_order",
+    "orphan_lines_total",
+    "orphan_modules_calling_legacy_health_endpoint",
+    "orphan_modules_total",
+    "orphan_modules_with_fabricated_key_shape",
+    "orphan_modules_with_storage_key",
+    "orphan_modules_with_wp_unscoped_storage_key",
+    "orphan_non_dual_mode_lines_total",
+    "orphan_non_dual_mode_modules",
+    "orphan_v1_v2_twins",
+    "shared_base_consumers_after_rewiring",
+    "shared_base_n_cycle_consumers",
+    "shared_base_statement_consumers"
+   ],
+   "from_mode_switch_resolution": [
+    "entries_with_redeemable_switch",
+    "entries_with_inert_switch",
+    "entries_with_no_switch_at_all",
+    "entries_mounting_the_ac14_notice",
+    "hosts_with_segmented_site",
+    "hosts_with_oo_mount",
+    "hosts_claiming_bidirectional_in_template"
+   ],
+   "from_dynamic_row_identity": [
+    "dynamic_row_identity_tables",
+    "entries_with_positional_identity_defects",
+    "entries_without_positional_identity_defects",
+    "files_with_positional_identity_defect",
+    "hardcoded_pattern_hits_total",
+    "hardcoded_patterns_at_zero",
+    "hardcoded_patterns_total",
+    "positional_identity_array_addressing_sites",
+    "positional_identity_defect_hits_total",
+    "positional_identity_display_sequence_sites",
+    "positional_identity_generated_opaque_sites",
+    "positional_identity_persistence_key_hits",
+    "positional_identity_render_key_consumers",
+    "positional_identity_render_key_hits",
+    "tables_clean",
+    "tables_total",
+    "tables_with_defect"
+   ],
+   "from_transport_key_resolution": [
+    "transport_key_declarations",
+    "transport_key_declarations_with_defect",
+    "transport_key_nonexistent_guessed_keys",
+    "hosts_importing_shared_checklist_persistence"
+   ],
+   "from_parent_duplicate_summary": [
+    "parent_duplicate_children"
+   ],
+   "from_n_cycle_form_differences": [
+    "n_cycle_form_differences"
+   ],
+   "from_blocking_preconditions": [
+    "blocking_preconditions_total"
+   ],
+   "computed_from_source_only": [
+    "n_production_files_scanned"
+   ]
+  },
+  "reason": "5 条 entry 逐一实测**都有** HTML 对端（checklist_responses + `N{n}-{sheet}-{field}` item_id 命名空间 + 逐 entry 一份 `useN{n}FormData.ts`，GET/PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；5 本权威册共 59 张 sheet、2185 个公式格，其中 12 张 sheet **只有** OO 承载 ⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边全部可达 ⇒ 非 unreachable；AC 12.1 的六件前置一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 5 条全部落**待裁决态**，如实计入 slice_counters.unadjudicated。🔴 tasks.md 正文点名的「纯 OO entry」在本循环**不存在** —— 逐 entry 查过 owner 常量、读写站点与后端路由三边，5 条全是 exists。「无对端不伪造映射」在本轮的落法是**反向的**：既不为凑数字硬裁 single_onlyoffice，也不为凑「双向」给这 5 条造 contract 字段映射（契约目录里现算 0 条属本 slice）。",
+  "ac_15_not_applicable_because": "🔴 AC 1.5 的触发条件是「入口**被裁决**为纯 OO 或纯 HTML」。本 slice 5 条 entry 的 capability 全为 null（待裁决），无一条被裁为 single_* ⇒ AC 1.5 **不适用**。生效的是 AC 1.4（见 mode_switch_resolution.live_ac_is_1_4）。把 AC 1.5 硬套上来会得出两个错结论：① 对 N1/N2/N3 —— 它们的开关**真能兑现**（切过去确实渲染 OO 编辑器），该修的是「没有可操作原因」（BP-7）不是把按钮删掉；② 对 N4/N5 —— 开关是空实现，但那是 BP-5 的缺陷登记，AC 1.5 说的是「不显示不可兑现的切换按钮」的**裁决后义务**，不是「开关坏了就删按钮」。",
+  "slice_counters": {
+   "unadjudicated": 5,
+   "fake_bidirectional_claimed_verified": 0,
+   "bidirectional_unverified": 0,
+   "stale_evidence": 0,
+   "note": "unadjudicated == 5 == len([e for e in independent_entries if e['capability'] is None])（SR-9 现算等值）。其余三项为 0 只表示「本 slice 无该类条目」，**不得**解读为「已具备双向能力」。"
+  }
+ },
+ "property_denominators": {
+  "why_this_key_exists": "空分母重言式（「没有 contract → Property 通过」）是本 spec 明确拒绝的论证。本节逐 Property 显式区分「有真分母的部分（真验）」与「无适用分母的部分（**不宣称通过**）」。🔴 本轮 Property 集是 **3 / 23 / 69 / 70** —— Property 3 与 23 前几轮只是 `property_3_and_23_partial` 里的顺带核，**本轮是正式点名项**，论证方向必须按它们**自己的原文**来，不得照抄那节的措辞。",
+  "property_3": {
+   "what_it_asserts": "未注册 adapter 不得宣称双向：任一 `bidirectional` entry 必须解析到唯一 adapter、approved authoritative model 与非空 immutable definition bundle；`projection_contract` 还必须解析到 approved per-entry contract。删 adapter/bundle/contract 任一项后守卫打红。（design.md §Property 3，Validates Requirements 1.3）",
+   "n_cycle_denominator": "🔴 **两个分母，一实一空**。实的：**否定方向** —— 5 条 entry 的 adapter_id 全 null、registry 里 `xlsx/gt-n` 现算 0 命中（而四条 pilot adapter **确实**在 registry 里 ⇒ 判据非空跑）、5 条宿主模板里「可双向回写」字样现算 0 命中、`SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现算为空数组（分母 = 5 条 entry + 1 个 registry + 1 个单一真源常量，非空）。空的：**正向** —— 本 slice 没有任何 bidirectional entry ⇒ 「删 adapter/bundle/contract 任一项后打红」无对象可跑。",
+   "how_handled": "守卫真验五件事：① 5 条 entry 的五个身份字段（adapter_id / authority_model / definition_bundle / instrumentation_candidate / published_representation）全 null；② registry 源码里 `xlsx/gt-n\\d` 命中 0，**且**四条 pilot 的 entry_id 至少一条命中（反向，防空跑）；③ 5 条宿主模板剥注释后「可双向回写」命中 0；④ AC 1.4 单一真源的 `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 现读为空列表，**且**该常量真被 `entrySyncNotice()` 消费（不是死常量）；⑤ 🔴 N 循环额外真验一条：**开关能兑现 ≠ 可以宣称双向** —— N1/N2/N3 的开关切过去真会渲染 OO 编辑器，所以「模板里没有『可双向回写』字样」这条在 N 上**不够**，必须再加「AC 1.4 的提示组件必须挂上」的判据（现算 0/5 ⇒ BP-7）；而 N4/N5 是空实现（BP-5），**也不能**因此就说「它没宣称双向」——`<el-segmented>` 显示两个可点选项本身就是双模式成功态的呈现。",
+   "not_claimed_passing": true,
+   "not_claimed_passing_part": "正向（bidirectional entry 删 adapter/bundle/contract 之一后打红）—— 分母为空。",
+   "carrier_for_the_empty_part": "backend/app/services/workpaper_sync/adapters/registry.py + resolution.py；跑通需先交付 BP-1/BP-2。"
+  },
+  "property_23": {
+   "what_it_asserts": "动态行身份不使用下标：删除/重排/再新增后旧 row_uuid 不复用，原行数据不串到新行。（design.md §Property 23，Validates Requirements 6.4；AC 6.5 是本轮点名的需求）",
+   "n_cycle_denominator": "🔴 **两个分母，一实一空**。实的：**缺陷侧与干净侧的两侧穷举** —— 5 张动态行表逐表判（3 张 DEFECT / 2 张 CLEAN）、位置化持久化键族现算 3 处、渲染键族 1 处（且其模板消费方现算 0）、数组位置寻址族 48 处、展示序号族 8 处（反向判据，不计入缺陷）、熵键族 13 处、六族硬编码全 0（分母 = N 域 135 个生产文件，非空）。🔴 **CLEAN 的两张表（N3-2 / N4-2）是本 Property 的反向分母**：它们的行身份是持久化的稳定 id 并按 id 寻址 —— 没有它们，「本循环有位置化缺陷」这条结论就是恒真的空话，扫描器也可能是「恒判缺陷」。空的：**正向的运行时行为** —— 「删除/重排/再新增后旧 id 不复用、数据不串行」需要真实浏览器交互（BP-3 未过、无 adapter），本轮只做**结构判据**不做运行时断言。",
+   "how_handled": "守卫真验七件事：① 5 张表的 `row_identity.kind` 落在闭集内且 `verdict` 与 kind 蕴含一致（`positional_*` / `array_position_*` ⇒ DEFECT；`generated_opaque_persisted` ⇒ CLEAN）；② 每张表的 `source_ref` / `persistence_source_ref` / `index_binding_source_ref` 逐条现读该行并断言行内含预期 token（**不是**只验行存在）；③ 两族站点集合现算并与声明做**有序等值 + 无重复**双断言；④ 反向断言 M 式扫描器（``itemId: `…row-${n}…` ``）在 N 上现算 0 命中 —— 证明本轮换了口径而不是抄旧扫描器；⑤ N3-2 的 `removeRow(rowId: string)` 与 `updateCell(rowId, …)` 现读签名，断言参数名是 `rowId` 而**不是** index（CLEAN 的正面判据）；⑥ N5-5 的 `updateRow(rowIndex, …)` / `filter((r, i) => i !== rowIndex …)` 现读，断言行对象类型里**没有** id 字段（DEFECT 的正面判据）；⑦ 六族硬编码正则全 0 且分母非空（135 个文件）。",
+   "not_claimed_passing": true,
+   "not_claimed_passing_part": "运行时正向（真删/真重排/真新增后的不串行）—— 需真实浏览器与 adapter，分母为空。",
+   "carrier_for_the_empty_part": "per-entry contract 的 row identity 声明（BP-8）+ 真实 OO 动态行场景（BP-3）。"
+  },
+  "property_69": {
+   "what_it_asserts": "evidence 由逐 scenario 实体与服务端重算闭合（design.md §Property 69，Validates Requirements 12.10）",
+   "n_cycle_denominator": "非空但**全为负向** —— 5 条 entry 的 evidence 都是 UNVERIFIABLE，分母是「UNVERIFIABLE 必须带非空 unverifiable_reasons」（5 条）与「声称 VERIFIED 必须有 sync_test_run_id + required_scenario_set_digest」（0 条声称，故断言「无一条空口声称」）。🔴 N 循环多三条 entry 级差异：① BP-4 只能出现在 N3 的 reasons 里；② BP-5 只能出现在 N4/N5 的；③ BP-8 只能出现在 N1/N2/N5 的；④ BP-12 只能出现在 N5 的 —— 守卫两侧都验，否则把 reasons 抄成 5 条同形也能过。",
+   "how_handled": "守卫按 SR-7 断言 5 条 UNVERIFIABLE 各带非空 reasons；断言无一条 entry 声称 VERIFIED；断言每个 entry 级 BP（BP-4/5/8/10/12）**只**出现在其 `entries` 列表所指 entry 的 reasons 里（真假两侧都验）；把 summary 的**每一族**计数逐项从各自来源节现算并等值比对（按 counting_notes 的分组穷举，并断言 counting_notes 的并集覆盖 summary 的全部非平凡键）；断言 slice_counters 四项与实际吻合（SR-9 的 unadjudicated == 5）。",
+   "not_claimed_passing": false,
+   "not_claimed_passing_part": "逐 scenario evidence 实体的**正向**闭合（需真实 OO 9.4 探针 —— BP-3）。"
+  },
+  "property_70": {
+   "what_it_asserts": "scenario / evidence / contract / bundle / candidate 不得跨 entry 或跨场景复用（design.md §Property 70，Validates Requirements 12.12）",
+   "n_cycle_denominator": "非空 —— **11 份** slice（D/E/F/G/H/I/J/K/L/M/N）的两两不相交判据（配对数由 `C(11,2)` **现算** = 55 对；M 那轮是 10 份 45 对 ⇒ 数字必须现算不能写死）、契约归属逐文件读 `review.entry_id`、5 本模板 belongs_to_entry 的双射性、5 条 entry 的 template_ref 两两不同（workbook 与 sha256 双集合）、5 个 `N{n}-` item_id 前缀两两不同且两两不互为前缀、deletion plan 删除路径与其余十份不相交。🔴 N 循环新增一条**必须两侧都验**的判据：N5 读 8 个外部 entry 的 item_id —— 守卫既要断言这些引用**全在 GET 侧**（不构成命名空间污染），也要断言 N5 的写键**全部**以 `N5-` 开头（一条写到 `N1-`/`N3-` 就是真污染）。",
+   "how_handled": "守卫真验：11 份 slice 的 entry 集合两两不相交（对数现算并与 `C(n,2)` 等值）；契约目录里没有任何文件的 review.entry_id 属本 slice，且四条 pilot 契约的 review.entry_id 分别真是那四个值（candidate 那份 entry_id 为 null，**不**要求非空）；5 本模板的 belongs_to_entry 是双射；template_ref.workbook / sha256 集合大小各 == 5；5 个 item_id 前缀两两不互为前缀；N5 的 8 个外部键**全部**只出现在 `responses.find(r => r.item_id === …)` 形态里、5 个 `N5-cross-*` 写键**全部**以 `N5-` 开头；deletion plan 的删除路径与其余十份 slice 的删除路径不相交。",
+   "not_claimed_passing": false
+  },
+  "not_claimed_at_all": [
+   "Property 20（generated col 占位不可注册生产 adapter）—— 本 slice contract 数 0，分母为空；只断言前提（契约归属、pilot 四条、registry 无 N adapter）。",
+   "Property 21（per-entry contract 逐字段完整）—— 本 slice contract 数 0，分母为空。",
+   "Property 22（动态列 key 与 label 解耦）—— N 循环无按公司/单位横向展开的宽表（`horizontal_company_column_literals` 与 `column_key_uses_label` 现算各 0 命中），分母为空；「0 命中」只作反向判据，不当成 Property 22 通过。",
+   "Property 24（保护字段修改形成冲突）—— N 侧 contract 数 0 ⇒ 无 `formula_mask` 可挂，端到端分母为空；本 slice 只如实登记 2185 个源侧公式格作为「有东西需要被保护」的前提。",
+   "Property 28（immutable definition 漂移 fail closed）—— 模板层分母非空（5 本册 sha256 现算），但 bundle 层为空（definition_bundle 全 null）；本轮不点名该 Property，模板层判据仍照做（见 authoritative_templates）但**不宣称** Property 28 通过。"
+  ]
+ },
+ "paradigm_schema_conflict": {
+  "what": "范式 JSON 的 `slice_schema.applies_to_tasks` 是 [48..57]、`effective_from_task_48` 对 ≥48 的任务追加 `html_counterpart_verdict` / `html_counterpart_source_refs` 与 BP 的 `status` / `must_fix_before` / `source_refs`；同时 SR-3 要求 capability ∈ 四值枚举**或** capability 为 null 且待裁决三字段齐备。",
+  "how_resolved_here": "沿用 D（Task 46 收口）/ F（48）/ G（49）/ H（50）/ I（51）/ J（52）/ K（53）/ L（54）/ M（55）已确立的诚实形态：capability 为 null + `capability_verdict_stage` / `capability_target` / `capability_target_blocked_by` 三字段齐备，5 条如实计入 `slice_counters.unadjudicated`（SR-9 现算等值）。追加的两个 entry 字段与三个 BP 字段全部补齐（本任务号 56 ≥ 48，`enforce_task48` 生效）。",
+  "residual_inconsistency": null,
+  "new_section_not_in_schema": {
+   "sections_note": "🔴 本清单只列 **schema 之外**的追加节。`parent_duplicate_summary` 与 `dynamic_row_identity` 是 schema 自己的 `conditional_sections`（触发才必填），**不算**追加节 —— 把它们混进来会让「declared == extra」这条精确等值判据永远打红。两者的触发态记在 `conditional_sections_state` 里。",
+   "sections": [
+    "n_cycle_form_differences",
+    "orphan_dual_mode_inventory",
+    "mode_switch_resolution",
+    "sheet_granularity_and_router_audit",
+    "transport_key_resolution",
+    "property_denominators"
+   ],
+   "why_not_a_conflict": "`slice_schema` 只规定**必填**字段（`required_top_level` 等）与条件节的触发形态，不禁止 slice 追加自述节。其中 `parent_duplicate_summary` 与 `dynamic_row_identity` 是 schema 的 **conditional_sections**（本轮两者的触发条件都成立：4 条子入口 / 5 张动态行表）；其余六节都带 `why_this_key_exists` + 可复算 recipe + counters，并由本轮守卫逐节现算比对 ——不是自由文本。",
+   "conditional_sections_state": {
+    "parent_duplicate_summary": "triggered（4 条子入口，全挂 N1）",
+    "dynamic_row_identity": "triggered（5 张动态行表）",
+    "currency_variant_model": "not_triggered（N 循环无币种 variant sheet；现算 5 本册里无同尾码双 sheet 共用持久化键的形态）⇒ 本 slice 不写该节"
+   },
+   "the_one_that_is_new_this_round": "🔴 `transport_key_resolution` 与 `dynamic_row_identity` 是**本轮的两个点名项**（tasks.md：「核验真实传输键、动态 identity 和纯 OO entry」）。前者形态借自 J 循环（Task 52）那节，但 N 的判据对象不同：J 的问题是 orphan 载体伪造键形态，N 的问题是 ① V1/V2 孪生里 V2 声明了生产从未写过的键 ② N5 跨 5 个外部命名空间只读取数。后者虽在 I/J/K/L/M 五轮都出现过，但本轮是 Property 23 **正式点名**，故判据从「顺带 partial」升级为「两侧穷举 + CLEAN 反向分母 + 换口径的反向断言」。",
+   "paradigm_json_is_read_only_here": "本任务**不改** `workpaper_sync_migration_paradigm.json` 一个字节。Task 54/55 的守卫用 `raw_block_digest()` + `canonical_digest()` 双向锁死 `/paradigm`，改一个字节全红；本轮守卫也复算这两个 digest 并与 `paradigm_registry` 里的常量比对。"
+  }
+ },
+ "properties_verified": [
+  {
+   "property": 3,
+   "validates_requirement": "1.3",
+   "claim": "negative_direction_full",
+   "see": "property_denominators.property_3"
+  },
+  {
+   "property": 23,
+   "validates_requirement": "6.4",
+   "claim": "structural_both_sides",
+   "see": "property_denominators.property_23"
+  },
+  {
+   "property": 69,
+   "validates_requirement": "12.10",
+   "claim": "negative_direction_full",
+   "see": "property_denominators.property_69"
+  },
+  {
+   "property": 70,
+   "validates_requirement": "12.12",
+   "claim": "full",
+   "see": "property_denominators.property_70"
+  }
+ ],
+ "requirements_covered": [
+  "1.3",
+  "1.4",
+  "1.5",
+  "1.6",
+  "1.7",
+  "6.4",
+  "6.5",
+  "6.10",
+  "12.1",
+  "12.4",
+  "12.8",
+  "12.9",
+  "12.10",
+  "12.11",
+  "12.12",
+  "14.1"
+ ]
+}

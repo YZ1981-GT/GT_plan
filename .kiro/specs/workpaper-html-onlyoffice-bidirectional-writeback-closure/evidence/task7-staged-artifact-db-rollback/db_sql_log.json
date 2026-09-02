@@ -1,0 +1,680 @@
+{
+  "schema": "tmp_task7_probe_2e922c226dc4",
+  "statements": [
+    {
+      "seq": 1,
+      "kind": "SELECT",
+      "sql": "SELECT current_database() AS db, version() AS v"
+    },
+    {
+      "seq": 2,
+      "kind": "TX",
+      "sql": "BEGIN -- create scratch schema tmp_task7_probe_2e922c226dc4"
+    },
+    {
+      "seq": 3,
+      "kind": "DDL",
+      "sql": "CREATE SCHEMA tmp_task7_probe_2e922c226dc4"
+    },
+    {
+      "seq": 4,
+      "kind": "DDL",
+      "sql": "CREATE TABLE tmp_task7_probe_2e922c226dc4.working_paper_artifact ( id uuid PRIMARY KEY, project_id uuid NOT NULL, wp_id uuid NOT NULL, kind varchar(32) NOT NULL, state varchar(32) NOT NULL, relative_path text NOT NULL, sha256 char(64) NOT NULL, size_bytes bigint NOT NULL, document_type varchar(16) NOT NULL, retention_class varchar(48) NOT NULL, durable_at timestamptz, quarantined_at timestamptz, published_at timestamptz, orphaned_at timestamptz, deleted_at timestamptz, created_at timestamptz NOT NULL DEFAULT now(), CONSTRAINT ck_wpa_kind CHECK (kind IN ('canonical','upgrade_candidate','incomin"
+    },
+    {
+      "seq": 5,
+      "kind": "DDL",
+      "sql": "CREATE UNIQUE INDEX uq_wpa_content_addressed ON tmp_task7_probe_2e922c226dc4.working_paper_artifact (project_id, kind, sha256)"
+    },
+    {
+      "seq": 6,
+      "kind": "DDL",
+      "sql": "CREATE TABLE tmp_task7_probe_2e922c226dc4.working_paper_content_version ( id uuid PRIMARY KEY, wp_id uuid NOT NULL, revision integer NOT NULL, parent_version_id uuid REFERENCES tmp_task7_probe_2e922c226dc4.working_paper_content_version (id), projection_artifact_sha256 char(64) NOT NULL, source varchar(32) NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), CONSTRAINT uq_wpcv_revision UNIQUE (wp_id, revision) )"
+    },
+    {
+      "seq": 7,
+      "kind": "DDL",
+      "sql": "CREATE TABLE tmp_task7_probe_2e922c226dc4.working_paper_content_representation ( id uuid PRIMARY KEY, wp_id uuid NOT NULL, content_version_id uuid NOT NULL REFERENCES tmp_task7_probe_2e922c226dc4.working_paper_content_version (id), entry_id varchar(128) NOT NULL, generation bigint NOT NULL, document_type varchar(16) NOT NULL, artifact_id uuid NOT NULL REFERENCES tmp_task7_probe_2e922c226dc4.working_paper_artifact (id), artifact_sha256 char(64) NOT NULL, definition_bundle_id uuid NOT NULL, definition_bundle_sha256 char(64) NOT NULL, reason varchar(32) NOT NULL, created_at timestamptz NOT NULL D"
+    },
+    {
+      "seq": 8,
+      "kind": "DDL",
+      "sql": "CREATE TABLE tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state ( wp_id uuid NOT NULL, entry_id varchar(128) NOT NULL, current_representation_id uuid NOT NULL REFERENCES tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id), representation_generation bigint NOT NULL, updated_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (wp_id, entry_id) )"
+    },
+    {
+      "seq": 9,
+      "kind": "DDL",
+      "sql": "CREATE TABLE tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit ( id uuid PRIMARY KEY, artifact_id uuid NOT NULL, policy_version varchar(64) NOT NULL, dry_run boolean NOT NULL, decision varchar(24) NOT NULL, reason varchar(64) NOT NULL, decided_at timestamptz NOT NULL DEFAULT now() )"
+    },
+    {
+      "seq": 10,
+      "kind": "DDL",
+      "sql": "CREATE FUNCTION tmp_task7_probe_2e922c226dc4.trg_representation_artifact_must_be_published() RETURNS trigger AS $body$ DECLARE a_kind text; a_state text; BEGIN SELECT kind, state INTO a_kind, a_state FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE id = NEW.artifact_id; IF a_state <> 'published' OR a_kind NOT IN ('canonical','projection') THEN RAISE EXCEPTION 'representation must reference a published canonical artifact (kind=%, state=%)', a_kind, a_state USING ERRCODE = 'check_violation'; END IF; RETURN NEW; END; $body$ LANGUAGE plpgsql"
+    },
+    {
+      "seq": 11,
+      "kind": "DDL",
+      "sql": "CREATE TRIGGER trg_wpcr_artifact_published BEFORE INSERT OR UPDATE ON tmp_task7_probe_2e922c226dc4.working_paper_content_representation FOR EACH ROW EXECUTE FUNCTION tmp_task7_probe_2e922c226dc4.trg_representation_artifact_must_be_published()"
+    },
+    {
+      "seq": 12,
+      "kind": "TX",
+      "sql": "COMMIT -- scratch schema created"
+    },
+    {
+      "seq": 13,
+      "kind": "TX",
+      "sql": "BEGIN -- baseline rev1/gen1"
+    },
+    {
+      "seq": 14,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, published_at) VALUES (:id,:pid,:wp,'canonical','published',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 15,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,1,:sha,'probe_baseline')"
+    },
+    {
+      "seq": 16,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,1,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 17,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state (wp_id, entry_id, current_representation_id, representation_generation) VALUES (:wp,:entry,:rep,1)"
+    },
+    {
+      "seq": 18,
+      "kind": "TX",
+      "sql": "COMMIT -- baseline committed"
+    },
+    {
+      "seq": 19,
+      "kind": "SELECT",
+      "sql": "SELECT a.sha256 AS artifact_sha256, a.relative_path, a.state AS artifact_state, r.generation, v.revision FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state es JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_representation r ON r.id = es.current_representation_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_version v ON v.id = r.content_version_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_artifact a ON a.id = r.artifact_id WHERE es.wp_id = :wp AND es.entry_id = :entry AND a.state = 'published' AND a.kind IN ('canonical','projection')"
+    },
+    {
+      "seq": 20,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact"
+    },
+    {
+      "seq": 21,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_version"
+    },
+    {
+      "seq": 22,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation"
+    },
+    {
+      "seq": 23,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state"
+    },
+    {
+      "seq": 24,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit"
+    },
+    {
+      "seq": 25,
+      "kind": "TX",
+      "sql": "BEGIN -- db2 injected_exception"
+    },
+    {
+      "seq": 26,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, published_at) VALUES (:id,:pid,:wp,'canonical','published',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 27,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, parent_version_id, projection_artifact_sha256, source) VALUES (:id,:wp,2,:parent,:sha,'probe_rollback')"
+    },
+    {
+      "seq": 28,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,2,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 29,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state SET current_representation_id = :rep, representation_generation = 2, updated_at = now() WHERE wp_id = :wp AND entry_id = :entry"
+    },
+    {
+      "seq": 30,
+      "kind": "TX",
+      "sql": "ROLLBACK -- db2 injected_exception"
+    },
+    {
+      "seq": 31,
+      "kind": "SELECT",
+      "sql": "SELECT a.sha256 AS artifact_sha256, a.relative_path, a.state AS artifact_state, r.generation, v.revision FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state es JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_representation r ON r.id = es.current_representation_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_version v ON v.id = r.content_version_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_artifact a ON a.id = r.artifact_id WHERE es.wp_id = :wp AND es.entry_id = :entry AND a.state = 'published' AND a.kind IN ('canonical','projection')"
+    },
+    {
+      "seq": 32,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact"
+    },
+    {
+      "seq": 33,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_version"
+    },
+    {
+      "seq": 34,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation"
+    },
+    {
+      "seq": 35,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state"
+    },
+    {
+      "seq": 36,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit"
+    },
+    {
+      "seq": 37,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE sha256 = :sha"
+    },
+    {
+      "seq": 38,
+      "kind": "SELECT",
+      "sql": "SELECT representation_generation AS gen, current_representation_id AS rep FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state WHERE wp_id=:wp AND entry_id=:entry"
+    },
+    {
+      "seq": 39,
+      "kind": "TX",
+      "sql": "BEGIN -- db2 constraint_violation"
+    },
+    {
+      "seq": 40,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, published_at) VALUES (:id,:pid,:wp,'canonical','published',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 41,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, parent_version_id, projection_artifact_sha256, source) VALUES (:id,:wp,2,:parent,:sha,'probe_rollback')"
+    },
+    {
+      "seq": 42,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,2,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 43,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state SET current_representation_id = :rep, representation_generation = 2, updated_at = now() WHERE wp_id = :wp AND entry_id = :entry"
+    },
+    {
+      "seq": 44,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,2,:sha,'probe_duplicate')"
+    },
+    {
+      "seq": 45,
+      "kind": "TX",
+      "sql": "ROLLBACK -- db2 constraint_violation"
+    },
+    {
+      "seq": 46,
+      "kind": "SELECT",
+      "sql": "SELECT a.sha256 AS artifact_sha256, a.relative_path, a.state AS artifact_state, r.generation, v.revision FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state es JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_representation r ON r.id = es.current_representation_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_version v ON v.id = r.content_version_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_artifact a ON a.id = r.artifact_id WHERE es.wp_id = :wp AND es.entry_id = :entry AND a.state = 'published' AND a.kind IN ('canonical','projection')"
+    },
+    {
+      "seq": 47,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact"
+    },
+    {
+      "seq": 48,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_version"
+    },
+    {
+      "seq": 49,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation"
+    },
+    {
+      "seq": 50,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state"
+    },
+    {
+      "seq": 51,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit"
+    },
+    {
+      "seq": 52,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE sha256 = :sha"
+    },
+    {
+      "seq": 53,
+      "kind": "SELECT",
+      "sql": "SELECT representation_generation AS gen, current_representation_id AS rep FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state WHERE wp_id=:wp AND entry_id=:entry"
+    },
+    {
+      "seq": 54,
+      "kind": "TX",
+      "sql": "BEGIN -- db3 upgrade_candidate"
+    },
+    {
+      "seq": 55,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, durable_at) VALUES (:id,:pid,:wp,:kind,:state,:rel,:sha,:size,'xlsx',:rc, CASE WHEN :state2 = 'durable' THEN now() ELSE NULL END)"
+    },
+    {
+      "seq": 56,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,:rev,:sha,'probe_forbidden')"
+    },
+    {
+      "seq": 57,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,:gen,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 58,
+      "kind": "TX",
+      "sql": "ROLLBACK -- db3 upgrade_candidate"
+    },
+    {
+      "seq": 59,
+      "kind": "TX",
+      "sql": "BEGIN -- db3 incoming_durable"
+    },
+    {
+      "seq": 60,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, durable_at) VALUES (:id,:pid,:wp,:kind,:state,:rel,:sha,:size,'xlsx',:rc, CASE WHEN :state2 = 'durable' THEN now() ELSE NULL END)"
+    },
+    {
+      "seq": 61,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,:rev,:sha,'probe_forbidden')"
+    },
+    {
+      "seq": 62,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,:gen,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 63,
+      "kind": "TX",
+      "sql": "ROLLBACK -- db3 incoming_durable"
+    },
+    {
+      "seq": 64,
+      "kind": "TX",
+      "sql": "BEGIN -- db3 canonical_orphan"
+    },
+    {
+      "seq": 65,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, durable_at) VALUES (:id,:pid,:wp,:kind,:state,:rel,:sha,:size,'xlsx',:rc, CASE WHEN :state2 = 'durable' THEN now() ELSE NULL END)"
+    },
+    {
+      "seq": 66,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,:rev,:sha,'probe_forbidden')"
+    },
+    {
+      "seq": 67,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,:gen,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 68,
+      "kind": "TX",
+      "sql": "ROLLBACK -- db3 canonical_orphan"
+    },
+    {
+      "seq": 69,
+      "kind": "TX",
+      "sql": "BEGIN -- db4b register artifact row first"
+    },
+    {
+      "seq": 70,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, published_at) VALUES (:id,:pid,:wp,'canonical','published',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 71,
+      "kind": "TX",
+      "sql": "COMMIT -- artifact row committed, pointer tx will fail"
+    },
+    {
+      "seq": 72,
+      "kind": "TX",
+      "sql": "BEGIN -- db4b pointer tx (will fail)"
+    },
+    {
+      "seq": 73,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,3,:sha,'probe_orphan')"
+    },
+    {
+      "seq": 74,
+      "kind": "TX",
+      "sql": "ROLLBACK -- db4b pointer tx"
+    },
+    {
+      "seq": 75,
+      "kind": "TX",
+      "sql": "BEGIN -- db4 reconciliation"
+    },
+    {
+      "seq": 76,
+      "kind": "SELECT",
+      "sql": "SELECT artifact_sha256 FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation"
+    },
+    {
+      "seq": 77,
+      "kind": "SELECT",
+      "sql": "SELECT id, sha256, state, relative_path FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE kind = 'canonical'"
+    },
+    {
+      "seq": 78,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, orphaned_at) VALUES (:id,:pid,:wp,'canonical','orphan',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 79,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, orphaned_at) VALUES (:id,:pid,:wp,'canonical','orphan',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 80,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET state='orphan', orphaned_at=now() WHERE id=:id"
+    },
+    {
+      "seq": 81,
+      "kind": "TX",
+      "sql": "COMMIT -- reconciliation"
+    },
+    {
+      "seq": 82,
+      "kind": "SELECT",
+      "sql": "SELECT sha256, state, relative_path, orphaned_at FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE state='orphan' ORDER BY sha256"
+    },
+    {
+      "seq": 83,
+      "kind": "SELECT",
+      "sql": "SELECT a.sha256 AS artifact_sha256, a.relative_path, a.state AS artifact_state, r.generation, v.revision FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state es JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_representation r ON r.id = es.current_representation_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_version v ON v.id = r.content_version_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_artifact a ON a.id = r.artifact_id WHERE es.wp_id = :wp AND es.entry_id = :entry AND a.state = 'published' AND a.kind IN ('canonical','projection')"
+    },
+    {
+      "seq": 84,
+      "kind": "TX",
+      "sql": "BEGIN -- db5 dry-run before grace"
+    },
+    {
+      "seq": 85,
+      "kind": "SELECT",
+      "sql": "SELECT id, sha256, relative_path, retention_class, orphaned_at FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE state='orphan' ORDER BY sha256"
+    },
+    {
+      "seq": 86,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 87,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 88,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 89,
+      "kind": "TX",
+      "sql": "COMMIT"
+    },
+    {
+      "seq": 90,
+      "kind": "TX",
+      "sql": "BEGIN -- db5 seed legal-hold + reappearing-reference orphans"
+    },
+    {
+      "seq": 91,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, orphaned_at) VALUES (:id,:pid,:wp,'canonical','orphan',:rel,:sha,:size,'xlsx',:rc, now() - interval '10 days')"
+    },
+    {
+      "seq": 92,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, orphaned_at) VALUES (:id,:pid,:wp,'canonical','orphan',:rel,:sha,:size,'xlsx',:rc, now() - interval '10 days')"
+    },
+    {
+      "seq": 93,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET state='published', published_at=now() WHERE id=:id"
+    },
+    {
+      "seq": 94,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,50,:sha,'probe_reappear')"
+    },
+    {
+      "seq": 95,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,50,'xlsx',:art,:sha,:bid,:bsha,'rematerialize')"
+    },
+    {
+      "seq": 96,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET state='orphan', orphaned_at=now() - interval '10 days' WHERE id=:id"
+    },
+    {
+      "seq": 97,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET orphaned_at = now() - interval '10 days' WHERE state='orphan' AND retention_class='canonical_orphan'"
+    },
+    {
+      "seq": 98,
+      "kind": "TX",
+      "sql": "COMMIT"
+    },
+    {
+      "seq": 99,
+      "kind": "TX",
+      "sql": "BEGIN -- db5 dry-run after grace"
+    },
+    {
+      "seq": 100,
+      "kind": "SELECT",
+      "sql": "SELECT id, sha256, relative_path, retention_class, orphaned_at FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE state='orphan' ORDER BY sha256"
+    },
+    {
+      "seq": 101,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 102,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 103,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 104,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 105,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 106,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 107,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 108,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 109,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 110,
+      "kind": "TX",
+      "sql": "COMMIT"
+    },
+    {
+      "seq": 111,
+      "kind": "TX",
+      "sql": "BEGIN -- db5 apply"
+    },
+    {
+      "seq": 112,
+      "kind": "SELECT",
+      "sql": "SELECT id, sha256, relative_path, retention_class, orphaned_at FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact WHERE state='orphan' ORDER BY sha256"
+    },
+    {
+      "seq": 113,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 114,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET state='deleted', deleted_at=now() WHERE id=:id"
+    },
+    {
+      "seq": 115,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 116,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 117,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET state='deleted', deleted_at=now() WHERE id=:id"
+    },
+    {
+      "seq": 118,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 119,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 120,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 121,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 122,
+      "kind": "SELECT",
+      "sql": "SELECT count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_content_representation WHERE artifact_id = :id OR artifact_sha256 = :sha"
+    },
+    {
+      "seq": 123,
+      "kind": "DML",
+      "sql": "UPDATE tmp_task7_probe_2e922c226dc4.working_paper_artifact SET state='deleted', deleted_at=now() WHERE id=:id"
+    },
+    {
+      "seq": 124,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit (id, artifact_id, policy_version, dry_run, decision, reason) VALUES (:id,:art,:pv,:dry,:dec,:rsn)"
+    },
+    {
+      "seq": 125,
+      "kind": "TX",
+      "sql": "COMMIT"
+    },
+    {
+      "seq": 126,
+      "kind": "SELECT",
+      "sql": "SELECT dry_run, decision, reason, count(*) AS n FROM tmp_task7_probe_2e922c226dc4.working_paper_artifact_gc_audit GROUP BY 1,2,3 ORDER BY 1,2,3"
+    },
+    {
+      "seq": 127,
+      "kind": "SELECT",
+      "sql": "SELECT a.sha256 AS artifact_sha256, a.relative_path, a.state AS artifact_state, r.generation, v.revision FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state es JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_representation r ON r.id = es.current_representation_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_version v ON v.id = r.content_version_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_artifact a ON a.id = r.artifact_id WHERE es.wp_id = :wp AND es.entry_id = :entry AND a.state = 'published' AND a.kind IN ('canonical','projection')"
+    },
+    {
+      "seq": 128,
+      "kind": "TX",
+      "sql": "BEGIN -- db6 commit pointer without publishing file"
+    },
+    {
+      "seq": 129,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_artifact (id, project_id, wp_id, kind, state, relative_path, sha256, size_bytes, document_type, retention_class, published_at) VALUES (:id,:pid,:wp,'canonical','published',:rel,:sha,:size,'xlsx','canonical_orphan', now())"
+    },
+    {
+      "seq": 130,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_version (id, wp_id, revision, projection_artifact_sha256, source) VALUES (:id,:wp,1,:sha,'probe_ghost')"
+    },
+    {
+      "seq": 131,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_content_representation (id, wp_id, content_version_id, entry_id, generation, document_type, artifact_id, artifact_sha256, definition_bundle_id, definition_bundle_sha256, reason) VALUES (:id,:wp,:ver,:entry,1,'xlsx',:art,:sha,:bid,:bsha,'content_commit')"
+    },
+    {
+      "seq": 132,
+      "kind": "DML",
+      "sql": "INSERT INTO tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state (wp_id, entry_id, current_representation_id, representation_generation) VALUES (:wp,:entry,:rep,1)"
+    },
+    {
+      "seq": 133,
+      "kind": "TX",
+      "sql": "COMMIT -- ghost pointer committed"
+    },
+    {
+      "seq": 134,
+      "kind": "SELECT",
+      "sql": "SELECT a.sha256 AS artifact_sha256, a.relative_path, a.state AS artifact_state, r.generation, v.revision FROM tmp_task7_probe_2e922c226dc4.working_paper_sync_entry_state es JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_representation r ON r.id = es.current_representation_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_content_version v ON v.id = r.content_version_id JOIN tmp_task7_probe_2e922c226dc4.working_paper_artifact a ON a.id = r.artifact_id WHERE es.wp_id = :wp AND es.entry_id = :entry AND a.state = 'published' AND a.kind IN ('canonical','projection')"
+    },
+    {
+      "seq": 135,
+      "kind": "DDL",
+      "sql": "DROP SCHEMA tmp_task7_probe_2e922c226dc4 CASCADE"
+    }
+  ]
+}

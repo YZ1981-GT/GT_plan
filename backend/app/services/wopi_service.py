@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -23,8 +24,56 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.models.workpaper_models import WorkingPaper
+# 🔴 Task 12（workpaper-html-onlyoffice-bidirectional-writeback-closure）：
+# WOPI 的三处路径解析（check_file_info / get_file / put_file）改为委托统一
+# canonical resolver。改造前三处各写一份 `Path(file_path)` + `.exists()` +
+# `parent.parent.parent` 回退 —— 既漏了 `Path('')` 判 True 的语义坑，也完全没有
+# 路径边界（Requirement 9.6 / Property 42）。
+from app.services.workpaper_sync.canonical_paths import (
+    BACKEND_ROOT as _BACKEND_ROOT,
+    is_within_any_legacy_root,
+    legacy_project_storage_root,
+)
+from app.services.wp_export.wp_file_resolver import resolve_wp_file
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_put_target(file_id: UUID, raw_file_path: str) -> Path:
+    """WOPI PutFile 的写入目标绝对路径（边界内），越界即 `PermissionError`。
+
+    分两支：
+
+    * 文件**已存在** ⇒ 直接用统一 resolver 的结果（同一份判据，读写不分叉）；
+    * 文件**还不存在**（首次保存）⇒ resolver 的 `is_file()` 判据用不上，只能做
+      「相对 backend 根归一 + 边界校验」。这一支必须单独存在：把它省掉会让首次
+      保存无路径可写，而共用 `is_file()` 判据又会让首次保存永远失败。
+
+    `path_rejected` / `type_mismatch` 抬成 `PermissionError` 而不是
+    `FileNotFoundError`：越界写入是安全事件，不是「文件找不到」。
+    """
+    existing = resolve_wp_file(raw_file_path, wp_code=None, allow_template_fallback=False)
+    if existing.path is not None:
+        return existing.path
+    if existing.verdict in ("path_rejected", "type_mismatch"):
+        logger.error(
+            "WOPI put_file: 写入目标被拒 wp=%s verdict=%s raw=%r",
+            file_id, existing.verdict, raw_file_path,
+        )
+        raise PermissionError(
+            f"底稿文件路径不可用于写入: {existing.reason}（{existing.verdict}）"
+        )
+    candidate = Path(str(raw_file_path))
+    resolved = (
+        candidate if candidate.is_absolute() else _BACKEND_ROOT / candidate
+    ).resolve()
+    if not is_within_any_legacy_root(resolved):
+        logger.error(
+            "WOPI put_file: 首次保存目标越界 wp=%s raw=%r resolved=%s",
+            file_id, raw_file_path, resolved,
+        )
+        raise PermissionError(f"底稿文件路径越界，拒绝写入: {raw_file_path}")
+    return resolved
 
 # ---------------------------------------------------------------------------
 # Lock store — Redis 分布式锁（生产环境）+ 内存锁（降级/开发环境）
@@ -105,8 +154,6 @@ class WOPIHostService:
         ``UserCanWrite = gate allow ∩ file state ∩ lock``（procedure-delegation-visibility-isolation
         Task 11 / Req 10 / Design C11）：``gate_allow`` 为统一门写授权结果，与文件状态、锁合取。
         """
-        from pathlib import Path
-
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
         )
@@ -114,14 +161,21 @@ class WOPIHostService:
         if wp is None:
             raise FileNotFoundError(f"底稿不存在: {file_id}")
 
-        # 真实文件大小
+        # 真实文件大小 —— 走统一 canonical resolver（Task 12）
+        # 🔴 改造前此处是 `Path(wp.file_path)` + `.exists()` + 自写 `parent.parent.parent`
+        #    回退：`Path('')` 的 `.exists()` 返回 True ⇒ 空 file_path 的底稿会把**当前
+        #    目录**的 stat 当成文件大小；且没有任何路径边界（Property 42）。
         file_size = 0
-        if wp.file_path:
-            fp = Path(wp.file_path)
-            if not fp.exists():
-                fp = Path(__file__).resolve().parent.parent.parent / wp.file_path
-            if fp.exists():
-                file_size = fp.stat().st_size
+        resolution = resolve_wp_file(
+            wp.file_path, wp_code=None, allow_template_fallback=False
+        )
+        if resolution.path is not None:
+            file_size = resolution.path.stat().st_size
+        elif wp.file_path:
+            logger.warning(
+                "WOPI check_file_info: 底稿文件不可达 wp=%s verdict=%s reason=%s",
+                file_id, resolution.verdict, resolution.reason,
+            )
 
         info = {
             "BaseFileName": Path(wp.file_path).name if wp.file_path else f"{file_id}.xlsx",
@@ -198,9 +252,11 @@ class WOPIHostService:
         return info
 
     async def get_file(self, db: AsyncSession, file_id: UUID) -> bytes:
-        """WOPI GetFile: 返回文件真实二进制内容。"""
-        from pathlib import Path
+        """WOPI GetFile: 返回文件真实二进制内容。
 
+        路径解析走统一 canonical resolver（Task 12）：`allow_template_fallback=False`
+        —— 下载「这份底稿」与「一份空白模板」是两件事，WOPI 不做模板兜底。
+        """
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
         )
@@ -211,16 +267,14 @@ class WOPIHostService:
         if not wp.file_path:
             raise FileNotFoundError(f"底稿文件路径为空: {file_id}")
 
-        fp = Path(wp.file_path)
-        if not fp.exists():
-            # 尝试相对于 backend/ 目录查找
-            backend_fp = Path(__file__).resolve().parent.parent.parent / wp.file_path
-            if backend_fp.exists():
-                fp = backend_fp
-            else:
-                raise FileNotFoundError(f"底稿文件不存在: {wp.file_path}")
-
-        return fp.read_bytes()
+        resolution = resolve_wp_file(
+            wp.file_path, wp_code=None, allow_template_fallback=False
+        )
+        if resolution.path is None:
+            raise FileNotFoundError(
+                f"底稿文件不可达: {wp.file_path}（{resolution.verdict}: {resolution.reason}）"
+            )
+        return resolution.path.read_bytes()
 
     async def put_file(
         self,
@@ -232,7 +286,6 @@ class WOPIHostService:
         """WOPI PutFile: 企业级保存 — 锁校验+版本快照+写入+哈希校验+审计留痕+事件发布。"""
         import hashlib
         import shutil
-        from pathlib import Path
 
         result = await db.execute(
             sa.select(WorkingPaper).where(WorkingPaper.id == file_id)
@@ -272,14 +325,26 @@ class WOPIHostService:
         if not wp.file_path:
             raise FileNotFoundError(f"底稿文件路径为空: {file_id}")
 
-        fp = Path(wp.file_path)
+        # 写入目标同样经统一 canonical resolver 归一（Task 12）。
+        # 🔴 写路径的边界判定比读路径更重要：改造前 `Path(wp.file_path)` 对
+        #    `../../` 或项目外绝对路径会直接 `mkdir` + `write_bytes`，把 OO 回传
+        #    的字节写到存储根之外（Property 42 的写侧反例）。
+        fp = _resolve_put_target(file_id, wp.file_path)
         fp.parent.mkdir(parents=True, exist_ok=True)
 
         # 2. 版本快照（保存前备份当前版本）
+        #
+        # 🔴 Task 19：快照名从 `wp.file_version` 换成**本次保存前的 content revision**。
+        #    WOPI 迁入统一 revision 域后不再推进 `file_version`，若快照名继续用它，
+        #    `{stem}_v1.xlsx` 会被每一次保存覆盖 —— 备份看着在、实际只剩最后一份。
+        #    快照名必须绑在**真正在动的**那个计数器上。
+        pre_save_revision = int(getattr(wp, "content_revision", 0) or 0)
+        # 单一声明处：保存前备份与 hash-mismatch 回滚必须指向**同一个**文件名。
+        # 两处各拼一遍 f-string 时，回滚分支（只在写盘校验失败时才走）会静默找不到快照。
+        snapshot_name = f"{fp.stem}_r{pre_save_revision}{fp.suffix}"
         if fp.exists():
             snapshot_dir = fp.parent / ".versions"
             snapshot_dir.mkdir(exist_ok=True)
-            snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
             shutil.copy2(fp, snapshot_dir / snapshot_name)
             logger.info("version snapshot: %s → %s", fp.name, snapshot_name)
 
@@ -290,7 +355,9 @@ class WOPIHostService:
             if existing_hash == content_hash:
                 logger.info("put_file IDEMPOTENT: wp=%s hash=%s (skip write)", file_id, content_hash[:12])
                 return {
-                    "version": wp.file_version,
+                    # 幂等路径不产生新内容版本，回传**当前** content revision
+                    # （回传 file_version 会让客户端拿到一个已经冻结的数）。
+                    "version": pre_save_revision,
                     "content_hash": content_hash,
                     "file_size": len(content),
                     "message": "文件内容未变化，跳过写入",
@@ -307,21 +374,52 @@ class WOPIHostService:
                          fp, content_hash, written_hash)
             # 尝试从快照恢复
             snapshot_dir = fp.parent / ".versions"
-            snapshot_name = f"{fp.stem}_v{wp.file_version}{fp.suffix}"
             snapshot_path = snapshot_dir / snapshot_name
             if snapshot_path.exists():
                 shutil.copy2(snapshot_path, fp)
                 logger.info("restored from snapshot after hash mismatch")
             raise RuntimeError("文件写入完整性校验失败，已从快照恢复")
 
-        # 5. 更新数据库
-        old_version = wp.file_version
-        wp.file_version += 1
+        # 5. 更新数据库 —— Task 19：迁入统一 business revision 域
+        #
+        # 改造前这里是 `wp.file_version += 1`：WOPI PutFile 自己推进一个跨通道版本
+        # 计数器，绕过统一提交入口（Requirement 2.2 明列 WOPI）。改造后：
+        #
+        #   * 权威内容 = 刚落盘并已通过 hash 校验的 OOXML **本体字节**，原样提交为
+        #     `authoritative_payload`（Requirement 2.11：不得被 JSON projection
+        #     writer 改写）；
+        #   * business content revision 由 `ContentMutationService.commit(...)` 的
+        #     CAS 唯一推进；`file_version` 一个字都不碰；
+        #   * `updated_at` / `prefill_stale` 仍在这里写 —— 它们是 Requirement 2.1
+        #     明列的**非**内容非版本字段（副作用），与 revision 无关。
+        #
+        # 冲突语义：WOPI 协议没有 expected-revision 通道（Office online 不会带我们的
+        # revision 回来），所以这里用「读到的当前值」当 expected。真并发下 CAS 会命中
+        # 0 行并抛 `RevisionConflictError`，转成 PermissionError（WOPI 的 409 语义）。
+        from app.services.workpaper_sync.content_mutation import WOPI as _WOPI_SOURCE
+        from app.services.workpaper_sync.models import (
+            RevisionConflictError as _RevisionConflictError,
+        )
+        from app.services.workpaper_sync.writer_migration import (
+            build_content_mutation_service_writer,
+            opaque_entry_id,
+        )
+
         wp.updated_at = datetime.now(timezone.utc)
         wp.prefill_stale = True
         await db.flush()
 
-        # 6. 审计留痕
+        _writer = build_content_mutation_service_writer(db)
+        _entry_id = opaque_entry_id(wp_code=None, wp_id=file_id)
+        old_version = await _writer.current_revision(file_id)
+        new_content_revision = old_version + 1
+
+        # 6. 审计留痕 —— **在**内容 commit 之前入库
+        #
+        # 🔴 顺序不是风格问题：`commit_bytes` 是这笔事务的唯一提交出口，写在它之后的
+        #    `db.add(log)` 会落到**下一个**事务里，而 WOPI router 并不一定再提交一次
+        #    ⇒ 审计日志静默丢失。放在之前，「内容 + 审计日志 + content version +
+        #    revision + 耐久事件」同生共死（Requirement 13.1）。
         try:
             from app.models.core import Log
             log = Log(
@@ -330,7 +428,8 @@ class WOPIHostService:
                 object_id=file_id,
                 new_value={
                     "old_version": old_version,
-                    "new_version": wp.file_version,
+                    "new_version": new_content_revision,
+                    "version_domain": "content_revision",
                     "file_size": len(content),
                     "content_hash": content_hash,
                     "lock_id": lock_id,
@@ -342,6 +441,27 @@ class WOPIHostService:
         except Exception as e:
             logger.warning("audit log for online save failed: %s", e)
 
+        try:
+            _receipt = await _writer.commit_bytes(
+                project_id=wp.project_id,
+                wp_id=file_id,
+                entry_id=_entry_id,
+                source=_WOPI_SOURCE,
+                payload=content,
+                document_type=fp.suffix.lstrip(".").lower() or "xlsx",
+                expected_revision=old_version,
+                # Task 65：authority model 由 lane 登记决定（`wopi_put_file` →
+                # `opaque_single_onlyoffice`），不再由调用点传身份参数。
+                substrate_path=fp,
+                lane_id="wopi_put_file",
+            )
+        except _RevisionConflictError as exc:
+            raise PermissionError(
+                "内容版本冲突：其他会话在本次 PutFile 期间修改了该底稿，请重新打开后再保存"
+            ) from exc
+        await _writer.publish_committed_events(_receipt)
+        new_content_revision = _receipt.revision
+
         # 7. 发布 WORKPAPER_SAVED 事件（异步，不阻塞保存响应）
         try:
             import asyncio as _asyncio
@@ -352,7 +472,10 @@ class WOPIHostService:
                 project_id=wp.project_id,
                 extra={
                     "wp_id": str(file_id),
-                    "file_version": wp.file_version,
+                    # Task 19：WOPI 不再推进 file_version；下游按唯一 business
+                    # content revision 刷新（键名保留兼容，装的是 content_revision）。
+                    "file_version": new_content_revision,
+                    "content_revision": new_content_revision,
                     "trigger": "wopi_online_save",
                     "content_hash": content_hash,
                 },
@@ -462,14 +585,23 @@ class WOPIHostService:
                     pname = proj.client_name or "unknown"
                     ws = proj.wizard_state or {}
                     yr = ws.get("steps", {}).get("basic_info", {}).get("data", {}).get("audit_year", 2025)
-                    rel_path = str(fp.relative_to(Path("storage") / "projects" / str(wp.project_id)))
+                    # 🔴 Task 12：`fp` 现在是**绝对**路径（统一 resolver 的后置条件），
+                    #    改造前是 `Path(wp.file_path)` 的相对路径。故基准也必须换成
+                    #    绝对的 `BACKEND_ROOT/storage/projects/{pid}`，否则
+                    #    `relative_to` 恒抛 ValueError 并被下方 except 吞成
+                    #    「cloud sync failed」——典型的 fail-open 静默失效。
+                    project_root = legacy_project_storage_root(wp.project_id)
+                    try:
+                        rel_path = str(fp.relative_to(project_root))
+                    except ValueError:
+                        rel_path = fp.name
                     await cloud_svc.sync_single_file(wp.project_id, pname, yr, fp, rel_path)
         except Exception as e:
             logger.warning("cloud sync after online save failed: %s", e)
 
         logger.info(
             "put_file SUCCESS: wp=%s v%d→v%d size=%d hash=%s",
-            file_id, old_version, wp.file_version, len(content), content_hash[:12],
+            file_id, old_version, new_content_revision, len(content), content_hash[:12],
         )
 
         # ── Phase 16: 版本链写入 ──
@@ -480,14 +612,14 @@ class WOPIHostService:
                 project_id=wp.project_id,
                 object_type="workpaper",
                 object_id=file_id,
-                version_no=wp.file_version,
+                version_no=new_content_revision,
                 source_snapshot_id=content_hash[:16],
             )
         except Exception as _vl_err:
             logger.warning("version_line write_stamp failed: %s", _vl_err)
 
         return {
-            "version": wp.file_version,
+            "version": new_content_revision,
             "content_hash": content_hash,
             "file_size": len(content),
             "message": "文件保存成功",

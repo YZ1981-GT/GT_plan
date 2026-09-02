@@ -1,0 +1,61 @@
+{
+  "generated_by": "backend/scripts/_mutation_kit/span.py::run_cli",
+  "mode": "run",
+  "pytest_args": [
+    "backend/tests/workpaper_sync/test_task26_oo_to_html.py",
+    "backend/tests/workpaper_sync/test_task26_oo_to_html_pg.py",
+    "backend/tests/workpaper_sync/test_task14_merge_conflicts.py",
+    "-q",
+    "--tb=no",
+    "-rf",
+    "-p",
+    "no:randomly"
+  ],
+  "tally": {
+    "RED": 2
+  },
+  "mutations": [
+    {
+      "id": "M39",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+      "why": "退役登记声明的 merge 消费方与事实脱钩（登记成 `resolution.py`，实际是 `oo_to_html.py`）⇒ 「登记表 ↔ 事实双向等值」这条判据必须打红。本条同时覆盖三种偏离里的两种：出现未登记的消费方 + 登记了却不消费。Task 26 把这条判据从「恰一个消费方」升级为双向锁死，因此必须有一条变异证明升级后的版本仍可证伪（否则升级就等于放宽）",
+      "verdict": "RED",
+      "summary": "1 failed, 351 passed in 20.03s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 23.6
+    },
+    {
+      "id": "M40",
+      "path": "backend/app/services/workpaper_sync/merge.py",
+      "want": "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly",
+      "why": "编排层声明「经由 retention.py 落库」⇒ 唯一 commit 边界的反查失效。`commits_through` 正是「coordinator 允许跑 merge 但不得自己 commit」这条不变量的载体（Property 61）；它若指向任意模块，边界就只剩注释",
+      "verdict": "RED",
+      "summary": "1 failed, 351 passed in 19.73s",
+      "added": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "gone": [],
+      "hit": [
+        "test_task14_merge_conflicts.py::TestTask14ScopeBoundary::test_merge_domain_consumers_match_the_retirement_registry_exactly"
+      ],
+      "added_files": [
+        "test_task14_merge_conflicts.py"
+      ],
+      "restored": true,
+      "restored_sha256": "54428bdf03872232168c1c8ede565d3434c62f87e18db278038afbda721f8d94",
+      "seconds": 23.4
+    }
+  ]
+}

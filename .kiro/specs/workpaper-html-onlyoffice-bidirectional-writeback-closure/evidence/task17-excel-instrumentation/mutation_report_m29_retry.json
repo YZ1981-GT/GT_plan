@@ -1,0 +1,24 @@
+[
+  {
+    "id": "M29",
+    "side": "be",
+    "want": "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_exclusion_preserves_order",
+    "why": "过滤时重排序 ⇒ 多处业务代码按「第一个 sheet」取默认表（`read_sheet_values(sheet_name=None)`），静默换表且不报错",
+    "verdict": "RED",
+    "summary": "3 failed, 129 passed in 34.61s",
+    "added": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_exclusion_preserves_order",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_production_sheet_enumerator_excludes_metadata_sheet",
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_univer_snapshot_excludes_metadata_sheet"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task17_excel_instrumentation.py::TestBusinessSheetExclusion::test_exclusion_preserves_order"
+    ],
+    "added_files": [
+      "test_task17_excel_instrumentation.py"
+    ],
+    "restored": true,
+    "seconds": 38.5
+  }
+]

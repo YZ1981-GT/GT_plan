@@ -1,0 +1,429 @@
+[
+  {
+    "id": "B01",
+    "side": "be",
+    "want": "test_identity_field_is_account_number",
+    "why": "把行身份字段从账号改成下标 —— Requirement 6.5 明令禁止数组下标作持久化身份。两张动态表都有这一行，故必须用 scope+offset 相对定位，否则 ANCHOR-MISS",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.36s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_identity_field_is_account_number"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_identity_field_is_account_number"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "B02",
+    "side": "be",
+    "want": "test_identity_template_has_no_index_placeholder",
+    "why": "把 id 模板换成 `{index}` 占位 —— 这是 Property 23 的原始缺陷形态。只断言「模板非空」的判据抓不到它，必须逐个占位符白名单",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.38s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_identity_template_has_no_index_placeholder"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_identity_template_has_no_index_placeholder"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B03",
+    "side": "be",
+    "want": "test_identity_is_variant_independent",
+    "why": "声明行身份与 variant 耦合 —— 那正是 E1-3 两版共用持久化键时会让行全部错位的形态。两张表都有这一行，用 scope+offset 锁到 E1-3 那张",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.53s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_identity_is_variant_independent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_identity_is_variant_independent"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.0
+  },
+  {
+    "id": "B04",
+    "side": "be",
+    "want": "test_frozen_template_digests_match_disk",
+    "why": "改一位 hex —— 模板 digest 判据必须现算比对而不是自比自（Requirement 6.10 模板漂移 fail closed）。只存 size 的判据抓不到内容漂移",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.45s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_frozen_template_digests_match_disk"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_frozen_template_digests_match_disk"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B05",
+    "side": "be",
+    "want": "test_variant_column_counts_and_identity_columns_derived_from_source",
+    "why": "把 rmb 版列数改成与 multi 相同 —— 若判据不真读 xlsx，「两个 variant 列集不同」这条源侧依据就空转，于是「variant 只影响字段集」变成一句无从核实的声明",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_variant_column_counts_and_identity_columns_derived_from_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_variant_column_counts_and_identity_columns_derived_from_source"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B06",
+    "side": "be",
+    "want": "test_foreign_currency_columns_only_in_multi",
+    "why": "声明 rmb 版有原币列 —— 与源模板表头区（rmb 版无「原币币种/期末汇率/原币」任一 label）矛盾。只断言 JSON 布尔值等于自己是同义反复，必须现扫源模板 label",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.06s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_foreign_currency_columns_only_in_multi"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_foreign_currency_columns_only_in_multi"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.5
+  },
+  {
+    "id": "B07",
+    "side": "be",
+    "want": "test_variant_column_counts_and_identity_columns_derived_from_source",
+    "why": "改 identity 列标签 —— 「两个 variant 的 identity 列逐字相同」是行身份与 variant 解耦的源侧依据；判据必须读源 xlsx 单元格而不是比较 JSON 内部两处",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.38s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_variant_column_counts_and_identity_columns_derived_from_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestCurrencyVariantAgainstAuthoritativeTemplate::test_variant_column_counts_and_identity_columns_derived_from_source"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B08",
+    "side": "be",
+    "want": "test_single_capability_implies_all_identity_fields_null",
+    "why": "裁决 single_onlyoffice 却挂 adapter —— 正是「为凑数伪造 contract/adapter」的形态。裁决与身份字段必须蕴含自洽，否则 single 裁决可以同时声称有 adapter",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.35s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_single_capability_implies_all_identity_fields_null"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_single_capability_implies_all_identity_fields_null"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B09",
+    "side": "be",
+    "want": "test_evidence_is_unverifiable_with_enumerated_reasons",
+    "why": "没跑真实 OO 就标 VERIFIED —— Requirement 12.10 要求 evidence 由服务端从逐 scenario 实体重算；自填验收态是本 spec 反复点名的假绿入口",
+    "verdict": "RED",
+    "summary": "2 failed, 51 passed, 1 warning in 2.40s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_summary_counters_match_entries",
+      "test_task47_e_cycle_migration.py::TestProperty69EvidencePerEntry::test_evidence_is_unverifiable_with_enumerated_reasons"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty69EvidencePerEntry::test_evidence_is_unverifiable_with_enumerated_reasons"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.0
+  },
+  {
+    "id": "B10",
+    "side": "be",
+    "want": "test_capability_matches_full_manifest",
+    "why": "slice 单方面把 entry 改成 bidirectional —— capability 必须与 source-backed 全量 manifest 一致，否则 slice 变成第二真源、迁移进度可以自己宣布",
+    "verdict": "RED",
+    "summary": "4 failed, 49 passed, 1 warning in 2.40s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_adjudication_argues_both_directions",
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_capability_matches_full_manifest",
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_single_capability_implies_all_identity_fields_null",
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_summary_counters_match_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_capability_matches_full_manifest"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "B11",
+    "side": "be",
+    "want": "test_slice_entry_set_equals_manifest_derived_set",
+    "why": "换成一个 manifest 里不存在的 entry —— 判据必须做集合相等（按选取规则现算），抄一份 id 名单的判据既抓不到凑数也抓不到漏迁",
+    "verdict": "RED",
+    "summary": "4 failed, 49 passed, 1 warning in 2.49s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_capability_matches_full_manifest",
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_manifest_legacy_reasons_copied_verbatim",
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_slice_entry_set_equals_manifest_derived_set",
+      "test_task47_e_cycle_migration.py::TestProperty69EvidencePerEntry::test_full_manifest_has_no_completed_evidence_for_e_entry"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_slice_entry_set_equals_manifest_derived_set"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.1
+  },
+  {
+    "id": "B12",
+    "side": "be",
+    "want": "test_bp4_source_refs_point_at_real_symbols",
+    "why": "让阻断项指向一个不存在的符号 —— 阻断项若不与真实符号锁死，重构后它会静静指向空气，复核者读到的是一条无法验证的「已登记缺陷」",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.46s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestProperty69EvidencePerEntry::test_bp4_source_refs_point_at_real_symbols"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty69EvidencePerEntry::test_bp4_source_refs_point_at_real_symbols"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B13",
+    "side": "be",
+    "want": "test_root_cause_chain_records_all_four_links",
+    "why": "把根因链里最关键的一环换成模糊描述 —— 归档 spec 已实测过：措辞准确但断言半径不足的守卫放行了本缺陷。根因链缺环时后来者会把它当「只是显示问题」",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.47s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestVariantSwitchZeroingClosed::test_root_cause_chain_records_all_four_links"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestVariantSwitchZeroingClosed::test_root_cause_chain_records_all_four_links"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.0
+  },
+  {
+    "id": "B14",
+    "side": "be",
+    "want": "test_slice_borrows_no_other_entry_identity",
+    "why": "显式借用 D2 pilot 的契约身份 —— Property 70 的核心禁令。只读 isolation.rule 文本的判据抓不到，必须真在整份 slice 里搜其它 entry 的契约 id",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.49s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_slice_borrows_no_other_entry_identity"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty70NoCrossEntryReuse::test_slice_borrows_no_other_entry_identity"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B15",
+    "side": "be",
+    "want": "test_summary_counters_match_entries",
+    "why": "汇总计数与 entry 数脱钩 —— 迁移进度就是靠这些计数报出去的；计数必须从 entries 现算，不能是人手维护的第二真源",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.38s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_summary_counters_match_entries"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestAdjudicationHonesty::test_summary_counters_match_entries"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "B16",
+    "side": "be",
+    "want": "test_delete_justification_is_source_backed",
+    "why": "声称被删文件还有生产消费方却仍标 executed —— 免 Task 45 gate 的唯一依据就是「入边为 0」，这条一破，删除就变成未经等价性验证的破坏性操作",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.33s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_delete_justification_is_source_backed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_delete_justification_is_source_backed"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B17",
+    "side": "be",
+    "want": "test_shared_dual_mode_is_preserved_with_both_consumers",
+    "why": "把共享 dual-mode 的消费方登记改错 —— 判据必须现扫宿主 import 求集合；登记与源码脱节时「删它会不会拆掉别的循环」这个判断就没有依据",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.39s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_shared_dual_mode_is_preserved_with_both_consumers"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_shared_dual_mode_is_preserved_with_both_consumers"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B18",
+    "side": "be",
+    "want": "test_localstorage_collision_verdict_is_derived",
+    "why": "改 localStorage 前缀 —— 「跨循环共用前缀但不冲突」这个结论是从 key 形态（以 wpId 收尾）推出来的；前缀一改，结论必须重新推导而不是继续沿用",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.36s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_localstorage_collision_verdict_is_derived"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_localstorage_collision_verdict_is_derived"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.8
+  },
+  {
+    "id": "B19",
+    "side": "be",
+    "want": "test_zeroing_defect_status_is_backed_by_source",
+    "why": "删掉 multi 分支的形态分派 —— 抹零缺陷本体（无条件由原币派生本位币）。登记为 FIXED_AND_GUARDED 时，修复点必须真的在 recalcRow 的函数体作用域内",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.39s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestVariantSwitchZeroingClosed::test_zeroing_defect_status_is_backed_by_source"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestVariantSwitchZeroingClosed::test_zeroing_defect_status_is_backed_by_source"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 5.9
+  },
+  {
+    "id": "B20",
+    "side": "be",
+    "want": "test_seed_builders_and_consumers_exist_on_disk",
+    "why": "把 slice 登记的种子构造器改名 —— 「文件存在」不足以证明登记有效；符号改名后登记表会变成指向空气的第二真源",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.52s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_seed_builders_and_consumers_exist_on_disk"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestProperty23RowIdentityNotIndex::test_seed_builders_and_consumers_exist_on_disk"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.0
+  },
+  {
+    "id": "B21",
+    "side": "be",
+    "want": "test_host_still_imports_only_the_shared_dual_mode",
+    "why": "给宿主加第二条 dual-mode import —— Task 45 范式禁止双路并存。判据必须求import 到的 dual-mode 符号集合，只查「有没有 import 目标那一个」抓不到多出来的",
+    "verdict": "RED",
+    "summary": "1 failed, 52 passed, 1 warning in 2.47s",
+    "added": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_host_still_imports_only_the_shared_dual_mode"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task47_e_cycle_migration.py::TestDeletionPlanExecuted::test_host_still_imports_only_the_shared_dual_mode"
+    ],
+    "added_files": [
+      "test_task47_e_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 6.1
+  }
+]

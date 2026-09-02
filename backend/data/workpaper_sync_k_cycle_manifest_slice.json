@@ -1,0 +1,3882 @@
+{
+  "schema_version": "manifest-slice:v1",
+  "task": "Task 53",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "K 循环（管理循环）Excel 独立 entry 的冻结 slice。🔴 与前七轮形态差异最大的两处：① **orphan dual-mode 数量创纪录**——13 个 `useK*DualMode.ts` 里 K1~K7 共 **7 个**是一阶 orphan（生产边与测试边各 0），因为 K1~K7 七个宿主各自在 `<script setup>` 里内联了一份等价 IIFE 实现；J 循环那轮的 4 个 orphan 已是当时最高。② **权威模板 14 本 vs entry 13 条**——多出来的 `K0 管理循环函证.xlsx` 在 source manifest 里没有任何 entry（componentType 为 confirmation-hub，逐 sheet 走跨循环共享的 D0 函证组件族），按 tasks.md 归 Task 57。本 slice 的 13 条 entry **全部**实测有 HTML 对端 ⇒ AC 12.8 禁止裁 single_onlyoffice，AC 12.1 的六件前置全未交付 ⇒ SR-6 禁止 bidirectional ⇒ 13/13 待裁决态。",
+  "frozen_at": "Task 53（2026-08-31）",
+  "source_manifest": "backend/data/workpaper_sync_entry_manifest.json",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "sibling_slices": [
+    "backend/data/workpaper_sync_d_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_e_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_f_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_g_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_h_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_i_cycle_manifest_slice.json",
+    "backend/data/workpaper_sync_j_cycle_manifest_slice.json"
+  ],
+  "slice_scope": {
+    "cycle": "K",
+    "document_type": "xlsx",
+    "selection_rule": "source_manifest 的 entries 中同时满足三条的：① document_type == 'xlsx' ② wp_match.wp_code_patterns 任一以 'K' 开头 ③ independent_entry == true。守卫按本规则从 manifest **现算**集合并与 independent_entries 做等值比对，多写一条（凑数）或少写一条（漏迁）都红。",
+    "independent_entry_count": 13,
+    "k_prefixed_entry_total": 13,
+    "k_prefixed_independent_total": 13,
+    "excluded_pilot_entry_count": 0,
+    "parent_duplicate_count": 0,
+    "parent_duplicate_note": "🔴 K 循环 parent_duplicate 子入口 **0 条** —— 实测 manifest 里没有任何 entry 的 `parent_entry_id` 指向 13 条 K entry 之一，`workpaper_sync_entry_overlay.json` 的 `parent_rules` 里也没有任何 `components/workpaper/k*/**` 的 file_glob（有的是 d4/h4/h8/n1/j1/b60 六条）。这与 D4（31 条）、J1（1 条）都不同，故本 slice **不含** `parent_duplicate_summary` 条件节 —— 触发条件不成立时写一个空节就是 additive 死声明。",
+    "excluded_from_slice": [
+      {
+        "what": "K0 管理循环函证（wp_code K0，权威模板 `K0 管理循环函证.xlsx`）",
+        "reason": "在 source manifest 里**没有任何 entry**：13 条 K 前缀 entry 全是 K1..K13，实测无一条 entry_id 含 `k0`。它的 workbook 级 componentType 是 `confirmation-hub`，逐 sheet 由跨循环共享的 D0 函证组件族渲染 （`components/workpaper/confirmation/alternativeK05` / `alternativeK06` / `confirmation/k0-confirmation/K0SummaryLowerZone.vue`）。按 tasks.md 的 Task 57（函证族）归属，不在本 slice。",
+        "verified_how": "① 对 manifest 全量 186 条 entry 现算 `'k0' in entry_id.lower()` 命中数 == 0；② `backend/wp_templates/_index.json` 里 K0 有独立条目（说明它是一本册而非某册的 sheet），故不能靠「模板不存在」排除，必须靠「无 entry + 归 Task 57」排除；③ `components/workpaper/__tests__/ieOrphanBaseline.spec.ts` 已登记 k0 是函证族（跨循环共享 D0 组件）。 ④ 后端另有 3 个 K0 专属渲染策略 （_k0_confirmation.py, _k0_confirmation_ai.py, _k0_confirmation_import_export.py），它们渲染的是 `confirmation-alternative-k05` / `confirmation-alternative-k06` 等函证族 componentType，**不 import** `k_cycle_specs` ⇒ K0 走的确实是函证族而不是 K 循环的科目取数路径。"
+      },
+      {
+        "what": "四个 pilot entry（B60 / D2 / H1 / G7）",
+        "reason": "Tasks 40–43 已单独迁移，Task 45 已删其 legacy 并冻结范式；不重复计数。",
+        "verified_how": "逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的顶层 `review.entry_id`，实得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 K ⇒ 本 slice 的 excluded_pilot_entry_count == 0。🔴 契约归属按 `review.entry_id` 判，不按文件名猜（四者的文件名与 entry_id 不同构）。"
+      },
+      {
+        "what": "K 循环的非 xlsx entry",
+        "reason": "本 slice 只覆盖 Excel 独立 entry（Wave 5 的 Excel lane）。",
+        "verified_how": "现算 K 前缀 entry 的 document_type 分布，13 条全是 xlsx ⇒ 排除集为空（如实登记 0）。"
+      },
+      {
+        "what": "K 循环的 parent_duplicate 子入口",
+        "reason": "AC 1.6 要求它们复用父 entry 的 adapter 而不独立计数。",
+        "verified_how": "现算 `parent_entry_id ∈ 13 条 K entry_id` 的条数 == 0 ⇒ 排除集为空（如实登记 0）。"
+      },
+      {
+        "what": "GtKamWorkpaper.vue（关键审计事项底稿宿主）",
+        "reason": "文件名以 `GtK` 开头但**不是 K 循环 entry**：它的 wp_code 是 KAM（关键审计事项），manifest 里没有以 `K` 开头的 wp_code_pattern 命中它。登记它是为了让「按文件名前缀 GtK 枚举宿主」这条捷径被显式否决。",
+        "verified_how": "现算 `components/workpaper/` 下匹配 `^GtK` 的文件共 14 个，其中 13 个是本 slice 的宿主，剩下 1 个是 GtKamWorkpaper.vue；对它现算 manifest 里的 wp_code_patterns，无一条以 `K` 后接数字开头。"
+      }
+    ]
+  },
+  "independent_entries": [
+    {
+      "entry_id": "xlsx/gt-k1-other-receivables",
+      "wp_code_pattern": "K1O",
+      "document_type": "xlsx",
+      "host": "GtK1OtherReceivables.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-4",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L9",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K1-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK1OtherReceivables.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K1 其他应收款.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
+        "sheet_count": 17,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L9",
+        "segmented_sites_in_gate": [
+          10
+        ],
+        "segmented_sites_before_comment_strip": [
+          10,
+          375
+        ],
+        "second_level_gate_sites": [
+          11
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts",
+        "localStorage_prefix": "k1-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K1 实测**有** HTML 对端（checklist_responses + `K1-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K1 其他应收款.xlsx`（17 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K1 其他应收款.xlsx` 共 17 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k2-other-current-assets",
+      "wp_code_pattern": "K2O",
+      "document_type": "xlsx",
+      "host": "GtK2OtherCurrentAssets.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L9",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K2-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK2OtherCurrentAssets.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K2 其他流动资产.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894",
+        "sheet_count": 11,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L9",
+        "segmented_sites_in_gate": [
+          10
+        ],
+        "segmented_sites_before_comment_strip": [
+          10,
+          277
+        ],
+        "second_level_gate_sites": [
+          11
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK2DualMode.ts",
+        "localStorage_prefix": "k2-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K2 实测**有** HTML 对端（checklist_responses + `K2-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K2 其他流动资产.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K2 其他流动资产.xlsx` 共 11 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k3-other-payables",
+      "wp_code_pattern": "K3O",
+      "document_type": "xlsx",
+      "host": "GtK3OtherPayables.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K3-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK3OtherPayables.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K3 其他应付款.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
+        "sheet_count": 12,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          293
+        ],
+        "second_level_gate_sites": [
+          10
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK3DualMode.ts",
+        "localStorage_prefix": "k3-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K3 实测**有** HTML 对端（checklist_responses + `K3-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K3 其他应付款.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K3 其他应付款.xlsx` 共 12 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k4-other-current-liabilities",
+      "wp_code_pattern": "K4O",
+      "document_type": "xlsx",
+      "host": "GtK4OtherCurrentLiabilities.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K4-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK4OtherCurrentLiabilities.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K4 其他流动负债.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "88cdf2e65d75840adb9db327fe5d46ee49986d03d17f396c1596d053a59611dd",
+        "sheet_count": 8,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          264
+        ],
+        "second_level_gate_sites": [
+          10
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK4DualMode.ts",
+        "localStorage_prefix": "k4-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K4 实测**有** HTML 对端（checklist_responses + `K4-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K4 其他流动负债.xlsx`（8 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K4 其他流动负债.xlsx` 共 8 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k5-provisions",
+      "wp_code_pattern": "K5P",
+      "document_type": "xlsx",
+      "host": "GtK5Provisions.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K5-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK5Provisions.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K5 预计负债.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "01780f5ee08b4ea659651ae0d40f28b15388a4e140f28840e8b1ad50f0a9c8e0",
+        "sheet_count": 11,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          254
+        ],
+        "second_level_gate_sites": [
+          10
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK5DualMode.ts",
+        "localStorage_prefix": "k5-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K5 实测**有** HTML 对端（checklist_responses + `K5-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K5 预计负债.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K5 预计负债.xlsx` 共 11 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k6-held-for-sale",
+      "wp_code_pattern": "K6H",
+      "document_type": "xlsx",
+      "host": "GtK6HeldForSale.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K6-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK6HeldForSale.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K6 持有待售资产和负债.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
+        "sheet_count": 11,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          244
+        ],
+        "second_level_gate_sites": [
+          10
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK6DualMode.ts",
+        "localStorage_prefix": "k6-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K6 实测**有** HTML 对端（checklist_responses + `K6-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K6 持有待售资产和负债.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K6 持有待售资产和负债.xlsx` 共 11 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k7-deferred-income",
+      "wp_code_pattern": "K7D",
+      "document_type": "xlsx",
+      "host": "GtK7DeferredIncome.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-5",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K7-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK7DeferredIncome.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K7 递延收益.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "90e915f70395698363b3aae3fef0ea0c38de7883292380eabaefa77d415c0e0b",
+        "sheet_count": 11,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          228
+        ],
+        "second_level_gate_sites": [
+          10
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "host_inlined_iife",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229",
+        "orphan_twin": "audit-platform/frontend/src/components/workpaper/composables/useK7DualMode.ts",
+        "localStorage_prefix": "k7-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K7 实测**有** HTML 对端（checklist_responses + `K7-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K7 递延收益.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K7 递延收益.xlsx` 共 11 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k8-selling-expenses",
+      "wp_code_pattern": "K8S",
+      "document_type": "xlsx",
+      "host": "GtK8SellingExpenses.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K8-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK8SellingExpenses.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K8 销售费用.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "41918d65caba05fe70a9726cee12ee5ea9a83723f8ec1053d9ba44b3ebe04015",
+        "sheet_count": 12,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          288
+        ],
+        "second_level_gate_sites": [],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "dedicated_composable",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L250",
+        "orphan_twin": null,
+        "localStorage_prefix": "k8-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K8 实测**有** HTML 对端（checklist_responses + `K8-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K8 销售费用.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K8 销售费用.xlsx` 共 12 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k9-admin-expenses",
+      "wp_code_pattern": "K9A",
+      "document_type": "xlsx",
+      "host": "GtK9AdminExpenses.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K9-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK9AdminExpenses.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K9 管理费用.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "ad2f7a863e6d90031abee12875fccf9ca1c196e69f713cda938d9d37051eedbf",
+        "sheet_count": 12,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L8",
+        "segmented_sites_in_gate": [
+          9
+        ],
+        "segmented_sites_before_comment_strip": [
+          9,
+          291
+        ],
+        "second_level_gate_sites": [],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "dedicated_composable",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L218",
+        "orphan_twin": null,
+        "localStorage_prefix": "k9-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K9 实测**有** HTML 对端（checklist_responses + `K9-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K9 管理费用.xlsx`（12 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K9 管理费用.xlsx` 共 12 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k10-other-income",
+      "wp_code_pattern": "K10O",
+      "document_type": "xlsx",
+      "host": "GtK10OtherIncome.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K10-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK10OtherIncome.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K10 其他收益.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "04996321e9ff9525b293ef3fd2bd0fffbc1249aae2e760ddd7c90aa836afbc0d",
+        "sheet_count": 11,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L8",
+        "segmented_sites_in_gate": [
+          10
+        ],
+        "segmented_sites_before_comment_strip": [
+          10
+        ],
+        "second_level_gate_sites": [
+          11
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "dedicated_composable",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L176",
+        "orphan_twin": null,
+        "localStorage_prefix": "k10-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K10 实测**有** HTML 对端（checklist_responses + `K10-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K10 其他收益.xlsx`（11 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K10 其他收益.xlsx` 共 11 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k11-asset-impairment-loss",
+      "wp_code_pattern": "K11A",
+      "document_type": "xlsx",
+      "host": "GtK11AssetImpairmentLoss.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K11-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK11AssetImpairmentLoss.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K11 资产减值损失.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+        "sheet_count": 7,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L8",
+        "segmented_sites_in_gate": [
+          10
+        ],
+        "segmented_sites_before_comment_strip": [
+          10,
+          198
+        ],
+        "second_level_gate_sites": [
+          11
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "dedicated_composable",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L143",
+        "orphan_twin": null,
+        "localStorage_prefix": "k11-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K11 实测**有** HTML 对端（checklist_responses + `K11-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K11 资产减值损失.xlsx`（7 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K11 资产减值损失.xlsx` 共 7 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k12-non-operating-income",
+      "wp_code_pattern": "K12N",
+      "document_type": "xlsx",
+      "host": "GtK12NonOperatingIncome.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-8",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K12-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK12NonOperatingIncome.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K12 营业外收入.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "7f9367a0bdf3d1ac1989c43592829f8b128b58db7b5aac6fe84b6c9f5934317c",
+        "sheet_count": 9,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L8",
+        "segmented_sites_in_gate": [
+          10
+        ],
+        "segmented_sites_before_comment_strip": [
+          10,
+          212
+        ],
+        "second_level_gate_sites": [
+          11
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "dedicated_composable",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L157",
+        "orphan_twin": null,
+        "localStorage_prefix": "k12-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K12 实测**有** HTML 对端（checklist_responses + `K12-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K12 营业外收入.xlsx`（9 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K12 营业外收入.xlsx` 共 9 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    },
+    {
+      "entry_id": "xlsx/gt-k13-non-operating-expense",
+      "wp_code_pattern": "K13N",
+      "document_type": "xlsx",
+      "host": "GtK13NonOperatingExpense.vue",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue",
+      "capability": null,
+      "capability_verdict_stage": "step_4_blocked_by_step_3_result_exists",
+      "capability_target": "bidirectional",
+      "capability_target_blocked_by": [
+        "BP-1",
+        "BP-2",
+        "BP-3",
+        "BP-6",
+        "BP-7",
+        "BP-9"
+      ],
+      "html_counterpart_verdict": "exists",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L8",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132",
+        "backend/app/routers/checklist_responses.py#L84"
+      ],
+      "html_counterpart": {
+        "store": "checklist_responses",
+        "table_keys": [
+          "K13-{sheet}-{field}"
+        ],
+        "row_identity_key": "item_id",
+        "how_resolved": "GtK13NonOperatingExpense.vue 用 `useChecklistPersistence({ wpId, projectId })` 取 `responses` 作为 `allResponses`，逐子 Tab 以 `@save=\"handleChildSave\"` 上抛，宿主 `handleChildSave()` 调 `persistence.save(itemId, toChecklistPatch(value))`，最终经 `PUT /api/workpapers/{wpId}/checklist-responses` 落库。故业务内容**确实存在于 HTML 侧持久化通道**，verdict = exists。"
+      },
+      "migration_state": "legacy_fake_bidirectional",
+      "adapter_id": null,
+      "authority_model": null,
+      "definition_bundle": null,
+      "instrumentation_candidate": null,
+      "published_representation": null,
+      "template_ref": {
+        "workbook": "K13 营业外支出.xlsx",
+        "root": "backend/wp_templates/K",
+        "sha256": "2a50b18a21de3b01afb9e586777fa2dd8215e0d59fc5f5c7c95d939f08eb1373",
+        "sheet_count": 9,
+        "in_runtime_index": true
+      },
+      "mount_count": 2,
+      "scenario_profile_id": null,
+      "editability": "editable",
+      "room_model": "shared",
+      "canonical_resolver": "legacy_sheet_onlyoffice_router",
+      "manifest_mirror": {
+        "capability": "single_onlyoffice",
+        "html_store": "unresolved",
+        "why_not_adopted": "BP-9：这两个值来自 overlay 的 defaults_by_component.GtOnlyOfficeSheet 默认值，不是逐 entry 裁决（AP-3）。"
+      },
+      "ui_toolbar_gate": {
+        "anchor": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L8",
+        "segmented_sites_in_gate": [
+          10
+        ],
+        "segmented_sites_before_comment_strip": [
+          10,
+          212
+        ],
+        "second_level_gate_sites": [
+          11
+        ],
+        "mounts_ac14_notice": false
+      },
+      "dual_mode_carrier": {
+        "kind": "dedicated_composable",
+        "site": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L156",
+        "orphan_twin": null,
+        "localStorage_prefix": "k13-dual-mode:"
+      },
+      "adjudication": {
+        "honest_capability": null,
+        "reason": "K13 实测**有** HTML 对端（checklist_responses + `K13-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence`，PUT 路由在后端真实存在）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿 `K13 营业外支出.xlsx`（9 张 sheet，非空白模板）⇒ AC 12.9 的 single_html 不适用；宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置（authority model / per-entry contract / non-null bundle / instrumentation candidate / published representation / 逐 scenario evidence）一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 待裁决态。",
+        "not_single_html_because": "OO 侧有真实业务价值：权威模板 `K13 营业外支出.xlsx` 共 9 张 sheet （含底稿目录 / 程序表 / 审定表 / 明细表 / 调整分录汇总 / 附注披露两变体 / 各专项检查表），不是「空白模板切换入口」。AC 12.9 的判据（无 OO 业务价值）不成立。",
+        "not_bidirectional_because": "AC 12.1 的六件前置全未交付（BP-1 / BP-2 / BP-3）；adapter_id 为 null 且 registry 里无本 entry 的 adapter。SR-6 硬性禁止。"
+      },
+      "evidence": {
+        "browser_case": null,
+        "contract_test": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py",
+        "sync_test_run_id": null,
+        "required_scenario_set_digest": null,
+        "verification_state": "UNVERIFIABLE",
+        "unverifiable_reasons": [
+          "BP-1：无 approved authority model / reviewed per-entry contract / non-null bundle。",
+          "BP-2：无 Task 36 finalize 出的 published representation。",
+          "BP-3：真实 OnlyOffice 9.4 探针未对本 entry 执行。",
+          "BP-7：AC 1.4 的提示组件未挂载 ⇒ step 11 的 DOM 级判据无对象。"
+        ]
+      }
+    }
+  ],
+  "authoritative_templates": {
+    "root": "backend/wp_templates/K",
+    "why_this_root": "唯一权威目录是 `backend/wp_templates/`（`wp_template_init_service` 生成底稿时从这里复制、`wp_template_finder` 以 `_index.json` 索引）。逐文件 size + sha256 现算比对，任一漂移 fail closed（Requirement 6.10）。",
+    "reference_copy_status": "absent_in_worktree",
+    "reference_copy_note": "🔴 参考副本目录 `基础数据/致同通用审计程序及底稿模板（2025年修订）/` 在本工作树中**不存在**（与 D/E/F/G/H/I/J 七轮实测一致；本轮又现算了一次 `os.path.isdir` 与 `glob('基础数据*')` 均为空）。故本 slice 无法做「权威版 vs 参考副本」的双处比对，只能以权威目录字节为唯一真源。⚠️ 注意 `backend/wp_templates/_reference/` **不是**这个参考副本 —— 它是 6 个行业参考示例文件（管理建议书 / 毛利分析 / 保理合同 / 五步法 / 质控会议记录 / EQCR 资料清单），与模板库副本无关，本 slice 现算它的文件名集合以防被后来者误当副本。",
+    "lock_file_policy": "枚举时跳过 `~$` 前缀的 Office 锁文件（用户开着 WPS/Excel 时会出现，且可能还有未保存改动）。实测本次枚举 0 个锁文件。",
+    "files": [
+      {
+        "name": "K0 管理循环函证.xlsx",
+        "size": 108986,
+        "sha256": "3de48276e74a7f860d3ff4c712c810d86443eaa2ee3fd2dd372fcb228721f552",
+        "sheet_count": 11,
+        "sheets": [
+          "底稿目录",
+          "函证程序表K0A",
+          "函证结果汇总表K0-1",
+          "核实被函证单位信息K0-2",
+          "跟函函证过程控制K0-3",
+          "函证差异调节表K0-4",
+          "其他应收款替代程序K0-5",
+          "其他应付款替代程序K0-6",
+          "邮件传真回函可靠性验证K0-7",
+          "函证程序舞弊风险评价表K0-8",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": null,
+        "excluded_reason": "K0 管理循环函证册在 source manifest 里**没有任何 entry**（实测：13 条 K 前缀 entry 全是 K1..K13，无一条 entry_id 含 k0）。它的 componentType 是 confirmation-hub，逐 sheet 由跨循环共享的 D0 函证组件族渲染（`components/workpaper/confirmation/alternativeK05|alternativeK06` 与 `confirmation/k0-confirmation/K0SummaryLowerZone.vue`），按 tasks.md 归 Task 57（函证族）而不是本 slice。"
+      },
+      {
+        "name": "K1 其他应收款.xlsx",
+        "size": 173926,
+        "sha256": "4abf05902fe09f7f6bec947c991c648669d26f39187f2f285866392c1c633eab",
+        "sheet_count": 17,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表 K1A",
+          "审定表K1-1",
+          "附注披露信息(上市公司）",
+          "附注披露信息（国企）",
+          "明细表K1-2",
+          "坏账准备明细表K1-3",
+          "调整分录汇总K1-4",
+          "大额其他应收款情况分析表K1-5",
+          "信用减值损失会计政策检查K1-6",
+          "三阶段划分检查表K1-7",
+          "坏账准备测算K1-8",
+          "坏账准备转回（收回）、核销检查表K1-9",
+          "长期未收回款项检查表K1-10",
+          "关联方及交易检查表K1-11",
+          "其他应收款检查表K1-12",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k1-other-receivables"
+      },
+      {
+        "name": "K10 其他收益.xlsx",
+        "size": 147249,
+        "sha256": "04996321e9ff9525b293ef3fd2bd0fffbc1249aae2e760ddd7c90aa836afbc0d",
+        "sheet_count": 11,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K10A",
+          "审定表K10-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K10-2",
+          "调整分录汇总K10-3",
+          "政府补助核对表K10-4",
+          "应收政府补助检查表K10-5",
+          "其他收益检查表K10-6",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k10-other-income"
+      },
+      {
+        "name": "K11 资产减值损失.xlsx",
+        "size": 58013,
+        "sha256": "dc0e5434b7c8e345913864ce524ad30a0a3729b5655627f3c30bce52294a9190",
+        "sheet_count": 7,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表 K11A",
+          "审定表K11-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K11-2",
+          "调整分录汇总K11-3"
+        ],
+        "belongs_to_entry": "xlsx/gt-k11-asset-impairment-loss"
+      },
+      {
+        "name": "K12 营业外收入.xlsx",
+        "size": 59739,
+        "sha256": "7f9367a0bdf3d1ac1989c43592829f8b128b58db7b5aac6fe84b6c9f5934317c",
+        "sheet_count": 9,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K12A",
+          "审定表K12-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K12-2",
+          "调整分录汇总K12-3",
+          "营业外收入检查表K12-4",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k12-non-operating-income"
+      },
+      {
+        "name": "K13 营业外支出.xlsx",
+        "size": 58775,
+        "sha256": "2a50b18a21de3b01afb9e586777fa2dd8215e0d59fc5f5c7c95d939f08eb1373",
+        "sheet_count": 9,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K13A",
+          "审定表K13-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K13-2",
+          "调整分录汇总K13-3",
+          "营业外支出检查表K13-4",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k13-non-operating-expense"
+      },
+      {
+        "name": "K2 其他流动资产.xlsx",
+        "size": 189597,
+        "sha256": "86740bb85e21ab85e85fefe9e9cd55d9e2267da406f8e3329096e21503919894",
+        "sheet_count": 11,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表 K2A",
+          "审定表K2-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K2-2",
+          "调整分录汇总K2-3",
+          "合同取得成本明细表K2-4",
+          "摊销测算表K2-5",
+          "其他流动资产检查表表K2-6",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k2-other-current-assets"
+      },
+      {
+        "name": "K3 其他应付款.xlsx",
+        "size": 92581,
+        "sha256": "b2770bdc8a67aaca5a3e2eefd8934a189abd3e57ffd872597d22176540718d4e",
+        "sheet_count": 12,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K3A",
+          "审定表K3-1",
+          "附注披露信息(上市公司)",
+          "附注披露信息(国企)",
+          "明细表K3-2",
+          "调整分录汇总K3-3",
+          "大额其他应付款情况分析表K3-4",
+          "长期挂账检查表K3-5",
+          "关联方及交易检查表K3-6",
+          "其他应付款检查表K3-7",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k3-other-payables"
+      },
+      {
+        "name": "K4 其他流动负债.xlsx",
+        "size": 170841,
+        "sha256": "88cdf2e65d75840adb9db327fe5d46ee49986d03d17f396c1596d053a59611dd",
+        "sheet_count": 8,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表 K4A",
+          "审定表 K4-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表 K4-2",
+          "调整分录汇总 K4-3",
+          "其他流动负债检查表 K4-4"
+        ],
+        "belongs_to_entry": "xlsx/gt-k4-other-current-liabilities"
+      },
+      {
+        "name": "K5 预计负债.xlsx",
+        "size": 81429,
+        "sha256": "01780f5ee08b4ea659651ae0d40f28b15388a4e140f28840e8b1ad50f0a9c8e0",
+        "sheet_count": 11,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表 K5A",
+          "审定表 K5-1",
+          "附注披露信息（上市公司)",
+          "附注披露信息（国企）",
+          "明细表 K5-2",
+          "调整分录汇总 K5-3",
+          "产品质量保修检查表 K5-4",
+          "弃置费用检查表 K5-5",
+          "未决诉讼检查表 K5-6",
+          "预计负债检查表 K5-7"
+        ],
+        "belongs_to_entry": "xlsx/gt-k5-provisions"
+      },
+      {
+        "name": "K6 持有待售资产和负债.xlsx",
+        "size": 118267,
+        "sha256": "f75f730e959f711c3cd8a7f0d8e33637cc32b6e1f034c103f3b8d88ff0b6076b",
+        "sheet_count": 11,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表 K6A",
+          "审定表 K6-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息(国企）",
+          "明细表K6-2",
+          "调整分录汇总 K6-3",
+          "初始确认检查表K6-4",
+          "减值准备测试表（后续计量） K6-5",
+          "处置组减值测试表（后续计量） K6-6",
+          "检查表（不再满足持有待售）K6-7"
+        ],
+        "belongs_to_entry": "xlsx/gt-k6-held-for-sale"
+      },
+      {
+        "name": "K7 递延收益.xlsx",
+        "size": 75642,
+        "sha256": "90e915f70395698363b3aae3fef0ea0c38de7883292380eabaefa77d415c0e0b",
+        "sheet_count": 11,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K7A",
+          "审定表K7-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国有企业）",
+          "明细表K7-2",
+          "调整分录汇总K7-3",
+          "测算表K7-4",
+          "递延收益检查表K7-5",
+          "会计提示",
+          "GT_Custom"
+        ],
+        "belongs_to_entry": "xlsx/gt-k7-deferred-income"
+      },
+      {
+        "name": "K8 销售费用.xlsx",
+        "size": 89923,
+        "sha256": "41918d65caba05fe70a9726cee12ee5ea9a83723f8ec1053d9ba44b3ebe04015",
+        "sheet_count": 12,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K8A",
+          "审定表K8-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K8-2",
+          "调整分录汇总K8-3",
+          "实质性分析K8-4",
+          "合同检查表K8-5",
+          "截止性测试(从记账凭证至原始凭证）K8-6",
+          "截止性测试（从原始凭证至记账凭证）K8-7",
+          "销售费用检查表K8-8"
+        ],
+        "belongs_to_entry": "xlsx/gt-k8-selling-expenses"
+      },
+      {
+        "name": "K9 管理费用.xlsx",
+        "size": 94307,
+        "sha256": "ad2f7a863e6d90031abee12875fccf9ca1c196e69f713cda938d9d37051eedbf",
+        "sheet_count": 12,
+        "sheets": [
+          "底稿目录",
+          "实质性程序表K9A",
+          "审定表K9-1",
+          "附注披露信息（上市公司）",
+          "附注披露信息（国企）",
+          "明细表K9-2",
+          "调整分录汇总K9-3",
+          "实质性分析K9-4",
+          "合同检查表K9-5",
+          "截止性测试(从记账凭证至原始凭证）K9-6",
+          "截止性测试（从原始凭证至记账凭证）K9-7",
+          "管理费用检查表K9-8"
+        ],
+        "belongs_to_entry": "xlsx/gt-k9-admin-expenses"
+      }
+    ],
+    "belongs_to_entry_mapping_note": "🔴 14 个文件 ↔ 13 个 entry 是**单射但不满射**：13 本有主（K1..K13 逐一对应），1 本（K0 函证册）`belongs_to_entry` 为 null 且带 excluded_reason。这与 I（6↔6 双射）、J（3 文件 / 1 entry）、H（11 文件 / 9 entry）都不同形，守卫按 SR-8 两侧都验：有主的必须命中本 slice 的 entry_id，为 null 的必须有 excluded_reason。",
+    "sheet_name_policy": "🔴 sheet 名**不得 strip**（J1 册实测有尾部真空格）。本轮对 14 本册的全部 sheet 名现算 `s != s.strip()` 命中数 == 0 —— K 循环没有这个形态，但判据照样两侧都验：「0 命中」本身是可复算结论，不是省略。"
+  },
+  "blocking_preconditions": [
+    {
+      "id": "BP-1",
+      "blocks": [
+        "step 5 publish_authority_model",
+        "step 6 publish_per_entry_contract",
+        "step 7 publish_approved_definition_bundle"
+      ],
+      "what": "本 slice 的 13 条 entry 一条 approved authority model / reviewed per-entry contract / non-null approved definition bundle 都没有 —— `backend/data/workpaper_sync_contracts/` 下现有的生产 contract 只有 Tasks 40–43 的四个 pilot（逐文件读 `review.entry_id` 得 xlsx/b60/gt-b60-bundle / xlsx/gt-d2-accounts-receivable / xlsx/gt-g7-long-term-equity-main / xlsx/gt-h1-fixed-assets），无一条属 K。",
+      "observable_consequences": [
+        "13 条 entry 的 capability 都不能取 bidirectional（SR-6 / AC 12.1）。",
+        "Property 20 的 contract 维度分母为空 ⇒ 「registry 拒绝 col_ 占位」这部分不宣称通过。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 9 register_adapter_and_wire_host",
+      "source_refs": [
+        "backend/data/workpaper_sync_contracts/",
+        "backend/app/services/workpaper_sync/adapters/registry.py"
+      ]
+    },
+    {
+      "id": "BP-2",
+      "blocks": [
+        "step 8 finalize_published_representation"
+      ],
+      "what": "Task 17 的 non-current representation upgrade candidate 未对 K 循环任一 entry 产出，故 Task 36 的 `ExcelEntryFinalizeGate.finalize_candidate` 无对象可 finalize，published representation 全为 null。",
+      "observable_consequences": [
+        "instrumentation_candidate / published_representation 两个身份字段全为 null。",
+        "本 slice 的 finalized_published_representations 计数恒为 0。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 9 register_adapter_and_wire_host",
+      "source_refs": [
+        "backend/app/services/workpaper_sync/excel_entry_gate.py"
+      ]
+    },
+    {
+      "id": "BP-3",
+      "blocks": [
+        "step 10 emit_per_scenario_evidence"
+      ],
+      "what": "真实 OnlyOffice 9.4 探针未对 K 循环执行 —— 13 条 entry 的 evidence 全部 UNVERIFIABLE，browser_case / sync_test_run_id 均为 null。",
+      "observable_consequences": [
+        "Property 69 的**正向**闭合（逐 scenario evidence 实体 + 服务端重算）无对象。",
+        "entries_left_unverifiable == 13。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 12 close_slice_counters 的 verification_state 转 VERIFIED",
+      "source_refs": [
+        "backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py"
+      ]
+    },
+    {
+      "id": "BP-4",
+      "blocks": [
+        "step 9 register_adapter_and_wire_host",
+        "step 11 enforce_honest_mode_visibility"
+      ],
+      "what": "🔴 **K1-9 坏账准备转回（收回）、核销检查表的 writeoff 能力必须由 adapter 承载**。tasks.md 的 Task 53 正文写「纯客户端 writeoff 能力必须 adapter 化或单模式裁决」，本任务逐站点实证的结论是**它不是纯客户端**：`useK1WriteoffCheck.buildSavePayload()` 产出 1 个主键 + 2 个派生合计键，经 `K1TabWriteoffCheck.persist()` 的 `emit('save', …)` 上抛到宿主 `handleChildSave()`，再由 `useChecklistPersistence.save()` 走 `PUT /api/workpapers/{wpId}/checklist-responses` 真落库（后端 `checklist_responses.py` 有该 PUT 路由）。故合法结论只有第①条：该能力必须由 adapter 承载（step 9），本任务不做 ⇒ 登记为阻断项。「纯客户端」本身不是裁 single 的理由，且此处连「纯客户端」这个前提都不成立。",
+      "observable_consequences": [
+        "K1 的 writeoff 三个传输键（K1-9-writeoff / K1-9-reversal-total / K1-9-writeoff-total）目前只有 legacy checklist 通道，没有 OO 对端投影 ⇒ 切到 OnlyOffice 模式后本表的录入不进 OO 工作簿，切回来也不会回灌。",
+        "K1 的 html_counterpart_verdict 因此恒为 exists（AC 12.8 禁止裁 single_onlyoffice）。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 9 register_adapter_and_wire_host（K1 的 per-entry contract 必须把这三个键映射成 typed slots）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L67",
+        "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L451",
+        "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue#L473",
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L436",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183",
+        "backend/app/routers/checklist_responses.py#L132"
+      ]
+    },
+    {
+      "id": "BP-5",
+      "blocks": [
+        "step 9 register_adapter_and_wire_host"
+      ],
+      "what": "🔴 **7 个一阶 orphan dual-mode composable**（`useK1DualMode.ts` ~ `useK7DualMode.ts`）在全前端 7187 个 .ts/.vue 里 statement-position 生产边与测试边**各为 0**；与此同时 K1~K7 七个宿主各自在 `<script setup>` 里内联了一份 `const dualMode = (() => { … })()` 等价实现，并**直接调用** legacy 端点 `/api/workpapers/onlyoffice/health`。按 AC 1.7「不可达旧桩 SHALL 删除」这 7 个文件是删除对象；按 legacy_deletion_paradigm step 6，7 个宿主的 legacy 端点直调必须在改线时移除。",
+      "observable_consequences": [
+        "K4/K5/K6 的 localStorage 前缀在两处各声明一份（orphan composable 与宿主内联 IIFE 同为 k4-/k5-/k6-dual-mode:），改线时若只改一处会留下读写不同键的分裂状态。",
+        "K1/K2/K3/K7 的宿主内联实现**完全没有** localStorage 持久化，而它们的 orphan composable 有 —— 「模式偏好是否持久化」在 K 循环内不一致。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 9 register_adapter_and_wire_host",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK2DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK3DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK4DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK5DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK6DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK7DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue"
+      ]
+    },
+    {
+      "id": "BP-6",
+      "blocks": [
+        "step 9 register_adapter_and_wire_host"
+      ],
+      "what": "6 个**在用**的 dual-mode composable（`useK8DualMode.ts` ~ `useK13DualMode.ts`，各 1 条生产边）同样直接调用两个 legacy 端点：`/api/workpapers/onlyoffice/health` 与 `/api/workpapers/{wpId}/sheets/{sheetName}/onlyoffice-config`。legacy_deletion_paradigm 的 step 6 明文规定这两个端点只能经 sync bridge 的 materialize 协议调用。",
+      "observable_consequences": [
+        "这 6 个 entry 改线时必须同时删掉 composable 里的端点直调，否则 legacy 与 bridge 双路并存。",
+        "6 个 composable 各自维护一份 `k{n}-dual-mode:` localStorage 前缀，未收敛到 `workpaper-sync-mode:`（step 5 unify_mode_values 未做）。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 9 register_adapter_and_wire_host",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/useK8DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK10DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK11DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK12DualMode.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/useK13DualMode.ts"
+      ]
+    },
+    {
+      "id": "BP-7",
+      "blocks": [
+        "step 11 enforce_honest_mode_visibility"
+      ],
+      "what": "🔴 **13 个宿主一个都没挂 AC 1.4 的单一真源提示组件** —— `workpaperEntrySyncNotice.ts` / `GtEntrySyncCapabilityNotice.vue` 在 13 个 `GtK*.vue` 里的引用数为 0（逐文件实测）。13 条 entry 全是 `migration_state == legacy_fake_bidirectional` 且 `adapter_id` 为 null，按 AC 1.4「入口未注册 adapter 或 adapter 未通过契约校验 THEN 前端 SHALL 禁止显示『可双向回写』，并显示可操作原因」，必须在各自的 `ui_toolbar_gate` 区块内挂上该组件；只放 `el-tooltip` 不算。",
+      "observable_consequences": [
+        "用户在 K1~K13 看到的仍是「结构化视图 / 在线编辑」两个平权选项，没有任何「尚不能双向回写、原因是 X」的可操作说明。",
+        "entries_mounting_the_ac14_notice == 0。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 12 close_slice_counters",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/sync/workpaperEntrySyncNotice.ts",
+        "audit-platform/frontend/src/components/workpaper/sync/GtEntrySyncCapabilityNotice.vue",
+        "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L9",
+        "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L9",
+        "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L8",
+        "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L8"
+      ]
+    },
+    {
+      "id": "BP-8",
+      "blocks": [
+        "step 6 publish_per_entry_contract",
+        "step 9 register_adapter_and_wire_host"
+      ],
+      "what": "🔴 **45 处把动态行身份取成位置**（family_a 纯序号 32 处 + family_b 下标兜底 13 处），分布在 13 条 entry 里的 9 条（K1/K3/K5/K6/K7/K8/K9/K11/K12）。这些 `id` / `rowKey` 一旦进 per-entry contract 的 stable_field_key，插行/删行/排序后同一 key 会指到不同业务行，OO↔HTML 双向合并会把值搬到错误的行上。",
+      "observable_consequences": [
+        "K5TabDisclosureSoe.vue 一个文件里就有 4 处（row-/contingent-/lit-/dec- 各一），删掉中间一行后其后所有行的 id 集体前移一位。",
+        "family_b 的 13 处形如 `raw.rowKey ?? `x-${idx}`` —— 历史载荷缺 rowKey 时静默退化成位置化身份，比纯序号更难发现。"
+      ],
+      "status": "registered_not_fixed",
+      "must_fix_before": "step 6 publish_per_entry_contract（契约里不得出现这些位置化 key 作为 stable_field_key）",
+      "source_refs": [
+        "audit-platform/frontend/src/components/workpaper/composables/k1AdjK11Writeback.ts#L91",
+        "audit-platform/frontend/src/components/workpaper/composables/k1AdjudicationModel.ts#L54",
+        "audit-platform/frontend/src/components/workpaper/composables/k1DisclosureModel.ts#L472",
+        "audit-platform/frontend/src/components/workpaper/composables/useK12Check.ts#L150",
+        "audit-platform/frontend/src/components/workpaper/composables/useK7Adjudication.ts#L131",
+        "audit-platform/frontend/src/components/workpaper/composables/useK8Checks.ts#L193",
+        "audit-platform/frontend/src/components/workpaper/composables/useK9Checks.ts#L197",
+        "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureListed.vue#L209",
+        "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureListed.vue#L261",
+        "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureSoe.vue#L208",
+        "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureSoe.vue#L260",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabAdjudication.vue#L374",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureListed.vue#L280",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureListed.vue#L348",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L316",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L379",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L540",
+        "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L559",
+        "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureListed.vue#L320",
+        "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureListed.vue#L358",
+        "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureSoe.vue#L299",
+        "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureSoe.vue#L331",
+        "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureListed.vue#L209",
+        "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureListed.vue#L218",
+        "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureSoe.vue#L348",
+        "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureSoe.vue#L356",
+        "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureListed.vue#L188",
+        "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureListed.vue#L214",
+        "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureSoe.vue#L172",
+        "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureSoe.vue#L197",
+        "audit-platform/frontend/src/components/workpaper/k9/core/K9TabDisclosureListed.vue#L169",
+        "audit-platform/frontend/src/components/workpaper/k9/core/K9TabDisclosureSoe.vue#L169",
+        "audit-platform/frontend/src/components/workpaper/composables/useK12Check.ts#L135",
+        "audit-platform/frontend/src/components/workpaper/composables/useK3Checks.ts#L218",
+        "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L76",
+        "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L87",
+        "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L98",
+        "audit-platform/frontend/src/components/workpaper/composables/useK8Checks.ts#L162",
+        "audit-platform/frontend/src/components/workpaper/composables/useK8Checks.ts#L180",
+        "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L173",
+        "audit-platform/frontend/src/components/workpaper/composables/useK9Adjudication.ts#L347",
+        "audit-platform/frontend/src/components/workpaper/composables/useK9Checks.ts#L166",
+        "audit-platform/frontend/src/components/workpaper/composables/useK9Checks.ts#L184",
+        "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L151",
+        "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureSoe.vue#L401"
+      ]
+    },
+    {
+      "id": "BP-9",
+      "blocks": [
+        "step 4 adjudicate_single_or_continue"
+      ],
+      "what": "🔴 **manifest 与本 slice 在 capability / html_store 两个字段上必须不一致**。manifest 的这两个值不是裁决，而是 `workpaper_sync_entry_overlay.json` 的 `defaults_by_component.GtOnlyOfficeSheet` 默认值（`capability: \"single_onlyoffice\"` / `html_store: \"unresolved\"`）机械展开到 13 条 entry 上的结果。按 AP-3「把 unresolved 写成结论然后据此裁 single，禁止」，本 slice 逐 entry 调查后得出 `html_counterpart_verdict == \"exists\"`，与 overlay 默认值直接冲突 ⇒ capability 记 null（待裁决），**不采信** manifest 镜像值。",
+      "observable_consequences": [
+        "manifest 现算 13 条 single_onlyoffice，本 slice 现算 0 条 —— 守卫必须断言两者**不相等**且该分歧已登记为本条 BP；断言相等就是把 overlay 默认值当裁决。",
+        "manifest 重新生成前，`workpaper_sync_entry_manifest.json` 里 K 循环仍显示 13 条single_onlyoffice —— 这是已知镜像滞后，不是本 slice 的错。"
+      ],
+      "status": "open",
+      "must_fix_before": "step 9 后重新生成 manifest（届时 adapter_id 非空、capability 由 slice 反哺）",
+      "source_refs": [
+        "backend/data/workpaper_sync_entry_overlay.json",
+        "backend/data/workpaper_sync_entry_manifest.json"
+      ]
+    }
+  ],
+  "cross_entry_isolation": {
+    "rule": "不得跨 entry 复用 contract / bundle / candidate / evidence / scenario（Property 70）",
+    "assertions": [
+      "八个 slice（D/E/F/G/H/I/J/K）的 entry 集合两两不相交 —— 守卫现算全部 28 个配对。",
+      "backend/data/workpaper_sync_contracts/ 下没有任何文件的 review.entry_id 属本 slice。",
+      "四条 pilot 契约的 review.entry_id 逐文件读出，分别真是 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets（防「文件名看起来对」而归属错）。",
+      "14 本权威模板的 belongs_to_entry 只指向本 slice 的 entry 或为 null 带 excluded_reason。",
+      "13 条 entry 的 adapter_id 全为 null，且 registry 里无任何 K 循环 adapter ⇒ 不存在「借用别的 entry 的 adapter」。",
+      "13 条 entry 的 evidence.sync_test_run_id 全为 null ⇒ 不存在跨 entry 复用 test run。",
+      "13 条 entry 的 template_ref.workbook 两两不同（现算集合大小 == 13）⇒ 不存在两条 entry 共用一本权威模板。",
+      "deletion plan 的删除路径集合与其余七份 slice 的删除路径集合不相交。"
+    ],
+    "contract_scan_recipe": "🔴 契约目录共 5 个文件，其中 **生产契约 4 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）与 **candidate 样例 1 份**（_example.candidate.json，`review_status == \"candidate\"`，`review.entry_id` 为 null）。判据只对生产契约要求 `review.entry_id` 非空；candidate 那份本身就是 step 6 的「review_status=candidate 不得注册生产 adapter」的反例分母 —— 首轮把它一起要求 entry_id 非空，守卫打红才发现口径错。",
+    "production_contract_files": [
+      "b60.hour_budget.json",
+      "d2.receivable_detail.json",
+      "g7.soe_subsidiary_disclosure.json",
+      "h1.disposal_check.json"
+    ],
+    "candidate_contract_files": [
+      "_example.candidate.json"
+    ]
+  },
+  "k_cycle_form_differences": {
+    "why_this_section_exists": "Task 48（F）与 Task 49（G）各自都因为「假设与前一循环同形」返工过一次，Task 50（H）为此新增 `h_cycle_form_differences`，Tasks 51/52 沿用。K 循环实测出**七处**与 D~J 七轮都不同的形态，逐条给可复算判据 —— 「没有某形态」也要落成判据，不得空谈。",
+    "differences": [
+      {
+        "id": "KD-1",
+        "what": "13 个 dual-mode composable 里 **7 个是一阶 orphan**（K1~K7），创八轮新高",
+        "why_it_matters": "J 循环那轮的 4 个 orphan 已是当时最高，且其中 2 个是二阶（经孤立 barrel）。K 循环的 7 个**全是一阶**（生产边 0 + 测试边 0，且 `components/workpaper/composables/` 下**没有 index.ts barrel**，现算 `os.path.exists` 为 False ⇒ 不存在二阶 orphan 的可能）。",
+        "recompute": "对 13 个 `useK{n}DualMode.ts` 逐个跑 statement-position 边解析：K1~K7 的 prod/test 边各为 0，K8~K13 各恰好 1 条 prod 边、0 条 test 边。两侧都验：orphan 集合大小 == 7 **且** live 集合大小 == 6 **且** live 的每条边指向的宿主与 `dual_mode_carrier.site` 一致。"
+      },
+      {
+        "id": "KD-2",
+        "what": "K1~K7 七个宿主把 dual-mode **内联成 IIFE**（`const dualMode = (() => {…})()`）",
+        "why_it_matters": "H 循环那轮查出「4 个宿主没有消费自己的 composable、而在宿主里内联了等价实现」，J 循环查出「J2/J3 根本没有双模式」。K 循环是**第三种形态**：composable 与内联实现**同时存在且都完整**，只是没人 import composable。后果是删 composable 后行为不变（与 H 同），但 K 多一层坑 —— K4/K5/K6 的 localStorage 前缀在两处各声明一份（同值），K1/K2/K3/K7 的内联实现**没有** localStorage 而 composable 有。",
+        "recompute": "对 K1~K7 现算宿主里 `const dualMode = (() => ` 的行号（各恰 1 处）与 `import { useK{n}DualMode }` 的命中数（各 0）；对 K8~K13 反向：IIFE 命中 0、import 命中各 1 处。两侧都验。",
+        "measured": {
+          "K1": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k1-dual-mode:"
+          },
+          "K2": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k2-dual-mode:"
+          },
+          "K3": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k3-dual-mode:"
+          },
+          "K4": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": "k4-dual-mode:",
+            "orphan_twin_prefix": "k4-dual-mode:"
+          },
+          "K5": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": "k5-dual-mode:",
+            "orphan_twin_prefix": "k5-dual-mode:"
+          },
+          "K6": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": "k6-dual-mode:",
+            "orphan_twin_prefix": "k6-dual-mode:"
+          },
+          "K7": {
+            "inline_iife_site": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229",
+            "imports_dedicated_composable": null,
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k7-dual-mode:"
+          },
+          "K8": {
+            "inline_iife_site": null,
+            "imports_dedicated_composable": "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L250",
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k8-dual-mode:"
+          },
+          "K9": {
+            "inline_iife_site": null,
+            "imports_dedicated_composable": "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L218",
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k9-dual-mode:"
+          },
+          "K10": {
+            "inline_iife_site": null,
+            "imports_dedicated_composable": "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L176",
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k10-dual-mode:"
+          },
+          "K11": {
+            "inline_iife_site": null,
+            "imports_dedicated_composable": "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L143",
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k11-dual-mode:"
+          },
+          "K12": {
+            "inline_iife_site": null,
+            "imports_dedicated_composable": "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L157",
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k12-dual-mode:"
+          },
+          "K13": {
+            "inline_iife_site": null,
+            "imports_dedicated_composable": "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L156",
+            "inline_localStorage_prefix": null,
+            "orphan_twin_prefix": "k13-dual-mode:"
+          }
+        }
+      },
+      {
+        "id": "KD-3",
+        "what": "K 循环对共享基类 `useWorkpaperEntryDualMode` 的贡献边数 == **0**",
+        "why_it_matters": "J 循环那轮贡献 3 条（1 宿主 + 2 orphan wrapper），所以「删完还剩几个消费方」（29 → 26）是那份 deletion plan 的核心数字。K 循环**一条都不贡献** ⇒ 本任务的删除与改线**不改变**共享基类的消费方计数（29 保持 29）。这条必须显式登记，否则后来者会以为 K 也要减。",
+        "recompute": "现算共享基类的 statement-position 边总数 == 29，其中路径匹配 `/(GtK\\d|k\\d+/)` 的条数 == 0；宽口径（逐文件 token 命中）== 33，差集里恰含 `composables/useK9DualMode.ts`（它在注释里提到基类名但不 import）—— 这正是「符号名 grep 会误判」的 K 循环实例。",
+        "measured": {
+          "shared_base": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+          "statement_position_consumers": 29,
+          "k_cycle_contribution": 0,
+          "remaining_after_k_cycle_work": 29,
+          "wide_scope_token_files": 33,
+          "wide_only_files": [
+            "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue",
+            "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
+            "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+            "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts"
+          ],
+          "wide_only_note": "🔴 `useK9DualMode.ts` 只在文档注释里写了「对齐 D4 七月十日 + K9 孪生模块…」并提到基类名，**不 import 它**。宽口径把它算进来 ⇒ 「K 贡献 0 条」这个结论只有窄口径（statement-position 路径字面量）才成立。"
+        }
+      },
+      {
+        "id": "KD-4",
+        "what": "权威模板 **14 本** vs entry **13 条**，多出来的是 `K0 管理循环函证.xlsx`",
+        "why_it_matters": "J 循环是 3 本模板 / 1 条 entry（多出来的两本是非 entry 宿主 J2/J3 的册）。K 循环多出来的那本**没有任何宿主**：它走 confirmation-hub，逐 sheet 由跨循环共享的 D0 函证组件族渲染 ⇒ 归 Task 57。且与 J0 不同，`K0` 在 `_index.json` 里**有**独立条目、两个解析函数都返回真实文件（J0 两个函数都返回 None）。",
+        "recompute": "现算 `backend/wp_templates/K/` 非锁文件数 == 14；`belongs_to_entry` 非 null 的 == 13、为 null 且带 excluded_reason 的 == 1；对 `K0` 跑 `find_template_file` 与 `find_template_file_any`，两者都返回 `K0 管理循环函证.xlsx`（**非 None** —— 与 J0 相反，判据不得照抄 J 那条）。"
+      },
+      {
+        "id": "KD-5",
+        "what": "parent_duplicate 子入口 **0 条**，故本 slice **不含** `parent_duplicate_summary` 条件节",
+        "why_it_matters": "`slice_schema.conditional_sections` 明文：触发条件不成立时写空节就是 additive 死声明。D4 有 31 条、J1 有 1 条，K 循环 0 条 ⇒ 正确做法是不写该节，并把「0 条」落成可复算判据。",
+        "recompute": "现算 manifest 里 `parent_entry_id ∈ 13 条 K entry_id` 的条数 == 0；并现算 overlay 的 `parent_rules[].file_glob` 里含 `/k` 后接数字的条数 == 0（实有的六条是 d4/h4/h8/n1/j1/b60）。两侧都验，且断言本 slice 顶层**没有** `parent_duplicate_summary` 键。"
+      },
+      {
+        "id": "KD-6",
+        "what": "两种 el-segmented 门控形态并存：11 个宿主用 `v-if=\"dualMode.isOoAvailable.value\"`，K8/K9 用 `disabled` 选项",
+        "why_it_matters": "AC 1.5 / AC 1.4 的 UI 判据必须落在「该 entry 自己声明的 `ui_toolbar_gate` 区块内」。K8/K9 走的是 D4「always-visible + disabled」范式（`modeOptions` 是 computed、选项里带 `disabled: !isOoAvailable.value`），没有 `v-if` 二级门控；其余 11 个有 `v-if`。判据若统一写成「必须有 v-if」会把 K8/K9 假红。",
+        "recompute": "逐宿主现算 `second_level_gate_sites`：K8/K9 为空数组，其余 11 个各 1 处；并现算 K8/K9 的 composable 里 `disabled: !isOoAvailable.value` 真实存在。",
+        "measured": {
+          "hosts_with_v_if_gate": [
+            "K1",
+            "K2",
+            "K3",
+            "K4",
+            "K5",
+            "K6",
+            "K7",
+            "K10",
+            "K11",
+            "K12",
+            "K13"
+          ],
+          "hosts_with_disabled_option_gate": [
+            "K8",
+            "K9"
+          ]
+        }
+      },
+      {
+        "id": "KD-7",
+        "what": "注释里的 `el-segmented` 会让「全文件 grep」多数出一处",
+        "why_it_matters": "任务书提醒「全文件 grep `el-segmented` 会撞 Tab 内部分段器」。K 循环的实况是**另一种**误命中源：11 个宿主的第二处 `el-segmented` 落在**块注释里**（剥注释后消失）。故 `ui_toolbar_gate` 的判据必须先 `stripComments()`。",
+        "recompute": "逐宿主现算剥注释前后的 `el-segmented` 行号集合：剥前多数为 2 处、剥后恒为 1 处，且剥后那处必须落在该宿主声明的 `toolbar_gate_anchor` 之后 6 行内。两侧都验（剥前 ⊋ 剥后）。",
+        "measured": {
+          "K1": {
+            "before": [
+              10,
+              375
+            ],
+            "after": [
+              10
+            ]
+          },
+          "K2": {
+            "before": [
+              10,
+              277
+            ],
+            "after": [
+              10
+            ]
+          },
+          "K3": {
+            "before": [
+              9,
+              293
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K4": {
+            "before": [
+              9,
+              264
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K5": {
+            "before": [
+              9,
+              254
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K6": {
+            "before": [
+              9,
+              244
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K7": {
+            "before": [
+              9,
+              228
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K8": {
+            "before": [
+              9,
+              288
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K9": {
+            "before": [
+              9,
+              291
+            ],
+            "after": [
+              9
+            ]
+          },
+          "K10": {
+            "before": [
+              10
+            ],
+            "after": [
+              10
+            ]
+          },
+          "K11": {
+            "before": [
+              10,
+              198
+            ],
+            "after": [
+              10
+            ]
+          },
+          "K12": {
+            "before": [
+              10,
+              212
+            ],
+            "after": [
+              10
+            ]
+          },
+          "K13": {
+            "before": [
+              10,
+              212
+            ],
+            "after": [
+              10
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "orphan_dual_mode_inventory": {
+    "why_this_key_exists": "🔴 K 循环的 orphan 规模是八轮最大（7 个一阶）。这一节**不是**删除清单（那在 deletion plan 里），是「K 循环到底有几个 dual-mode 死桩、几个活桩、各自的持久化前缀与 legacy 端点直调」的穷举清册。判「某模块有没有人用」一律用 statement-position 路径字面量，**禁符号名 grep**。",
+    "scan_scope": "audit-platform/frontend/src 全域 **7187** 个 .ts/.vue（含 __tests__，因为「只有测试在用」与「谁都不用」必须分得开）",
+    "consumer_edge_recipe": "只认三种 **statement-position** 形态：`from '<spec>'` / `import('<spec>')` / `vi.mock('<spec>')`，其中 `<spec>` 经 `@/` 与相对路径解析后必须**路径相等**于目标模块（不是 stem 相等 —— 那会把 `./apiPaths/index` 这类误命中）。🔴 落在**双引号字符串内**的匹配一律排除：`workpaperSyncLegacyBaseline.generated.ts` 的 JSON `\"snippet\"` 字段里含完整的 `from '...'` 形态，会骗过路径字面量口径。",
+    "reachability_recipe": "orphan 分两阶：① **一阶** —— statement-position 生产边数 == 0 且测试边数 == 0；② **二阶** —— 全部生产边都指向同一目录的 barrel `index.ts`，且对该 barrel 再算入边为 0。🔴 K 循环**不存在二阶 orphan**，理由可复算：`components/workpaper/composables/index.ts` **不存在**（现算 `os.path.exists` == False）⇒ 该目录下的模块没有 barrel 可躲。判据两侧都验：7 个一阶 orphan 的边数各为 0 **且** barrel 文件确实不存在。",
+    "modules": [
+      {
+        "id": "OD-1",
+        "wp_code": "K1",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK1DualMode.ts",
+        "lines": 115,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k1-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L376",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-2",
+        "wp_code": "K2",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK2DualMode.ts",
+        "lines": 115,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k2-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L278",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-3",
+        "wp_code": "K3",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK3DualMode.ts",
+        "lines": 115,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k3-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L294",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-4",
+        "wp_code": "K4",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK4DualMode.ts",
+        "lines": 126,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k4-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L267",
+        "twin_localStorage_prefix": "k4-dual-mode:",
+        "prefix_collision_with_twin": true,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-5",
+        "wp_code": "K5",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK5DualMode.ts",
+        "lines": 126,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k5-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L257",
+        "twin_localStorage_prefix": "k5-dual-mode:",
+        "prefix_collision_with_twin": true,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-6",
+        "wp_code": "K6",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK6DualMode.ts",
+        "lines": 125,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k6-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L247",
+        "twin_localStorage_prefix": "k6-dual-mode:",
+        "prefix_collision_with_twin": true,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      },
+      {
+        "id": "OD-7",
+        "wp_code": "K7",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK7DualMode.ts",
+        "lines": 116,
+        "orphan_order": "first_order",
+        "production_consumers": 0,
+        "test_only_consumers": 0,
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": "k7-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "host_inlined_twin": "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L229",
+        "twin_localStorage_prefix": null,
+        "prefix_collision_with_twin": false,
+        "action": "delete",
+        "action_side_effects": "零副作用：无人 import ⇒ 删除不改变任何运行时行为。宿主的内联 IIFE 继续工作（它不依赖本文件）。",
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产边与测试边都为 0，删除不需要先改任何消费方。"
+      }
+    ],
+    "live_modules": [
+      {
+        "id": "LD-1",
+        "wp_code": "K8",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK8DualMode.ts",
+        "lines": 189,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L250"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k8-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-2",
+        "wp_code": "K9",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK9DualMode.ts",
+        "lines": 182,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L218"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k9-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-3",
+        "wp_code": "K10",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK10DualMode.ts",
+        "lines": 155,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L176"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k10-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-4",
+        "wp_code": "K11",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK11DualMode.ts",
+        "lines": 154,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L143"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k11-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-5",
+        "wp_code": "K12",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK12DualMode.ts",
+        "lines": 158,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L157"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k12-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      },
+      {
+        "id": "LD-6",
+        "wp_code": "K13",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useK13DualMode.ts",
+        "lines": 158,
+        "production_consumers": [
+          "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L156"
+        ],
+        "test_only_consumers": [],
+        "localStorage_prefix": "k13-dual-mode:",
+        "legacy_endpoints_called": [
+          "/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config",
+          "/api/workpapers/onlyoffice/health"
+        ],
+        "action": "rewire_then_delete",
+        "action_why": "有 1 条真实生产边 ⇒ 必须先把宿主改线到 sync bridge（step 9）才能删；删除前它是唯一承载该 entry 模式切换的模块。",
+        "registered_as": "BP-6"
+      }
+    ],
+    "shared_base": {
+      "path": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+      "statement_position_consumers": 29,
+      "k_cycle_contribution": 0,
+      "remaining_after_k_cycle_work": 29,
+      "preserved": true,
+      "preserved_because": "K 循环对它的贡献边为 0（KD-3）⇒ 本任务既不减少也不增加它的消费方；按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+      "verification_recipe": "两侧都验：① 现算 statement 边总数 == 29；② 其中 K 路径的条数 == 0；③ 现算宽口径 token 文件数 == 33 且差集恰含 `useK9DualMode.ts`（证明 KD-3 的「窄口径」不是空谈）。"
+    },
+    "summary": {
+      "orphan_dual_mode_total": 7,
+      "orphan_dual_mode_first_order": 7,
+      "orphan_dual_mode_second_order": 0,
+      "orphan_barrels": 0,
+      "live_dual_mode_total": 6,
+      "orphans_with_prefix_collision_with_host_twin": 3,
+      "orphans_whose_twin_has_no_persistence": 4,
+      "modules_calling_legacy_health_endpoint": 13,
+      "modules_calling_legacy_config_endpoint": 6,
+      "hosts_calling_legacy_health_endpoint_directly": 7,
+      "orphan_lines_total": 838,
+      "counting_note": "🔴 各计数按维度现算并与本键等值比对：`orphan == True` 的 7 条 ⇒ orphan_dual_mode_total；二阶恒 0（barrel 不存在）；live 6 条；前缀撞车按 `inline_localStorage_prefix == localStorage_prefix` 现算得 3（K4/K5/K6）；孪生无持久化按 `inline_localStorage_prefix is None` 现算得 4（K1/K2/K3/K7）；3 + 4 == 7 ✓。端点计数分两类：health 全 13 个 composable 都调，config 只有 K8~K13 六个调（K1~K7 的 orphan composable 只有 health）；宿主直调 health 的 7 个（K1~K7 的内联 IIFE）。"
+    },
+    "endpoint_scan_recipe": "🔴 端点扫描必须**认反引号模板字面量**：`['\\\"`](/api/[^'\\\"`]+)['\\\"`]`。只认单/双引号的正则会漏掉 `` `/api/workpapers/${wpId.value}/sheets/${encodeURIComponent(sn)}/onlyoffice-config` `` —— 首轮实测就因此把 6 个在用 composable 的 config 直调漏登记成 0，守卫现算时打红才发现。这条是「登记必须与守卫同口径」的实例。"
+  },
+  "writeoff_capability_resolution": {
+    "why_this_key_exists": "🔴 直接兑现 tasks.md 的 Task 53 正文第二条「纯客户端 writeoff 能力必须 adapter 化或单模式裁决」。判据要求：**落到真实读写站点与传输键，不按命名猜**。本节把 writeoff 能力的每一跳都写成可复算的 source_ref，并给出二值结论。",
+    "is_client_only": false,
+    "verdict": "must_be_adapter_borne",
+    "verdict_why": "实证结论是 **writeoff 不是纯客户端** —— 它有完整的服务端持久化链路。按任务书的裁决规则，合法结论只有两条：① 该能力必须由 adapter 承载（step 9）；② 逐条实证确无 HTML 对端才可裁 single_onlyoffice。这里 ② 的前提直接不成立（对端就是 checklist_responses），故取 ①，登记为 BP-4 并给 must_fix_before。🔴 附带纠正一个可能的误判路径：即使 writeoff **真是**纯客户端，「纯客户端」本身也不是裁 single 的理由 —— AC 12.8 的唯一判据是「无 HTML 对端」。",
+    "owner_module": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts",
+    "owner_constants": {
+      "ITEM_ID": {
+        "value": "K1-9-writeoff",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L67"
+      },
+      "REVERSAL_TOTAL_KEY": {
+        "value": "K1-9-reversal-total",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L68"
+      },
+      "WRITEOFF_TOTAL_KEY": {
+        "value": "K1-9-writeoff-total",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L69"
+      },
+      "K1_3_ROWS_KEY": {
+        "value": "K1-3-baddebt-rows",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L70"
+      },
+      "K1_11_ITEM_ID": {
+        "value": "K1-11-related-party",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L71"
+      }
+    },
+    "transport_keys": [
+      {
+        "key": "K1-9-writeoff",
+        "role": "primary_managed_table",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L67",
+        "payload_shape": "JSON.stringify({ tables: { reversal: [...], writeoff: [...] }, auditProcedures, auditNote, conclusion, conclusionOption })",
+        "derivation": "字面量常量 `const ITEM_ID = 'K1-9-writeoff'`，非拼接"
+      },
+      {
+        "key": "K1-9-reversal-total",
+        "role": "derived_total",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L68",
+        "payload_shape": "String(reversalTotal.value)",
+        "derivation": "字面量常量；由 `buildSavePayload().totals[0]` 写出"
+      },
+      {
+        "key": "K1-9-writeoff-total",
+        "role": "derived_total",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L69",
+        "payload_shape": "String(writeoffTotal.value)",
+        "derivation": "字面量常量；由 `buildSavePayload().totals[1]` 写出"
+      }
+    ],
+    "read_only_upstream_keys": [
+      {
+        "key": "K1-3-baddebt-rows",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L70",
+        "role": "cross_sheet_read（K1-3 坏账准备明细的本期转回/本期核销列，用于勾稽与导入）"
+      },
+      {
+        "key": "K1-11-related-party",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L71",
+        "role": "cross_sheet_read（K1-11 关联方名录，用于标记关联方核销）"
+      }
+    ],
+    "write_path": [
+      {
+        "hop": 1,
+        "what": "buildSavePayload() 产出 1 主键 + 2 合计键",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK1WriteoffCheck.ts#L451"
+      },
+      {
+        "hop": 2,
+        "what": "persist() 把主键与两个合计键写进 allResponses 并 emit('save', …)",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/k1/inspection/K1TabWriteoffCheck.vue#L473"
+      },
+      {
+        "hop": 3,
+        "what": "host handleChildSave() 调 persistence.save(itemId, toChecklistPatch(value))",
+        "source_ref": "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L436"
+      },
+      {
+        "hop": 4,
+        "what": "useChecklistPersistence 发 PUT /api/workpapers/{wpId}/checklist-responses",
+        "source_ref": "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L183"
+      },
+      {
+        "hop": 5,
+        "what": "后端 checklist_responses 路由的 PUT 处理器真实存在（非 404）",
+        "source_ref": "backend/app/routers/checklist_responses.py#L132"
+      }
+    ],
+    "oo_counterpart_status": "absent",
+    "oo_counterpart_status_why": "权威模板 `K1 其他应收款.xlsx` 里**有**对应 sheet 「坏账准备转回（收回）、核销检查表K1-9」（现算 sheetnames 命中），但目前没有任何 adapter / contract 把上述三个传输键映射到该 sheet 的单元格 ⇒ 切到 OnlyOffice 模式时本表的 HTML 录入不进工作簿，切回来也不回灌。这正是 BP-4 要 adapter 承载的具体内容，**不是**「无 HTML 对端」。",
+    "declared_key_hit_counts": {
+      "K1-9-writeoff": 9,
+      "K1-9-reversal-total": 2,
+      "K1-9-writeoff-total": 2,
+      "K1-3-baddebt-rows": 8,
+      "K1-11-related-party": 3
+    },
+    "declared_key_hit_counts_note": "守卫对每个键现算 K 域生产源码里的**精确字面量**命中数（整个引号内容 == 该键，每行至多计一次）并与本表等值比对：少一处（键被改名而登记没跟）或多一处（新增了第二个写入方）都红。🔴 口径必须是**精确字面量**而不是子串包含：子串口径下 `'K1-9-writeoff-total'` 会被算进 `K1-9-writeoff` 的命中里（首轮实测差 3 处，守卫打红才发现）。",
+    "guessed_keys_with_zero_hits": [
+      "K1-9-rows",
+      "K1-9-writeoff-rows",
+      "K1-9-reversal-rows",
+      "k1-9-writeoff",
+      "K1-writeoff",
+      "K1-9-total",
+      "K1-9-writeoff-check"
+    ],
+    "guessed_keys_note": "🔴 这 7 个「按命名规律该有」的键在全 K 域生产源码里精确字面量命中数各为 **0**。这是「禁按命名规律推断」那条要求的**非空反向分母** —— 没有它，「我们现读了 owner 常量」只是自述。⚠️ 反例登记：裸字面量 `K1-9` 在 K 域有 12 处命中，但它是 **sheet 码**（`k1SheetProgress.ts` / `useK1ImportExport.ts` / `useK1WriteoffImportExport.ts` 等）而不是 checklist item_id ⇒ 不得当「传输键存在」的证据，也不能列进本清单当 0 命中项。",
+    "bare_sheet_code_hits": {
+      "K1-9": 11
+    },
+    "bare_sheet_code_note": "🔴 裸字面量 `K1-9` 在 K 域有 11 处**精确字面量**命中，但它是 **sheet 码**（`k1SheetProgress.ts` / `useK1ImportExport.ts` / `useK1WriteoffImportExport.ts` / `K1TabIndex.vue` 等）而不是 checklist item_id ⇒ 不得当「传输键存在」的证据，也不能列进 guessed_keys_with_zero_hits。"
+  },
+  "account_scope_and_four_table_audit": {
+    "why_this_key_exists": "🔴 直接兑现 tasks.md 的 Task 53 正文第一条「复用 K1/K2 scope 与四表真源」。判据要验「K 的科目/分类是否**真从**该真源派生」，**不是**抄第二份常量。",
+    "frontend_scope_paradigm": {
+      "paradigm_file": "audit-platform/frontend/src/components/workpaper/composables/k2AccountScope.ts",
+      "why_it_is_the_paradigm": "平台级 per-cycle 科目真源范式：运行态取 render 下发的 `tb_source_codes`，常量只作兜底 + 展示（文件头注释原文：「运行态口径以 render 下发的 `tb_source_codes.gross_standard` 为准（报表映射解析结果），本文件的常量只作**兜底 + 展示**。禁止在组件里再写字面量科目码。」）。",
+      "verdict": "clean",
+      "verified_how": "① `k1AccountScope.ts` 与 `k2AccountScope.ts` 都 `import { tbQueryCodes, type TbSourceCodes } from './shared/tbSourceCodes'`；② 两者导出的查询函数都以 `src?.gross_standard` / `src?.provision_standard` 为一等入参，兜底常量走 `tbQueryCodes(codes, fallback)` 的第二参 ⇒ 运行态优先级正确；③ 13 个 K 循环各有自己的 `k{n}AccountScope.ts`（现算 13/13 存在），无一个在组件里写死科目码字面量。",
+      "per_entry_scope_files": [
+        "audit-platform/frontend/src/components/workpaper/composables/k1AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k2AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k3AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k4AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k5AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k6AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k7AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k8AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k9AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k10AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k11AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k12AccountScope.ts",
+        "audit-platform/frontend/src/components/workpaper/composables/k13AccountScope.ts"
+      ],
+      "cross_lock_carrier": "audit-platform/frontend/src/components/workpaper/composables/__tests__/kCycleAccountScopeCrossLock.spec.ts —— 已有守卫直读后端 py 源码交叉锁死（不使用冻结期望表），本 slice 不再造第二份。"
+    },
+    "backend_four_table_reuse": {
+      "declaration_source_of_truth": "backend/app/services/four_table/k_cycle_specs.py",
+      "shared_component_used": "backend/app/services/four_table/report_line_accounts.ReportLineAccountSpec",
+      "verdict": "clean",
+      "verified_how": "① `k_cycle_specs.py#L41` `from .report_line_accounts import ReportLineAccountSpec`，`KCycleSpec.spec_for()#L176` 与 `liability_spec_for()#L449` 都返回 `ReportLineAccountSpec` ⇒ 科目定位声明走共享件，没抄第二份；② **13 个** render 策略 `_k{n}_*.py` 逐一 `from app.services.four_table.k_cycle_specs import …`（现算 13/13）；③ 资产负债类 7 条（K1~K7）用共享叶子聚合 `select_leaves` / `aggregate_leaves`；损益类 6 条（K8~K13）用共享 `pl_render.render_pl_cycle` ⇒ 两条路都是共享件，没有任何 K 专属文件自己实现科目定位或聚合。",
+      "balance_side_entries": [
+        "K1",
+        "K2",
+        "K3",
+        "K4",
+        "K5",
+        "K6",
+        "K7"
+      ],
+      "pl_side_entries": [
+        "K8",
+        "K9",
+        "K10",
+        "K11",
+        "K12",
+        "K13"
+      ],
+      "pl_side_zero_select_leaves_note": "🔴 K8~K13 的 `select_leaves` / `aggregate_leaves` 命中数为 **0** 是**正确的**，不是「没复用共享件」：它们是损益类，走 `pl_render.render_pl_cycle`（内部再调 `pl_occurrence`，那里有 `select_leaves`）。判据必须按「资产负债侧看 select_leaves / 损益侧看 render_pl_cycle」分支写，统一要求 select_leaves 会把 6 条损益 entry 假红。",
+      "duplicate_aggregation_found": 0,
+      "duplicate_aggregation_recipe": "现扫 `backend/app/` 全域 2126 个 .py，找同时满足「提到 K 循环码」与「自己写科目前缀匹配 / 方向带符号求和」而**不** import 共享件的文件；命中数 0。两侧都验：命中 0 **且** 13 个 render 策略的共享件 import 各自存在。",
+      "main_render_strategies": [
+        "backend/app/routers/wp_render_strategies/_k10_other_income.py",
+        "backend/app/routers/wp_render_strategies/_k11_asset_impairment_loss.py",
+        "backend/app/routers/wp_render_strategies/_k12_non_operating_income.py",
+        "backend/app/routers/wp_render_strategies/_k13_non_operating_expense.py",
+        "backend/app/routers/wp_render_strategies/_k1_other_receivables.py",
+        "backend/app/routers/wp_render_strategies/_k2_other_current_assets.py",
+        "backend/app/routers/wp_render_strategies/_k3_other_payables.py",
+        "backend/app/routers/wp_render_strategies/_k4_other_current_liabilities.py",
+        "backend/app/routers/wp_render_strategies/_k5_provisions.py",
+        "backend/app/routers/wp_render_strategies/_k6_held_for_sale.py",
+        "backend/app/routers/wp_render_strategies/_k7_deferred_income.py",
+        "backend/app/routers/wp_render_strategies/_k8_selling_expenses.py",
+        "backend/app/routers/wp_render_strategies/_k9_admin_expenses.py"
+      ],
+      "main_render_strategy_selector": "🔴 `RENDER_STRATEGY_DIR.glob('_k*.py')` 会捞到 **42** 个文件，其中只有 13 个是本 slice 的主渲染策略。判据必须按「是否 import `app.services.four_table.k_cycle_specs`」筛选，不能按文件名前缀 —— 首轮实测就因此把 `_k0_confirmation.py` 当成损益侧 entry 打红。另外 3 个是 K0 函证族策略（归 Task 57），26 个是各 entry 的 `_ai_generate` / `_import_export` 辅助策略（不做科目定位，不参与本判据）。",
+      "k0_render_strategies": [
+        "backend/app/routers/wp_render_strategies/_k0_confirmation.py",
+        "backend/app/routers/wp_render_strategies/_k0_confirmation_ai.py",
+        "backend/app/routers/wp_render_strategies/_k0_confirmation_import_export.py"
+      ],
+      "auxiliary_render_strategies_count": 26,
+      "all_k_prefixed_strategy_files": 42
+    },
+    "k1_detail_seed_note": "`backend/app/services/four_table/k1_detail_seed.py` 与 `k1_aux_detail.py` 是 K1 的专属**取数封装**，它们本身就在 `four_table/` 包内且各自调用共享的 `select_leaves` / `aggregate_leaves`（现算 1 / 2 次）⇒ 属正确复用，不是抄第二份。"
+  },
+  "dynamic_row_identity": {
+    "why_this_section_exists": "本 slice 的 13 条 entry 里 9 条含「行数由业务数据决定」的动态行表（附注披露双变体 / 各专项检查表 / 截止性测试 / 调整分录），触发 `slice_schema.conditional_sections` 的 `dynamic_row_identity`。",
+    "source_of_truth": "各 owner 模块 / Tab 组件的源码（本节每行都带 source_ref 指到具体文件与行号），不是本文件的自述",
+    "forbidden_identity_kinds": [
+      "array_index",
+      "positional_ordinal",
+      "label_as_key",
+      "row_number"
+    ],
+    "kind_semantics_note": "🔴 `tables[].row_identity.kind` 描述该表的**主身份机制**（沿用 I/J 两轮的既定口径）。K 循环的实况是主身份机制本身就是位置化的（BP-8），故这里的 kind 如实写 `positional_ordinal` / `index_fallback` 而不是美化成 `generated_opaque_string` —— 而 `positional_ordinal` 落在 `forbidden_identity_kinds` 里会被范式校验器判违规，这正是我们要的：**缺陷不能靠改声明消失**。为不让范式校验器把「如实登记」判成「违规声明」，本节 `tables[]` 只登记 `row_identity.kind` 为**非禁止值**的表（即已具备稳定身份的），位置化的 45 处一律进 `positional_identity_inventory` 并挂 BP-8 —— 两个容器的并集必须覆盖全部命中，交集为空（守卫两侧都验）。",
+    "tables": [
+      {
+        "table_key": "K8-6/K8-7 截止性测试（新增行）",
+        "persistence_key": "checklist_responses item_id（K8-{sheet}-{field} 命名空间）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowKey",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L267",
+          "generator": "`row-${idx}-${Date.now()}`（含时间戳熵，新增行不会与既有行撞键）",
+          "note": "🔴 同一文件的 #L173 是 `raw.rowKey ?? `row-${idx}`` —— **反序列化路径**退化成位置化身份，已按 family_b 登记进 BP-8。同一张表两条路走两套身份，这正是「主身份机制干净不等于该表干净」。"
+        }
+      },
+      {
+        "table_key": "K9-6/K9-7 截止性测试（新增行）",
+        "persistence_key": "checklist_responses item_id（K9-{sheet}-{field} 命名空间）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowKey",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L220",
+          "generator": "`row-${idx}-${Date.now()}`",
+          "note": "与 K8 同形；#L151 的反序列化路径同样退化，已进 BP-8。"
+        }
+      },
+      {
+        "table_key": "K6-5/K6-6 减值准备测试表（新增行）",
+        "persistence_key": "checklist_responses item_id（K6-{sheet}-{field} 命名空间）",
+        "row_identity": {
+          "kind": "generated_opaque_string",
+          "identity_field": "rowId",
+          "source_ref": "audit-platform/frontend/src/components/workpaper/k6/impairment/K6TabImpairmentTest.vue#L479",
+          "generator": "`row-${Date.now()}-${i}`（时间戳在前，序号只作同批次去重）"
+        }
+      }
+    ],
+    "positional_identity_inventory": {
+      "why_this_key_exists": "「哪些地方把行身份取成位置」必须是**穷举且可复算**的清单，否则守卫只能对声明过的那几条打红，新出现的下一条不会被发现。这里冻结扫描口径与全部命中，并按**四族**分类。",
+      "scan_recipe": "对 K 域 **367** 个生产 .ts/.vue 先 `stripComments()`（同长空白替换，**保留行号**），再逐行匹配身份键赋值 `(?<![\\w$])(rowId|rowKey|id)\\s*:\\s*([^,\\n]+)`，对取值再匹配位置化 token `(?:^|[^\\w$])(?:i|idx|index)(?:\\s*\\+\\s*1)?(?:\\s*\\}|\\s*[,)\\]`]|$)` 或插值 `\\$\\{\\s*(?:i|idx|index)\\s*\\}`。",
+      "scanned_scope": "components/workpaper/{k1..k13}/** 的 .ts/.vue（排除 __tests__）+ 13 个 GtK*.vue 宿主 + components/workpaper/composables/ 下匹配 `^(use)?[kK](1[0-3]|[1-9])(?![0-9])` 的 .ts + composables/workpaper/{k1..k13}/** 的 .ts",
+      "scanned_scope_note": "🔴 K 循环的 owner 模块**分居两处**：`components/workpaper/composables/`（useK1WriteoffCheck / k1DisclosureModel / useK8Checks / useK9Cutoff 等）与 `components/workpaper/k{n}/**`（各 Tab 组件）。只扫其中一处会漏掉一半命中。前缀正则用 `(?![0-9])` 负向断言，否则 `K1` 会吃掉 `K10..K13`。",
+      "total_hits": 48,
+      "family_a_pure_ordinal": {
+        "what": "取值只由序号构成（无 `??`/`||` 兜底、无 Date.now()/Math.random() 熵）",
+        "is_defect": true,
+        "count": 32,
+        "hits": [
+          "audit-platform/frontend/src/components/workpaper/composables/k1AdjK11Writeback.ts#L91",
+          "audit-platform/frontend/src/components/workpaper/composables/k1AdjudicationModel.ts#L54",
+          "audit-platform/frontend/src/components/workpaper/composables/k1DisclosureModel.ts#L472",
+          "audit-platform/frontend/src/components/workpaper/composables/useK12Check.ts#L150",
+          "audit-platform/frontend/src/components/workpaper/composables/useK7Adjudication.ts#L131",
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Checks.ts#L193",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Checks.ts#L197",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureListed.vue#L209",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureListed.vue#L261",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureSoe.vue#L208",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureSoe.vue#L260",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabAdjudication.vue#L374",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureListed.vue#L280",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureListed.vue#L348",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L316",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L379",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L540",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L559",
+          "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureListed.vue#L320",
+          "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureListed.vue#L358",
+          "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureSoe.vue#L299",
+          "audit-platform/frontend/src/components/workpaper/k6/core/K6TabDisclosureSoe.vue#L331",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureListed.vue#L209",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureListed.vue#L218",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureSoe.vue#L348",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureSoe.vue#L356",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureListed.vue#L188",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureListed.vue#L214",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureSoe.vue#L172",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureSoe.vue#L197",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabDisclosureListed.vue#L169",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabDisclosureSoe.vue#L169"
+        ],
+        "samples": [
+          "audit-platform/frontend/src/components/workpaper/composables/k1AdjK11Writeback.ts#L91  rowKey: `r${i}`",
+          "audit-platform/frontend/src/components/workpaper/composables/k1AdjudicationModel.ts#L54  rowKey: `a${i}`",
+          "audit-platform/frontend/src/components/workpaper/composables/k1DisclosureModel.ts#L472  rowKey: `portfolio-${i}`",
+          "audit-platform/frontend/src/components/workpaper/composables/useK12Check.ts#L150  rowKey: `check-${idx}`"
+        ]
+      },
+      "family_b_index_as_fallback": {
+        "what": "取值含 `??` 或 `||` —— 历史载荷缺身份字段时**静默退化**成位置化身份",
+        "is_defect": true,
+        "count": 13,
+        "hits": [
+          "audit-platform/frontend/src/components/workpaper/composables/useK12Check.ts#L135",
+          "audit-platform/frontend/src/components/workpaper/composables/useK3Checks.ts#L218",
+          "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L76",
+          "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L87",
+          "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L98",
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Checks.ts#L162",
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Checks.ts#L180",
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L173",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Adjudication.ts#L347",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Checks.ts#L166",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Checks.ts#L184",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L151",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabDisclosureSoe.vue#L401"
+        ],
+        "samples": [
+          "audit-platform/frontend/src/components/workpaper/composables/useK12Check.ts#L135  rowKey: raw.rowKey ?? `check-${idx}`",
+          "audit-platform/frontend/src/components/workpaper/composables/useK3Checks.ts#L218  id: raw.id ?? `K3-7-${String(idx + 1).padStart(2",
+          "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L76  id: String(raw?.id || `imp-${idx}`)",
+          "audit-platform/frontend/src/components/workpaper/composables/useK6NoteBlocks.ts#L87  id: String(raw?.id || `${prefix}-${idx}`)"
+        ],
+        "why_worse_than_a": "纯序号一眼可见；下标兜底只在「载荷里没有 rowKey」时才生效，正常路径看不出问题，迁移历史数据时才暴露。"
+      },
+      "family_c_generated_opaque_must_not_be_flagged": {
+        "what": "取值含 Date.now() 或 Math.random() 且**不含** `??`/`||` ⇒ 恒新鲜生成，序号只作同批次去重",
+        "is_defect": false,
+        "count": 3,
+        "hits": [
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L267",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L220",
+          "audit-platform/frontend/src/components/workpaper/k6/impairment/K6TabImpairmentTest.vue#L479"
+        ],
+        "samples": [
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L267  rowKey: `row-${idx}-${Date.now()}`",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L220  rowKey: `row-${idx}-${Date.now()}`",
+          "audit-platform/frontend/src/components/workpaper/k6/impairment/K6TabImpairmentTest.vue#L479  rowId: `row-${Date.now()}-${i}`"
+        ]
+      },
+      "family_d_display_ordinal_must_not_be_flagged": {
+        "what": "`seq: idx + 1` 形态 —— 键是 `seq`（展示序号）而不是身份键，不进 total_hits",
+        "is_defect": false,
+        "count": 38,
+        "hits": [
+          "audit-platform/frontend/src/components/workpaper/composables/k1AdjustmentInject.ts#L40",
+          "audit-platform/frontend/src/components/workpaper/composables/k1AdjustmentInject.ts#L58",
+          "audit-platform/frontend/src/components/workpaper/composables/useK10Detail.ts#L133",
+          "audit-platform/frontend/src/components/workpaper/composables/useK10Detail.ts#L156",
+          "audit-platform/frontend/src/components/workpaper/composables/useK11Detail.ts#L224",
+          "audit-platform/frontend/src/components/workpaper/composables/useK11Detail.ts#L253",
+          "audit-platform/frontend/src/components/workpaper/composables/useK12Detail.ts#L169",
+          "audit-platform/frontend/src/components/workpaper/composables/useK12Detail.ts#L210",
+          "audit-platform/frontend/src/components/workpaper/composables/useK13Detail.ts#L174",
+          "audit-platform/frontend/src/components/workpaper/composables/useK13Detail.ts#L224",
+          "audit-platform/frontend/src/components/workpaper/composables/useK1Adjustment.ts#L229",
+          "audit-platform/frontend/src/components/workpaper/composables/useK1Adjustment.ts#L358",
+          "audit-platform/frontend/src/components/workpaper/composables/useK3Checks.ts#L219",
+          "audit-platform/frontend/src/components/workpaper/composables/useK4Check.ts#L132",
+          "audit-platform/frontend/src/components/workpaper/composables/useK5ProvisionCheck.ts#L158",
+          "audit-platform/frontend/src/components/workpaper/composables/useK7Check.ts#L124",
+          "audit-platform/frontend/src/components/workpaper/k1/core/K1TabIndex.vue#L195",
+          "audit-platform/frontend/src/components/workpaper/k10/core/K10TabIndex.vue#L193",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabAdjustment.vue#L364",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabIndex.vue#L196",
+          "audit-platform/frontend/src/components/workpaper/k12/core/K12TabIndex.vue#L196",
+          "audit-platform/frontend/src/components/workpaper/k13/core/K13TabIndex.vue#L191",
+          "audit-platform/frontend/src/components/workpaper/k2/core/K2TabAdjustment.vue#L338",
+          "audit-platform/frontend/src/components/workpaper/k2/core/K2TabIndex.vue#L189",
+          "audit-platform/frontend/src/components/workpaper/k3/core/K3TabAdjustment.vue#L263",
+          "audit-platform/frontend/src/components/workpaper/k3/core/K3TabIndex.vue#L191",
+          "audit-platform/frontend/src/components/workpaper/k4/core/K4TabAdjustment.vue#L318",
+          "audit-platform/frontend/src/components/workpaper/k4/core/K4TabIndex.vue#L188",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabAdjustment.vue#L310",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabIndex.vue#L191",
+          "audit-platform/frontend/src/components/workpaper/k6/core/K6TabAdjustment.vue#L380",
+          "audit-platform/frontend/src/components/workpaper/k6/core/K6TabIndex.vue#L191",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabAdjustment.vue#L282",
+          "audit-platform/frontend/src/components/workpaper/k7/core/K7TabIndex.vue#L189",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabAdjustment.vue#L259",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabIndex.vue#L192",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabAdjustment.vue#L333",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabIndex.vue#L194"
+        ]
+      },
+      "family_discriminator": "🔴 三族的判别式必须是**可复算的布尔表达式**而不是人工归类：ENTROPY = `Date\\.now\\(\\)|Math\\.random\\(\\)`，FALLBACK = `\\?\\?|\\|\\|`。family_c ⇔ ENTROPY 且非 FALLBACK；family_b ⇔ FALLBACK；family_a ⇔ 其余。三族互斥且并集 == total_hits（守卫现算三个条数并断言 32 + 13 + 3 == 48）。⚠️ 反例登记：`K7TabDisclosureSoe.vue#L401` 的 ``String(raw?.id || `grant-${idx}-${Date.now()}`)`` **同时**含 ENTROPY 与 FALLBACK ⇒ 按判别式归 family_b（是缺陷）。若判别式写成「含 Date.now 就放过」，这一处会被漏掉。",
+      "defect_hits_total": 45,
+      "defect_hits_by_entry": {
+        "K1": 3,
+        "K12": 2,
+        "K7": 6,
+        "K8": 8,
+        "K9": 7,
+        "K11": 4,
+        "K5": 7,
+        "K6": 7,
+        "K3": 1
+      },
+      "entries_with_zero_defect_hits": [
+        "K2",
+        "K4",
+        "K10",
+        "K13"
+      ],
+      "entries_with_zero_defect_hits_note": "🔴 K2 / K4 / K10 / K13 四条 entry 的位置化身份命中数为 **0**。「某族 0 命中」也要落成判据（不得空跑）：守卫现算这四条 entry 的命中数各为 0，且 9 条有命中的 entry 逐条等值比对。多一处少一处都红 —— 包括「K2 将来新增了一处」会立刻打红。",
+      "registered_as": "BP-8"
+    },
+    "hardcoded_scan_result": {
+      "why_this_key_exists": "「不硬编码列数/行数」若只写在文档里就是散文。这里把扫描口径与实测结果冻结下来，守卫按同一口径现扫并与本结果等值比对 —— 将来有人写死列数/行数会立刻打红，反之修好了不改登记也会打红。",
+      "scanned_scope": "与 positional_identity_inventory.scanned_scope 同一批 **367** 个文件；扫描前剥块注释 / 行注释 / HTML 注释",
+      "patterns": {
+        "blankRows_literal_count": 0,
+        "horizontal_company_column_literals": 0,
+        "column_key_uses_label": 0,
+        "row_cell_key_uses_label": 0,
+        "seed_placeholder_literal": 0,
+        "positional_row_id_template": 13
+      },
+      "pattern_definitions": {
+        "blankRows_literal_count": "blankRows\\s*\\([^,)]*,\\s*\\d+\\s*\\)",
+        "horizontal_company_column_literals": "['\\\"]公司\\s*[1-9]\\d*['\\\"]",
+        "column_key_uses_label": "key\\s*:\\s*(?:row|col|c)\\.label",
+        "row_cell_key_uses_label": "cells\\s*\\[\\s*(?:row|r)\\.label\\s*\\]",
+        "seed_placeholder_literal": "['\\\"](?:项目|成本项目|单位)\\s*N['\\\"]",
+        "positional_row_id_template": "`(?:seed|row|detail|item)-\\$\\{\\s*(?:i|idx|index)\\s*\\}"
+      },
+      "hits": {
+        "blankRows_literal_count": [],
+        "horizontal_company_column_literals": [],
+        "column_key_uses_label": [],
+        "row_cell_key_uses_label": [],
+        "seed_placeholder_literal": [],
+        "positional_row_id_template": [
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L173",
+          "audit-platform/frontend/src/components/workpaper/composables/useK8Cutoff.ts#L267",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L151",
+          "audit-platform/frontend/src/components/workpaper/composables/useK9Cutoff.ts#L220",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureListed.vue#L209",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureListed.vue#L261",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureSoe.vue#L208",
+          "audit-platform/frontend/src/components/workpaper/k11/core/K11TabDisclosureSoe.vue#L260",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureListed.vue#L280",
+          "audit-platform/frontend/src/components/workpaper/k5/core/K5TabDisclosureSoe.vue#L316",
+          "audit-platform/frontend/src/components/workpaper/k8/core/K8TabDisclosureListed.vue#L188",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabDisclosureListed.vue#L169",
+          "audit-platform/frontend/src/components/workpaper/k9/core/K9TabDisclosureSoe.vue#L169"
+        ]
+      },
+      "why_five_are_zero": "K 循环的表结构：没有按公司/单位横向展开的宽表（K3-4/K1-5 大额情况分析是**纵向**多行、列固定），全 K 域 0 次调用 `blankRows`（该函数在 H 域使用），披露载荷的列 key 走 `disclosureColumnDefs` 的声明式列定义而不是 label，种子占位无「项目N」字面量。",
+      "why_the_sixth_is_not_zero": "🔴 `positional_row_id_template` 命中 **13** 处，**不是 0** —— 这是 K 循环与 J 循环（该模式 0 命中）最重要的差别之一。J slice 把这个模式命名为 `four_table_seed_positional` 并写「全 0」；K 循环的命中不是四表种子而是**披露表与截止性测试的行 id 模板**，故本 slice 按实际语义**改名**为 `positional_row_id_template` 并如实登记 13 处，全部已含在 BP-8 的 45 处里（守卫断言这 13 处是 family_a ∪ family_b ∪ family_c 的子集，证明两个扫描口径互相印证而不是各说各话）。",
+      "not_claimed_as_evidence_of_quality": "🔴 五个 0 只表示「本 slice 无这五类硬编码」，不得解读为「K 循环的动态结构处理是干净的」—— 真实缺陷在 positional_identity_inventory（48 处命中、45 处是缺陷）。五个 0 各有一条变异注入证明它们不是空跑出来的。"
+    }
+  },
+  "template_resolution_audit": {
+    "why_this_section_exists": "F 循环（BP-5）与 D 循环（BP-5）都查出「整册码回落打开错工作簿」，G 循环有同型的 sheet 标签缺陷。本任务对 K 循环做同一项实测，结论是**没有**该缺陷 —— 但「没有」必须落成可复算判据，否则后来者要么重复调查，要么把「没查」当成「没有」。",
+    "how_verified": "以 `backend/app/services/wp_template_finder` 的 `find_template_file` 与 `find_template_file_any` 对 **168** 个 K 码逐个实跑（K0..K13 各自的整册码 + `K{n}-1..K{n}-10` 十个子码 + `K{n}A` 程序表码）。",
+    "result": "clean",
+    "measured_code_count": 168,
+    "invariant": "对每个被测的 K 码 `K{n}` 及其子码 `K{n}-{m}`（m ∈ 1..10），两个解析函数都返回文件名以 `K{n} ` 开头的那本工作簿，无一条回落到另一本；`K{n}A` 十四个程序表码两个函数都返回 None。",
+    "two_functions_agree": true,
+    "cross_workbook_fallback_hits": 0,
+    "program_table_code_note": "`K0A` ~ `K13A` 这 14 个程序表码在 `_index.json` 里没有独立条目，两个解析函数都返回 None —— 这是正确的：程序表是各册内的一张 sheet（`实质性程序表 K1A` / `函证程序表K0A` 等），不是独立工作簿。",
+    "k0_code_note": "🔴 `K0` **两个函数都返回真实文件** `K0 管理循环函证.xlsx` —— 与 J 循环的 `J0`（两个函数都返回 None，因为 J 没有函证册）**相反**。判据不得照抄 J 那条「X0 必须返回 None」，否则 K 必假红。",
+    "over_range_subcode_note": "🔴 源模板里并不存在对应 sheet 的子码（例如 `K11-5`..`K11-10`、`K4-5`..`K4-10`）两个解析函数仍返回各自的册（解析按册前缀而非 sheet）。这不是缺陷，但必须登记：判据若写成「解析结果非 None ⇒ 该 sheet 存在」就会假绿。",
+    "why_k_is_clean_unlike_f2": "F2 的失效根因是「同一 wp_code 在 `_index.json` 里有 11 条候选、优先级只由索引顺序决定」。K 循环的索引里每个 K 码**恰好一本**工作簿（14 条索引项对 14 个文件，一一对应），候选集合大小恒为 1 ⇒ 优先级无从出错。",
+    "measured": [
+      {
+        "code": "K0",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-1",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-2",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-3",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-4",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-5",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-6",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-7",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-8",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-9",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0-10",
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
+      },
+      {
+        "code": "K0A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K1",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-1",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-2",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-3",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-4",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-5",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-6",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-7",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-8",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-9",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1-10",
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
+      },
+      {
+        "code": "K1A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K2",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-1",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-2",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-3",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-4",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-5",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-6",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-7",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-8",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-9",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2-10",
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
+      },
+      {
+        "code": "K2A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K3",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-1",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-2",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-3",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-4",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-5",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-6",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-7",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-8",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-9",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3-10",
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
+      },
+      {
+        "code": "K3A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K4",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-1",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-2",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-3",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-4",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-5",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-6",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-7",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-8",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-9",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4-10",
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
+      },
+      {
+        "code": "K4A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K5",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-1",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-2",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-3",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-4",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-5",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-6",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-7",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-8",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-9",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5-10",
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
+      },
+      {
+        "code": "K5A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K6",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-1",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-2",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-3",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-4",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-5",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-6",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-7",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-8",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-9",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6-10",
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
+      },
+      {
+        "code": "K6A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K7",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-1",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-2",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-3",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-4",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-5",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-6",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-7",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-8",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-9",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7-10",
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
+      },
+      {
+        "code": "K7A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K8",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-1",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-2",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-3",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-4",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-5",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-6",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-7",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-8",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-9",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8-10",
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
+      },
+      {
+        "code": "K8A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K9",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-1",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-2",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-3",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-4",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-5",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-6",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-7",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-8",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-9",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9-10",
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
+      },
+      {
+        "code": "K9A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K10",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-1",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-2",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-3",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-4",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-5",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-6",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-7",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-8",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-9",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10-10",
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
+      },
+      {
+        "code": "K10A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K11",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-1",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-2",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-3",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-4",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-5",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-6",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-7",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-8",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-9",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11-10",
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
+      },
+      {
+        "code": "K11A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K12",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-1",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-2",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-3",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-4",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-5",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-6",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-7",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-8",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-9",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12-10",
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
+      },
+      {
+        "code": "K12A",
+        "find": null,
+        "find_any": null
+      },
+      {
+        "code": "K13",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-1",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-2",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-3",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-4",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-5",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-6",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-7",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-8",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-9",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13-10",
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
+      },
+      {
+        "code": "K13A",
+        "find": null,
+        "find_any": null
+      }
+    ]
+  },
+  "honest_adjudication_summary": {
+    "total_independent": 13,
+    "pilot_contract_published": 0,
+    "adjudicated_as_bidirectional": 0,
+    "adjudicated_as_single_onlyoffice": 0,
+    "adjudicated_as_single_html": 0,
+    "adjudicated_as_unreachable": 0,
+    "capability_verdict_pending": 13,
+    "html_counterpart_exists": 13,
+    "html_counterpart_none": 0,
+    "finalized_published_representations": 0,
+    "entries_left_unverifiable": 13,
+    "parent_duplicate_children": 0,
+    "reachable_hosts_in_cycle": 13,
+    "hosts_with_oo_mount": 13,
+    "authoritative_template_files": 14,
+    "template_files_with_owner_entry": 13,
+    "template_files_without_owner_entry": 1,
+    "authoritative_template_sheets_total": 152,
+    "orphan_dual_mode_modules": 7,
+    "orphan_dual_mode_first_order": 7,
+    "orphan_dual_mode_second_order": 0,
+    "orphan_barrels": 0,
+    "live_dual_mode_modules": 6,
+    "hosts_with_inlined_iife_dual_mode": 7,
+    "hosts_with_dedicated_composable_dual_mode": 6,
+    "shared_base_statement_consumers": 29,
+    "shared_base_k_cycle_consumers": 0,
+    "hosts_calling_legacy_health_endpoint_directly": 7,
+    "dual_mode_modules_calling_legacy_health_endpoint": 13,
+    "dual_mode_modules_calling_legacy_config_endpoint": 6,
+    "writeoff_transport_keys": 3,
+    "writeoff_is_client_only": false,
+    "writeoff_write_path_hops": 5,
+    "guessed_transport_keys_with_zero_hits": 7,
+    "per_entry_account_scope_files": 13,
+    "backend_render_strategies_importing_k_cycle_specs": 13,
+    "duplicate_account_aggregation_found": 0,
+    "dynamic_row_identity_tables": 3,
+    "positional_identity_hits_total": 48,
+    "positional_identity_defect_hits": 45,
+    "positional_identity_family_a": 32,
+    "positional_identity_family_b": 13,
+    "positional_identity_family_c": 3,
+    "positional_identity_family_d": 38,
+    "entries_with_positional_identity_defects": 9,
+    "entries_without_positional_identity_defects": 4,
+    "hardcoded_pattern_hits_total": 13,
+    "hardcoded_patterns_at_zero": 5,
+    "entries_mounting_the_ac14_notice": 0,
+    "template_resolution_codes_measured": 168,
+    "template_resolution_cross_workbook_fallbacks": 0,
+    "k_production_files_scanned": 367,
+    "blocking_preconditions_total": 9,
+    "counting_notes": {
+      "total_independent": "13 = manifest 里按 selection_rule 现算的 K 前缀 xlsx 独立 entry 数；与 slice_scope.independent_entry_count 及 len(independent_entries) 三方等值（SR-1）。",
+      "capability_verdict_pending": "13 = capability 为 null 的条数（SR-9 要求它 == slice_counters.unadjudicated）。13/13 全待裁决是本 slice 的实况，不是「归零冒充进度」。",
+      "html_counterpart_exists": "13 = 逐 entry 走 step 3 得出的二值结论；none 为 0。两者相加必须 == total_independent（守卫现算）。",
+      "authoritative_template_files": "14 = K0..K13 十四本；其中 belongs_to_entry 非 null 的 13 本、为 null 且带 excluded_reason 的 1 本（13 + 1 = 14 ✓）。",
+      "authoritative_template_sheets_total": "各册 sheet_count 之和，由 openpyxl 现读；sheet 名不 strip。",
+      "orphan_dual_mode_modules": "7 = useK1DualMode..useK7DualMode（生产边与测试边各 0）。二阶恒 0，因为该目录**没有** index.ts barrel。7 + live 6 == 13 个 useK*DualMode.ts 文件 ✓。",
+      "hosts_with_inlined_iife_dual_mode": "7 = K1..K7（宿主内联 IIFE）；hosts_with_dedicated_composable_dual_mode = 6 = K8..K13。7 + 6 == 13 ✓，且两个集合互斥（守卫现算交集为空）。",
+      "shared_base_k_cycle_consumers": "0 —— K 循环对 useWorkpaperEntryDualMode 一条边都不贡献，故 shared_base_statement_consumers 在本任务前后都是 29（KD-3）。",
+      "dual_mode_modules_calling_legacy_config_endpoint": "6 = 只有 K8~K13 六个在用的 composable 调 onlyoffice-config；K1~K7 的 orphan composable 只调 health ⇒ health 计数是 13、config 计数是 6，两个数不同源，混用会让「谁违反 step 6」说不清。",
+      "positional_identity_hits_total": "48 = family_a 32 + family_b 13 + family_c 3。family_d（展示序号 38 处）**不计入** total_hits —— 它的键是 `seq` 不是身份键。",
+      "positional_identity_defect_hits": "45 = family_a 32 + family_b 13。family_c 的 3 处虽被同一正则命中但不是缺陷。",
+      "entries_with_positional_identity_defects": "9 = K1/K3/K5/K6/K7/K8/K9/K11/K12；entries_without = 4 = K2/K4/K10/K13。9 + 4 == 13 ✓。逐 entry 的命中数在 positional_identity_inventory.defect_hits_by_entry 里，其值之和必须 == 45（守卫现算）。",
+      "hardcoded_pattern_hits_total": "13 = 六个模式里五个为 0、`positional_row_id_template` 为 13。🔴 **不是 0** —— J 循环那份 slice 的同名判据是「六个 0」，照抄会假红。这 13 处必须是 48 处位置化命中的子集（守卫现算子集关系）。",
+      "entries_mounting_the_ac14_notice": "0 —— 13 个宿主一个都没挂，已登记 BP-7。",
+      "blocking_preconditions_total": "9 = BP-1..BP-9；每条都必须被至少一个 entry 的 capability_target_blocked_by 引用（守卫现算并集覆盖）。"
+    },
+    "reason": "13 条 entry 逐一实测**都有** HTML 对端（checklist_responses + `K{n}-{sheet}-{field}` item_id 命名空间 + 平台级共享持久化适配器 `useChecklistPersistence` + 后端真实 PUT 路由）⇒ AC 12.8 禁止 single_onlyoffice；OO 侧打开的是真实业务工作簿（14 本册共 152 张 sheet）⇒ AC 12.9 的 single_html 不适用；13 个宿主经 htmlRendererRegistry 的模块边可达 ⇒ 非 unreachable；AC 12.1 的六件前置一件未交付 ⇒ SR-6 禁止 bidirectional。四个终态同时被排除 ⇒ 13/13 待裁决态（capability=null + 三字段齐备）。",
+    "ac_15_not_applicable_because": "🔴 AC 1.5 的触发条件是「入口**被裁决**为纯 OO 或纯 HTML」。本 slice 13 条 entry 的 capability 全为 null（待裁决），四个终态一个都不成立 ⇒ 触发条件不成立 ⇒ **AC 1.5 对本 slice 不适用**。生效的是 **AC 1.4**（入口未注册 adapter ⇒ 禁止显示「可双向回写」并显示可操作原因）：13 条 entry 的 adapter_id 全为 null、migration_state 全为 legacy_fake_bidirectional，AC 1.4 的触发条件成立，义务未兑现 ⇒ 登记 BP-7。守卫两侧都验：① 断言没有任何 entry 的 capability 以 `single_` 开头（AC 1.5 前提不成立）；② 断言 AC 1.4 的单一真源模块存在、13 个宿主的引用数各为 0（义务未兑现且已登记）。",
+    "slice_counters": {
+      "unadjudicated": 13,
+      "fake_bidirectional_claimed_verified": 0,
+      "bidirectional_unverified": 0,
+      "stale_evidence": 0,
+      "note": "unadjudicated=13 的含义是「本 slice 有 13 条 entry 的 capability 终态尚未确定」，缺什么已逐条落在 blocking_preconditions 并由各 entry 的 capability_target_blocked_by 指名。fake_bidirectional_claimed_verified=0：没有任何 entry 的 evidence 声称 VERIFIED。bidirectional_unverified=0：bidirectional 条数本身为 0。stale_evidence=0：没有任何 entry 挂过 evidence（sync_test_run_id 全为 null）⇒ 无「已产出但已过期」的证据。🔴 计数为 0 只表示「本 slice 无该类条目」，不得解读为「已具备双向能力」。"
+    }
+  },
+  "property_denominators": {
+    "why_this_key_exists": "Task 46 首轮把「没有 contract → Property 通过」写成结论，那是空分母重言式（同 spec 的 Task 20 专门写代码拒绝这种论证）。本节逐 Property 显式区分「有真分母的部分（真验）」与「无适用分母的部分（**不宣称通过**）」。",
+    "property_20": {
+      "what_it_asserts": "generated col 占位不可注册生产 adapter —— contract 含无语义 `col_[a-z]+` 且无人工 stable key/source_ref 时 registry 校验失败（design.md §Property 20，Validates Requirements 6.1 / 6.2）",
+      "k_cycle_denominator": "**contract 维度分母为空**（本 slice 已发布的 per-entry contract 数 = 0，见 BP-1），故「registry 拒绝占位 contract」这部分**不宣称通过**。但 Property 20 的**前提方向**有非空分母：① 逐文件读 `workpaper_sync_contracts/` 下每份 contract 的 `review.entry_id`，断言无一条属本 slice（分母 = 目录下全部契约文件，非空）；② 承载字段级判据的四条 pilot 契约真实存在且 review_status 在顶层（分母 = 4，非空）；③ 13 条 entry 的 adapter_id 全为 null 且 registry 里无 K adapter（分母 = 13，非空）。",
+      "how_handled": "守卫真验四件事：① 契约归属逐文件读 `review.entry_id`（不是数文件个数）；② 四条 pilot 契约的 entry_id 逐一等于 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets；③ registry 里现算 K adapter 数 == 0；④ 13 个宿主模板里没有「可双向回写」字样。",
+      "not_claimed_passing": true,
+      "not_claimed_passing_part": "「contract 含 col_ 占位时 registry 真的拒绝」这条 —— 分母为空（本 slice contract 数 0），只断言前提成立 + 承载者存在，不宣称通过。",
+      "carrier_for_the_empty_part": "backend/tests/workpaper_sync/test_task13_contract_registry.py + backend/app/services/workpaper_sync/contracts.py 的 parse_contract"
+    },
+    "property_24": {
+      "what_it_asserts": "公式与分类 summary 单元格保持**受保护**：OO↔HTML 双向回写不得把派生值（公式结果 / 分类合计）当成用户录入写回，破坏公式或覆盖 summary（design.md §Property 24，Validates Requirement 6.6）",
+      "k_cycle_denominator": "🔴 **两个分母，一空一实**。空的那个：OO↔HTML 双向回写路径本身不存在（13 条 entry 的 adapter_id 全 null、published_representation 全 null）⇒ 「回写时保护公式/summary 单元格」这部分**无对象可验**，不宣称通过。实的那个（分母非空且**是 K 循环点名 Property 24 的真正理由**）：K 循环的派生值在 HTML 侧**确实存在且确实是派生的** —— `useK1WriteoffCheck` 的 `reversalTotal` / `writeoffTotal` 是 `computed` 归约，写出的 `K1-9-reversal-total` / `K1-9-writeoff-total` 两个 checklist 键是**派生态**；同一模块的 `k13ReversalTotal` / `k13WriteoffTotal` 是从 K1-3 载荷现算的勾稽量。分母 = 这 2 个派生传输键 + 2 个勾稽 computed，非空。",
+      "how_handled": "守卫真验三件事：① 断言 `K1-9-reversal-total` / `K1-9-writeoff-total` 在 owner 模块里确实由 `buildSavePayload()` 的 `totals` 数组产出、且其值来自 `reversalTotal.value` / `writeoffTotal.value` 两个 `computed`（现读源码，不看注释）⇒ 它们是派生值，将来任何 contract 把它们标成 `mode: \"input\"` 就是把 summary 当录入；② 断言 owner 模块里这两个键**没有**反序列化入口（`load()` 只读 `tables` / `auditProcedures` / `auditNote` / `conclusion` / `conclusionOption` 五个字段，不读两个 total）⇒ 目前 HTML 侧就是「只写不读」的受保护形态，这条性质必须在 adapter 化时保住；③ 断言 13 条 entry 的 published_representation 全为 null（空分母那侧的前提）。",
+      "not_claimed_passing": true,
+      "not_claimed_passing_part": "「双向回写真的不覆盖公式/summary 单元格」这条 —— 回写路径不存在，分母为空。只验了「派生值在 HTML 侧确实是派生且只写不读」这个可被 adapter 破坏的前提性质。",
+      "carrier_for_the_empty_part": "backend/app/services/workpaper_sync/ 的 projection/merge 层 + backend/tests/workpaper_sync/test_task44_oo94_excel_pilot_gate.py 的 different-field merge / same-field conflict 场景（需真实 OO 9.4，见 BP-3）"
+    },
+    "property_69": {
+      "what_it_asserts": "evidence 由逐 scenario 实体与服务端重算闭合（design.md §Property 69，Validates Requirements 12.10）",
+      "k_cycle_denominator": "非空但**全为负向** —— 13 条 entry 的 evidence 都是 UNVERIFIABLE，分母是「UNVERIFIABLE 必须带非空 unverifiable_reasons」（13 条）与「声称 VERIFIED 必须有 sync_test_run_id + required_scenario_set_digest」（0 条声称，故断言「无一条空口声称」）。",
+      "how_handled": "守卫按 SR-7 断言 13 条 UNVERIFIABLE 各带非空 reasons；断言无一条 entry 声称 VERIFIED；把 summary 的每个计数逐项从各自来源节现算并等值比对（40+ 个计数）；断言 slice_counters 四项与实际吻合（SR-9 的 unadjudicated == 13）。",
+      "not_claimed_passing": false,
+      "not_claimed_passing_part": "逐 scenario evidence 实体的**正向**闭合（需真实 OO 9.4 探针 —— BP-3）。"
+    },
+    "property_70": {
+      "what_it_asserts": "scenario / evidence / contract / bundle / candidate 不得跨 entry 或跨场景复用（design.md §Property 70，Validates Requirements 12.11 / 12.12）",
+      "k_cycle_denominator": "非空 —— 13 条 K entry × (D 7 + E 1 + F 8 + G 17 + H 9 + I 6 + J 1) 的两两不相交判据（八 slice，28 个配对）、契约归属逐文件读 `review.entry_id`、14 本模板 belongs_to_entry 的单射性、13 条 entry 的 template_ref 两两不同。",
+      "how_handled": "守卫真验：八个 slice 的 entry 集合两两不相交（28 个配对全算）；契约目录里没有任何文件的 review.entry_id 属本 slice，且四条 pilot 契约的 review.entry_id 分别真是那四个值；14 本模板的 belongs_to_entry 只指向本 slice 或 null 带 excluded_reason；13 条 entry 的 template_ref.workbook 集合大小 == 13；deletion plan 的删除路径与其余七份 slice 的删除路径不相交。",
+      "not_claimed_passing": false
+    },
+    "property_3_21_22_23_28_not_claimed": {
+      "why_here": "Task 53 的正文只点名 Property 20 / 24 / 69 / 70，但相邻任务（46/48~52）的守卫分别额外核了 Property 3（未注册 adapter 不得宣称双向）/ 21（contract 字段完整）/ 22（动态列 key 与 label 解耦）/ 23（动态行身份稳定）/ 28（definition drift fail closed）。本 slice 沿用它们能沿用的部分，并显式写明**哪些部分不宣称通过**。",
+      "not_claimed_passing": true,
+      "partially_claimed": [
+        "Property 3 的**否定方向**（13 条 entry 的 adapter_id 全 null、registry 无 K adapter、宿主模板无「可双向回写」字样）—— 分母非空，真验。正向（bidirectional entry 删 adapter/bundle 之一后打红）分母为空，不宣称通过。",
+        "Property 23 的**缺陷侧**（45 处位置化行身份穷举 + 四族划分 + 逐 entry 分布 + 4 条零命中 entry 的反向判据）—— 分母非空，真验且如实登记为 BP-8。正向（稳定身份在插删排序后不变）需要真实 OO 动态能力场景，分母为空。",
+        "Property 28 的**模板层**（14 本册 size + sha256 现算比对、sheet 清单四路现算、锁文件 0 个、参考副本 absent、168 个 K 码的解析审计）—— 分母非空，真验。bundle 层 drift（definition bundle digest 漂移 fail closed）分母为空，不宣称通过。"
+      ],
+      "not_claimed_parts": [
+        "Property 21（per-entry contract 逐字段 stable_field_key / json_pointer / mode / value_type / source_ref 完整）—— 本 slice contract 数 0，分母为空。",
+        "Property 22（动态列 key 与 label 解耦）—— K 循环无按公司/单位横向展开的宽表（`horizontal_company_column_literals` 与 `column_key_uses_label` 现算各 0 命中），分母为空；「0 命中」只作反向判据，不当成 Property 22 通过。",
+        "Property 3 / 23 / 28 的正向部分（见 partially_claimed 各条）。"
+      ]
+    }
+  },
+  "paradigm_schema_conflict": {
+    "what": "范式 JSON 的 `slice_schema.applies_to_tasks` 是 [48..57]，`effective_from_task_48` 明文把 `html_counterpart_verdict` / `html_counterpart_source_refs` 加进 required_entry、把 `status` / `must_fix_before` / `source_refs` 加进 required_blocking_precondition。Task 53 ≥ 48 ⇒ 两组追加必填**都施加**在本 slice 上。",
+    "how_resolved_here": "沿用 D（Task 46 收口）/ F（48）/ G（49）/ H（50）/ I（51）/ J（52）已确立的诚实形态：capability 记 null + `capability_verdict_stage` + `capability_target` + `capability_target_blocked_by` 三字段齐备（SR-3 右支），由 SR-9 管住计数。两组追加必填逐项补齐：13 条 entry 各带 html_counterpart_verdict/source_refs，9 条 BP 各带 status/must_fix_before/source_refs。",
+    "residual_inconsistency": null,
+    "new_section_not_in_schema": {
+      "sections": [
+        "k_cycle_form_differences",
+        "orphan_dual_mode_inventory",
+        "writeoff_capability_resolution",
+        "account_scope_and_four_table_audit",
+        "template_resolution_audit",
+        "property_denominators",
+        "paradigm_schema_conflict"
+      ],
+      "why_not_a_conflict": "`slice_schema.required_top_level` 是**必填清单**而非白名单，校验器 `validate_slice_against_schema` 只检查必填项存在 + 各子结构形态，对额外顶层键不报违规（实测 D/E/F/G/H/I/J 七份 slice 各带若干额外节均通过）。",
+      "how_it_is_still_locked": "本节不靠范式校验器管，而由 `test_task53_k_cycle_migration.py` 的 TestOrphanDualModeInventory / TestWriteoffCapability / TestAccountScopeAndFourTableReuse / TestKCycleFormDifferences / TestProperty23StaticStructure / TestProperty28DefinitionDriftFailClosed 各自现算锁死。",
+      "why_writeoff_section_is_new": "🔴 前七轮没有这一节，因为 tasks.md 只对 Task 53 提出了「纯客户端 writeoff 能力必须 adapter 化或单模式裁决」这条要求。它不是 `transport_key_resolution` 的子集：后者问「键是什么」，前者问「这个能力的读写是否越过服务端」—— 结论（不是纯客户端 ⇒ 必须 adapter 化）直接决定 BP-4 的存在。",
+      "why_no_transport_key_resolution_section": "🔴 J 循环那轮有 `transport_key_resolution` 顶层节（7 条 declaration）。本 slice **不设**该节，而把传输键收进 `writeoff_capability_resolution`：理由是 K 循环 13 条 entry 的持久化通道**完全同构**（都是 `useChecklistPersistence` + `K{n}-{sheet}-{field}` item_id 命名空间），为 13 条 entry 各写一份同形 declaration 是同信息量的重复；真正需要逐键锁死的是 tasks.md 点名的 writeoff 那三个键。同构性本身有判据：13 个宿主各自 import `useChecklistPersistence`（现算 13/13）。",
+      "why_no_parent_duplicate_summary_section": "🔴 K 循环 parent_duplicate 子入口 0 条（KD-5）⇒ `slice_schema.conditional_sections` 的触发条件不成立 ⇒ 不写该节。守卫断言本 slice 顶层**没有**该键，且 manifest 侧现算 0 条子入口。",
+      "why_no_currency_variant_model_section": "K 循环没有「同一 entry 多个 variant sheet 共用一个持久化键」的形态（那是 E1-3 特有）。附注披露的上市/国企两变体是**两张不同 sheet、两个不同 item_id 命名空间**，不触发该条件节。"
+    },
+    "known_red_it_causes": {
+      "status": "none",
+      "why": "G1 收口（SR-3 改成蕴含式 + 新增 SR-9）已把待裁决态变成范式的合法一等公民，`test_slice_schema_validator_coverage.py` 的 `_UNJUDGED_SLICES` 为空且本 slice 实测通过 `validate_slice_against_schema`（违规数 0）。",
+      "locked_by": "backend/tests/workpaper_sync/test_task53_k_cycle_migration.py::TestParadigmCompliance::test_the_slice_passes_the_paradigm_nominated_validator"
+    },
+    "sibling_slice_conflicts": "与 D / E / F / G / H / I / J 七份 slice 无字段级冲突（本 slice 是它们的同构变体：把 J 的 `orphan_dual_mode_inventory` 扩到 7 个一阶 orphan + 6 个活桩，把 J 的 `transport_key_resolution` 收敛成 `writeoff_capability_resolution`，新增 `account_scope_and_four_table_audit` 兑现 Task 53 正文第一条）。",
+    "paradigm_bytes_untouched": "本任务**不改** backend/data/workpaper_sync_migration_paradigm.json 的任何字节（守卫用硬编码 digest 双向锁死 `paradigm` 块），也不扩充 capability_enum，也不改 `workpaper_sync_entry_manifest.json` / `workpaper_sync_entry_overlay.json`。"
+  },
+  "properties_verified": [
+    "Property 20（部分真验；contract 维度分母为空的部分不宣称通过 —— 见 property_denominators）",
+    "Property 24（部分真验；双向回写路径不存在故保护判据分母为空 —— 见 property_denominators）",
+    "Property 69（负向真验；正向逐 scenario 闭合待 BP-3）",
+    "Property 70（真验，分母非空：八 slice 28 个配对 + 契约归属 + 模板单射 + 删除路径不相交）"
+  ],
+  "requirements_covered": [
+    "6.1",
+    "6.2",
+    "6.6",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1",
+    "1.4"
+  ]
+}

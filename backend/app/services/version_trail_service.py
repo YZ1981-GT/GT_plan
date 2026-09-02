@@ -24,6 +24,13 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.audit_platform_models import WorkpaperSnapshot
+# 🔴 Task 19（workpaper-html-onlyoffice-bidirectional-writeback-closure）：
+# `rollback_to_snapshot` 是底稿内容恢复路径，必须与 HTML save 共用同一个业务版本域。
+from app.services.workpaper_sync.content_mutation import ROLLBACK, html_only_entry_id
+from app.services.workpaper_sync.entry_profile import Capability
+from app.services.workpaper_sync.writer_migration import (
+    build_content_mutation_service_writer,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -479,6 +486,21 @@ class VersionTrailService:
         )
 
     @staticmethod
+    async def _load_restore_scope(db: AsyncSession, workpaper_id: UUID) -> str | None:
+        """底稿的稳定业务身份 `wp_code`（`entry_id` 的构造材料）。
+
+        `wp_code` 在 `wp_index`，不在 `working_paper`（本仓库 schema 铁律），所以必须
+        JOIN。缺行时返回 `None`，由 `html_only_entry_id` 退回 `wp_id` —— V151 的
+        `ck_wpssi_entry_non_empty` 不接受空串，凑一个空字符串会在 DB 层炸成一个看不出
+        来源的约束错误。
+        """
+        row = (await db.execute(sa.text(
+            "SELECT wi.wp_code AS wp_code FROM working_paper wp "
+            "LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id WHERE wp.id = :wid"
+        ), {"wid": str(workpaper_id)})).first()
+        return row.wp_code if row is not None else None
+
+    @staticmethod
     async def rollback_to_snapshot(
         db: AsyncSession,
         project_id: UUID,
@@ -495,6 +517,22 @@ class VersionTrailService:
         4. DELETE FROM checklist_responses WHERE wp_id = workpaper_id
         5. INSERT INTO checklist_responses (from snapshot data_json rows)
         6. 创建新快照 snapshot_type='rollback', description="回滚到{ts}的版本"
+        7. 🔴 Task 19：经统一入口提交，恰推进一次 `content_revision`
+
+        ═══ 第 7 步为什么必须存在 ═══
+
+        改造前 1~6 步走完只 `flush()`：底稿的**业务内容已经换了一份**（整份
+        `checklist_responses` 被删掉重建），而任何版本读者都看不出区别 —— 没有版本字段
+        动过，也没有 immutable content version 记录这次应用。于是并发的编辑器仍按旧
+        base 提交，把刚刚回滚掉的结论/备注原样写回去，用户看到「回滚没生效」。
+
+        走 projection lane 而不是 authoritative-bytes lane：这条路径恢复的是结构化行
+        （`checklist_responses`），手上没有 OOXML 本体可发布成 representation。
+        `capability=single_html` 是本调用点的声明；若该底稿其实已发布过 OO
+        representation，`commit_html_projection` 会按数据库事实二次拒绝（背着权威
+        OOXML 恢复结构化投影 = Requirement 2.11 禁止的形态）。
+
+        Requirements: 2.2、9.11、12.7；Property 61
         """
         from fastapi import HTTPException
 
@@ -577,7 +615,32 @@ class VersionTrailService:
             data_size_bytes=data_size_bytes,
         )
         db.add(rollback_snapshot)
+        # flush（不是 commit）：`SnapshotMeta` 要回传 DB 生成的 `id` / `created_at`。
+        # 它必须发生在唯一提交出口**之前** —— 写在之后就落到下一个事务，而 router 不再
+        # 提交一次 ⇒ 回滚快照静默丢失（Requirement 13.1）。
         await db.flush()
+
+        # ─── Step 7: 唯一业务 commit（Requirement 2.2 / Property 61）────────────
+        # 本方法自己没有 `db.commit()`、没有任何版本字段赋值：整份 checklist_responses
+        # 的删除+重建、rollback 快照行、content version、`content_revision` CAS 与 outbox
+        # 同生共死。
+        scope = await VersionTrailService._load_restore_scope(db, workpaper_id)
+        writer = build_content_mutation_service_writer(db)
+        receipt = await writer.commit_projection(
+            project_id=project_id,
+            wp_id=workpaper_id,
+            entry_id=html_only_entry_id(wp_code=scope, wp_id=workpaper_id),
+            capability=Capability.single_html,
+            # 载荷键名沿用 lane 的 `html_data`（= 「本次业务 projection 内容」），但这条
+            # writer 恢复的是 checklist 行而不是 sheet 单元格，所以显式套一层具名键：
+            # canonical 载荷进内容寻址 digest，事后必须能看出这份 digest 覆盖的是什么。
+            html_data={"checklist_responses": data_json or []},
+            expected_revision=await writer.current_revision(workpaper_id),
+            source=ROLLBACK,
+            actor_id=user_id,
+            trigger="version_trail_rollback",
+        )
+        await writer.publish_committed_events(receipt)
 
         return SnapshotMeta(
             id=rollback_snapshot.id,

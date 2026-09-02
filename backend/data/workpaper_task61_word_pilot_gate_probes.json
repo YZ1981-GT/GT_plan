@@ -1,0 +1,880 @@
+{
+  "anchors": {
+    "14.7": 1,
+    "14.9": 1,
+    "A terminal 前/后 B close": 1,
+    "HTML→OO": 1,
+    "OO→HTML": 1,
+    "Task 6 probe未真实通过时保持 UNVERIFIABLE": 1,
+    "Tasks 62–64 阻塞": 1,
+    "Word-only保留": 1,
+    "`reconcile_close_intents()` 重入与适用路径最终 exactly-one close-capture": 1,
+    "authorization-first claim": 1,
+    "browser crash no-userdata recovery case": 1,
+    "different-field merge": 1,
+    "download-only 三实体为 0": 1,
+    "frozen-base status 6/2 dedupe": 1,
+    "leader promotion前revoke/expire后的successor": 1,
+    "opaque version UUID rollback与跨wp同numeric revision无碰撞": 1,
+    "prior confirmation/bundle/fence/contributor拒绝": 1,
+    "quarantined拒绝application/engine": 1,
+    "refresh/reopen": 1,
+    "resolver返回 published representation": 1,
+    "rollback与 Word-only保留": 1,
+    "same-application higher-sequence fold不self-stale": 1,
+    "same-field conflict/resolve": 1,
+    "single close": 1,
+    "tag/row UUID retention": 1,
+    "不得借离线 engine宣称通过": 1,
+    "两个用户两种关闭顺序": 1,
+    "保持 UNVERIFIABLE": 1,
+    "只允许测试 Task 60 已 finalize": 1,
+    "同Idempotency-Key及不同kind/payload均409且不泄露旧ID": 1,
+    "均无条件运行": 1,
+    "完整复原数据": 1,
+    "无successor`recovery_required`": 1,
+    "禁止 paragraph fallback": 1,
+    "联合浏览器、recovery+application+operation timeline、DB": 1,
+    "逐 scenario 记录独立 application IDs/evidence": 1
+  },
+  "binding_constraints": [
+    {
+      "id": "BP-61-1",
+      "kind": "binding",
+      "measured_by": "gate.binding_constraint_is_measured / arm_a + arm_b",
+      "owner_task": "36/77（finalize gate）与 ContentMutationService.commit —— 不属 Task 61",
+      "scope": "platform_wide_not_f2_specific",
+      "unblocks": "Task 61 正文第一句的准入条件（resolver 返回 published representation）",
+      "what": "`working_paper_sync_entry_state` 全表 0 行 ⇒ 没有任何 entry 有 current published representation ⇒ `registry._describe_entry_supply` 对 **186 个** planned entry 全部给出拒绝原因，`registered_adapter_ids` 恒为空。"
+    },
+    {
+      "id": "BP-61-2",
+      "kind": "non_binding_but_open",
+      "measured_by": "gate.binding_constraint_is_measured / arm_b（移除它后原因不变）",
+      "owner_task": "60（接 descriptor/bridge）+ 前端 docx 挂载点 —— 不属 Task 61",
+      "scope": "f2_lane",
+      "what": "source-backed manifest 里 document_type=='docx' 的 entry 现算 7 条、F2 lane 0 条；唯一的 F2 entry `xlsx/gt-f2-stocktake-bundle` 是 xlsx（宿主挂的是 `GtOnlyOfficeSheet`）。拿它注册 docx adapter 会被 RG-6 `assert_document_types_agree` 以 error_code=`adapter_document_type_mismatch` 拒绝（四方实测 adapter/matcher/contract=docx、manifest=xlsx）。",
+      "why_not_binding": "内存翻掉它之后 F2 的拒绝原因与 b60 Excel pilot **逐字相等** ⇒ 它排在 BP-61-1 之后，不是当前的绑定约束。"
+    },
+    {
+      "id": "BP-61-3",
+      "kind": "must_not_fix_yet",
+      "lesson_refs": [
+        "additive 注入即死代码",
+        "禁令清单必须包含真实目标（Task 64 M13）"
+      ],
+      "measured_by": "boundary.word_adapter_has_not_landed（forbidden path 三条分开断言）",
+      "owner_task": "61（本任务）—— 但解除条件是 BP-61-1 与 BP-61-2 先解",
+      "scope": "f2_lane",
+      "what": "`adapters/word.py` 若现在落地即**死代码 + 拆守卫**：`build_excel_adapter` 的唯一构造点在四个 `pilot_*.attach_pilot_adapters` 里（实测），没有 F2 docx manifest entry + provider 模块时 Word adapter 零构造点；而建这个文件同时会让 `PENDING_ENGINE_ADAPTERS` 的 forbidden-path 判据失守。"
+    }
+  ],
+  "declared_properties": [
+    "P30",
+    "P31",
+    "P32",
+    "P33",
+    "P34",
+    "P55",
+    "P56",
+    "P58",
+    "P62",
+    "P65",
+    "P69",
+    "P71"
+  ],
+  "gate_probe_count": 7,
+  "gate_version": "task61-gate/2",
+  "lane_entry_keys": [
+    "word-lane/f2-22-stocktake-plan",
+    "word-lane/f2-23-stocktake-summary"
+  ],
+  "out_of_lane_scenarios": {
+    "authoritative_revision_conflict": {
+      "measured_from": "check_task44_oo94_excel_pilot_gate.py:_SCENARIO_PROBES",
+      "owner_task": "67",
+      "reason": "🔴 BP-23（本门实测）：Task 61 正文的场景枚举**没有**列这一条，Task 44 的Excel 侧门也没有声明它 ⇒ 它是**平台级未归属**场景，不是本 lane 的豁免。本门如实登记而不替它编一个 anchor（编 anchor 会破坏正文分母锁）"
+    },
+    "dynamic_column_stable_keys": {
+      "measured_from": "onlyoffice_word_sdt_carrier_contract.json:pilot_template_row_carrier_gap.fact",
+      "owner_task": "67",
+      "reason": "同上：Word tagged-SDT 契约没有列维度（stable key 是 `段/字段` 而不是`行/列`），F2-22/F2-23 的 word/document.xml 里 w:tbl 计数为 0"
+    },
+    "dynamic_row_add_delete_reorder_copy": {
+      "measured_from": "workpaper_sync_f2_word_lane_publication.json:counters.row_scoped_fields_total",
+      "owner_task": "67",
+      "reason": "本 lane 无行域字段：Task 60 发布记录现算 row_scoped_fields_total=0（两份契约都没有 repeaters），且 Task 6 把 row_sdt 载体判 failed / blocked ⇒ 行动态族在 F2-22/F2-23 上没有载体可承载"
+    },
+    "no_silent_overwrite": {
+      "measured_from": "check_task44_oo94_excel_pilot_gate.py:_SCENARIO_PROBES",
+      "owner_task": "67",
+      "reason": "🔴 BP-23（本门实测）：同上 —— Task 61 正文与 Task 44 的门都没有声明它。登记为平台级未归属，由 Task 67 的 structural pre-reconcile 统一裁决"
+    },
+    "single_html_no_blank_oo_artifact": {
+      "measured_from": "workpaper_sync_f2_word_lane_publication.json:entries[].capability_target",
+      "owner_task": "63",
+      "reason": "single-mode 族只适用于被裁决为 single_html 的 entry；两个 F2 entry 的capability_target 现算均为 bidirectional 且 html_counterpart_verdict=exists"
+    }
+  },
+  "per_entry_probe_count": 34,
+  "probes": [
+    {
+      "anchor": "HTML→OO",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.html_to_oo",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P30",
+        "P65"
+      ],
+      "requirements": [
+        "7.1",
+        "7.3",
+        "14.2"
+      ],
+      "scenario_id": "html_to_oo"
+    },
+    {
+      "anchor": "OO→HTML",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.oo_to_html",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P30",
+        "P34"
+      ],
+      "requirements": [
+        "7.1",
+        "7.8",
+        "14.2"
+      ],
+      "scenario_id": "oo_to_html"
+    },
+    {
+      "anchor": "tag/row UUID retention",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.identity_retention",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P33"
+      ],
+      "requirements": [
+        "7.6",
+        "14.4"
+      ],
+      "scenario_id": "identity_retention"
+    },
+    {
+      "anchor": "tag/row UUID retention",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.word_sdt_tag_row_uuid_retention",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P33",
+        "P34"
+      ],
+      "requirements": [
+        "7.6",
+        "14.4"
+      ],
+      "scenario_id": "word_sdt_tag_row_uuid_retention"
+    },
+    {
+      "anchor": "Word-only保留",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.word_free_body_isolation",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P31"
+      ],
+      "requirements": [
+        "7.3",
+        "14.4"
+      ],
+      "scenario_id": "word_free_body_isolation"
+    },
+    {
+      "anchor": "different-field merge",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.different_field_merge",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P31"
+      ],
+      "requirements": [
+        "7.3",
+        "8.10"
+      ],
+      "scenario_id": "different_field_merge"
+    },
+    {
+      "anchor": "same-field conflict/resolve",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.same_field_conflict_resolve",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P32",
+        "P62"
+      ],
+      "requirements": [
+        "7.4",
+        "8.10",
+        "14.6"
+      ],
+      "scenario_id": "same_field_conflict_resolve"
+    },
+    {
+      "anchor": "refresh/reopen",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.refresh_required_reopen",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P62"
+      ],
+      "requirements": [
+        "14.6"
+      ],
+      "scenario_id": "refresh_required_reopen"
+    },
+    {
+      "anchor": "frozen-base status 6/2 dedupe",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.frozen_base_status_6_2_dedupe",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P56"
+      ],
+      "requirements": [
+        "8.10",
+        "14.3"
+      ],
+      "scenario_id": "frozen_base_status_6_2_dedupe"
+    },
+    {
+      "anchor": "same-application higher-sequence fold不self-stale",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.same_application_higher_sequence_fold",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P56",
+        "P62"
+      ],
+      "requirements": [
+        "8.10",
+        "14.3"
+      ],
+      "scenario_id": "same_application_higher_sequence_fold"
+    },
+    {
+      "anchor": "同Idempotency-Key及不同kind/payload均409且不泄露旧ID",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.cross_participant_idempotency_409",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "4.11",
+        "12.10"
+      ],
+      "scenario_id": "cross_participant_idempotency_409"
+    },
+    {
+      "anchor": "quarantined拒绝application/engine",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.quarantined_rejects_application_and_engine",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P34"
+      ],
+      "requirements": [
+        "4.11",
+        "7.8"
+      ],
+      "scenario_id": "quarantined_rejects_application_and_engine"
+    },
+    {
+      "anchor": "prior confirmation/bundle/fence/contributor拒绝",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.wrong_prior_confirmation_bundle_fence_contributor_rejected",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "4.11",
+        "8.10"
+      ],
+      "scenario_id": "wrong_prior_confirmation_bundle_fence_contributor_rejected"
+    },
+    {
+      "anchor": "opaque version UUID rollback与跨wp同numeric revision无碰撞",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.opaque_version_rollback_no_numeric_collision",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P71"
+      ],
+      "requirements": [
+        "12.10",
+        "14.8"
+      ],
+      "scenario_id": "opaque_version_rollback_no_numeric_collision"
+    },
+    {
+      "anchor": "rollback与 Word-only保留",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.rollback",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P31",
+        "P71"
+      ],
+      "requirements": [
+        "7.3",
+        "14.8"
+      ],
+      "scenario_id": "rollback"
+    },
+    {
+      "anchor": "browser crash no-userdata recovery case",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.browser_crash_no_userdata_recovery_case",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55",
+        "P69"
+      ],
+      "requirements": [
+        "14.7",
+        "14.9"
+      ],
+      "scenario_id": "browser_crash_no_userdata_recovery_case"
+    },
+    {
+      "anchor": "authorization-first claim",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.authorization_first_recovery_claim",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "4.11"
+      ],
+      "scenario_id": "authorization_first_recovery_claim"
+    },
+    {
+      "anchor": "download-only 三实体为 0",
+      "has_validator": false,
+      "probe_class": "scenario",
+      "probe_id": "scenario.download_only_zero_three_entities",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.10",
+        "14.9"
+      ],
+      "scenario_id": "download_only_zero_three_entities"
+    },
+    {
+      "anchor": "single close",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.single_participant_close",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": "single_participant_close"
+    },
+    {
+      "anchor": "两个用户两种关闭顺序",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.two_user_close_order_a_then_b",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": "two_user_close_order_a_then_b"
+    },
+    {
+      "anchor": "两个用户两种关闭顺序",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.two_user_close_order_b_then_a",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": "two_user_close_order_b_then_a"
+    },
+    {
+      "anchor": "A terminal 前/后 B close",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.b_close_before_a_forcesave_terminal",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55",
+        "P56"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": "b_close_before_a_forcesave_terminal"
+    },
+    {
+      "anchor": "A terminal 前/后 B close",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.b_close_after_a_forcesave_terminal",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55",
+        "P56"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": "b_close_after_a_forcesave_terminal"
+    },
+    {
+      "anchor": "leader promotion前revoke/expire后的successor",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.close_leader_revoked_successor_exactly_one",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P58"
+      ],
+      "requirements": [
+        "4.11",
+        "14.7"
+      ],
+      "scenario_id": "close_leader_revoked_successor_exactly_one"
+    },
+    {
+      "anchor": "无successor`recovery_required`",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.close_leader_revoked_no_successor_recovery_required",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "14.7",
+        "14.9"
+      ],
+      "scenario_id": "close_leader_revoked_no_successor_recovery_required"
+    },
+    {
+      "anchor": "`reconcile_close_intents()` 重入与适用路径最终 exactly-one close-capture",
+      "has_validator": false,
+      "probe_class": "close_aspect",
+      "probe_id": "scenario.close_reconciler_reentrant_exactly_one_capture",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P55"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": "close_reconciler_reentrant_exactly_one_capture"
+    },
+    {
+      "anchor": "只允许测试 Task 60 已 finalize",
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.published_representation_and_approved_bundle",
+      "production_refs": [
+        "app.services.workpaper_sync.contracts:available_contract_ids",
+        "app.services.workpaper_sync.adapters.registry:build_production_registry",
+        "app.services.workpaper_sync.evidence:load_entry_manifest"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.3",
+        "12.10"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "Task 6 probe未真实通过时保持 UNVERIFIABLE",
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.carrier_gate_probe_really_passed",
+      "production_refs": [
+        "app.services.workpaper_sync.word_instrumentation:WordSdtCarrierGate"
+      ],
+      "properties": [
+        "P33",
+        "P71"
+      ],
+      "requirements": [
+        "7.6",
+        "14.4",
+        "14.16"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "不得借离线 engine宣称通过",
+      "has_validator": false,
+      "probe_class": "admission",
+      "probe_id": "admission.no_offline_engine_claim",
+      "production_refs": [
+        "app.services.workpaper_sync.word_sdt_engine:WordEngineBinding"
+      ],
+      "properties": [
+        "P30",
+        "P34"
+      ],
+      "requirements": [
+        "7.8",
+        "12.3"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "联合浏览器、recovery+application+operation timeline、DB",
+      "has_validator": true,
+      "probe_class": "evidence",
+      "probe_id": "evidence.union_of_six_sources",
+      "production_refs": [
+        "app.services.workpaper_sync.evidence:load_entry_manifest"
+      ],
+      "properties": [
+        "P55",
+        "P58",
+        "P69"
+      ],
+      "requirements": [
+        "14.2",
+        "14.3",
+        "14.16"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "逐 scenario 记录独立 application IDs/evidence",
+      "has_validator": true,
+      "probe_class": "evidence",
+      "probe_id": "evidence.distinct_application_ids_per_scenario",
+      "production_refs": [
+        "app.services.workpaper_sync.pilot_harness:run_scenario_oracle"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.10",
+        "14.9"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "完整复原数据",
+      "has_validator": true,
+      "probe_class": "evidence",
+      "probe_id": "evidence.full_restoration",
+      "production_refs": [
+        "app.services.workpaper_sync.evidence:load_entry_manifest"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "14.9"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "禁止 paragraph fallback",
+      "has_validator": false,
+      "probe_class": "boundary",
+      "probe_id": "boundary.word_adapter_has_not_landed",
+      "production_refs": [
+        "app.services.workpaper_sync.adapters.registry:PENDING_ENGINE_ADAPTERS"
+      ],
+      "properties": [
+        "P34"
+      ],
+      "requirements": [
+        "7.8",
+        "12.3"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "Tasks 62–64 阻塞",
+      "has_validator": false,
+      "probe_class": "boundary",
+      "probe_id": "boundary.downstream_tasks_stay_blocked",
+      "production_refs": [
+        "app.services.workpaper_sync.adapters.registry:DELIVERED_PER_ENTRY_CONTRACTS"
+      ],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.3"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "保持 UNVERIFIABLE",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.ordering_upstream_gap_before_black_box",
+      "production_refs": [],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "14.9"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "14.9",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.no_documentary_pass",
+      "production_refs": [],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "14.9"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "只允许测试 Task 60 已 finalize",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.admission_is_state_sensitive",
+      "production_refs": [],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.3"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "Task 6 probe未真实通过时保持 UNVERIFIABLE",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.carrier_freshness_is_measured",
+      "production_refs": [],
+      "properties": [
+        "P71"
+      ],
+      "requirements": [
+        "14.16"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "均无条件运行",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.denominator_locked_against_task44",
+      "production_refs": [],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "12.10"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "14.7",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.mutation_four_state",
+      "production_refs": [],
+      "properties": [
+        "P69"
+      ],
+      "requirements": [
+        "14.7"
+      ],
+      "scenario_id": null
+    },
+    {
+      "anchor": "resolver返回 published representation",
+      "has_validator": false,
+      "probe_class": "gate",
+      "probe_id": "gate.binding_constraint_is_measured",
+      "production_refs": [
+        "app.services.workpaper_sync.adapters.registry:build_production_registry",
+        "app.services.workpaper_sync.adapters.registry:_describe_entry_supply"
+      ],
+      "properties": [
+        "P65",
+        "P69"
+      ],
+      "requirements": [
+        "7.3",
+        "12.3"
+      ],
+      "scenario_id": null
+    }
+  ],
+  "properties_claimed_but_not_declared": [],
+  "properties_without_probe": [],
+  "property_titles": {
+    "P30": "Word 只认 tagged SDT",
+    "P31": "Word-only 正文保留",
+    "P32": "Word 多实例异值冲突",
+    "P33": "Word pilot tag 往返保留",
+    "P34": "SDT 丢失不降级",
+    "P55": "真浏览器双向闭环",
+    "P56": "重复 callback 零多版本",
+    "P58": "客户端与服务端联合时序",
+    "P62": "server last-applied 与 client-confirmed base 不混同",
+    "P65": "business projection 与同 revision representation 等值",
+    "P69": "evidence 由逐 scenario 实体与服务端重算闭合",
+    "P71": "evidence 随环境、runner 与 immutable definition bundle 变化失效"
+  },
+  "registry_digest": "e415fbc7e8e0f0a178f80ae9b4fdcf07ff7a62a6ea13955bf755bdcfa42fb0f5",
+  "requirements_claimed_but_not_declared": [],
+  "requirements_without_probe": [],
+  "scenario_denominator": {
+    "declared_scenario_probes": 26,
+    "not_declared_anywhere": [],
+    "out_of_lane_registered": 5,
+    "production_oracles": 31,
+    "task44_declared": 25,
+    "word_family_scenarios": [
+      "word_free_body_isolation",
+      "word_sdt_tag_row_uuid_retention"
+    ]
+  },
+  "scenario_probe_count": 26,
+  "schema_version": "task61-word-pilot-gate-probes:v1",
+  "task": 61,
+  "task_requirements": [
+    "12.10",
+    "12.3",
+    "14.16",
+    "14.2",
+    "14.3",
+    "14.4",
+    "14.6",
+    "14.7",
+    "14.8",
+    "14.9",
+    "4.11",
+    "7.1",
+    "7.3",
+    "7.4",
+    "7.6",
+    "7.8",
+    "8.10"
+  ],
+  "task_text_properties": [
+    "P30",
+    "P31",
+    "P32",
+    "P33",
+    "P34",
+    "P55",
+    "P56",
+    "P58",
+    "P62",
+    "P65",
+    "P69",
+    "P71"
+  ],
+  "total_probe_rows": 75
+}

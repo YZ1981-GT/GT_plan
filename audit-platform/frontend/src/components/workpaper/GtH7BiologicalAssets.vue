@@ -28,6 +28,7 @@
           style="margin-left: 16px"
           @change="onMeasurementModelChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-h7-biological-assets" />
       </div>
 
       <!-- OnlyOffice 模式 -->
@@ -377,6 +378,7 @@ import { getHiExtractionSegments } from './composables/hiExtractionSegments'
 
 // ─── Lazy-loaded 子组件 ──────────────────────────────────────────────────────
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 const GtWpVersionTrail = defineAsyncComponent(() => import('./version-trail/GtWpVersionTrail.vue'))
 
 // core

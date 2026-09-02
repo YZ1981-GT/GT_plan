@@ -1,0 +1,42 @@
+[
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_row_identity_key_and_generator_are_source_backed",
+    "why": "行身份键从 id 改成 rowId 仍绿 ⇒ 判据没回源码核对，照抄 D 循环「全 rowId」的结论会让 F2 的契约按不存在的字段取行身份",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.49s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_row_identity_key_and_generator_are_source_backed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_row_identity_key_and_generator_are_source_backed"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed",
+    "why": "🔴 首轮此条判 GREEN，暴露的是守卫缺陷：判据原本写「sources 里至少一个通过探针」，于是把 CK-1 的一个 source 换成不含 `${sheetCode}-` 的 useF1Detail.ts 后，其余 4 个仍命中 ⇒ 登记表可以混进不体现该机制的模块。改成「每个 source 都必须通过探针」后必须 RED",
+    "verdict": "RED",
+    "summary": "1 failed, 81 passed, 1 warning in 5.48s",
+    "added": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task48_f_cycle_migration.py::TestHtmlCounterpartIsSourceBacked::test_composite_transport_key_mechanisms_are_source_backed"
+    ],
+    "added_files": [
+      "test_task48_f_cycle_migration.py"
+    ],
+    "restored": true,
+    "seconds": 8.6
+  }
+]

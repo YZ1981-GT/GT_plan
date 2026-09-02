@@ -23,7 +23,8 @@ import http from '@/utils/http'
 import ErrorBoundary from '@/components/ErrorBoundary.vue'
 import { useB60Applicability, B60_SUB_WP_CODES } from './composables/useB60Applicability'
 import { DEFAULT_CHAPTER_DEFINITIONS } from './constants/defaultChapterDefinitions'
-import { useB60DualMode } from './composables/useB60DualMode'
+// Task 45: legacy useB60DualMode deleted — pilot host now delegates to sync bridge.
+import { usePilotBridgeAdapter } from '../sync/usePilotBridgeAdapter'
 import { B60_STRUCTURED_CODES } from './constants/subSheetSchemas'
 import { useWorkpaperVersionToolbar } from '../composables/useWorkpaperVersionToolbar'
 import { useWorkpaperReviewProvide } from '../composables/useWorkpaperReviewProvide'
@@ -108,26 +109,26 @@ const chapterDefinitions = ref<any[]>([])
 const projectContext = ref<Record<string, string>>({})
 const chapterEditorRef = ref<{ flushPendingSaves?: () => Promise<void> } | null>(null)
 
-// ─── Main doc dual-mode（章节编辑 ↔ 在线编辑，切 OO 前预拉 config「拉取成功」才切换） ───
-const mainDual = useB60DualMode({
+// ─── Main doc dual-mode — Task 45: bridge adapter replaces legacy useB60DualMode ───
+const mainDual = usePilotBridgeAdapter({
+  entryId: 'xlsx/b60/gt-b60-bundle',
   wpId: toRef(props, 'wpId'),
   sheetName: computed(() => 'B60'),
-  structuredLabel: '章节编辑',
-  flushBeforeOnline: async () => {
+  flushBeforeOo: async () => {
     if (chapterEditorRef.value?.flushPendingSaves) {
       await chapterEditorRef.value.flushPendingSaves()
     }
   },
-  reloadStructured: async () => {
+  reloadHtml: async () => {
     await reloadChapterData()
   },
 })
 const mainModeOptions = computed(() => [
-  { label: '章节编辑', value: 'structured' as const },
+  { label: '章节编辑', value: 'html' as const },
   { label: '在线编辑', value: 'onlyoffice' as const, disabled: !mainDual.isOoAvailable.value },
 ])
 const mainOoStatus = computed(() => {
-  if (mainDual.checking.value || mainDual.switching.value) return { type: 'info' as const, text: 'OnlyOffice 拉取中…' }
+  if (mainDual.switching.value) return { type: 'info' as const, text: '切换中…' }
   if (mainDual.isOoAvailable.value) return { type: 'success' as const, text: 'OnlyOffice 拉取成功' }
   return { type: 'warning' as const, text: 'OnlyOffice 不可用（在线编辑已禁用）' }
 })
@@ -367,7 +368,7 @@ onMounted(async () => {
             </div>
 
             <!-- 结构化主底稿（15 章 / 38 表 + SCOT+ 接 B50） -->
-            <ErrorBoundary v-if="mainDual.currentMode.value === 'structured'">
+            <ErrorBoundary v-if="mainDual.currentMode.value === 'html'">
               <GtB60MainDoc
                 ref="chapterEditorRef"
                 :wp-id="props.wpId"

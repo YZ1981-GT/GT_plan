@@ -1,0 +1,315 @@
+{
+  "generated_by": "backend/scripts/diagnose/mutate_task7_staged_artifact_boundary_guards.py",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 7,
+  "test_files": [
+    "backend/tests/test_workpaper_staged_artifact_boundary_contract.py"
+  ],
+  "baseline_all_green": true,
+  "restored_baseline_all_green": true,
+  "tally": {
+    "RED": 22,
+    "GREEN": 1
+  },
+  "mutations": [
+    {
+      "id": 1,
+      "label": "契约 schema_version 漂移",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_contract_is_versioned_and_complete"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_contract_is_versioned_and_complete"
+      ],
+      "note": ""
+    },
+    {
+      "id": 2,
+      "label": "契约声称文件系统与 PostgreSQL 同一事务",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_contract_declares_no_cross_medium_transaction"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_contract_declares_no_cross_medium_transaction"
+      ],
+      "note": ""
+    },
+    {
+      "id": 3,
+      "label": "design.md 把「不宣称同事务」改成「宣称同事务」",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/design.md",
+      "expect_tests": [
+        "test_spec_docs_never_claim_filesystem_and_postgres_share_a_transaction",
+        "test_spec_docs_keep_the_explicit_disclaimer"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_spec_docs_keep_the_explicit_disclaimer",
+        "test_spec_docs_never_claim_filesystem_and_postgres_share_a_transaction"
+      ],
+      "note": ""
+    },
+    {
+      "id": 4,
+      "label": "跨卷 winerror 漂移（17 → 18）",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_cross_volume_replace_facts_match_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_cross_volume_replace_facts_match_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 5,
+      "label": "谎称 FILE_SHARE_DELETE 能让 os.replace 成功",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 6,
+      "label": "目标占用 winerror 集合被掺入 32",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 7,
+      "label": "share 模式清单删掉 read_write_delete（只测一种就下结论）",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 8,
+      "label": "谎称 Windows 支持目录 fsync",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_directory_fsync_unsupported_claim_matches_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_directory_fsync_unsupported_claim_matches_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 9,
+      "label": "原子性观测下限被抬高到不可能（暴露观测量不足即假绿）",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_same_volume_replace_atomicity_is_backed_by_enough_observations"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_same_volume_replace_atomicity_is_backed_by_enough_observations"
+      ],
+      "note": ""
+    },
+    {
+      "id": 10,
+      "label": "跨卷 fallback 的未完成大小被手填成实测不存在的值",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_cross_volume_replace_facts_match_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_cross_volume_replace_facts_match_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 11,
+      "label": "path_safety 必拒清单删掉 symlink_escape",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_path_safety_rejections_match_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_path_safety_rejections_match_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 12,
+      "label": "谎称软链接越界未覆盖（覆盖状态与实证不符）",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_symlink_escape_is_really_covered"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_symlink_escape_is_really_covered"
+      ],
+      "note": ""
+    },
+    {
+      "id": 13,
+      "label": "resolver 拒绝 candidate/incoming 的 pgcode 漂移",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_resolver_never_returns_candidate_incoming_or_orphan"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_resolver_never_returns_candidate_incoming_or_orphan"
+      ],
+      "note": ""
+    },
+    {
+      "id": 14,
+      "label": "GC 二次确认原因被改成 grace 原因",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_retention_gc_respects_grace_recheck_and_legal_hold"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_retention_gc_respects_grace_recheck_and_legal_hold"
+      ],
+      "note": ""
+    },
+    {
+      "id": 15,
+      "label": "not_covered 抹掉 os.replace 中断项（把未实证含混成已覆盖）",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_os_replace_interruption_is_declared_as_not_independently_injected"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_os_replace_interruption_is_declared_as_not_independently_injected"
+      ],
+      "note": ""
+    },
+    {
+      "id": 16,
+      "label": "声称 Task 9 的表已迁移",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [
+        "test_target_tables_are_declared_as_not_yet_migrated"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_target_tables_are_declared_as_not_yet_migrated"
+      ],
+      "note": ""
+    },
+    {
+      "id": 17,
+      "label": "evidence 篡改：FILE_SHARE_DELETE 下 os.replace 改成没失败",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback/fs_observations.json",
+      "expect_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_file_occupancy_matrix_matches_evidence"
+      ],
+      "note": ""
+    },
+    {
+      "id": 18,
+      "label": "evidence 篡改：DB rollback 后文件也没了（等于宣称同事务）",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback/db_observations.json",
+      "expect_tests": [
+        "test_contract_declares_no_cross_medium_transaction",
+        "test_db_rollback_leaves_pointer_and_revision_untouched"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_contract_declares_no_cross_medium_transaction",
+        "test_db_rollback_leaves_pointer_and_revision_untouched"
+      ],
+      "note": "anchor 命中 2 处（两种失败注入），按 replace_all 处理（见 ALLOW_MULTI）"
+    },
+    {
+      "id": 19,
+      "label": "evidence 篡改：probe_status 变 error（fail-open 检测）",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback/run_meta.json",
+      "expect_tests": [
+        "test_probe_reported_no_fail_open_errors"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_probe_reported_no_fail_open_errors"
+      ],
+      "note": ""
+    },
+    {
+      "id": 20,
+      "label": "evidence 篡改：校验门失败后竟然发布了 artifact",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback/fs_observations.json",
+      "expect_tests": [
+        "test_validation_gate_injections_leave_current_untouched"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_validation_gate_injections_leave_current_untouched"
+      ],
+      "note": "anchor 命中 3 处（三个注入点），按 replace_all 处理"
+    },
+    {
+      "id": 21,
+      "label": "evidence 篡改：写目标换成业务表但仍保留 scratch schema 名（打弱判据）",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback/db_sql_log.json",
+      "expect_tests": [
+        "test_db_probe_did_not_touch_business_tables"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_db_probe_did_not_touch_business_tables"
+      ],
+      "note": "故意保留 scratch schema 名：若守卫只做『语句里有 schema 名』的子串检查就会 GREEN。首轮实测确实 GREEN ⇒ 已把守卫改成结构化提取写目标后复测。anchor 多处命中，replace_all。"
+    },
+    {
+      "id": 23,
+      "label": "findings.md 把「不是同一事务」改成「是同一事务」（evidence 文档也在扫描面内）",
+      "file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback/findings.md",
+      "expect_tests": [
+        "test_spec_docs_never_claim_filesystem_and_postgres_share_a_transaction"
+      ],
+      "result": "RED",
+      "failed_tests": [
+        "test_spec_docs_never_claim_filesystem_and_postgres_share_a_transaction"
+      ],
+      "note": ""
+    },
+    {
+      "id": 22,
+      "label": "契约新增一个无人消费的说明字段（GREEN 对照）",
+      "file": "backend/data/workpaper_staged_artifact_boundary_contract.json",
+      "expect_tests": [],
+      "result": "GREEN",
+      "failed_tests": [],
+      "note": "期望 GREEN：守卫按字段语义判据而非整文件 hash，无害新增不应误红"
+    }
+  ]
+}

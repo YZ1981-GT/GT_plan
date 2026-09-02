@@ -1,0 +1,162 @@
+{
+  "policy_id": "workpaper-sync-retention",
+  "policy_version": "workpaper-sync-retention:v1",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 11,
+  "requirements": ["5.11", "9.6", "9.7", "10.7", "10.8"],
+  "properties": ["Property 5", "Property 17"],
+  "purpose": "incoming / temp / candidate / conflict / recovery / evidence / trace / orphan 的版本化 retention 策略（Requirement 5.11）。policy_version 是 evidence 与审计的一部分：改任何 TTL/grace/deletable/敏感级别都必须提升版本号并同步守卫。",
+
+  "invariants": {
+    "dry_run_required_before_apply": true,
+    "dry_run_never_deletes": true,
+    "second_reference_recheck_required": true,
+    "retain_on_uncertainty": true,
+    "audit_row_per_object": true,
+    "audit_persists_dry_run_flag": true
+  },
+
+  "alert_retain_reasons": [
+    "no_policy_retain_and_alert",
+    "class_scope_mismatch",
+    "orphaned_at_missing",
+    "age_anchor_missing",
+    "reference_found_on_recheck",
+    "state_changed_on_recheck",
+    "in_flight_operation"
+  ],
+
+  "classes": {
+    "default": {
+      "sensitivity": "business_content",
+      "applies_to_kinds": ["canonical", "projection"],
+      "applies_to_states": ["published"],
+      "age_anchor": "published_at",
+      "ttl_hours": 0,
+      "grace_hours": 0,
+      "deletable": false,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["engagement_manager", "business_partner", "quality_control", "eqcr"],
+      "comment": "已发布的 canonical/projection 是内容版本历史本体，永不由 GC 删除；只有失去引用并被标为 orphan 后才进入 orphan_canonical 类。"
+    },
+    "orphan_canonical": {
+      "sensitivity": "business_content",
+      "applies_to_kinds": ["canonical", "projection"],
+      "applies_to_states": ["orphan"],
+      "age_anchor": "orphaned_at",
+      "ttl_hours": 24,
+      "grace_hours": 72,
+      "deletable": true,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": true,
+      "access_roles": ["platform_admin"],
+      "comment": "Task 7 db2 证明 DB rollback 不回滚已 publish 的文件；这类 orphan 只能等 grace 过后、二次确认零引用才删。"
+    },
+    "incoming_durable": {
+      "sensitivity": "business_content",
+      "applies_to_kinds": ["incoming"],
+      "applies_to_states": ["durable"],
+      "age_anchor": "durable_at",
+      "ttl_hours": 168,
+      "grace_hours": 72,
+      "deletable": true,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["engagement_manager", "platform_admin"],
+      "comment": "durable incoming 是 application 的只读 substrate；有 application/delivery/recovery 引用或 in-flight operation 时二次复核必须保留。"
+    },
+    "incoming_quarantined": {
+      "sensitivity": "security_evidence",
+      "applies_to_kinds": ["incoming"],
+      "applies_to_states": ["quarantined"],
+      "age_anchor": "quarantined_at",
+      "ttl_hours": 720,
+      "grace_hours": 168,
+      "deletable": true,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["platform_admin"],
+      "comment": "隔离文件是安全事件证据，保留期比 durable 长；只允许 authorization-first download-only / expire / retention，永不 release。"
+    },
+    "upgrade_candidate": {
+      "sensitivity": "business_content",
+      "applies_to_kinds": ["upgrade_candidate"],
+      "applies_to_states": ["staged", "candidate", "orphan"],
+      "age_anchor": "created_at",
+      "ttl_hours": 336,
+      "grace_hours": 72,
+      "deletable": true,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["platform_admin"],
+      "comment": "candidate 永不 current；未被 candidate 行引用的 staged 文件过期即回收。"
+    },
+    "trace_bundle": {
+      "sensitivity": "audit_evidence",
+      "applies_to_kinds": ["trace_bundle"],
+      "applies_to_states": ["published", "orphan"],
+      "age_anchor": "created_at",
+      "ttl_hours": 2160,
+      "grace_hours": 168,
+      "deletable": true,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["quality_control", "eqcr", "platform_admin"],
+      "comment": "被 evidence scenario 引用的 trace 由二次复核保留（Requirement 14.14 要求服务端可重算）。"
+    },
+    "evidence_manifest": {
+      "sensitivity": "audit_evidence",
+      "applies_to_kinds": ["evidence"],
+      "applies_to_states": ["published"],
+      "age_anchor": "created_at",
+      "ttl_hours": 0,
+      "grace_hours": 0,
+      "deletable": false,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["quality_control", "eqcr", "platform_admin"],
+      "comment": "逐 entry evidence manifest 是归档判据，不由 GC 删除。"
+    },
+    "retention_audit": {
+      "sensitivity": "audit_evidence",
+      "applies_to_kinds": ["evidence"],
+      "applies_to_states": ["published"],
+      "age_anchor": "created_at",
+      "ttl_hours": 0,
+      "grace_hours": 0,
+      "deletable": false,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["platform_admin"],
+      "comment": "GC 自身的判定清单。若可被 GC 删除，删除审计就会被下一轮 GC 抹掉。"
+    },
+    "definition": {
+      "sensitivity": "definition",
+      "applies_to_kinds": ["definition", "template"],
+      "applies_to_states": ["published"],
+      "age_anchor": "published_at",
+      "ttl_hours": 0,
+      "grace_hours": 0,
+      "deletable": false,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["engagement_manager", "quality_control", "eqcr", "platform_admin"],
+      "comment": "历史 operation/retry 只读 frozen bundle FK + digest，definition blob 永不回收。"
+    },
+    "staging_temp": {
+      "sensitivity": "transient",
+      "applies_to_kinds": ["canonical", "projection", "incoming", "upgrade_candidate"],
+      "applies_to_states": ["staged"],
+      "age_anchor": "created_at",
+      "ttl_hours": 24,
+      "grace_hours": 24,
+      "deletable": true,
+      "honor_legal_hold": true,
+      "requires_orphaned_at": false,
+      "access_roles": ["platform_admin"],
+      "comment": "进程中断留在 .staging 的半成品（Task 7 fs6）。resolver 命名空间不含 .staging，故删除不影响任何读路径。"
+    }
+  }
+}

@@ -1,0 +1,132 @@
+[
+  {
+    "id": "M08",
+    "side": "fe",
+    "want": "unclaimed 却带 application_id ⇒ 拒绝",
+    "why": "只检查三实体中的一个 ⇒ 另两个可以在 claim 前伪造。这正是本 spec 反复抓到的「守卫只覆盖一条分支、其余永远绿」形态；`operation_id` 那条仍会红，所以判据必须逐个实体参数化，否则单条通过就掩盖另两条",
+    "verdict": "RED",
+    "summary": "165/169 passed, numFailedTestSuites=2",
+    "added": [
+      "recovery case 的三实体不变量 application_created 时三实体必须同时具备",
+      "recovery case 的三实体不变量 unclaimed 却带 application_id ⇒ 拒绝（伪造三实体会让 UI 显示普通重试）",
+      "recovery case 的三实体不变量 unclaimed 却带 forcesave_request_id ⇒ 拒绝（伪造三实体会让 UI 显示普通重试）",
+      "recovery case 的三实体不变量 生成的 case 状态域每一个都有显式三实体裁决（新增状态不得默认放行）"
+    ],
+    "gone": [],
+    "hit": [
+      "recovery case 的三实体不变量 unclaimed 却带 application_id ⇒ 拒绝（伪造三实体会让 UI 显示普通重试）",
+      "recovery case 的三实体不变量 unclaimed 却带 forcesave_request_id ⇒ 拒绝（伪造三实体会让 UI 显示普通重试）"
+    ],
+    "added_files": [
+      "workpaperSyncDto.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.8
+  },
+  {
+    "id": "M09",
+    "side": "fe",
+    "want": "缺 typed slot instrumentation 时拒绝（三个必须全在）",
+    "why": "只要求一个 slot ⇒ 缺 instrumentation/contract 的 descriptor 可挂载。Requirement 2.3 要求三个 typed slot 全在（可选 child 只能用 typed null marker）；少一个 slot 意味着 bundle identity 不完整而编辑器已经开了",
+    "verdict": "RED",
+    "summary": "166/169 passed, numFailedTestSuites=2",
+    "added": [
+      "EditorLaunchDescriptor 解析 字段齐备时解析成功并保留 onlyofficeConfig 原样",
+      "EditorLaunchDescriptor 解析 缺 typed slot contract 时拒绝（三个必须全在）",
+      "EditorLaunchDescriptor 解析 缺 typed slot instrumentation 时拒绝（三个必须全在）"
+    ],
+    "gone": [],
+    "hit": [
+      "EditorLaunchDescriptor 解析 缺 typed slot contract 时拒绝（三个必须全在）",
+      "EditorLaunchDescriptor 解析 缺 typed slot instrumentation 时拒绝（三个必须全在）"
+    ],
+    "added_files": [
+      "workpaperSyncDto.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M10",
+    "side": "fe",
+    "want": "download-only 响应带 result_revision ⇒ 拒绝（伪造 applied）",
+    "why": "把 `result_revision` 从禁项里摘掉 ⇒ download-only 回执可以带一个 revision，UI 就会显示「结构化回写完成」。AC 5.8 明令 download-only 永不创建 request/application/operation，也不得冒充 applied",
+    "verdict": "RED",
+    "summary": "168/169 passed, numFailedTestSuites=2",
+    "added": [
+      "claim / download-only 的响应分型 download-only 响应带 result_revision ⇒ 拒绝（伪造 applied）"
+    ],
+    "gone": [],
+    "hit": [
+      "claim / download-only 的响应分型 download-only 响应带 result_revision ⇒ 拒绝（伪造 applied）"
+    ],
+    "added_files": [
+      "workpaperSyncDto.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M11",
+    "side": "fe",
+    "want": "SSE 健康时只读一次，之后不轮询",
+    "why": "无条件起轮询 ⇒ design §API 的「优先 SSE/事件，轮询作为断线恢复」被破坏。功能上完全「正常」（状态照样更新），只有 poll 计数判据能看出来 —— 在 6000 会话规模下这条是把 operation GET 打成常态流量的入口",
+    "verdict": "RED",
+    "summary": "167/169 passed, numFailedTestSuites=2",
+    "added": [
+      "SSE 优先、轮询只用于恢复 SSE 健康时只读一次，之后不轮询",
+      "SSE 优先、轮询只用于恢复 断线重连后补读一次（错过的事件靠这次补齐）"
+    ],
+    "gone": [],
+    "hit": [
+      "SSE 优先、轮询只用于恢复 SSE 健康时只读一次，之后不轮询"
+    ],
+    "added_files": [
+      "workpaperSyncOperationTracker.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M12",
+    "side": "fe",
+    "want": "同 state 但 revision 推进也必须通知",
+    "why": "去重键丢掉 revision ⇒ same-application 的 sequence fold 只推进 applied revision 而不改 state，于是新 revision 被当重复事实丢掉，UI 停在旧 revision。「按 operation 去重」的朴素写法正是这个缺陷",
+    "verdict": "RED",
+    "summary": "167/169 passed, numFailedTestSuites=3",
+    "added": [
+      "去重键 operation 去重键含 canonical id / state / result revision 三段",
+      "按 operation / revision 去重 同 state 但 revision 推进也必须通知"
+    ],
+    "gone": [],
+    "hit": [
+      "去重键 operation 去重键含 canonical id / state / result revision 三段",
+      "按 operation / revision 去重 同 state 但 revision 推进也必须通知"
+    ],
+    "added_files": [
+      "workpaperSyncOperationTracker.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  },
+  {
+    "id": "M13",
+    "side": "fe",
+    "want": "content.updated 按 wp_id + revision（AC 11.9），不含 operation",
+    "why": "把 operation 塞进 content.updated 的去重键 ⇒ 同一个 revision 会被投递两次（一次来自 operation 应用、一次来自纯表示升级）。AC 11.9 明文按 `wp_id + revision` 去重",
+    "verdict": "RED",
+    "summary": "168/169 passed, numFailedTestSuites=2",
+    "added": [
+      "去重键 content.updated 按 wp_id + revision（AC 11.9），不含 operation"
+    ],
+    "gone": [],
+    "hit": [
+      "去重键 content.updated 按 wp_id + revision（AC 11.9），不含 operation"
+    ],
+    "added_files": [
+      "workpaperSyncOperationTracker.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 2.7
+  }
+]

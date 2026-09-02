@@ -1,0 +1,169 @@
+[
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_route_table_covers_every_real_user_route",
+    "why": "投影少 6 条路由 ⇒ 那 6 个端点前端永远打不到，而所有「路径模板长得对」的判据仍然全绿（它们只检查已投影的那些）。分母必须是 router 的全部路由",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 0.93s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.7
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_idempotency_key_projection_equals_the_dependant_truth",
+    "why": "把「服务端是否强制」写死成 False ⇒ 必填集变空，前端不再发 header。Task 28 已证明这一侧改动零功能测试失败；判据必须取自 FastAPI 解出的 dependant，不能是一张手抄名单",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 1.01s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 4.0
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_closed_domain_equals_the_backend_enum",
+    "why": "封闭域只投影前三个值 ⇒ 其余状态在前端变成「未知状态」而 fail visible，或（若前端兜底）被静默归类。域必须逐项等于后端 Enum",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 0.95s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.8
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_terminal_set_equals_the_state_machine",
+    "why": "terminal 集被整体误抄成状态域 ⇒ 前端会在 `error` / `accepted` 这类非终态上停止等待并显示「完成」。`error` 可重试（AC 5.8），它绝不能进 terminal 集",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 0.95s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.9
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_confirm_keys_come_from_a_real_confirm_payload_call",
+    "why": "confirm 回传清单改成 descriptor 响应键集 ⇒ 前端会回传 20 项而服务端只比对 10 项，或反过来漏掉改名项 `content_revision`。design §API 的 confirm 是十项，真源只能是 `confirm_payload()` 的真实调用结果",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 0.94s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.8
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_rejection_status_equals_the_single_mapping_point",
+    "why": "把全部拒绝码压成 422 ⇒ 前端把 409（陈旧 identity，三门必须全关）与 403/404/500 全当成「内容不适配」。`classify_materialize_rejection` 是唯一映射点，抄第二份必漂",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 0.96s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.8
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_prefix_template_drops_the_path_converter_but_keeps_all_three_scope_segments",
+    "why": "把 Starlette 的 `:path` 语法留在模板里 ⇒ 前端会拼出字面量 `.../entries/{entry_id:path}` 并拿到统一 404。模板是给 URL 用的，不是给路由声明用的",
+    "verdict": "RED",
+    "summary": "2 failed, 26 passed in 0.94s",
+    "added": [
+      "test_task31_frontend_contract.py::test_check_mode_agrees_with_the_stored_artifact",
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_generated_file_is_fresh"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.8
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_the_callback_route_is_never_projected_to_the_frontend",
+    "why": "让客户端代码里出现 callback 路径 ⇒ callback 是 DocServer 的服务凭证面，响应体是顶层 `{\"error\": N}`（被 ResponseWrapperMiddleware 刻意排除包装），前端解包层套上去必然错一层。判据必须剥掉注释再扫代码 —— 模块 docstring 里**必须**写清「为什么没有 callback 调用面」，裸 `in` 扫源码会假红",
+    "verdict": "RED",
+    "summary": "1 failed, 27 passed in 0.90s",
+    "added": [
+      "test_task31_frontend_contract.py::test_the_callback_route_is_never_projected_to_the_frontend"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task31_frontend_contract.py::test_the_callback_route_is_never_projected_to_the_frontend"
+    ],
+    "added_files": [
+      "test_task31_frontend_contract.py"
+    ],
+    "restored": true,
+    "seconds": 3.7
+  }
+]

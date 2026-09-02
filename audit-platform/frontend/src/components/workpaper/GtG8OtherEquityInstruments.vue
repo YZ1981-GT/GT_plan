@@ -10,6 +10,7 @@
           size="small"
           @change="dualMode.onModeChange"
         />
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-g8-other-equity-instruments" />
         <el-button size="small" @click="openVersionHistory()">版本历史</el-button>
         <el-tag v-if="isHtmlSheet && !dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
       </div>
@@ -174,6 +175,7 @@ import { parseNum } from './composables/useG8FormulaEngine'
 import type { ChecklistResponse } from './composables/useF1FormData'
 import { useWorkpaperReviewThreads } from './composables/useWorkpaperReviewThreads'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const G8TabProcedure = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabProcedure.vue'))
 const G8TabAdjudication = defineAsyncComponent(() => import('./g8-other-equity-instruments/core/G8TabAdjudication.vue'))

@@ -1,0 +1,434 @@
+{
+  "schema_version": "j-cycle-deletion-plan:v1",
+  "task": "Task 52",
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "description": "J 循环的 legacy dual-mode composable 删除清册。🔴 与 D~I 六轮形态最不同的一份：本清册的删除对象**不属于任何 slice entry** —— 唯一的 entry（J1）没有 per-entry dual-mode composable（宿主直连共享基类），而 4 个待删对象全是 J2/J3 两个**非 entry 宿主**的 orphan（AC 1.7 的不可达旧桩）。裁决字段逐条与 backend/data/workpaper_sync_j_cycle_manifest_slice.json 同源（capability 为 null 的待裁决态 + html_counterpart_verdict = exists），本清册不另立判据。",
+  "paradigm_ref": "backend/data/workpaper_sync_migration_paradigm.json",
+  "adjudication_source_of_truth": "backend/data/workpaper_sync_j_cycle_manifest_slice.json#independent_entries",
+  "orphan_source_of_truth": "backend/data/workpaper_sync_j_cycle_manifest_slice.json#orphan_dual_mode_inventory",
+  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
+  "pilot_already_migrated": null,
+  "pilot_already_migrated_note": "🔴 J 循环**没有** pilot，故本键为 null 而不是像 H 那样填一条。实证：四个 pilot 是 B60（Task 40）/ D2（Task 41）/ H1（Task 42）/ G7（Task 43），逐文件读 backend/data/workpaper_sync_contracts/*.json 的 review.entry_id 得 xlsx/b60/gt-b60-bundle / xlsx/gt-d2-accounts-receivable / xlsx/gt-g7-long-term-equity-main / xlsx/gt-h1-fixed-assets，无一条属 J 循环。",
+  "why_this_plan_has_no_entry_scoped_deletion": {
+    "statement": "🔴 本清册的 `entries[]` 里唯一的 entry（xlsx/j1/gt-j1-employee-compensation）的 `legacy_composables_to_delete` 是**空数组**，`action` 是 `update_host_only`。这不是漏填。",
+    "why": "J1 宿主 GtJ1EmployeeCompensation.vue#L110 直接 import 平台共享基类 `useWorkpaperEntryDualMode`（#L170 实例化），**不存在** per-entry 的 useJ1DualMode.ts / useJ1EntryDualMode.ts / composables/workpaper/j1/useJ1DualMode.ts —— 三条路径都不存在（磁盘判据）。legacy_deletion_paradigm 的 step 3（物理删除 legacy composable）对 J1 无对象；适用的是 step 4（宿主 import 改线为 usePilotBridgeAdapter / WorkpaperSyncEditorHost）。",
+    "why_step_5_also_inapplicable": "step 5 是「统一 localStorage 键前缀」。共享基类逐行实读 65 行，`localStorage` 命中数为 **0**（只有 mode/ooAvailable/checking 三个 ref + checkOOHealth + switchMode + onMounted 探测）⇒ J1 没有 `j1-dual-mode:` 之类的键要迁。H/I 循环那 15 个独立实现各自带前缀，判据若写死「必须有 localStorage 前缀要迁」会对 J1 假红。",
+    "verification_recipe": "① 断言三条 per-entry composable 路径都不存在；② 断言宿主里指向共享基类的 import 路径字面量存在（statement-position 口径）；③ 断言共享基类源码里 `localStorage` 命中数为 0；④ 断言本清册该 entry 的 legacy_composables_to_delete 为空且 action == 'update_host_only'。四条都验，缺一即「空数组」无从区分于「忘了填」。"
+  },
+  "shared_base_preserved": {
+    "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+    "lines": 65,
+    "reason": "共享基类被大量非 J 模块使用，按 legacy_deletion_paradigm 的 shared_base_preserved 约束不删。",
+    "statement_position_consumers": 29,
+    "pseudo_string_edges": 5,
+    "pseudo_string_edge_file": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts",
+    "j_cycle_consumers": 3,
+    "j_cycle_consumer_sites": [
+      "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L110",
+      "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts#L7",
+      "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts#L7"
+    ],
+    "remaining_after_this_plan": 26,
+    "remaining_after_this_plan_recipe": "29 − 3 = 26。三条 J 边的消失方式各不相同：J1 宿主那条随 step 4 改线消失；useJ2EntryDualMode / useJ3EntryDualMode 两条随本清册删除文件消失。🔴 计数必须用**窄口径（statement-position）**：宽口径把生成文件的 5 处 JSON snippet 也算进来得 30，于是「删完还剩几个」这个决定「共享基类能不能删」的数就错了 1。",
+    "remaining_consumer_families": {
+      "b_cycle_hosts": 5,
+      "d_cycle_wrappers": 6,
+      "g_cycle_wrappers": 1,
+      "m_cycle_wrappers": 10,
+      "n_cycle_wrappers": 1,
+      "test_only": 3
+    },
+    "remaining_consumer_families_note": "5 + 6 + 1 + 10 + 1 + 3 = 26 ✓（B22A / B22B ControlMatrix / B22B DeficiencyEvaluation / B22C / B50 五个宿主；useD1/D3/D4/D5/D6/D7EntryDualMode 六个 wrapper；useG2DualMode；useM1..M10EntryDualMode 十个；useN2DualMode；b22bControlMatrix.spec.ts 与 useB22BControlMatrix.spec.ts 两个 vi.mock + useWorkpaperEntryDualMode.spec.ts 自测）。守卫按族现算并与本键等值比对 —— 只报总数 26 而不分族，会让「删了 J 之后 D/M 那两族还在不在」查不出来。",
+    "verification_recipe": "对 4 个待删/改线对象逐一断言它们指向共享基类的 import 路径字面量当前**存在**（删除前的前提），并现算共享基类的 statement 边总数 == 29、宽口径 == 30、差集恰是生成文件那一处。两侧都验。"
+  },
+  "host_inlined_second_implementation": {
+    "why_this_key_exists": "H 循环有 4 个宿主没有消费自己的 dual-mode composable、而在宿主里内联了等价实现，于是「删了 composable、测试全绿」不能证明任何事。本任务对 J 循环做同一项实测。",
+    "result": "not_applicable_but_worse",
+    "measured": "3 个宿主逐个实测：J1 宿主**真消费**共享基类（#L110 import + #L170 实例化 + #L10/#L17 模板里用 dualMode.mode / dualMode.switchMode / dualMode.ooAvailable / dualMode.checking / dualMode.resolveOoSheetName 五个成员）；J2 宿主（238 行）与 J3 宿主（210 行）**既不消费任何 dual-mode composable，也没有内联等价实现** —— 两者的 `GtOnlyOfficeSheet` / `el-segmented` / `DualMode` / `localStorage` / 小写 `onlyoffice` 五个 token 各 0 命中。🔴 唯一的非零命中：J3 宿主有 **2** 处大写 `OnlyOffice`（#L65 的注释 `<!-- 兜底 OnlyOffice -->` 与 #L67 的 el-empty 文案 `（将使用 OnlyOffice）`）—— 都是**文案/注释**而非代码，且那条兜底分支实际渲染的是 el-empty 不是 OO 组件。写下来是因为「0 命中」若被写成六个 token 全 0 就是错的，而错一个数会让整条判据失去可信度。",
+    "measured_token_hits": {
+      "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue": {
+        "GtOnlyOfficeSheet": 0,
+        "el-segmented": 0,
+        "DualMode": 0,
+        "localStorage": 0,
+        "onlyoffice": 0,
+        "OnlyOffice": 0
+      },
+      "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue": {
+        "GtOnlyOfficeSheet": 0,
+        "el-segmented": 0,
+        "DualMode": 0,
+        "localStorage": 0,
+        "onlyoffice": 0,
+        "OnlyOffice": 2
+      },
+      "OnlyOffice_hit_sites_in_j3": [
+        "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue#L65",
+        "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue#L67"
+      ]
+    },
+    "why_worse_than_h": "🔴 H 的问题是「宿主自己有一份、composable 那份是死的」；J2/J3 的问题是「**根本没有双模式**，而 composable 那份（两份）是死的」。后果不同：H 删了 composable 后行为不变（因为宿主那份还在）；J2/J3 删了 composable 后行为同样不变，但原因是它们本来就没有 OO 侧 —— 所以「删完行为不变」在 J2/J3 上是**正确的期望**而不是可疑信号。判据必须能表达这个区别，否则「删完全绿」会被当成 H 那种可疑情形而反复返工。",
+    "invariant": "对 J1：宿主里 `dualMode` 的来源必须是共享基类的返回值，且宿主自身不得出现对 `*-dual-mode:` 前缀键的 localStorage 直接读写（实测 0 命中）。对 J2/J3：`measured_token_hits` 登记的每个 token 命中数必须与现算逐个相等（不是「都为 0」—— J3 的 `OnlyOffice` 是 2）—— 两侧都验，任一被打破说明有人给非 entry 宿主偷偷加了 OO 入口而未更新 manifest，或把已登记的文案改掉了。",
+    "hosts": {
+      "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue": {
+        "consumes_dual_mode": true,
+        "dual_mode_source": "shared_base",
+        "import_site": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L110",
+        "instantiate_site": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L170",
+        "oo_mount_site": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L17",
+        "segmented_site": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L10",
+        "inlined_second_implementation": false,
+        "localStorage_hits": 0
+      },
+      "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue": {
+        "consumes_dual_mode": false,
+        "dual_mode_source": null,
+        "oo_mount_site": null,
+        "segmented_site": null,
+        "inlined_second_implementation": false,
+        "localStorage_hits": 0,
+        "onlyoffice_string_hits": 0
+      },
+      "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue": {
+        "consumes_dual_mode": false,
+        "dual_mode_source": null,
+        "oo_mount_site": null,
+        "segmented_site": null,
+        "inlined_second_implementation": false,
+        "localStorage_hits": 0,
+        "onlyoffice_string_hits": 0
+      }
+    }
+  },
+  "orphan_dual_mode_to_delete": {
+    "why_this_key_exists": "🔴 本清册的**真正删除对象**在这里，而不在 `entries[]` 里 —— 4 个 orphan dual-mode composable 属 J2/J3 两个非 entry 宿主，按 AC 1.7「不可达旧桩 SHALL 删除；不得以豁免或 DEPRECATED 注释长期保留」必须删。把它们塞进 `entries[]` 会造出假 entry（违反 slice 的 selection_rule 可复算性），所以另立本键。",
+    "in_scope_of_this_deletion_plan": true,
+    "ac_reference": "1.7",
+    "modules": [
+      {
+        "id": "OD-1",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useJ2EntryDualMode.ts",
+        "type": "orphan_dual_mode_wrapper_of_shared_base",
+        "lines": 41,
+        "orphan_order": "first_order",
+        "wraps_shared_base": true,
+        "consumers": [],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": null,
+        "action": "delete_file",
+        "action_side_effects": [
+          "共享基类的 statement 消费边 29 → 28"
+        ],
+        "blocking_risk": "none",
+        "blocking_risk_why": "生产与测试边都是 0 ⇒ 删除不会让任何 import 失效、不需要同步改任何 spec 的 vi.mock 路径（与 I1 那条不同：I1 的 spec 有 `vi.mock('../composables/useI1DualMode')`，删除时必须同步改否则 vitest 报 Cannot find module）。",
+        "extra_finding": "🔴 它的 `J2_SHEET_MAP`（#L14，8 条）目标 sheet 名与权威模板 `J2 长期应付职工薪酬-设定受益计划净资产.xlsx` 的 9 张 sheet **交集为空** —— 即便被接起来也是错的。这条写下来是为了让「删掉它」不被误读为「丢失了 sheet 映射能力」：那份能力从来不正确。"
+      },
+      {
+        "id": "OD-2",
+        "file": "audit-platform/frontend/src/components/workpaper/composables/useJ3EntryDualMode.ts",
+        "type": "orphan_dual_mode_wrapper_of_shared_base",
+        "lines": 37,
+        "orphan_order": "first_order",
+        "wraps_shared_base": true,
+        "consumers": [],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": null,
+        "localStorage_prefix": null,
+        "action": "delete_file",
+        "action_side_effects": [
+          "共享基类的 statement 消费边 28 → 27"
+        ],
+        "blocking_risk": "none",
+        "blocking_risk_why": "同 OD-1，生产与测试边都是 0。",
+        "extra_finding": "🔴 `J3_SHEET_MAP`（#L14，4 条）目标与 `J3 股份支付.xlsx` 的 6 张 sheet 交集为空。"
+      },
+      {
+        "id": "OD-3",
+        "file": "audit-platform/frontend/src/composables/workpaper/j2/useJ2DualMode.ts",
+        "type": "orphan_dual_mode_standalone_behind_orphan_barrel",
+        "lines": 35,
+        "orphan_order": "second_order",
+        "wraps_shared_base": false,
+        "consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L11"
+        ],
+        "test_only_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j2/__tests__/j2Components.spec.ts#L13"
+        ],
+        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
+        "barrel_inbound_edges": 0,
+        "localStorage_prefix": null,
+        "action": "delete_file_and_drop_barrel_reexport_and_update_spec",
+        "action_side_effects": [
+          "必须同步删掉 `composables/workpaper/j2/index.ts#L11` 的 `export { useJ2DualMode } from './useJ2DualMode'`（否则 barrel 编译失败）",
+          "必须同步改 `composables/workpaper/j2/__tests__/j2Components.spec.ts#L13` 的 import（否则 vitest 报 Cannot find module）"
+        ],
+        "blocking_risk": "low",
+        "blocking_risk_why": "🔴 唯一的生产边指向的 barrel 自身入边为 0（全仓没有任何文件 import `@/composables/workpaper/j2`；J2 宿主与 6 个子 Tab 都走逐模块深链）⇒ 删除不影响任何真实渲染路径。但**必须同时**处理 barrel re-export 与 spec import，否则删除动作本身会把构建/测试打红 —— 这与 OD-1/OD-2 的「零连带」不同，是本清册里唯一需要三处协同的删除。",
+        "extra_finding": "该模块与共享基类零关系（不 import 它），是一份自成体系的 mode 状态机（无 OO 健康探测、无 sheet 名解析、无持久化）。删掉它不减少任何能力。"
+      },
+      {
+        "id": "OD-4",
+        "file": "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts",
+        "type": "orphan_dual_mode_standalone_behind_orphan_barrel",
+        "lines": 39,
+        "orphan_order": "second_order",
+        "wraps_shared_base": false,
+        "consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j3/index.ts#L7"
+        ],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j3/index.ts",
+        "barrel_inbound_edges": 0,
+        "localStorage_prefix": null,
+        "action": "delete_file_and_drop_barrel_reexport",
+        "action_side_effects": [
+          "必须同步删掉 `composables/workpaper/j3/index.ts#L7` 的 `export * from './useJ3DualMode'`（否则 barrel 编译失败）"
+        ],
+        "blocking_risk": "low",
+        "blocking_risk_why": "barrel 入边 0；无测试边 ⇒ 只需两处协同（文件 + barrel）。",
+        "extra_finding": "🔴 **它直调 legacy 端点**：`http.get('/api/workpapers/onlyoffice/health')`（#L25），命中 legacy_deletion_paradigm step 6 明禁项「该端点的调用只能通过 sync bridge 的 materialize 协议」。现在无危害只因不可达；顺着 barrel 接起来就是一条绕过 bridge 的旁路 ⇒ 删除的优先级高于 OD-1/OD-2/OD-3。",
+        "legacy_endpoint_direct_call_source": "audit-platform/frontend/src/composables/workpaper/j3/useJ3DualMode.ts#L25"
+      }
+    ],
+    "orphan_barrels": [
+      {
+        "file": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
+        "lines": 16,
+        "inbound_edges": 0,
+        "reexports": 11,
+        "action": "keep_but_drop_the_dual_mode_reexport",
+        "why_not_delete_the_barrel": "🔴 barrel 本身入边为 0（也是死代码），但删它会连带 11 条 re-export 里的其余 10 个模块（useJ2FormData / useJ2CrossSheet / useJ2Adjudication / useJ2Detail / useJ2AccrualCheck / useJ2Disclosure / useJ2ImportExport / useJ2Integration / useJ2FormulaEngine / useJ2ActuarialEngine）的可达性判定 —— 其中 useJ2ActuarialEngine 与 useJ2FormulaEngine 各有 PBT 测试边（`__tests__/useJ2FormulaEngine.pbt.spec.ts`），删 barrel 不会打破它们但会改变「哪些模块只剩测试边」的清单。本任务只负责 dual-mode 那一条 re-export；整个 barrel 的存废是 BP-7 的对象。",
+        "inbound_edge_recipe": "🔴 判 barrel 入边**必须用路径解析口径**（把 import spec 解析成绝对文件路径再比对），不能用「模块 stem 相等」口径 —— 后者会把 `services/apiPaths.ts#L16/L17` 的 `export * from './apiPaths/index'` 误命中成 j2/j3 barrel 的入边（实测：stem 口径各得 2 条假边，路径解析口径得 0 条）。"
+      },
+      {
+        "file": "audit-platform/frontend/src/composables/workpaper/j3/index.ts",
+        "lines": 9,
+        "inbound_edges": 0,
+        "reexports": 9,
+        "action": "keep_but_drop_the_dual_mode_reexport",
+        "why_not_delete_the_barrel": "同上。该 barrel re-export 的 9 个模块里 `useJ3ImportExport` 有一条**真实生产边**（`components/workpaper/j3/core/J3TabDetail.vue#L16` 走 `@/composables/workpaper/j3/useJ3ImportExport` 深链），`useJ3FormulaEngine` / `useJ3OptionPricingEngine` 各有测试边 ⇒ 该目录**不是**整片死代码，删 barrel 需要逐模块重新判定。",
+        "inbound_edge_recipe": "同 j2 barrel：入边必须用**路径解析口径**（把 import spec 解析成绝对文件路径再比对）。stem 相等口径会把 `services/apiPaths.ts` 的 `export * from './apiPaths/index'` 误命中（实测各得 2 条假边）。"
+      }
+    ],
+    "counters": {
+      "modules_to_delete": 4,
+      "first_order": 2,
+      "second_order": 2,
+      "total_lines_to_delete": 152,
+      "barrel_reexports_to_drop": 2,
+      "spec_files_requiring_sync_change": 1,
+      "modules_with_zero_side_effect_deletion": 2,
+      "modules_with_broken_sheet_map": 2,
+      "modules_with_legacy_endpoint_direct_call": 1,
+      "counting_recipe": "守卫从 modules[] 现算全部计数并与本键等值比对：modules_to_delete = len(modules)；first_order / second_order 按 orphan_order 现算；total_lines_to_delete = Σ lines（41 + 37 + 35 + 39 = 152，且每条 lines 必须等于 splitlines() 的真长度）；barrel_reexports_to_drop = action 含 'drop_barrel_reexport' 的条数；spec_files_requiring_sync_change = Σ len(test_only_consumers)；modules_with_zero_side_effect_deletion = blocking_risk == 'none' 的条数；modules_with_broken_sheet_map = extra_finding 里 sheet map 交集为空的条数（OD-1/OD-2，由 slice 的 sheet_map_defect 字段现算）；modules_with_legacy_endpoint_direct_call = legacy_endpoint_direct_call_source 非空的条数。"
+    }
+  },
+  "lookalike_carriers_not_in_scope": {
+    "why_this_key_exists": "🔴 这一节**不是**删除清单，是「删除/改线时最容易误接的东西」清单（沿用 I 循环 BP-5 的形态）。两个 FormData composable 生产可达性同样为零（只经孤立 barrel），却各含完整持久化管道，长得比真载体更像载体。",
+    "in_scope_of_this_deletion_plan": false,
+    "why_not_in_scope": "它们是持久化载体而非 legacy dual-mode 实现，不在 legacy_deletion_paradigm step 3 的删除对象内；且 `useJ2FormData.writebackTB` / `publishAdjudicated` 的逻辑将来可能被真实 adapter 复用 ⇒ 删或留的决定不由本任务下，登记为 slice 的 BP-7。",
+    "modules": [
+      {
+        "module": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts",
+        "lines": 152,
+        "production_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L4"
+        ],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
+        "barrel_inbound_edges": 0,
+        "pipeline_it_contains": [
+          "GET /api/workpapers/{wpId}/render-config (#L51)",
+          "PUT /api/workpapers/{wpId}/checklist-responses (#L90)",
+          "POST /api/projects/{projectId}/trial-balance/writeback (#L102)",
+          "POST /api/projects/{projectId}/events/publish (#L117)"
+        ],
+        "fabricated_transport_key_form": "item_id: `J2-${key}`",
+        "fabricated_transport_key_source": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
+        "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue#L110（宿主经 useChecklistPersistence，六个子 Tab 的字面量 KEY 对象）",
+        "must_not_wire_to": true,
+        "must_not_wire_to_why": "接到它身上 ⇒ 宿主行为一点不变（不可达）而契约按一套从未存在过的键形态生成，且「文件确实被改了」会让常规守卫全绿 —— 假绿第①源（additive 注入即死代码）的最贵形态。"
+      },
+      {
+        "module": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts",
+        "lines": 151,
+        "production_consumers": [
+          "audit-platform/frontend/src/composables/workpaper/j3/index.ts#L3",
+          "audit-platform/frontend/src/composables/workpaper/j3/useJ3Detail.ts#L20",
+          "audit-platform/frontend/src/composables/workpaper/j3/useJ3Integration.ts#L17"
+        ],
+        "test_only_consumers": [],
+        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j3/index.ts",
+        "barrel_inbound_edges": 0,
+        "transitive_consumers_also_barrel_only": [
+          "audit-platform/frontend/src/composables/workpaper/j3/useJ3Detail.ts",
+          "audit-platform/frontend/src/composables/workpaper/j3/useJ3Integration.ts"
+        ],
+        "transitive_note": "🔴 它有 3 条入边而不是 1 条，但另两条来自 `useJ3Detail`（自身入边 1 = 只有 barrel）与 `useJ3Integration`（自身入边 **0**）⇒ 三者构成只经孤立 barrel 相连的簇。判据不能只看一层。**不宣称**整个 `composables/workpaper/j3/` 都是死的：同目录的 `useJ3ImportExport.ts` 有一条真实生产边。",
+        "pipeline_it_contains": [
+          "GET /api/workpapers/{wpId}/render-config (#L61)",
+          "PUT /api/workpapers/{wpId}/checklist-responses (#L99)"
+        ],
+        "fabricated_transport_key_form": "item_id: `J3-${key}`",
+        "fabricated_transport_key_source": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts#L96",
+        "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/j3/GtJ3ShareBasedPayment.vue#L87（宿主经 useChecklistPersistence，四个子 Tab 的字面量 KEY 对象）",
+        "must_not_wire_to": true,
+        "must_not_wire_to_why": "同上。"
+      }
+    ],
+    "verification_recipe": "判消费方一律用 statement-position import 路径字面量三形态之一：`from '<...mod>'` / `import('<...mod>')` / `vi.mock('<...mod>')`，并排除落在双引号字符串里的匹配（JD-6 形态）。**两侧都断言**：声称只经 barrel 的真只经 barrel（barrel 入边用路径解析口径算得 0），声称有 N 条入边的真有 N 条。"
+  },
+  "pseudo_consumer_edges": {
+    "why_this_key_exists": "🔴 J 循环的伪消费边形态与 I 循环不同：I 是「注释里提及模块名」（符号名口径会误报），J 是「生成数据文件里的 JSON `\"snippet\"` 字符串含完整的 `from '...'` 形态」（**路径字面量口径也会误报**）。删除时若据此认为共享基类还有 30 个消费方，剩余计数就错 1；反过来若把生成文件当真消费方去改它，会与生成器打架。",
+    "edges": [
+      {
+        "mentioned_module": "useWorkpaperEntryDualMode",
+        "mentioned_in": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1319",
+        "text": "\"snippet\": \"import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'\"",
+        "is_import_edge": false,
+        "why_not": "该匹配位于 JSON 对象的 `\"snippet\"` 字符串值内（同一行内其前的未转义双引号个数为奇数）"
+      },
+      {
+        "mentioned_module": "useWorkpaperEntryDualMode",
+        "mentioned_in": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1353",
+        "text": "\"snippet\": \"import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'\"",
+        "is_import_edge": false,
+        "why_not": "同上"
+      },
+      {
+        "mentioned_module": "useWorkpaperEntryDualMode",
+        "mentioned_in": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1387",
+        "text": "\"snippet\": \"import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'\"",
+        "is_import_edge": false,
+        "why_not": "同上"
+      },
+      {
+        "mentioned_module": "useWorkpaperEntryDualMode",
+        "mentioned_in": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1421",
+        "text": "\"snippet\": \"import { useWorkpaperEntryDualMode } from './composables/useWorkpaperEntryDualMode'\"",
+        "is_import_edge": false,
+        "why_not": "同上"
+      },
+      {
+        "mentioned_module": "useWorkpaperEntryDualMode",
+        "mentioned_in": "audit-platform/frontend/src/components/workpaper/sync/workpaperSyncLegacyBaseline.generated.ts#L1477",
+        "text": "\"snippet\": \"import { useWorkpaperEntryDualMode, type WorkpaperRenderMode } from './composables/useWorkpaperEntryDualMode'\"",
+        "is_import_edge": false,
+        "why_not": "同上；本条的 snippet 还带 `type WorkpaperRenderMode` ⇒ 与前四条不是同一字符串，判据不得用「5 条完全相同」这类脆弱形态"
+      }
+    ],
+    "verification_recipe": "对这 5 处**反向断言**：该文件里 `useWorkpaperEntryDualMode` 的子串命中数 > 0（伪边确实存在，不是判据自说自话）**且** statement-position 口径下该文件的 import 边数 == 0。守卫两侧都验，否则判据回到宽口径。",
+    "counters": {
+      "pseudo_edges": 5,
+      "pseudo_edge_files": 1,
+      "wide_scope_consumer_count": 30,
+      "statement_position_consumer_count": 29,
+      "counting_recipe": "守卫现算：宽口径（逐文件命中即计）== 30、窄口径 == 29、差集 == {workpaperSyncLegacyBaseline.generated.ts}；本文件的 pseudo_edges 条数 == 该文件内的匹配次数 5。"
+    }
+  },
+  "entries": [
+    {
+      "entry_id": "xlsx/j1/gt-j1-employee-compensation",
+      "wp_code_pattern": "J1E",
+      "host_component": "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue",
+      "capability_adjudication": null,
+      "capability_verdict_stage": "pipeline_entry_pending_definition_delivery",
+      "capability_target": "bidirectional",
+      "html_counterpart_verdict": "exists",
+      "adjudication_reason": "按 AC 12.8 的真判据（有无 HTML 对端）实测：本 entry 的业务内容真实存在于 checklist_responses —— primary managed table 是三个键 `J1-2-detail-{shortTerm,postEmployment,severance}`（owner 常量 STORAGE_KEY_PREFIX 在 useJ1Detail.ts#L108，经 storageKey() #L110 派生；行身份字段 id 由 #L127 生成式产出），写路径是宿主的平台级共享适配器 useChecklistPersistence（#L105 import / #L213 handleChildSave / 适配器 #L182 api.put）加 7 个子 Tab 的 8 处 http.put 直写，读路径是 persistence.load()（适配器 #L263）+ render-config 快照基线。后端 checklist_responses 路由 GET(#L84)/PUT(#L132) 真实存在 ⇒ verdict = exists，不得裁 single_onlyoffice。",
+      "html_counterpart_source_refs": [
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L105",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L186",
+        "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L213",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L182",
+        "audit-platform/frontend/src/composables/workpaper/useChecklistPersistence.ts#L263",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L108",
+        "audit-platform/frontend/src/composables/workpaper/j1/useJ1Detail.ts#L247",
+        "backend/app/routers/checklist_responses.py#L132"
+      ],
+      "legacy_composables_to_delete": [],
+      "legacy_composables_to_delete_note": "🔴 空数组是**实测结论**不是漏填：J1 没有 per-entry dual-mode composable（三条候选路径都不存在），宿主 #L110 直连共享基类。见 why_this_plan_has_no_entry_scoped_deletion 的四条验证配方。",
+      "legacy_composables_preserved": [
+        {
+          "file": "audit-platform/frontend/src/components/workpaper/composables/useWorkpaperEntryDualMode.ts",
+          "why": "平台共享基类，删完 J 循环三条边后仍有 26 个消费方 ⇒ 按 shared_base_preserved 约束不删。J1 的改线动作是把宿主的 import 从它换成 bridge adapter，而不是删它。"
+        }
+      ],
+      "localStorage_prefix": null,
+      "localStorage_prefix_note": "共享基类零 localStorage（实测 0 命中）⇒ legacy_deletion_paradigm step 5 对本 entry 不适用。",
+      "action": "update_host_only",
+      "action_detail": "step 4：把宿主 #L110 的 `import { useWorkpaperEntryDualMode } from '../composables/useWorkpaperEntryDualMode'` 与 #L170 的实例化改为 usePilotBridgeAdapter / WorkpaperSyncEditorHost，宿主只传 entryId/wpId/sheetName + flush/reload 回调；#L10 的 el-segmented 与 #L11-15 的三个 el-tag 由 bridge 的模式可见性门控接管（同时兑现 BP-10 的二级门控与 AC 1.4 的可操作原因）。",
+      "must_fix_before_wiring": [
+        "BP-5：收敛 7 个子 Tab 的 8 处 http.put 直写，否则 adapter 只覆盖一半写入",
+        "BP-8：修 useJ1Detail.ts#L87 的行标签与 #L181 / J1TabAdjustment.vue#L59 的位置化兜底，否则错值固化进契约",
+        "BP-11：收敛 J1-2 传输键的两份真源，否则契约看不见读方"
+      ],
+      "must_not_wire_to": [
+        "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts",
+        "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts"
+      ],
+      "must_not_wire_to_why": "两者生产可达性为 0 且键形态是 `J2-${key}` / `J3-${key}`（从未在生产写过）—— 接到它们身上会得到「文件改了、守卫全绿、行为不变」的假绿。它们也不属本 entry（J2/J3 非 entry 宿主的载体）。",
+      "extra_ui_action_required": "🔴 本 entry 的工具栏 el-segmented（#L10）**没有** `v-if=\"dualMode.ooAvailable.value\"` 二级门控（与 I2 同型），且宿主未挂 GtEntrySyncCapabilityNotice ⇒ 改线时必须同时补上 AC 1.4 的可操作原因（常显摘要 + tooltip 细节，挂载点落在 `.j1-dual-mode-bar` 区块内）与二级门控，否则删了 legacy 而假双向的界面照旧。见 BP-10。"
+    }
+  ],
+  "excluded_from_plan": [
+    {
+      "what": "3 个 J 宿主目录下的 **37** 个非宿主生产组件（j1/ 21 个 + j2/ 9 个 + j3/ 7 个；口径 = 各目录递归 .ts/.vue 生产文件减去宿主自身）",
+      "reason": "它们是同一 entry 内的 sheet 分发组件与表格/对话框子件，不持有 dual-mode 状态（模式由宿主统一管）。唯一例外 `j1/inspection/J1TabGeneralCheck.vue` 自己有一个 GtOnlyOfficeSheet 挂载点，故被 manifest 枚举成 parent_duplicate 子入口（`xlsx/j1/inspection/j1-tab-general-check`）—— 按 AC 1.6 它复用父 entry 的 adapter、不独立计数、不单独删除。",
+      "verified_how": "断言除 J1TabGeneralCheck.vue 外，其余子 Tab 都不在 manifest 的 186 条 entry 的 host_path 集合里。"
+    },
+    {
+      "what": "`composables/workpaper/j1/` 下的 18 个业务 composable（useJ1Detail / useJ1Adjudication / useJ1DisclosureSections / …）与 `components/workpaper/composables/` 下的 3 个 j1* 模块",
+      "reason": "它们是持久化与联动载体（J1 的真载体），**绝不能删**。useJ1Detail 是 primary managed table 的 owner（TK-1），useJ1Adjudication 是第二份键声明的 owner（BP-11），j1NoteSectionMap 是底稿→附注同步的载荷构造者。",
+      "verified_how": "断言 useJ1Detail / useJ1Adjudication 各有 ≥ 2 条真实生产边（J1TabDetail.vue + J1DetailSection.vue / useJ1DisclosureSections.ts）。"
+    },
+    {
+      "what": "`composables/workpaper/j2/` 与 `j3/` 下除 dual-mode 与 barrel 外的 **19** 个模块（j2 10 个 + j3 9 个；j2 目录共 12 文件 = barrel 1 + dual 1 + 其余 10，j3 共 11 = 1 + 1 + 9），以及两个 barrel `index.ts` 本身",
+      "reason": "本清册只处理 dual-mode 那两条 re-export；barrel 与其余模块的存废由 BP-7 承接（其中 `useJ3ImportExport` 有真实生产边、`useJ2ActuarialEngine` / `useJ2FormulaEngine` / `useJ3FormulaEngine` / `useJ3OptionPricingEngine` 有 PBT 测试边 ⇒ 不是整片死代码，需逐模块重判）。",
+      "verified_how": "断言 `useJ3ImportExport.ts` 有一条来自 `components/workpaper/j3/core/J3TabDetail.vue` 的真实生产边（否则「不是整片死代码」这句成了自述）。"
+    },
+    {
+      "what": "共享基类 `useWorkpaperEntryDualMode.ts` 与它的 26 个非 J 消费方",
+      "reason": "shared_base_preserved 约束。本清册只记录它的 J 循环边数（3）与删完后的剩余数（26），不动它的字节。",
+      "verified_how": "现算 statement 边总数 == 29、J 循环贡献 == 3、按族分解 == {5,6,1,10,1,3} 且和为 26。"
+    }
+  ],
+  "counters": {
+    "entries": 1,
+    "composables_to_delete_entry_scoped": 0,
+    "composables_preserved": 1,
+    "orphan_dual_mode_to_delete": 4,
+    "orphan_dual_mode_lines_total": 152,
+    "orphan_barrel_reexports_to_drop": 2,
+    "lookalike_persistence_carriers": 2,
+    "pseudo_consumer_edges": 5,
+    "hosts_with_inlined_second_implementation": 0,
+    "hosts_without_any_dual_mode": 2,
+    "test_files_requiring_sync_change": 1,
+    "entries_with_extra_ui_action_required": 1,
+    "entries_with_must_fix_before_wiring": 1,
+    "entries_with_must_not_wire_to": 1,
+    "shared_base_consumers_before": 29,
+    "shared_base_consumers_after": 26,
+    "counting_recipe": "守卫从各节现算全部计数并与本键等值比对（抄错或凑数即红）：entries = len(entries)；composables_to_delete_entry_scoped = Σ len(entries[].legacy_composables_to_delete)（= 0，且必须与 why_this_plan_has_no_entry_scoped_deletion 的四条磁盘判据一致）；composables_preserved = Σ len(entries[].legacy_composables_preserved)；orphan_dual_mode_to_delete = len(orphan_dual_mode_to_delete.modules)；orphan_dual_mode_lines_total = Σ modules[].lines 且每条等于该文件 splitlines() 的真长度；orphan_barrel_reexports_to_drop = action 含 'drop_barrel_reexport' 的条数；lookalike_persistence_carriers = len(lookalike_carriers_not_in_scope.modules)；pseudo_consumer_edges = len(pseudo_consumer_edges.edges)；hosts_with_inlined_second_implementation = host_inlined_second_implementation.hosts 里 inlined_second_implementation == true 的条数；hosts_without_any_dual_mode = consumes_dual_mode == false 的条数；test_files_requiring_sync_change = Σ len(orphan_dual_mode_to_delete.modules[].test_only_consumers)；shared_base_consumers_before/after 现算（29 / 29 − 3）。"
+  },
+  "properties_verified": [3, 20, 69, 70],
+  "requirements_covered": [
+    "1.4",
+    "1.5",
+    "1.7",
+    "6.1",
+    "11.1",
+    "11.5",
+    "12.1",
+    "12.4",
+    "12.8",
+    "12.9",
+    "12.10",
+    "12.11",
+    "12.12",
+    "14.1"
+  ]
+}

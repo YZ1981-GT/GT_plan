@@ -1,0 +1,102 @@
+[
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_with_three_way_input_is_judged_by_the_oracle",
+    "why": "merge 家族与 conflict 家族的 oracle 分派错位 ⇒ P25 的场景会用 P26 的判据（要求同字段冲突），互相把对方判失败",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.81s",
+    "added": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_with_three_way_input_is_judged_by_the_oracle"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestNoRealOnlyOfficeMeansUnverifiable::test_a_merge_scenario_with_three_way_input_is_judged_by_the_oracle"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M16",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_a_conflict_appears",
+    "why": "不同字段并行修改产生冲突也算通过 ⇒ P25 的核心判据（conflict_count=0）失效。首轮 GREEN 的原因是判据用的三方本来就零冲突 ⇒ 该分支在真实数据上不可达 ——必须专门构造一份会冲突的三方（真实数据上分支不可达 = 永久 GREEN）",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.54s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_a_conflict_appears"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_a_conflict_appears"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.8
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_the_incoming_side_is_lost",
+    "why": "不再检查 incoming 侧是否被采纳 ⇒ 「current 整体保留」也算自动合并。首轮 GREEN 的原因是只测了 current 侧那一半 —— 两侧必须成对",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.31s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_the_incoming_side_is_lost"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty25DifferentFieldMergeOracle::test_oracle_fails_when_the_incoming_side_is_lost"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_the_three_conflict_values_do_not_match_the_inputs",
+    "why": "冲突三值不再与输入逐一比对 ⇒ 裁决界面可能显示错值而守卫全绿（P26 的「冲突三值完整」）。首轮 GREEN 的原因是没有任何判据构造过「三值与输入不一致」的冲突记录",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.24s",
+    "added": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_the_three_conflict_values_do_not_match_the_inputs"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestProperty26SameFieldConflictOracle::test_oracle_fails_when_the_three_conflict_values_do_not_match_the_inputs"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task39_pilot_harness.py::TestTimelineOracle::test_a_recovery_scenario_is_judged_against_the_recovery_order",
+    "why": "recovery 场景改用 OO→HTML 的时序序列 ⇒ AC 14.8 为 no-userdata crash 单列的`incoming durable < recovery case(no operation) < claim` 不再被检查。首轮 GREEN 的原因是判据只比「行结果 == decision 结果」——两者一起变，必须落到「喂 recovery 序列必 passed / 喂 OO 序列必缺阶段」",
+    "verdict": "RED",
+    "summary": "1 failed, 104 passed in 10.30s",
+    "added": [
+      "test_task39_pilot_harness.py::TestTimelineOracle::test_a_recovery_scenario_is_judged_against_the_recovery_order"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task39_pilot_harness.py::TestTimelineOracle::test_a_recovery_scenario_is_judged_against_the_recovery_order"
+    ],
+    "added_files": [
+      "test_task39_pilot_harness.py"
+    ],
+    "restored": true,
+    "seconds": 13.5
+  }
+]

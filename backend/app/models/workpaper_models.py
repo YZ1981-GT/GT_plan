@@ -293,6 +293,26 @@ class WorkingPaper(Base):
     file_version: Mapped[int] = mapped_column(
         sa.Integer, server_default=text("1"), nullable=False
     )
+    # ─── V151 / spec workpaper-html-onlyoffice-bidirectional-writeback-closure ───
+    #
+    # 唯一 business content revision 域（Requirement 2.1）。V151 用
+    # `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` 加了这两列，但 ORM 侧一直没声明 ——
+    # 于是任何用 `Base.metadata.create_all` 建库的测试（SQLite in-memory）里这两列
+    # **根本不存在**，读它的代码报 `no such column: content_revision`。Task 19 把
+    # 上传/WOPI/custom 迁进统一 revision 域后必须补上，否则迁移后的写路径在
+    # metadata 建库的环境里恒炸（Task 19 实测到这一点）。
+    #
+    # 🔴 `current_content_version_id` 刻意**不声明 ForeignKey**：目标表
+    # `working_paper_content_version` 定义在 `workpaper_sync_models`，而那个模块并非
+    # 所有 `create_all` 场景都会被 import。声明 FK 会让未 import 它的场景在
+    # `create_all` 阶段 NoReferencedTableError —— 真正的 FK 约束由 V151
+    # (`fk_wp_current_content_version`) 在数据库侧持有，那才是权威。
+    content_revision: Mapped[int] = mapped_column(
+        sa.BigInteger, server_default=text("0"), nullable=False
+    )
+    current_content_version_id: Mapped[uuid.UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), nullable=True
+    )
     last_parsed_at: Mapped[datetime | None] = mapped_column(nullable=True)
     parsed_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     prefill_stale: Mapped[bool] = mapped_column(

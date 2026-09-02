@@ -1,0 +1,99 @@
+[
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes",
+    "why": "静态看表达式里有没有 `st_mtime` 会被注释/间接 helper 骗过（rooms.py 已记录过同一个坑）。判据要求 xlsx provider 必须是 `probe_kind == behavioral`",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 65.52s (0:01:05)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestCrossRulesRunAgainstTheRealManifest::test_rg17_exercises_two_distinct_branches_on_real_data",
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestSourceFactsAreObservedNotAssumed::test_doc_key_provider_probe_finds_both_real_routes"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 68.5
+  },
+  {
+    "id": "M17",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestProfileParticipatesInTheManifestDigest::test_flipping_a_profile_field_changes_both_digests",
+    "why": "Requirement 1.2 要求「source-backed 字段与来源摘要进入 manifest digest」。字段不进摘要 ⇒ profile 变了 evidence 不会 stale（design 的 stale policy 失效）",
+    "verdict": "RED",
+    "summary": "2 failed, 287 passed in 69.01s (0:01:09)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestProfileParticipatesInTheManifestDigest::test_flipping_a_profile_field_changes_both_digests",
+      "test_workpaper_sync_manifest_contract.py::test_manifest_and_frontend_projection_are_current"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestProfileParticipatesInTheManifestDigest::test_flipping_a_profile_field_changes_both_digests"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py",
+      "test_workpaper_sync_manifest_contract.py"
+    ],
+    "restored": true,
+    "seconds": 72.2
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reviewed_expectation_mismatch_is_rejected",
+    "why": "双向锁死的一半：复核过的取值域与源码推导值必须逐条相等。短路后 overlay 变成一段无人核对的说明文字（AC 1.2 明禁自由文本决定 profile）",
+    "verdict": "GREEN",
+    "summary": "289 passed in 66.04s (0:01:06)",
+    "added": [],
+    "gone": [],
+    "hit": [],
+    "added_files": [],
+    "restored": true,
+    "seconds": 69.2
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected",
+    "why": "双向锁死的另一半：复核过但已无人派生的取值必须打红，否则 overlay 会攒下一堆描述早已不存在的源码形态的「批准」",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 65.77s (0:01:05)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_stale_reviewed_expectation_is_rejected"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 68.8
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree",
+    "why": "这条是 `editability=unreachable` 唯一的独立复核：源码入边为 0 ↔ overlay unreachable_rule 必须同时成立。短路后 Requirement 1.7 的裁决无人交叉验证",
+    "verdict": "RED",
+    "summary": "1 failed, 288 passed in 65.13s (0:01:05)",
+    "added": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task73_entry_profile_manifest.py::TestGeneratorFailsClosed::test_reachability_and_reviewed_unreachable_rule_must_agree"
+    ],
+    "added_files": [
+      "test_task73_entry_profile_manifest.py"
+    ],
+    "restored": true,
+    "seconds": 68.2
+  }
+]

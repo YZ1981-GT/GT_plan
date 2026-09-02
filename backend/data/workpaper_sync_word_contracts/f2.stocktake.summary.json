@@ -1,0 +1,164 @@
+{
+  "schema_version": "contract-definition:v1",
+  "contract_id": "f2.stocktake.summary",
+  "semantic_version": "1.0.0",
+  "review_status": "reviewed",
+  "document_type": "docx",
+  "template": {
+    "relative_path": "F/F2-23 存货监盘小结.docx",
+    "template_sha256": "09106818415ea72d51d14441b4f3fa544c8ae7d8a1f20b5b1f6956bc9232b080",
+    "normalized_structure_hash": "9aacc31e205bdf5b905f92456ceea0fd5e017f91627b062701acb193a45c4623"
+  },
+  "template_definition_sha256": "e9ba184095b9934c300e1aba7dac299d9eb6513dc38675dbe3d42c05fedf1cec",
+  "instrumentation_definition_sha256": "c6c37aa7000e7c7bff3471e044c58647c9f2d5bbd6496bf4f01d04c016c08941",
+  "identity_carriers": [
+    "field_sdt_block",
+    "field_sdt_inline"
+  ],
+  "fields": [
+    {
+      "stable_field_key": "summary/entity_name",
+      "json_pointer": "/entityName",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p01+04:${entityName}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/entity_name",
+      "instances": "many"
+    },
+    {
+      "stable_field_key": "summary/audit_year",
+      "json_pointer": "/auditYear",
+      "mode": "editable",
+      "value_type": "integer",
+      "source_ref": "F2-23!p02:${auditYear}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/audit_year",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/bs_date",
+      "json_pointer": "/bsDate",
+      "mode": "editable",
+      "value_type": "date",
+      "source_ref": "F2-23!p04:${bsDate}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/bs_date",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/purpose",
+      "json_pointer": "/purpose",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p06:${purpose}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/purpose",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/scope",
+      "json_pointer": "/scope",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p08:${scope}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/scope",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/warehouses",
+      "json_pointer": "/warehouses",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p10:${warehouses}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/warehouses",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/count_date",
+      "json_pointer": "/countDate",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p12:${countDate}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/count_date",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/client_staff",
+      "json_pointer": "/clientStaff",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p14:${clientStaff}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/client_staff",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/auditors",
+      "json_pointer": "/auditors",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p15:${auditors}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/auditors",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/assignment",
+      "json_pointer": "/assignment",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p17:${assignment}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/assignment",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/count_method",
+      "json_pointer": "/countMethod",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p19:${countMethod}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/count_method",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/summary_block",
+      "json_pointer": "/summaryBlock",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p21:${summaryBlock}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/summary_block",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/result_by_location",
+      "json_pointer": "/resultByLocation",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p23:${resultByLocation}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/result_by_location",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/conclusion",
+      "json_pointer": "/conclusionBlock",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p25:${conclusionBlock}",
+      "sdt_tag": "gt:block:f2.stocktake.summary:summary/conclusion",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/team_name",
+      "json_pointer": "/teamName",
+      "mode": "editable",
+      "value_type": "text",
+      "source_ref": "F2-23!p30:${teamName}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/team_name",
+      "instances": "one"
+    },
+    {
+      "stable_field_key": "summary/summary_date",
+      "json_pointer": "/summaryDate",
+      "mode": "editable",
+      "value_type": "date",
+      "source_ref": "F2-23!p31:${summaryDate}",
+      "sdt_tag": "gt:field:f2.stocktake.summary:summary/summary_date",
+      "instances": "one"
+    }
+  ]
+}

@@ -1,0 +1,146 @@
+[
+  {
+    "id": "M01",
+    "anchor": "test_removing_one_enumerated_item_from_the_task_text_fails_the_gate",
+    "why": "正文枚举项被删 ⇒ probe 分母锁立刻抛；证明分母不可悄悄缩小",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.13s ================="
+  },
+  {
+    "id": "M02",
+    "anchor": "test_an_unclaimed_requirement_is_a_structural_failure",
+    "why": "AC 编号无 probe 对应 ⇒ 结构性失效；证明每个声明的 Requirement 都有验证路径",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.17s ================="
+  },
+  {
+    "id": "M03",
+    "anchor": "test_a_property_missing_from_design_md_is_a_structural_failure",
+    "why": "design.md 里不存在的 Property 编号 ⇒ 拒绝；证明 Property 与 design 双向锁",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.04s ================="
+  },
+  {
+    "id": "M04",
+    "anchor": "test_a_vanished_production_symbol_fails_the_probe",
+    "why": "生产符号被改名/删除 ⇒ probe 立刻失效；证明 probe 与生产代码双向锁",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.16s ================="
+  },
+  {
+    "id": "M05",
+    "anchor": "test_dropping_one_scenario_probe_makes_the_denominator_shrink_detectable",
+    "why": "required set 里有场景却没人声明 probe ⇒ 结构性失效；证明场景分母不可缩小",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 4.44s ================="
+  },
+  {
+    "id": "M06",
+    "anchor": "test_a_scenario_probe_without_a_production_oracle_is_rejected",
+    "why": "probe 声明但无 oracle ⇒ 拒绝；证明每条 probe 都有真实验证函数",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.16s ================="
+  },
+  {
+    "id": "M07",
+    "anchor": "test_a_hardcoded_admission_would_fail_the_state_sensitivity_probe",
+    "why": "把 probe_finalize_signals 硬编码为恒 False ⇒ 替身翻转不变 ⇒ 失败；证明准入判定读的是真实状态而非 return False",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.17s ================="
+  },
+  {
+    "id": "M08",
+    "anchor": "test_all_four_pilots_are_blocked_before_task_36_finalize",
+    "why": "finalize 未完成时四个 pilot 全被阻断；证明 gate 真实读取 finalize 状态",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 4.48s ================="
+  },
+  {
+    "id": "M09",
+    "anchor": "test_every_burial_form_of_a_result_claim_is_rejected",
+    "why": "执行记录携带结果声明字段 ⇒ 拒绝；证明不得以文档声明冒充真实执行",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 6 passed, 105 deselected, 1 warning in 1.05s ================="
+  },
+  {
+    "id": "M10",
+    "anchor": "test_load_execution_records_rejects_a_claiming_file",
+    "why": "文件中携带声明字段 ⇒ 拒绝；证明外部输入也不得包含结果声明",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.03s ================="
+  },
+  {
+    "id": "M11",
+    "anchor": "test_the_probe_would_fail_if_the_refusal_stopped_working",
+    "why": "把拒绝逻辑替换为放行 ⇒ probe 失败；证明拒绝路径被 probe 覆盖",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.02s ================="
+  },
+  {
+    "id": "M12",
+    "anchor": "test_a_broken_record_reaches_failed",
+    "why": "记录字段被改坏 ⇒ validator 返回 failed（而非通过/unverifiable）；证明 validator 是双向可达的",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 22 passed, 89 deselected, 1 warning in 4.66s ================="
+  },
+  {
+    "id": "M13",
+    "anchor": "test_reused_application_ids_across_scenarios_are_rejected_by_production",
+    "why": "同一 application 跨场景复用 ⇒ oracle 拒绝；证明 Property 70 的跨场景不可复用",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 4.47s ================="
+  },
+  {
+    "id": "M14",
+    "anchor": "test_naive_timestamps_are_rejected",
+    "why": "naive 时间戳（无时区）⇒ 失败；证明 timeline 校验真实使用 aware datetime",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 4.44s ================="
+  },
+  {
+    "id": "M15",
+    "anchor": "test_wrong_close_capture_count_is_failed_by_production_oracle",
+    "why": "close-capture 数不为 1 ⇒ oracle 失败；证明 exactly-one 的 liveness 判据",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 4.43s ================="
+  },
+  {
+    "id": "M16",
+    "anchor": "test_structural_failure_exits_two_not_one",
+    "why": "结构性失效返回退出码 2 而非 1；证明结构错误与普通阻断区分",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.05s ================="
+  },
+  {
+    "id": "M17",
+    "anchor": "test_mutation_probe_requires_declared_equals_executed",
+    "why": "declared != executed ⇒ 变异 probe 不通过；证明不可用已跑子集冒充全量",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.04s ================="
+  },
+  {
+    "id": "M18",
+    "anchor": "test_mutation_probe_rejects_a_non_red_verdict",
+    "why": "变异结果含 GREEN ⇒ 不通过；证明每条变异必须 RED",
+    "verdict": "RED",
+    "exit_code": 0,
+    "summary": "================ 1 passed, 110 deselected, 1 warning in 1.04s ================="
+  }
+]

@@ -330,7 +330,8 @@ import http from '@/utils/http'
 import { eventBus } from '@/utils/eventBus'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
 import { useH1CrossSheet } from './composables/useH1CrossSheet'
-import { useH1DualMode } from './composables/useH1DualMode'
+// Task 45: legacy useH1DualMode deleted — pilot host now delegates to sync bridge.
+import { usePilotBridgeAdapter } from './sync/usePilotBridgeAdapter'
 import {
   buildDetailSeedRows,
   shouldSeedDetailRows,
@@ -412,11 +413,13 @@ const resolvedHtmlData = ref<any>(props.htmlData || null)
 const { depreciationForAlloc } = useH1CrossSheet(allResponses)
 const depreciationBranch = ref<'A' | 'B' | 'C'>('A')
 
-const dual = useH1DualMode({
+// ─── Task 45: bridge adapter replaces legacy useH1DualMode ──────────────────
+const dual = usePilotBridgeAdapter({
+  entryId: 'xlsx/gt-h1-fixed-assets',
   wpId: toRef(props, 'wpId'),
   sheetName: computed(() => props.sheetName || ''),
-  autoSave: async () => { scheduleAutoSnapshot() },
-  reloadAll: async () => { await selfLoad() },
+  flushBeforeOo: async () => { scheduleAutoSnapshot() },
+  reloadHtml: async () => { await selfLoad() },
 })
 const currentMode = dual.currentMode
 const modeOptions = dual.modeOptions

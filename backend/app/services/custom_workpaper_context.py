@@ -116,37 +116,29 @@ async def resolve_is_custom(
 
 
 def resolve_is_custom_sync(wp: WorkingPaper, wp_code: str | None) -> bool:
-    """`resolve_is_custom` 的同步收窄版（只判「自建底稿」这一支，不查 DB）。
+    """`resolve_is_custom` 的**同步子集**：只判「manual + 非标准编号」这一支。
 
-    用于 OnlyOffice 路径 —— 那里的 `_resolve_wp_file` 是同步函数、且 WOPI 下载与
+    用于拿不到 `AsyncSession` 的调用点（OnlyOffice 文件解析路径在 WOPI/callback 里
+    有些位置只有 ORM 对象），那里的 `_resolve_wp_file` 是同步函数、且 WOPI 下载与
     callback 两个入口都不便再开一次查询。判据只保留不需要 DB 的那一支：
 
         source_type == manual  AND  wp_code 不像标准编号
 
-    🔴 **有意比 `resolve_is_custom` 更窄**：漏判「有自定义程序实例但 source_type
-    不是 manual」的底稿时，OO 侧退回既有的「模板 → 缓存副本」路径 —— 那是本函数
-    引入前的行为，属零回归方向；而误判会把标准底稿的业务文件直接暴露给 OO 直编，
-    绕过 `_hide_non_target_sheets` 等既有保护。故宁窄勿宽。
+    🔴 **只判一支是有意的收窄** —— 「有自定义程序实例」那一支需要查库，此处判不了。
+    收窄方向安全：漏判时 OO 侧退回既有的「模板 → 缓存副本」路径 —— 那是本函数引入前的
+    行为，属零回归方向；而误判会把标准底稿的业务文件直接暴露给 OO 直编，绕过
+    `_hide_non_target_sheets` 等既有保护。故宁窄勿宽，判不出来时返回 False。
 
     两个函数对「自建底稿」这一支必须给出相同结论（守卫交叉锁死）。
-    """
-    if not wp_code:
-        return False
-    return wp.source_type == WpSourceType.manual and not is_standard_wp_code(wp_code)
-
-
-def resolve_is_custom_sync(wp: WorkingPaper, wp_code: str | None) -> bool:
-    """`resolve_is_custom` 的**同步子集**：只判「manual + 非标准编号」这一支。
-
-    用于拿不到 `AsyncSession` 的调用点（OnlyOffice 文件解析路径在 WOPI/callback 里
-    有些位置只有 ORM 对象）。
-
-    🔴 **只判一支是有意的收窄** —— 「有自定义程序实例」那一支需要查库，此处判不了。
-    收窄方向安全：判不出来时返回 False ⇒ 退回既有「模板 → OO 缓存」路径（零回归），
-    而不是把标准底稿误判成 custom 去直编业务文件本体。
 
     `create-custom` 建的自建底稿恒满足 `source_type == manual` 且编号非标准
     （`_custom_code_exists` 侧的编号由用户自定义），故本 spec 的实测路径覆盖得到。
+
+    🔴 Task 65 删除了本函数在同一文件里的**第二份定义**（原 L118 与 L138 各有一份，
+    后者覆盖前者 ⇒ 前者是死代码）。两份判据表达式一致、只差 `try/except`，所以行为上
+    没有暴露；但 `test_custom_workpaper_oo_file_resolution.py` 的
+    `assert "def resolve_is_custom_sync(" in code` 是 grep 式守卫，**无法区分定义了一次
+    还是两次** —— 那正是本 spec 记录的假绿第②源。
     """
     if not wp_code:
         return False

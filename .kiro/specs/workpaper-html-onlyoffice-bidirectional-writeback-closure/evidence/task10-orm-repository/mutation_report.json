@@ -1,0 +1,1287 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally",
+    "why": "把 application_key 列改名 ⇒ ORM 与 V151 DDL 出现 orm_extra + ddl_extra 双向漂移。不能只删这一行：删了 Property 64 的『只存在于 application 表』断言仍会绿，改名同时打红列比对与持有者断言，证明两条判据都真的在看列集合",
+    "verdict": "RED",
+    "summary": "2 failed, 29 passed, 28 errors in 8.00s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_application_key_lives_only_on_content_application",
+      "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally",
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_application_key_lives_only_on_content_application",
+      "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.0
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_application_key_lives_only_on_content_application",
+    "why": "给 operation ORM 加 application_key ⇒ 违反 Property 64『application identity 的唯一 owner 是 application 表』。这是最典型的幂等真源复制形态",
+    "verdict": "RED",
+    "summary": "2 failed, 29 passed, 28 errors in 7.35s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_application_key_lives_only_on_content_application",
+      "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally",
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_application_key_lives_only_on_content_application",
+      "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 10.3
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally",
+    "why": "把 duplicate 指针改成 NOT NULL ⇒ 与 DDL 的 nullable 不符，pre-correlation 合法态（application 与 duplicate 皆空）在 ORM 层变成不可表达。🔴 首轮把 `Mapped[uuid.UUID | None]` 改成 `Mapped[uuid.UUID]` 判 GREEN —— 那是**无效变异**：`mapped_column(..., nullable=True)` 的显式参数覆盖类型标注推导，改标注对 nullable 毫无影响。故必须改显式参数本身",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.25s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_operation_has_nullable_unique_application_and_direct_self_fk",
+      "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_operation_has_nullable_unique_application_and_direct_self_fk",
+      "test_task10_orm_repository_contract.py::test_orm_columns_match_ddl_bidirectionally"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.4
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_orm_covers_exactly_the_v151_tables",
+    "why": "从 WORKPAPER_SYNC_TABLES 清单里删掉一张表 ⇒ ORM 覆盖面与 V151 的 28 张表不再相等。该清单是守卫的分母，若守卫只断言『>=1 张表』这条变异不会红",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.22s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_orm_covers_exactly_the_v151_tables"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_orm_covers_exactly_the_v151_tables"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_duplicate_is_terminal_and_operation_terminals_are_closed",
+    "why": "给 duplicate 加出边 ⇒ loser shell 不再 terminal，可继续流转甚至走到 applied。Property 18 要求 N-1 个 duplicate 是 terminal 可轮询态",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.34s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_duplicate_is_terminal_and_operation_terminals_are_closed",
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_duplicate_is_terminal_and_operation_terminals_are_closed",
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.5
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_quarantined_incoming_has_no_edge_to_durable",
+    "why": "给 quarantined 开一条到 durable 的边 ⇒ 隔离可被『解除』，quarantined incoming 能创建 application 并进入 engine（Requirement 5.6 明令禁止的两支互转）",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.14s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises",
+      "test_task10_orm_repository_contract.py::test_quarantined_incoming_has_no_edge_to_durable"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises",
+      "test_task10_orm_repository_contract.py::test_quarantined_incoming_has_no_edge_to_durable"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M07",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_promoted_leader_cannot_pick_successor",
+    "why": "允许已 promoted 的 leader 再选 successor ⇒ 违反 Requirement 10.10『promotion 后授权失效只能走 recovery，不得接任再造第二 capture』",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.11s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises",
+      "test_task10_orm_repository_contract.py::test_promoted_leader_cannot_pick_successor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_promoted_leader_cannot_pick_successor"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M08",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_illegal_transition_raises",
+    "why": "关掉允许状态边的实际比对 ⇒ `assert_transition` 退化成『状态已登记即通过』，任何非法边都放行。这条变异专打『守卫只查状态存在、不查边』的假绿形态",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.20s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_illegal_transition_raises"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.3
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_operation_shape_rejects_illegal_combinations",
+    "why": "放开『同时绑定 application 与 duplicate 指针』⇒ primary/duplicate 不再互斥，一个 shell 可同时是 winner 与 loser",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.02s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_operation_shape_rejects_illegal_combinations"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_operation_shape_rejects_illegal_combinations"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_direct_primary_rejects_self_chain_stranded_cross_scope",
+    "why": "短路 direct-primary invariant 的『duplicate 指针非空』这一项。🔴 首轮把 chain 与 stranded 写成两条独立变异，两条都判 GREEN —— 因为拆开后彼此遮蔽（凡 duplicate 必 application 空，所以任一支被短路，另一支仍会拒）。生产代码已按 V151 的同名断言合并成一条 or 条件，本变异改其中一个 or 项，使『合并后的判据整体有效』可被证明",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.08s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_direct_primary_rejects_self_chain_stranded_cross_scope"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_direct_primary_rejects_self_chain_stranded_cross_scope"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M11",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_direct_primary_rejects_self_chain_stranded_cross_scope",
+    "why": "短路 direct-primary invariant 的『state=duplicate』这一项。与 M10 配对证明合并条件的两个 or 项都真的参与判定",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.03s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_direct_primary_rejects_self_chain_stranded_cross_scope"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_direct_primary_rejects_self_chain_stranded_cross_scope"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M12",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_property_18_fold_is_greatest_and_monotonic",
+    "why": "把 GREATEST fold 改成取小 ⇒ effective_request_sequence 会回退，room durable fence 指向过期 sequence。纯逻辑与真实 PG 两侧都必须打红",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 11.95s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_property_18_fold_is_greatest_and_monotonic",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_property_18_fold_is_greatest_and_monotonic",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 15.0
+  },
+  {
+    "id": "M13",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_no_self_supersede_and_requires_higher_sequence",
+    "why": "放开 self-supersede ⇒ 同 canonical application 因自己的较高 sequence 把自己判 stale，形成 Property 36 明令禁止的 duplicate→primary→stale 循环",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.01s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_no_self_supersede_and_requires_higher_sequence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_no_self_supersede_and_requires_higher_sequence"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M14",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_delivery_ownership_by_durable_at_only",
+    "why": "关掉『durable fact 存在 ⇒ 恰一个 owner』⇒ durable incoming 可成为无所有者死路（Requirement 5.4 明确禁止）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.93s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_delivery_ownership_by_durable_at_only"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_delivery_ownership_by_durable_at_only"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M15",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_delivery_ownership_by_durable_at_only",
+    "why": "回归变异：给 request 与 application **加**一个错误的 XOR。Task 10 明文写『request 与 application 可同时被 delivery/operation 引用，不施加错误 XOR』——只断言『双 owner 被拒』的守卫看不见这条错误约束，必须有正控制才能抓到",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed, 28 errors in 8.04s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_delivery_ownership_by_durable_at_only",
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_delivery_ownership_by_durable_at_only"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.1
+  },
+  {
+    "id": "M18",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_application_key_signature_excludes_status_and_sequence",
+    "why": "给 application key 偷偷混进 callback_status 入参 ⇒ 直接违反 Property 64（key 不含 callback status）。默认值让签名变化但不破坏既有调用，正是真实代码里最容易溜进来的形态",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.03s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_application_key_signature_excludes_status_and_sequence"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_application_key_signature_excludes_status_and_sequence"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M19",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_application_key_is_stable_and_identity_sensitive",
+    "why": "把 generation 从 key 里抹掉 ⇒ 不同 generation 的相同 incoming 会折叠成同一 application，跨代际内容互相覆盖",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.98s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_application_key_is_stable_and_identity_sensitive"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_application_key_is_stable_and_identity_sensitive"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M20",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_digest_single_source_of_truth",
+    "why": "digest 单一真源放开全零 hash ⇒ 『忘了算 hash 就填 0』的伪身份可以进入 application key / bundle slot（与 V151 的 wpsync_is_digest 对称）",
+    "verdict": "RED",
+    "summary": "3 failed, 56 passed in 11.00s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_application_key_rejects_empty_and_zero_digests",
+      "test_task10_orm_repository_contract.py::test_digest_single_source_of_truth",
+      "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_application_key_rejects_empty_and_zero_digests",
+      "test_task10_orm_repository_contract.py::test_digest_single_source_of_truth"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M21",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_delivery_key_varies_by_status_and_discriminator",
+    "why": "把 status 从 delivery key 里抹掉 ⇒ status 6 与 status 2 撞同一 delivery row，『每次 delivery 各留证据』失效（Requirement 4.3）",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 12.28s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_delivery_key_varies_by_status_and_discriminator",
+      "test_task10_orm_repository_contract.py::test_property_64_key_independent_of_status_sequence_room_pointer"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_delivery_key_varies_by_status_and_discriminator",
+      "test_task10_orm_repository_contract.py::test_property_64_key_independent_of_status_sequence_room_pointer"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 15.4
+  },
+  {
+    "id": "M22",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_frozen_fingerprint_covers_every_frozen_field",
+    "why": "把 client_edit_epoch 从 frozen fingerprint 里抹掉 ⇒ 不同 edit epoch 的重放会被当成逐项等值的 cache hit 而返回旧 request（Requirement 4.1）",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 10.99s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_frozen_fingerprint_covers_every_frozen_field",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_frozen_fingerprint_covers_every_frozen_field"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M23",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_property_59_numeric_revision_is_never_a_scope_key",
+    "why": "放开 numeric revision 作 scope resource_id ⇒ 两个不同 wp 的 revision 1 在authorization 索引里碰撞成同一行（Requirement 8.7 / 10.6）",
+    "verdict": "RED",
+    "summary": "1 failed, 30 passed, 28 errors in 9.30s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_property_59_numeric_revision_is_never_a_scope_key",
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_property_59_numeric_revision_is_never_a_scope_key",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M24",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_projection_contract_requires_three_approved_definition_children",
+    "why": "关掉『projection_contract 三 child 必须全 approved definition』⇒ typed null marker可冒充 per-entry contract（Requirement 2.3 / 3.3）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.02s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_projection_contract_requires_three_approved_definition_children"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_projection_contract_requires_three_approved_definition_children"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M25",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected",
+    "why": "关掉 slot omission 检测 ⇒ 缺 slot 的 bundle 可以通过 canonicalization，而 canonical bytes 里少一个 slot 会让 definition identity 静默漂移",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.00s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M26",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected",
+    "why": "放开『用别的 slot 的 marker』⇒ contract slot 可以放 template 的 typed null marker，bundle 的 typed 语义失效",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.98s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_slot_omission_null_empty_zero_and_illegal_marker_all_rejected"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M27",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+    "why": "去掉 per-wp advisory lock ⇒ 同 wp 不再串行（第二个事务能立刻拿到锁）。Property 59 要求正确性由数据库锁决定，不是进程锁",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.05s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.2
+  },
+  {
+    "id": "M28",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+    "why": "把 business revision 的 CAS 条件删掉 ⇒ 乐观锁退化成无条件 UPDATE，并发两个 worker 各 +1（丢更新），最终 revision 会变成 before+2",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.03s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.1
+  },
+  {
+    "id": "M30",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+    "why": "把 create-or-hit 的冲突键从 application_key 换成 id ⇒ 并发 shell 各自 INSERT 都『不冲突』，随后撞 application_key 唯一约束整事务失败 ⇒ 1 primary + N-1 duplicates 的收敛不再成立",
+    "verdict": "RED",
+    "summary": "31 passed, 28 errors in 8.04s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.1
+  },
+  {
+    "id": "M31",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+    "why": "关掉『跨 participant/kind 复用同 key ⇒ 409』⇒ 另一个 participant 用同 key 会拿到别人的 request/operation（Requirement 4.1 明确要求 409 且不返回旧标识）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 10.93s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.0
+  },
+  {
+    "id": "M32",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+    "why": "关掉 fingerprint 逐项等值比对 ⇒ 同 key 但不同 base/bundle/fence 的 payload 会被当 cache hit 返回旧 request，冻结语义失效",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.34s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M33",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+    "why": "让 409 的错误消息把旧 request id 带出去 ⇒ 违反『不得返回旧标识』。只断言『抛了 409』的守卫看不见泄露，必须有 leaks_old_id 判据",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.60s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.9
+  },
+  {
+    "id": "M34",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+    "why": "关掉 scope id 复用检测 ⇒ retired tombstone 的 (kind,id) 可被重新登记，authorization 索引会把新 child 指到旧归属（Requirement 10.6）",
+    "verdict": "RED",
+    "summary": "31 passed, 1 warning, 28 errors in 8.95s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M36",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+    "why": "关掉 opaque resource_id 校验 ⇒ numeric revision 可作 scope key。repository 与 DB CHECK 是双向的，这条只打 repository 侧",
+    "verdict": "RED",
+    "summary": "31 passed, 28 errors in 9.11s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.3
+  },
+  {
+    "id": "M37",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+    "why": "关掉 quarantined incoming 的 fail-closed ⇒ 隔离文件能被 extract/merge 消费。🔴 首轮判 GREEN：当时暂态分支与隔离分支共用 QuarantinedIncomingError，短路本分支后暂态分支抛同类异常把判据遮蔽。生产代码已拆出 IncomingNotDurableError，守卫改断言**异常类型** ⇒ 本变异现在可被抓到",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.62s",
+    "added": [
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 15.0
+  },
+  {
+    "id": "M40",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+    "why": "关掉『durable_at 已存在则拒绝改归属』⇒ 已归 recovery 的 delivery 可被重新 sealing，durable fact 不再 immutable（V151 的 durable_at immutable 是第二道锁）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.66s",
+    "added": [
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.9
+  },
+  {
+    "id": "M41",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+    "why": "去掉『已 promoted 即幂等返回』⇒ reconciler 重入会尝试再造 capture；partial unique 只能挡住『同时 open』，挡不住 leader 状态被再次改写",
+    "verdict": "RED",
+    "summary": "31 passed, 28 errors in 9.25s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 12.5
+  },
+  {
+    "id": "M43",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+    "why": "把 deterministic comparator 从『最高 (intent_sequence,id)』改成最低 ⇒ leader 选择与 Requirement 4.10 规定的规则不一致，successor 也会选错",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.48s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M44",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+    "why": "关掉 no-successor 分支 ⇒ 无合法 successor 时既不 supersede generation 也不落recovery_required，intents 永久停在 waiting/created（Requirement 4.10 禁止的『永久 retryable_blocked / 静默关闭』）",
+    "verdict": "RED",
+    "summary": "31 passed, 28 errors in 10.29s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 13.6
+  },
+  {
+    "id": "M45",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+    "why": "去掉 close barrier ⇒ active 未归零、前置普通 forcesave 未终结时就提升 leader，会丢失尚未耐久的贡献",
+    "verdict": "RED",
+    "summary": "2 failed, 57 passed in 11.42s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M46",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+    "why": "关掉『leader 失去资格则审计为 authorization_stale 并推进 eligibility epoch』⇒被撤销的 leader 仍被当合法 leader，撤权用户的贡献会被提交",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.31s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.6
+  },
+  {
+    "id": "M47",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+    "why": "允许对已 primary/已 duplicate 的 shell 再次 correlate ⇒ 重复 callback 会二次绑定，产生第二 primary 或把 duplicate 重定向",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.46s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M48",
+    "side": "be",
+    "want": "test_task10_orm_repository_contract.py::test_repository_never_commits",
+    "why": "把 repository 的 flush 换成 commit ⇒ 直接违反『只 flush 不 commit』。AST 守卫与真实 PG 的 rollback 行为守卫必须同时打红：前者证明结构，后者证明行为（只有 AST 守卫时，绕过 `_flush()` 的 commit 仍可能溜进来）",
+    "verdict": "RED",
+    "summary": "4 failed, 55 passed in 24.07s",
+    "added": [
+      "test_task10_orm_repository_contract.py::test_repository_never_commits",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_orm_repository_contract.py::test_repository_never_commits",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes"
+    ],
+    "added_files": [
+      "test_task10_orm_repository_contract.py",
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 27.4
+  },
+  {
+    "id": "M49",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+    "why": "不再把 room durable fence 指向 canonical application ⇒ Requirement 10.11 要求的『same-application fold 与 room latest-durable 在同一事务原子决定』失效",
+    "verdict": "RED",
+    "summary": "31 passed, 28 errors in 8.47s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 11.7
+  },
+  {
+    "id": "M50",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+    "why": "关掉 recovery claim 的最终 write fence 重验 ⇒ 陈旧 fence 的 prior confirmation 也能创建三实体（Property 43 要求 commit 前失败且零实体）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.49s",
+    "added": [
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M51",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+    "why": "关掉 claim 的幂等命中分支 ⇒ 并发同 Idempotency-Key 的第二次 claim 会再造request/operation，违反『最多创建一个』",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.49s",
+    "added": [
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  },
+  {
+    "id": "M52",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+    "why": "放开 download-only 的『三实体恒空』前置校验 ⇒ 已 claim 的 case 也能转 download-only，Requirement 5.8 的零三实体判据失效。🔴 首轮锚点只短路三段 or 里的一段，被另两段遮蔽判 GREEN；生产代码已把三段收敛成单一布尔 `has_any_entity`，本变异短路它整体",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 13.24s",
+    "added": [
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 16.7
+  },
+  {
+    "id": "M54",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+    "why": "放开『只有 approved bundle 可用于 finalize/room』⇒ candidate bundle 能 finalize representation 并被 room/resolver 使用（Requirement 3.3 / 9.8）",
+    "verdict": "RED",
+    "summary": "31 passed, 28 errors in 11.44s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_delivery_ownership_pre_and_post_durable",
+      "test_task10_repository_pg.py::test_download_only_creates_zero_three_entities",
+      "test_task10_repository_pg.py::test_numeric_revision_never_collides_across_workpapers",
+      "test_task10_repository_pg.py::test_operation_table_has_no_application_key_column",
+      "test_task10_repository_pg.py::test_property_18_n_shells_one_primary_rest_direct_duplicates",
+      "test_task10_repository_pg.py::test_property_18_sequential_fold_does_not_self_supersede",
+      "test_task10_repository_pg.py::test_property_43_final_authorization_fence_blocks_claim",
+      "test_task10_repository_pg.py::test_property_4_representation_upgrade_does_not_bump_revision",
+      "test_task10_repository_pg.py::test_property_59_revision_optimistic_lock_has_single_winner",
+      "test_task10_repository_pg.py::test_property_59_same_wp_serial_cross_wp_parallel",
+      "test_task10_repository_pg.py::test_property_5_repository_only_flushes",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]",
+      "test_task10_repository_pg.py::test_property_63_leader_revoked_selects_successor",
+      "test_task10_repository_pg.py::test_property_63_no_successor_zero_capture_but_explicit_terminal",
+      "test_task10_repository_pg.py::test_property_63_ordinary_forcesave_barrier",
+      "test_task10_repository_pg.py::test_property_63_reconciler_is_idempotent",
+      "test_task10_repository_pg.py::test_property_64_forcesave_composite_idempotency",
+      "test_task10_repository_pg.py::test_quarantined_incoming_cannot_create_application_or_be_released",
+      "test_task10_repository_pg.py::test_ran_on_real_postgresql_in_scratch_schema",
+      "test_task10_repository_pg.py::test_recovery_case_has_zero_entities_before_claim",
+      "test_task10_repository_pg.py::test_recovery_claim_is_concurrent_idempotent",
+      "test_task10_repository_pg.py::test_scope_tombstone_is_immortal_and_never_reused",
+      "test_task10_repository_pg.py::test_self_supersede_rejected_by_repository_and_database"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ab]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[order_ba]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_after]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[ordinary_terminal_before]",
+      "test_task10_repository_pg.py::test_property_63_close_capture_exactly_one[single]"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.7
+  },
+  {
+    "id": "M55",
+    "side": "be",
+    "want": "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current",
+    "why": "关掉『finalize 前必须补齐 approved contract + bundle』⇒ candidate 可在无 per-entry contract 时 finalize（Requirement 3.4 / 9.10）",
+    "verdict": "RED",
+    "summary": "1 failed, 58 passed in 11.47s",
+    "added": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task10_repository_pg.py::test_candidate_cannot_finalize_or_become_current"
+    ],
+    "added_files": [
+      "test_task10_repository_pg.py"
+    ],
+    "restored": true,
+    "seconds": 14.8
+  }
+]

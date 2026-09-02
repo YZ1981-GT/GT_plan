@@ -1,0 +1,33 @@
+{
+  "probe": "task6-oo94-word-tagged-sdt",
+  "doc": "f223",
+  "wp_code": "F2-23",
+  "started_at": "2026-08-24T23:52:56.067576+00:00",
+  "oo_url_from_host": "http://localhost:8080",
+  "host_for_oo": "host.docker.internal",
+  "probe_port": 9995,
+  "doc_key": "t6f223r2",
+  "template_rel": "backend/wp_templates/F/F2-23 存货监盘小结.docx",
+  "seed_file": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt/artifacts/f223_reopen_cb05_status2.docx",
+  "staged_sha256": "ba600e6cd397ba2b7a052317d03253cd1ef21d936ba532d814524a665c8f1403",
+  "operations": [
+    "baseline",
+    "edit_in_sdt",
+    "forcesave",
+    "download",
+    "reopen"
+  ],
+  "oo_secret_ref": "sha256:61babf80965111e647799bc8",
+  "oo_build_endpoints": {
+    "healthcheck": "true",
+    "info": "ERROR HTTPError: HTTP Error 403: Forbidden"
+  },
+  "previous_runs": [
+    {
+      "started_at": "2026-08-24T23:49:51.091732+00:00",
+      "doc_key": "t6f223r1",
+      "seed_file": "D:/GT_plan/.kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task6-oo94-word-tagged-sdt/staging/f223_instrumented.docx",
+      "staged_sha256": "1a9db84a6e7cf6e8c1b1a17f76485d6145ae412f64289d55b91f98717bb78f47"
+    }
+  ]
+}

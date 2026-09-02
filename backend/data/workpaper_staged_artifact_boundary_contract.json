@@ -1,0 +1,270 @@
+{
+  "contract_id": "workpaper_staged_artifact_boundary_contract",
+  "schema_version": 1,
+  "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
+  "task": 7,
+  "requirements": ["2.4", "3.4", "5.9", "9.6", "9.7", "14.6"],
+  "properties": ["Property 5", "Property 9", "Property 42"],
+  "purpose": "把 Windows staged artifact publish、DB rollback 与 orphan GC 的**平台真实行为**固化成版本化边界契约，供 Task 9（迁移）、Task 11（CanonicalArtifactRepository / RetentionPolicyService）、Task 15（ContentMutationService）直接引用。本契约不是实现，也不描述任何已存在的生产代码。",
+  "evidence": {
+    "dir": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/task7-staged-artifact-db-rollback",
+    "probe": "backend/scripts/diagnose/probe_task7_staged_artifact_boundaries.py",
+    "files": ["run_meta.json", "fs_observations.json", "db_observations.json", "db_sql_log.json", "findings.md"],
+    "required_case_ids": ["fs1", "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "db1", "db2", "db3", "db4", "db5", "db6"],
+    "recompute_rule": "本契约每个 observed_* / winerror / 布尔判据都必须能从上述原始 evidence 重算；手填不能过守卫。"
+  },
+
+  "cross_medium_transaction": {
+    "filesystem_and_postgres_share_one_transaction": false,
+    "acid_across_media_claim_allowed": false,
+    "only_correct_semantics": "文件先 durable/publish 并通过校验，随后在一个短 PostgreSQL 事务内发布 content version / representation / pointer / outbox；事务失败时文件不会被回滚，只留下对 resolver 不可见的 orphan，由 reconciliation + RetentionPolicy GC 清理。",
+    "forbidden_phrasings": [
+      "文件系统与 PostgreSQL 在同一事务",
+      "artifact 与 DB pointer 同事务提交",
+      "跨介质 ACID"
+    ],
+    "empirical_proof": {
+      "case_id": "db2",
+      "observed_file_survived_db_rollback": true,
+      "observed_pointer_unchanged": true,
+      "observed_resolver_sees_old_artifact_only": true,
+      "reverse_proof_case_id": "db6",
+      "observed_db_commit_cannot_create_file": true,
+      "observed_pointer_to_missing_artifact_is_physically_possible": true
+    }
+  },
+
+  "staging": {
+    "must_be_same_volume_as_publish_target": true,
+    "reason": "跨卷 os.replace 在 Windows 直接失败；唯一可用的跨卷搬运是 copy 语义，会让目标路径在内容完整前就可见。",
+    "streaming_write": {
+      "chunked": true,
+      "hash_computed_while_streaming": true,
+      "observed_streaming_hash_equals_reread_hash": true,
+      "file_fsync_required": true,
+      "observed_file_fsync_supported": true
+    },
+    "directory_fsync": {
+      "supported_on_windows": false,
+      "observed_failure_stage": "open",
+      "observed_exc_type": "PermissionError",
+      "observed_errno": 13,
+      "note": "Windows 不允许 os.open 目录，因此 POSIX 惯用的『rename 后 fsync 父目录』无法照搬；rename 的元数据持久性依赖 NTFS 日志，实现不得声称做了目录 fsync。"
+    },
+    "identity": {
+      "stage_id_is_independent_of_operation": true,
+      "note": "design.md §发布协议 步骤 1：staging identity 不依赖 operation/application，unmatched recovery 才能先耐久。"
+    }
+  },
+
+  "publish": {
+    "primitive": "os.replace",
+    "windows_api": "MoveFileExW(..., MOVEFILE_REPLACE_EXISTING)",
+    "content_addressed": {
+      "target_name_pattern": "{generation:09d}-{sha256[:12]}{ext}",
+      "observed_same_content_yields_same_target_name": true,
+      "observed_same_content_yields_same_target_sha256": true,
+      "observed_divergent_content_yields_different_target_name": true,
+      "observed_divergent_publish_does_not_clobber_existing_target": true,
+      "idempotency_scope": "path_and_sha256",
+      "observed_file_index_changes_on_republish": true,
+      "note": "幂等判据是（目标路径, 目标 sha256）稳定，不是文件身份稳定：重复 publish 会换 NTFS file index，实现不得用 st_ino 判幂等。"
+    },
+    "same_volume_atomicity": {
+      "observed_intermediate_sizes": [],
+      "observed_torn_content_reads": 0,
+      "observed_missing_observations": 0,
+      "size_sampling_min_observations": 200,
+      "content_sampling_min_observations": 20,
+      "verdict": "atomic_no_partial_or_missing",
+      "note": "判据是并发观测量足够大且未见中间态；观测数不足时探针直接报 ERROR，不允许把『没看』当成『没有』。"
+    },
+    "cross_volume": {
+      "os_replace_supported": false,
+      "observed_exc_type": "OSError",
+      "observed_errno": 18,
+      "observed_winerror": 17,
+      "observed_source_survives_failure": true,
+      "observed_target_absent_after_failure": true,
+      "fallback_shutil_move": {
+        "succeeds": true,
+        "atomic": false,
+        "observed_destination_visible_while_incomplete": true,
+        "observed_incomplete_sizes": [0],
+        "note": "实测目标路径在拷贝完成前即以 0 字节可见；因缓冲写入，中间大小未必逐级可见，契约只声明『不完整即可见』这一点。"
+      }
+    },
+    "file_occupancy": {
+      "occupied_target_blocks_replace": true,
+      "observed_share_modes_tested": ["none", "read", "read_write", "read_delete", "read_write_delete", "delete_only"],
+      "observed_target_winerrors": [5],
+      "share_delete_makes_replace_succeed": false,
+      "observed_source_winerror": 32,
+      "observed_old_content_preserved_on_failure": true,
+      "diagnosable": true,
+      "diagnostic_mapping": {
+        "target_occupied": {"exc_type": "PermissionError", "errno": 13, "winerror": 5, "code": "FILE_IN_USE"},
+        "source_occupied": {"exc_type": "PermissionError", "errno": 13, "winerror": 32, "code": "FILE_IN_USE"},
+        "cross_volume": {"exc_type": "OSError", "errno": 18, "winerror": 17, "code": "CROSS_VOLUME_RENAME"}
+      },
+      "mitigation": "immutable_content_addressed_target_never_preexists",
+      "observed_fresh_target_publish_succeeds_while_old_current_held": true,
+      "note": "🔴 任何 share 模式（含 FILE_SHARE_DELETE）下目标被打开都会让 os.replace 报 WinError 5，因此『让读者用 share-delete 打开』不是可行缓解。可行缓解只有两条：目标名内容寻址、从不预先存在；current 切换交给 DB pointer 而非覆盖固定路径。"
+    }
+  },
+
+  "process_interruption": {
+    "mid_staging_kill": {
+      "observed_residue_exists": true,
+      "observed_residue_is_partial": true,
+      "observed_residue_hash_differs_from_full": true,
+      "observed_residue_in_staging_namespace": true,
+      "observed_resolver_namespace_contains_residue": false,
+      "observed_publish_gate_refuses_residue": true
+    },
+    "post_stage_pre_publish_kill": {
+      "observed_staging_hash_valid": true,
+      "observed_published_anything": false,
+      "classification": "orphan_candidate_invisible_to_resolver"
+    },
+    "half_product_can_be_mistaken_for_published": false,
+    "reasons": [
+      "半成品只存在于 .staging/{wp_id}/{artifact_stage_id}/artifact.tmp，不在 .versions 命名空间",
+      "publish 目标名由内容 sha256 决定，半成品 hash 与声明 hash 不符时 publish gate 直接拒绝",
+      "resolver 只解析 .versions 下由 DB pointer 指向的 published artifact"
+    ],
+    "verdict_source": "disk_state_not_exit_code",
+    "observed_child_returncode_after_kill": 1,
+    "note": "被 TerminateProcess 杀掉的子进程退出码为 1，与『写成功/失败』无关；成败一律查磁盘。",
+    "os_replace_interruption": {
+      "independently_injected": false,
+      "derived_from": "fs3",
+      "reason": "os.replace 是单次 MoveFileExW 元数据调用，用户态无法注入『半个 rename』；原子性结论取 fs3 的并发观测。"
+    }
+  },
+
+  "path_safety": {
+    "must_reject": [
+      "traversal_relative",
+      "traversal_nested",
+      "traversal_posix_style",
+      "absolute_outside",
+      "unc_path",
+      "cross_project_absolute",
+      "cross_project_traversal",
+      "symlink_escape"
+    ],
+    "must_accept": ["inside_ok"],
+    "resolution_rule": "os.path.realpath 解析后必须仍等于项目根或以项目根为祖先；软链接/junction 必须在 realpath 后判定，不能只做字符串前缀比较。",
+    "symlink_escape_covered": true,
+    "observed_symlink_mechanism": "os.symlink",
+    "cross_project_reuse": {
+      "same_relative_path_resolves_to_different_absolute_paths": true,
+      "note": "相同相对路径在不同 project_id 根下解析结果必须不同；跨项目复用只能靠 realpath 归属判定，不能靠 relative_path 字符串唯一性。"
+    },
+    "extension_masquerade": {
+      "magic_bytes_required": "PK\u0003\u0004",
+      "observed_non_zip_with_xlsx_ext_rejected": true,
+      "observed_ext_type_mismatch_detected": true,
+      "detection_rule": "zip 内部件决定类型：xl/workbook.xml ⇒ xlsx，word/document.xml ⇒ docx；扩展名不作类型依据。"
+    }
+  },
+
+  "validation_gates": {
+    "order": ["zip_structure", "ooxml_parts", "roundtrip_equivalence"],
+    "fail_closed": true,
+    "observed_injections": ["zip_structure", "ooxml_parts", "roundtrip_equivalence"],
+    "observed_all_injections_blocked_publish": true,
+    "observed_all_injections_left_current_unchanged": true,
+    "observed_all_injections_left_pointer_unchanged": true,
+    "invariant": "任一 gate 失败 ⇒ 不 publish、不推进 pointer/revision、current artifact hash 不变、.versions 命名空间不变；只在 .staging 留下 residue。"
+  },
+
+  "db_boundary": {
+    "target_tables_not_yet_migrated": true,
+    "note": "working_paper_artifact / working_paper_content_version / working_paper_content_representation / working_paper_sync_entry_state 由 Task 9 创建；本任务在 tmp_task7_probe_* scratch schema 内建等价结构验证行为，未新增正式迁移、未写业务表。",
+    "scratch_schema_prefix": "tmp_task7_probe_",
+    "no_business_write_proof": "db_sql_log.json 中所有 DDL/DML 语句都必须包含 scratch schema 名；守卫逐条校验。",
+    "rollback_invariants": {
+      "observed_failure_kinds": ["python_exception", "db_constraint"],
+      "observed_pointer_generation_after_rollback": 1,
+      "observed_pointer_still_points_to_old_representation": true,
+      "observed_new_artifact_rows_after_rollback": 0,
+      "observed_counts_equal_baseline": true,
+      "observed_file_survived": true,
+      "observed_resolver_returns_old_artifact_only": true
+    },
+    "resolver_exclusion": {
+      "resolver_predicate": "artifact.state='published' AND artifact.kind IN ('canonical','projection') AND 经 entry_state.current_representation_id 可达",
+      "observed_representation_referencing_candidate_rejected": true,
+      "observed_representation_referencing_incoming_durable_rejected": true,
+      "observed_representation_referencing_orphan_rejected": true,
+      "observed_reject_pgcode": "23514",
+      "enforcement": "database_trigger_plus_service_validator"
+    },
+    "orphan_reconciliation": {
+      "detects_disk_file_without_db_row": true,
+      "detects_db_row_without_reference": true,
+      "observed_registered_new_orphans": true,
+      "observed_precommitted_row_marked_orphan": true,
+      "observed_resolver_unaffected": true,
+      "sets_orphaned_at": true
+    },
+    "retention_gc": {
+      "policy_version": "workpaper-sync-retention:v1",
+      "requires_dry_run_first": true,
+      "requires_second_reference_recheck": true,
+      "observed_dry_run_before_grace_decisions": ["retain"],
+      "observed_dry_run_before_grace_reasons": ["grace_not_elapsed"],
+      "observed_dry_run_never_deletes": true,
+      "observed_legal_hold_retained": true,
+      "observed_reference_reappears_retained": true,
+      "observed_reference_reappears_reason": "reference_found_on_recheck",
+      "observed_delete_reason": "grace_elapsed_and_unreferenced",
+      "observed_deleted_files_gone": true,
+      "observed_resolver_unaffected_by_gc": true,
+      "retain_on_uncertainty": true,
+      "audit_row_per_decision": true,
+      "decisions": ["retain", "delete"],
+      "retain_reasons": ["no_policy_retain_and_alert", "legal_hold", "orphaned_at_missing", "grace_not_elapsed", "reference_found_on_recheck"]
+    }
+  },
+
+  "property_oracles": {
+    "Property 5": {
+      "statement_ref": "design.md ### Property 5",
+      "oracle": "在 artifact publish 与 DB transaction 任一点注入失败后，current pointer 要么仍指旧 published version，要么完整指向已存在的新 artifact；candidate 永不可见；无引用 artifact 最终进入 orphan GC。",
+      "covered_by_cases": ["fs8", "db2", "db3", "db4", "db5"]
+    },
+    "Property 9": {
+      "statement_ref": "design.md ### Property 9",
+      "oracle": "在 OOXML/roundtrip 校验任一点注入失败，current file hash/pointer/revision 均不变。",
+      "covered_by_cases": ["fs8"]
+    },
+    "Property 42": {
+      "statement_ref": "design.md ### Property 42",
+      "oracle": "目录穿越、项目外绝对路径、软链接越界和跨项目复用均被拒绝。",
+      "covered_by_cases": ["fs7"]
+    }
+  },
+
+  "not_covered": [
+    {
+      "item": "os.replace 自身被中断的半成品",
+      "status": "not_independently_injected",
+      "blocker": "单次 MoveFileExW 元数据调用，用户态无法注入中断点",
+      "substitute_evidence": "fs3 的 5000+ 次 size 采样与 800+ 次 content 采样均未见中间态"
+    },
+    {
+      "item": "杀毒软件扫描导致的 rename 冲突",
+      "status": "not_injected",
+      "blocker": "无法在本机确定性触发 AV 扫描窗口",
+      "substitute_evidence": "fs5 已证明任意进程持有目标句柄即产生 WinError 5，AV 持句柄属同一失败模式与同一诊断码"
+    },
+    {
+      "item": "生产 CanonicalArtifactRepository / RetentionPolicyService 的真实实现行为",
+      "status": "out_of_scope_wave0",
+      "blocker": "Task 11 尚未开工；本任务只固化其必须满足的平台边界"
+    }
+  ]
+}

@@ -12,6 +12,7 @@
         <el-button size="small" @click="versionToolbar.openVersionHistory()">版本历史</el-button>
         <el-tag v-if="!dualMode.isOoAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <el-tag v-if="isIpoSheet && !formData.isIpoProject.value" size="small" type="info">IPO专项（当前项目不可见）</el-tag>
+        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-f2-inventory-special" />
       </div>
 
       <el-alert
@@ -245,6 +246,7 @@ const F2InterviewCheckExample = defineAsyncComponent(
 
 const GtGridSheet = defineAsyncComponent(() => import('./GtGridSheet.vue'))
 const GtOnlyOfficeSheet = defineAsyncComponent(() => import('./GtOnlyOfficeSheet.vue'))
+import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const props = defineProps<{
   wpId: string
