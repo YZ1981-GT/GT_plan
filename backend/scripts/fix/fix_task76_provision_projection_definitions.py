@@ -101,6 +101,30 @@ class ProvisionTarget:
         }
 
 
+#: wp_code 裁决表（真源见文件自身的 `why` / `basis_rule`）。
+WP_CODE_ADJUDICATION = _BACKEND / "data" / "workpaper_sync_entry_wp_code_adjudication.json"
+
+
+def load_wp_code_adjudication() -> dict[str, dict[str, Any]]:
+    """读 entry → wp_code 的**显式裁决**，返回 `{entry_id: 条目}`。
+
+    缺文件即抛（fail closed）：宿主解析没有裁决表就只能回落到会产幻影码的启发式，
+    而那正是本文件要消除的东西。
+    """
+    if not WP_CODE_ADJUDICATION.is_file():
+        raise SystemExit(
+            f"[FAIL] 缺 wp_code 裁决表 {WP_CODE_ADJUDICATION} —— 宿主解析不得回落到 "
+            "manifest 的 `wp_code_patterns` 启发式（实测产 D2A / G7L / H1F 三个幻影码）"
+        )
+    doc = json.loads(WP_CODE_ADJUDICATION.read_text(encoding="utf-8"))
+    out: dict[str, dict[str, Any]] = {}
+    for row in doc.get("adjudications") or []:
+        entry_id = str(row.get("entry_id") or "").strip()
+        if entry_id:
+            out[entry_id] = row
+    return out
+
+
 async def resolve_targets(
     session: Any,
     *,
@@ -111,23 +135,45 @@ async def resolve_targets(
     from app.services.workpaper_sync.adapters import registry as registry_module
     from app.services.workpaper_sync.projection_provisioning import load_projection_supply
 
+    adjudication = load_wp_code_adjudication()
+
     targets: list[ProvisionTarget] = []
     for row in registry_module.DELIVERED_PER_ENTRY_CONTRACTS:
         entry_id = str(row.get("entry_id") or "").strip()
         if entry_filter and entry_id != entry_filter:
             continue
         supply = load_projection_supply(entry_id)
-        wp_codes = tuple(sorted(getattr(supply.provider, "PILOT_WP_CODES", ()) or ()))
+        # 🔴 宿主解析**不读** `PILOT_WP_CODES`：那是 manifest 从宿主 Vue 文件名 CamelCase 抽出来的
+        #    启发式产物，实测产出 `D2A` / `G7L` / `H1F` 三个在 `wp_index` 里 0 命中的幻影码，
+        #    于是四份契约全部 unresolved 且 `unresolved_reason` 说的原因（「没有承载它的业务底稿」）
+        #    是错的。真源见 `backend/data/workpaper_sync_entry_wp_code_adjudication.json`
+        #    （契约里冻结的 `template.relative_path` + 受管 `excel_name`，都进了 contract sha256）。
+        verdict = adjudication.get(entry_id)
+        wp_codes = tuple(verdict["wp_codes"]) if verdict else ()
         target = ProvisionTarget(
             entry_id=entry_id,
             contract_id=supply.contract_id,
             provider_module=supply.provider_module,
             wp_codes=wp_codes,
         )
+        if verdict is None:
+            # fail closed：**不回落**到启发式。回落等于把「无人裁决」伪装成「已裁决」。
+            target.unresolved_reason = (
+                f"entry {entry_id} 在 wp_code 裁决表里没有条目 —— 宿主解析必须走显式裁决，"
+                "不得回落到 manifest 的 `wp_code_patterns` 启发式（它会产幻影码）"
+            )
+            targets.append(target)
+            continue
+        if not verdict.get("resolvable_today", True):
+            target.unresolved_reason = (
+                f"entry {entry_id} 的 wp_code 裁决为 {list(wp_codes)}，但登记为今日不可解析："
+                f"{verdict.get('blocking_reason') or '（未写明原因）'}"
+            )
+            targets.append(target)
+            continue
         if not wp_codes:
             target.unresolved_reason = (
-                f"provider {supply.provider_module} 没有 `PILOT_WP_CODES` —— "
-                "无法确定该 entry 对应哪些底稿编码"
+                f"entry {entry_id} 的裁决条目里 `wp_codes` 为空 —— 裁决表结构错误"
             )
             targets.append(target)
             continue

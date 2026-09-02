@@ -1,0 +1,82 @@
+{
+  "adjudication_digest": "c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
+  "adjudications": [
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "B60=「总体审计策略及具体审计计划」（唯一有文件的实例是 5749B 占位表，无该 sheet）；B60B=「对IPO申报财务报表审计的特殊考虑」，与工时预算无关",
+        "heuristic_would_say": [
+          "B60",
+          "B60B"
+        ],
+        "managed_excel_name": "B60-1工时预算与控制表",
+        "template_relative_path": "B/B60-1 审计项目工时预算与控制表.xlsx",
+        "wp_index_evidence": "wp_code=B60-1「审计项目工时预算与控制表」3 行未删除、3 行有 file_path；三份文件与权威模板同为 16568 B 且都含该 sheet(31x9)"
+      },
+      "contract_id": "b60.hour_budget",
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "resolvable_today": true,
+      "wp_codes": [
+        "B60-1"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "D2A 在 wp_index 里 0 命中（CamelCase 吞掉了 Accounts 的 A）",
+        "heuristic_would_say": [
+          "D2A"
+        ],
+        "managed_excel_name": "明细表D2-2",
+        "template_relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+        "wp_index_evidence": "wp_code=D2-2「应收账款明细表」5 行未删除、1 行有 file_path"
+      },
+      "contract_id": "d2.receivable_detail",
+      "entry_id": "xlsx/gt-d2-accounts-receivable",
+      "resolvable_today": true,
+      "wp_codes": [
+        "D2-2"
+      ]
+    },
+    {
+      "basis": {
+        "blocked_note": "🔴 G7 不是本 entry 独占：gt-g7-equity-method / gt-g7-equity-subsidiary 的真码同为 G7 ⇒ 以 wp_code 为 matcher 域会撞 RG-3 MatcherOverlapError。本条裁决只供 provisioning 定位宿主，**不得**直接当 EntryMatcher 的域",
+        "heuristic_is_wrong_because": "G7L 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "G7L"
+        ],
+        "managed_excel_name": "附注披露信息（国企）",
+        "template_relative_path": "G/G7 长期股权投资.xlsx",
+        "wp_index_evidence": "wp_code=G7「长期股权投资」4 行未删除、4 行有 file_path"
+      },
+      "blocking_reason": "matcher 需先从「按 wp_code 路由」改成「按 entry 路由」（独立设计决策）",
+      "contract_id": "g7.soe_subsidiary_disclosure",
+      "entry_id": "xlsx/gt-g7-long-term-equity-main",
+      "resolvable_today": false,
+      "wp_codes": [
+        "G7"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "H1F 在 wp_index 里 0 命中",
+        "heuristic_would_say": [
+          "H1F"
+        ],
+        "managed_excel_name": "减少检查表H1-8",
+        "not_h1_8_because": "wp_code=H1-8 是「固定资产调整分录」（2 行、**0 行有文件**），而「减少检查表H1-8」是 H1 固定资产.xlsx 里的一个 sheet",
+        "template_relative_path": "H/H1 固定资产.xlsx",
+        "wp_index_evidence": "wp_code=H1「固定资产」5 行未删除、5 行有 file_path"
+      },
+      "contract_id": "h1.disposal_check",
+      "entry_id": "xlsx/gt-h1-fixed-assets",
+      "resolvable_today": true,
+      "wp_codes": [
+        "H1"
+      ]
+    }
+  ],
+  "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",
+  "not_fixing_the_heuristic_here": "本轮**不改** `_source_match()` 的正则：修正它会让 `gt-g7-equity-method` / `gt-g7-equity-subsidiary` / `gt-g7-long-term-equity-main` 三个 entry 的码同时收敛到 `G7`，而 Task 43 对 g7 的选型依据正是 `G7L` 的**matcher 域独占**（见 adapters/registry.py 的 RG-3 说明）—— 一改就撞 `MatcherOverlapError`。那需要把 matcher 从「按 wp_code 路由」改成「按 entry 路由」，是独立设计决策。本文件先把 provisioning 与那个启发式**解耦**，使幻影码不再致害。",
+  "review_status": "reviewed",
+  "schema_version": "entry-wp-code-adjudication:v1",
+  "why": "provisioning 的宿主解析**不得**依赖 manifest 的 `wp_match.wp_code_patterns` —— 那是 `generate_workpaper_sync_manifest._source_match()` 从**宿主 Vue 文件名**（CamelCase）抽出来的启发式产物，正则 `[A-Z][0-9]+(?:-[0-9]+)*(?:[A-Z])?` 会把下一个词的首字母吞进来，产出 `D2A` / `G7L` / `H1F` 这类**在 wp_index 里 0 命中**的幻影码（pilot 模块自己的 docstring 已承认这点）。实测后果：Task 76 的 `resolve_targets` 对四份契约全部 unresolved，且它给出的原因（「库里没有承载它的业务底稿实例」）是错的 —— 宿主底稿多得是，缺的是正确的码。"
+}
