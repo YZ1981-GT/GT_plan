@@ -102,6 +102,42 @@
    "why_not_fixed_here": "正文明令不运行真实 OO 场景。"
   }
  ],
+ "census_contract": {
+  "census_keys": [
+   "census_contract.measured",
+   "inbound_obligations"
+  ],
+  "excluded_is_not_unchecked": "`census_semantics` 断言六条语义性质，其中 `scan_reaches_beyond_the_required_targets` 专门抓「只返回写死的 5 条」。",
+  "measured": {
+   "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
+   "row_count": 13,
+   "structured_ownership_rows": 10
+  },
+  "projection": "`inbound_obligations` → 只保留 `required_inbound_targets` 那几行（稳定核）；整块剔会把「普查器退化」一起放过。",
+  "semantics": {
+   "all_hold": true,
+   "all_required_targets_present": true,
+   "both_ownership_kinds_present": true,
+   "every_scan_root_is_represented": true,
+   "failing_checks": [],
+   "opaque_gate_carries_structured_ownership": true,
+   "scan_is_not_empty": true,
+   "scan_reaches_beyond_the_required_targets": true,
+   "scan_roots_are_declared": true,
+   "scan_roots_represented": {
+    "backend/app": true,
+    "backend/data": true
+   }
+  },
+  "statement": "入向义务是仓库级普查的结果（随仓库演进）：`--check` 时现算并断言语义性质，**不进**逐字节冻结基线；真实目标那几行走投影，继续锁死。",
+  "still_locked": [
+   "report_commit（源码变了但报告没重生成 —— 唯一的真 stale 轴）",
+   "required_inbound_targets 那几行的 kinds / hit_count / structured_ownership",
+   "chain_checks 的逐项判定、counters、entries 的逐 entry 事实",
+   "report_digest（现在算在 census 投影**之后**的内容上 ⇒ 非普查内容继续锁死）"
+  ],
+  "why": "BP-72-8 实测：下游 pre-delete 报告落进 `backend/data/` 就把 12 行顶成 13 行。"
+ },
  "chain_checks": {
   "application_and_engine_are_durable_only": {
    "check_id": "application_and_engine_are_durable_only",
@@ -27269,6 +27305,15 @@
    "structured_ownership": true
   },
   {
+   "hit_count": 19,
+   "kinds": [
+    "owner_task",
+    "prose_reference"
+   ],
+   "path": "backend/data/workpaper_sync_task72_pre_delete_eligibility.json",
+   "structured_ownership": true
+  },
+  {
    "hit_count": 5,
    "kinds": [
     "owner_task",
@@ -27277,6 +27322,10 @@
    "path": "backend/data/workpaper_task61_word_pilot_gate_probes.json",
    "structured_ownership": true
   }
+ ],
+ "inbound_scan_roots": [
+  "backend/app",
+  "backend/data"
  ],
  "inputs": {
   "entry_manifest": {
@@ -27412,8 +27461,8 @@
   "SELECT id::text AS id, entry_id, manifest_source_digest, scenario_profile_digest, required_scenario_set_digest, definition_bundle_sha256, authority_model_definition_sha256, editability, room_model, aggregate_result FROM working_paper_sync_test_run",
   "SELECT s.id::text AS id, r.entry_id AS entry_id, s.scenario_id, s.scenario_kind, s.result FROM working_paper_entry_evidence_scenario s JOIN working_paper_sync_test_run r ON r.id = s.run_id"
  ],
- "report_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
- "report_digest": "ecde1f1d6947189af147693d2767ee06e6446e4a98ba9c7364be782d2588dc9f",
+ "report_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
+ "report_digest": "2e4efc280b6e933456383dc0bca977a743e834cc46936db456015185721f1bea",
  "reported_counter_kinds": [
   "unadjudicated",
   "fake_bidirectional",

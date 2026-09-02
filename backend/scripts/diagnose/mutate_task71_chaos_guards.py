@@ -549,10 +549,11 @@ MUTATIONS: Final[tuple[Mutation, ...]] = (
         "M61",
         GATE_REL,
         "upstream_lock_impact",
-        '        "task70_lock_goes_stale_because_of_this_gate": (',
-        '        "task70_lock_goes_stale_because_of_this_gate": False,  # mutated: 谎报无影响\n        "_unused_stale": (',
+        '        "task70_lock_goes_stale_because_of_this_gate": not projection_agrees,',
+        '        "task70_lock_goes_stale_because_of_this_gate": False,  # mutated: 与现算脱钩',
         "TestGuardPlacement::test_upstream_lock_impact_is_measured_and_owned",
-        "谎报「本门守卫不影响上游锁」—— 收尾必须交代是否新增红，藏起来等于隐瞒",
+        "把「上游锁是否被本门顶红」写死成 False 而不是由现算投影派生 —— 上游普查免疫被回退时"
+        "本门会谎报「无影响」，收尾必须交代是否新增红，藏起来等于隐瞒",
     ),
     Mutation(
         "M62",
@@ -743,28 +744,29 @@ def locate(mutation: Mutation) -> tuple[Path, str, str]:
     return path, source, mutated
 
 
-def check_anchors() -> int:
+def check_anchors(mutations: tuple[Mutation, ...] | None = None) -> int:
     """只读锚点体检 —— 「已归档的变异集是否还可复现」的最便宜判据。"""
+    chosen = MUTATIONS if mutations is None else mutations
     bad: list[str] = []
-    for mutation in MUTATIONS:
+    for mutation in chosen:
         try:
             locate(mutation)
         except LookupError as exc:
             bad.append(f"  {mutation.mid}  {exc}")
-    print(f"[任务71变异] 锚点体检 {len(MUTATIONS) - len(bad)}/{len(MUTATIONS)} 命中")
+    print(f"[任务71变异] 锚点体检 {len(chosen) - len(bad)}/{len(chosen)} 命中")
     for line in bad:
         print(line)
     return 1 if bad else 0
 
 
-def run_pytest() -> tuple[int, str]:
+def run_pytest(targets: tuple[str, ...] = (GUARD_TEST,)) -> tuple[int, str]:
     """跑守卫文件。**不经 shell**（`-k "a or b"` 会被拆成位置参数）。`-rfE` 同时收 ERROR。"""
     proc = subprocess.run(
         [
             sys.executable,
             "-m",
             "pytest",
-            GUARD_TEST,
+            *targets,
             "-q",
             "--no-header",
             "-p",
@@ -806,14 +808,19 @@ def classify(output: str, want: str) -> str:
     return "GREEN"
 
 
-def run(selected: list[str]) -> int:
-    chosen = [m for m in MUTATIONS if m.mid in selected] if selected != ["all"] else list(MUTATIONS)
-    unknown = sorted(set(selected) - {m.mid for m in MUTATIONS} - {"all"})
+def run(
+    selected: list[str],
+    mutations: tuple[Mutation, ...] | None = None,
+    targets: tuple[str, ...] = (GUARD_TEST,),
+) -> int:
+    pool = MUTATIONS if mutations is None else mutations
+    chosen = [m for m in pool if m.mid in selected] if selected != ["all"] else list(pool)
+    unknown = sorted(set(selected) - {m.mid for m in pool} - {"all"})
     if unknown:
         print(f"[任务71变异] 未知变异号: {unknown}", file=sys.stderr)
         return 2
 
-    baseline = {rel: md5(REPO / rel) for rel in {GATE_REL, GUARD_REL}}
+    baseline = {rel: md5(REPO / rel) for rel in {m.file for m in chosen}}
     verdicts: dict[str, str] = {}
     for mutation in chosen:
         try:
@@ -824,7 +831,7 @@ def run(selected: list[str]) -> int:
             continue
         try:
             write_source(path, mutated)
-            _, output = run_pytest()
+            _, output = run_pytest(targets)
             state = classify(output, mutation.want)
         finally:
             write_source(path, original)

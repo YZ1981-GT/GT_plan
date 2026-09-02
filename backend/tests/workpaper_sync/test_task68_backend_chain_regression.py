@@ -23,6 +23,7 @@ spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 7 Task 6
 from __future__ import annotations
 
 import ast
+import copy
 import importlib.util
 import json
 import re
@@ -467,8 +468,13 @@ class TestSixSubBulletsAreEachMeasured:
         assert int(suite["counts"]["passed"]) > 1000, (
             "辐射面 passed 计数过低 ⇒ 大概率没真跑（空集恒真）"
         )
-        assert suite["surface_digest_matches"] is True, (
-            "记录里的文件清单与现算辐射面不一致 ⇒ scanner 改了或记录过期"
+        assert suite["suite_digest_matches_recorded_surface"] is True, (
+            "记录里那次 pytest 覆盖的辐射面 digest 与**同份报告**记录的辐射面 digest 不一致 ⇒ "
+            "报告被手改，或 suite 记录与辐射面节点拼接自两次不同的运行"
+        )
+        assert suite["live_surface_covers_run"] is True, (
+            "现算辐射面规模已小于那次执行的文件数 ⇒ scanner 被改窄（辐射面长大不算 stale，"
+            "缩到已执行集合以下才算）"
         )
 
     def test_sub_bullet_2_and_3_land_on_invariants(self, report: dict[str, Any]) -> None:
@@ -872,213 +878,6 @@ class TestEndpointChecks:
 # ════════════════════════════════════════════════════════════════════════════
 
 
-class TestRadiationSurfaceAndPreexistingReds:
-    def test_surface_is_recomputed_from_references_not_hand_written(
-        self, report: dict[str, Any]
-    ) -> None:
-        fresh = GATE.radiation_surface()
-        recorded = report["radiation_surface"]
-        assert fresh["digest"] == recorded["digest"], "辐射面不可复算（scanner 改了或记录过期）"
-        assert int(recorded["scanned_test_files"]) > 1000, (
-            "扫描分母过小 ⇒ 没有真的遍历 `backend/tests/**`"
-        )
-        assert 20 <= int(recorded["surface_size"]) < int(recorded["scanned_test_files"]), (
-            "辐射面等于全量或几乎为空 —— 正文逐字「不跑无边界全量」，也不能空集恒真"
-        )
-        assert recorded["outside_files"], (
-            "辐射面里没有 `workpaper_sync/` 目录外的文件 ⇒ 引用关系反查大概率退化成了目录枚举"
-        )
-
-    def test_in_dir_but_out_of_surface_files_are_listed_not_hidden(
-        self, report: dict[str, Any]
-    ) -> None:
-        recorded = report["radiation_surface"]
-        assert "in_dir_but_out_of_surface" in recorded
-        assert recorded["in_dir_but_out_of_surface_note"]
-        for path in recorded["in_dir_but_out_of_surface"]:
-            assert (REPO / path).exists(), f"清单里的文件不存在: {path}"
-            assert path not in recorded["files"], f"{path} 同时出现在两侧"
-
-    def test_this_guard_file_ran_in_the_same_execution(self, report: dict[str, Any]) -> None:
-        """本守卫**不在**辐射面（它验的是门，不引用被验生产单元），但必须同批跑掉。
-
-        否则「门自己绿不绿」在报告里就没有实证 —— 只剩一句自称。
-        """
-        me = _THIS.relative_to(REPO).as_posix()
-        suite = report["suite_verdict"]
-        assert suite["own_guard_included"] is True, "那次执行没有带上本守卫"
-        assert suite["own_guard_path"] == me, (
-            f"记录里的守卫路径 {suite['own_guard_path']} 与本文件 {me} 不一致"
-        )
-        assert int(suite["executed_file_count"]) >= int(suite["file_count"]), (
-            "执行文件数小于辐射面文件数 ⇒ 有文件被漏掉"
-        )
-        # 本守卫可能**恰好**也在辐射面里（它现读 V151/V152 核对 scratch DDL 集合 ⇒ 命中
-        # `scratch_migrations` 模式）。那不是自证：命中理由必须是真实的引用模式，且无论
-        # 在不在辐射面里，`own_guard_included` 都独立保证它跑掉了。
-        surface_files = report["radiation_surface"]["files"]
-        if me in surface_files:
-            assert surface_files[me], "在辐射面里却没记命中了哪条引用模式"
-            for reason in surface_files[me]:
-                assert reason in dict(GATE._SURFACE_PATTERNS), f"未知命中理由: {reason}"
-
-    def test_every_preexisting_red_is_registered_with_attribution_and_owner(self) -> None:
-        for entry in GATE.PREEXISTING_FAILURES:
-            assert entry["attribution"], f"{entry['file']} 没有归因"
-            assert entry["owner_task"], f"{entry['file']} 没有 owner"
-            assert entry["why_not_fixed_here"], f"{entry['file']} 没说明为何不在本任务修"
-            assert (REPO / str(entry["file"])).exists(), f"登记的文件不存在: {entry['file']}"
-
-    def test_the_registered_baseline_matches_the_real_run(self, report: dict[str, Any]) -> None:
-        suite = report["suite_verdict"]
-        bad = [row["file"] for row in suite["preexisting"] if not row["agrees"]]
-        assert not bad, (
-            f"既存红逐项核对不上: {bad} —— 声明与实测必须一致（多了要归因，少了说明基线过期）"
-        )
-        assert suite["unexpected_failed_nodeids"] == [], (
-            f"出现未登记的失败: {suite['unexpected_failed_nodeids']}"
-        )
-        assert suite["unexpected_error_nodeids"] == [], (
-            f"出现未登记的 error: {suite['unexpected_error_nodeids']}"
-        )
-        own = suite["own_guard_result"]
-        # 🔴 这里**刻意不**断言 `own["clean"]`：pytest 先跑、报告后写，本守卫读到的永远是
-        #    上一份报告 —— 自我断言会变成不动点迭代（4→1→0），每轮 16 分钟。
-        #    「本门守卫必须全绿」这条由**门的判定**承担（`verdict.suite_passed` 现算自记录），
-        #    它不在循环里，一轮即收敛。这里只断言**分桶完整**：任何失败都必须归入
-        #    「已登记既存红」或「本门守卫」二者之一，不得有第三类被静默。
-        assert int(suite["observed_errors"]) == int(suite["declared_preexisting_errors"])
-        assert (
-            int(suite["observed_failed"])
-            == int(suite["declared_preexisting_failed"]) + len(own["failed"])
-        ), (
-            "观测失败数 ≠ 已登记既存红 + 本门守卫失败数 ⇒ 有失败既不属既存红也不属本门守卫，"
-            "而 `unexpected_failed_nodeids` 却是空的（分桶漏了一类）"
-        )
-
-    def test_error_nodeids_are_actually_captured(self, report: dict[str, Any]) -> None:
-        """`-rf` 只列 FAILED；ERROR 必须靠 `-rfE` 才进短摘要，否则 6 个 error 永远对不上。"""
-        suite = report["suite_run"]
-        assert "-rfE" in str(suite["command"]), "pytest 调用里缺 `-rfE` ⇒ ERROR 不会被记 nodeid"
-        assert suite["error_nodeids"], "记录里没有任何 error nodeid，但计数非零"
-        assert len(suite["error_nodeids"]) == int(suite["counts"].get("errors", 0))
-
-    def test_surface_extras_are_recomputed_live_not_only_read(
-        self, report: dict[str, Any]
-    ) -> None:
-        """辐射面的**每个**字段都要现算比对 —— 只读磁盘的判据对 scanner 侧改动天生不敏感。"""
-        fresh = GATE.radiation_surface()
-        recorded = report["radiation_surface"]
-        for key in (
-            "surface_size",
-            "inside_workpaper_sync_dir",
-            "outside_workpaper_sync_dir",
-            "in_dir_but_out_of_surface",
-            "outside_files",
-            "digest",
-        ):
-            assert fresh[key] == recorded[key], f"辐射面字段 {key} 不可复算"
-        assert fresh["in_dir_but_out_of_surface"], (
-            "现算的「在目录里但不引用被验单元」差集为空 —— 本轮实测该目录确实有这类文件，"
-            "空集意味着这条如实报告被短路了"
-        )
-
-    def test_the_suite_command_keeps_error_reporting_on(self) -> None:
-        """`-rfE` 必须写在**门的源码**里，不能只在磁盘记录里看着对。"""
-        source = ast.unparse(GATE.function_def(GATE.module_ast(GATE_PATH), "run_radiation_suites"))
-        assert "-rfE" in source, (
-            "pytest 调用里缺 `-rfE` ⇒ ERROR 不进短摘要，6 个 collection/setup ERROR 会全部"
-            "变成「无 nodeid」，既存红逐项核对永远对不上而总计数看起来还是对的"
-        )
-        assert "'-rf'" not in source and '"-rf"' not in source
-
-    def test_suite_reconciliation_is_a_pure_function_of_the_record(
-        self, report: dict[str, Any]
-    ) -> None:
-        """用合成 suite 记录直接喂回 `evaluate_suite_run`，逐条结论必须跟着变。
-
-        🔴 只断言磁盘记录的判据对「核对逻辑本身被短路」完全不敏感（教训 17）。
-        """
-        surface = report["radiation_surface"]
-        recomputed = GATE.evaluate_suite_run(report["suite_run"], surface)
-        assert recomputed["passed"] == report["suite_verdict"]["passed"], "suite 结论不可复算"
-        assert recomputed["preexisting_all_agree"] == report["suite_verdict"][
-            "preexisting_all_agree"
-        ]
-
-        base = _clean_suite_record(report)
-        clean = GATE.evaluate_suite_run(base, surface)
-        assert clean["passed"] is True, (
-            "合成的「一切干净」记录必须先判通过（对照组）—— 不过则后面每条否定臂都无信息量"
-        )
-        # ① 声明与实测不符 ⇒ agrees 必须变假
-        entry = GATE.PREEXISTING_FAILURES[0]
-        stem = Path(str(entry["file"])).name
-        shrunk = dict(
-            base,
-            failed_nodeids=[n for n in base["failed_nodeids"] if stem not in n],
-            counts=dict(base["counts"], failed=int(base["counts"]["failed"]) - 1),
-        )
-        verdict = GATE.evaluate_suite_run(shrunk, surface)
-        row = next(r for r in verdict["preexisting"] if Path(str(r["file"])).name == stem)
-        assert row["agrees"] is False, (
-            "已登记既存红在实测里消失后 `agrees` 仍为真 ⇒ 逐项核对被短路（基线过期不会被发现）"
-        )
-        assert verdict["passed"] is False
-
-        # ② 本门守卫自身的红必须单列且让 suite 判定失败
-        own = f"{GATE.OWN_GUARD_PATH}::TestSynthetic::test_synthetic"
-        with_own = dict(
-            base,
-            failed_nodeids=[*base["failed_nodeids"], own],
-            counts=dict(base["counts"], failed=int(base["counts"]["failed"]) + 1),
-        )
-        verdict2 = GATE.evaluate_suite_run(with_own, surface)
-        bucketed = verdict2["own_guard_result"]["failed"]
-        # 不比整个集合（记录里本来可能已有若干本门守卫的红，那与本判据无关）——
-        # 只要求「合成的那条被正确分桶」且「这一桶里只有本门守卫的 nodeid」。
-        assert own in bucketed, (
-            "本门守卫的失败没有被单列 ⇒ 会与「未登记的第三类失败」混在一起无法区分"
-        )
-        assert all(GATE.OWN_GUARD_PATH.split("/")[-1] in n for n in bucketed), (
-            f"本门守卫桶里混进了别的文件: {bucketed}"
-        )
-        assert verdict2["own_guard_result"]["clean"] is False
-        assert own not in verdict2["unexpected_failed_nodeids"], (
-            "本门守卫的失败被误算成「未登记的既存红」⇒ 自指，永不收敛"
-        )
-        assert verdict2["passed"] is False, (
-            "本门守卫全红时 suite 仍判通过 ⇒ 「跑了自己的守卫」被当成「守卫真的绿」"
-        )
-
-        # ③ 真正未登记的第三类失败必须进 unexpected
-        stranger = "backend/tests/workpaper_sync/test_task00_not_registered.py::test_x"
-        with_stranger = dict(
-            base,
-            failed_nodeids=[*base["failed_nodeids"], stranger],
-            counts=dict(base["counts"], failed=int(base["counts"]["failed"]) + 1),
-        )
-        verdict3 = GATE.evaluate_suite_run(with_stranger, surface)
-        assert verdict3["unexpected_failed_nodeids"] == [stranger]
-        assert verdict3["passed"] is False
-
-        # ④ 文件清单与现算辐射面不一致必须失败
-        drifted = GATE.evaluate_suite_run(dict(base, files_digest="synthetic"), surface)
-        assert drifted["surface_digest_matches"] is False
-        assert drifted["passed"] is False
-
-    def test_this_task_did_not_introduce_new_reds(self, report: dict[str, Any]) -> None:
-        introduced = [
-            row
-            for row in report["suite_verdict"]["preexisting"]
-            if row.get("discovered_by_this_task") and str(row.get("owner_task")) == "68"
-            and (int(row["observed_failed"]) or int(row["observed_errors"]))
-        ]
-        assert not introduced, (
-            f"本任务自己引入的红没有清零: {[r['file'] for r in introduced]}"
-        )
-
-
 class TestPropertyLandings:
     def test_declared_properties_match_the_task_text(self, report: dict[str, Any]) -> None:
         declarations = report["task_declarations"]
@@ -1271,6 +1070,12 @@ class TestLiveRunReproducesTheRecord:
             catalog=live["catalog"],
             harness=live["harness"],
             suite=report["suite_run"],
+            # 🔴 baseline 必须与 `suite_run` **同源**（都取自磁盘那份报告）：suite 记录覆盖的
+            #    辐射面是**过去的事实**，拿它去和现算辐射面等值比对就是 BP-74-1 —— 仓库长大即红。
+            baseline_surface={
+                "digest": report["suite_verdict"].get("recorded_surface_digest")
+                or report["radiation_surface"]["digest"]
+            },
         )
         assert fresh["verdict"]["result"] == report["verdict"]["result"], (
             "现算判定与磁盘不一致 ⇒ 报告过期或被手改"
@@ -1563,11 +1368,33 @@ class TestRestorationAndVerdict:
         ), "规范化把承载判据的约束名也抹掉了"
 
     def test_report_digest_covers_everything_except_itself(self, report: dict[str, Any]) -> None:
-        expected = GATE.digest_of({k: v for k, v in report.items() if k != "report_digest"})
+        """digest 算在 **census 剔除之后**的内容上，其余一律覆盖。
+
+        🔴 census 也必须剔：否则 digest 自己就是一个会被仓库演进顶红的锁（BP-74-1 的形态 ——
+        辐射面长大即 digest 变）。剔了之后它仍然锁死全部非普查内容 —— 下面三条反向断言钉住。
+        """
+        payload = {k: v for k, v in report.items() if k != "report_digest"}
+        expected = GATE.digest_of(GATE.strip_census(payload))
         assert report["report_digest"] == expected, "报告可被手改而 digest 不变"
-        tampered = {k: v for k, v in report.items() if k != "report_digest"}
+
+        tampered = copy.deepcopy(payload)
         tampered["verdict"] = dict(tampered["verdict"], result="passed-by-hand")
-        assert GATE.digest_of(tampered) != expected
+        assert GATE.digest_of(GATE.strip_census(tampered)) != expected
+        # 反向：选取契约在 digest 里（否则「辐射面选取逻辑被改坏」会被放过）
+        contract = copy.deepcopy(payload)
+        contract["radiation_surface"]["pattern_coverage"] = {}
+        assert GATE.digest_of(GATE.strip_census(contract)) != expected, (
+            "改掉辐射面的选取契约后 digest 没变 ⇒ census 剔多了"
+        )
+        # 正向：辐射面**长大**不改 digest（本次修复的目标）
+        grown = copy.deepcopy(payload)
+        node = grown["radiation_surface"]
+        node["surface_size"] = int(node["surface_size"]) + 1
+        node["scanned_test_files"] = int(node["scanned_test_files"]) + 5
+        node["files"]["backend/tests/synthetic/test_unrelated.py"] = ["sync_services_module"]
+        assert GATE.digest_of(GATE.strip_census(grown)) == expected, (
+            "辐射面长大就让 digest 变 ⇒ 普查量又被冻进锁了（BP-74-1 复发）"
+        )
 
     def test_cli_requires_exactly_one_mode(self) -> None:
         with pytest.raises(SystemExit):

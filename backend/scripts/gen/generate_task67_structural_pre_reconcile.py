@@ -46,6 +46,11 @@ stale 清零**，不运行真实 OO 场景，**不授权删除**，也不把 pla
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))  # import 自举：backend/scripts
+import _census_lock  # noqa: E402  普查量/逐字节锁分离（四门共用，说理在那里）
+
 import argparse
 import asyncio
 import copy
@@ -1863,6 +1868,99 @@ REQUIRED_INBOUND_TARGETS: tuple[str, ...] = (
 )
 
 
+#: 🔴 **普查派生量（census-derived）** —— 逐字节锁必须剔除/投影的那一类字段。
+#: 缺陷形态、为什么剔、剔除 ≠ 不管：见 `backend/scripts/_census_lock.py`（同型三处 + 一处传递）。
+#:
+#: 本门落点：`inbound_obligations` = 现扫 `backend/app` 与 `backend/data` 里点名 Task 67 的
+#: 文件，随仓库演进。BP-72-8 实测：Task 72 的 pre-delete 报告一落盘就把 12 行顶成 13 行，
+#: `test_inbound_scan_recomputes_...` 与 `test_check_matches_the_file_on_disk` 双双打红。
+#: 本节点走**投影**而非删除：整块剔会把「入向普查器退化」一起放过（教训 16 的原始动机），
+#: 故 :data:`REQUIRED_INBOUND_TARGETS` 那批真实目标的行继续锁死，只剔随仓库增长的尾巴。
+CENSUS_KEYS: tuple[str, ...] = ("inbound_obligations", "census_contract.measured")
+
+
+def _project_inbound_obligations(rows: Any) -> Any:
+    """入向义务的**稳定投影**：只留真实目标那几行（它们不随仓库演进，继续进锁）。"""
+    if not isinstance(rows, list):
+        return rows
+    return [
+        r for r in rows if isinstance(r, Mapping) and str(r.get("path")) in REQUIRED_INBOUND_TARGETS
+    ]
+
+
+#: 走**投影**（保留稳定核）而不是整块剔除的 census 路径。未列在此的 census 路径整块剔。
+CENSUS_PROJECTIONS: Mapping[str, Any] = {"inbound_obligations": _project_inbound_obligations}
+
+
+def strip_census(node: Any, *, path: str = "") -> Any:
+    """按点号路径对 :data:`CENSUS_KEYS` 剔除、对 :data:`CENSUS_PROJECTIONS` 投影（机制见
+    `_census_lock`）。🔴 路径限定而非裸键名：报告里另有十余处正当的 `sha256` / `*_digest`，
+    按裸键名剔会把真 stale 轴一起放过。
+    """
+    return _census_lock.strip_census(
+        node, CENSUS_KEYS, projections=CENSUS_PROJECTIONS, path=path
+    )
+
+
+def census_semantics(rows: Sequence[Mapping[str, Any]] | None = None) -> dict[str, Any]:
+    """入向普查的**语义性质**。现算、不随仓库演进 ⇒ 逐条进锁（框架见 `_census_lock`）。
+
+    * `scan_is_not_empty` 空集恒真；`all_required_targets_present` 普查器漏掉真实目标；
+    * `scan_reaches_beyond_the_required_targets` —— 普查器被「修」成只返回那 5 条写死目标时
+      投影比对照样绿，这条是唯一能抓到它的判据；
+    * `every_scan_root_is_represented` 某个扫描根整块失联；`both_ownership_kinds_present`
+      「结构化归属 vs 散文提及」被压平成一态。
+    """
+    live = list(rows) if rows is not None else collect_inbound_obligations()
+    paths = {str(row["path"]) for row in live}
+    structured = {str(row["path"]) for row in live if row.get("structured_ownership")}
+    roots = {r: any(p.startswith(f"{r}/") for p in paths) for r in INBOUND_SCAN_ROOTS}
+    checks = {
+        "scan_is_not_empty": bool(live),
+        "all_required_targets_present": set(REQUIRED_INBOUND_TARGETS) <= paths,
+        "scan_reaches_beyond_the_required_targets": bool(paths - set(REQUIRED_INBOUND_TARGETS)),
+        # 🔴 「每个根都有代表」与「一个根都没登记」必须分开：空的 roots 字典让 `all()` 恒真。
+        "scan_roots_are_declared": bool(roots) and set(roots) == set(INBOUND_SCAN_ROOTS),
+        "every_scan_root_is_represented": bool(roots) and all(roots.values()),
+        "both_ownership_kinds_present": bool(structured) and bool(paths - structured),
+        "opaque_gate_carries_structured_ownership": (
+            "backend/app/services/workpaper_sync/opaque_entry_gate.py" in structured
+        ),
+    }
+    return _census_lock.finalize_checks(checks, scan_roots_represented=roots)
+
+
+def build_census_contract(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    """普查契约节点。组装见 `_census_lock.build_census_contract`。"""
+    return _census_lock.build_census_contract(
+        statement=(
+            "入向义务是仓库级普查的结果（随仓库演进）：`--check` 时现算并断言语义性质，"
+            "**不进**逐字节冻结基线；真实目标那几行走投影，继续锁死。"
+        ),
+        census_keys=CENSUS_KEYS,
+        projection=(
+            "`inbound_obligations` → 只保留 `required_inbound_targets` 那几行（稳定核）；"
+            "整块剔会把「普查器退化」一起放过。"
+        ),
+        why="BP-72-8 实测：下游 pre-delete 报告落进 `backend/data/` 就把 12 行顶成 13 行。",
+        excluded_is_not_unchecked=(
+            "`census_semantics` 断言六条语义性质，其中 "
+            "`scan_reaches_beyond_the_required_targets` 专门抓「只返回写死的 5 条」。"
+        ),
+        still_locked=[
+            "report_commit（源码变了但报告没重生成 —— 唯一的真 stale 轴）",
+            "required_inbound_targets 那几行的 kinds / hit_count / structured_ownership",
+            "chain_checks 的逐项判定、counters、entries 的逐 entry 事实",
+            "report_digest（现在算在 census 投影**之后**的内容上 ⇒ 非普查内容继续锁死）",
+        ],
+        semantics=census_semantics(rows),
+        measured={
+            "row_count": len(rows),
+            "structured_ownership_rows": sum(1 for r in rows if r.get("structured_ownership")),
+        },
+    )
+
+
 def collect_inbound_obligations() -> list[dict[str, Any]]:
     """现扫生产代码/数据里点名 Task 67 的归属登记（不抄第二份清单）。"""
     out: list[dict[str, Any]] = []
@@ -2198,6 +2296,8 @@ def build_report() -> dict[str, Any]:
         "structural_errors": errors,
         "counters": counters,
         "inbound_obligations": inbound,
+        "census_contract": build_census_contract(inbound),
+        "inbound_scan_roots": list(INBOUND_SCAN_ROOTS),
         "required_inbound_targets": list(REQUIRED_INBOUND_TARGETS),
         "blocking_preconditions": bps,
         "entries": rows,
@@ -2212,8 +2312,10 @@ def build_report() -> dict[str, Any]:
             "Property 67", "Property 69", "Property 70", "Property 71",
         ],
     }
+    # 🔴 digest 算在 **census 投影之后**的内容上：于是它继续锁死「非普查内容」（报告不可被
+    #    手改），而不再被仓库演进顶红。少了 `strip_census`，digest 就重新变成一个会自己过期的锁。
     report["report_digest"] = digest_of(
-        {key: value for key, value in report.items() if key != "report_digest"}
+        strip_census({key: value for key, value in report.items() if key != "report_digest"})
     )
     return report
 
@@ -2256,16 +2358,27 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--write", action="store_true", help="重算并原子写入报告")
     args = parser.parse_args(argv)
 
-    rendered = render(build_report())
+    report = build_report()
+    rendered = render(report)
     if args.check:
         if not OUTPUT_PATH.is_file():
             print(f"[FAIL] {rel(OUTPUT_PATH)} 不存在 —— 先跑 --write")
             return 2
-        on_disk = OUTPUT_PATH.read_text(encoding="utf-8")
-        if on_disk != rendered:
-            print(f"[FAIL] {rel(OUTPUT_PATH)} 与现算结果不同（逐字节比对失败）")
+        on_disk = json.loads(OUTPUT_PATH.read_text(encoding="utf-8"))
+        # 🔴 逐字节比对在 census 投影**之后**做（BP-72-8）；剔除 ≠ 不管，语义断言紧随其后现算。
+        if strip_census(on_disk) != strip_census(json.loads(rendered)):
+            print(f"[FAIL] {rel(OUTPUT_PATH)} 与现算不同（已按 census 投影，剩下的是真 stale 轴）")
             return 2
-        print(f"[OK] {rel(OUTPUT_PATH)} 与现算结果逐字节一致")
+        semantics = report["census_contract"]["semantics"]
+        if not semantics["all_hold"]:
+            print(f"[FAIL] 入向普查语义断言不成立: {semantics['failing_checks']}")
+            return 2
+        disk_rows = ((on_disk.get("census_contract") or {}).get("measured") or {}).get("row_count")
+        live_rows = report["census_contract"]["measured"]["row_count"]
+        print(
+            f"[OK] {rel(OUTPUT_PATH)} 一致（census 剔除后）；"
+            f"入向义务快照 {disk_rows} → {live_rows} 行（不参与锁）"
+        )
         return 0
 
     tmp = OUTPUT_PATH.with_suffix(OUTPUT_PATH.suffix + ".tmp")

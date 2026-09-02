@@ -1580,11 +1580,47 @@ class TestInboundObligationsAndBlockingPreconditions:
     def test_inbound_scan_recomputes_and_contains_the_real_targets(
         self, report: dict[str, Any]
     ) -> None:
-        """教训 16：不只要求非空 + 逐条成立，还要断言真实目标在里面。"""
+        """教训 16：不只要求非空 + 逐条成立，还要断言真实目标在里面。
+
+        🔴 这里原来比 `现算路径集合 == 记录路径集合` —— 那是把「本仓库今天有几个文件点名本任务」
+        冻进了锁：任何新落盘且正文提到本任务的产物都让它打红（BP-72-8 实测）。改成两段：
+        ①现算侧断言**语义性质**（非空 / 覆盖真实目标 / 触及真实目标之外 / 两个扫描根都有代表 /
+        结构化归属与散文提及两态都在）；②记录 ↔ 现算只在**真实目标那几行**上逐字节相等
+        （投影，见 `GEN.strip_census`）。
+        """
         live = GEN.collect_inbound_obligations()
         recorded = report["inbound_obligations"]
-        assert {row["path"] for row in live} == {row["path"] for row in recorded}
-        paths = {row["path"] for row in recorded}
+
+        # ① 现算侧语义性质：不随仓库演进，逐条可断言
+        semantics = GEN.census_semantics(live)
+        assert semantics["all_hold"] is True, (
+            f"入向普查语义断言不成立: {semantics['failing_checks']}"
+        )
+        # 这条**单独**列出来：普查器被「修」成只返回那 5 条写死目标时，投影比对照样绿，
+        # 只有它能抓到（剔除 ≠ 不管的核心一条）。
+        assert semantics["scan_reaches_beyond_the_required_targets"] is True, (
+            "入向普查只返回了写死的真实目标 ⇒ 它已经不是普查器了"
+        )
+        assert semantics["every_scan_root_is_represented"] is True, (
+            f"某个扫描根整块失联: {semantics['scan_roots_represented']}"
+        )
+
+        # ② 记录 ↔ 现算：真实目标那几行逐字节相等（尾巴走 census，不进锁）
+        live_core = {
+            row["path"]: row
+            for row in live
+            if row["path"] in GEN.REQUIRED_INBOUND_TARGETS
+        }
+        recorded_core = {
+            row["path"]: row
+            for row in recorded
+            if row["path"] in GEN.REQUIRED_INBOUND_TARGETS
+        }
+        assert live_core == recorded_core, (
+            "真实目标那几行的现算结果与记录不一致 ⇒ 普查器对它们的判定漂移了"
+        )
+        assert len(live) > len(GEN.REQUIRED_INBOUND_TARGETS)
+        paths = {row["path"] for row in live}
         # 🔴 这五条路径**写死在判据里**，不迭代 `GEN.REQUIRED_INBOUND_TARGETS`：
         # 迭代那个常量时，把常量删空判据照样绿（教训 16 的 M13 形态）。
         for target in (
@@ -1769,10 +1805,25 @@ class TestInboundObligationsAndBlockingPreconditions:
 
 class TestGeneratorIsIdempotentAndCheckIsStrict:
     def test_check_matches_the_file_on_disk(self, live_report: dict[str, Any]) -> None:
-        """`--check` 与磁盘逐字节比对。变异检验的公共锚点（几乎每条变异都会带红它）。"""
-        rendered = GEN.render(live_report)
-        assert rendered == REPORT_PATH.read_text(encoding="utf-8"), (
-            "现算报告与磁盘不同 —— 生成器或输入变了，请重跑 `--write`"
+        """`--check` 与磁盘比对（**在 census 投影之后**）。变异检验的公共锚点。
+
+        🔴 原判据是 `render(live) == 磁盘原文` 的裸逐字节比对 —— 它把
+        `inbound_obligations`（现扫 `backend/app` / `backend/data` 里点名本任务的文件）冻进了锁：
+        任何新落盘且正文提到本任务的产物都让它打红（BP-72-8）。现在比对走
+        `GEN.strip_census()`，普查尾巴被投影掉、真实目标那几行仍逐字节相等。
+        """
+        on_disk = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
+        assert GEN.strip_census(on_disk) == GEN.strip_census(live_report), (
+            "现算报告与磁盘不同（已按 census 投影，剩下的都是真 stale 轴）—— "
+            "生成器或输入变了，请重跑 `--write`"
+        )
+        # 剔了什么必须可核对，且**只**剔那一处普查量
+        assert set(GEN.CENSUS_KEYS) == {"inbound_obligations", "census_contract.measured"}
+        # 真实目标那几行必须真的**留在**投影里（投影不是「整块剔掉」）
+        projected = GEN.strip_census(on_disk)["inbound_obligations"]
+        assert {row["path"] for row in projected} == set(GEN.REQUIRED_INBOUND_TARGETS), (
+            "投影后的入向义务不等于那批真实目标 ⇒ 要么整块剔掉了（普查器退化会被放过），"
+            "要么投影选错了行"
         )
 
     def test_cli_requires_exactly_one_mode(self) -> None:
@@ -1793,18 +1844,45 @@ class TestGeneratorIsIdempotentAndCheckIsStrict:
         """
         payload = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
         recorded = payload.pop("report_digest")
-        assert GEN.digest_of(payload) == recorded, "report_digest 与磁盘内容不符"
+        # 🔴 digest 算在 **census 投影之后**的内容上（否则它自己就是一个会被仓库演进顶红的锁）。
+        assert GEN.digest_of(GEN.strip_census(payload)) == recorded, "report_digest 与磁盘内容不符"
 
         live = dict(live_report)
         live_digest = live.pop("report_digest")
-        assert GEN.digest_of(live) == live_digest, (
-            "现算报告的 report_digest 覆盖面小于全部字段 ⇒ 报告可被任意手改而 digest 不变"
+        assert GEN.digest_of(GEN.strip_census(live)) == live_digest, (
+            "现算报告的 report_digest 覆盖面小于全部字段（census 除外）⇒ 报告可被任意手改而 "
+            "digest 不变"
         )
         # 反向：动一个与 digest 无关的深层字段，digest 必须变。
         tampered = copy.deepcopy(live)
         tampered["counters"]["reported_by_task_text"]["unaccepted"] = -1
-        assert GEN.digest_of(tampered) != live_digest, (
+        assert GEN.digest_of(GEN.strip_census(tampered)) != live_digest, (
             "改掉 counters 里的一个数字后 digest 没变 ⇒ digest 没覆盖 counters"
+        )
+        # 反向之二：**真实目标那几行**在投影里，改它 digest 必须变（投影不是整块剔除）。
+        core = copy.deepcopy(live)
+        target = next(
+            row
+            for row in core["inbound_obligations"]
+            if row["path"] in GEN.REQUIRED_INBOUND_TARGETS
+        )
+        target["structured_ownership"] = not target["structured_ownership"]
+        assert GEN.digest_of(GEN.strip_census(core)) != live_digest, (
+            "改掉真实目标那一行的结构化归属后 digest 没变 ⇒ 投影把稳定核也剔掉了，"
+            "「普查器退化」会被放过"
+        )
+        # 正向：普查**尾巴**（真实目标之外的行）不进 digest —— 那正是本次修复要达成的效果。
+        tail = copy.deepcopy(live)
+        tail["inbound_obligations"].append(
+            {
+                "path": "backend/data/_synthetic_new_artifact_that_mentions_this_task.json",
+                "kinds": ["prose_reference"],
+                "hit_count": 1,
+                "structured_ownership": False,
+            }
+        )
+        assert GEN.digest_of(GEN.strip_census(tail)) == live_digest, (
+            "新落盘一个提到本任务的产物就让 digest 变 ⇒ 普查量又被冻进锁了（BP-72-8 复发）"
         )
 
     def test_the_report_declares_its_requirements_and_properties(self) -> None:

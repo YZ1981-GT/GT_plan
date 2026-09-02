@@ -1,9 +1,20 @@
 {
   "artifact_git_status": {
-    "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "??",
-    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "??",
-    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "??",
-    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "??"
+    "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "M",
+    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "MM",
+    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "MM",
+    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "MM"
+  },
+  "artifact_git_status_semantics": {
+    "every_product_is_on_disk": true,
+    "missing_products": [],
+    "product_count": 4,
+    "products": [
+      "backend/data/workpaper_sync_task70_oo_scenario_refresh.json",
+      "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py",
+      "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py",
+      "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py"
+    ]
   },
   "black_box_availability": {
     "application_chain_suppliable": false,
@@ -228,6 +239,42 @@
       "why_not_fixed_here": "任务 68 的产物禁改。修法在它那侧：辐射面 digest 不应把「后续任务新增的测试文件」算进锁里（或该锁应只覆盖它自己声明的被验单元清单）。"
     }
   ],
+  "census_contract": {
+    "census_keys": [
+      "artifact_git_status",
+      "census_contract.measured",
+      "radiation_surface.digest",
+      "radiation_surface.referencing_test_file_count",
+      "radiation_surface.referencing_test_files",
+      "radiation_surface.scanned_test_files"
+    ],
+    "excluded_is_not_unchecked": "剔除 ≠ 不管：`census_semantics` 逐条现算并断言语义性质，语义性质本身继续进锁。",
+    "measured": {
+      "digest": "89bd90cc272305757c5446c261dd5df2de00188a66c87d239544c646abd70c2d",
+      "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
+      "referencing_test_file_count": 284,
+      "scanned_test_files": 2346
+    },
+    "semantics": {
+      "all_hold": true,
+      "every_production_subject_is_covered": true,
+      "failing_checks": [],
+      "own_guard_is_in_the_surface": true,
+      "subject_coverage_is_complete": true,
+      "surface_is_not_empty": true,
+      "surface_is_not_the_whole_tree": true,
+      "uncovered_production_subjects": [],
+      "walk_really_traversed_the_tree": true
+    },
+    "statement": "普查派生量（仓库级扫描得出的计数与成员清单）在 `--check` 时现算并断言语义性质，**不进**逐字节冻结基线。",
+    "still_locked": [
+      "source_commit（源码变了但 evidence 没刷新 —— 唯一的真 stale 轴）",
+      "radiation_surface.production_subjects / subject_coverage / own_guard_* / how（辐射面**选取契约**：scanner 退化或 subject 名单被删立刻变红）",
+      "scenario_execution 的逐项判定与 blocked_by 码分布",
+      "report_digest（现在算在 census 剔除**之后**的内容上 ⇒ 非普查内容继续锁死）"
+    ],
+    "why": "「本仓库今天有多少测试文件 / 多少文件引用了被验单元」是随仓库演进的量。把它冻进逐字节锁 ⇒ 任意位置新增一个 `test_*.py` 都打红本门（BP-71-8 实测：登记 2340，换目录与不写模块路径字面量都躲不开）。"
+  },
   "close_gate": {
     "close_scenario_count": 8,
     "close_scenario_ids": [
@@ -1072,7 +1119,13 @@
     "unverified_without_owner": []
   },
   "radiation_surface": {
-    "digest": "f8ed6929e353afda44288257a6e188949074579e5d2071084bdb90fbcc8113e7",
+    "census_derived_keys": [
+      "digest",
+      "referencing_test_file_count",
+      "referencing_test_files",
+      "scanned_test_files"
+    ],
+    "digest": "89bd90cc272305757c5446c261dd5df2de00188a66c87d239544c646abd70c2d",
     "how": "扫 backend/tests 下 test_*.py 对本门触碰生产单元的**实际引用**，不按目录取全量",
     "own_guard_outside_census_dir": true,
     "own_guard_path": "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py",
@@ -1087,7 +1140,7 @@
       "command_service",
       "excel_entry_gate"
     ],
-    "referencing_test_file_count": 280,
+    "referencing_test_file_count": 284,
     "referencing_test_files": {
       "backend/tests/attachment_ocr_ai_evidence_governance_hardening/test_archive_hold_property_group_pbt.py": [
         "evidence"
@@ -1978,6 +2031,9 @@
         "entry_profile",
         "evidence"
       ],
+      "backend/tests/workpaper_sync/test_task74_domain_adjudication.py": [
+        "evidence"
+      ],
       "backend/tests/workpaper_sync/test_task75_published_identity_observer.py": [
         "adapters import registry",
         "adapters.registry",
@@ -2008,14 +2064,35 @@
       "backend/tests/workpaper_sync/test_v151_schema_contract.py": [
         "evidence"
       ],
+      "backend/tests/workpaper_sync_chaos/test_task71_chaos_gate.py": [
+        "evidence"
+      ],
+      "backend/tests/workpaper_sync_oo/test_task70_census_lock.py": [
+        "evidence",
+        "pilot_harness"
+      ],
       "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": [
         "command_service",
         "entry_profile",
         "evidence",
         "pilot_harness"
+      ],
+      "backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py": [
+        "evidence"
       ]
     },
-    "scanned_test_files": 2340,
+    "scanned_test_files": 2346,
+    "subject_coverage": {
+      "adapters import registry": true,
+      "adapters.registry": true,
+      "command_service": true,
+      "entry_profile": true,
+      "evidence": true,
+      "excel_entry_gate": true,
+      "pilot_harness": true,
+      "pilot_simple_checklist": true,
+      "projection_provisioning": true
+    },
     "why_own_guard_is_outside": "任务 68 的逐字节锁把 `backend/tests/workpaper_sync/` 做成**目录普查**：往那里新增任何不引用被验生产单元的测试文件都会打红它 1~3 条守卫（BP-69-6 实测）。本门的守卫因此放在 `backend/tests/workpaper_sync_oo/`。"
   },
   "readonly_inputs": [
@@ -2026,7 +2103,7 @@
     "backend/data/workpaper_sync_task68_backend_chain_regression.json",
     "backend/data/workpaper_sync_task69_frontend_regression.json"
   ],
-  "report_digest": "7e19de44fea4e118cf6a037c939b0af02084e4746cfd7c5a1f7a0b46b2af70ad",
+  "report_digest": "2c00d184309dfac54e288d64de0a08f170490152ef0a05dd16f3d0de2cba2df5",
   "result_declaration_scan": {
     "forbidden_keys": [
       "aggregate_result",
@@ -89503,7 +89580,7 @@
     }
   },
   "schema_version": "task70-oo94-full-entry-scenario-refresh:v1",
-  "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+  "source_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "sub_bullets": {
     "1": "消费任务 67 结构报告与任务 68/69 回归结果；逐 entry 从 source-backed manifest 的 editable/room_model/scenario_profile + capability + approved bundle + authority model 重新推导完整 required scenario set，固定 source/profile digest 并以新 test run 刷新 stale evidence",
@@ -90007,8 +90084,8 @@
         "registration_plan_size": 186,
         "registrations": 0
       },
-      "report_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
-      "report_digest": "ecde1f1d6947189af147693d2767ee06e6446e4a98ba9c7364be782d2588dc9f",
+      "report_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
+      "report_digest": "2e4efc280b6e933456383dc0bca977a743e834cc46936db456015185721f1bea",
       "source_regeneration_digests_agree": false,
       "test_run_rows_total": 0
     },
@@ -90034,8 +90111,8 @@
       },
       "oo_scope_boundary_owner": "70",
       "path": "backend/data/workpaper_sync_task68_backend_chain_regression.json",
-      "report_digest": "b5d75a354ca98c2cb6c0d642c86239b6f5516cb6cb11472b65706d08e32f4985",
-      "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c"
+      "report_digest": "420d04b58caf59a0d5aa0a3229f959b9720395912e0c44ae4475b6d28e90c543",
+      "source_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf"
     },
     "task69_frontend_regression": {
       "blocking_point_ids": [

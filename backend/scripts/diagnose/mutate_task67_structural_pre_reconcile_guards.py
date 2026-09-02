@@ -46,6 +46,7 @@ from _mutation_kit import Mutation, run_cli  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[3]
 
+CENSUS_LOCK = "backend/scripts/_census_lock.py"
 GEN = "backend/scripts/gen/generate_task67_structural_pre_reconcile.py"
 
 #: 🔴 kit 按**短 nodeid**（basename::类::方法）匹配新增失败集合 —— 带
@@ -425,8 +426,8 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M30", side="be", path=GEN, kind="replace",
-        anchor='        {key: value for key, value in report.items() if key != "report_digest"}',
-        new='        {"task": report["task"]}',
+        anchor='        strip_census({key: value for key, value in report.items() if key != "report_digest"})',
+        new='        strip_census({"task": report["task"]})',
         want=f"{_IDEM}::test_report_digest_covers_everything_except_itself",
         wants=(_BYTE_LOCK,),
         why="`report_digest` 只覆盖一个字段 ⇒ 报告可以被任意手改而 digest 不变。"
@@ -458,6 +459,49 @@ MUTATIONS: list[Mutation] = [
         why="deletion plan 落点恒真 ⇒ 双向核对的一侧失效。正文要求与 Task 66 deletion plan "
             "**双向**核对、且「计划外 legacy/unreachable 立即报结构错误」；"
             "恒真之后任何计划外的 legacy entry 都会被当成已有落点",
+    ),
+
+    # ═══ 八、普查免疫（BP-72-8 的修复：普查派生量不进冻结基线，但仍现算断言语义）═══
+    Mutation(
+        id="M33", side="be", path=CENSUS_LOCK, kind="replace",
+        anchor="            if child in projected:",
+        new="            if False:  # mutated: 不再对入向普查做投影",
+        want=f"{_IDEM}::test_check_matches_the_file_on_disk",
+        wants=(
+            f"{_BP}::test_inbound_scan_recomputes_and_contains_the_real_targets",
+            f"{_IDEM}::test_report_digest_covers_everything_except_itself",
+        ),
+        why="🔴 `strip_census` 不再投影 `inbound_obligations` ⇒ 整块进锁，回到 BP-72-8："
+            "任何新落盘且正文提到本任务的产物都让逐字节锁打红。这条变异必须让「投影后仍相等」"
+            "与「新增尾巴不改 digest」两条判据同时红",
+    ),
+    Mutation(
+        id="M34", side="be", path=GEN, kind="replace",
+        anchor='CENSUS_KEYS: tuple[str, ...] = ("inbound_obligations", "census_contract.measured")',
+        new='CENSUS_KEYS: tuple[str, ...] = ("inbound_obligations", "census_contract.measured", "counters")',
+        want=f"{_IDEM}::test_check_matches_the_file_on_disk",
+        wants=(f"{_IDEM}::test_report_digest_covers_everything_except_itself",),
+        why="把**非普查**字段（六类计数）也剔进 census ⇒ 剔多了。正文要求「不得削弱真正的 "
+            "stale 轴」：counters 一旦不进锁，未验收/未裁决/stale 被改成任意数字都不会红",
+    ),
+    Mutation(
+        id="M35", side="be", path=CENSUS_LOCK, kind="replace",
+        anchor='        "all_hold": all(checks.values()),',
+        new='        "all_hold": True,  # mutated: 普查语义断言恒真',
+        want=f"{_BP}::test_inbound_scan_recomputes_and_contains_the_real_targets",
+        wants=(f"{_IDEM}::test_check_matches_the_file_on_disk",),
+        why="把普查语义断言改成恒真 —— 「剔除 ≠ 不管」退化成「不看了」。投影只锁那 5 条真实"
+            "目标，语义断言是唯一还在看「普查器是不是真的在普查」的东西",
+    ),
+    Mutation(
+        id="M36", side="be", path=GEN, kind="replace",
+        anchor='        "scan_reaches_beyond_the_required_targets": bool(paths - set(REQUIRED_INBOUND_TARGETS)),',
+        new='        "scan_reaches_beyond_the_required_targets": True,  # mutated: 恒真',
+        want=f"{_BP}::test_inbound_scan_recomputes_and_contains_the_real_targets",
+        wants=(f"{_IDEM}::test_check_matches_the_file_on_disk",),
+        why="🔴 最隐蔽的一条：普查器被「修」成只返回那 5 条写死目标时，投影比对**照样绿**"
+            "（投影本来就只留那 5 条）。`scan_reaches_beyond_the_required_targets` 是唯一能"
+            "抓到它的判据；恒真之后「普查器退化成硬编码名单」就没人管了",
     ),
 ]
 

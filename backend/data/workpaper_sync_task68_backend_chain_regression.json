@@ -645,6 +645,51 @@
       "why_not_fixed_here": "正文要求「不得由实现任务自证」；本门对能落到 DDL/行/AST 的不变量全部重新表达，对需要真实 OO / 真实宿主 / 压力面的部分如实标弱并点名 owner，而不是把「跑了他们的测试」说成「我独立验过」。"
     }
   ],
+  "census_contract": {
+    "census_keys": [
+      "census_contract.measured",
+      "properties.rows[].annotated_in_surface_files",
+      "properties.rows[].sample_files",
+      "radiation_surface.digest",
+      "radiation_surface.files",
+      "radiation_surface.in_dir_but_out_of_surface",
+      "radiation_surface.inside_workpaper_sync_dir",
+      "radiation_surface.outside_files",
+      "radiation_surface.outside_workpaper_sync_dir",
+      "radiation_surface.scanned_test_files",
+      "radiation_surface.surface_size",
+      "suite_verdict.live_surface_size",
+      "suite_verdict.surface_growth_since_run"
+    ],
+    "excluded_is_not_unchecked": "剔除 ≠ 不管：`census_semantics` 现算并断言六条语义性质，其中 `every_pattern_has_a_match` 比「digest 相等」强 —— digest 只说「和上次一样」，它说「每条选取规则今天真的选到了东西」。",
+    "measured": {
+      "digest": "2961d151f983249034f7deac7cf2e0083bb1f26e2dad96fb8c7318127ceec97c",
+      "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
+      "scanned_test_files": 2346,
+      "surface_size": 95
+    },
+    "semantics": {
+      "all_hold": true,
+      "every_pattern_has_a_match": true,
+      "failing_checks": [],
+      "in_dir_difference_is_still_reported": true,
+      "pattern_coverage_is_complete": true,
+      "patterns_without_a_match": [],
+      "surface_is_not_empty": true,
+      "surface_is_not_the_whole_tree": true,
+      "surface_reaches_outside_the_sync_dir": true,
+      "walk_really_traversed_the_tree": true
+    },
+    "statement": "普查派生量（仓库级扫描得出的计数与成员清单）在 `--check` 时现算并断言语义性质，**不进**逐字节冻结基线。",
+    "still_locked": [
+      "source_commit（源码变了但报告没重生成 —— 唯一的真 stale 轴）",
+      "radiation_surface.patterns / pattern_coverage / 两条差集存在性布尔",
+      "suite_verdict 的既存红逐项核对、`live_surface_covers_run`、`suite_digest_matches_recorded_surface`",
+      "properties.rows[].tier / owner_task（档位与归属不受普查影响）",
+      "report_digest（现在算在 census 剔除**之后**的内容上 ⇒ 非普查内容继续锁死）"
+    ],
+    "why": "辐射面按引用关系派生 ⇒ 新增一个引用了被验模块的测试文件就顶掉 `surface_size` 与`digest`（BP-74-1 实测）。换目录、不写模块路径字面量都躲不开（那只是让新文件不进辐射面，`scanned_test_files` 仍是全树计数）。"
+  },
   "design_property_titles": {
     "1": "入口清册覆盖源码挂载点",
     "10": "单次业务 commit 与 representation 幂等",
@@ -4536,7 +4581,7 @@
     "declared_count": 48,
     "rows": [
       {
-        "annotated_in_surface_files": 13,
+        "annotated_in_surface_files": 14,
         "checks": [
           "candidate_never_current_never_resolvable",
           "chain_candidate_only_upgrader_and_finalize_owner",
@@ -5022,7 +5067,7 @@
         "tier": "independently_executed"
       },
       {
-        "annotated_in_surface_files": 9,
+        "annotated_in_surface_files": 10,
         "caveat": "本门未在独立文件里重新表达这条 Property；独立性只来自「由本门从仓库根真跑了这些文件」。比第一档弱，如实标出。",
         "checks": [],
         "owner_task": "68",
@@ -5155,7 +5200,17 @@
     }
   },
   "radiation_surface": {
-    "digest": "4b3ae9b848315403aba90da22820e92169d6960c4f8704497530d8039ccfbc8a",
+    "census_derived_keys": [
+      "digest",
+      "files",
+      "in_dir_but_out_of_surface",
+      "inside_workpaper_sync_dir",
+      "outside_files",
+      "outside_workpaper_sync_dir",
+      "scanned_test_files",
+      "surface_size"
+    ],
+    "digest": "2961d151f983249034f7deac7cf2e0083bb1f26e2dad96fb8c7318127ceec97c",
     "files": {
       "backend/tests/test_onlyoffice_single_file_dockey.py": [
         "sync_services_module"
@@ -5527,6 +5582,9 @@
         "sync_services_module",
         "scratch_migrations"
       ],
+      "backend/tests/workpaper_sync/test_task74_domain_adjudication.py": [
+        "sync_services_module"
+      ],
       "backend/tests/workpaper_sync/test_task75_published_identity_observer.py": [
         "sync_services_module",
         "sync_orm_module",
@@ -5556,15 +5614,18 @@
         "scratch_migrations"
       ]
     },
+    "has_files_outside_the_sync_dir": true,
+    "has_in_dir_files_out_of_surface": true,
     "in_dir_but_out_of_surface": [
       "backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py",
       "backend/tests/workpaper_sync/test_migration_paradigm_contract.py",
       "backend/tests/workpaper_sync/test_slice_schema_validator_coverage.py",
       "backend/tests/workpaper_sync/test_task47_e_cycle_migration.py",
-      "backend/tests/workpaper_sync/test_task66_legacy_deletion_plan.py"
+      "backend/tests/workpaper_sync/test_task66_legacy_deletion_plan.py",
+      "backend/tests/workpaper_sync/test_task68_radiation_surface.py"
     ],
     "in_dir_but_out_of_surface_note": "这些文件在 `workpaper_sync/` 目录里但**不引用**任何被验生产单元（只读 data/JSON 与schema 契约），按引用关系判据它们不在辐射面。如实列出，不偷偷补进分母也不假装覆盖。",
-    "inside_workpaper_sync_dir": 90,
+    "inside_workpaper_sync_dir": 91,
     "outside_files": [
       "backend/tests/test_onlyoffice_single_file_dockey.py",
       "backend/tests/test_workpaper_writer_inventory.py",
@@ -5572,6 +5633,13 @@
       "backend/tests/test_wp_onlyoffice_router.py"
     ],
     "outside_workpaper_sync_dir": 4,
+    "pattern_coverage": {
+      "scratch_migrations": true,
+      "sync_orm_module": true,
+      "sync_package_path": true,
+      "sync_router_module": true,
+      "sync_services_module": true
+    },
     "patterns": {
       "scratch_migrations": "V15[12]__",
       "sync_orm_module": "app\\.models\\.workpaper_sync_models|workpaper_sync_models",
@@ -5579,11 +5647,11 @@
       "sync_router_module": "app\\.routers\\.wp_sync_router|wp_sync_router",
       "sync_services_module": "app\\.services\\.workpaper_sync"
     },
-    "scanned_test_files": 2338,
+    "scanned_test_files": 2346,
     "statement": "辐射面 = `backend/tests/**/test_*.py` 中**按模块路径引用**到本次被验生产单元（`app.services.workpaper_sync.*` / `workpaper_sync_models` / `wp_sync_router` / V151・V152）的测试文件全集。不跑无边界全量。",
-    "surface_size": 94
+    "surface_size": 95
   },
-  "report_digest": "b5d75a354ca98c2cb6c0d642c86239b6f5516cb6cb11472b65706d08e32f4985",
+  "report_digest": "420d04b58caf59a0d5aa0a3229f959b9720395912e0c44ae4475b6d28e90c543",
   "restoration": {
     "drifted_tables": {},
     "foreign_scratch_note": "非本轮创建的 `tmp_task68_reg_*` 残留。来源通常是变异实验 M41（**故意**删掉 `DROP SCHEMA` 以证明清理逻辑有效）—— 如实列出并单独清理，不并进本轮复原结论。",
@@ -6784,7 +6852,7 @@
     }
   },
   "schema_version": "task68-backend-chain-independent-regression:v1",
-  "source_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
+  "source_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "sub_bullets": {
     "1": "运行 migration/repository/artifact/retention/content+representation mutation/definition-bundle store/candidate finalize/room/close-intent/request/delivery/recovery/content-application/operation/scope-index/merge/coordinator/outbox/evidence/Excel/Word targeted tests",
@@ -6850,6 +6918,8 @@
     "executed_file_count": 94,
     "executed_from": ".",
     "file_count": 94,
+    "live_surface_covers_run": true,
+    "live_surface_size": 95,
     "not_fixed_here": "17 条既存红（11 failed + 6 errors）如实登记，**一条都不修** —— 不属本任务，且会改 source commit 让 Task 70 的 evidence stale。",
     "observed_errors": 6,
     "observed_failed": 13,
@@ -6971,15 +7041,18 @@
     ],
     "preexisting_all_agree": true,
     "provenance": "recorded_from_real_execution",
+    "recorded_surface_digest": "4b3ae9b848315403aba90da22820e92169d6960c4f8704497530d8039ccfbc8a",
     "state": "executed",
+    "suite_digest_matches_recorded_surface": true,
     "summary_line": "13 failed, 6346 passed, 12 xfailed, 24 warnings, 6 errors in 998.68s (0:16:38)",
-    "surface_digest_matches": true,
+    "surface_growth_note": "辐射面比那次执行时**长大**不算 stale（仓库在演进）；缩到已执行集合以下才算 —— 那才是「改 scanner 蒙过去」。增量本身是普查派生量，不进锁。",
+    "surface_growth_since_run": 1,
     "unexpected_error_nodeids": [],
     "unexpected_failed_nodeids": []
   },
   "task": "Task 68",
   "task_declarations": {
-    "body_digest": "bfa8e2dfb2e43719b0dcf9d25c2fe644c0f99b5e642bce4ee55d7cd9a8736077",
+    "body_digest": "51df35aa3fe8266e4079c415fa1a2a8cf63c2df82df540f03bdfea45b776436b",
     "declared_properties": [
       4,
       5,
@@ -7175,8 +7248,8 @@
       "disposition": "read_only_input",
       "path": "backend/data/workpaper_sync_task67_structural_pre_reconcile.json",
       "present": true,
-      "sha256": "1ce645666747d4bb8bd979346fa9fdbd45f410c99c6f62c6176ef14f94c45371",
-      "size_bytes": 1174926
+      "sha256": "f72ff7e4375c8e1fb760192d6d5b1085ef16fe2b8f06ed32110612faa72a8f0a",
+      "size_bytes": 1176985
     }
   },
   "verdict": {

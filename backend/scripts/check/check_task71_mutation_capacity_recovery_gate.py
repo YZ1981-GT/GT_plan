@@ -65,6 +65,11 @@ recovery claim canonical 收敛。本门**不重跑**这些，而是：
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))  # import 自举：backend/scripts
+import _census_lock  # noqa: E402  普查量/逐字节锁分离（四门共用，说理在那里）
+
 import argparse
 import ast
 import asyncio
@@ -3919,35 +3924,58 @@ def upstream_lock_impact() -> dict[str, Any]:
     live = module.radiation_surface()
     disk = (read_json(T70_REPORT).get("radiation_surface") or {})
     guard_in_surface = GUARD_TEST_REL in (live.get("referencing_test_files") or {})
+    # 🔴 上游那把锁**已改形**：普查派生量（全树计数 / 引用者清单 / 它们的 digest）走
+    #    `CENSUS_KEYS` 剔除 + 语义断言，不再进逐字节比对。本门因此不再用「计数是否相等」当判据
+    #    （那正是 BP-71-8 的形态），改为直接现算它剔除普查量后的投影是否仍与盘上一致。
+    census_keys = sorted(getattr(module, "CENSUS_KEYS", ()) or ())
+    strip = getattr(module, "strip_census", None)
+    if strip is None or not census_keys:
+        raise Task71GateError(
+            "上游任务 70 的门没有 `CENSUS_KEYS` / `strip_census` —— 普查免疫的改形被回退了，"
+            "本门对它的判据前提失效（BP-71-8 复发）"
+        )
+    # 🔴 上游的 `strip_census` 是**路径限定**的（键形如 `radiation_surface.scanned_test_files`）
+    #    ⇒ 必须把节点挂回它在报告里的原位再剔，直接喂裸节点会一个都剔不掉（本轮验收实测：
+    #    加一个临时测试文件后 `projection_agrees` 假报 False，两条守卫打红）。
+    projection_agrees = strip({"radiation_surface": live}) == strip({"radiation_surface": disk})
+    upstream_semantics = module.census_semantics(live)
     return {
         "statement": (
-            "本门新增守卫文件会让任务 70 的逐字节锁 stale：它把 `backend/tests` 全树的 test "
-            "文件计数锁进了比对，任何新增测试文件都会顶掉它。"
+            "本门新增守卫文件**曾经**会让任务 70 的逐字节锁 stale（它把 `backend/tests` 全树的 "
+            "test 文件计数锁进了比对）。该判据缺陷已修：上游把普查派生量收进 `CENSUS_KEYS`，"
+            "`--check` 现算并断言语义性质而不再逐字节比对它们。本门现算复核这件事仍然成立。"
         ),
+        "task70_census_keys": census_keys,
+        "task70_surface_projection_agrees": projection_agrees,
+        "task70_census_semantics_all_hold": bool(upstream_semantics.get("all_hold")),
+        "task70_subject_coverage": dict(live.get("subject_coverage") or {}),
         "task70_scanned_test_files_live": live.get("scanned_test_files"),
         "task70_scanned_test_files_on_disk": disk.get("scanned_test_files"),
         "task70_referencing_count_live": live.get("referencing_test_file_count"),
         "task70_referencing_count_on_disk": disk.get("referencing_test_file_count"),
         "task70_digest_live": live.get("digest"),
         "task70_digest_on_disk": disk.get("digest"),
-        "task70_lock_goes_stale_because_of_this_gate": (
-            live.get("scanned_test_files") != disk.get("scanned_test_files")
-            or live.get("digest") != disk.get("digest")
-        ),
+        "task70_lock_goes_stale_because_of_this_gate": not projection_agrees,
         "own_guard_is_in_task70_surface": guard_in_surface,
         "own_guard_matched_subjects": sorted(
             (live.get("referencing_test_files") or {}).get(GUARD_TEST_REL) or []
         ),
-        "why_unavoidable": (
+        "why_it_used_to_be_unavoidable": (
             "`scanned_test_files` 是**全树计数**，与文件内容无关 ⇒ 换目录（BP-69-6 的规避法）"
             "与不写模块路径字面量（BP-70-8 的规避法）都躲不开。唯一的「规避」是不写守卫，"
-            "而那等于放弃本门的判据。"
+            "而那等于放弃本门的判据 —— 所以只能改判据的形状，不能规避。"
+        ),
+        "how_it_was_fixed": (
+            "上游把「仓库级普查得出的计数/成员清单/digest」显式归入 `CENSUS_KEYS`，逐字节比对"
+            "前先 `strip_census`；同时**仍然现算**这些量并断言其语义性质（真的遍历过全树 / 非空 / "
+            "不是全量 / 每个被验单元都有引用者 / 本门守卫在辐射面里）。剔除 ≠ 不管。"
         ),
         "isolation_method": (
-            "把守卫文件临时移出 `backend/tests` 再跑任务 70 的 `--check`：移出 rc=0、放回 rc=1 "
-            "⇒ 该红**只**由本门守卫文件的存在引起，与任务 70 自身的源码漂移无关。"
+            "把守卫文件临时移出 `backend/tests` 再跑任务 70 的 `--check`：修复**前**移出 rc=0、"
+            "放回 rc=1（该红只由本门守卫文件的存在引起）；修复**后**两种情形都 rc=0，"
+            "而故意改坏上游普查逻辑仍然 rc=1。"
         ),
-        "disposition": "如实登记，不重生成上游产物",
+        "disposition": "已修（改判据形状，不用豁免）",
         "owner_task": "70",
         "baseline_locks": [
             {
@@ -3993,6 +4021,10 @@ def radiation_surface() -> dict[str, Any]:
         if why:
             files[path.relative_to(REPO).as_posix()] = why
     guard_dir = Path(GUARD_TEST_REL).parent.as_posix()
+    # 🔴 逐 pattern 覆盖布尔 —— 辐射面**选取契约**的一部分，**不是**普查派生量：它不随仓库
+    #    演进，但 pattern 被删空/改坏时立刻变假。因此它继续进逐字节锁，而计数 / 成员清单 /
+    #    digest 走 census（见 :data:`CENSUS_KEYS`）。
+    coverage = {name: any(name in why for why in files.values()) for name in patterns}
     return {
         "statement": (
             "辐射面 = `backend/tests/**/test_*.py` 中按模块路径引用到本门被验生产单元"
@@ -4000,6 +4032,7 @@ def radiation_surface() -> dict[str, Any]:
             "测试文件全集。不跑无边界全量（仓库根 test 文件逾 1500 个）。"
         ),
         "patterns": patterns,
+        "pattern_coverage": coverage,
         "scanned_test_files": scanned,
         "referencing_test_file_count": len(files),
         "files": dict(sorted(files.items())),
@@ -4009,6 +4042,9 @@ def radiation_surface() -> dict[str, Any]:
         "own_guard_outside_census_dir": not GUARD_TEST_REL.startswith(
             f"{UPSTREAM_CENSUS_DIR}/"
         ),
+        "census_derived_keys": sorted(
+            key.split(".", 1)[1] for key in CENSUS_KEYS if key.startswith("radiation_surface.")
+        ),
         "why_own_dir": (
             "BP-69-6：任务 68 的逐字节锁把 `%s` 做成目录普查，往里新增任何「不引用被验生产"
             "单元」的测试文件都会打红它 1~3 条。BP-70-8：换目录不够 —— 它的辐射面 digest 扫"
@@ -4016,6 +4052,136 @@ def radiation_surface() -> dict[str, Any]:
             "生产模块经 `_production()` 取。" % UPSTREAM_CENSUS_DIR
         ),
         "digest": digest_of(sorted(files)),
+    }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# §16.1 普查派生量：现算、断言语义性质、**不进冻结基线**
+# ════════════════════════════════════════════════════════════════════════════
+
+#: 🔴 **普查派生量（census-derived）** —— 逐字节锁必须剔除的**第二类**字段。
+#:
+#: :data:`VOLATILE_KEYS` 剔的是「每轮都变的随机值 / 墙钟」；本集合剔的是「随**仓库演进**而变
+#: 的普查结果」。本门有两处：
+#:
+#: * 自己的 :func:`radiation_surface`（`scanned_test_files` 是 `backend/tests` **全树**计数）；
+#: * :func:`upstream_lock_impact` 里**转记的**上游全树计数与 digest（传递形态：上游把普查量
+#:   冻进锁，本门又把上游的 live 值冻进自己的锁 ⇒ 同一个缺陷被复制了一份）。
+#:
+#: ═══ 剔除 ≠ 不管 ═══
+#:
+#: 这些量在 `--check` 时**仍然现算**，由 :func:`census_semantics` 逐条断言语义性质。语义性质
+#: 不随仓库演进，因此它们**继续锁死**。特别地，`upstream_lock_impact` 里那三条**判定**
+#: （`task70_surface_projection_agrees` / `task70_census_semantics_all_hold` /
+#: `own_guard_is_in_task70_surface`）继续进锁 —— 它们才是本门对上游那把锁的真判据。
+#: `artifact_git_status` 走 census：提交前 `??`、提交后 tracked-clean，冻进锁里等于「入库」
+#: 这个正确动作本身打红门。语义性质另立 `artifact_git_status_semantics` 锁死（见 `_census_lock`）。
+CENSUS_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "radiation_surface.scanned_test_files",
+        "radiation_surface.referencing_test_file_count",
+        "radiation_surface.files",
+        "radiation_surface.digest",
+        "upstream_lock_impact.task70_scanned_test_files_live",
+        "upstream_lock_impact.task70_scanned_test_files_on_disk",
+        "upstream_lock_impact.task70_referencing_count_live",
+        "upstream_lock_impact.task70_referencing_count_on_disk",
+        "upstream_lock_impact.task70_digest_live",
+        "upstream_lock_impact.task70_digest_on_disk",
+        "blocking_points[].measured.scanned_test_files_live",
+        "blocking_points[].measured.scanned_test_files_on_disk",
+        "blocking_points[].measured.referencing_count_live",
+        "blocking_points[].measured.referencing_count_on_disk",
+        "artifact_git_status",
+        "census_contract.measured",
+    }
+)
+
+
+def strip_census(node: Any, *, path: str = "") -> Any:
+    """按**点号路径**剔除 :data:`CENSUS_KEYS`。
+
+    🔴 路径限定而不是按裸键名：本报告里另有数十处正当的 `digest` / `files` 同名量
+    （bundle digest / policy fingerprint / retention 的 artifact 清单），按裸键名剔会把真正的
+    stale 轴一起放过。列表元素的路径带 `[]` 段，于是 `blocking_points[].measured.xxx` 能命中。
+    """
+    if isinstance(node, Mapping):
+        out: dict[Any, Any] = {}
+        for key, value in node.items():
+            child = f"{path}.{key}" if path else str(key)
+            if child in CENSUS_KEYS:
+                continue
+            out[key] = strip_census(value, path=child)
+        return out
+    if isinstance(node, list):
+        return [strip_census(value, path=f"{path}[]") for value in node]
+    return node
+
+
+def census_semantics(surface: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """普查量的**语义性质**。现算，且不随仓库演进 ⇒ 逐条进锁。
+
+    每条对应一种真实的退化形态：
+
+    * `walk_really_traversed_the_tree` —— scanner 被短路成不遍历时计数掉到 0；
+    * `surface_is_not_empty` / `surface_is_not_the_whole_tree` —— 空集恒真 / 退化成无边界全量；
+    * `every_pattern_has_a_match` —— 某条引用 pattern 没有任何命中者（pattern 写坏或模块改名）；
+    * `own_guard_is_in_the_surface` —— 本门守卫必须真的引用被验单元（否则「本门验过」无落点）。
+    """
+    live = dict(surface) if surface is not None else radiation_surface()
+    scanned = int(live["scanned_test_files"])
+    referencing = int(live["referencing_test_file_count"])
+    coverage = dict(live["pattern_coverage"])
+    unmatched = sorted(name for name, hit in coverage.items() if not hit)
+    checks = {
+        "walk_really_traversed_the_tree": scanned > 1000,
+        "surface_is_not_empty": referencing > 0,
+        "surface_is_not_the_whole_tree": 0 < referencing < scanned,
+        # 🔴 「一条都没缺」与「一条都没有」必须分开两条：空 coverage 让 `not unmatched` 恒真。
+        "pattern_coverage_is_complete": set(coverage) == set(live.get("patterns") or {}),
+        "every_pattern_has_a_match": bool(coverage) and not unmatched,
+        "own_guard_is_in_the_surface": GUARD_TEST_REL in (live.get("files") or {}),
+    }
+    return {
+        **checks,
+        "patterns_without_a_match": unmatched,
+        "failing_checks": sorted(name for name, ok in checks.items() if not ok),
+        "all_hold": all(checks.values()),
+    }
+
+
+def build_census_contract(surface: Mapping[str, Any]) -> dict[str, Any]:
+    """普查契约节点：哪些键走 census、为什么、语义断言结果、以及**没有**被削弱的轴。"""
+    return {
+        "statement": (
+            "普查派生量（仓库级扫描得出的计数与成员清单）在 `--check` 时现算并断言语义性质，"
+            "**不进**逐字节冻结基线。"
+        ),
+        "census_keys": sorted(CENSUS_KEYS),
+        "why": (
+            "本门有两处：自己的辐射面全树计数，以及**转记的**上游全树计数（传递形态 —— 上游把"
+            "普查量冻进锁，本门又把上游的 live 值冻进自己的锁，同一个缺陷被复制了一份）。"
+            "两处都会被仓库里任意位置新增一个 `test_*.py` 顶红。"
+        ),
+        "excluded_is_not_unchecked": (
+            "剔除 ≠ 不管：`census_semantics` 现算并断言五条语义性质；`upstream_lock_impact` 里"
+            "那三条对上游的**判定**（投影一致 / 上游语义全成立 / 本门守卫在上游辐射面里）"
+            "继续进锁 —— 它们才是本门对上游那把锁的真判据。"
+        ),
+        "still_locked": [
+            "source_commit（源码变了但证据没刷新 —— 唯一的真 stale 轴）",
+            "radiation_surface.patterns / pattern_coverage / own_guard_*",
+            "upstream_lock_impact 的三条判定 + task70_census_keys + task70_subject_coverage",
+            "变异覆盖分母的逐条解析、行为臂的逐条判定、六个面的逐条实测",
+            "report_digest（现在算在 census 剔除**之后**的内容上 ⇒ 非普查内容继续锁死）",
+        ],
+        "semantics": census_semantics(surface),
+        "measured": {
+            "scanned_test_files": surface["scanned_test_files"],
+            "referencing_test_file_count": surface["referencing_test_file_count"],
+            "digest": surface["digest"],
+            "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
+        },
     }
 
 
@@ -4317,11 +4483,24 @@ def build_blocking_points(
         {
             "id": "BP-71-8",
             "statement": (
-                "本门新增守卫文件让任务 70 的逐字节锁 stale：它的 `radiation_surface()` 把"
+                "本门新增守卫文件**曾经**让任务 70 的逐字节锁 stale：它的 `radiation_surface()` 把"
                 "**`backend/tests` 全树 test 文件计数**锁进了比对，仓库里任何位置新增一个 "
-                "`test_*.py` 都会顶掉它 —— 比 BP-70-8 更强的结构性脆弱点。"
+                "`test_*.py` 都会顶掉它 —— 比 BP-70-8 更强的结构性脆弱点。**已修**：上游把普查"
+                "派生量收进 `CENSUS_KEYS`，`--check` 比对前先 `strip_census`，同时仍现算并断言"
+                "语义性质（剔除 ≠ 不管）。本门自己的两处同型缺陷（自有辐射面全树计数 + 转记上游"
+                "live 值的传递形态）一并改形。"
             ),
             "measured": {
+                "task70_census_keys": lock_impact["task70_census_keys"],
+                "task70_surface_projection_agrees": lock_impact[
+                    "task70_surface_projection_agrees"
+                ],
+                "task70_census_semantics_all_hold": lock_impact[
+                    "task70_census_semantics_all_hold"
+                ],
+                "task70_lock_goes_stale_because_of_this_gate": lock_impact[
+                    "task70_lock_goes_stale_because_of_this_gate"
+                ],
                 "scanned_test_files_live": lock_impact["task70_scanned_test_files_live"],
                 "scanned_test_files_on_disk": lock_impact[
                     "task70_scanned_test_files_on_disk"
@@ -4334,16 +4513,22 @@ def build_blocking_points(
                 "isolation_method": lock_impact["isolation_method"],
             },
             "measured_how": (
-                "现算任务 70 的 `radiation_surface()` 并与它盘上报告比对；另用「把守卫临时移出 "
-                "`backend/tests` 再跑它的 --check」隔离出因果（移出 rc=0 / 放回 rc=1）"
+                "现算任务 70 的 `radiation_surface()`，先 `strip_census` 再与它盘上报告比对"
+                "（投影一致即普查免疫成立）；另现算它的 `census_semantics` 断言普查量的语义性质"
+                "仍全部成立 —— 剔除不等于不看"
             ),
             "owner_task": lock_impact["owner_task"],
             "why_not_fixed_here": (
-                "Tasks 61/66/67/68/69/70 产物禁改；重生成任务 70 的报告会改它的 source_commit "
-                "语义并掩盖这条脆弱点。与任务 70 自己对任务 69 的 BP-70-6 同一处置。"
+                "本条**已在本轮修掉**（改判据形状，不加豁免）。仍不在本任务修的是任务 69 那把锁的"
+                "复选框根因（BP-70-6）—— 它不属本类：那是「把 tasks.md 的复选框状态摘进 body "
+                "digest」，与仓库级普查无关，owner 是任务 69。"
             ),
-            "disposition": "仍阻塞（上游锁脆弱性，本门如实交代）",
-            "relation_to_upstream": "BP-70-8 的严格扩展：换目录 + 不写模块路径都躲不开全树计数",
+            "disposition": "已修（改判据形状，不用豁免）",
+            "relation_to_upstream": (
+                "BP-70-8 的严格扩展：换目录 + 不写模块路径都躲不开全树计数 ⇒ 唯一出路是改判据"
+                "的形状。同类形态在本 spec 被独立发现三次（BP-71-8 / BP-72-8 / BP-74-1），本轮"
+                "四处一并收口。"
+            ),
         }
     )
 
@@ -4644,6 +4829,7 @@ def build_report() -> dict[str, Any]:
     multi_resolver = build_multi_resolver_adjudication()
     bp681 = build_bp_68_1_recheck(harness)
     lock_impact = upstream_lock_impact()
+    surface = radiation_surface()
 
     facet_pool: dict[str, Any] = {
         "bp_68_1_recheck": bp681,
@@ -4698,7 +4884,8 @@ def build_report() -> dict[str, Any]:
         "forward_recompute": build_forward_recompute(),
         "properties": build_property_landings(),
         "mutation_state_machine": build_mutation_state_machine(),
-        "radiation_surface": radiation_surface(),
+        "radiation_surface": surface,
+        "census_contract": build_census_contract(surface),
         "upstream_lock_impact": lock_impact,
         "scratch_schema": harness.get("scratch_schema"),
         "temp_artifact_root": harness.get("temp_artifact_root"),
@@ -4718,9 +4905,15 @@ def build_report() -> dict[str, Any]:
     report["artifact_git_status"] = git_porcelain(
         [GATE_REL, rel(OUTPUT_PATH), GUARD_TEST_REL, MUTATE_REL]
     )
+    report["artifact_git_status_semantics"] = _census_lock.artifact_status_semantics(
+        report["artifact_git_status"]
+    )
     report["verdict"] = build_verdict(report)
     report["elapsed_seconds"] = round(time.time() - started, 2)
-    report["report_digest"] = digest_of(strip_volatile(report))
+    # 🔴 digest 算在 **census 剔除之后**的内容上：于是它继续锁死「非普查内容」，而不再被仓库
+    #    演进顶红。`strip_volatile` 与 `strip_census` 必须都做 —— 少任何一个，digest 就重新
+    #    变成一个会自己过期的锁。
+    report["report_digest"] = digest_of(strip_census(strip_volatile(report)))
     return report
 
 
@@ -4756,10 +4949,31 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[任务71] {rel(OUTPUT_PATH)} 不存在 —— 先跑 --write", file=sys.stderr)
         return 2
     on_disk = json.loads(read_text(OUTPUT_PATH))
-    live = strip_volatile({k: v for k, v in report.items() if k != "report_digest"})
-    disk = strip_volatile({k: v for k, v in on_disk.items() if k != "report_digest"})
+    # 🔴 比对**在 census 剔除之后**做：仓库级普查量（自有辐射面全树计数 + 转记的上游 live 值）
+    #    随仓库演进，冻进锁里等于要求仓库停止演进（BP-71-8 的传递形态）。
+    live = strip_census(
+        strip_volatile({k: v for k, v in report.items() if k != "report_digest"})
+    )
+    disk = strip_census(
+        strip_volatile({k: v for k, v in on_disk.items() if k != "report_digest"})
+    )
     if live == disk:
-        print(f"[任务71] --check 通过：{rel(OUTPUT_PATH)} 与现算逐字节一致")
+        # 剔除 ≠ 不管：普查量现算并断言语义性质。少了这一段，上一条就退化成「不看了」。
+        semantics = report["census_contract"]["semantics"]
+        if not semantics["all_hold"]:
+            print(
+                f"[任务71] 普查语义断言不成立: {semantics['failing_checks']}"
+                f"（无命中者的 pattern: {semantics['patterns_without_a_match']}）",
+                file=sys.stderr,
+            )
+            return 1
+        measured = report["census_contract"]["measured"]
+        disk_measured = (on_disk.get("census_contract") or {}).get("measured") or {}
+        print(
+            f"[任务71] --check 通过：{rel(OUTPUT_PATH)} 与现算一致（census 剔除后）；"
+            f"census 快照 全树 test 文件 {disk_measured.get('scanned_test_files')} → "
+            f"{measured['scanned_test_files']}（不参与锁）"
+        )
         return 0
     live_keys = set(live)
     disk_keys = set(disk)
@@ -4767,8 +4981,8 @@ def main(argv: list[str] | None = None) -> int:
         key for key in sorted(live_keys | disk_keys) if live.get(key) != disk.get(key)
     ]
     print(
-        f"[任务71] 现算结果与 {rel(OUTPUT_PATH)} 不一致 —— 报告已过期或被手改；"
-        f"不一致的顶层键: {diffs}",
+        f"[任务71] 现算结果与 {rel(OUTPUT_PATH)} 不一致 —— 报告已过期或被手改"
+        f"（已剔除 census 与 volatile，剩下的都是真 stale 轴）；不一致的顶层键: {diffs}",
         file=sys.stderr,
     )
     return 1

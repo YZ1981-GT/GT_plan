@@ -297,10 +297,10 @@ MUTATIONS: list[Mutation] = [
         id="M24", side="be", path=GATE, kind="replace",
         anchor='        "digest": digest_of(sorted(files)),',
         new='        "digest": digest_of("task68-fixed"),',
-        want=f"{_SURF}::test_surface_is_recomputed_from_references_not_hand_written",
-        wants=(f"{_SUB}::test_sub_bullet_1_and_6_land_on_a_real_execution",),
-        why="辐射面 digest 与文件清单脱钩 ⇒ `surface_digest_matches` 恒真。那是「记录里那次 pytest "
-            "跑的正是现算辐射面」的唯一锁；脱钩后改 scanner 也不会红",
+        want=f"{_SURF}::test_surface_extras_are_recomputed_live_not_only_read",
+        why="辐射面 digest 与文件清单脱钩 ⇒ 它不再随 scanner 改动而变。digest 本身走 census "
+            "（不与冻结基线等值比对），但它必须仍是**文件清单的函数** —— 否则 suite 记录与"
+            "辐射面的同源性判据（`suite_digest_matches_recorded_surface`）失去意义",
     ),
     Mutation(
         id="M25", side="be", path=GATE, kind="replace",
@@ -389,8 +389,8 @@ MUTATIONS: list[Mutation] = [
     ),
     Mutation(
         id="M34", side="be", path=GATE, kind="replace",
-        anchor='        {key: value for key, value in report.items() if key != "report_digest"}',
-        new='        {"task": report["task"]}',
+        anchor='        strip_census({key: value for key, value in report.items() if key != "report_digest"})',
+        new='        strip_census({"task": report["task"]})',
         want=f"{_FIN}::test_the_digest_expression_covers_the_whole_report",
         why="`report_digest` 只覆盖一个字段 ⇒ 报告可被任意手改而 digest 不变。本报告是 Tasks "
             "70/72 的输入，能被手改而守卫不红，整份独立回归结论就没有约束力",
@@ -473,6 +473,57 @@ MUTATIONS: list[Mutation] = [
             "一套生产上并不存在的 schema 上 —— 「行上验过」变成「在另一套 DDL 上验过」，"
             "而 schema 侧读的仍是生产库，两侧悄悄脱钩",
     ),
+
+    # ═══ 八、普查免疫（BP-74-1 的修复：普查派生量不进冻结基线，但仍现算断言语义）═══
+    Mutation(
+        id="M43", side="be", path=GATE, kind="replace",
+        anchor="            if child in CENSUS_KEYS:",
+        new="            if False:  # 变异：不再剔除普查派生量",
+        want=f"{_SURF}::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        why="🔴 `strip_census` 不再剔除任何东西 ⇒ 辐射面规模/成员清单/digest 重新进锁，回到 "
+            "BP-74-1：新增一个引用了被验模块的测试文件就打红三条守卫。仓库因此不能演进",
+    ),
+    Mutation(
+        id="M44", side="be", path=GATE, kind="replace",
+        anchor='        "radiation_surface.surface_size",',
+        new='        "radiation_surface.surface_size_MUTATED",',
+        want=f"{_SURF}::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        why="把辐射面规模从 census 名单里改名剔走 —— 名单类判据必须写死真实目标（教训 16）。"
+            "`surface_size` 正是 BP-74-1 的根因字段（登记 94，新增一个引用者即 95）",
+    ),
+    Mutation(
+        id="M45", side="be", path=GATE, kind="replace",
+        anchor='        "properties.rows[].sample_files",',
+        new='        "properties.rows[].sample_files",\n        "properties.rows[].tier",',
+        want=f"{_SURF}::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        why="把 Property **档位**也剔进 census ⇒ 剔多了。正文要求「不得削弱真正的 stale 轴」："
+            "档位一旦不进锁，第二档伪装成第一档（M30 那条）就再也不会红",
+    ),
+    Mutation(
+        id="M46", side="be", path=GATE, kind="replace",
+        anchor='        "all_hold": all(checks.values()),',
+        new='        "all_hold": True,  # 变异：普查语义断言恒真',
+        want=f"{_SURF}::test_census_semantics_are_asserted_not_merely_skipped",
+        why="把普查语义断言改成恒真 —— 「剔除 ≠ 不管」退化成「不看了」。计数与成员清单既已不"
+            "进锁，语义断言就是唯一还在看「辐射面是不是真的算出来了」的东西",
+    ),
+    Mutation(
+        id="M47", side="be", path=GATE, kind="replace",
+        anchor='        name: any(name in why for why in files.values()) for name, _ in _SURFACE_PATTERNS',
+        new='        name: True for name, _ in _SURFACE_PATTERNS  # 变异：覆盖布尔恒真',
+        want=f"{_SURF}::test_surface_extras_are_recomputed_live_not_only_read",
+        why="🔴 逐 pattern 覆盖布尔恒真 ⇒ 「每条选取规则今天真的选到了东西」失守。注意它**与"
+            "记录相等**（记录里今天也全是 True），所以只有「从同一份成员清单重算」这条判据能抓到 —— "
+            "等值比对在这里天生不敏感。它是替代「digest 逐字节相等」的那条判据",
+    ),
+    Mutation(
+        id="M48", side="be", path=GATE, kind="replace",
+        anchor='    covers_run = live_size >= executed_files',
+        new='    covers_run = True  # 变异：辐射面缩窄不再打红',
+        want=f"{_SURF}::test_suite_reconciliation_is_a_pure_function_of_the_record",
+        why="🔴 辐射面被改窄到已执行集合以下也判通过 ⇒ 「改 scanner 蒙过去」有了落脚点。"
+            "这条是等值 digest 判据被拆掉之后**唯一**替代它的反向保护",
+    ),
 ]
 
 
@@ -483,10 +534,18 @@ if __name__ == "__main__":
             # 🔴 `guard_files` 的**键是文件 basename**（kit 用 `rglob(key)` 定位）。
             #    写成 `{"be": "<相对路径>"}` 会让 `_locate_want` 一个 want 都定位不到，
             #    判定永远只能是 WRONG-TEST（首轮 `--list` 42/42 全报此症）。
-            guard_files={_T: "Task 68 后端全链独立回归守卫"},
+            guard_files={
+                _T: "Task 68 后端全链独立回归守卫",
+                # 辐射面/既存红判据已拆到独立文件（宿主 1809 行 > 行数门禁）。不登记的话
+                # kit 的 `_locate_want` 定位不到那批 want，判定只能是 WRONG-TEST。
+                "test_task68_radiation_surface.py": "Task 68 辐射面 / 既存红判据（拆分）",
+            },
             repo=REPO,
             description="Task 68 后端全链独立回归守卫变异检验",
-            backend_args=["backend/tests/workpaper_sync/test_task68_backend_chain_regression.py"],
+            backend_args=[
+                "backend/tests/workpaper_sync/test_task68_backend_chain_regression.py",
+                "backend/tests/workpaper_sync/test_task68_radiation_surface.py",
+            ],
             allow_dirty_baseline=True,
         )
     )

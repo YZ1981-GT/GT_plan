@@ -29,6 +29,7 @@ BP-70-8：换目录只躲开目录普查；上游的**辐射面 digest** 扫 `ba
 from __future__ import annotations
 
 import ast
+import copy
 import importlib.util
 import json
 import re
@@ -100,12 +101,30 @@ class TestReportIsFreshAndByteLocked:
         )
 
     def test_report_digest_is_self_consistent(self, gate: Any, report: Mapping[str, Any]) -> None:
-        recomputed = gate.digest_of(
-            gate.strip_volatile(
-                {key: value for key, value in report.items() if key != "report_digest"}
-            )
-        )
+        """digest 算在 **volatile + census 都剔除之后**的内容上。
+
+        🔴 census 也必须剔：否则 digest 自己就是一个会被仓库演进顶红的锁（BP-71-8 的传递形态 ——
+        本门把上游的 live 全树计数转记进了自己的报告）。剔了之后它仍然锁死全部非普查内容。
+        """
+        payload = {key: value for key, value in report.items() if key != "report_digest"}
+        recomputed = gate.digest_of(gate.strip_census(gate.strip_volatile(payload)))
         assert recomputed == report["report_digest"]
+
+        # 反向 ①：动一个**非普查**判定，digest 必须变（否则 census 剔多了）
+        tampered = copy.deepcopy(payload)
+        tampered["upstream_lock_impact"]["task70_surface_projection_agrees"] = False
+        assert gate.digest_of(gate.strip_census(gate.strip_volatile(tampered))) != recomputed, (
+            "改掉对上游那把锁的判定后 digest 没变 ⇒ census 剔多了，真判据被放过"
+        )
+        # 反向 ②：往**普查**量里加一个新测试文件，digest 必须**不变**（本次修复的目标）
+        grown = copy.deepcopy(payload)
+        grown["radiation_surface"]["scanned_test_files"] = (
+            int(grown["radiation_surface"]["scanned_test_files"]) + 1
+        )
+        grown["upstream_lock_impact"]["task70_scanned_test_files_live"] = 999_999
+        assert gate.digest_of(gate.strip_census(gate.strip_volatile(grown))) == recomputed, (
+            "新增一个测试文件就让 digest 变 ⇒ 普查量又被冻进锁了（BP-71-8 复发）"
+        )
 
     def test_volatile_keys_are_only_random_and_wallclock(self, gate: Any) -> None:
         """排除名单里只能有随机值与墙钟耗时。
@@ -1442,11 +1461,25 @@ class TestMultiResolverAdjudication:
     def test_inventory_staleness_is_reported_not_silently_regenerated(
         self, report: Mapping[str, Any]
     ) -> None:
+        """staleness 必须**如实报告**并点名 owner，本门不顺手重生成 inventory。
+
+        🔴 本判据原来断言 `inventory_on_disk_is_stale is True` —— 那是把「上游 inventory 今天
+        恰好是 stale 的」这个**随仓库演进的瞬时事实**冻成了必须成立的真相：inventory 的持有方
+        一旦按流程重生成它（本轮实测就发生了，`unadjudicated_writer` 236 → 0），本门反而打红。
+        与 BP-71-8 / BP-72-8 / BP-74-1 同一形态。改为断言**机制**：两侧 digest 现算比对、
+        stale 与否与 digest 是否相等严格一致、owner 与「不在本任务重生成」的说明必须在。
+        """
         row = report["multi_resolver_adjudication"]
-        assert row["inventory_on_disk_is_stale"] is True
+        # 机制而不是瞬时值：stale 判定必须**恰好**等于两侧 digest 不等
+        assert row["inventory_on_disk_is_stale"] == (
+            row["inventory_source_digest_on_disk"] != row["inventory_source_digest_live"]
+        ), "staleness 判定与两侧 digest 脱钩 ⇒ 它可以被任意谎报"
+        assert row["inventory_source_digest_on_disk"], "缺磁盘侧 digest ⇒ 无从比对"
+        assert row["inventory_source_digest_live"], "缺现算侧 digest ⇒ 判据没有输入"
         assert str(row["inventory_stale_owner_task"]).strip()
-        assert row["inventory_source_digest_on_disk"] != row["inventory_source_digest_live"]
-        assert "不" in row["inventory_stale_note"]
+        assert "不" in row["inventory_stale_note"], (
+            "缺「本门不重生成 inventory」的说明 —— 处置必须写明"
+        )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2169,23 +2202,42 @@ class TestGuardPlacement:
     ) -> None:
         """本门守卫对上游锁的影响必须**现算**出来并点名 owner，不许含糊过去。
 
-        实测：任务 70 的 `--check` **只**因为本文件的存在而变红（把它移出 `backend/tests`
-        后 rc=0、放回 rc=1）。根因是它把 `backend/tests` 全树 test 文件计数锁进了逐字节比对，
-        换目录（BP-69-6 的规避法）与不写模块路径字面量（BP-70-8 的规避法）都躲不开。
+        🔴 本判据原来断言 `task70_scanned_test_files_live == on_disk + 1` —— 它把「上游那把锁
+        今天差几个测试文件」冻进了判据：仓库再新增第二个测试文件它就打红，而这与本门无关
+        （BP-71-8 的传递形态：上游把普查量冻进锁，本门又把上游的 live 值冻进自己的锁）。
+
+        改形后断言的是**语义性质**：
+        ① 上游确实把普查派生量收进了 `CENSUS_KEYS`（否则本门的判据前提失效）；
+        ② 剔除普查量后的投影仍与盘上一致（普查免疫真的成立）；
+        ③ 上游**仍然现算**并断言那些量的语义性质（剔除 ≠ 不管）；
+        ④ 本门守卫确实在上游辐射面里且命中理由非空（否则「影响」这件事无从谈起）。
         """
         for row in (gate.upstream_lock_impact(), report["upstream_lock_impact"]):
-            assert row["task70_lock_goes_stale_because_of_this_gate"] is True
+            assert row["task70_census_keys"], (
+                "上游没有登记任何 census 键 ⇒ 普查免疫的改形被回退了（BP-71-8 复发）"
+            )
+            assert any(
+                key.endswith("scanned_test_files") for key in row["task70_census_keys"]
+            ), "上游的 census 键里没有全树计数 —— 那正是 BP-71-8 的根因字段"
+            assert row["task70_surface_projection_agrees"] is True, (
+                "剔除普查量后上游辐射面投影仍与盘上不一致 ⇒ 是真 stale，不是仓库演进"
+            )
+            assert row["task70_census_semantics_all_hold"] is True, (
+                "上游普查量的语义断言不成立 ⇒ 剔除退化成了「不看了」"
+            )
+            assert row["task70_lock_goes_stale_because_of_this_gate"] is False, (
+                "本门守卫文件的存在仍然让上游那把锁 stale ⇒ BP-71-8 没修好"
+            )
             assert row["own_guard_is_in_task70_surface"] is True
             assert row["own_guard_matched_subjects"], "本文件命中的 subject 清单为空 —— 判据前提漂移"
-            assert row["owner_task"] == "70"
-            assert (
-                row["task70_scanned_test_files_live"]
-                == row["task70_scanned_test_files_on_disk"] + 1
-            ), (
-                "全树 test 文件计数的增量不是 1 —— 说明还有别的新增测试文件，需重新归因"
+            assert row["task70_subject_coverage"], "上游逐单元覆盖布尔为空 —— 选取契约没进锁"
+            assert all(row["task70_subject_coverage"].values()), (
+                f"上游有被验单元没有任何引用者: {row['task70_subject_coverage']}"
             )
+            assert row["owner_task"] == "70"
             assert str(row["isolation_method"]).strip()
-            assert str(row["why_unavoidable"]).strip()
+            assert str(row["why_it_used_to_be_unavoidable"]).strip()
+            assert str(row["how_it_was_fixed"]).strip()
 
     def test_all_four_upstream_locks_are_declared_with_baselines(self, gate: Any) -> None:
         """四把上游锁逐条登记基线（少一条即无法判「是否新增红」）。"""

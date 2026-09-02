@@ -21,6 +21,7 @@ spec: workpaper-html-onlyoffice-bidirectional-writeback-closure · Wave 7
 from __future__ import annotations
 
 import ast
+import copy
 import importlib.util
 import json
 import re
@@ -123,12 +124,32 @@ class TestReportIsFreshAndByteLocked:
         )
 
     def test_report_digest_is_self_consistent(self, gate: Any, report: Mapping[str, Any]) -> None:
-        recomputed = gate.digest_of(
-            gate.strip_volatile(
-                {key: value for key, value in report.items() if key != "report_digest"}
-            )
-        )
+        """digest 算在 **volatile + census 都剔除之后**的内容上。
+
+        🔴 census 也必须剔：否则 digest 自己就是一个会被仓库演进顶红的锁（BP-71-8 的形态）。
+        剔了之后它仍然锁死全部非普查内容 —— 下面两条反向断言把这件事钉住。
+        """
+        payload = {key: value for key, value in report.items() if key != "report_digest"}
+        recomputed = gate.digest_of(gate.strip_census(gate.strip_volatile(payload)))
         assert recomputed == report["report_digest"]
+
+        # 反向 ①：动一个**非普查**字段，digest 必须变（否则 census 剔多了）
+        tampered = copy.deepcopy(payload)
+        tampered["radiation_surface"]["subject_coverage"] = {}
+        assert gate.digest_of(gate.strip_census(gate.strip_volatile(tampered))) != recomputed, (
+            "改掉辐射面的选取契约后 digest 没变 ⇒ census 剔多了，真 stale 轴被放过"
+        )
+        # 反向 ②：往**普查**量里加一个新测试文件，digest 必须**不变**（本次修复的目标）
+        grown = copy.deepcopy(payload)
+        grown["radiation_surface"]["scanned_test_files"] = (
+            int(grown["radiation_surface"]["scanned_test_files"]) + 1
+        )
+        grown["radiation_surface"]["referencing_test_files"][
+            "backend/tests/synthetic/test_unrelated.py"
+        ] = ["evidence"]
+        assert gate.digest_of(gate.strip_census(gate.strip_volatile(grown))) == recomputed, (
+            "新增一个测试文件就让 digest 变 ⇒ 普查量又被冻进锁了（BP-71-8 复发）"
+        )
 
     def test_volatile_keys_are_exactly_the_two_kinds(self, gate: Any) -> None:
         """`--check` 排除的只能是随机值与墙钟耗时。

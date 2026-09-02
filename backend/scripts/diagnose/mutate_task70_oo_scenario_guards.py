@@ -46,7 +46,13 @@ REPO: Final[Path] = Path(__file__).resolve().parents[3]
 GATE_REL: Final[str] = "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py"
 GUARD_REL: Final[str] = "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py"
 
+CENSUS_LOCK_REL: Final[str] = "backend/scripts/_census_lock.py"
 GUARD_TEST: Final[str] = GUARD_REL
+
+#: census 判据已拆到独立守卫文件（宿主 1704 行 > 行数门禁）。它必须一起跑：那 6 条 census
+#: 变异要打红的判据在那个文件里，漏掉就全变 WRONG-TEST（BP-74-4 同型：`want` 与实际位置脱钩）。
+CENSUS_GUARD_REL: Final[str] = "backend/tests/workpaper_sync_oo/test_task70_census_lock.py"
+TARGETS: Final[tuple[str, ...]] = (GUARD_TEST, CENSUS_GUARD_REL)
 
 
 @dataclass(frozen=True)
@@ -401,6 +407,64 @@ MUTATIONS: Final[tuple[Mutation, ...]] = (
         "TestGuardPlacement::test_artifact_git_status_is_reported_for_every_product",
         "把「产物不存在」报成 tracked-clean —— CI 在干净 checkout 下必挂而报告说一切正常",
     ),
+    # ── 普查免疫类（BP-71-8 的修复：普查派生量不进冻结基线，但仍现算断言语义）──────
+    Mutation(
+        "M36",
+        CENSUS_LOCK_REL,
+        "strip_census",
+        "            if child in keys:",
+        "            if False:  # mutated: 不再剔除普查派生量",
+        "TestCensusLock::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        "让 `strip_census` 不再剔除任何东西 —— 普查量重新进锁，仓库长大即打红（BP-71-8 复发）",
+    ),
+    Mutation(
+        "M37",
+        GATE_REL,
+        "CENSUS_KEYS",
+        '        "radiation_surface.scanned_test_files",',
+        '        "radiation_surface.scanned_test_files_MUTATED",',
+        "TestCensusLock::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        "把全树计数从 census 名单里改名剔走 —— 名单类判据必须写死真实目标（教训 16）；"
+        "它正是 BP-71-8 的根因字段",
+    ),
+    Mutation(
+        "M38",
+        GATE_REL,
+        "CENSUS_KEYS",
+        '        "census_contract.measured",',
+        '        "census_contract.measured",\n        "radiation_surface.subject_coverage",',
+        "TestCensusLock::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        "把**选取契约**字段也剔进 census —— 剔多了会让「辐射面选取逻辑被改坏」一起被放过，"
+        "这正是「不许整块剔掉 radiation_surface」那条约束",
+    ),
+    Mutation(
+        "M39",
+        CENSUS_LOCK_REL,
+        "finalize_checks",
+        '        "all_hold": all(checks.values()),',
+        '        "all_hold": True,  # mutated: 语义断言恒真',
+        "TestCensusLock::test_census_semantics_are_asserted_not_merely_skipped",
+        "把普查语义断言改成恒真 —— 「剔除 ≠ 不管」退化成「不看了」，第 1 条修法失去意义",
+    ),
+    Mutation(
+        "M40",
+        GATE_REL,
+        "radiation_surface",
+        '"subject_coverage": coverage,',
+        '"subject_coverage": {},  # mutated: 逐单元覆盖布尔清空',
+        "TestCensusLock::test_census_semantics_are_asserted_not_merely_skipped",
+        "把逐被验单元覆盖布尔清空 —— 空集恒真（`not uncovered` 对空字典成立），"
+        "只有独立的 `subject_coverage_is_complete` 能抓到",
+    ),
+    Mutation(
+        "M41",
+        GATE_REL,
+        "build_report",
+        '        "census_contract": build_census_contract(surface),',
+        "        # mutated: 报告里不再登记普查契约",
+        "TestCensusLock::test_census_contract_declares_what_is_still_locked",
+        "把普查契约节点从报告里摘掉 —— 「剔了什么 / 为什么 / 什么仍然锁死」无从复核",
+    ),
 )
 
 
@@ -503,7 +567,7 @@ def run_pytest(want: str) -> tuple[int, str]:
             sys.executable,
             "-m",
             "pytest",
-            GUARD_TEST,
+            *TARGETS,
             "-q",
             "--no-header",
             "-p",
@@ -548,7 +612,7 @@ def run(selected: list[str]) -> int:
         print(f"[任务70变异] 未知变异号: {unknown}", file=sys.stderr)
         return 2
 
-    baseline = {rel: md5(REPO / rel) for rel in {GATE_REL, GUARD_REL}}
+    baseline = {rel: md5(REPO / rel) for rel in {GATE_REL, GUARD_REL} | {m.file for m in chosen}}
     verdicts: dict[str, str] = {}
     for mutation in chosen:
         try:

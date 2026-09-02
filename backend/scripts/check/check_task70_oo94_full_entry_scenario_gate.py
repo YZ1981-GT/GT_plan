@@ -67,6 +67,11 @@ evidence 的那一环，因此它必须同时做到两件互相拉扯的事：
 
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _Path
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))  # import 自举：backend/scripts
+import _census_lock  # noqa: E402  普查量/逐字节锁分离（四门共用，说理在那里）
+
 import argparse
 import ast
 import asyncio
@@ -2505,21 +2510,130 @@ def radiation_surface() -> dict[str, Any]:
         matched = [subject for subject in subjects if subject in text]
         if matched:
             hits[rel(path)] = sorted(set(matched))
+    # 🔴 逐 subject 覆盖布尔 —— 这是辐射面**选取契约**的一部分，**不是**普查派生量：
+    #    它不随仓库演进（每个被验单元今天各有 4~264 个引用者），但一旦 scanner 退化成空集
+    #    或某个 subject 被从名单里删掉，它立刻变假。因此它继续进逐字节锁，而计数/成员清单/
+    #    digest 走 census（见 :data:`CENSUS_KEYS`）。
+    coverage = {
+        subject: any(subject in why for why in hits.values()) for subject in subjects
+    }
     return {
         "how": "扫 backend/tests 下 test_*.py 对本门触碰生产单元的**实际引用**，不按目录取全量",
         "production_subjects": list(subjects),
+        "subject_coverage": coverage,
         "scanned_test_files": scanned,
         "referencing_test_file_count": len(hits),
         "referencing_test_files": dict(sorted(hits.items())),
         "digest": digest_of(sorted(hits)),
         "own_guard_path": GUARD_TEST_REL,
         "own_guard_outside_census_dir": True,
+        "census_derived_keys": sorted(
+            key.split(".", 1)[1] for key in CENSUS_KEYS if key.startswith("radiation_surface.")
+        ),
         "why_own_guard_is_outside": (
             "任务 68 的逐字节锁把 `backend/tests/workpaper_sync/` 做成**目录普查**：往那里新增"
             "任何不引用被验生产单元的测试文件都会打红它 1~3 条守卫（BP-69-6 实测）。本门的守卫"
             "因此放在 `backend/tests/workpaper_sync_oo/`。"
         ),
     }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# §14.1 普查派生量：现算、断言语义性质、**不进冻结基线**
+# ════════════════════════════════════════════════════════════════════════════
+
+#: 🔴 **普查派生量（census-derived）** —— 逐字节锁必须剔除的**第二类**字段。
+#:
+#: :data:`VOLATILE_KEYS` 剔的是「每轮都变的随机值 / 墙钟」；本集合剔的是「随**仓库演进**而变
+#: 的普查结果」：本仓库今天有多少测试文件、有多少文件引用了被验单元、它们的成员清单与 digest。
+#:
+#: ═══ 为什么必须剔（三次实测的同一笔账）═══
+#:
+#: 把这些量冻进「必须逐字节相等」的锁里，等于要求仓库停止演进。本门的
+#: :func:`radiation_surface` 把 **`backend/tests` 全树 `test_*.py` 计数**（登记值 2340）写进了
+#: 逐字节比对 ⇒ 仓库**任意位置**新增一个测试文件都让
+#: `test_task70_oo_scenario_gate.py::TestReportIsFreshAndByteLocked::test_gate_check_passes`
+#: 打红（BP-71-8）。换目录（BP-69-6 的规避法）与不写模块路径字面量（BP-70-8 的规避法）都躲
+#: 不开 —— 唯一的「规避」是不写守卫，那等于放弃判据。同一形态在本 spec 被独立发现过三次
+#: （BP-71-8 全树计数 / BP-72-8 入向义务普查 / BP-74-1 引用派生辐射面），三个 owner 各自只能
+#: 「如实登记」，同一笔账付了三次。
+#:
+#: ═══ 剔除 ≠ 不管 ═══
+#:
+#: 这些量在 `--check` 时**仍然现算**，并由 :func:`census_semantics` 逐条断言其**语义性质**
+#: （真的遍历过全树 / 非空 / 不是全量 / 每个被验单元都有引用者 / 本门守卫在辐射面里）。
+#: 语义性质不随仓库演进，因此它们**继续锁死**。整块剔会把「辐射面选取逻辑被改坏」一起放过，
+#: 故节点里的选取契约（`production_subjects` / `subject_coverage` / `own_guard_*` / `how`）
+#: 继续逐字节锁死，只有计数 / 成员清单 / digest 走 census。完整说理见 `_census_lock`。
+CENSUS_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "radiation_surface.scanned_test_files",
+        "radiation_surface.referencing_test_file_count",
+        "radiation_surface.referencing_test_files",
+        "radiation_surface.digest",
+        "artifact_git_status",
+        "census_contract.measured",
+    }
+)
+
+
+def strip_census(node: Any, *, path: str = "") -> Any:
+    """按点号路径剔除 :data:`CENSUS_KEYS`（机制见 `_census_lock`）。🔴 路径限定而非裸键名：
+    报告里另有十余处正当的 `digest` 同名量（`typed_child_digest` / `manifest_source_digest`）。
+    """
+    return _census_lock.strip_census(node, CENSUS_KEYS, path=path)
+
+
+def census_semantics(surface: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """普查量的**语义性质**。现算，且不随仓库演进 ⇒ 逐条进锁。
+
+    通用四条见 `_census_lock.surface_core_checks`；本门另加 `own_guard_is_in_the_surface`
+    —— 本门守卫必须真的引用被验单元，否则「本门验过」没落点。"""
+    live = dict(surface) if surface is not None else radiation_surface()
+    checks, uncovered = _census_lock.surface_core_checks(
+        scanned=int(live["scanned_test_files"]),
+        present=int(live["referencing_test_file_count"]),
+        coverage=dict(live["subject_coverage"]),
+        expected_names=live.get("production_subjects") or (),
+        complete_key="subject_coverage_is_complete",
+        every_key="every_production_subject_is_covered",
+    )
+    checks["own_guard_is_in_the_surface"] = GUARD_TEST_REL in (
+        live.get("referencing_test_files") or {}
+    )
+    return _census_lock.finalize_checks(checks, uncovered_production_subjects=uncovered)
+
+
+def build_census_contract(surface: Mapping[str, Any]) -> dict[str, Any]:
+    """普查契约节点。组装见 `_census_lock.build_census_contract`。"""
+    return _census_lock.build_census_contract(
+        statement=(
+            "普查派生量（仓库级扫描得出的计数与成员清单）在 `--check` 时现算并断言语义性质，"
+            "**不进**逐字节冻结基线。"
+        ),
+        census_keys=CENSUS_KEYS,
+        why=(
+            "「本仓库今天有多少测试文件 / 多少文件引用了被验单元」是随仓库演进的量。把它冻进"
+            "逐字节锁 ⇒ 任意位置新增一个 `test_*.py` 都打红本门（BP-71-8 实测：登记 2340，"
+            "换目录与不写模块路径字面量都躲不开）。"
+        ),
+        excluded_is_not_unchecked=(
+            "剔除 ≠ 不管：`census_semantics` 逐条现算并断言语义性质，语义性质本身继续进锁。"
+        ),
+        still_locked=[
+            "source_commit（源码变了但 evidence 没刷新 —— 唯一的真 stale 轴）",
+            "radiation_surface.production_subjects / subject_coverage / own_guard_* / how"
+            "（辐射面**选取契约**：scanner 退化或 subject 名单被删立刻变红）",
+            "scenario_execution 的逐项判定与 blocked_by 码分布",
+            "report_digest（现在算在 census 剔除**之后**的内容上 ⇒ 非普查内容继续锁死）",
+        ],
+        semantics=census_semantics(surface),
+        measured={
+            "scanned_test_files": surface["scanned_test_files"],
+            "referencing_test_file_count": surface["referencing_test_file_count"],
+            "digest": surface["digest"],
+        },
+    )
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2654,6 +2768,10 @@ def build_verdict(report: Mapping[str, Any]) -> dict[str, Any]:
 #:
 #: 🔴 只排除这两类。`source_commit` 刻意**不**排除：上游报告用它当锁，本门也要，否则
 #: 「源码变了但 evidence 没刷新」这条 stale 轴测不出来。
+#:
+#: 第二类排除项是 :data:`CENSUS_KEYS`（仓库级普查派生量）—— 与本集合**语义不同**：volatile
+#: 干脆不看，census 仍然现算并断言语义性质。两者刻意分成两个常量，合并会让「剔除 ≠ 不管」
+#: 这条区分消失。
 VOLATILE_KEYS: Final[frozenset[str]] = frozenset(
     {"generated_at", "elapsed_seconds", "wallclock_seconds", "probe_elapsed_seconds"}
 )
@@ -2781,6 +2899,8 @@ def build_report(
         GUARD_TEST_REL,
         MUTATE_REL,
     ]
+    artifact_status = git_porcelain(artifacts)
+    surface = radiation_surface()
 
     report: dict[str, Any] = {
         "task": f"任务 {TASK_NUMBER}",
@@ -2853,11 +2973,13 @@ def build_report(
         "forward_recompute": build_forward_recompute(),
         "properties": build_property_landings(),
         "db_snapshot": snapshot,
-        "radiation_surface": radiation_surface(),
+        "radiation_surface": surface,
+        "census_contract": build_census_contract(surface),
         "upstream_lock_reruns": (
             dict(upstream_locks) if upstream_locks is not None else rerun_upstream_locks(run_locks)
         ),
-        "artifact_git_status": git_porcelain(artifacts),
+        "artifact_git_status": artifact_status,
+        "artifact_git_status_semantics": _census_lock.artifact_status_semantics(artifact_status),
         "production_code_touched": {
             "backend_production_files": [],
             "frontend_production_files": [],
@@ -2890,8 +3012,13 @@ def build_report(
         execution=execution,
     )
     report["verdict"] = build_verdict(report)
+    # 🔴 digest 算在 **census 剔除之后**的内容上：于是它继续锁死「非普查内容」（要求原文），
+    #    而不再被仓库演进顶红。`strip_volatile` 与 `strip_census` 的顺序无关（两者剔的键不交叉），
+    #    但**必须都做** —— 少任何一个，digest 就重新变成一个会自己过期的锁。
     report["report_digest"] = digest_of(
-        strip_volatile({key: value for key, value in report.items() if key != "report_digest"})
+        strip_census(
+            strip_volatile({key: value for key, value in report.items() if key != "report_digest"})
+        )
     )
     return report
 
@@ -2951,12 +3078,32 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     on_disk = json.loads(read_text(OUTPUT_PATH))
     fresh = json.loads(rendered)
-    if strip_volatile(on_disk) != strip_volatile(fresh):
+    # 🔴 逐字节比对**在 census 剔除之后**做：仓库级普查量（全树 test 计数 / 引用者清单 /
+    #    它们的 digest）随仓库演进，冻进锁里等于要求仓库停止演进（BP-71-8）。
+    if strip_census(strip_volatile(on_disk)) != strip_census(strip_volatile(fresh)):
         print(
-            f"[任务70] 现算结果与 {rel(OUTPUT_PATH)} 不一致 —— 报告已过期或被手改",
+            f"[任务70] 现算结果与 {rel(OUTPUT_PATH)} 不一致 —— 报告已过期或被手改"
+            "（已剔除 census 与 volatile，剩下的都是真 stale 轴）",
             file=sys.stderr,
         )
         return 1
+    # 🔴 剔除 ≠ 不管：普查量现算并断言语义性质。少了这一段，第一条就退化成「不看了」。
+    semantics = report["census_contract"]["semantics"]
+    if not semantics["all_hold"]:
+        print(
+            f"[任务70] 普查语义断言不成立: {semantics['failing_checks']}"
+            f"（未覆盖的被验单元: {semantics['uncovered_production_subjects']}）",
+            file=sys.stderr,
+        )
+        return 1
+    census = report["census_contract"]["measured"]
+    disk_census = ((on_disk.get("census_contract") or {}).get("measured") or {})
+    print(
+        f"[任务70] census 快照（不参与锁）: 全树 test 文件 "
+        f"{disk_census.get('scanned_test_files')} → {census['scanned_test_files']}；"
+        f"引用者 {disk_census.get('referencing_test_file_count')} → "
+        f"{census['referencing_test_file_count']}"
+    )
     if report["verdict"]["structural_errors"]:
         print(
             f"[任务70] 结构错误: {report['verdict']['structural_errors']}",

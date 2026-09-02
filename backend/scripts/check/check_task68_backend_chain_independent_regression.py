@@ -4886,11 +4886,20 @@ def radiation_surface() -> dict[str, Any]:
         for p in (TEST_ROOT / "workpaper_sync").glob("test_*.py")
     )
     out_of_surface = [p for p in dir_all if p not in files]
+    # 🔴 逐 pattern 覆盖布尔 —— 辐射面**选取契约**的一部分，**不是**普查派生量：它不随仓库
+    #    演进（五条 pattern 今天各有 4~90 个命中者），但一旦 pattern 被删空或改坏就立刻变假。
+    #    因此它继续进逐字节锁，而计数 / 成员清单 / digest 走 census（见 :data:`CENSUS_KEYS`）。
+    coverage = {
+        name: any(name in why for why in files.values()) for name, _ in _SURFACE_PATTERNS
+    }
     return {
         "statement": "辐射面 = `backend/tests/**/test_*.py` 中**按模块路径引用**到本次被验生产单元"
                      "（`app.services.workpaper_sync.*` / `workpaper_sync_models` / "
                      "`wp_sync_router` / V151・V152）的测试文件全集。不跑无边界全量。",
         "patterns": {name: pattern for name, pattern in _SURFACE_PATTERNS},
+        "pattern_coverage": coverage,
+        "has_files_outside_the_sync_dir": bool(outside),
+        "has_in_dir_files_out_of_surface": bool(out_of_surface),
         "scanned_test_files": scanned,
         "surface_size": len(files),
         "inside_workpaper_sync_dir": len(in_dir),
@@ -4903,6 +4912,147 @@ def radiation_surface() -> dict[str, Any]:
             "schema 契约），按引用关系判据它们不在辐射面。如实列出，不偷偷补进分母也不假装覆盖。"
         ),
         "digest": digest_of(sorted(files)),
+        "census_derived_keys": sorted(
+            key.split(".", 1)[1] for key in CENSUS_KEYS if key.startswith("radiation_surface.")
+        ),
+    }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# §9.1 普查派生量：现算、断言语义性质、**不进冻结基线**
+# ════════════════════════════════════════════════════════════════════════════
+
+#: 🔴 **普查派生量（census-derived）** —— 逐字节锁必须剔除的那一类字段。
+#:
+#: 本门的 :func:`radiation_surface` 按**引用关系**派生辐射面，并把结果（登记 `surface_size`
+#: 94 / 全树扫描 2338 / 成员清单 / digest）写进了逐字节锁。于是**新增一个引用了被验模块的
+#: 测试文件**就让三条守卫打红（BP-74-1 实测：`test_task74_domain_adjudication.py` 落盘把
+#: `surface_size` 顶成 95）。这类量随仓库演进 —— 冻进锁里等于要求仓库停止演进。
+#: 同一形态在本 spec 被独立发现过三次（BP-74-1 / BP-71-8 全树计数 / BP-72-8 入向普查），
+#: 三个 owner 各自只能「如实登记」，同一笔账付了三次。
+#:
+#: ═══ 剔除 ≠ 不管 ═══
+#:
+#: 这些量在 `--check` 时**仍然现算**，由 :func:`census_semantics` 逐条断言语义性质
+#: （真的遍历过全树 / 非空 / 不是全量 / 每条 pattern 都有命中者 / 目录外与「目录内不在辐射面」
+#: 两类差集都仍然存在）。语义性质不随仓库演进，因此它们**继续锁死**。
+#:
+#: ═══ 为什么不整块剔掉 `radiation_surface` ═══
+#:
+#: 整块剔会把「辐射面选取逻辑被改坏」一起放过。因此 `patterns` / `pattern_coverage` /
+#: 两条差集存在性布尔 / `statement` 继续逐字节锁死，只有计数 / 成员清单 / digest 走 census。
+#: `properties.rows[].annotated_in_surface_files`（某条 Property 被辐射面里几个文件点名）
+#: 与 `sample_files` 同为普查派生 —— 档位（`tier`）与 owner 不受影响，继续锁死。
+CENSUS_KEYS: Final[frozenset[str]] = frozenset(
+    {
+        "radiation_surface.scanned_test_files",
+        "radiation_surface.surface_size",
+        "radiation_surface.inside_workpaper_sync_dir",
+        "radiation_surface.outside_workpaper_sync_dir",
+        "radiation_surface.outside_files",
+        "radiation_surface.files",
+        "radiation_surface.in_dir_but_out_of_surface",
+        "radiation_surface.digest",
+        "properties.rows[].annotated_in_surface_files",
+        "properties.rows[].sample_files",
+        "suite_verdict.live_surface_size",
+        "suite_verdict.surface_growth_since_run",
+        "census_contract.measured",
+    }
+)
+
+
+def strip_census(node: Any, *, path: str = "") -> Any:
+    """按**点号路径**剔除 :data:`CENSUS_KEYS`。
+
+    🔴 路径限定而不是按裸键名：本报告里另有数十处正当的 `digest` / `files` 同名量
+    （`schema_catalog` 的 DDL digest、`suite_run` 的 `files_digest`），按裸键名剔会把真正的
+    stale 轴一起放过。列表元素的路径带 `[]` 段，于是 `properties.rows[].xxx` 能精确命中。
+    """
+    if isinstance(node, Mapping):
+        out: dict[Any, Any] = {}
+        for key, value in node.items():
+            child = f"{path}.{key}" if path else str(key)
+            if child in CENSUS_KEYS:
+                continue
+            out[key] = strip_census(value, path=child)
+        return out
+    if isinstance(node, list):
+        return [strip_census(value, path=f"{path}[]") for value in node]
+    return node
+
+
+def census_semantics(surface: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """辐射面普查量的**语义性质**。现算，且不随仓库演进 ⇒ 逐条进锁。
+
+    每条对应一种真实的退化形态（都比「计数相等」更能抓到问题）：
+
+    * `walk_really_traversed_the_tree` —— scanner 被短路成不遍历时计数掉到 0；
+    * `surface_is_not_empty` —— 空集恒真（现算失败时不得当作「无需回归」）；
+    * `surface_is_not_the_whole_tree` —— 退化成「跑无边界全量」，正文明令禁止；
+    * `every_pattern_has_a_match` —— 某条引用 pattern 没有任何命中者 ⇒ pattern 写坏或生产
+      模块改名（这条比「digest 相等」强：digest 只说「和上次一样」）；
+    * `surface_reaches_outside_the_sync_dir` —— 引用关系反查退化成目录枚举；
+    * `in_dir_difference_is_still_reported` —— 「目录内但不在辐射面」那条如实报告被短路。
+    """
+    live = dict(surface) if surface is not None else radiation_surface()
+    scanned = int(live["scanned_test_files"])
+    size = int(live["surface_size"])
+    coverage = dict(live["pattern_coverage"])
+    unmatched = sorted(name for name, hit in coverage.items() if not hit)
+    checks = {
+        "walk_really_traversed_the_tree": scanned > 1000,
+        "surface_is_not_empty": size > 0,
+        "surface_is_not_the_whole_tree": 0 < size < scanned,
+        # 🔴 「一条都没缺」与「一条都没有」必须分开两条：空的 coverage 字典让 `not unmatched`
+        #    恒真（空集恒真），只有下面这条能抓到。
+        "pattern_coverage_is_complete": set(coverage)
+        == {name for name, _ in _SURFACE_PATTERNS},
+        "every_pattern_has_a_match": bool(coverage) and not unmatched,
+        "surface_reaches_outside_the_sync_dir": bool(live["has_files_outside_the_sync_dir"]),
+        "in_dir_difference_is_still_reported": bool(live["has_in_dir_files_out_of_surface"]),
+    }
+    return {
+        **checks,
+        "patterns_without_a_match": unmatched,
+        "failing_checks": sorted(name for name, ok in checks.items() if not ok),
+        "all_hold": all(checks.values()),
+    }
+
+
+def build_census_contract(surface: Mapping[str, Any]) -> dict[str, Any]:
+    """普查契约节点：哪些键走 census、为什么、语义断言结果、以及**没有**被削弱的轴。"""
+    return {
+        "statement": (
+            "普查派生量（仓库级扫描得出的计数与成员清单）在 `--check` 时现算并断言语义性质，"
+            "**不进**逐字节冻结基线。"
+        ),
+        "census_keys": sorted(CENSUS_KEYS),
+        "why": (
+            "辐射面按引用关系派生 ⇒ 新增一个引用了被验模块的测试文件就顶掉 `surface_size` 与"
+            "`digest`（BP-74-1 实测）。换目录、不写模块路径字面量都躲不开（那只是让新文件不进"
+            "辐射面，`scanned_test_files` 仍是全树计数）。"
+        ),
+        "excluded_is_not_unchecked": (
+            "剔除 ≠ 不管：`census_semantics` 现算并断言六条语义性质，其中 "
+            "`every_pattern_has_a_match` 比「digest 相等」强 —— digest 只说「和上次一样」，"
+            "它说「每条选取规则今天真的选到了东西」。"
+        ),
+        "still_locked": [
+            "source_commit（源码变了但报告没重生成 —— 唯一的真 stale 轴）",
+            "radiation_surface.patterns / pattern_coverage / 两条差集存在性布尔",
+            "suite_verdict 的既存红逐项核对、`live_surface_covers_run`、"
+            "`suite_digest_matches_recorded_surface`",
+            "properties.rows[].tier / owner_task（档位与归属不受普查影响）",
+            "report_digest（现在算在 census 剔除**之后**的内容上 ⇒ 非普查内容继续锁死）",
+        ],
+        "semantics": census_semantics(surface),
+        "measured": {
+            "scanned_test_files": surface["scanned_test_files"],
+            "surface_size": surface["surface_size"],
+            "digest": surface["digest"],
+            "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
+        },
     }
 
 
@@ -5062,18 +5212,46 @@ def run_radiation_suites(surface: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def evaluate_suite_run(
-    suite: Mapping[str, Any] | None, surface: Mapping[str, Any]
+    suite: Mapping[str, Any] | None,
+    surface: Mapping[str, Any],
+    baseline_surface: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """核对 suite 记录：文件清单必须与现算辐射面一致，既存红必须逐项对上。"""
+    """核对 suite 记录：执行集合必须仍被现算辐射面覆盖，既存红必须逐项对上。
+
+    :param baseline_surface: 与 `suite` **同一次运行**写下的辐射面节点（`--check` 时从磁盘
+        报告里取，`--write --run-suites` 时就是现算的那份）。它与 `suite.files_digest` 的
+        等值比对是「报告内部一致性」判据，两侧都是过去的事实，不随仓库演进。
+    """
     if not suite:
         return {
             "state": "not_executed",
             "detail": "辐射面 pytest 未执行 —— 子条目 1 无结论。用 `--write --run-suites` 真跑一次。",
-            "surface_digest_matches": None,
+            "suite_digest_matches_recorded_surface": None,
+            "live_surface_covers_run": None,
             "preexisting": [],
             "passed": False,
         }
-    digest_matches = suite.get("files_digest") == surface["digest"]
+    # 🔴 这里原来是 `suite.files_digest == 现算 surface.digest` 的**等值**判据 —— 它把「辐射面
+    #    有多少成员」冻进了锁：仓库任意新增一个引用被验模块的测试文件都会让它变 False，进而把
+    #    verdict 打成 failed（BP-74-1）。改成两条各自独立、且都**不随仓库增长**的判据：
+    #
+    #    ① `suite_digest_matches_recorded_surface` —— 那次执行覆盖的辐射面 digest 必须等于
+    #       **同一份报告里**记录的辐射面 digest。两侧都是**过去的事实**，永远可复核，抓的是
+    #       「报告被手改 / suite 记录与报告拼接自两次不同的运行」。
+    #    ② `live_surface_covers_run` —— 现算辐射面规模必须 **≥** 那次执行的文件数。辐射面长大
+    #       不打红（那是仓库演进），但 scanner 被改窄到低于已执行集合就打红 —— 那正是原判据真正
+    #       要防的事（「改 scanner 蒙过去」）。
+    # baseline 缺省回落到现算辐射面：守卫用合成 suite 记录直接喂本函数时（纯函数正向重算），
+    # 「那次执行」就是「现在」，两侧同源。
+    recorded_surface_digest = str(
+        (baseline_surface if baseline_surface is not None else surface).get("digest") or ""
+    )
+    digest_matches = bool(
+        recorded_surface_digest and suite.get("files_digest") == recorded_surface_digest
+    )
+    live_size = int(surface["surface_size"])
+    executed_files = int(suite.get("file_count") or 0)
+    covers_run = live_size >= executed_files
     counts = dict(suite.get("counts") or {})
     failed_nodeids = list(suite.get("failed_nodeids") or [])
     error_nodeids = list(suite.get("error_nodeids") or [])
@@ -5125,7 +5303,15 @@ def evaluate_suite_run(
         "own_guard_included": suite.get("own_guard_included"),
         "own_guard_path": suite.get("own_guard_path"),
         "elapsed_seconds": suite.get("elapsed_seconds"),
-        "surface_digest_matches": digest_matches,
+        "suite_digest_matches_recorded_surface": digest_matches,
+        "recorded_surface_digest": recorded_surface_digest,
+        "live_surface_covers_run": covers_run,
+        "live_surface_size": live_size,
+        "surface_growth_since_run": live_size - executed_files,
+        "surface_growth_note": (
+            "辐射面比那次执行时**长大**不算 stale（仓库在演进）；缩到已执行集合以下才算 —— "
+            "那才是「改 scanner 蒙过去」。增量本身是普查派生量，不进锁。"
+        ),
         "counts": counts,
         "summary_line": suite.get("summary_line"),
         "declared_preexisting_failed": declared_failed,
@@ -5146,6 +5332,7 @@ def evaluate_suite_run(
         },
         "passed": bool(
             digest_matches
+            and covers_run
             and all(r["agrees"] for r in rows)
             and not unexpected_failed
             and not unexpected_errors
@@ -5580,8 +5767,13 @@ def build_report(
     catalog: SchemaCatalog | None = None,
     harness: Mapping[str, Any] | None = None,
     suite: Mapping[str, Any] | None = None,
+    baseline_surface: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """组装报告。三个昂贵输入可注入 —— 守卫据此**正向重算**（教训 15）。"""
+    """组装报告。三个昂贵输入可注入 —— 守卫据此**正向重算**（教训 15）。
+
+    :param baseline_surface: 与 `suite` 同一次运行写下的辐射面节点。缺省时按「与 suite 同源」
+        推导：给了 `suite` 就从磁盘报告取，没给就用现算的那份（`--write --run-suites` 的情形）。
+    """
     catalog = catalog if catalog is not None else read_schema_catalog()
     harness = harness if harness is not None else run_behaviour_harness()
     observations = dict(harness.get("observations") or {})
@@ -5593,7 +5785,9 @@ def build_report(
     invariant_rows = [inv.evaluate(catalog, observations) for inv in ALL_INVARIANTS]
     endpoint_rows = build_endpoint_checks()
     surface = radiation_surface()
-    suite_row = evaluate_suite_run(suite, surface)
+    suite_row = evaluate_suite_run(
+        suite, surface, baseline_surface if baseline_surface is not None else surface
+    )
     landings = build_property_landings(invariant_rows, endpoint_rows, surface, suite_row)
     restoration = restoration_record(harness)
 
@@ -5656,6 +5850,7 @@ def build_report(
         },
         "endpoint_checks": endpoint_rows,
         "radiation_surface": surface,
+        "census_contract": build_census_contract(surface),
         "suite_run": dict(suite) if suite else None,
         "suite_verdict": suite_row,
         "oo_scope_boundary": dict(OO_SCOPE_BOUNDARY),
@@ -5669,8 +5864,10 @@ def build_report(
         landings=landings,
     )
     report["verdict"] = build_verdict(report)
+    # 🔴 digest 算在 **census 剔除之后**的内容上：于是它继续锁死「非普查内容」（报告不可被
+    #    手改），而不再被仓库演进顶红。少了 `strip_census`，digest 就重新变成会自己过期的锁。
     report["report_digest"] = digest_of(
-        {key: value for key, value in report.items() if key != "report_digest"}
+        strip_census({key: value for key, value in report.items() if key != "report_digest"})
     )
     return report
 
@@ -5697,18 +5894,30 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     suite: Mapping[str, Any] | None = None
+    baseline_surface: Mapping[str, Any] | None = None
     if args.run_suites:
         if not args.write:
             print("[Task68] --run-suites 只能与 --write 同用", file=sys.stderr)
             return 2
-        suite = run_radiation_suites(radiation_surface())
+        baseline_surface = radiation_surface()
+        suite = run_radiation_suites(baseline_surface)
     elif OUTPUT_PATH.exists():
-        # `suite_run` 是**昂贵的真实执行记录**：复用磁盘上的那一份，但辐射面清单会现算并
-        # 逐项核对（`surface_digest_matches`），改 scanner 蒙不过去。
+        # `suite_run` 是**昂贵的真实执行记录**：复用磁盘上的那一份。与它**同源**的辐射面节点
+        # 也一并取回当 baseline —— 「那次执行覆盖的辐射面」是过去的事实，必须与过去的记录比，
+        # 不能与现算的比（现算会随仓库长大，等值比对因此永远过期，即 BP-74-1）。
         existing = read_json(OUTPUT_PATH)
         suite = existing.get("suite_run")
+        # 🔴 baseline **随 suite 记录一起前滚**：一旦报告被 `--write`（不带 --run-suites）重写，
+        #    `radiation_surface` 就变成写盘那一刻的现算值，而 `suite_run` 还是旧的那次执行 ⇒
+        #    再用 `radiation_surface.digest` 当 baseline 会立刻对不上。所以优先读上一轮已经固化
+        #    的 `suite_verdict.recorded_surface_digest`，只有它还不存在时才回落到同份报告的
+        #    `radiation_surface.digest`（首次迁移路径）。
+        carried = str(((existing.get("suite_verdict") or {}).get("recorded_surface_digest")) or "")
+        baseline_surface = (
+            {"digest": carried} if carried else (existing.get("radiation_surface") or None)
+        )
 
-    report = build_report(suite=suite)
+    report = build_report(suite=suite, baseline_surface=baseline_surface)
     rendered = render(report)
     verdict = report["verdict"]["result"]
 
