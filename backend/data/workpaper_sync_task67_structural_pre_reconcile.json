@@ -1257,7 +1257,7 @@
  },
  "database_snapshot": {
   "candidates": [],
-  "check_constraint_count": 214,
+  "check_constraint_count": 221,
   "content_versions": [],
   "definition_artifacts": [
    {
@@ -1443,8 +1443,8 @@
   },
   "scope_index": [],
   "test_runs": [],
-  "trigger_count": 34,
-  "unique_index_count": 60
+  "trigger_count": 35,
+  "unique_index_count": 62
  },
  "description": "Task 67 —— 从最终源码重新生成 mounts 与 source-backed manifest，逐 entry 锁定 source digest / editable / room_model / scenario_profile，并与 registry、宿主 DOM、descriptor+room 配置、authority-model+contract+definition bundle、candidate+published representation 及 Task 66 deletion plan 双向核对的**结构报告**。",
  "entries": [
@@ -27461,8 +27461,8 @@
   "SELECT id::text AS id, entry_id, manifest_source_digest, scenario_profile_digest, required_scenario_set_digest, definition_bundle_sha256, authority_model_definition_sha256, editability, room_model, aggregate_result FROM working_paper_sync_test_run",
   "SELECT s.id::text AS id, r.entry_id AS entry_id, s.scenario_id, s.scenario_kind, s.result FROM working_paper_entry_evidence_scenario s JOIN working_paper_sync_test_run r ON r.id = s.run_id"
  ],
- "report_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
- "report_digest": "2e4efc280b6e933456383dc0bca977a743e834cc46936db456015185721f1bea",
+ "report_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
+ "report_digest": "3c8b13fdec7505982ca5b15b41688f7352f4b2cb56d268461bb39d1fbe4f4019",
  "reported_counter_kinds": [
   "unadjudicated",
   "fake_bidirectional",

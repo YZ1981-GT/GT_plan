@@ -106,3 +106,76 @@ class TestCensusLock:
             assert expect in result["failing_checks"], (
                 f"{label}：打红的不是预期那条（实得 {result['failing_checks']}）"
             )
+
+    def test_coverage_boolean_is_derived_not_hardcoded(self, gate: Any) -> None:
+        """喂「某 pattern 零命中」的合成清单：覆盖布尔必须给出 False。
+
+        🔴 今天每条 pattern 都真有命中者 ⇒ 把它写成 `{name: True}` 恒真与「从成员清单重算」
+        在真实数据上**结果相同**（等价变异，实测 GREEN）。判据因此落在**纯函数 + 合成输入**上，
+        而不是在真实数据上做自我比对。
+        """
+        derive = gate._census_lock.coverage_from_members
+        assert derive({"a.py": ["p1"]}, ["p1", "p2"]) == {"p1": True, "p2": False}, (
+            "零命中的 pattern 没有被判成 False ⇒ 覆盖布尔是恒真的"
+        )
+        assert derive({}, ["p1"]) == {"p1": False}, "空成员清单下覆盖必须全 False（空集恒真是假绿源）"
+        # 正例（防判据恒假）：真实数据上仍必须与成员清单一致
+        live = gate.radiation_surface()
+        assert live["pattern_coverage"] == derive(live["files"], live["patterns"])
+
+    def test_upstream_precondition_is_fail_closed(self, gate: Any) -> None:
+        """上游回退掉普查免疫（缺 `CENSUS_KEYS` 或 `strip_census`）时本门必须**抛**。
+
+        🔴 今天上游是合规的，那条前提检查从不触发 ⇒ 把它改成 `if False:` 是等价变异
+        （实测 GREEN，而它正是 fail-open：`strip=None` 会让 `None == None` 得 True）。
+        """
+        class _NoCensusKeys:
+            CENSUS_KEYS: tuple[str, ...] = ()
+
+            @staticmethod
+            def strip_census(node, *a, **k):
+                return node
+
+            @staticmethod
+            def radiation_surface():
+                return {}
+
+            @staticmethod
+            def census_semantics(surface=None):
+                return {"all_hold": True}
+
+        with pytest.raises(gate.Task71GateError):
+            gate.upstream_lock_impact(_NoCensusKeys)
+
+        class _NoStrip(_NoCensusKeys):
+            CENSUS_KEYS = ("radiation_surface.scanned_test_files",)
+            strip_census = None
+
+        with pytest.raises(gate.Task71GateError):
+            gate.upstream_lock_impact(_NoStrip)
+
+    def test_projection_agreement_is_really_computed(self, gate: Any) -> None:
+        """喂一个「剔除普查量后仍与盘上不一致」的合成上游：判定必须为 False，不得写死 True。"""
+        real = gate.upstream_lock_impact()
+        assert real["task70_surface_projection_agrees"] is True, "正例失败：真实上游本应一致"
+        assert real["task70_lock_goes_stale_because_of_this_gate"] is False
+
+        upstream = sys.modules["t70_for_71"]
+        drifted = copy.deepcopy(upstream.radiation_surface())
+        # 动一个**非普查**字段（选取契约）—— 它必须仍在锁里，于是投影必须判不一致
+        drifted["production_subjects"] = ["synthetic_subject_only"]
+
+        class _Drifted:
+            CENSUS_KEYS = upstream.CENSUS_KEYS
+            strip_census = staticmethod(upstream.strip_census)
+            census_semantics = staticmethod(upstream.census_semantics)
+
+            @staticmethod
+            def radiation_surface():
+                return drifted
+
+        row = gate.upstream_lock_impact(_Drifted)
+        assert row["task70_surface_projection_agrees"] is False, (
+            "动了上游的选取契约字段后投影仍报一致 ⇒ 该判定被写死，普查免疫的复核形同虚设"
+        )
+        assert row["task70_lock_goes_stale_because_of_this_gate"] is True

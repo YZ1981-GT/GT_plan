@@ -62,6 +62,10 @@ _COUNT = f"{_T}::TestCountersAndStructuralErrors"
 _BP = f"{_T}::TestInboundObligationsAndBlockingPreconditions"
 _IDEM = f"{_T}::TestGeneratorIsIdempotentAndCheckIsStrict"
 
+#: census 语义退化判据（**新建**文件）：宿主里没有这类判据，M35/M36 实测 GREEN 才补的。
+_CEN = "test_task67_census_lock.py"
+_CENSUS = f"{_CEN}::TestCensusSemanticsAreAssertedNotMerelySkipped"
+
 #: 公共锚点：几乎每条落在生成器上的变异都会让现算报告与磁盘不同。
 _BYTE_LOCK = f"{_IDEM}::test_check_matches_the_file_on_disk"
 
@@ -488,8 +492,7 @@ MUTATIONS: list[Mutation] = [
         id="M35", side="be", path=CENSUS_LOCK, kind="replace",
         anchor='        "all_hold": all(checks.values()),',
         new='        "all_hold": True,  # mutated: 普查语义断言恒真',
-        want=f"{_BP}::test_inbound_scan_recomputes_and_contains_the_real_targets",
-        wants=(f"{_IDEM}::test_check_matches_the_file_on_disk",),
+        want=f"{_CENSUS}::test_each_degradation_reds_exactly_its_own_check",
         why="把普查语义断言改成恒真 —— 「剔除 ≠ 不管」退化成「不看了」。投影只锁那 5 条真实"
             "目标，语义断言是唯一还在看「普查器是不是真的在普查」的东西",
     ),
@@ -497,8 +500,7 @@ MUTATIONS: list[Mutation] = [
         id="M36", side="be", path=GEN, kind="replace",
         anchor='        "scan_reaches_beyond_the_required_targets": bool(paths - set(REQUIRED_INBOUND_TARGETS)),',
         new='        "scan_reaches_beyond_the_required_targets": True,  # mutated: 恒真',
-        want=f"{_BP}::test_inbound_scan_recomputes_and_contains_the_real_targets",
-        wants=(f"{_IDEM}::test_check_matches_the_file_on_disk",),
+        want=f"{_CENSUS}::test_each_degradation_reds_exactly_its_own_check",
         why="🔴 最隐蔽的一条：普查器被「修」成只返回那 5 条写死目标时，投影比对**照样绿**"
             "（投影本来就只留那 5 条）。`scan_reaches_beyond_the_required_targets` 是唯一能"
             "抓到它的判据；恒真之后「普查器退化成硬编码名单」就没人管了",
@@ -511,11 +513,15 @@ if __name__ == "__main__":
         run_cli(
             mutations=MUTATIONS,
             guard_files={
-                "be": "backend/tests/workpaper_sync/test_task67_structural_pre_reconcile.py",
+                _T: "Task 67 structural pre-reconcile 守卫",
+                _CEN: "Task 67 census 语义退化判据（新建）",
             },
             repo=REPO,
             description="Task 67 structural pre-reconcile 守卫变异检验",
-            backend_args=["backend/tests/workpaper_sync/test_task67_structural_pre_reconcile.py"],
+            backend_args=[
+                "backend/tests/workpaper_sync/test_task67_structural_pre_reconcile.py",
+                "backend/tests/workpaper_sync/test_task67_census_lock.py",
+            ],
             allow_dirty_baseline=True,
         )
     )

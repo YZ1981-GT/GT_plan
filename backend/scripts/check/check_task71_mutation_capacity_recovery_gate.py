@@ -3898,7 +3898,7 @@ UPSTREAM_LOCKS: Final[tuple[tuple[str, str, int, int], ...]] = (
 )
 
 
-def upstream_lock_impact() -> dict[str, Any]:
+def upstream_lock_impact(module_override: Any = None) -> dict[str, Any]:
     """本门新增守卫文件对上游逐字节锁的**结构性**影响（不跑 pytest，只现算）。
 
     🔴 实测（本门收尾时用「把守卫临时移出 `backend/tests` 再跑一次」隔离）：任务 70 的
@@ -3912,15 +3912,21 @@ def upstream_lock_impact() -> dict[str, Any]:
     `source_commit` 语义）。如实登记并把 owner 指向任务 70 —— 与任务 70 自己对任务 69 的
     BP-70-6 同一处置。
     """
-    t70_gate = BACKEND / "scripts/check/check_task70_oo94_full_entry_scenario_gate.py"
-    spec = importlib.util.spec_from_file_location("t70_for_71", t70_gate)
-    if spec is None or spec.loader is None:
-        raise Task71GateError(f"无法加载任务 70 的门: {rel(t70_gate)}")
-    module = sys.modules.get("t70_for_71")
+    # 🔴 `module_override` 只为**守卫喂合成上游**而存在：本函数的两条判据
+    #    （前提 fail-closed、投影一致性现算）在今天这个合规上游上恒为真，于是「把它们写死」
+    #    是等价变异（实测 M06/M07 GREEN）。喂一个缺 `CENSUS_KEYS` 或不真剔除的假上游，
+    #    写死的实现立刻现形。生产路径不传该参数，行为不变。
+    module = module_override
     if module is None:
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["t70_for_71"] = module
-        spec.loader.exec_module(module)
+        t70_gate = BACKEND / "scripts/check/check_task70_oo94_full_entry_scenario_gate.py"
+        spec = importlib.util.spec_from_file_location("t70_for_71", t70_gate)
+        if spec is None or spec.loader is None:
+            raise Task71GateError(f"无法加载任务 70 的门: {rel(t70_gate)}")
+        module = sys.modules.get("t70_for_71")
+        if module is None:
+            module = importlib.util.module_from_spec(spec)
+            sys.modules["t70_for_71"] = module
+            spec.loader.exec_module(module)
     live = module.radiation_surface()
     disk = (read_json(T70_REPORT).get("radiation_surface") or {})
     guard_in_surface = GUARD_TEST_REL in (live.get("referencing_test_files") or {})
@@ -4024,7 +4030,7 @@ def radiation_surface() -> dict[str, Any]:
     # 🔴 逐 pattern 覆盖布尔 —— 辐射面**选取契约**的一部分，**不是**普查派生量：它不随仓库
     #    演进，但 pattern 被删空/改坏时立刻变假。因此它继续进逐字节锁，而计数 / 成员清单 /
     #    digest 走 census（见 :data:`CENSUS_KEYS`）。
-    coverage = {name: any(name in why for why in files.values()) for name in patterns}
+    coverage = _census_lock.coverage_from_members(files, patterns)
     return {
         "statement": (
             "辐射面 = `backend/tests/**/test_*.py` 中按模块路径引用到本门被验生产单元"

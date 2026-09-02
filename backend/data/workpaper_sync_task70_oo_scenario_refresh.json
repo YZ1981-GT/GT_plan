@@ -1,9 +1,9 @@
 {
   "artifact_git_status": {
-    "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "M",
-    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "MM",
-    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "MM",
-    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "MM"
+    "backend/data/workpaper_sync_task70_oo_scenario_refresh.json": "tracked-clean",
+    "backend/scripts/check/check_task70_oo94_full_entry_scenario_gate.py": "tracked-clean",
+    "backend/scripts/diagnose/mutate_task70_oo_scenario_guards.py": "tracked-clean",
+    "backend/tests/workpaper_sync_oo/test_task70_oo_scenario_gate.py": "tracked-clean"
   },
   "artifact_git_status_semantics": {
     "every_product_is_on_disk": true,
@@ -253,7 +253,7 @@
       "digest": "89bd90cc272305757c5446c261dd5df2de00188a66c87d239544c646abd70c2d",
       "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
       "referencing_test_file_count": 284,
-      "scanned_test_files": 2346
+      "scanned_test_files": 2347
     },
     "semantics": {
       "all_hold": true,
@@ -2081,7 +2081,7 @@
         "evidence"
       ]
     },
-    "scanned_test_files": 2346,
+    "scanned_test_files": 2347,
     "subject_coverage": {
       "adapters import registry": true,
       "adapters.registry": true,
@@ -2103,7 +2103,7 @@
     "backend/data/workpaper_sync_task68_backend_chain_regression.json",
     "backend/data/workpaper_sync_task69_frontend_regression.json"
   ],
-  "report_digest": "2c00d184309dfac54e288d64de0a08f170490152ef0a05dd16f3d0de2cba2df5",
+  "report_digest": "3523d245e4cd3167c3dc392d1643dbadce2ca89ceac0e76a47fa5982daba596f",
   "result_declaration_scan": {
     "forbidden_keys": [
       "aggregate_result",
@@ -89580,7 +89580,7 @@
     }
   },
   "schema_version": "task70-oo94-full-entry-scenario-refresh:v1",
-  "source_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
+  "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "sub_bullets": {
     "1": "消费任务 67 结构报告与任务 68/69 回归结果；逐 entry 从 source-backed manifest 的 editable/room_model/scenario_profile + capability + approved bundle + authority model 重新推导完整 required scenario set，固定 source/profile digest 并以新 test run 刷新 stale evidence",
@@ -90084,8 +90084,8 @@
         "registration_plan_size": 186,
         "registrations": 0
       },
-      "report_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
-      "report_digest": "2e4efc280b6e933456383dc0bca977a743e834cc46936db456015185721f1bea",
+      "report_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
+      "report_digest": "3c8b13fdec7505982ca5b15b41688f7352f4b2cb56d268461bb39d1fbe4f4019",
       "source_regeneration_digests_agree": false,
       "test_run_rows_total": 0
     },
@@ -90111,8 +90111,8 @@
       },
       "oo_scope_boundary_owner": "70",
       "path": "backend/data/workpaper_sync_task68_backend_chain_regression.json",
-      "report_digest": "420d04b58caf59a0d5aa0a3229f959b9720395912e0c44ae4475b6d28e90c543",
-      "source_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf"
+      "report_digest": "31980e806a5b45c7ca478f918dab775cee38bec5fde721ae73e86c552cbfb03c",
+      "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c"
     },
     "task69_frontend_regression": {
       "blocking_point_ids": [

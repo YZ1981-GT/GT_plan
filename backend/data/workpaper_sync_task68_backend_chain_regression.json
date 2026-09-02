@@ -665,7 +665,7 @@
     "measured": {
       "digest": "2961d151f983249034f7deac7cf2e0083bb1f26e2dad96fb8c7318127ceec97c",
       "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
-      "scanned_test_files": 2346,
+      "scanned_test_files": 2347,
       "surface_size": 95
     },
     "semantics": {
@@ -5622,6 +5622,7 @@
       "backend/tests/workpaper_sync/test_slice_schema_validator_coverage.py",
       "backend/tests/workpaper_sync/test_task47_e_cycle_migration.py",
       "backend/tests/workpaper_sync/test_task66_legacy_deletion_plan.py",
+      "backend/tests/workpaper_sync/test_task67_census_lock.py",
       "backend/tests/workpaper_sync/test_task68_radiation_surface.py"
     ],
     "in_dir_but_out_of_surface_note": "这些文件在 `workpaper_sync/` 目录里但**不引用**任何被验生产单元（只读 data/JSON 与schema 契约），按引用关系判据它们不在辐射面。如实列出，不偷偷补进分母也不假装覆盖。",
@@ -5647,11 +5648,11 @@
       "sync_router_module": "app\\.routers\\.wp_sync_router|wp_sync_router",
       "sync_services_module": "app\\.services\\.workpaper_sync"
     },
-    "scanned_test_files": 2346,
+    "scanned_test_files": 2347,
     "statement": "辐射面 = `backend/tests/**/test_*.py` 中**按模块路径引用**到本次被验生产单元（`app.services.workpaper_sync.*` / `workpaper_sync_models` / `wp_sync_router` / V151・V152）的测试文件全集。不跑无边界全量。",
     "surface_size": 95
   },
-  "report_digest": "420d04b58caf59a0d5aa0a3229f959b9720395912e0c44ae4475b6d28e90c543",
+  "report_digest": "31980e806a5b45c7ca478f918dab775cee38bec5fde721ae73e86c552cbfb03c",
   "restoration": {
     "drifted_tables": {},
     "foreign_scratch_note": "非本轮创建的 `tmp_task68_reg_*` 残留。来源通常是变异实验 M41（**故意**删掉 `DROP SCHEMA` 以证明清理逻辑有效）—— 如实列出并单独清理，不并进本轮复原结论。",
@@ -5731,8 +5732,8 @@
     "why_this_is_the_proof": "「跑完没报错」不是复原实证 —— 被 `^C` 中断的运行可能已提交部分变更，判成败一律**查数据**不看 exit code。前后逐表行数 + 残留 schema 计数是可复算的数据侧判据。"
   },
   "schema_catalog": {
-    "column_count": 503,
-    "constraint_count": 400,
+    "column_count": 516,
+    "constraint_count": 413,
     "constraints": {
       "working_paper.ck_wp_content_revision_non_negative": "CHECK ((content_revision >= 0))",
       "working_paper.fk_wp_current_content_version": "FOREIGN KEY (current_content_version_id) REFERENCES working_paper_content_version(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED",
@@ -6006,6 +6007,19 @@
       "working_paper_pending_mutation.working_paper_pending_mutation_result_content_version_id_fkey": "FOREIGN KEY (result_content_version_id) REFERENCES working_paper_content_version(id) ON DELETE RESTRICT",
       "working_paper_pending_mutation.working_paper_pending_mutation_user_id_fkey": "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT",
       "working_paper_pending_mutation.working_paper_pending_mutation_wp_id_fkey": "FOREIGN KEY (wp_id) REFERENCES working_paper(id) ON DELETE RESTRICT",
+      "working_paper_representation_candidate_event.ck_wprce_attach_edge": "CHECK ((((event_type)::text <> 'contract_bundle_attached'::text) OR (((from_state)::text = 'awaiting_contract'::text) AND ((to_state)::text = 'ready'::text))))",
+      "working_paper_representation_candidate_event.ck_wprce_attached_identity": "CHECK ((((event_type)::text <> 'contract_bundle_attached'::text) OR ((contract_definition_id IS NOT NULL) AND (definition_bundle_id IS NOT NULL) AND (definition_bundle_sha256 IS NOT NULL))))",
+      "working_paper_representation_candidate_event.ck_wprce_bundle_digest": "CHECK (((definition_bundle_sha256 IS NULL) OR wpsync_is_digest((definition_bundle_sha256)::text)))",
+      "working_paper_representation_candidate_event.ck_wprce_event_type": "CHECK (((event_type)::text = ANY ((ARRAY['contract_bundle_attached'::character varying, 'attach_refused'::character varying])::text[])))",
+      "working_paper_representation_candidate_event.ck_wprce_from_state": "CHECK (((from_state)::text = ANY ((ARRAY['staged'::character varying, 'awaiting_contract'::character varying, 'ready'::character varying, 'finalized'::character varying, 'rejected'::character varying, 'orphaned'::character varying])::text[])))",
+      "working_paper_representation_candidate_event.ck_wprce_sequence_positive": "CHECK ((sequence_no >= 1))",
+      "working_paper_representation_candidate_event.ck_wprce_to_state": "CHECK (((to_state)::text = ANY ((ARRAY['staged'::character varying, 'awaiting_contract'::character varying, 'ready'::character varying, 'finalized'::character varying, 'rejected'::character varying, 'orphaned'::character varying])::text[])))",
+      "working_paper_representation_candidate_event.uq_wprce_sequence": "UNIQUE (candidate_id, sequence_no)",
+      "working_paper_representation_candidate_event.working_paper_representation_candid_contract_definition_id_fkey": "FOREIGN KEY (contract_definition_id) REFERENCES working_paper_sync_definition_artifact(id) ON DELETE RESTRICT",
+      "working_paper_representation_candidate_event.working_paper_representation_candidat_definition_bundle_id_fkey": "FOREIGN KEY (definition_bundle_id) REFERENCES working_paper_sync_definition_bundle(id) ON DELETE RESTRICT",
+      "working_paper_representation_candidate_event.working_paper_representation_candidate_event_actor_id_fkey": "FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE RESTRICT",
+      "working_paper_representation_candidate_event.working_paper_representation_candidate_event_candidate_id_fkey": "FOREIGN KEY (candidate_id) REFERENCES working_paper_representation_upgrade_candidate(id) ON DELETE RESTRICT",
+      "working_paper_representation_candidate_event.working_paper_representation_candidate_event_pkey": "PRIMARY KEY (id)",
       "working_paper_representation_upgrade_candidate.ck_wpruc_equivalence_digest": "CHECK (((visible_equivalence_report_sha256 IS NULL) OR wpsync_is_digest((visible_equivalence_report_sha256)::text)))",
       "working_paper_representation_upgrade_candidate.ck_wpruc_finalized_at": "CHECK ((((state)::text = 'finalized'::text) = (finalized_at IS NOT NULL)))",
       "working_paper_representation_upgrade_candidate.ck_wpruc_finalized_pointer": "CHECK ((((state)::text = 'finalized'::text) = (finalized_representation_id IS NOT NULL)))",
@@ -6174,7 +6188,7 @@
       "wpsync_is_opaque_resource_id": "CREATE OR REPLACE FUNCTION public.wpsync_is_opaque_resource_id(p_value text)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE PARALLEL SAFE\nAS $function$\n    SELECT p_value IS NOT NULL\n       AND length(btrim(p_value)) > 0\n       AND p_value !~ '^\\s*[0-9]+\\s*$';\n$function$\n",
       "wpsync_is_uuid_text": "CREATE OR REPLACE FUNCTION public.wpsync_is_uuid_text(p_value text)\n RETURNS boolean\n LANGUAGE sql\n IMMUTABLE PARALLEL SAFE\nAS $function$\n    SELECT p_value IS NOT NULL\n       AND p_value ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$';\n$function$\n"
     },
-    "index_count": 108,
+    "index_count": 112,
     "indexes": {
       "working_paper.idx_working_paper_project_id": "CREATE INDEX idx_working_paper_project_id ON public.working_paper USING btree (project_id)",
       "working_paper.idx_wp_parsed_data_gin": "CREATE INDEX idx_wp_parsed_data_gin ON public.working_paper USING gin (parsed_data jsonb_path_ops) WHERE (is_deleted = false)",
@@ -6250,6 +6264,10 @@
       "working_paper_pending_mutation.idx_wppm_scope": "CREATE INDEX idx_wppm_scope ON public.working_paper_pending_mutation USING btree (project_id, wp_id, entry_id, state)",
       "working_paper_pending_mutation.uq_wppm_idempotency": "CREATE UNIQUE INDEX uq_wppm_idempotency ON public.working_paper_pending_mutation USING btree (wp_id, entry_id, user_id, idempotency_key)",
       "working_paper_pending_mutation.working_paper_pending_mutation_pkey": "CREATE UNIQUE INDEX working_paper_pending_mutation_pkey ON public.working_paper_pending_mutation USING btree (id)",
+      "working_paper_representation_candidate_event.idx_wprce_bundle": "CREATE INDEX idx_wprce_bundle ON public.working_paper_representation_candidate_event USING btree (definition_bundle_id)",
+      "working_paper_representation_candidate_event.idx_wprce_candidate": "CREATE INDEX idx_wprce_candidate ON public.working_paper_representation_candidate_event USING btree (candidate_id, sequence_no)",
+      "working_paper_representation_candidate_event.uq_wprce_sequence": "CREATE UNIQUE INDEX uq_wprce_sequence ON public.working_paper_representation_candidate_event USING btree (candidate_id, sequence_no)",
+      "working_paper_representation_candidate_event.working_paper_representation_candidate_event_pkey": "CREATE UNIQUE INDEX working_paper_representation_candidate_event_pkey ON public.working_paper_representation_candidate_event USING btree (id)",
       "working_paper_representation_upgrade_candidate.idx_wpruc_entry": "CREATE INDEX idx_wpruc_entry ON public.working_paper_representation_upgrade_candidate USING btree (wp_id, entry_id, state)",
       "working_paper_representation_upgrade_candidate.working_paper_representation_upgrade_candidate_pkey": "CREATE UNIQUE INDEX working_paper_representation_upgrade_candidate_pkey ON public.working_paper_representation_upgrade_candidate USING btree (id)",
       "working_paper_sync_conflict.idx_wpsc_group": "CREATE INDEX idx_wpsc_group ON public.working_paper_sync_conflict USING btree (operation_id, sheet_key, table_key, row_key)",
@@ -6631,6 +6649,19 @@
       "working_paper_pending_mutation.state": "NO",
       "working_paper_pending_mutation.user_id": "NO",
       "working_paper_pending_mutation.wp_id": "NO",
+      "working_paper_representation_candidate_event.actor_id": "YES",
+      "working_paper_representation_candidate_event.candidate_id": "NO",
+      "working_paper_representation_candidate_event.contract_definition_id": "YES",
+      "working_paper_representation_candidate_event.correlation_id": "NO",
+      "working_paper_representation_candidate_event.created_at": "NO",
+      "working_paper_representation_candidate_event.definition_bundle_id": "YES",
+      "working_paper_representation_candidate_event.definition_bundle_sha256": "YES",
+      "working_paper_representation_candidate_event.detail": "NO",
+      "working_paper_representation_candidate_event.event_type": "NO",
+      "working_paper_representation_candidate_event.from_state": "NO",
+      "working_paper_representation_candidate_event.id": "NO",
+      "working_paper_representation_candidate_event.sequence_no": "NO",
+      "working_paper_representation_candidate_event.to_state": "NO",
       "working_paper_representation_upgrade_candidate.content_version_id": "NO",
       "working_paper_representation_upgrade_candidate.created_at": "NO",
       "working_paper_representation_upgrade_candidate.entry_id": "NO",
@@ -6813,7 +6844,7 @@
       "working_paper_sync_scope_index": 0,
       "working_paper_sync_test_run": 0
     },
-    "trigger_count": 34,
+    "trigger_count": 35,
     "triggers": {
       "working_paper_artifact.trg_wpa_incoming_path": "CREATE TRIGGER trg_wpa_incoming_path BEFORE INSERT OR UPDATE ON public.working_paper_artifact FOR EACH ROW EXECUTE FUNCTION wpsync_check_artifact_incoming_path()",
       "working_paper_artifact.trg_wpa_transition": "CREATE TRIGGER trg_wpa_transition BEFORE UPDATE ON public.working_paper_artifact FOR EACH ROW EXECUTE FUNCTION wpsync_check_artifact_transition()",
@@ -6836,6 +6867,7 @@
       "working_paper_oo_close_intent.trg_wpoci_promotion": "CREATE TRIGGER trg_wpoci_promotion BEFORE INSERT OR UPDATE ON public.working_paper_oo_close_intent FOR EACH ROW EXECUTE FUNCTION wpsync_check_close_intent_promotion()",
       "working_paper_oo_close_intent_event.trg_wpocie_append_only": "CREATE TRIGGER trg_wpocie_append_only BEFORE DELETE OR UPDATE ON public.working_paper_oo_close_intent_event FOR EACH ROW EXECUTE FUNCTION wpsync_forbid_timeline_mutation()",
       "working_paper_oo_room.trg_wpoor_monotonic": "CREATE TRIGGER trg_wpoor_monotonic BEFORE UPDATE ON public.working_paper_oo_room FOR EACH ROW EXECUTE FUNCTION wpsync_check_room_monotonic()",
+      "working_paper_representation_candidate_event.trg_wprce_append_only": "CREATE TRIGGER trg_wprce_append_only BEFORE DELETE OR UPDATE ON public.working_paper_representation_candidate_event FOR EACH ROW EXECUTE FUNCTION wpsync_forbid_timeline_mutation()",
       "working_paper_representation_upgrade_candidate.trg_wpruc_guard": "CREATE TRIGGER trg_wpruc_guard BEFORE INSERT OR UPDATE ON public.working_paper_representation_upgrade_candidate FOR EACH ROW EXECUTE FUNCTION wpsync_check_upgrade_candidate()",
       "working_paper_sync_definition_artifact.trg_wpsda_immutable": "CREATE TRIGGER trg_wpsda_immutable BEFORE UPDATE ON public.working_paper_sync_definition_artifact FOR EACH ROW EXECUTE FUNCTION wpsync_check_definition_immutable()",
       "working_paper_sync_definition_bundle.trg_wpsdb_immutable": "CREATE TRIGGER trg_wpsdb_immutable BEFORE UPDATE ON public.working_paper_sync_definition_bundle FOR EACH ROW EXECUTE FUNCTION wpsync_check_bundle_immutable()",
@@ -6852,7 +6884,7 @@
     }
   },
   "schema_version": "task68-backend-chain-independent-regression:v1",
-  "source_commit": "42d2f6e6ff9fc1b762caade3381e82b573437ccf",
+  "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "sub_bullets": {
     "1": "运行 migration/repository/artifact/retention/content+representation mutation/definition-bundle store/candidate finalize/room/close-intent/request/delivery/recovery/content-application/operation/scope-index/merge/coordinator/outbox/evidence/Excel/Word targeted tests",
@@ -7248,7 +7280,7 @@
       "disposition": "read_only_input",
       "path": "backend/data/workpaper_sync_task67_structural_pre_reconcile.json",
       "present": true,
-      "sha256": "f72ff7e4375c8e1fb760192d6d5b1085ef16fe2b8f06ed32110612faa72a8f0a",
+      "sha256": "1f3ddaa4e7485591fdc0a8897608abaaba9c5c405f4163e48f4de9cf369a53ae",
       "size_bytes": 1176985
     }
   },

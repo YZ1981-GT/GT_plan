@@ -44,6 +44,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 __all__ = [
     "strip_census",
+    "coverage_from_members",
     "artifact_status_semantics",
     "surface_core_checks",
     "finalize_checks",
@@ -113,6 +114,22 @@ def artifact_status_semantics(status: Mapping[str, str]) -> dict[str, Any]:
         "product_count": len(status),
         "every_product_is_on_disk": all(v != "missing-on-disk" for v in status.values()),
         "missing_products": sorted(k for k, v in status.items() if v == "missing-on-disk"),
+    }
+
+
+def coverage_from_members(
+    members: Mapping[str, Any], names: Iterable[str]
+) -> dict[str, bool]:
+    """逐名字的覆盖布尔：`names` 里每个名字是否被 `members` 的任一命中理由提到。
+
+    🔴 抽成**纯函数**的唯一理由是可被喂合成输入：今天每个 pattern/subject 都真有命中者，
+    于是「把它写成 `{name: True}` 恒真」与「从成员清单重算」在真实数据上**结果相同** ——
+    等价变异，数值判据天生测不出（实测 GREEN）。喂一个「某名字零命中」的合成清单，恒真实现
+    立刻现形。
+    """
+    return {
+        str(name): any(str(name) in (why or ()) for why in members.values())
+        for name in names
     }
 
 

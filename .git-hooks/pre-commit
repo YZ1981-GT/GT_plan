@@ -24,9 +24,21 @@ else
 fi
 
 # ── 2. 文件行数门禁 ──
-PY=$(command -v python || command -v python3 || true)
+# 🔴 只 `command -v` 不够，必须**探活**：仓库根曾有一个残缺 virtualenv（`.venv_depprobe`，
+#    只有 `Scripts/` 没有 `pyvenv.cfg`）抢在 PATH 最前，它的 python 一启动就报
+#    `No pyvenv.cfg file` 并非零退出 ⇒ 下面的行数门禁被判成「超限」，而 check_file_size.py
+#    **从未运行过**。那是**假红**，比跳过更糟：它会让人去拆本来合规的文件（实测踩过一次）。
+PY=""
+for _cand in "$(command -v python || true)" "$(command -v python3 || true)" "$(command -v py || true)"; do
+    [ -n "$_cand" ] || continue
+    if "$_cand" -c "" > /dev/null 2>&1; then
+        PY="$_cand"
+        break
+    fi
+    echo "[pre-commit] ⚠️ 跳过无法启动的 python: $_cand"
+done
 if [ -z "$PY" ]; then
-    echo "[pre-commit] ⚠️ python 未找到，跳过文件大小门禁（CI 兜底）"
+    echo "[pre-commit] ⚠️ 没有可用的 python（候选全部无法启动），跳过文件大小门禁（CI 兜底）"
     exit 0
 fi
 

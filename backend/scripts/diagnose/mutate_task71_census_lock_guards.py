@@ -39,6 +39,7 @@ sys.modules[_spec.name] = _host
 _spec.loader.exec_module(_host)
 
 Mutation = _host.Mutation
+CENSUS_LOCK_REL = "backend/scripts/_census_lock.py"
 GATE_REL = _host.GATE_REL
 
 #: 本组变异要打红的守卫文件。**两个**：5 条落在拆分出来的 census 守卫上，2 条仍落在宿主的
@@ -90,11 +91,11 @@ MUTATIONS: Final[tuple[Mutation, ...]] = (
     ),
     Mutation(
         "M05",
-        GATE_REL,
-        "radiation_surface",
-        "    coverage = {name: any(name in why for why in files.values()) for name in patterns}",
-        "    coverage = {name: True for name in patterns}  # mutated: 覆盖布尔恒真",
-        "TestCensusLock::test_census_derived_quantities_are_excluded_from_the_byte_lock",
+        CENSUS_LOCK_REL,
+        "coverage_from_members",
+        "        str(name): any(str(name) in (why or ()) for why in members.values())",
+        "        str(name): True  # mutated: 覆盖布尔恒真",
+        "TestCensusLock::test_coverage_boolean_is_derived_not_hardcoded",
         "🔴 逐 pattern 覆盖布尔恒真。注意它**与记录相等**（记录里今天也全是 True），"
         "所以只有「从同一份成员清单重算」这条判据能抓到 —— 等值比对在这里天生不敏感",
     ),
@@ -104,7 +105,7 @@ MUTATIONS: Final[tuple[Mutation, ...]] = (
         "upstream_lock_impact",
         '    projection_agrees = strip({"radiation_surface": live}) == strip({"radiation_surface": disk})',
         "    projection_agrees = True  # mutated: 不再现算上游投影是否一致",
-        "TestGuardPlacement::test_upstream_lock_impact_is_measured_and_owned",
+        "TestCensusLock::test_projection_agreement_is_really_computed",
         "本门对上游那把锁的核心判定被写成恒真 ⇒ 上游普查免疫被回退时本门也不会红",
     ),
     Mutation(
@@ -113,7 +114,7 @@ MUTATIONS: Final[tuple[Mutation, ...]] = (
         "upstream_lock_impact",
         "    if strip is None or not census_keys:",
         "    if False:  # mutated: 上游没有普查免疫也照样往下走",
-        "TestGuardPlacement::test_upstream_lock_impact_is_measured_and_owned",
+        "TestCensusLock::test_upstream_precondition_is_fail_closed",
         "上游的门被回退掉 `CENSUS_KEYS` / `strip_census` 时不再上抛 ⇒ 本门的判据前提悄悄失效"
         "（fail-open：`projection_agrees` 会拿 `None` 比 `None` 得 True）",
     ),
