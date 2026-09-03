@@ -11,11 +11,12 @@
   ],
   "notable": [
     "M14 首轮 GREEN —— 那时门禁只有 vite optimize + no-undef 两条判据。它证明 optimize 对「引擎→共享模型」这层边有洞：把 shared/plAdjudicationModel.ts 的 parseNum 去掉 export 后，6 个 K 引擎的 import 全断，optimize 不报。补了第三条判据（静态具名 import 交叉核验）后转 RED。",
-    "跑批期间 harness 自身暴露两个缺陷并已修：① 中断残留被当 pristine（起手基线门 HARNESS-DIRTY-TREE 已加）② 快照拍在被截断的文件上会把损坏当基线传播（实测把 TrialBalance.vue 清空 4491 行；已加与 HEAD 字节数比对的截断守卫，并已从 HEAD 复原）。"
+    "跑批期间 harness 自身暴露两个缺陷并已修：① 中断残留被当 pristine（起手基线门 HARNESS-DIRTY-TREE 已加）② 快照拍在被截断的文件上会把损坏当基线传播（实测把 TrialBalance.vue 清空 4491 行；已加与 HEAD 字节数比对的截断守卫，并已从 HEAD 复原）。",
+    "M17~M20 是本轮新增，守的是本门禁自己的一个**真实漏网**：`_resolve_module` 首版 docstring 写「解析不出返回 None（当作外部包，不查）」，但相对/`@/` spec 解析不出**不可能**是外部包 —— 那正是「import 路径写错」这条断边。实测漏网：`D2TabAnalysis.vue` 的 `../composables/useExcelIO`（真源在 `@/composables/useExcelIO`）被静默跳过，而前端既有守卫 `FrontendReferenceIntegrity.spec.ts`（helper `findBrokenModuleReferences`，带 `computeStringMask` 排字符串字面量 + `KNOWN_DEAD_MODULE_FILES` 署名登记）能抓到。修法**刻意不重实现**（那会造出判据强度不同的第二真源，弱的那份给虚假安全感），改为 `assert_owner_guard_is_wired()` 三条独立断言：守卫文件在 / helper 真被调用（不是只 import）/ CI 里真有一条 vitest step 跑它（注释掉不算）。M17 spec_exists · M18 helper_invoked · M19 ci_step_present（均 monkeypatch 隔离，零风险）· M20 接线级（真实注释掉 CI 那行 ⇒ main() 必须 exit 1 且命中的正是这条 failure，非仅函数返回 False）。四条实测全 RED，还原自证 True。"
   ],
   "totals": {
-    "mutations": 16,
-    "red": 16,
+    "mutations": 20,
+    "red": 20,
     "green": 0,
     "anchor_miss": 0
   },
@@ -35,6 +36,10 @@
     "M13": "RED",
     "M14": "RED",
     "M15": "RED",
-    "M16": "RED"
+    "M16": "RED",
+    "M17": "RED",
+    "M18": "RED",
+    "M19": "RED",
+    "M20": "RED"
   }
 }

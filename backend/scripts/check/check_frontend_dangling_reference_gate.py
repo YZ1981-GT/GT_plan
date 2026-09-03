@@ -199,7 +199,31 @@ _DECL_EXPORT_RE = re.compile(
 
 
 def _resolve_module(importer: Path, spec: str) -> Path | None:
-    """解析相对 / `@/` import 到磁盘文件。解析不出返回 None（当作外部包，不查）。"""
+    """解析相对 / `@/` import 到磁盘文件。
+
+    🔴 返回 `None` 的语义**按 spec 形态分两种，不可混为一谈**（首版 docstring 写
+    「解析不出返回 None（当作外部包，不查）」，那句话对相对/别名 spec 是错的，
+    且已造成一次真实漏网 —— 见下）：
+
+    * **裸 spec**（`vue` / `element-plus`）—— 真的是外部包，跳过是对的。
+    * **相对 / `@/` spec 解析不出** —— 相对路径**不可能**是外部包，这就是
+      「import 路径写错」这条断边本身。本函数仍返回 `None`，但**它不是本模块的
+      判据范围**：调用方 `assert_named_imports_resolve` 只回答「目标模块解析到了、
+      但没导出这个名字」，回答不了「目标模块根本解析不到」。
+
+    后一问的**唯一真源**是前端既有守卫
+    `src/__tests__/FrontendReferenceIntegrity.spec.ts`（helper
+    `_helpers/frontendSourceScan.findBrokenModuleReferences`）：它用
+    `computeStringMask` 排掉字符串字面量里的代码快照、用 `isResolvableSpecifier`
+    区分裸/相对、`moduleExists` 试全套后缀与 index，并带 `KNOWN_DEAD_MODULE_FILES`
+    逐条署名登记（「清单只减不增」）。该守卫已挂在 `governance-checks.yml`。
+    **本门禁刻意不重实现一遍** —— 重实现的后果是两份判据强度不同的第二真源，
+    弱的那份会给出虚假安全感（本门禁 2026-09-03 实测正是如此：
+    `D2TabAnalysis.vue` 里一条 `../composables/useExcelIO`（真源在
+    `@/composables/useExcelIO`）解析不到，被本函数当外部包静默跳过，
+    而 `findBrokenModuleReferences` 能抓到）。改由 `assert_owner_guard_is_wired()`
+    断言那个所有者守卫仍在 CI 里，防它被删后本门禁静默变窄。
+    """
     if spec.startswith("@/"):
         base = FRONTEND / "src" / spec[2:]
     elif spec.startswith("."):
@@ -265,6 +289,46 @@ def module_exports(path: Path, _seen: set[Path] | None = None) -> set[str] | Non
     return names
 
 
+#: 「相对/别名 spec 解析不到」这条判据的所有者守卫（见 `_resolve_module` docstring）。
+#: 本门禁不重实现它，只断言它仍被 CI 真实调用 —— 否则删掉那一步就能让本门禁静默变窄。
+OWNER_GUARD_SPEC = "src/__tests__/FrontendReferenceIntegrity.spec.ts"
+OWNER_GUARD_HELPER = "findBrokenModuleReferences"
+_WORKFLOW = _REPO / ".github" / "workflows" / "governance-checks.yml"
+
+
+def assert_owner_guard_is_wired() -> dict[str, Any]:
+    """断言「模块解析不到」判据的所有者守卫真实存在且真被 CI 调用。
+
+    三条各自独立（任一被绕过都要打红）：
+    1. 守卫文件在磁盘上；
+    2. 它真的调用了 `findBrokenModuleReferences`（不是只 import 不调用 —— 那是
+       additive 死代码形态）；
+    3. CI workflow 里有一条 step 真的以 vitest 跑它（不是注释掉、不是只在名字里提）。
+    """
+    facts: dict[str, Any] = {
+        "spec": OWNER_GUARD_SPEC,
+        "spec_exists": False,
+        "helper_invoked": False,
+        "ci_step_present": False,
+    }
+    spec_path = FRONTEND / OWNER_GUARD_SPEC
+    facts["spec_exists"] = spec_path.is_file()
+    if facts["spec_exists"]:
+        text = spec_path.read_text(encoding="utf-8", errors="replace")
+        facts["helper_invoked"] = bool(
+            re.search(r"\b" + OWNER_GUARD_HELPER + r"\s*\(", text)
+        )
+    if _WORKFLOW.is_file():
+        for line in _WORKFLOW.read_text(encoding="utf-8", errors="replace").splitlines():
+            bare = line.strip()
+            if bare.startswith("#"):
+                continue
+            if "vitest" in bare and OWNER_GUARD_SPEC.split("/")[-1] in bare:
+                facts["ci_step_present"] = True
+                break
+    return facts
+
+
 def assert_named_imports_resolve(files: list[Path]) -> list[dict[str, Any]]:
     """逐条相对具名 import 核验目标模块真的导出了它。返回断掉的边。"""
     broken: list[dict[str, Any]] = []
@@ -304,6 +368,7 @@ def main(argv: list[str] | None = None) -> int:
     files = iter_source_files()
 
     abuse = assert_exemptions_are_never_called(exemptions, files)
+    owner_guard = assert_owner_guard_is_wired()
     broken_imports = assert_named_imports_resolve(files)
     reg_doc = json.loads(REGISTER.read_text(encoding="utf-8")) if REGISTER.is_file() else {}
     register = reg_doc.get("entries") or []
@@ -328,6 +393,15 @@ def main(argv: list[str] | None = None) -> int:
     if not args.skip_optimize:
         optimize = run_vite_optimize(_REPO / "tmp_dangling_gate_optimize.log")
     failures: list[str] = []
+    missing_owner = [k for k in ("spec_exists", "helper_invoked", "ci_step_present")
+                     if not owner_guard.get(k)]
+    if missing_owner:
+        failures.append(
+            "「模块解析不到」判据的所有者守卫失守：" + ", ".join(missing_owner)
+            + f"（{OWNER_GUARD_SPEC}）。本门禁的第三判据只覆盖「目标解析到了但没导出这个名字」，"
+            "覆盖不了「目标模块根本解析不到」—— 后者的唯一真源是那个守卫。它一旦被删或"
+            "不再被 CI 调用，本门禁会静默变窄（2026-09-03 实测漏过一条真断边）"
+        )
     if abuse:
         failures.append(
             "豁免表被滥用：以下豁免名出现在调用位置，说明它是**值**不是类型，"
@@ -364,6 +438,7 @@ def main(argv: list[str] | None = None) -> int:
         "auto_import_globals": len(auto),
         "exemptions": [row["name"] for row in exemptions],
         "exemption_abuse_hits": abuse,
+        "owner_guard": owner_guard,
         "source_files_scanned": len(files),
         "broken_named_imports": len(broken_imports),
         "register_entries": len(register),
