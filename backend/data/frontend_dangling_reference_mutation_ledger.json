@@ -1,0 +1,40 @@
+{
+  "schema_version": "frontend-dangling-reference-mutation:v1",
+  "gate": "frontend-dangling-reference/1",
+  "recorded_at": "2026-09-03",
+  "how_it_was_run": "分 6 批（每条变异要跑一遍全量 eslint，单次 30 分钟上限跑不完 16 条），每批跑完都确认「还原后基线 PASS」",
+  "four_state_vocabulary": [
+    "RED",
+    "GREEN",
+    "ANCHOR-MISS",
+    "HARNESS-WRITE-FAILED"
+  ],
+  "notable": [
+    "M14 首轮 GREEN —— 那时门禁只有 vite optimize + no-undef 两条判据。它证明 optimize 对「引擎→共享模型」这层边有洞：把 shared/plAdjudicationModel.ts 的 parseNum 去掉 export 后，6 个 K 引擎的 import 全断，optimize 不报。补了第三条判据（静态具名 import 交叉核验）后转 RED。",
+    "跑批期间 harness 自身暴露两个缺陷并已修：① 中断残留被当 pristine（起手基线门 HARNESS-DIRTY-TREE 已加）② 快照拍在被截断的文件上会把损坏当基线传播（实测把 TrialBalance.vue 清空 4491 行；已加与 HEAD 字节数比对的截断守卫，并已从 HEAD 复原）。"
+  ],
+  "totals": {
+    "mutations": 16,
+    "red": 16,
+    "green": 0,
+    "anchor_miss": 0
+  },
+  "results": {
+    "M01": "RED",
+    "M02": "RED",
+    "M03": "RED",
+    "M04": "RED",
+    "M05": "RED",
+    "M06": "RED",
+    "M07": "RED",
+    "M08": "RED",
+    "M09": "RED",
+    "M10": "RED",
+    "M11": "RED",
+    "M12": "RED",
+    "M13": "RED",
+    "M14": "RED",
+    "M15": "RED",
+    "M16": "RED"
+  }
+}

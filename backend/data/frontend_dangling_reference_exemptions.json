@@ -1,0 +1,13 @@
+{
+  "schema_version": "frontend-dangling-reference-exemptions:v1",
+  "why_this_file_exists": "no-undef 在 TS 类型位置会误报：lib.dom 的类型（EventListener 等）不是运行时全局，被用在类型标注里时 eslint 认不出来。这些名字运行时被擦除，不构成崩溃，故豁免。",
+  "anti_abuse_rule": "每个豁免名必须通过 never_called_anywhere 判据：全库 src 内不得出现该名字的调用位置（`Name(` / `new Name(`）。有人想用豁免掩盖一个真的悬空函数时，这条立刻打红 —— 豁免表因此是**可核验的声明**，不是「相信我」。",
+  "how_to_add": "先确认它真是类型而不是值。若是值（函数/常量），正确做法是补 import 或补定义，不是加进本表。",
+  "type_only_globals": [
+    { "name": "EventListener", "source": "lib.dom.d.ts", "reason": "addEventListener 回调的类型标注" },
+    { "name": "RequestInit", "source": "lib.dom.d.ts", "reason": "fetch 第二参的类型标注" },
+    { "name": "HeadersInit", "source": "lib.dom.d.ts", "reason": "fetch headers 的类型标注" },
+    { "name": "BlobPart", "source": "lib.dom.d.ts", "reason": "new Blob([...]) 入参元素的类型标注" },
+    { "name": "Ref", "source": "vue", "reason": "Vue 的 Ref<T> 类型；auto-import 只注入值不注入类型，故类型位置会被 no-undef 报出" }
+  ]
+}

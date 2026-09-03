@@ -5568,3 +5568,36 @@ jobs:
           && ! grep -qE "[0-9]+ skipped" /tmp/mcp_data_summary.txt
       - name: Mutation anchors static self-check (M01-M35)
         run: python backend/scripts/diagnose/mutate_dsh_agent_panel_guards.py --check-anchors
+
+  # ───────────────────────────────────────────────────────────────────────────
+  # 前端悬空引用 / 缺失导出门禁
+  #
+  # 抓「四层静态检查全绿、只有运行时才炸」那一类。2026-09-03 一次普查抓到 13 处悬空引用
+  # + 34 条缺失导出：后者让 vite dev server 直接起不来（K8~K13 公式引擎收敛到共享模型时
+  # 删掉了 parseNum / calcAuditedAmount 两个导出），前者典型是 PrefillDiffPanel.vue 只
+  # import 了 useDisplayPrefsStore 工厂却从未建实例 —— 模板渲染就调 prefs.fmt，面板一打开
+  # 白屏。两类都在 HEAD 里躺了一个月。
+  #
+  # 三条判据（缺一不可，理由写在门禁脚本模块头）：
+  #   ① vite optimize —— 全量扫源码图，任何 No matching export / [ERROR] 即失败
+  #   ② eslint no-undef —— 引用了既未声明也未导入的名字
+  #   ③ 静态具名 import 交叉核验 —— ① 对「引擎→共享模型」这层边有洞（变异 M14 实测）
+  #
+  # 变异检验 16/16 全 RED（含一条「往豁免表塞真函数名」的反滥用变异）。
+  frontend-dangling-reference-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install frontend deps
+        working-directory: audit-platform/frontend
+        run: npm ci
+      - name: Dangling reference / missing export gate
+        run: python backend/scripts/check/check_frontend_dangling_reference_gate.py
+      - name: Mutation anchors static self-check (M01-M16)
+        run: python backend/scripts/diagnose/mutate_frontend_dangling_reference_gate.py --check-anchors
