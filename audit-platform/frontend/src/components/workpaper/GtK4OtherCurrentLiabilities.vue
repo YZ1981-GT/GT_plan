@@ -359,8 +359,11 @@ async function handleChildSave(itemId: string, value: unknown): Promise<void> {
 async function _loadTbData(): Promise<void> {
   if (!props.projectId) return
   try {
+    // 科目码单一真源 = k4AccountScope.k4QueryCodes（运行态取 render 下发的 tb_source_codes）。
+    // 提成局部常量：既给下面的过滤用同一份码集，也避免同一次取数调两遍。
+    const k4Codes = k4QueryCodes((props.htmlData as any)?.tb_source_codes)
     const res = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
-      params: { account_prefix: k4QueryCodes((props.htmlData as any)?.tb_source_codes)[0] || '', year: props.year },
+      params: { account_prefix: k4Codes[0] || '', year: props.year },
       _silent: true,
     } as any)
     const list: any[] = Array.isArray(res?.data?.data ?? res?.data) ? (res?.data?.data ?? res?.data) : []
@@ -372,8 +375,8 @@ async function _loadTbData(): Promise<void> {
         aVal += Number(item.audited_amount ?? 0)
       }
     }
-    tbData.value.unadjusted = u2245
-    tbData.value.audited = a2245
+    tbData.value.unadjusted = uVal
+    tbData.value.audited = aVal
   } catch {
     // TB取数失败静默处理
   }

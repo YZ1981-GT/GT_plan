@@ -6,7 +6,7 @@
  * 2. VALID_COMPONENT_TYPES（后端 wp_classification_service.py）
  * 3. wp_code_overrides（D5/D5-1/D5-2/D5-3/D5-4 映射）
  */
-import { describe, it, expect } from 'vitest'
+import { beforeAll, describe, it, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
 

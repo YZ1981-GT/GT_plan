@@ -1920,7 +1920,7 @@ const balanceCheckLoaded = ref(false)
 
 async function loadBalanceCheck() {
   try {
-    const { data } = await http.get(
+    const { data } = await api.get(
       `/api/projects/${projectId.value}/trial-balance/balance-check`,
       { params: { year: year.value } }
     )
@@ -2512,7 +2512,7 @@ async function createSnapshotBestEffort(trigger: string) {
       unadjusted: r.unadjusted, aje_dr: r.aje_dr, aje_cr: r.aje_cr,
       rcl_dr: r.rcl_dr, rcl_cr: r.rcl_cr, audited: r.audited,
     }))
-    await http.post(
+    await api.post(
       `/api/projects/${projectId.value}/trial-balance/snapshots`,
       { trigger, detail_rows: detailRows, summary_rows: summaryRows },
       { params: { year: year.value } }

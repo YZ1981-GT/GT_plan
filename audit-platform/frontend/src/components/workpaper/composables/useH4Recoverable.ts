@@ -11,6 +11,7 @@
  */
 import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { calcRecoverableAmount } from './useH4FormulaEngine'
+import type { H4RecoverableSourceKind, H4SensitivityRow } from './h4RecoverableModel'
 import {
   recalcH4ImpairmentCalcRow,
   type H4ImpairmentCalcRow,

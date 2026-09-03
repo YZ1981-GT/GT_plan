@@ -17,6 +17,7 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
+import { createExcelJsWorkbook, loadExcelJsWorkbook } from '../composables/useExcelIO'
 
 const props = defineProps<{
   wpId: string

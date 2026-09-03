@@ -9,6 +9,7 @@ import { ref, computed, watch, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { parseNum, isDebitCreditBalanced, calcSubtotal } from './useG8FormulaEngine'
 import { mapCutoffToG8Voucher, mergeByFillMode } from './gCycleCutoffFill'
+import { G8_ACCOUNT_CODE } from './g8Constants'
 import type { ExtractedVoucher, FillMode } from './useCutoffAutoSampling'
 import type { ChecklistResponse } from './useF1FormData'
 import {

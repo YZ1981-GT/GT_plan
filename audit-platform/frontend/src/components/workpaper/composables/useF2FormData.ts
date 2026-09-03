@@ -7,6 +7,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
+import { normalizeApplicableStandards } from './applicableStandards'
 
 export interface ChecklistResponse {
   item_id: string

@@ -3,7 +3,7 @@
  * Spec: .kiro/specs/f3-notes-payable/ Task 9.2
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { calcSubtotal } from './useF3FormulaEngine'
+import { calcSubtotal, parseNum } from './useF3FormulaEngine'
 import { buildF3DisclosureClassRows } from './useF3CrossSheet'
 import type { ChecklistResponse } from './useF3FormData'
 

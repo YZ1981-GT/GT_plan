@@ -96,6 +96,11 @@ defineEmits<{
   cancel: []
 }>()
 
+// 🔴 store 实例必须在 setup 顶层建：useDisplayPrefsStore 是 setup 作用域 composable，
+//    写进函数体内会静默失效（memory 已记这条平台坑）。原先只 import 了工厂函数、
+//    从未建实例，模板里 formatVal → prefs.fmt 直接抛 ⇒ 本面板一打开就白屏。
+const prefs = useDisplayPrefsStore()
+
 const selectedCells = ref<string[]>([])
 
 function onSelectionChange(rows: PrefillChange[]) {

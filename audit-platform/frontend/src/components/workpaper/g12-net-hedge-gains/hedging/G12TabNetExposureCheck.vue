@@ -156,6 +156,7 @@
 
 <script setup lang="ts">
 import { computed, inject, ref, toRef, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useG12NetExposure } from '../../composables/useG12NetExposure'
 import { useG12HedgeDetail } from '../../composables/useG12HedgeDetail'
 import {

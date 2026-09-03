@@ -23,6 +23,8 @@ import {
   getHSeedSpec,
   normalizeAccountName,
   readHSegmentPrefill,
+  type HPrefillBalanceItem,
+  type HSeedRowAdapter,
   type HSegmentPrefill,
   type HSeedSpec,
 } from '../hCycleAdjudicationSeed'

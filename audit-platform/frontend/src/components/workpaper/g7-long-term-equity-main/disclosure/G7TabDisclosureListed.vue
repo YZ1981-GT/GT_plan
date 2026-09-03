@@ -363,6 +363,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref, toRef, watch, inject, type ComputedRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import type { G7DisclosureColumn } from './g7ListedDisclosureModel'
 import { useRouter } from 'vue-router'
 import { api } from '@/services/apiProxy'
 import { useDecimalCalc } from '@/composables/useDecimalCalc'

@@ -427,6 +427,7 @@ import {
   describeAdjPrefillPlan,
   describeAdjPrefillConflicts,
   planHasWork,
+  type AdjPrefillMode,
 } from '../../composables/shared/adjudicationPrefillPlan'
 import {
   useH2Adjudication,

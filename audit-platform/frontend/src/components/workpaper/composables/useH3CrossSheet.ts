@@ -16,6 +16,13 @@
  * Requirements: 16.6-16.7
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
+// 判定委托 useH3Adjustment 的单一真源（本文件 561~563 行注释已声明）。
+// 删掉本地第二份副本时漏了这条 import，三个判定成了悬空引用 ⇒ 调整分录汇总一算就抛。
+import {
+  isH3AccumDepSubject,
+  isH3GrossSubject,
+  isH3ImpairmentSubject,
+} from './useH3Adjustment'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

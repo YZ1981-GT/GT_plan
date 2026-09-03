@@ -371,14 +371,14 @@ async function writebackTB(assetAudited: number, liabilityAudited: number): Prom
 
     // EventBus: substantive:adjudicated (资产)
     eventBus.emit('substantive:adjudicated', {
-      accountCode: ACCOUNT_CODE_ASSET,
+      accountCode: k6AssetCode.value,
       auditedAmount: assetAudited,
       wpCode: 'K6',
       timestamp: Date.now(),
     })
     // EventBus: substantive:adjudicated (负债)
     eventBus.emit('substantive:adjudicated', {
-      accountCode: ACCOUNT_CODE_LIABILITY,
+      accountCode: k6LiabCode.value,
       auditedAmount: liabilityAudited,
       wpCode: 'K6',
       timestamp: Date.now(),
@@ -396,7 +396,9 @@ async function writebackTB(assetAudited: number, liabilityAudited: number): Prom
 async function _loadTbData(): Promise<void> {
   if (!props.projectId || !props.year) return
   try {
-    // 持有待售资产科目 1481
+    // 持有待售资产科目：码集真源 = k6AccountScope.k6QueryCodes（运行态读 render 下发的
+    // tb_source_codes）。提成局部常量供 params 与下面的前缀过滤共用，避免调两遍。
+    const k6AssetCodes = k6QueryCodes((props.htmlData as any)?.tb_source_codes)
     const resAsset = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
       params: { account_prefix: k6AssetCodes[0] || '', year: props.year },
       _silent: true,
@@ -413,7 +415,8 @@ async function _loadTbData(): Promise<void> {
     tbData.value.unadjustedAsset = uAsset
     tbData.value.auditedAsset = aAsset
 
-    // 持有待售负债科目 2605
+    // 持有待售负债科目：同上，负债侧走 tb_source_codes.liability
+    const k6LiabCodes = k6QueryCodes((props.htmlData as any)?.tb_source_codes?.liability)
     const resLiab = await http.get(`/api/projects/${props.projectId}/trial-balance`, {
       params: { account_prefix: k6LiabCodes[0] || '', year: props.year },
       _silent: true,

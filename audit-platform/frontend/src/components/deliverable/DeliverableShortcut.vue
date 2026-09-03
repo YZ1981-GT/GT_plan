@@ -38,7 +38,10 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { Document, ArrowRight } from '@element-plus/icons-vue'
-import { api } from '@/utils/apiProxy'
+// 🔴 不能从 @/utils/apiProxy 具名 import api：那个文件只有 `export const apiProxy`
+//    与 `export default api`，没有具名 `api` ⇒ 取到 undefined，一调 api.get 就抛。
+//    canonical 路径是 @/services/apiProxy（全库其余调用点都用它）。
+import { api } from '@/services/apiProxy'
 
 interface CompletenessResult {
   passed: boolean

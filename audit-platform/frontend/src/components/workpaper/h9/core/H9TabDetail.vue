@@ -349,7 +349,11 @@ import { ref, toRef, inject } from 'vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import { useH9Detail, type H9DetailRow } from '../../composables/useH9Detail'
 import { useH9ImportExport } from '../../composables/useH9ImportExport'
-import { fetchH9LedgerByLessor, H9_LEDGER_ACCOUNT_CODES } from '../../composables/h9LedgerPull'
+import {
+  fetchH9LedgerByLessor,
+  H9_LEDGER_ACCOUNT_CODES,
+  mergeH9LedgerRows,
+} from '../../composables/h9LedgerPull'
 import GtIndexChip from '../../GtIndexChip.vue'
 
 const props = defineProps<{

@@ -443,6 +443,7 @@ import {
   planAdjudicationPrefill,
   planHasWork,
   resolveAdjPrefillWrites,
+  type AdjPrefillMode,
 } from '../../composables/shared/adjudicationPrefillPlan'
 
 const props = defineProps<{

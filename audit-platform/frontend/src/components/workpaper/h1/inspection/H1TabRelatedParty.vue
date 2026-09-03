@@ -824,7 +824,7 @@ async function generateAI() {
     const text = res.data?.data?.text ?? res.data?.text ?? ''
     if (text) {
       auditNoteText.value = text
-      saveNote()
+      saveAuditNote()
       ElMessage.success('AI 已生成关联交易审计说明')
     } else {
       ElMessage.warning('AI 暂无建议')

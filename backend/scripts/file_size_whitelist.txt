@@ -18,7 +18,7 @@ backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
 audit-platform/frontend/src/components/workpaper/g4-bond-investment-ecl/impairment/G4TabEclMeasurement.vue  1700
 audit-platform/frontend/src/components/workpaper/e1/E1TabDisclosure.vue
-audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue
+audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/G7TabDisclosureSOE.vue  1667
 audit-platform/frontend/src/components/workpaper/g7-long-term-equity-main/disclosure/g7SoeDisclosureModel.ts
 
 #   dsh-agent-panel-acceptance.spec.ts —— 单 spec 的完整浏览器验收（三视口 × 五角色 ×
@@ -312,3 +312,13 @@ backend/tests/workpaper_sync_predelete/test_task72_pre_delete_eligibility.py  10
 # ── 前端 ────────────────────────────────────────────────────────────
 audit-platform/frontend/src/components/workpaper/sync/__tests__/task69IndependentRegression.spec.ts  2103
 
+#   GtConfirmationSummary.vue / TrialBalance.vue —— **改动前即 1955 / 4491 行已超限**；
+#     本次为悬空引用修复，两个文件行数**一行未增**（原地替换）：前者把
+#     `import { ElMessage }` 补成 `{ ElMessage, ElMessageBox }`（模板调 ElMessageBox
+#     但从未导入，点确认弹窗即崩），后者把两处 `http.get/post` 改成该文件里真实存在的
+#     `api.`（http 在此文件无定义，试算表两个接口一调即崩）。
+#     baseline 即当前真实行数，不留膨胀空间；两个文件都确需按 Tab / 区块拆分，
+#     属独立打磨任务，不在本次悬空引用修复范围。
+#     spec: frontend-dangling-reference-gate（本轮）
+audit-platform/frontend/src/components/workpaper/confirmation/GtConfirmationSummary.vue  1955
+audit-platform/frontend/src/views/TrialBalance.vue  4491
