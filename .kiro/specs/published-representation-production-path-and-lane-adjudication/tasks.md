@@ -202,6 +202,7 @@
     - 连库快照用**一次** `asyncio.run` 取全部（每测试各自 async 会污染共享连接池，第二个起 `NoneType has no attribute send`）
     - 目标顺序按 design.md §首版目标选取：先 `xlsx/gt-h1-fixed-assets`（最干净），再 `xlsx/gt-d2-accounts-receivable`（判据 C 的活证人 —— 该 wp 已有 opaque representation）
     - 若 H1 卡在 loader 某一步而 D2 通得过，对调顺序并把实测原因记入 evidence（design.md §Open Gates 第 3 项）
+    - 🔴 **2026-09-03 Gate 3 裁决已落：首版目标顺序 H1 → D2 维持不变**，且已在**真库只读**上把 `loader.load()` 完整九步跑通（H1 bundle `e21fb645` approved / digest `05086f4021a6` / contract `h1.disposal_check` / `projection_contract` / structure 25；D2 bundle `d443feca` / `db877e9dbc73` / `d2.receivable_detail` / structure 39）。H1 的 bundle digest 与 Task 44 门禁报的 `bundle=05086f4021a6` 逐字一致（两条独立路径互证）。H1 动态列 **0** 项（G7 为 `minority_financials: 10`），故 H1 确为最干净首版。⇒ 本任务**不需要**再为「H1 是否可行」留退路分支；若实施中 H1 反而失败，那是回归而非未知，必须定位原因不得直接对调顺序。
     - _Requirements: 11.1, 11.5, 11.6_
 
   - [ ]* 7.2 属性测试：落库字段一致、事务形状与失败无残留 (F8)
@@ -238,6 +239,10 @@
     - 落范围边界的结构缺席判据：本 spec 交付物中不含 Task 74 的 writer 迁移改动、不含 `multi_resolver` 改动、不含 `allow_external_relationships` 变更、不含供给门/pilot attach 的 scope 参数、不含新增 `backend/migrations/V*.sql`
     - 落 capability 变更纪律判据：若 manifest capability 出现 `bidirectional`，则 overlay 必须已 reviewed 且 `approved_source_digest` 复核门未被绕过
     - `--json` 落盘新基线并记录与旧基线的差集（`failed` 计数不得因本 spec 交付而增加）
+    - 🔴 **2026-09-03 Open Gates 裁决已落：R1 按 Requirement 12.6 拆两阶段**（Gate 1 实测门确实拒绝，`--check` 退出码 2，approved `b0fd31f17739…` vs current `d9fddb64a7b3…`，且 current 随宿主 `.vue` 编辑漂移 —— BP-67-1 登记时为 `5756356a0ac9…`）。
+      **阶段一（本 spec 交付）**：只证「供给门放行」—— `_describe_entry_supply` 对该 entry 返回 `None`。判据落在供给门返回值上，**不**落在 `adapter_registered`。
+      **阶段二（本 spec 不做，另立）**：capability 翻转致 `adapter_registered` False→True。它需要 manifest 重生成，而更新 `approved_source_digest` 须人工复核 mount diff（owner = Task 67 登记的「1/67 复核方」），且宿主稳定前不宜复核。
+      ⇒ 本门**不得**把 `adapter_registered=True` 写成阶段一的通过条件（那会让本 spec 永远无法收口，或诱导去绕 `approved_source_digest` 复核门 —— 后者已被 Requirement 7.8 明令禁止）。Gate 2 实测**成立**（四个 pilot entry 与源文件严格 1:1，单文件 glob 即逐 entry 精确，`capability` 可覆盖，无需扩 schema），故阶段二在表达上没有障碍，只被 Gate 1 卡在后面。
     - _Requirements: 8.1, 8.4, 8.5, 8.8, 9.3, 9.4, 12.1, 12.2, 12.3, 12.4, 12.5, 7.8_
 
   - [ ]* 9.2 属性测试：供给门放行与注册会计恒等式 (F9)

@@ -759,3 +759,88 @@ R3 的改法有既成机制：该门的 `binding_constraint_facts(arms)` 用 arm
 1. **manifest 重生成是否可行**。`workpaper_sync_entry_overlay.json` 的 `approved_source_digest` 与磁盘 manifest 当前相等（均 `b0fd31f1…`），但 `generate_workpaper_sync_manifest.py` 的复核门要求它等于 **Node 侧现算的** `discovery.sourceDigest`。Task 67 的 BP-67-1 登记该门当前**拒绝**当前源码。若确实拒绝，Rollout 第 5 步（capability 裁决）需先解 BP-67-1，届时 R1 的 `adapter_registered` 目标要拆成两阶段：先证「供给门放行」（`_describe_entry_supply` 返回 `None`），capability 翻转另立。
 2. **capability 逐 entry 覆盖的表达形态**。overlay 的 `overrides` 现为 **file_glob 粒度**（2 条），`defaults_by_component` 把 `GtOnlyOfficeSheet` 定为 `single_onlyoffice`。把单个 entry 翻成 `bidirectional` 需确认 overlay schema 是否支持 per-entry 覆盖；不支持则需先扩 schema（那是 generator 域，不是本 spec 自行加字段）。
 3. **H1 的 instrumented 字节能否通过 loader 全部九步**。Task 75 的采集器只在 G7 上做过端到端证明。`--check` 的只读预演就是这一项的判据，必须在 `--apply` 前跑通；若 H1 卡在某步而 D2 通得过，首版目标顺序对调并记录实测原因。
+
+---
+
+## Open Gates 裁决（2026-09-03 实测，实施前置已完成）
+
+三项全部真跑确认。判据与读数如下，**不是文档推断**。
+
+### Gate 1 — manifest 重生成：**不成立（门确实拒绝）**
+
+`python backend/scripts/gen/generate_workpaper_sync_manifest.py --check` 实测**退出码 2**：
+
+```
+[FAIL] source mounts changed since the reviewed overlay:
+  approved='b0fd31f177397d9cba4e17db485f789876b12371b5cc154e4bd55b4f9fc3443c'
+  current ='d9fddb64a7b3d9881bb81e247b848c36b7e5668202b0d07e7b7900779cc88a32'
+```
+
+🔴 **且 `current` 是移动靶，不是一个待更新的固定值**。BP-67-1 登记时 current 为
+`5756356a0ac9…`，本次实测已变成 `d9fddb64a7b3…`。原因直接：mount 源就是宿主
+`.vue` 文件，而并发会话此刻正在改 `GtH1FixedAssets.vue` / `GtB60Bundle.vue` /
+`GtD2AccountsReceivable.vue`（本次核验期间 `git status` 实录）。任何宿主编辑都会
+让 digest 漂一次。
+
+⇒ **Requirement 12.6 的 WHERE 条件成立**，按其规定执行：`adapter_registered`
+False→True 拆两阶段 —— 第一阶段只证「供给门放行」（`_describe_entry_supply` 对该
+entry 返回 `None`），capability 翻转另立。更新 `approved_source_digest` 需人工复核
+mount diff，owner 是 Task 67 登记的「1/67 复核方」，**不属本 spec**；且宿主稳定前
+不宜复核。
+
+### Gate 2 — capability 逐 entry 覆盖：**成立（无需扩 schema）**
+
+`overrides` 的选择器确实是 `file_glob` + `component` 而非 `entry_id`，但对本 spec
+涉及的四个 entry 而言它**已经是逐 entry 精确的**：从磁盘 manifest 现算，四者与源
+文件是严格 **1:1**（每 entry 只涉及 1 个文件，每文件只产 1 个 entry）——
+
+| entry | 源文件 | mounts | 该文件产出的 entry 数 |
+|---|---|---|---|
+| `xlsx/gt-h1-fixed-assets` | `GtH1FixedAssets.vue` | 2 | 1 |
+| `xlsx/gt-d2-accounts-receivable` | `GtD2AccountsReceivable.vue` | 2 | 1 |
+| `xlsx/gt-g7-long-term-equity-main` | `GtG7LongTermEquityMain.vue` | 2 | 1 |
+| `xlsx/b60/gt-b60-bundle` | `b60/GtB60Bundle.vue` | 1 | 1 |
+
+故指向单个文件的 glob 只会命中那一个 entry。`capability` 是可覆盖字段（既有第二条
+override 就设了 `capability: "single_html"`），生成器侧 `_merge_override(value,
+override)` 把 override 合进 `defaults_by_component`，且 `len(matching_overrides)
+> 1` 会 fail closed。
+
+⇒ **Requirement 12.7 的 WHERE 条件不成立**，无需 generator 域扩 schema。
+但注意：**改 overlay 仍须先过 Gate 1**（overlay 变了 manifest 就得重生成），
+故本项虽可表达，仍被 Gate 1 卡在后面。
+
+### Gate 3 — H1 能否通过 loader 全部九步：**成立**
+
+两半分别实证。**纯文件侧**（`instrument_workbook_bytes` → 契约 →
+`structure_fingerprint` → `identity_inventory` → `observe_structure_inventory` →
+`observe_dynamic_columns`，全部走生产函数，未自拼口径）：
+
+| entry | instrumented | sheets/business | row_uuids | Table 锚点 | structure | 动态列 |
+|---|---|---|---|---|---|---|
+| H1 | 201,639 B | 27 / 26 | 15 | `GT_H18_ROWS @ 减少检查表H1-8` | 25 | 0 |
+| D2 | 107,286 B | 12 / 8 | 13 | `GT_D22_ROWS @ 明细表D2-2` | 39 | 0 |
+| G7 | 265,087 B | 23 / 22 | 5 | `GT_G7N_ROWS @ 附注披露信息（国企）` | 107 | `minority_financials: 10` |
+
+三者的五条 loader 纯函数判据（`assert_contract_declares_no_metadata_sheet` /
+`assert_metadata_sheet_excluded` / `_assert_dynamic_columns_declared` /
+`assert_no_structure_drift` / `assert_identity_inventory_usable`）**全部 PASS**。
+另 `test_task42_h1_grouped_dynamic_pilot.py` **143 passed**，独立印证 H1 模板的
+instrument + 可见等价 + 反读可用。
+
+**DB 侧**：对真库（只读，`NullPool` 专用引擎 + `dispose()`）跑完整 `loader.load()`：
+
+| entry | frozen bundle | state / digest | contract | authority_model | structure_inventory_size |
+|---|---|---|---|---|---|
+| H1 | `e21fb645` | approved / `05086f4021a6` | `h1.disposal_check` | `projection_contract` | 25 |
+| D2 | `d443feca` | approved / `db877e9dbc73` | `d2.receivable_detail` | `projection_contract` | 39 |
+
+两者 **九步全过**。H1 的 bundle digest `05086f4021a6` 与 Task 44 门禁报的
+`bundle=05086f4021a6` 逐字一致（两条独立路径互证）。
+
+⇒ 首版目标顺序 **H1 → D2 维持不变**，且 H1 确实最干净（0 动态列，G7 有 10 个）。
+破环链前三环（instrument → `loader.load()` → `FrozenEntryDefinitions`）已在真库
+实证可行；第四环 `build_excel_adapter` 需 `ExcelIdentityBinding`，属 Task 4.5 本职，
+未在本次前置核验中构造。
+
+**本次核验未写任何库**（PG 只读 + 专用 NullPool 引擎），未改任何生产代码。
