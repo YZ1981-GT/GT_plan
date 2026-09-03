@@ -393,8 +393,8 @@
     "validate_registry_problems": []
   },
   "artifact_git_status": {
-    "backend/data/workpaper_sync_task71_mutation_capacity_recovery.json": "M",
-    "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py": "M",
+    "backend/data/workpaper_sync_task71_mutation_capacity_recovery.json": "tracked-clean",
+    "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py": "tracked-clean",
     "backend/scripts/diagnose/mutate_task71_chaos_guards.py": "tracked-clean",
     "backend/tests/workpaper_sync_chaos/test_task71_chaos_gate.py": "tracked-clean"
   },
@@ -1017,10 +1017,10 @@
         "own_guard_matched_subjects": [
           "evidence"
         ],
-        "referencing_count_live": 284,
-        "referencing_count_on_disk": 284,
-        "scanned_test_files_live": 2347,
-        "scanned_test_files_on_disk": 2347,
+        "referencing_count_live": 286,
+        "referencing_count_on_disk": 286,
+        "scanned_test_files_live": 2349,
+        "scanned_test_files_on_disk": 2349,
         "task70_census_keys": [
           "artifact_git_status",
           "census_contract.measured",
@@ -1252,7 +1252,7 @@
       "digest": "9912cc0d137896309f444cd0add93e1d0c8111a7a0f2e18c04abc49eb51923b0",
       "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
       "referencing_test_file_count": 6,
-      "scanned_test_files": 2347
+      "scanned_test_files": 2349
     },
     "semantics": {
       "all_hold": true,
@@ -2271,47 +2271,47 @@
     "measured": true,
     "own_schema_left": 0,
     "public_after": {
-      "working_paper_artifact": 9,
+      "working_paper_artifact": 20,
       "working_paper_callback_delivery": 0,
       "working_paper_callback_recovery_case": 0,
       "working_paper_content_application": 0,
       "working_paper_content_application_event": 0,
-      "working_paper_content_representation": 0,
-      "working_paper_content_version": 0,
+      "working_paper_content_representation": 1,
+      "working_paper_content_version": 1,
       "working_paper_entry_evidence_scenario": 0,
       "working_paper_forcesave_request": 0,
       "working_paper_oo_close_intent": 0,
       "working_paper_oo_room": 0,
       "working_paper_representation_upgrade_candidate": 0,
-      "working_paper_sync_definition_artifact": 6,
-      "working_paper_sync_definition_bundle": 3,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
       "working_paper_sync_definition_null_marker": 3,
-      "working_paper_sync_entry_state": 0,
+      "working_paper_sync_entry_state": 1,
       "working_paper_sync_operation": 0,
       "working_paper_sync_operation_event": 0,
-      "working_paper_sync_scope_index": 0,
+      "working_paper_sync_scope_index": 2,
       "working_paper_sync_test_run": 0
     },
     "public_before": {
-      "working_paper_artifact": 9,
+      "working_paper_artifact": 20,
       "working_paper_callback_delivery": 0,
       "working_paper_callback_recovery_case": 0,
       "working_paper_content_application": 0,
       "working_paper_content_application_event": 0,
-      "working_paper_content_representation": 0,
-      "working_paper_content_version": 0,
+      "working_paper_content_representation": 1,
+      "working_paper_content_version": 1,
       "working_paper_entry_evidence_scenario": 0,
       "working_paper_forcesave_request": 0,
       "working_paper_oo_close_intent": 0,
       "working_paper_oo_room": 0,
       "working_paper_representation_upgrade_candidate": 0,
-      "working_paper_sync_definition_artifact": 6,
-      "working_paper_sync_definition_bundle": 3,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
       "working_paper_sync_definition_null_marker": 3,
-      "working_paper_sync_entry_state": 0,
+      "working_paper_sync_entry_state": 1,
       "working_paper_sync_operation": 0,
       "working_paper_sync_operation_event": 0,
-      "working_paper_sync_scope_index": 0,
+      "working_paper_sync_scope_index": 2,
       "working_paper_sync_test_run": 0
     },
     "restored": true,
@@ -2428,7 +2428,7 @@
     "71": "evidence 随环境、runner 与 immutable definition bundle 变化失效",
     "72": "量化容量模型可重复"
   },
-  "elapsed_seconds": 32.71,
+  "elapsed_seconds": 34.71,
   "fault_injection": {
     "injection_count": 6,
     "injections": {
@@ -2592,7 +2592,7 @@
     "has_positive_case": true,
     "statement": "六条合成算例覆盖四个档位与两条优先级（unresolved / disagreeing 压过真行证据）；至少一条正例（C1）—— 缺正例时「分类器恒返 unverifiable」测不出来。"
   },
-  "generated_at": "2026-09-02T20:28:16+0800",
+  "generated_at": "2026-09-03T00:09:04+0800",
   "generated_by": "backend/scripts/check/check_task71_mutation_capacity_recovery_gate.py",
   "multi_resolver_adjudication": {
     "bulk_adapters_gate_not_attached": true,
@@ -5705,7 +5705,7 @@
       "retention": "app\\.services\\.workpaper_sync\\.retention"
     },
     "referencing_test_file_count": 6,
-    "scanned_test_files": 2347,
+    "scanned_test_files": 2349,
     "statement": "辐射面 = `backend/tests/**/test_*.py` 中按模块路径引用到本门被验生产单元（capacity_profile / retention / redaction / alerting）或本门自己的门文件名的测试文件全集。不跑无边界全量（仓库根 test 文件逾 1500 个）。",
     "upstream_census_dir": "backend/tests/workpaper_sync",
     "why_own_dir": "BP-69-6：任务 68 的逐字节锁把 `backend/tests/workpaper_sync` 做成目录普查，往里新增任何「不引用被验生产单元」的测试文件都会打红它 1~3 条。BP-70-8：换目录不够 —— 它的辐射面 digest 扫`backend/tests` 全树按模块路径收文件，所以本门守卫连模块路径字面量都不写，生产模块经 `_production()` 取。"
@@ -5811,7 +5811,7 @@
       "long_opaque_blob"
     ]
   },
-  "report_digest": "4e6409cd989db89d074bfac9ebb5fc1a597734a770624c6af13c3510217c032e",
+  "report_digest": "0530374d8dc808d5848dc2f8735181a840f32e01c6259dc9fdae48734006c1fc",
   "retention": {
     "apply_audit_relative_path_present": true,
     "apply_audit_sha256_present": true,
@@ -5836,8 +5836,8 @@
     ]
   },
   "schema_version": "task71-mutation-capacity-recovery-retention:v1",
-  "scratch_schema": "tmp_task71_chaos_8e05b26e7216",
-  "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
+  "scratch_schema": "tmp_task71_chaos_790fc69e4717",
+  "source_commit": "c882f831c9eb39c2b53c5dab00b0558015bebe24",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "sub_bullets": {
     "1": "application/protocol 变异 + sequence 变异 + delivery 变异",
@@ -5952,13 +5952,13 @@
     "sub_bullet_count_match": true,
     "why_normalized": "任务 69 的门未归一化复选框 ⇒ 编排器把 `[-]` 翻成 `[x]` 后它的逐字节锁必红（BP-70-6 实测，本门起手复现）。本门只锁正文内容。"
   },
-  "temp_artifact_root": "tmp_task71_artifact_root_b5c64144",
+  "temp_artifact_root": "tmp_task71_artifact_root_b2509065",
   "upstream_inputs": {
     "task67_structural_pre_reconcile": {
       "entry_count": 186,
       "how_this_gate_uses_it": "删除门变异的分母：任务 67 只允许报告 stale、不得要求 fresh/stale=0、不得宣称eligibility。本门把这三条做成对源码的现算判据而不是读它的自述。",
       "path": "backend/data/workpaper_sync_task67_structural_pre_reconcile.json",
-      "report_digest": "3c8b13fdec7505982ca5b15b41688f7352f4b2cb56d268461bb39d1fbe4f4019"
+      "report_digest": "bcfb1db2325462b23e9088ed284d6a4455f8935548c6994cc6fe8e3b00146e2f"
     },
     "task68_backend_chain_regression": {
       "arm_count": 120,
@@ -5972,9 +5972,9 @@
       "how_this_gate_uses_it": "本门的变异分母里凡是标 `t68_arm:` 的都要在这份报告里**真的**找到那条 arm 且`agrees=True`；上游一旦丢掉某条 arm 或它变成 disagrees，本门立刻变红。BP-68-1（pre-durable rejected/error 零 owner 在 DDL 层无约束力）由本门独立复核。",
       "invariant_count": 26,
       "path": "backend/data/workpaper_sync_task68_backend_chain_regression.json",
-      "report_digest": "31980e806a5b45c7ca478f918dab775cee38bec5fde721ae73e86c552cbfb03c",
+      "report_digest": "cfeac76378b7a838e44b31d9cdf86f85223d62eb740c48ebe2e4b31b11c392fe",
       "restored": true,
-      "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
+      "source_commit": "c882f831c9eb39c2b53c5dab00b0558015bebe24",
       "verdict": "passed"
     },
     "task69_frontend_regression": {
@@ -5987,19 +5987,19 @@
     },
     "task70_oo_scenario_refresh": {
       "evidence_rows_measured_zero": {
-        "working_paper_content_representation": 0,
-        "working_paper_content_version": 0,
+        "working_paper_content_representation": 1,
+        "working_paper_content_version": 1,
         "working_paper_entry_evidence_scenario": 0,
-        "working_paper_sync_entry_state": 0,
+        "working_paper_sync_entry_state": 1,
         "working_paper_sync_test_run": 0
       },
       "executed_end_to_end": 0,
       "how_this_gate_uses_it": "任务 70 实录：evidence 五表全 0 行、180 个 OO entry 的 capability 全是single_onlyoffice、forcesave 对不存在 doc key 回 error 1（需活动编辑会话）、3030 未监听。⇒ 本门的容量/故障恢复/retention 行为侧同样只能在 scratch schema 造行，生产 `public` 无业务数据可演练。这是既定条件，不是本门偷懒。",
       "oo_reachable": null,
       "path": "backend/data/workpaper_sync_task70_oo_scenario_refresh.json",
-      "report_digest": "3523d245e4cd3167c3dc392d1643dbadce2ca89ceac0e76a47fa5982daba596f",
+      "report_digest": "26753a22d6fc03303af92752629602f7b1d15eba5aef70fd086be5e9d8cb0f0f",
       "required_scenario_rows": 3290,
-      "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
+      "source_commit": "c882f831c9eb39c2b53c5dab00b0558015bebe24",
       "verdict": "unverifiable"
     }
   },
@@ -6051,13 +6051,13 @@
       "radiation_surface.scanned_test_files"
     ],
     "task70_census_semantics_all_hold": true,
-    "task70_digest_live": "89bd90cc272305757c5446c261dd5df2de00188a66c87d239544c646abd70c2d",
-    "task70_digest_on_disk": "89bd90cc272305757c5446c261dd5df2de00188a66c87d239544c646abd70c2d",
+    "task70_digest_live": "5b724c7fb590afc6502073a6ecfc98c122fddd525edcfb059fd5889c18ff78c3",
+    "task70_digest_on_disk": "5b724c7fb590afc6502073a6ecfc98c122fddd525edcfb059fd5889c18ff78c3",
     "task70_lock_goes_stale_because_of_this_gate": false,
-    "task70_referencing_count_live": 284,
-    "task70_referencing_count_on_disk": 284,
-    "task70_scanned_test_files_live": 2347,
-    "task70_scanned_test_files_on_disk": 2347,
+    "task70_referencing_count_live": 286,
+    "task70_referencing_count_on_disk": 286,
+    "task70_scanned_test_files_live": 2349,
+    "task70_scanned_test_files_on_disk": 2349,
     "task70_subject_coverage": {
       "adapters import registry": true,
       "adapters.registry": true,
@@ -6106,7 +6106,7 @@
     "targets_with_only_unverifiable_evidence": 0,
     "task72_stage_a": "保持红。`multi_resolver` 实测 4 ≠ 0 且四条 resolver 行仍 deferred ⇒ `legacy_delete` gate 不放行；容量真实负载与 evidence 类变异保持 UNVERIFIABLE。"
   },
-  "wallclock_seconds": 9.26,
+  "wallclock_seconds": 9.79,
   "wave": 7,
   "why_this_task_is_acceptance_not_a_checklist": "正文点名的每一条「变异覆盖 …」都必须真造出非法形态并证明系统拒绝它，每条都要有对照组（合法形态被接受）+ 实验组（非法形态被拒，且各臂拒绝理由互不命中）。只声明「已覆盖」不构成任何证据。"
 }

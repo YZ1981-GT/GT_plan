@@ -21,7 +21,7 @@
    },
    "id": "BP-67-2",
    "owner_task": "`ContentMutationService.commit` + Tasks 36/77 finalize gate",
-   "statement": "registry 注册计划有 186 项、其中 4 项静态可注册，但 `build_production_registry().registrations()` 实测 0 条。原因是 published representation 供给为 0：`working_paper_sync_entry_state`=0 行、`working_paper_content_representation`=0 行、`working_paper_content_version`=0 行。",
+   "statement": "registry 注册计划有 186 项、其中 4 项静态可注册，但 `build_production_registry().registrations()` 实测 0 条。原因是 published representation 供给为 0：`working_paper_sync_entry_state`=1 行、`working_paper_content_representation`=1 行、`working_paper_content_version`=1 行。",
    "title": "186 条 planned entry 一条都注册不上（供给为 0）",
    "why_not_fixed_here": "供给是运行时产物，structural pre-reconcile 不写库。"
   },
@@ -44,14 +44,14 @@
   },
   {
    "evidence": {
-    "approved_bundle_rows": 3,
+    "approved_bundle_rows": 5,
     "bundles_bound_to_entry": 0,
-    "definition_bundle_rows": 3,
+    "definition_bundle_rows": 5,
     "delivered_per_entry_contracts": 4
    },
    "id": "BP-67-4",
    "owner_task": "70（按 approved bundle 重推 required scenario） / 76·77（bundle↔entry 绑定）",
-   "statement": "`working_paper_sync_definition_bundle` 实测 3 行、其中 approved 3 行（较 Task 61 实测的 1 行已增长），但 bundle 表**无 entry_id 列**，与 entry 的唯一连接（representation / application / test_run）全为 0 行 ⇒ 逐 entry 的authority model 依旧只能靠 `DELIVERED_PER_ENTRY_CONTRACTS` 的 reviewed 登记（覆盖 4 条 entry），其余 182 条无供给。",
+   "statement": "`working_paper_sync_definition_bundle` 实测 5 行、其中 approved 5 行（较 Task 61 实测的 1 行已增长），但 bundle 表**无 entry_id 列**，与 entry 的唯一连接（representation / application / test_run）全为 0 行 ⇒ 逐 entry 的authority model 依旧只能靠 `DELIVERED_PER_ENTRY_CONTRACTS` 的 reviewed 登记（覆盖 4 条 entry），其余 182 条无供给。",
    "title": "approved bundle 存在但一条都没绑到 entry ⇒ authority model 逐 entry 仍未定",
    "why_not_fixed_here": "本任务不写库、不发布 contract。"
   },
@@ -146,7 +146,7 @@
    "measured_by": "`ck_wpa_durable_quarantine_exclusive` + `ck_wpa_quarantined_state_no_durable_at` + `ck_wpa_durable_state_has_durable_at` + `ck_wpa_incoming_never_published` + `trg_wpa_transition`",
    "owner_task": "68/70",
    "passed": true,
-   "row_denominator": 9,
+   "row_denominator": 20,
    "row_tables": [
     "working_paper_artifact"
    ],
@@ -422,7 +422,7 @@
    "measured_by": "bundle 三个 `*_type_ref_agree` CHECK + `trg_wpsdb_slots` + 逐 bundle 行现算 child 反查",
    "owner_task": "67",
    "passed": true,
-   "row_denominator": 3,
+   "row_denominator": 5,
    "row_tables": [
     "working_paper_sync_definition_bundle"
    ],
@@ -563,12 +563,12 @@
   },
   "content_version_scope_uses_opaque_uuid_only": {
    "check_id": "content_version_scope_uses_opaque_uuid_only",
-   "denominator_empty": true,
-   "denominator_empty_note": "行分母为 0 ⇒ 本检查的通过**只来自 schema 侧结构判据**（UNIQUE/CHECK/trigger 的实际定义），不来自「没有违反行」。行供给归 owner_task=68/70。",
+   "denominator_empty": false,
+   "denominator_empty_note": null,
    "measured_by": "`ck_wpssi_content_version_uuid` + `ck_wpssi_opaque_resource_id` + `uq_wpcv_wp_revision` 含 wp_id + 路由源码 AST 现读 `versions/{version_id}`",
    "owner_task": "68/70",
    "passed": true,
-   "row_denominator": 0,
+   "row_denominator": 3,
    "row_tables": [
     "working_paper_content_version",
     "working_paper_sync_scope_index"
@@ -615,7 +615,7 @@
    "schema_satisfied": true,
    "state": "measured",
    "statement": "content version 的 scope 只用 opaque UUID；numeric revision 不得作 route / resource key，两个 wp 相同 numeric revision 不得碰撞。",
-   "verified_on_rows": false
+   "verified_on_rows": true
   },
   "delivery_durable_at_owner_constraint": {
    "check_id": "delivery_durable_at_owner_constraint",
@@ -816,7 +816,7 @@
    "measured_by": "`ck_wpsda_authority_model_type` 封闭三态 + `trg_wpsdb_slots` + 逐 bundle 现算 child state",
    "owner_task": "67",
    "passed": true,
-   "row_denominator": 3,
+   "row_denominator": 5,
    "row_tables": [
     "working_paper_sync_definition_bundle"
    ],
@@ -857,12 +857,12 @@
   },
   "pure_upgrade_keeps_revision_and_history_freezes_bundle": {
    "check_id": "pure_upgrade_keeps_revision_and_history_freezes_bundle",
-   "denominator_empty": true,
-   "denominator_empty_note": "行分母为 0 ⇒ 本检查的通过**只来自 schema 侧结构判据**（UNIQUE/CHECK/trigger 的实际定义），不来自「没有违反行」。行供给归 owner_task=67。",
+   "denominator_empty": false,
+   "denominator_empty_note": null,
    "measured_by": "`uq_wpcr_generation` 含 content_version_id + `ck_wpcr_reason` 含 definition_upgrade + `trg_wpcv_immutable` + `trg_wpcr_immutable`",
    "owner_task": "67",
    "passed": true,
-   "row_denominator": 0,
+   "row_denominator": 2,
    "row_tables": [
     "working_paper_content_representation",
     "working_paper_content_version"
@@ -918,16 +918,16 @@
    "schema_satisfied": true,
    "state": "measured",
    "statement": "纯 definition upgrade 只加 representation generation、不动 content version revision；历史 retry 冻结当时的 bundle digest。",
-   "verified_on_rows": false
+   "verified_on_rows": true
   },
   "scope_tombstone_exists_and_retired_is_not_reusable": {
    "check_id": "scope_tombstone_exists_and_retired_is_not_reusable",
-   "denominator_empty": true,
-   "denominator_empty_note": "行分母为 0 ⇒ 本检查的通过**只来自 schema 侧结构判据**（UNIQUE/CHECK/trigger 的实际定义），不来自「没有违反行」。行供给归 owner_task=68/70。",
+   "denominator_empty": false,
+   "denominator_empty_note": null,
    "measured_by": "`trg_wpssi_no_delete` + `trg_wpssi_update_guard` + `pk_wpssi(resource_kind,resource_id)` + `ck_wpssi_entry_non_empty`",
    "owner_task": "68/70",
    "passed": true,
-   "row_denominator": 0,
+   "row_denominator": 2,
    "row_tables": [
     "working_paper_sync_scope_index"
    ],
@@ -982,7 +982,7 @@
    "schema_satisfied": true,
    "state": "measured",
    "statement": "scope index 的 child 退役写 tombstone；tombstone 不可 DELETE、不可清空、resource id 不可复用。",
-   "verified_on_rows": false
+   "verified_on_rows": true
   },
   "typed_null_marker_rules": {
    "check_id": "typed_null_marker_rules",
@@ -1060,18 +1060,18 @@
  },
  "counters": {
   "candidate_representation_side": {
-   "content_representation_rows": 0,
-   "content_version_rows": 0,
+   "content_representation_rows": 1,
+   "content_version_rows": 1,
    "entries_with_published_representation": 0,
-   "entry_state_rows": 0,
+   "entry_state_rows": 1,
    "upgrade_candidate_rows": 0
   },
   "definition_side": {
-   "approved_bundle_rows": 3,
+   "approved_bundle_rows": 5,
    "bundles_bound_to_a_manifest_entry": 0,
    "bundles_bound_to_a_manifest_entry_why": "bundle 表无 entry_id 列；与 entry 的唯一连接是 representation / application / test_run 的外键，三张表实测 0 行。",
-   "definition_artifact_rows": 6,
-   "definition_bundle_rows": 3,
+   "definition_artifact_rows": 14,
+   "definition_bundle_rows": 5,
    "typed_null_marker_rows": 3
   },
   "deletion_plan_side": {
@@ -1258,7 +1258,16 @@
  "database_snapshot": {
   "candidates": [],
   "check_constraint_count": 221,
-  "content_versions": [],
+  "content_versions": [
+   {
+    "authoritative_artifact_sha256": "31e7992ba1e83952620e1777d108b46f7e7817dcdc9484c07f079f1dd3af0afa",
+    "id": "33450e8a-d4a5-4353-be7a-6a6296f5f945",
+    "projection_sha256": null,
+    "revision": 1,
+    "source": "upload",
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e"
+   }
+  ],
   "definition_artifacts": [
    {
     "authority_model_type": "custom_authoritative_ooxml",
@@ -1297,6 +1306,66 @@
     "supersedes_id": null
    },
    {
+    "authority_model_type": "projection_contract",
+    "id": "bd660451-f3b1-438f-b1c6-324520a5f0dd",
+    "kind": "authority_model",
+    "logical_id": "d2.receivable_detail.authority-model",
+    "semantic_version": "1.0.0",
+    "sha256": "2befb296c1db44e82994977d8a300abb9dc89a535d9e26f7c3d229563ccef661",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": null,
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": "projection_contract",
+    "id": "cae1034c-3a9b-4ef8-bace-a000ebb743f9",
+    "kind": "authority_model",
+    "logical_id": "h1.disposal_check.authority-model",
+    "semantic_version": "1.0.0",
+    "sha256": "bad2e813869f46fcfe1bdebd337bccf52170e8fb37d976b3393cb8c9222f2f04",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": null,
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": null,
+    "id": "444d1d86-be4f-4f58-b763-924dc8e1856c",
+    "kind": "contract",
+    "logical_id": "d2.receivable_detail",
+    "semantic_version": "1.0.0",
+    "sha256": "bdd2f6494185777ce429ea04940510bcf6cf59c4f8a837c48251a4b4dfc86007",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": null,
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": null,
+    "id": "4f530e67-b704-4340-adac-b2fed079eca1",
+    "kind": "instrumentation",
+    "logical_id": "d2.receivable_detail.instrumentation",
+    "semantic_version": "1.0.0",
+    "sha256": "b6bb140f720940e896b19fd07c72839d4086b5a55ac9fa789114d5c668b3b9aa",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": null,
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": null,
+    "id": "71762594-6b6c-48d6-9e53-73062dc78a42",
+    "kind": "template",
+    "logical_id": "h1.disposal_check.template",
+    "semantic_version": "1.0.0",
+    "sha256": "ef2e9042958aa94766b6d6d12fb9deee4ea909a64ee0944fce486ae570a916a1",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": "20165b7da28a3712fc511d9b001c8f979a6153bc1a1cb2d1449ef3d83673bedd",
+    "supersedes_id": null
+   },
+   {
     "authority_model_type": null,
     "id": "8b23a1aa-5d10-4d72-93f6-db1e94f77370",
     "kind": "instrumentation",
@@ -1322,6 +1391,30 @@
    },
    {
     "authority_model_type": null,
+    "id": "a7c27c2e-563d-4930-9aba-64bffc45b2de",
+    "kind": "instrumentation",
+    "logical_id": "h1.disposal_check.instrumentation",
+    "semantic_version": "1.0.0",
+    "sha256": "1bccb2d955ec9224564f8aa4d5b2a2cf96d436026463070c96be8e5737f80496",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": null,
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": null,
+    "id": "d07417b3-fd26-4197-9f7f-9e310d41718b",
+    "kind": "template",
+    "logical_id": "d2.receivable_detail.template",
+    "semantic_version": "1.0.0",
+    "sha256": "c7bbec6e010a1c3c768c3524cddb82864c89bb953b1daa4299a34f97ce799638",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": "ff7a91a514db64ca030103f8cb10759fc4e62c77cf6d4cbe3c61bb7d69ebdc9e",
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": null,
     "id": "f11c7763-38c6-41d4-81d2-81bba689ab38",
     "kind": "template",
     "logical_id": "b60.hour_budget.template",
@@ -1330,6 +1423,18 @@
     "source_commit": "task76-projection-provisioning",
     "state": "approved",
     "structure_hash": "47d3f903004328b11f8cb384162ea2f16ef6fbfbfc7f4babb6ba18549e6d225f",
+    "supersedes_id": null
+   },
+   {
+    "authority_model_type": null,
+    "id": "ff82292c-99af-4fee-aa6c-dee85fe454e9",
+    "kind": "contract",
+    "logical_id": "h1.disposal_check",
+    "semantic_version": "1.0.0",
+    "sha256": "15dea471349e9047c4fe762ed91ae7a18baa686c73aa3129e1cd9f85e846df4b",
+    "source_commit": "task76-projection-provisioning",
+    "state": "approved",
+    "structure_hash": null,
     "supersedes_id": null
    }
   ],
@@ -1352,6 +1457,23 @@
     "template_slot_type": "definition"
    },
    {
+    "authority_model_definition_id": "bd660451-f3b1-438f-b1c6-324520a5f0dd",
+    "authority_model_definition_sha256": "2befb296c1db44e82994977d8a300abb9dc89a535d9e26f7c3d229563ccef661",
+    "canonical_payload_sha256": "db877e9dbc73eabcb73505d85151e99bc5a4f5f65282c6febb364816c8b76132",
+    "contract_slot_digest": "bdd2f6494185777ce429ea04940510bcf6cf59c4f8a837c48251a4b4dfc86007",
+    "contract_slot_ref": "definition:444d1d86-be4f-4f58-b763-924dc8e1856c",
+    "contract_slot_type": "definition",
+    "id": "d443feca-8560-4e9c-a617-e9ac43d0a542",
+    "instrumentation_slot_digest": "b6bb140f720940e896b19fd07c72839d4086b5a55ac9fa789114d5c668b3b9aa",
+    "instrumentation_slot_ref": "definition:4f530e67-b704-4340-adac-b2fed079eca1",
+    "instrumentation_slot_type": "definition",
+    "schema_version": "definition-bundle:v1",
+    "state": "approved",
+    "template_slot_digest": "c7bbec6e010a1c3c768c3524cddb82864c89bb953b1daa4299a34f97ce799638",
+    "template_slot_ref": "definition:d07417b3-fd26-4197-9f7f-9e310d41718b",
+    "template_slot_type": "definition"
+   },
+   {
     "authority_model_definition_id": "c99a0069-3581-45a9-b30d-c9a3eb45450a",
     "authority_model_definition_sha256": "c219ad48ca230be715b9d500a8a18f4277b9de4d89e41b4284cefca59416d73b",
     "canonical_payload_sha256": "c8c4494821ddee3b378f9f7af17853ff7004cace0d1a995d689bc827f922dd8b",
@@ -1367,6 +1489,23 @@
     "template_slot_digest": "dcee43ee96784a4f9c04a466d4f8e74b4005c579d8ece72b30a5fc8a72467309",
     "template_slot_ref": "marker:template:none:v1",
     "template_slot_type": "template:none:v1"
+   },
+   {
+    "authority_model_definition_id": "cae1034c-3a9b-4ef8-bace-a000ebb743f9",
+    "authority_model_definition_sha256": "bad2e813869f46fcfe1bdebd337bccf52170e8fb37d976b3393cb8c9222f2f04",
+    "canonical_payload_sha256": "05086f4021a60aff4a6f7a6f498845d68d41f2742f0cf91d82b7e6c02f41d5cf",
+    "contract_slot_digest": "15dea471349e9047c4fe762ed91ae7a18baa686c73aa3129e1cd9f85e846df4b",
+    "contract_slot_ref": "definition:ff82292c-99af-4fee-aa6c-dee85fe454e9",
+    "contract_slot_type": "definition",
+    "id": "e21fb645-fefc-4f34-8666-c5157e28a311",
+    "instrumentation_slot_digest": "1bccb2d955ec9224564f8aa4d5b2a2cf96d436026463070c96be8e5737f80496",
+    "instrumentation_slot_ref": "definition:a7c27c2e-563d-4930-9aba-64bffc45b2de",
+    "instrumentation_slot_type": "definition",
+    "schema_version": "definition-bundle:v1",
+    "state": "approved",
+    "template_slot_digest": "ef2e9042958aa94766b6d6d12fb9deee4ea909a64ee0944fce486ae570a916a1",
+    "template_slot_ref": "definition:71762594-6b6c-48d6-9e53-73062dc78a42",
+    "template_slot_type": "definition"
    },
    {
     "authority_model_definition_id": "ecd4ed9c-bd9f-4275-9e37-ea97e9248dce",
@@ -1386,7 +1525,14 @@
     "template_slot_type": "template:none:v1"
    }
   ],
-  "entry_states": [],
+  "entry_states": [
+   {
+    "current_representation_id": "f9b29813-63d4-4e8c-9d23-dca9df60fac9",
+    "entry_id": "opaque-017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "representation_generation": 1,
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e"
+   }
+  ],
   "error": null,
   "evidence_scenarios": [],
   "null_markers": [
@@ -1416,15 +1562,29 @@
    }
   ],
   "readable": true,
-  "representations": [],
+  "representations": [
+   {
+    "adapter_id": "opaque.authoritative.v1",
+    "authority_model_definition_sha256": "c219ad48ca230be715b9d500a8a18f4277b9de4d89e41b4284cefca59416d73b",
+    "content_version_id": "33450e8a-d4a5-4353-be7a-6a6296f5f945",
+    "definition_bundle_id": "6d09d6b7-1a61-4992-a7fd-c9e89b2336e4",
+    "definition_bundle_sha256": "c8c4494821ddee3b378f9f7af17853ff7004cace0d1a995d689bc827f922dd8b",
+    "document_type": "xlsx",
+    "entry_id": "opaque-017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "generation": 1,
+    "id": "f9b29813-63d4-4e8c-9d23-dca9df60fac9",
+    "reason": "content_commit",
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e"
+   }
+  ],
   "row_counts": {
-   "working_paper_artifact": 9,
+   "working_paper_artifact": 20,
    "working_paper_callback_delivery": 0,
    "working_paper_callback_recovery_case": 0,
    "working_paper_content_application": 0,
    "working_paper_content_application_event": 0,
-   "working_paper_content_representation": 0,
-   "working_paper_content_version": 0,
+   "working_paper_content_representation": 1,
+   "working_paper_content_version": 1,
    "working_paper_entry_evidence_scenario": 0,
    "working_paper_forcesave_request": 0,
    "working_paper_oo_client_confirmation": 0,
@@ -1433,15 +1593,34 @@
    "working_paper_oo_room": 0,
    "working_paper_representation_upgrade_candidate": 0,
    "working_paper_sync_conflict": 0,
-   "working_paper_sync_definition_artifact": 6,
-   "working_paper_sync_definition_bundle": 3,
+   "working_paper_sync_definition_artifact": 14,
+   "working_paper_sync_definition_bundle": 5,
    "working_paper_sync_definition_null_marker": 3,
-   "working_paper_sync_entry_state": 0,
+   "working_paper_sync_entry_state": 1,
    "working_paper_sync_operation": 0,
-   "working_paper_sync_scope_index": 0,
+   "working_paper_sync_scope_index": 2,
    "working_paper_sync_test_run": 0
   },
-  "scope_index": [],
+  "scope_index": [
+   {
+    "entry_id": "opaque-017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "generation": null,
+    "project_id": "fce6120d-c22f-47e9-8358-ec8d59ae0239",
+    "resource_id": "33450e8a-d4a5-4353-be7a-6a6296f5f945",
+    "resource_kind": "content_version",
+    "retired_at": null,
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e"
+   },
+   {
+    "entry_id": "opaque-017624e2-cd7e-4641-bd99-db7c1f1f5f7e",
+    "generation": null,
+    "project_id": "fce6120d-c22f-47e9-8358-ec8d59ae0239",
+    "resource_id": "f9b29813-63d4-4e8c-9d23-dca9df60fac9",
+    "resource_kind": "content_representation",
+    "retired_at": null,
+    "wp_id": "017624e2-cd7e-4641-bd99-db7c1f1f5f7e"
+   }
+  ],
   "test_runs": [],
   "trigger_count": 35,
   "unique_index_count": 62
@@ -27461,8 +27640,8 @@
   "SELECT id::text AS id, entry_id, manifest_source_digest, scenario_profile_digest, required_scenario_set_digest, definition_bundle_sha256, authority_model_definition_sha256, editability, room_model, aggregate_result FROM working_paper_sync_test_run",
   "SELECT s.id::text AS id, r.entry_id AS entry_id, s.scenario_id, s.scenario_kind, s.result FROM working_paper_entry_evidence_scenario s JOIN working_paper_sync_test_run r ON r.id = s.run_id"
  ],
- "report_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
- "report_digest": "3c8b13fdec7505982ca5b15b41688f7352f4b2cb56d268461bb39d1fbe4f4019",
+ "report_commit": "c882f831c9eb39c2b53c5dab00b0558015bebe24",
+ "report_digest": "bcfb1db2325462b23e9088ed284d6a4455f8935548c6994cc6fe8e3b00146e2f",
  "reported_counter_kinds": [
   "unadjudicated",
   "fake_bidirectional",
@@ -27711,12 +27890,9 @@
    "application_to_primary_operation_one_to_one",
    "candidate_non_current_and_non_resolvable",
    "close_authorization_stale_successor_recovery_required",
-   "content_version_scope_uses_opaque_uuid_only",
    "delivery_durable_at_owner_constraint",
    "duplicate_direct_canonical_and_zero_stranded_shell",
-   "forcesave_five_tuple_and_frozen_fingerprint",
-   "pure_upgrade_keeps_revision_and_history_freezes_bundle",
-   "scope_tombstone_exists_and_retired_is_not_reusable"
+   "forcesave_five_tuple_and_frozen_fingerprint"
   ],
   "means": "`structural_errors_reported` 是本任务的**预期**结果之一 —— 正文要求如实报告，不要求清零。它既不阻塞也不放行 Task 72 Stage A。",
   "state": "structural_errors_reported",

@@ -569,23 +569,19 @@
         "working_paper_callback_recovery_case",
         "working_paper_content_application",
         "working_paper_content_application_event",
-        "working_paper_content_representation",
-        "working_paper_content_version",
         "working_paper_entry_evidence_scenario",
         "working_paper_forcesave_request",
         "working_paper_oo_close_intent",
         "working_paper_oo_room",
         "working_paper_representation_upgrade_candidate",
-        "working_paper_sync_entry_state",
         "working_paper_sync_operation",
         "working_paper_sync_operation_event",
-        "working_paper_sync_scope_index",
         "working_paper_sync_test_run"
       ],
       "id": "BP-68-2",
-      "measured": 16,
+      "measured": 12,
       "owner_task": "70",
-      "statement": "生产 `public` schema 里 16 张相关表实测 0 行 ⇒ 正文点名的行为侧不变量在生产数据上**一条都验不了**；本门只能在 scratch schema 造行验。",
+      "statement": "生产 `public` schema 里 12 张相关表实测 0 行 ⇒ 正文点名的行为侧不变量在生产数据上**一条都验不了**；本门只能在 scratch schema 造行验。",
       "subject": "production_public_schema_row_supply",
       "task68_disposition": "reported_not_fixed",
       "why_not_fixed_here": "行供给来自 Task 70 的真实场景执行；本门不造 evidence（见 `oo_scope_boundary`）。scratch schema 的结论对 DDL 成立，但**不能**替代生产数据上的验收。"
@@ -663,10 +659,10 @@
     ],
     "excluded_is_not_unchecked": "剔除 ≠ 不管：`census_semantics` 现算并断言六条语义性质，其中 `every_pattern_has_a_match` 比「digest 相等」强 —— digest 只说「和上次一样」，它说「每条选取规则今天真的选到了东西」。",
     "measured": {
-      "digest": "2961d151f983249034f7deac7cf2e0083bb1f26e2dad96fb8c7318127ceec97c",
+      "digest": "a039c702f64dd1533e01ee74c640f2bb8a618a7915af1e0552f9360625c3fb48",
       "note": "本节点是**快照**，不参与逐字节比对（见 `census_keys`）。",
-      "scanned_test_files": 2347,
-      "surface_size": 95
+      "scanned_test_files": 2349,
+      "surface_size": 96
     },
     "semantics": {
       "all_hold": true,
@@ -5210,7 +5206,7 @@
       "scanned_test_files",
       "surface_size"
     ],
-    "digest": "2961d151f983249034f7deac7cf2e0083bb1f26e2dad96fb8c7318127ceec97c",
+    "digest": "a039c702f64dd1533e01ee74c640f2bb8a618a7915af1e0552f9360625c3fb48",
     "files": {
       "backend/tests/test_onlyoffice_single_file_dockey.py": [
         "sync_services_module"
@@ -5542,6 +5538,9 @@
         "sync_services_module",
         "sync_package_path"
       ],
+      "backend/tests/workpaper_sync/test_task61_first_published_representation_bootstrap.py": [
+        "sync_services_module"
+      ],
       "backend/tests/workpaper_sync/test_task61_oo94_word_pilot_gate.py": [
         "sync_services_module",
         "sync_package_path"
@@ -5623,10 +5622,11 @@
       "backend/tests/workpaper_sync/test_task47_e_cycle_migration.py",
       "backend/tests/workpaper_sync/test_task66_legacy_deletion_plan.py",
       "backend/tests/workpaper_sync/test_task67_census_lock.py",
-      "backend/tests/workpaper_sync/test_task68_radiation_surface.py"
+      "backend/tests/workpaper_sync/test_task68_radiation_surface.py",
+      "backend/tests/workpaper_sync/test_task76_wp_code_adjudication.py"
     ],
     "in_dir_but_out_of_surface_note": "这些文件在 `workpaper_sync/` 目录里但**不引用**任何被验生产单元（只读 data/JSON 与schema 契约），按引用关系判据它们不在辐射面。如实列出，不偷偷补进分母也不假装覆盖。",
-    "inside_workpaper_sync_dir": 91,
+    "inside_workpaper_sync_dir": 92,
     "outside_files": [
       "backend/tests/test_onlyoffice_single_file_dockey.py",
       "backend/tests/test_workpaper_writer_inventory.py",
@@ -5648,11 +5648,11 @@
       "sync_router_module": "app\\.routers\\.wp_sync_router|wp_sync_router",
       "sync_services_module": "app\\.services\\.workpaper_sync"
     },
-    "scanned_test_files": 2347,
+    "scanned_test_files": 2349,
     "statement": "辐射面 = `backend/tests/**/test_*.py` 中**按模块路径引用**到本次被验生产单元（`app.services.workpaper_sync.*` / `workpaper_sync_models` / `wp_sync_router` / V151・V152）的测试文件全集。不跑无边界全量。",
-    "surface_size": 95
+    "surface_size": 96
   },
-  "report_digest": "31980e806a5b45c7ca478f918dab775cee38bec5fde721ae73e86c552cbfb03c",
+  "report_digest": "cfeac76378b7a838e44b31d9cdf86f85223d62eb740c48ebe2e4b31b11c392fe",
   "restoration": {
     "drifted_tables": {},
     "foreign_scratch_note": "非本轮创建的 `tmp_task68_reg_*` 残留。来源通常是变异实验 M41（**故意**删掉 `DROP SCHEMA` 以证明清理逻辑有效）—— 如实列出并单独清理，不并进本轮复原结论。",
@@ -5660,47 +5660,47 @@
     "measured": true,
     "own_schema_left": 0,
     "public_after": {
-      "working_paper_artifact": 9,
+      "working_paper_artifact": 20,
       "working_paper_callback_delivery": 0,
       "working_paper_callback_recovery_case": 0,
       "working_paper_content_application": 0,
       "working_paper_content_application_event": 0,
-      "working_paper_content_representation": 0,
-      "working_paper_content_version": 0,
+      "working_paper_content_representation": 1,
+      "working_paper_content_version": 1,
       "working_paper_entry_evidence_scenario": 0,
       "working_paper_forcesave_request": 0,
       "working_paper_oo_close_intent": 0,
       "working_paper_oo_room": 0,
       "working_paper_representation_upgrade_candidate": 0,
-      "working_paper_sync_definition_artifact": 6,
-      "working_paper_sync_definition_bundle": 3,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
       "working_paper_sync_definition_null_marker": 3,
-      "working_paper_sync_entry_state": 0,
+      "working_paper_sync_entry_state": 1,
       "working_paper_sync_operation": 0,
       "working_paper_sync_operation_event": 0,
-      "working_paper_sync_scope_index": 0,
+      "working_paper_sync_scope_index": 2,
       "working_paper_sync_test_run": 0
     },
     "public_before": {
-      "working_paper_artifact": 9,
+      "working_paper_artifact": 20,
       "working_paper_callback_delivery": 0,
       "working_paper_callback_recovery_case": 0,
       "working_paper_content_application": 0,
       "working_paper_content_application_event": 0,
-      "working_paper_content_representation": 0,
-      "working_paper_content_version": 0,
+      "working_paper_content_representation": 1,
+      "working_paper_content_version": 1,
       "working_paper_entry_evidence_scenario": 0,
       "working_paper_forcesave_request": 0,
       "working_paper_oo_close_intent": 0,
       "working_paper_oo_room": 0,
       "working_paper_representation_upgrade_candidate": 0,
-      "working_paper_sync_definition_artifact": 6,
-      "working_paper_sync_definition_bundle": 3,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
       "working_paper_sync_definition_null_marker": 3,
-      "working_paper_sync_entry_state": 0,
+      "working_paper_sync_entry_state": 1,
       "working_paper_sync_operation": 0,
       "working_paper_sync_operation_event": 0,
-      "working_paper_sync_scope_index": 0,
+      "working_paper_sync_scope_index": 2,
       "working_paper_sync_test_run": 0
     },
     "restored": true,
@@ -6823,25 +6823,25 @@
     },
     "readable": true,
     "row_counts": {
-      "working_paper_artifact": 9,
+      "working_paper_artifact": 20,
       "working_paper_callback_delivery": 0,
       "working_paper_callback_recovery_case": 0,
       "working_paper_content_application": 0,
       "working_paper_content_application_event": 0,
-      "working_paper_content_representation": 0,
-      "working_paper_content_version": 0,
+      "working_paper_content_representation": 1,
+      "working_paper_content_version": 1,
       "working_paper_entry_evidence_scenario": 0,
       "working_paper_forcesave_request": 0,
       "working_paper_oo_close_intent": 0,
       "working_paper_oo_room": 0,
       "working_paper_representation_upgrade_candidate": 0,
-      "working_paper_sync_definition_artifact": 6,
-      "working_paper_sync_definition_bundle": 3,
+      "working_paper_sync_definition_artifact": 14,
+      "working_paper_sync_definition_bundle": 5,
       "working_paper_sync_definition_null_marker": 3,
-      "working_paper_sync_entry_state": 0,
+      "working_paper_sync_entry_state": 1,
       "working_paper_sync_operation": 0,
       "working_paper_sync_operation_event": 0,
-      "working_paper_sync_scope_index": 0,
+      "working_paper_sync_scope_index": 2,
       "working_paper_sync_test_run": 0
     },
     "trigger_count": 35,
@@ -6884,7 +6884,7 @@
     }
   },
   "schema_version": "task68-backend-chain-independent-regression:v1",
-  "source_commit": "ecdde3722d89071d55c7d7f37735a1461e41982c",
+  "source_commit": "c882f831c9eb39c2b53c5dab00b0558015bebe24",
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",
   "sub_bullets": {
     "1": "运行 migration/repository/artifact/retention/content+representation mutation/definition-bundle store/candidate finalize/room/close-intent/request/delivery/recovery/content-application/operation/scope-index/merge/coordinator/outbox/evidence/Excel/Word targeted tests",
@@ -6951,7 +6951,7 @@
     "executed_from": ".",
     "file_count": 94,
     "live_surface_covers_run": true,
-    "live_surface_size": 95,
+    "live_surface_size": 96,
     "not_fixed_here": "17 条既存红（11 failed + 6 errors）如实登记，**一条都不修** —— 不属本任务，且会改 source commit 让 Task 70 的 evidence stale。",
     "observed_errors": 6,
     "observed_failed": 13,
@@ -7078,7 +7078,7 @@
     "suite_digest_matches_recorded_surface": true,
     "summary_line": "13 failed, 6346 passed, 12 xfailed, 24 warnings, 6 errors in 998.68s (0:16:38)",
     "surface_growth_note": "辐射面比那次执行时**长大**不算 stale（仓库在演进）；缩到已执行集合以下才算 —— 那才是「改 scanner 蒙过去」。增量本身是普查派生量，不进锁。",
-    "surface_growth_since_run": 1,
+    "surface_growth_since_run": 2,
     "unexpected_error_nodeids": [],
     "unexpected_failed_nodeids": []
   },
@@ -7280,8 +7280,8 @@
       "disposition": "read_only_input",
       "path": "backend/data/workpaper_sync_task67_structural_pre_reconcile.json",
       "present": true,
-      "sha256": "1f3ddaa4e7485591fdc0a8897608abaaba9c5c405f4163e48f4de9cf369a53ae",
-      "size_bytes": 1176985
+      "sha256": "a7349b3bbde32974c6edf341e852acf76facd0d34acd61a3f28bd035f752458f",
+      "size_bytes": 1183991
     }
   },
   "verdict": {
@@ -7290,7 +7290,7 @@
     "failed_invariants": [],
     "honest_scope": {
       "note": "所有行为侧结论都来自 **scratch schema** 的真行；生产 `public` schema 的相关表实测 0 行（见 BP-68-2），因此「行上验过」= DDL 与约束在真库上确实会报错，**不等于**生产数据已被验收。生产数据侧验收归 Task 70。",
-      "production_rows_available": 4,
+      "production_rows_available": 8,
       "really_verified_on_rows": 26,
       "schema_side_only": 0
     },
