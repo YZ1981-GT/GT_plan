@@ -286,7 +286,7 @@ import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
 // Task 45: legacy useD2EntryDualMode deleted — pilot host now delegates to sync bridge.
-import { usePilotBridgeAdapter, type PilotRenderMode } from '../sync/usePilotBridgeAdapter'
+import { usePilotBridgeAdapter, type PilotRenderMode } from './sync/usePilotBridgeAdapter'
 // Re-export getSheetNameFromD2Code which was also in the deleted module.
 // The sheet name resolution function is kept inline since it's pure data.
 const D2_SHEET_MAP: Record<string, string> = {

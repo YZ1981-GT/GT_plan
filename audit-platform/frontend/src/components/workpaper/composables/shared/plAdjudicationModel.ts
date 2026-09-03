@@ -67,26 +67,42 @@ export interface PlAdjPrefillRow {
 
 // ─── 纯函数 ─────────────────────────────────────────────────────────────────
 
-/** 审定数 = 未审 + AJE + RJE */
-export function calcPlAudited(unadjusted: number, aje: number, rje: number): number {
-  return (unadjusted || 0) + (aje || 0) + (rje || 0)
+/**
+ * 审定数 = 未审 + AJE + RJE。
+ *
+ * 🔴 入参逐个过 `parseNum`，**不用** `(v || 0)`：见 `parseNum` 的注释，数字字符串会被
+ * `|| 0` 原样带进算式变成字符串拼接。改瘦前 6 个 `useK*FormulaEngine.ts` 各自的
+ * `calcAuditedAmount` 正是 `parseNum(u) + parseNum(a) + parseNum(r)`，收敛到本模块时
+ * 这层加固被丢掉了 —— 这里补回来。
+ */
+export function calcPlAudited(unadjusted: unknown, aje: unknown, rje: unknown): number {
+  return parseNum(unadjusted) + parseNum(aje) + parseNum(rje)
+}
+/**
+ * `calcPlAudited` 的**同一实现**，保留改瘦前 K8~K13 引擎的导出名。
+ *
+ * 两个名字不是两份实现：`calcPlAudited` 服务 `PlAdjRow` 行模型，`calcAuditedAmount`
+ * 是 6 个引擎对外的历史 API（消费方与既有测试都按这个名字 import）。
+ */
+export function calcAuditedAmount(unadjusted: unknown, aje: unknown, rje: unknown): number {
+  return calcPlAudited(unadjusted, aje, rje)
 }
 
 /** 同比变动额 */
 export function calcPlYoyChange(audited: number, priorAmount: number): number {
-  return (audited || 0) - (priorAmount || 0)
+  return parseNum(audited) - parseNum(priorAmount)
 }
 
 /** 同比变动率（分母为 0 返 null） */
 export function calcPlYoyRate(audited: number, priorAmount: number): number | null {
-  const prior = priorAmount || 0
+  const prior = parseNum(priorAmount)
   if (Math.abs(prior) < 0.005) return null
-  return ((audited || 0) - prior) / prior
+  return (parseNum(audited) - prior) / prior
 }
 
 /** 小计求和 */
 export function calcPlSubtotal(values: number[]): number {
-  return values.reduce((s, v) => s + (v || 0), 0)
+  return values.reduce((s, v) => s + parseNum(v), 0)
 }
 
 /**
@@ -102,5 +118,21 @@ export function legacyCalcIncomeStatementOccurrence(
   creditOrDebit: number,
 ): number {
   // 后端保证其中一侧为 0，减法等于非零侧
-  return (debitOrCredit || 0) - (creditOrDebit || 0)
+  return parseNum(debitOrCredit) - parseNum(creditOrDebit)
+}
+
+/**
+ * 安全数值解析：`null` / `undefined` / 空串 / 非数字 / `NaN` / `Infinity` → `0`。
+ *
+ * 🔴 这里是 K8~K13 的**单一真源**，本模块所有纯函数的入参都过它。曾经用的
+ * **不等价**：数字字符串 `'12'` 是 truthy，`v || 0` 会把它原样带进算式变成字符串
+ * 拼接（`'12' + 0 === '120'`），而 `parseNum('12') === 12`。所以凡是入参可能来自
+ * `allResponses` / JSON 反序列化的地方必须走本函数，不要图省事写 `|| 0`。
+ *
+ * 6 个 `useK*FormulaEngine.ts` 只做 re-export，不各自复制实现。
+ */
+export function parseNum(val: string | number | null | undefined | unknown): number {
+  if (val === null || val === undefined || val === '') return 0
+  const n = typeof val === 'number' ? val : Number(val)
+  return Number.isFinite(n) ? n : 0
 }

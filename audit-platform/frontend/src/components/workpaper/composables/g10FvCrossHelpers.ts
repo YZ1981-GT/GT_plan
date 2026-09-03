@@ -385,7 +385,7 @@ export interface G10AProcedureMark {
   programNos: readonly number[]
 }
 
-function isG10AProcedureMarkDone(m: Map<string, { conclusion?: string; remark?: string }>, key: string): boolean {
+export function isG10AProcedureMarkDone(m: Map<string, { conclusion?: string; remark?: string }>, key: string): boolean {
   const item = m.get(key)
   return item?.conclusion === 'completed' || !!item?.remark
 }
