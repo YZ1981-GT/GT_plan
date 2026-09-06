@@ -836,7 +836,10 @@ async def resolve_published_frozen_definitions(
     observation = await observe_published_frozen_definitions(
         session=session,
         resolution=CanonicalResolutionService(
-            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+            # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
+        session, CanonicalArtifactRepository(_BACKEND_ROOT)
         ),
         representation=representation,
         correlation_id=f"{PILOT_ADAPTER_ID}@{getattr(representation, 'id', None)}",
@@ -880,23 +883,23 @@ async def attach_pilot_adapters(
 
     from app.models.workpaper_sync_models import (
         WorkpaperContentRepresentation,
-        WorkpaperSyncEntryState,
+    )
+    from app.services.workpaper_sync.projection_target_resolution import (
+        resolve_visible_current_representation_id,
     )
     from app.services.workpaper_sync import entry_source_facts as facts
     from app.services.workpaper_sync.adapters.excel import build_excel_adapter
     from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
     from app.services.workpaper_sync.resolution import CanonicalResolutionService
 
-    representation_id = (
-        (
-            await session.execute(
-                sa.select(WorkpaperSyncEntryState.current_representation_id).where(
-                    WorkpaperSyncEntryState.entry_id == PILOT_ENTRY_ID
-                )
-            )
-        )
-        .scalars()
-        .first()
+    # 🔴 BP-27：按 entry 取 current representation 必须**同时**满足「底稿可见」与
+    #    「多实例下确定」。`entry_state` 主键是 `(wp_id, entry_id)` ⇒ 同一 entry 在多个
+    #    底稿实例上有状态是合法设计；此前四个 pilot 各写一份只按 entry_id 过滤、无
+    #    ORDER BY、不看项目软删除的 `.first()`，H1 实测同时命中两行（一条在活项目
+    #    `c71b7c54`、一条在已删项目 `f663b18c`）⇒ adapter 可能绑到前端 404 的那份。
+    #    可见性口径的唯一真源是 `projection_target_resolution.TARGET_VISIBILITY_SQL`。
+    representation_id = await resolve_visible_current_representation_id(
+        session, entry_id=PILOT_ENTRY_ID
     )
     if representation_id is None:
         return ()
@@ -911,6 +914,9 @@ async def attach_pilot_adapters(
         return ()
 
     resolution = CanonicalResolutionService(
+        # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
         session, CanonicalArtifactRepository(_BACKEND_ROOT)
     )
     bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)

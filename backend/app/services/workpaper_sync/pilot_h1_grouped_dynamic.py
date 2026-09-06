@@ -277,7 +277,10 @@ __all__ = [
     "TEMPLATE_ID",
     "TEMPLATE_RELATIVE_PATH",
     "TEMPLATE_SHA256",
+    "TEMPLATE_BUSINESS_SKELETON_ROWS",
+    "TEMPLATE_PHYSICAL_LAST_ROW",
     "TEMPLATE_SKELETON_ROWS",
+    "TEMPLATE_TYPOGRAPHY_TAIL_ROWS",
     "UNMANAGED_BELOW_FOOTER_CELLS",
     "UPSTREAM_DEBT_DISPOSAL_METHOD_ENUM_DOMAIN_SPLIT",
     "UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY",
@@ -403,6 +406,24 @@ FIRST_DATA_ROW: Final[int] = 13
 #: 并断言 `skeleton_row_count(0) == 1 != TEMPLATE_SKELETON_ROWS`。
 TEMPLATE_SKELETON_ROWS: Final[int] = 15
 
+#: 物理骨架行里属于**排版占位**的尾部行数（`A27` 的 `……`，1 行）。
+#:
+#: 🔴 BP-21：中文审计模板在数据区末尾放一行续行省略号，它是排版符号不是业务行。
+#: 把它算进受管行区间会让 `materialize` 试图把 `……` 按 `integer` 写回 `seq` 字段 ——
+#: 首版发布实测就卡在这里（`EditableCellWriteError`，受管格 `A27`）。
+#:
+#: 这个数**不是**本模块自己判的：`excel_instrumentation` 在注入期调
+#: :func:`app.services.workpaper_sync.excel_typography_rows.assert_last_data_row_is_not_typography_placeholder`
+#: 现读模板字节，声明的 `last_data_row` 落在占位行上即 fail closed 并给出应声明的值。
+#: 于是本常量是「被生产门验证过的模板事实」，不是一处可以写错而无人发现的数字。
+#: 全库同形态实测 170 处 / 37 份模板 / 35 个 wp_code。
+TEMPLATE_TYPOGRAPHY_TAIL_ROWS: Final[int] = 1
+
+#: 真实**业务**骨架行数 = 物理骨架 − 尾部排版占位行（14 行，`A13..A26`）。
+TEMPLATE_BUSINESS_SKELETON_ROWS: Final[int] = (
+    TEMPLATE_SKELETON_ROWS - TEMPLATE_TYPOGRAPHY_TAIL_ROWS
+)
+
 
 def skeleton_row_count(seed: int) -> int:
     """动态区骨架行数 = ``max(seed, 1)``。**本模块唯一**决定行数的地方。
@@ -419,12 +440,38 @@ def skeleton_row_count(seed: int) -> int:
     return max(int(seed), 1)
 
 
-#: 数据区最后一行 = 起始行 + 骨架行数 - 1。经 :func:`skeleton_row_count` 计算，
-#: seed 取权威模板自己的物理骨架行数 ⇒ 这个数来自源侧推导而非写死的行数算术。
-LAST_DATA_ROW: Final[int] = FIRST_DATA_ROW + skeleton_row_count(TEMPLATE_SKELETON_ROWS) - 1
+#: **受管**行区间末行 = 起始行 + 业务骨架行数 - 1。经 :func:`skeleton_row_count` 计算，
+#: seed 取权威模板自己的**业务**骨架行数 ⇒ 这个数来自源侧推导而非写死的行数算术。
+#:
+#: 🔴 BP-21 起 seed 用 :data:`TEMPLATE_BUSINESS_SKELETON_ROWS`（14）而不是
+#: :data:`TEMPLATE_SKELETON_ROWS`（15）：末行 `A27` 是排版占位 `……`，不是业务行。
+LAST_DATA_ROW: Final[int] = (
+    FIRST_DATA_ROW + skeleton_row_count(TEMPLATE_BUSINESS_SKELETON_ROWS) - 1
+)
 
-#: footer 所在行（`A28 合计`），必须在受管行区间之后。
-FOOTER_ROW: Final[int] = LAST_DATA_ROW + 1
+#: **物理**骨架末行（含尾部排版占位行）= 27。
+#:
+#: 🔴 它与 :data:`LAST_DATA_ROW`（26）是**两件事**，混用是 BP-21 落地时踩过的坑：
+#:
+#: * :data:`LAST_DATA_ROW` = 受管业务行区间末行 ⇒ Table ref、row UUID、projection、
+#:   `formula_mask`（受管的只读区）都按它算；
+#: * 本常量 = 模板**物理**结构的末行 ⇒ 模板自带的那些覆盖整个骨架的事实按它算：
+#:   两个数据验证区（`B13:B27` / `E13:E27`）、footer 的合计区间（`SUM(x13:x27)`）、
+#:   以及 `L`/`O` 两列**逐行**公式（占位行上也有）。
+#:
+#: 首版实测：把 DV 区间也跟着受管区收缩成 `B13:B26` 后，`enum_source_ref` 指向一个模板里
+#: **不存在**的区间 ⇒ 守卫 `KeyError: 'B13:B26'`、枚举值域读成空集。
+#: 合计区间同理：模板里是 `SUM(I13:I27)`，它对受管区末行 26 属**超集**（
+#: `assert_footer_formula_covers_managed_rows` 的判据是 `last >= effective_last_row`）
+#: ⇒ 收缩受管区不会让合计判据打红，但把它写成 `SUM(I13:I26)` 就与模板不符了。
+TEMPLATE_PHYSICAL_LAST_ROW: Final[int] = FIRST_DATA_ROW + TEMPLATE_SKELETON_ROWS - 1
+
+#: footer 所在行（`A28 合计`）—— 紧跟**物理**骨架末行。
+#:
+#: 🔴 它与 :data:`LAST_DATA_ROW` 之间隔着那 :data:`TEMPLATE_TYPOGRAPHY_TAIL_ROWS` 行占位行
+#: —— BP-21 之前二者相邻，那只是因为占位行被误算成了业务行。footer 的物理位置（`A28`）
+#: 没有变，守卫仍用 openpyxl 断言 `A{FOOTER_ROW}` 的文本恰为 `合计`。
+FOOTER_ROW: Final[int] = TEMPLATE_PHYSICAL_LAST_ROW + 1
 
 #: 最后一列受管业务列（`Z 是否异常`）。
 MANAGED_LAST_COL: Final[str] = "Z"
@@ -463,11 +510,27 @@ FOOTER_MARKER: Final[str] = "合计"
 #: HTML store 里承载整张表的那一条 item（`useH1DisposalCheck.ts` 的 `${ITEM_PREFIX}-rows`）。
 STORE_ITEM_ID: Final[str] = "H1-8-rows"
 
+#: 「审计师还没录任何一行」时的 store 载荷。
+#:
+#: 🔴 由 **provider 自己**声明，而不是让调用方拿一个通用常量喂所有 pilot。
+#:    起因（2026-09-05 实测）：宿主 `fix_projection_first_publication.py` 曾用单一
+#:    `_EMPTY_STORE_PAYLOAD = "[]"` 喂全部四个 pilot，而 G7 的载荷根形态是 **对象**
+#:    不是数组 ⇒ 它必然 `StorePayloadError`。「空载荷长什么样」是每个 pilot 的
+#:    store schema 决定的，只有 provider 自己知道，放在调用方就是猜。
+#:
+#: 本 pilot 的根形态是行数组，因此空行集就是 `[]` —— `build_store_projection` 对它
+#: 产出 `values` 与 `row_keys` 皆空的 Projection（实测 values=0），下游无额外约束。
+EMPTY_STORE_PAYLOAD: Final[str] = "[]"
+
 #: 载荷里每行自带的稳定行身份键（形如 `disp-mrgi0qg1-fwwm`）。
 ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 
 #: `B13:B27` 的数据验证值域（**样式源**；与前端 `H1_2_CATEGORY_OPTIONS` 逐字同序相等）。
-CATEGORY_DV_CELL_RANGE: Final[str] = f"B{FIRST_DATA_ROW}:B{LAST_DATA_ROW}"
+#:
+#: 🔴 区间用 :data:`TEMPLATE_PHYSICAL_LAST_ROW`（27）而不是 :data:`LAST_DATA_ROW`（26）：
+#: 这是 `enum_source_ref` 指向的**模板实际 DV 区间**，模板里它覆盖整个物理骨架（含占位行）。
+#: 跟着受管区收缩会让 source_ref 指向一个不存在的区间（实测 `KeyError: 'B13:B26'`）。
+CATEGORY_DV_CELL_RANGE: Final[str] = f"B{FIRST_DATA_ROW}:B{TEMPLATE_PHYSICAL_LAST_ROW}"
 CATEGORY_DV_VALUES: Final[tuple[str, ...]] = (
     "房屋及建筑物",
     "机器设备",
@@ -478,7 +541,10 @@ CATEGORY_DV_VALUES: Final[tuple[str, ...]] = (
 
 #: `E13:E27` 的数据验证值域（**会计科目口径**；与前端业务口径下拉互不为子集，
 #: 见 :data:`UPSTREAM_DEBT_DISPOSAL_METHOD_ENUM_DOMAIN_SPLIT`）。
-DISPOSAL_METHOD_DV_CELL_RANGE: Final[str] = f"E{FIRST_DATA_ROW}:E{LAST_DATA_ROW}"
+#: 🔴 同 :data:`CATEGORY_DV_CELL_RANGE`：DV 区间是物理模板事实，用物理末行。
+DISPOSAL_METHOD_DV_CELL_RANGE: Final[str] = (
+    f"E{FIRST_DATA_ROW}:E{TEMPLATE_PHYSICAL_LAST_ROW}"
+)
 DISPOSAL_METHOD_DV_VALUES: Final[tuple[str, ...]] = ("处置", "其他减少")
 
 #: 受管区域**之下**的真实内容（未管理区域；插删行必须不动它们）。
@@ -1115,7 +1181,25 @@ def _rows_table_payload() -> dict[str, Any]:
         "header_rows": HEADER_ROW_COUNT,
         "row_identity": {"kind": "field", "json_pointer": f"/rows/*/{ROW_IDENTITY_STORE_KEY}"},
         "delete_policy": "tombstone",
-        "footer_anchor": {"marker": FOOTER_MARKER, "search_column": "A"},
+        # 🔴 `carries_total_formula: True` 是**如实描述模板事实**，不是放宽：
+        #    `I28..O28` 共 7 格逐格实测为 `SUM(x13:x27)`（见模块 docstring §二）。
+        #    Spec: excel-structural-row-insertion-and-shift-aware-verification R5.1~5.4
+        #
+        #    不声明的后果（首版发布实测）：插行时
+        #    `assert_footer_formula_covers_managed_rows` 判「合计区间覆盖不到位移后的末行」
+        #    而引擎**无权**扩张它 ⇒ 结算 `blocked_total_formula_not_extendable`，
+        #    即照插会产出一张合计漏算 N 行的审计底稿。声明为真才让引擎有权按
+        #    **声明的**位移量扩张该区间（Requirement 4.4）；未扩张仍 fail closed。
+        "footer_anchor": {
+            "marker": FOOTER_MARKER,
+            "search_column": "A",
+            "carries_total_formula": True,
+            "note": (
+                "footer 行 A28 承载 7 条合计公式（I28..O28 = SUM(x13:x27)，逐格实测）。"
+                "区间末行 27 是 BP-21 的排版占位行，合计公式覆盖它属超集 ⇒ 对受管区末行 "
+                "26 仍然成立。声明为真使结构性插行有权按声明位移量扩张该区间"
+            ),
+        },
         "formula_mask": list(FORMULA_MASK),
         "fields": fields,
     }
@@ -1701,7 +1785,10 @@ async def resolve_published_frozen_definitions(
     observation = await observe_published_frozen_definitions(
         session=session,
         resolution=CanonicalResolutionService(
-            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+            # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
+        session, CanonicalArtifactRepository(_BACKEND_ROOT)
         ),
         representation=representation,
         correlation_id=f"{PILOT_ADAPTER_ID}@{getattr(representation, 'id', None)}",
@@ -1754,23 +1841,23 @@ async def attach_pilot_adapters(
 
     from app.models.workpaper_sync_models import (
         WorkpaperContentRepresentation,
-        WorkpaperSyncEntryState,
+    )
+    from app.services.workpaper_sync.projection_target_resolution import (
+        resolve_visible_current_representation_id,
     )
     from app.services.workpaper_sync import entry_source_facts as facts
     from app.services.workpaper_sync.adapters.excel import build_excel_adapter
     from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
     from app.services.workpaper_sync.resolution import CanonicalResolutionService
 
-    representation_id = (
-        (
-            await session.execute(
-                sa.select(WorkpaperSyncEntryState.current_representation_id).where(
-                    WorkpaperSyncEntryState.entry_id == PILOT_ENTRY_ID
-                )
-            )
-        )
-        .scalars()
-        .first()
+    # 🔴 BP-27：按 entry 取 current representation 必须**同时**满足「底稿可见」与
+    #    「多实例下确定」。`entry_state` 主键是 `(wp_id, entry_id)` ⇒ 同一 entry 在多个
+    #    底稿实例上有状态是合法设计；此前四个 pilot 各写一份只按 entry_id 过滤、无
+    #    ORDER BY、不看项目软删除的 `.first()`，H1 实测同时命中两行（一条在活项目
+    #    `c71b7c54`、一条在已删项目 `f663b18c`）⇒ adapter 可能绑到前端 404 的那份。
+    #    可见性口径的唯一真源是 `projection_target_resolution.TARGET_VISIBILITY_SQL`。
+    representation_id = await resolve_visible_current_representation_id(
+        session, entry_id=PILOT_ENTRY_ID
     )
     if representation_id is None:
         return ()
@@ -1785,6 +1872,9 @@ async def attach_pilot_adapters(
         return ()
 
     resolution = CanonicalResolutionService(
+        # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
         session, CanonicalArtifactRepository(_BACKEND_ROOT)
     )
     bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)

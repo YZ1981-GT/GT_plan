@@ -208,6 +208,8 @@ __all__ = [
     "HEADER_GROUP_ROW",
     "HEADER_LEAF_ROW",
     "LAST_DATA_ROW",
+    "TEMPLATE_PHYSICAL_LAST_ROW",
+    "TEMPLATE_TYPOGRAPHY_TAIL_ROWS",
     "MANAGED_FIELD_SPECS",
     "MANAGED_LAST_COL",
     "MANAGED_SHEET",
@@ -225,7 +227,7 @@ __all__ = [
     "TEMPLATE_ID",
     "TEMPLATE_RELATIVE_PATH",
     "TEMPLATE_SHA256",
-    "UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP",
+
     "UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY",
     "UUID_COL",
     "PilotDefinitions",
@@ -324,8 +326,39 @@ ROWS_TABLE_KEY: Final[str] = "receivable_detail_rows"
 
 #: 数据区与 footer（逐 sheet 读权威模板得来，见模块 docstring §三）。
 FIRST_DATA_ROW: Final[int] = 13
-LAST_DATA_ROW: Final[int] = 25
-FOOTER_ROW: Final[int] = 26
+
+#: 物理骨架行里属于**排版占位**的尾部行数（`A25` 的 `……`，1 行）。
+#:
+#: 🔴 BP-21：中文审计模板在数据区末尾放一行续行省略号，它是排版符号不是业务行
+#: （`A13..A24` 是字面量 1..12、`A25` 是 `……`、`A26` 是 `合计`）。把它算进受管行区间会让
+#: `materialize` 试图把 `……` 按业务字段类型写回。
+#:
+#: 这个数**不是**本模块自己判的：`excel_instrumentation` 在注入期调
+#: :func:`app.services.workpaper_sync.excel_typography_rows.assert_last_data_row_is_not_typography_placeholder`
+#: 现读模板字节，声明的 `last_data_row` 落在占位行上即 fail closed 并给出应声明的值。
+TEMPLATE_TYPOGRAPHY_TAIL_ROWS: Final[int] = 1
+
+#: **受管**行区间末行。BP-21 之前是 25（把 `A25` 的 `……` 算成了第 13 条业务行）。
+LAST_DATA_ROW: Final[int] = 24
+
+#: **物理**骨架末行（含尾部排版占位行）= 25。
+#:
+#: 🔴 它与 :data:`LAST_DATA_ROW`（24）是**两件事**，混用是 BP-21 落地时在 H1 上踩过的坑：
+#:
+#: * :data:`LAST_DATA_ROW` = 受管业务行区间末行 ⇒ Table ref、row UUID、projection、
+#:   `formula_mask`（受管的只读区）都按它算；
+#: * 本常量 = 模板**物理**结构的末行 ⇒ 模板自带的、覆盖整个骨架的事实按它算：
+#:   footer 的合计区间（`SUM(x13:x25)`，30 条逐格实测）、以及 `Q`/`S`/`AB` 三列**逐行**
+#:   公式（占位行 25 上也有）。
+#:
+#: 本常量只进守卫与文档，**不进** `build_contract_payload()` ⇒ 引入它不改契约 digest。
+TEMPLATE_PHYSICAL_LAST_ROW: Final[int] = LAST_DATA_ROW + TEMPLATE_TYPOGRAPHY_TAIL_ROWS
+
+#: footer 所在行（`A26 合计`）—— 紧跟**物理**骨架末行。
+#:
+#: 🔴 它与 :data:`LAST_DATA_ROW` 之间隔着那行排版占位 —— BP-21 之前二者相邻，那只是因为
+#: 占位行被误算成了业务行。footer 的物理位置（`A26`）没有变。
+FOOTER_ROW: Final[int] = TEMPLATE_PHYSICAL_LAST_ROW + 1
 
 #: 两级表头的两行：组标题在 11、账龄二级标题在 12。
 HEADER_GROUP_ROW: Final[int] = 11
@@ -360,6 +393,18 @@ FOOTER_MARKER: Final[str] = "合计"
 
 #: HTML store 里承载整张大表的那一条 item（`checklist_responses.item_id`）。
 STORE_ITEM_ID: Final[str] = "D2-detail-rows"
+
+#: 「审计师还没录任何一行」时的 store 载荷。
+#:
+#: 🔴 由 **provider 自己**声明，而不是让调用方拿一个通用常量喂所有 pilot。
+#:    起因（2026-09-05 实测）：宿主 `fix_projection_first_publication.py` 曾用单一
+#:    `_EMPTY_STORE_PAYLOAD = "[]"` 喂全部四个 pilot，而 G7 的载荷根形态是 **对象**
+#:    不是数组 ⇒ 它必然 `StorePayloadError`。「空载荷长什么样」是每个 pilot 的
+#:    store schema 决定的，只有 provider 自己知道，放在调用方就是猜。
+#:
+#: 本 pilot 的根形态是行数组，因此空行集就是 `[]`（实测 `build_store_projection`
+#: 对它产出 values=0）。
+EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 
 #: 载荷里每行自带的稳定行身份键（形如 `dr-mrgi0qg1-fwwmgum`）。
 ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
@@ -840,7 +885,26 @@ def _rows_table_payload() -> dict[str, Any]:
         "header_rows": 2,
         "row_identity": {"kind": "field", "json_pointer": f"/rows/*/{ROW_IDENTITY_STORE_KEY}"},
         "delete_policy": "tombstone",
-        "footer_anchor": {"marker": FOOTER_MARKER, "search_column": "A"},
+        # 🔴 `carries_total_formula: True` 是**如实描述模板事实**，不是放宽：
+        #    `E26..AH26` 共 30 格逐格实测为 `SUM(x13:x25)`（见模块 docstring §三）。
+        #    Spec: excel-structural-row-insertion-and-shift-aware-verification R5.1~5.4
+        #
+        #    不声明的后果（首版发布实测）：本 entry 的 store 有 729 个行身份而 substrate 只有
+        #    12 个物理业务行 ⇒ 必须插 717 行；此时
+        #    `assert_footer_formula_covers_managed_rows` 判「合计区间覆盖不到位移后的末行」
+        #    而引擎**无权**扩张它 ⇒ 结算 `blocked_total_formula_not_extendable`，
+        #    即照插会产出一张合计漏算数百行的审计底稿。声明为真才让引擎有权按**声明的**
+        #    位移量扩张该区间（Requirement 4.4）；未扩张仍 fail closed。
+        "footer_anchor": {
+            "marker": FOOTER_MARKER,
+            "search_column": "A",
+            "carries_total_formula": True,
+            "note": (
+                "footer 行 A26 承载 30 条合计公式（E26..AH26 = SUM(x13:x25)，逐格实测）。"
+                "区间末行 25 是 BP-21 的排版占位行，合计公式覆盖它属超集 ⇒ 对受管区末行 "
+                "24 仍然成立。声明为真使结构性插行有权按声明位移量扩张该区间"
+            ),
+        },
         "formula_mask": list(FORMULA_MASK),
         "fields": fields,
     }
@@ -1274,33 +1338,25 @@ UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY: Final[str] = (
 )
 
 
-#: 🔴 **登记的上游缺口 ③（本任务新发现）**：`value_type=boolean` 的 Excel 格在平台上
-#: **端到端不自洽**，每行都会产生一条 `type_normalization_failure` schema 冲突。
+#: ✅ **原「上游缺口 ③」已由 BP-22 修掉，登记随之删除**（2026-09-05）。
 #:
-#: 实测链条（三段各自可打红，见守卫 `TestBooleanCellIsAKnownUpstreamIncoherence`）：
+#: 原缺口：`value_type=boolean` 的 Excel 格端到端不自洽 —— `_write_kind_for` 把它归
+#: `CellWriteKind.number_literal` ⇒ 落盘 `<c r="AK13"><v>1</v></c>`（无 `t="b"`）⇒
+#: extract 用 openpyxl 读回 **int 1** ⇒ `merge.normalize_value(1, boolean)` 明令拒绝折叠
+#: ⇒ **每一行**该字段一条 `type_normalization_failure`。本 entry 的首版发布因此卡在
+#: `roundtrip_verified`（`ValueNormalizationError … 实得 0`）。
 #:
-#: 1. `excel_materialize._write_kind_for()` 把 `ValueType.boolean` 归到
-#:    `CellWriteKind.number_literal`，`_render_number(True)` 渲染成 ``1``
-#:    ⇒ 落盘形态是 ``<c r="AK13"><v>1</v></c>``（没有 `t="b"`）；
-#: 2. extract 用 openpyxl 读回得到 **int 1**；
-#: 3. `merge.normalize_value(1, ValueType.boolean)` 明令拒绝（「0/1 与 'True' 都不折叠」）
-#:    ⇒ 每一行的该字段都变成 `type_normalization_failure`。
+#: 修法取当时登记的第一条：`excel_materialize` 新增 `CellWriteKind.boolean_literal`，
+#: 落 OOXML **真布尔格** `t="b"` + `<v>1|0</v>`，`None` 落空格（不是 `<v>0</v>` ——
+#: 后者把「未填」变成「填了 false」，对「是否函证」是实质性语义错误）。
 #:
-#: 本 pilot **不**为绕开它而改 value_type：`is_confirmation` 的类型真源是前端
-#: `useD2Detail.DetailRow.isConfirmation: boolean`，改成 `text`/`enum` 就得在拆分里
-#: 自造一个 bool→"是/否" 映射（无来源自造字段，Requirement 6.1 明令禁止）。
-#: 正确修法在 engine 侧二选一：`_write_kind_for` 对 boolean 走 `t="b"` 布尔格，
-#: 或 `normalize_value` 对 boolean 折叠 0/1。owner 建议归 Task 37/38 后续。
-UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP: Final[str] = (
-    "Task 41 欠账：`value_type=boolean` 的 Excel 受管格端到端不自洽 —— materialize 按 "
-    "number_literal 写 `<v>1</v>`（无 t=\"b\"），extract 读回 int 1，而 "
-    "`merge.normalize_value` 对 boolean 拒绝 0/1 折叠 ⇒ 每行一条 "
-    "type_normalization_failure schema 冲突。本 entry 唯一的 boolean 列是 "
-    "`is_confirmation`（AK 是否函证），类型真源是前端 DetailRow.isConfirmation，"
-    "不得为绕开缺口自造 bool→文本映射。修法二选一：`excel_materialize._write_kind_for` "
-    "对 boolean 写真布尔格，或 `merge.normalize_value` 对 boolean 折叠 0/1。"
-    "owner 建议归 engine 侧（Task 37/38 后续）"
-)
+#: **没有**取第二条（让 `normalize_value` 折叠 0/1）：那条拒绝是对的，折叠会让
+#: 「整数 1 被当成 true」这类真实类型错误静默通过。也**没有**改 `value_type`：
+#: `is_confirmation` 的类型真源是前端 `useD2Detail.DetailRow.isConfirmation: boolean`，
+#: 改成 `text`/`enum` 就得自造 bool→「是/否」映射（Requirement 6.1 禁止无来源自造字段）。
+#:
+#: 现由守卫 `TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell` 钉住修复后的形态，
+#: 其中一条用 `hasattr` 断言本常量**已真删**（字符串判据会被本段说明满足）。
 
 
 async def resolve_published_frozen_definitions(
@@ -1342,7 +1398,10 @@ async def resolve_published_frozen_definitions(
     observation = await observe_published_frozen_definitions(
         session=session,
         resolution=CanonicalResolutionService(
-            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+            # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
+        session, CanonicalArtifactRepository(_BACKEND_ROOT)
         ),
         representation=representation,
         correlation_id=f"{PILOT_ADAPTER_ID}@{getattr(representation, 'id', None)}",
@@ -1399,23 +1458,23 @@ async def attach_pilot_adapters(
 
     from app.models.workpaper_sync_models import (
         WorkpaperContentRepresentation,
-        WorkpaperSyncEntryState,
+    )
+    from app.services.workpaper_sync.projection_target_resolution import (
+        resolve_visible_current_representation_id,
     )
     from app.services.workpaper_sync import entry_source_facts as facts
     from app.services.workpaper_sync.adapters.excel import build_excel_adapter
     from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
     from app.services.workpaper_sync.resolution import CanonicalResolutionService
 
-    representation_id = (
-        (
-            await session.execute(
-                sa.select(WorkpaperSyncEntryState.current_representation_id).where(
-                    WorkpaperSyncEntryState.entry_id == PILOT_ENTRY_ID
-                )
-            )
-        )
-        .scalars()
-        .first()
+    # 🔴 BP-27：按 entry 取 current representation 必须**同时**满足「底稿可见」与
+    #    「多实例下确定」。`entry_state` 主键是 `(wp_id, entry_id)` ⇒ 同一 entry 在多个
+    #    底稿实例上有状态是合法设计；此前四个 pilot 各写一份只按 entry_id 过滤、无
+    #    ORDER BY、不看项目软删除的 `.first()`，H1 实测同时命中两行（一条在活项目
+    #    `c71b7c54`、一条在已删项目 `f663b18c`）⇒ adapter 可能绑到前端 404 的那份。
+    #    可见性口径的唯一真源是 `projection_target_resolution.TARGET_VISIBILITY_SQL`。
+    representation_id = await resolve_visible_current_representation_id(
+        session, entry_id=PILOT_ENTRY_ID
     )
     if representation_id is None:
         return ()
@@ -1430,6 +1489,9 @@ async def attach_pilot_adapters(
         return ()
 
     resolution = CanonicalResolutionService(
+        # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
         session, CanonicalArtifactRepository(_BACKEND_ROOT)
     )
     bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)

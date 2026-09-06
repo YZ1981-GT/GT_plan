@@ -45,6 +45,7 @@ backend/app/services/doc_ai_context_builder.py  898
 #   _test_x3_keyfamily_property_criteria.py —— 声明式 property 判据测试（keyfamily 维度），
 #     每组 property 含 source 期望值 + 结构校验 + 反空转，拆分会让单组的三段分离。
 #     spec: x3-adjustment-entry-import-export
+backend/scripts/fix/fix_projection_first_publication.py  968
 backend/tests/_test_x3_keyfamily_property_criteria.py  808
 
 #   custom_query.py —— **改动前即 2621 行已远超上限**（单文件承担 router + 14 个
@@ -227,6 +228,7 @@ backend/tests/test_wp_html_save.py  808
 backend/tests/test_wp_onlyoffice_router.py  2198
 backend/tests/workpaper_sync/test_downstream_base_reliability_gate.py  1112
 backend/tests/workpaper_sync/test_migration_paradigm_contract.py  2217
+backend/tests/workpaper_sync/test_projection_first_publication_pg.py  2666
 backend/tests/workpaper_sync/test_task10_orm_repository_contract.py  866
 backend/tests/workpaper_sync/test_task10_repository_pg.py  2470
 backend/tests/workpaper_sync/test_task11_artifact_repository.py  1263
@@ -320,5 +322,13 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/task69Independen
 #     baseline 即当前真实行数，不留膨胀空间；两个文件都确需按 Tab / 区块拆分，
 #     属独立打磨任务，不在本次悬空引用修复范围。
 #     spec: frontend-dangling-reference-gate（本轮）
+#   fix_projection_first_publication.py —— projection lane 首版发布的**唯一**宿主：
+#     十阶段全链（plan → instrument → ooxml gate → adapter → projection → materialize
+#     → roundtrip → unmanaged regions → commit）+ 11 格封闭结算词表 + 每格解除方。
+#     拆分会让「阶段顺序」与「结算词表」跨文件，而顺序本身就是判据（Task 6.1 实测过
+#     少一段就变假绿）。spec: published-representation-production-path 任务 6.1
+#   test_projection_first_publication_pg.py —— 上者的真库判据（独立 schema + 一次
+#     asyncio.run 采集全阶段快照）。判据与它们共享的 `snap` fixture 必须同文件，
+#     否则每个测试各自 async 会污染共享连接池。spec: 同上 任务 F8
 audit-platform/frontend/src/components/workpaper/confirmation/GtConfirmationSummary.vue  1955
 audit-platform/frontend/src/views/TrialBalance.vue  4491

@@ -652,6 +652,25 @@ STORE_ITEM_ID: Final[str] = "G7-main-disclosure-soe-v2"
 #: store `remark` 的 schema 版本（`applySavedState` 里 `if (saved.version !== 2) return`）。
 STORE_STATE_VERSION: Final[int] = 2
 
+#: 🔴 本 pilot **没有**「空载荷」这个合法状态 —— 故意为 `None`，不是漏填。
+#:
+#: 与 H1 / D2 的区别是结构性的，不是程度问题：它们的载荷根形态是**行数组**，
+#: 零行是一个完整可用的状态（`build_store_projection` 产出 values=0 的 Projection）。
+#: 本 pilot 的动态列数量由 `entitySlots[RENDER_SLOT]` 的**实测实体列表**决定，而
+#: :func:`iter_store_entities` 对空列表**故意抛错**（「审计师删到 0 家」必须显式失败，
+#: 不得被静默补成模板默认的 5 列 —— 那是写死列数的另一种形态）。
+#:
+#: 因此不存在「既是空的、又能产出合法 projection」的载荷。2026-09-05 逐个实测四种
+#: 候选形态，全部被拒且各有正当理由：
+#:   * `"[]"`                          → 载荷必须是对象（根形态就不对）
+#:   * `"{}"`                          → state version=None（本 pilot 冻结的是 2）
+#:   * `{"version": 2}`                → entitySlots 缺失
+#:   * `{"version": 2, "entitySlots": {}, "tables": {}}` → 实体列表为空
+#:
+#: 调用方（如首版发布宿主）读到 `None` 时应结算为「该 entry 的 store 尚无可发布内容」
+#: 这一**独立**结论，而不是找一个形状去凑 —— 凑出来的载荷会去对抗上面那条判据。
+EMPTY_STORE_PAYLOAD: Final[str | None] = None
+
 #: manifest 生成器抽 wp_code 的那条正则（`generate_workpaper_sync_manifest._source_match`）。
 #: 复现它是「`G7L` 是名字提取产物」这一判据的核心 —— 不是断言常量等于常量。
 WP_CODE_EXTRACTION_PATTERN: Final[str] = r"[A-Z][0-9]+(?:-[0-9]+)*(?:[A-Z])?"
@@ -2283,7 +2302,10 @@ async def resolve_published_frozen_definitions(
     observation = await observe_published_frozen_definitions(
         session=session,
         resolution=CanonicalResolutionService(
-            session, CanonicalArtifactRepository(_BACKEND_ROOT)
+            # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
+        session, CanonicalArtifactRepository(_BACKEND_ROOT)
         ),
         representation=representation,
         correlation_id=f"{PILOT_ADAPTER_ID}@{getattr(representation, 'id', None)}",
@@ -2336,23 +2358,23 @@ async def attach_pilot_adapters(
 
     from app.models.workpaper_sync_models import (
         WorkpaperContentRepresentation,
-        WorkpaperSyncEntryState,
+    )
+    from app.services.workpaper_sync.projection_target_resolution import (
+        resolve_visible_current_representation_id,
     )
     from app.services.workpaper_sync import entry_source_facts as facts
     from app.services.workpaper_sync.adapters.excel import build_excel_adapter
     from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
     from app.services.workpaper_sync.resolution import CanonicalResolutionService
 
-    representation_id = (
-        (
-            await session.execute(
-                sa.select(WorkpaperSyncEntryState.current_representation_id).where(
-                    WorkpaperSyncEntryState.entry_id == PILOT_ENTRY_ID
-                )
-            )
-        )
-        .scalars()
-        .first()
+    # 🔴 BP-27：按 entry 取 current representation 必须**同时**满足「底稿可见」与
+    #    「多实例下确定」。`entry_state` 主键是 `(wp_id, entry_id)` ⇒ 同一 entry 在多个
+    #    底稿实例上有状态是合法设计；此前四个 pilot 各写一份只按 entry_id 过滤、无
+    #    ORDER BY、不看项目软删除的 `.first()`，H1 实测同时命中两行（一条在活项目
+    #    `c71b7c54`、一条在已删项目 `f663b18c`）⇒ adapter 可能绑到前端 404 的那份。
+    #    可见性口径的唯一真源是 `projection_target_resolution.TARGET_VISIBILITY_SQL`。
+    representation_id = await resolve_visible_current_representation_id(
+        session, entry_id=PILOT_ENTRY_ID
     )
     if representation_id is None:
         return ()
@@ -2367,6 +2389,9 @@ async def attach_pilot_adapters(
         return ()
 
     resolution = CanonicalResolutionService(
+        # 🔴 BP-29：根是 `_BACKEND_ROOT`（= `backend/`）而非 `storage_root()`
+        #    —— `relative_path` 自带 `storage/` 前缀，用后者拼出双层路径，读写
+        #    错层则 adapter 组装必抛。实测分布 142 : 4，详见分工书 §17.3。
         session, CanonicalArtifactRepository(_BACKEND_ROOT)
     )
     bundle = await resolution.load_bundle_snapshot(representation.definition_bundle_id)
