@@ -312,6 +312,23 @@ export const templateLibraryMgmt = {
   seedAll: '/api/template-library-mgmt/seed-all',
   versionInfo: '/api/template-library-mgmt/version-info',
   formulaAcnrMigration: '/api/template-library-mgmt/formula-acnr-migration',
+
+  // ─── 模板覆盖层（spec excel-template-override-layer-and-onlyoffice-template-editor）──
+  // 权威目录 backend/wp_templates/ 运行时只读；编辑产物落覆盖层并版本化。
+  // 挂在 templateLibraryMgmt 下而不是新开一个导出对象 —— 后者要同步改 apiPaths/index.ts
+  // 的三处 re-export 列表，那是三个并发会话都在改的文件。
+  overrideResolution: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/resolution`,
+  overrideVersions: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/versions`,
+  overrideEditSession: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/edit-session`,
+  overrideUpload: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/upload`,
+  overridePromote: (wpCode: string, versionId: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/versions/${versionId}/promote`,
+  overrideDeleteCurrent: (wpCode: string) =>
+    `/api/wp-template-overrides/${encodeURIComponent(wpCode)}/current`,
 } as const
 
 // ─── 自定义模板 ─────────────────────────────────────────────────────────────

@@ -27526,7 +27526,7 @@
    "path": "backend/data/workpaper_sync_task66_legacy_deletion_plan.json",
    "plan_commit": "d330d7cea6bb112709edce5bf287877df0a5f60c",
    "readonly": true,
-   "sha256": "b22a2232e387e28afdfff087084020fdd56d945eeb5e0785d65b1328cfe9fe47"
+   "sha256": "943ea32b7b990e35b8c5785b9f39cc46fecd336c420798203c6978c7f5aa53f7"
   }
  },
  "paradigm_schema_version": "migration-paradigm:v1",
@@ -27641,7 +27641,7 @@
   "SELECT s.id::text AS id, r.entry_id AS entry_id, s.scenario_id, s.scenario_kind, s.result FROM working_paper_entry_evidence_scenario s JOIN working_paper_sync_test_run r ON r.id = s.run_id"
  ],
  "report_commit": "c882f831c9eb39c2b53c5dab00b0558015bebe24",
- "report_digest": "bcfb1db2325462b23e9088ed284d6a4455f8935548c6994cc6fe8e3b00146e2f",
+ "report_digest": "9b0a2ac447b18458dbe7bde09f0015e0dd044d6622d531244970b1df8e2291d7",
  "reported_counter_kinds": [
   "unadjudicated",
   "fake_bidirectional",

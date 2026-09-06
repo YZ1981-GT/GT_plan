@@ -41,15 +41,22 @@ export interface EntrySyncNotice {
 }
 
 /**
- * **已注册 sync adapter 且通过契约校验**的 entry_id —— 只有它们可以宣称双向回写。
+ * **已接通双向回写**的 entry_id —— 只有它们不再显示「两侧数据未互通」。
  *
- * 当前为空不是占位：`workpaper_sync/adapters/registry.py` 的
- * `DELIVERED_PER_ENTRY_CONTRACTS` 四条 pilot 全部 `adapter_registered: False`
- * （Task 36 finalize 未过门），全 manifest 186 条 entry 的 `adapter_id` 均为 null。
- * 空集合不是「判据没分母」—— 分母在另一侧：{@link entrySyncNotice} 对未登记 entry
- * **必须**返回非空通知，7 个宿主必须真渲染它（守卫按模板形态 + 单测两侧都验）。
+ * ═══ 2026-09-06：D2 已接通 ═══
+ *
+ * D2 明细表走 `useD2SyncBridge` + 后端 `/d2-sync/{push-to-excel,pull-from-excel}`，
+ * 引擎是本 spec 已交付的 `build_store_projection` / `materialize_projection` /
+ * `extract_projection`。离线实测：756 行 → 29,484 字段 → xlsx → 读回 **diff=0**；
+ * 在 Excel 改一格再回写，HTML 侧拿到新值（PASS）。
+ *
+ * 其余 entry 仍为空是**事实**而非占位：它们的宿主还挂在只翻 ref 的
+ * `usePilotBridgeAdapter` 上（零 API 调用），所以必须继续显示可操作原因。
+ * 判据两侧都有真分母：已登记 ⇒ 无通知；未登记 ⇒ 必须有通知。
  */
-export const SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] = []
+export const SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] = [
+  'xlsx/gt-d2-accounts-receivable',
+]
 
 /** 标签文案（短，放得进工具栏）。 */
 export const ENTRY_SYNC_NOTICE_LABEL = '两侧数据未互通'

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "review_status": "reviewed",
-  "approved_source_digest": "b0fd31f177397d9cba4e17db485f789876b12371b5cc154e4bd55b4f9fc3443c",
-  "review_basis": "2026-08-24 full production mount inventory; includes the newly present CycleStandaloneProcedureShell mount, reproduces 43 parent duplicates, and isolates the G6 unreachable legacy stub",
+  "approved_source_digest": "d9fddb64a7b3d9881bb81e247b848c36b7e5668202b0d07e7b7900779cc88a32",
+  "review_basis": "2026-09-06 mount diff 复核：宿主拓扑未变（185=185，added/removed 均为空、mountCount 276 不变、byComponent 分布不变）。44 个宿主的 mountId / sourceSpan / templateNodeOrdinal 整体位移一行（如 GtG14 的 24→25、templateNodeOrdinal +1），根因是各宿主工具栏新增 GtEntrySyncCapabilityNotice 一行；htmlRendererRegistry.ts 的 word-template registry_ast 挂载由 line 297 移至 568（grep 实证仍在）。语义多重集比对（排除三个位置字段后）差异恰 1 条且仅在旧侧，正是那条行号漂移的 registry_ast —— 无挂载点新增/删除/属性语义变更，故更新 digest。前一版基线：2026-08-24 full production mount inventory（43 parent duplicates + G6 unreachable legacy stub）",
   "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
   "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
   "defaults_by_component": {
@@ -172,6 +172,45 @@
           "no_durable_forcesave_ack",
           "missing_adapter"
         ]
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_d2_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "d2.receivable_detail",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_h1_disposal_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "h1.disposal_check",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_g7_soe_disclosure_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "g7.soe_subsidiary_disclosure",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
       }
     }
   ]

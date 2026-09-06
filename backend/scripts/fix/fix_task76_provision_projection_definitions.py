@@ -56,11 +56,22 @@ _BACKEND = Path(__file__).resolve().parents[2]
 if str(_BACKEND) not in sys.path:  # pragma: no cover - import 自举
     sys.path.insert(0, str(_BACKEND))
 
+from app.services.workpaper_sync import (  # noqa: E402
+    projection_target_resolution as _TARGET_RESOLUTION,
+)
+
 #: `--check` 的三种结算（封闭词表；自由文本会让守卫只能比字符串）。
 CHECK_STAGE_STATES: tuple[str, ...] = ("reused", "would_create")
 
-#: `--check` / `--apply` 共用的目标选取排序（确定性：重跑必选同一条底稿）。
-TARGET_ORDER_SQL: str = "wi.wp_code, wp.created_at, wp.id"
+#: `--check` / `--apply` 共用的目标选取排序 —— 真源在生产模块，本宿主只**转引**。
+#:
+#: 🔴 BP-24（2026-09-05 实测）：这里原来是 `"wi.wp_code, wp.created_at, wp.id"`，比首版宿主
+#:    少了 `has_store_payload DESC` 那一项。两份全序读同一张裁决表却选出不同底稿：D2 的首版
+#:    发布落在 `ef7f88e3`（store 866,972 B），本脚本解析到 `1e171c06`（store 空）⇒ `--check`
+#:    对**已发布**的 D2 报 `settlement=blocked` / `current_representation_id=null`；B60 同样
+#:    分歧。若 `--apply` 照旧执行，candidate/representation 会建在另一条底稿上 ——「四表有
+#:    真实行」与「首版已发布」各自成立却指向不同 wp，是假绿。理由与实证见生产模块顶部。
+TARGET_ORDER_SQL: str = _TARGET_RESOLUTION.TARGET_ORDER_SQL
 
 
 class ProvisionScriptError(RuntimeError):
@@ -81,6 +92,9 @@ class ProvisionTarget:
     project_id: uuid.UUID | None = None
     wp_id: uuid.UUID | None = None
     wp_code: str | None = None
+    #: 选中底稿的 HTML 侧 store 载荷字节数。它是 :data:`TARGET_ORDER_SQL` 的**第一决定项**，
+    #: 报告里带上它，「为什么选这条」才是可复算的而不是要读者自己去猜排序。
+    store_bytes: int = 0
     unresolved_reason: str | None = None
 
     @property
@@ -96,33 +110,22 @@ class ProvisionTarget:
             "project_id": None if self.project_id is None else str(self.project_id),
             "wp_id": None if self.wp_id is None else str(self.wp_id),
             "wp_code": self.wp_code,
+            "store_bytes": self.store_bytes,
             "resolved": self.resolved,
             "unresolved_reason": self.unresolved_reason,
         }
 
 
 #: wp_code 裁决表（真源见文件自身的 `why` / `basis_rule`）。
-WP_CODE_ADJUDICATION = _BACKEND / "data" / "workpaper_sync_entry_wp_code_adjudication.json"
+WP_CODE_ADJUDICATION = _TARGET_RESOLUTION.WP_CODE_ADJUDICATION
 
 
 def load_wp_code_adjudication() -> dict[str, dict[str, Any]]:
-    """读 entry → wp_code 的**显式裁决**，返回 `{entry_id: 条目}`。
-
-    缺文件即抛（fail closed）：宿主解析没有裁决表就只能回落到会产幻影码的启发式，
-    而那正是本文件要消除的东西。
-    """
-    if not WP_CODE_ADJUDICATION.is_file():
-        raise SystemExit(
-            f"[FAIL] 缺 wp_code 裁决表 {WP_CODE_ADJUDICATION} —— 宿主解析不得回落到 "
-            "manifest 的 `wp_code_patterns` 启发式（实测产 D2A / G7L / H1F 三个幻影码）"
-        )
-    doc = json.loads(WP_CODE_ADJUDICATION.read_text(encoding="utf-8"))
-    out: dict[str, dict[str, Any]] = {}
-    for row in doc.get("adjudications") or []:
-        entry_id = str(row.get("entry_id") or "").strip()
-        if entry_id:
-            out[entry_id] = row
-    return out
+    """转引生产侧的裁决表读取（BP-24：本宿主不再自留第二份实现）。"""
+    try:
+        return _TARGET_RESOLUTION.load_wp_code_adjudication()
+    except _TARGET_RESOLUTION.ProjectionTargetResolutionError as exc:
+        raise SystemExit(f"[FAIL] {exc}") from exc
 
 
 async def resolve_targets(
@@ -164,10 +167,30 @@ async def resolve_targets(
             )
             targets.append(target)
             continue
-        if not verdict.get("resolvable_today", True):
+        # 🔴 2026-09-04：判据从 `resolvable_today` 换成 `resolvable_for_provisioning`。
+        #
+        # 旧字段把两件互不相干的事混在一个布尔里：①能不能为该 entry 定位到宿主底稿
+        # （provisioning 要的）②该 wp_code 能不能当 EntryMatcher 的域（RG-3 要的）。
+        # G7 的 ② 为假（三个 entry 真码同为 G7 ⇒ MatcherOverlapError），于是 ① 也被一并
+        # 关掉，Task 76 对 G7 完全不 provision，G7 的首版发布因此恒落
+        # `blocked_missing_approved_bundle`。而裁决文件自己的 `basis.blocked_note` 明写
+        # 「本条裁决只供 provisioning 定位宿主，**不得**直接当 EntryMatcher 的域」——
+        # 文件既声明两种用途要分开，又用同一个开关把两者一起关掉，是自相矛盾。
+        #
+        # 缺键即抛（**不** `get(..., True)` 默认放行）：默认 True 会让「裁决表漏填」被
+        # 静默当成「已裁决可解析」，那是 fail-open。
+        if "resolvable_for_provisioning" not in verdict:
+            raise ProvisionScriptError(
+                f"entry {entry_id} 的裁决条目缺 `resolvable_for_provisioning` —— "
+                "该键是 provisioning 的准入判据，缺键不得默认放行"
+                "（旧键 `resolvable_today` 已废弃：它把宿主定位与 matcher 域两件事"
+                "混在一个布尔里，见裁决文件的 superseded_verdict_note）"
+            )
+        if not verdict["resolvable_for_provisioning"]:
             target.unresolved_reason = (
-                f"entry {entry_id} 的 wp_code 裁决为 {list(wp_codes)}，但登记为今日不可解析："
-                f"{verdict.get('blocking_reason') or '（未写明原因）'}"
+                f"entry {entry_id} 的 wp_code 裁决为 {list(wp_codes)}，但登记为"
+                f"不可用于 provisioning 定位宿主："
+                f"{verdict.get('not_provisionable_reason') or '（未写明原因）'}"
             )
             targets.append(target)
             continue
@@ -177,19 +200,15 @@ async def resolve_targets(
             )
             targets.append(target)
             continue
-        clauses: list[Any] = [sa.text("wp.is_deleted = false")]
-        params: dict[str, Any] = {"codes": list(wp_codes)}
-        if project_filter is not None:
-            clauses.append(sa.text("wp.project_id = :pid"))
-            params["pid"] = str(project_filter)
-        sql = sa.text(
-            "SELECT wp.id AS wp_id, wp.project_id AS project_id, wi.wp_code AS wp_code "
-            "FROM working_paper wp JOIN wp_index wi ON wi.id = wp.wp_index_id "
-            "WHERE wi.wp_code = ANY(:codes) AND wp.is_deleted = false "
-            + ("AND wp.project_id = :pid " if project_filter is not None else "")
-            + f"ORDER BY {TARGET_ORDER_SQL} LIMIT 1"
+        # 🔴 BP-24：目标解析走生产侧单一真源（含 `has_store_payload DESC` 那一项）。
+        #    `store_item_id` 从 provider 现取 —— 它决定全序的第一项，写死空串会让本脚本
+        #    重新退回「选到 store 为空的那条底稿」，也就是 BP-24 本身。
+        hit = await _TARGET_RESOLUTION.resolve_projection_target(
+            session,
+            wp_codes=wp_codes,
+            store_item_id=str(getattr(supply.provider, "STORE_ITEM_ID", "") or ""),
+            project_id=project_filter,
         )
-        hit = (await session.execute(sql, params)).mappings().first()
         if hit is None:
             target.unresolved_reason = (
                 f"库里没有 wp_code ∈ {list(wp_codes)} 的未删除底稿"
@@ -199,9 +218,10 @@ async def resolve_targets(
             )
             targets.append(target)
             continue
-        target.project_id = uuid.UUID(str(hit["project_id"]))
-        target.wp_id = uuid.UUID(str(hit["wp_id"]))
-        target.wp_code = str(hit["wp_code"])
+        target.project_id = uuid.UUID(str(hit.project_id))
+        target.wp_id = uuid.UUID(str(hit.wp_id))
+        target.wp_code = str(hit.wp_code)
+        target.store_bytes = int(hit.store_bytes or 0)
         targets.append(target)
     return targets
 
@@ -359,7 +379,15 @@ class DryRunPublisher:
 async def preview_representation_settlement(
     session: Any, *, wp_id: uuid.UUID, entry_id: str, bundle_id: uuid.UUID | None
 ) -> dict[str, Any]:
-    """只读预判 representation 阶段结算（与 provisioner 的分支同序）。"""
+    """只读预判 representation 阶段结算（与 provisioner 的分支**同序且同数量**）。
+
+    🔴 2026-09-05 修：本函数曾**漏掉** `_settle_representation_stage` 的第二条分支
+    （`_candidate_bound_to` → `reused_candidate`），于是「已 attach 完、candidate 处于
+    `ready` 且已绑本次 bundle」这个状态被预判成 `blocked`，而 `--apply` 实跑会给
+    `reused_candidate`。H1 实测复现：attach 成功后 `--check` 仍报
+    `settlement=blocked` —— 预演与真跑对同一库状态给出不同结论，正是「预演选 A 真发选
+    B 而报告读起来完全正常」那类缺陷。分支必须与生产那份逐条对应。
+    """
     from app.models.workpaper_sync_models import (
         WorkpaperContentRepresentation,
         WorkpaperRepresentationUpgradeCandidate,
@@ -406,8 +434,33 @@ async def preview_representation_settlement(
             )
         ).scalar_one()
     )
+    # 与生产第二条分支同源：已绑本次 bundle 且**未 finalize** 的 candidate。
+    # 判据取 `target_definition_bundle_id == bundle_id`（而不是 `state == 'ready'`）——
+    # 生产那边就是这么找的，用状态当代理会把「ready 但绑的是别的 bundle」误判成复用。
+    bound_candidate: Any = None
+    if bundle_id is not None:
+        bound_candidate = (
+            (
+                await session.execute(
+                    sa.select(
+                        WorkpaperRepresentationUpgradeCandidate.id,
+                        WorkpaperRepresentationUpgradeCandidate.state,
+                    ).where(
+                        WorkpaperRepresentationUpgradeCandidate.wp_id == wp_id,
+                        WorkpaperRepresentationUpgradeCandidate.entry_id == entry_id,
+                        WorkpaperRepresentationUpgradeCandidate.target_definition_bundle_id
+                        == bundle_id,
+                        WorkpaperRepresentationUpgradeCandidate.finalized_representation_id
+                        .is_(None),
+                    )
+                )
+            )
+            .first()
+        )
     if bundle_id is not None and current_bundle is not None and current_bundle == bundle_id:
         settlement = "reused_current"
+    elif bound_candidate is not None:
+        settlement = "reused_candidate"
     elif int(pending or 0) > 0:
         settlement = "attached_candidate"
     else:
@@ -417,6 +470,12 @@ async def preview_representation_settlement(
         "current_representation_id": None if pointer is None else str(pointer),
         "current_definition_bundle_id": None if current_bundle is None else str(current_bundle),
         "candidates_awaiting_contract": int(pending or 0),
+        "candidate_bound_to_target_bundle": (
+            None if bound_candidate is None else str(bound_candidate[0])
+        ),
+        "candidate_bound_state": (
+            None if bound_candidate is None else str(bound_candidate[1])
+        ),
     }
 
 

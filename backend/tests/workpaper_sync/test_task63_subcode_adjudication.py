@@ -555,7 +555,180 @@ class TestAdjudicationRecord:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# 5. 守卫自检（反向：判据本身必须是可失效的）
+# 5. 驻留重验（2026-09-04）：三条 BP 的 `measured` 判据必须与源码/manifest 现算相等
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 为什么要有这一组：`measured` 块是本轮新加的**判据载体**。若没有消费方，它就是
+# additive 死代码（假绿第①源）—— 下一轮接手的人读到 `b_subcodes_with_own_entry_count: 0`
+# 会以为那是刚算的，实际可能是几个月前烧进去的常量。这里逐条**重算一遍**再比对，
+# 期望值全部来自真源（manifest / registry.py / word_sdt_engine.py），记录是被校验的一侧。
+
+
+class TestResidencyReverification:
+    def test_verdicts_cover_every_blocking_precondition_that_blocks_this_lane(
+        self, record: dict
+    ):
+        """重验结论必须逐条覆盖 entry 真正挂着的阻塞项，不能只登记好看的几条。
+
+        分母**由 entry 的 blocked_by 现算**，不是写死 4 条 —— 否则将来 entry 多挂一条
+        阻塞而重验漏了它，本测试仍绿。
+        """
+        rv = record["residency_reverification"]
+        blocked_ids = {
+            bid
+            for e in record["entries"]
+            for bid in e["blocked_by"]
+            if bid.startswith("BP-")
+        }
+        assert blocked_ids, "没有任何 entry 挂 BP-* ⇒ 分母为空，本测试是重言式"
+        assert blocked_ids <= set(rv["verdicts"]), (
+            f"entry 挂着 {sorted(blocked_ids - set(rv['verdicts']))} 但重验没给判定 —— "
+            "驻留任务每轮必须逐条重验，漏一条就等于复述旧结论"
+        )
+        assert set(rv["verdicts"].values()) == {"still_open"}, (
+            f"重验判定出现非 still_open: {rv['verdicts']} —— "
+            "任一阻塞解除时必须同步改 status 与 entry 的 verification_state，"
+            "不能只改这里的一行字"
+        )
+        assert rv["not_advanced_because"].strip()
+
+    def test_bp16_manifest_criterion_is_recomputed_from_the_manifest(self, record: dict):
+        """BP-16：9 个 B 子码有没有自己的 manifest entry —— 重算，不信记录里的数。"""
+        manifest_path = ROOT / "backend" / "data" / "workpaper_sync_entry_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        entries = manifest["entries"]
+
+        def patterns_of(entry: dict) -> list[str]:
+            return list((entry.get("wp_match") or {}).get("wp_code_patterns") or [])
+
+        codes = [e["wp_code"] for e in record["entries"] if e["has_usable_docx_carrier"]]
+        assert len(codes) == 9
+        hits = sorted(c for c in codes if any(c in patterns_of(e) for e in entries))
+
+        bp16 = next(b for b in record["blocking_preconditions"] if b["id"] == "BP-16")
+        m = bp16["measured"]
+        assert m["b_subcodes_with_own_entry"] == hits
+        assert m["b_subcodes_with_own_entry_count"] == len(hits)
+        assert m["b_subcode_count"] == len(codes)
+        assert m["manifest_entry_total"] == len(entries)
+        # 泛匹配 entry 必须真的存在 —— 它是「这 9 个 wp_code 今天归谁」的唯一答案
+        catch_all = {e["entry_id"] for e in entries if not patterns_of(e)}
+        assert m["covering_catch_all_entry"] in catch_all
+        assert m["covering_catch_all_entry_present"] is True
+        # BP-16 仍 open 的充要条件
+        assert m["b_subcodes_with_own_entry_count"] == 0, (
+            "已有 B 子码获得 per-entry manifest entry ⇒ BP-16 需改判，"
+            "同时必须重新评估「契约登记行 entry_id 命中 manifest」这条判据"
+        )
+
+    def test_bp18_forbiddance_names_the_real_target_not_just_a_nonempty_list(
+        self, record: dict
+    ):
+        """BP-18：禁令必须**逐字包含**真实目标路径（Task 64 M13 的教训）。"""
+        registry = (
+            ROOT / "backend" / "app" / "services" / "workpaper_sync" / "adapters" / "registry.py"
+        ).read_text(encoding="utf-8")
+        block = re.search(
+            r"PENDING_ENGINE_ADAPTERS\s*:[^=]*=\s*\((.*?)\n\)\n", registry, re.DOTALL
+        )
+        assert block, "registry.py 里已找不到 PENDING_ENGINE_ADAPTERS 定义块"
+        forbidden = re.findall(
+            r'"(app/services/workpaper_sync/adapters/[^"]*)"', block.group(1)
+        )
+        target = "app/services/workpaper_sync/adapters/word.py"
+
+        bp18 = next(b for b in record["blocking_preconditions"] if b["id"] == "BP-18")
+        m = bp18["measured"]
+        assert m["forbidden_paths"] == sorted(forbidden)
+        assert m["real_target_is_listed"] is True
+        assert target in forbidden, (
+            "禁令清单不再逐字包含 adapters/word.py —— 改名即可让 Word adapter 落地，"
+            "Task 61 的门被挪开了"
+        )
+        for rel in forbidden:
+            assert not (ROOT / "backend" / rel).exists(), (
+                f"{rel} 已存在 ⇒ Word engine adapter 在 Task 61 通过前落地了"
+            )
+        assert m["forbidden_paths_all_absent"] is True
+
+    def test_bp17_publish_gate_symbol_is_where_the_source_refs_say_it_is(
+        self, record: dict
+    ):
+        """BP-17：`assert_may_publish` 的定义处必须真在 source_refs 里列出的文件中。
+
+        首版 BP-17 的 source_refs 只有 `word_instrumentation.py` / `word_entry_gate.py`，
+        而那个「恒抛」的方法定义在 `word_sdt_engine.py` —— 读者按 refs 去找会找不到。
+        本条把「refs 指到定义处」变成机器判据。
+        """
+        bp17 = next(b for b in record["blocking_preconditions"] if b["id"] == "BP-17")
+        m = bp17["measured"]
+        rel = m["assert_may_publish_defined_in"]
+        assert rel, "BP-17 未记录 assert_may_publish 的定义处"
+        assert f"backend/{rel}" in bp17["source_refs"], (
+            f"BP-17 的 source_refs 未包含定义 assert_may_publish 的 backend/{rel}"
+        )
+        src = (ROOT / "backend" / rel).read_text(encoding="utf-8")
+        assert "def assert_may_publish" in src, (
+            f"backend/{rel} 里已无 assert_may_publish 定义 —— BP-17 的措辞已随上游改名失准"
+        )
+        # 守卫条件仍在：缺 bundle 必抛，而不是「记录里写着会抛」
+        body = re.search(
+            r"\n    def assert_may_publish\(self\) -> None:(.*?)(?=\n    @|\n    def )",
+            src,
+            re.DOTALL,
+        )
+        assert body, "取不到 assert_may_publish 的函数体"
+        assert "self.bundle is None" in body.group(1)
+        assert "raise WordApprovedBundleRequiredError" in body.group(1)
+        assert m["assert_may_publish_raises_without_bundle"] is True
+        # candidate 侧两个 target 仍写死 None ⇒ 本 lane 到不了 finalize
+        instr = (
+            ROOT / "backend" / "app" / "services" / "workpaper_sync" / "word_instrumentation.py"
+        ).read_text(encoding="utf-8")
+        assert "target_definition_bundle_id=None" in instr
+        assert "target_contract_definition_id=None" in instr
+        assert m["candidate_targets_hardwired_none"] is True
+
+    def test_bp18_no_longer_restates_upstream_blocking_ids(self, record: dict):
+        """反向判据：BP-18 不得再转述 Task 61 的内部阻塞编号。
+
+        转述上游编号正是 2026-08-31 那版失准的根因（「BP-10~BP-15 六条全部 open」在
+        Task 61 自己 2026-09-01 的记录里已被证伪）。上游重编号是常态，本记录只断言
+        自己能现算的事实。
+        """
+        bp18 = next(b for b in record["blocking_preconditions"] if b["id"] == "BP-18")
+        assert "BP-10" not in bp18["what"], (
+            "BP-18 的 what 又开始转述上游阻塞编号 —— 上游一重编号本记录就失准"
+        )
+        assert bp18["upstream_correction"].strip(), (
+            "失准更正记录被删 —— 下一轮会重犯同一个错"
+        )
+
+    def test_source_digests_cover_every_file_the_measured_criteria_read(
+        self, record: dict
+    ):
+        """每条 measured 判据读过的源文件都必须锁 digest，且 digest 与磁盘现算相等。"""
+        sources = record["sources"]
+        by_path = {v["path"]: v["sha256"] for v in sources.values()}
+        needed = {
+            "backend/data/workpaper_sync_entry_manifest.json",
+            "backend/app/services/workpaper_sync/adapters/registry.py",
+            "backend/app/services/workpaper_sync/word_sdt_engine.py",
+            "backend/app/services/workpaper_sync/word_instrumentation.py",
+        }
+        missing = needed - set(by_path)
+        assert not missing, f"measured 判据读了却没锁 digest 的源文件: {sorted(missing)}"
+        import hashlib
+
+        for rel in sorted(needed):
+            actual = hashlib.sha256((ROOT / rel).read_bytes()).hexdigest()
+            assert by_path[rel] == actual, (
+                f"{rel} 的 digest 与磁盘不符 ⇒ 记录已 stale，请重跑生成器"
+            )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 6. 守卫自检（反向：判据本身必须是可失效的）
 # ═══════════════════════════════════════════════════════════════════════════
 
 

@@ -370,6 +370,10 @@ def plan(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+#: 「这个关键字参数根本没被传」的哨兵。见 `_FakeExcelAdapter.verify_unmanaged_regions`。
+_NOT_PASSED: Final[object] = object()
+
+
 class _FakeExcelAdapter:
     """把 projection 真写进文件再真读回来的载体替身。
 
@@ -396,6 +400,9 @@ class _FakeExcelAdapter:
         self.unmanaged_equivalent = unmanaged_equivalent
         self.materialize_calls = 0
         self.extract_calls = 0
+        #: BP-23 见证：生产调用点**实际喂进** `verify_unmanaged_regions` 的归一化声明。
+        #  `None` 表示还没被调用过；被调用后是 `{参数名: 值 | _NOT_PASSED}`。
+        self.unmanaged_call_kwargs: dict[str, Any] | None = None
 
     # ── 协议方法 ────────────────────────────────────────────────────
     async def read_current_projection(self, ctx: Any) -> Projection:  # pragma: no cover
@@ -467,8 +474,23 @@ class _FakeExcelAdapter:
         )
 
     def verify_unmanaged_regions(
-        self, *, before: Path, after: Path, contract: Any
+        self,
+        *,
+        before: Path,
+        after: Path,
+        contract: Any,
+        row_shift: Any = _NOT_PASSED,
+        total_formula_rows: Any = _NOT_PASSED,
+        propagation: Any = _NOT_PASSED,
     ) -> UnmanagedRegionReport:
+        # 🔴 默认值刻意是 `_NOT_PASSED` 哨兵而**不是** `None`：无插行时 materialize
+        #    声明的就是 `None`，拿 `None` 当「没传」会让 BP-23 的接线一旦被回退（调用点
+        #    删掉三个 kwarg）仍然报绿 —— 那正是本轮修掉的「生产零消费」形态。
+        self.unmanaged_call_kwargs = {
+            "row_shift": row_shift,
+            "total_formula_rows": total_formula_rows,
+            "propagation": propagation,
+        }
         if self.unmanaged_equivalent:
             return UnmanagedRegionReport(
                 equivalent=True, inspected_aspects=("formula", "style", "drawing")
@@ -1322,6 +1344,37 @@ class TestStageAndVerifyWithRealFiles:
         # 🔴 文件已 publish 但**没有任何 DB 行引用它** ⇒ 此刻是不可见 orphan
         #    （Requirement 2.4：事务失败的 artifact 不可见并由 orphan GC 清理）。
         assert ".versions" in staged.representation.relative_path
+
+    @pytest.mark.asyncio
+    async def test_unmanaged_verification_is_fed_the_materialize_declarations(
+        self, xc: C.SyncContract, tmp_path: Path
+    ) -> None:
+        """BP-23：`verify_unmanaged_regions` 的三个归一化入参必须**真被生产调用点喂**。
+
+        本判据不是「参数存在」而是「参数被传」：替身用 `_NOT_PASSED` 哨兵接收，只要
+        `_stage_and_verify` 里回退成 `before/after/contract` 三参调用，哨兵就会留在
+        `unmanaged_call_kwargs` 里 ⇒ 打红。这三个参数此前生产零消费（假绿第①源
+        「additive 注入即死代码」），D2 首版实测不喂 `row_shift` 会让未管理区域从
+        238 项漂移涨到 632 项。
+        """
+        p = self._plan(xc, tmp_path)
+        adapter = _FakeExcelAdapter()
+        projection = proj(xc, {PERIOD: "2025 年度", TOTAL: Decimal("100.00")})
+        await self._svc(tmp_path)._stage_and_verify(  # noqa: SLF001
+            plan=p,
+            mutation=CM.BusinessMutation(projection=projection),
+            projection=projection,
+            adapter=adapter,
+        )
+        seen = adapter.unmanaged_call_kwargs
+        assert seen is not None, "verify_unmanaged_regions 根本没被调用"
+        missing = sorted(name for name, val in seen.items() if val is _NOT_PASSED)
+        assert not missing, (
+            f"生产调用点没有喂这些归一化声明：{missing} —— "
+            "它们会退回 BP-23 之前的「参数在、无人喂」形态"
+        )
+        # 三者的值必须来自 `MaterializeResult` 的声明字段，而不是调用点自己现造。
+        assert set(seen) == {"row_shift", "total_formula_rows", "propagation"}
 
     @pytest.mark.asyncio
     async def test_roundtrip_gap_blocks_before_any_db_write(

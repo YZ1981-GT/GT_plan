@@ -2395,13 +2395,20 @@ def mutation_coverage_facts() -> tuple[bool, str, dict[str, Any]]:
 # 首版这道门把「四条结构事实全部成立」当作「word_bulk 门未被跨越」的证据，其中第四条是
 # 「生产 registry 里没有注册任何 docx adapter」。2026-09-01 的三臂实测证明这条是**重言
 # 式**：把前三条的前提逐一移除（manifest 里放进 docx F2 entry、往交付登记表加行、provider
-# 走白名单内的模块）之后，第四条**仍然**成立 —— 因为它被一条完全不同的、平台级的约束顶着：
-# `working_paper_sync_entry_state` 全表 0 行 ⇒ 186 个 planned entry 一个都注册不上。
+# 走白名单内的模块）之后，第四条**仍然**成立 —— 因为它被一条完全不同的、平台级的约束顶着。
 #
-# 于是「registry 无 docx adapter」度量的根本不是 Word 批量迁移的门，而是「整平台还没有
-# 任何 published representation」。把它当门禁证据 = 假绿第③源（守卫把恒真值当基线锁死）。
+# 于是「registry 无 docx adapter」度量的根本不是 Word 批量迁移的门，而是那条平台级约束。
+# 把它当门禁证据 = 假绿第③源（守卫把恒真值当基线锁死）。
+#
+# 🔴 2026-09-04 更正那条平台级约束的表述。原文写的是「`working_paper_sync_entry_state`
+# 全表 0 行 ⇒ 186 个 planned entry 一个都注册不上」，实测该表已有 **2 行**，且其中 1 行是
+# **manifest entry**（非 `opaque-` 命名空间），供给门对它**放行**。行数判据因此已失效 ——
+# 详见 `BINDING_CONSTRAINTS` 里 BP-61-1 的 `what` 与 `measured_2026_09_04`。约束本身**未
+# 解除**（`registered_adapter_ids` 仍为空），但根因已从「没有 published representation」
+# 移到「capability 未翻成 `bidirectional`」。
 #
 # 本节把这件事变成**可执行**判据：三臂各自真跑一次，并要求三臂结果互不相同。
+# 三臂度量逻辑本身不因上述更正而改动 —— 先后关系继续由实测得出，不由写死字面量得出。
 
 #: 本任务实测出的阻塞前置。🔴 id 用 task-scoped 前缀 `BP-61-n` 而不是全局 `BP-NN`：
 #: 实测 Tasks 60 / 63 / 64 各自登记了 `BP-16`~`BP-22`、同号不同义，全局单调编号在多会话
@@ -2411,14 +2418,63 @@ BINDING_CONSTRAINTS: Final[tuple[Mapping[str, Any], ...]] = (
         "id": "BP-61-1",
         "kind": "binding",
         "what": (
-            "`working_paper_sync_entry_state` 全表 0 行 ⇒ 没有任何 entry 有 current "
-            "published representation ⇒ `registry._describe_entry_supply` 对 **186 个** "
-            "planned entry 全部给出拒绝原因，`registered_adapter_ids` 恒为空。"
+            "**185 / 186** planned entry 没有 current published representation ⇒ "
+            "`registry._describe_entry_supply` 对它们全部给出拒绝原因，"
+            "`registered_adapter_ids` 仍为空。"
         ),
         "scope": "platform_wide_not_f2_specific",
-        "owner_task": "36/77（finalize gate）与 ContentMutationService.commit —— 不属 Task 61",
+        "owner_task": (
+            "供给侧 = published-representation-production-path-and-lane-adjudication "
+            "spec（首版发布宿主）；capability 翻转侧 = manifest 重生成 + "
+            "`approved_source_digest` 人工复核（Task 67 登记的复核方）—— 均不属 Task 61"
+        ),
         "measured_by": "gate.binding_constraint_is_measured / arm_a + arm_b",
         "unblocks": "Task 61 正文第一句的准入条件（resolver 返回 published representation）",
+        #: 🔴 2026-09-04 更正。原 `what` 写的是「`working_paper_sync_entry_state` 全表
+        #: 0 行 ⇒ 没有任何 entry 有 current published representation ⇒ 对 **186 个**
+        #: planned entry 全部给出拒绝原因」。三句里有两句已成假话：
+        #:
+        #:   * 「全表 0 行」  → 实测 **2 行**
+        #:   * 「186 个全部被拒」→ 实测 **185 个**（G7 已放行）
+        #:
+        #: ⇒ **行数判据必须换成按 manifest entry_id 集合过滤**：全表行数里混着
+        #: `opaque-` 命名空间的行（它们不是 manifest entry，对 registry 注册没有贡献），
+        #: 数全表会让「有了 opaque representation」被误读成「供给已经出现」。
+        #:
+        #: 约束本身**未解除**，但根因移位了：`registered_adapter_ids` 为空**不再是**因为
+        #: 「没有 published representation」，而是因为那个已有 representation 的 entry 的
+        #: manifest capability 仍是 `single_onlyoffice`。这两件事的解除方不同（见
+        #: `owner_task`），混在一句话里会把工作派给错的人。
+        "measured_2026_09_04": {
+            "working_paper_sync_entry_state_rows_total": 2,
+            "of_which_opaque_namespace": 1,
+            "of_which_manifest_entry": 1,
+            "manifest_entry_with_current_representation": (
+                "xlsx/gt-g7-long-term-equity-main",
+            ),
+            "supply_gate_verdict_for_that_entry": "None（放行）",
+            "supply_gate_rejects_remaining": 185,
+            "manifest_entry_count": 186,
+            "registered_adapter_ids": (),
+            "capability_of_that_entry": "single_onlyoffice",
+            "manifest_capability_counts": {
+                "single_html": 5,
+                "single_onlyoffice": 180,
+                "unreachable": 1,
+                "bidirectional": 0,
+            },
+            "why_still_binding": (
+                "供给门已放行 1 个 entry，但 `registered_adapter_ids` 仍为空 —— 注册还要求"
+                "该 entry 的 manifest capability 为 `bidirectional`，实测仍是 "
+                "`single_onlyoffice`。⇒ 约束未解除，根因由「无 representation」移到"
+                "「capability 未翻转」"
+            ),
+            "measured_by_probe": (
+                "registry._describe_entry_supply 逐 entry 真跑 + "
+                "build_manifest_registration_plan + build_production_registry"
+                "（该 entry 的 plan item 的 `blocked_reason` 实测已变 None）"
+            ),
+        },
     },
     {
         "id": "BP-61-2",

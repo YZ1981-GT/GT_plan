@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "1bccb2d955ec9224564f8aa4d5b2a2cf96d436026463070c96be8e5737f80496",
+  "instrumentation_definition_sha256": "e4f226a082cbdd6504fd60be7d882afdc4c5643ef53bde106563cc83969b7cf6",
   "review": {
     "authority_root": "backend/wp_templates",
     "dynamic_rows": {
@@ -605,12 +605,14 @@
             }
           ],
           "footer_anchor": {
+            "carries_total_formula": true,
             "marker": "合计",
+            "note": "footer 行 A28 承载 7 条合计公式（I28..O28 = SUM(x13:x27)，逐格实测）。区间末行 27 是 BP-21 的排版占位行，合计公式覆盖它属超集 ⇒ 对受管区末行 26 仍然成立。声明为真使结构性插行有权按声明位移量扩张该区间",
             "search_column": "A"
           },
           "formula_mask": [
-            "L13:L27",
-            "O13:O27"
+            "L13:L26",
+            "O13:O26"
           ],
           "header_rows": 3,
           "row_identity": {

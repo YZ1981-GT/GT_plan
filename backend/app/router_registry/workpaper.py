@@ -24,6 +24,9 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_template_download import router as wp_template_download
     from app.routers.wp_template_version import router as wp_template_version
     from app.routers.wp_template_list import router as wp_template_list
+    # spec excel-template-override-layer-and-onlyoffice-template-editor Task 16：
+    # 模板覆盖层（解析来源 / 版本 / OO 编辑会话 / 上传替换 / 回滚）。
+    from app.routers.wp_template_override_router import router as wp_template_override
     from app.routers.working_paper import router as working_paper
     from app.routers.wp_editor_router import router as wp_editor
     from app.routers.wp_batch_router import router as wp_batch_domain
@@ -327,6 +330,7 @@ def register_workpaper_routers(app: FastAPI) -> None:
     from app.routers.wp_onlyoffice_router import public_router as wp_onlyoffice_public
     from app.routers.wp_sync_router import router as wp_sync
     from app.routers.wp_sync_router import public_router as wp_sync_public
+    from app.routers.d2_sync_router import router as d2_sync
     from app.routers.cutoff_sampling import router as cutoff_sampling
     from app.routers.voucher_sampling import router as voucher_sampling
     from app.routers.formula_scope_query import router as formula_scope_query
@@ -336,10 +340,10 @@ def register_workpaper_routers(app: FastAPI) -> None:
 
     groups = {
         # ── 6 大聚合组（design §7.1）──
-        "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_xlsx, wp_template_docx, wp_template_download, wp_template_version, wp_template_list],
+        "模板管理": [wp_template, wp_template_metadata, wp_template_files, wp_template_xlsx, wp_template_docx, wp_template_download, wp_template_version, wp_template_list, wp_template_override],
         "生命周期": [working_paper, wp_editor, wp_batch_domain, wp_relation_domain, workpaper_batch_status, wp_batch_ops, wp_progress, wp_prerequisite_status, wp_procedure_status, wp_procedure_categories],
         "复核": [wp_review_domain, wp_review, wp_review_status, wp_cell_annotations, review_records_global, wp_eqcr_evaluation, review_workflow_router, signing_router, my_signing_router],
-        "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_workpaper_index_resolve, wp_trace, wp_disclosure_sync, wp_disclosure_sync_html, wp_onlyoffice, custom_workpaper_cells],
+        "渲染": [wp_render_config, wp_classification, wp_html_save, wp_xlsx_export, wp_index_resolve, wp_workpaper_index_resolve, wp_trace, wp_disclosure_sync, wp_disclosure_sync_html, wp_onlyoffice, d2_sync, custom_workpaper_cells],
         "数据": [formula, wp_mapping, wp_data_rules, wp_prefill_context, wp_prefill_preview, wp_user_formulas, wp_formula, bad_debt_rows, wp_cross_check, wp_dependencies, sampling, sampling_enhanced, cutoff_sampling, voucher_sampling, aging_analysis, data_fetch_custom, cf_verification, wp_procedure_tables, wp_field_overrides, wp_report_analysis, wp_misstatement, checklist_responses, completion_phase, a17_summary, a18_regulatory, a21_review, wp_export_word, b5_version, analytical_review_save, d1_disclosure_export, d1_import_export, d2_import_export, d3_import_export, d4_import_export, d5_import_export, d6_import_export, d7_import_export, e1_import_export, f1_import_export, f2_import_export, f2_val_import_export, f2_spe_import_export, f2_st_import_export, f3_import_export, f4_import_export, f5_import_export, f0_import_export, g0_import_export, h0_import_export, g1_import_export, g2_import_export, g3_import_export, g4_main_import_export, g4_sppi_import_export, g4_ecl_import_export, g5_import_export, g6_main_import_export, g6_sppi_import_export, g6_ecl_import_export, g7_main_import_export, g7_method_import_export, g7_sub_import_export, g8_import_export, g8_validate, g9_import_export, g9_validate, g10_import_export, g10_validate, g11_import_export, g11_validate, g12_import_export, g13_import_export, g14_import_export, h10_import_export, h10_validate, l1_import_export, c24_import_export, l2_interest_payable, l3_long_term_loans, l4_bonds_payable, l5_long_term_payables, l6_special_payables, l7_other_noncurrent_liabilities, l8_financial_expenses, m1_dividends_payable, m2_paid_in_capital, m3_treasury_stock, m4_capital_reserve, m5_surplus_reserve, m6_retained_earnings, m7_special_reserve, m8_general_risk_reserve, m9_other_comprehensive_income, m10_other_equity_instruments, n1_deferred_tax_assets, n2_taxes_payable, n3_deferred_tax_liabilities, n4_taxes_and_surcharges, n5_income_tax_expense, s_estimate_calculation, s_transaction_calculation, s34_checklist, k0_import_export, l0_import_export, h1_import_export, h2_import_export, h3_import_export, h4_import_export, h5_oil_gas_assets, h7_biological_assets, h6_import_export, h8_import_export, h9_import_export, i1_import_export, i2_import_export, i3_import_export, i4_import_export, i4_peer_policies, i5_import_export, i6_import_export, k1_import_export, k2_import_export, k3_import_export, k4_import_export, k5_import_export, k6_import_export, k7_import_export, k8_import_export, k9_import_export, k10_import_export, k11_import_export, k12_import_export, k13_import_export, j1_import_export, j2_import_export, j3_import_export, formula_scope_query, b60_chapters, b60_data_pull],
         "批量导入导出": [wp_bulk_tab],
         "搜索": [wp_search, wp_version_search, global_search, wp_health_dashboard],

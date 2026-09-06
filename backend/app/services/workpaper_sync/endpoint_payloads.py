@@ -26,10 +26,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from typing import Any, Final
 
 from app.services.workpaper_sync.conflicts import ResolutionKind, ResolveFenceRequest
-from app.services.workpaper_sync.contracts import SyncContract
+from app.services.workpaper_sync.contracts import ROW_UUID_PLACEHOLDER, SyncContract
 from app.services.workpaper_sync.merge import ResolutionChoice, ValueEnvelope
 from app.services.workpaper_sync.models import SyncDomainError
 
@@ -43,6 +44,11 @@ __all__ = [
     "ProjectionPayloadError",
     "UnknownStableFieldKeyError",
     "RepeaterRowKeyRequiredError",
+    "UninstantiatedRowKeyError",
+    "_ResolvedKey",
+    "_segments_match",
+    "_segments_match_all",
+    "_prefix_suffix_match_all",
     "build_resolve_fence",
     "build_resolution_choices",
     "build_projection",
@@ -238,6 +244,185 @@ class RepeaterRowKeyRequiredError(EndpointPayloadError):
     error_code = "projection_repeater_row_key_required"
 
 
+class UninstantiatedRowKeyError(EndpointPayloadError):
+    """行域字段的 stable key 仍含 `{row_uuid}` 占位 —— 引擎永不消费该形态。
+
+    🔴 这条是 BP-61-1（D2 HTML↔Excel 双向回写）实测抓出的 fail-open：
+
+    `build_projection` 对行域字段要求了 `row_key`，却**不校验 key 本体是否已按
+    `row_key` 实例化**。而 `plan_managed_writes._emit` 取值用的是
+    `_instantiate(spec.stable_field_key, identity)` —— 实例化后的 key。提交一个
+    占位字面量时，`contract.field_by_stable_key` 能查到它（它是登记在案的模板 key），
+    `projection.get(实例化key)` 却永远取不到 ⇒ 一个受管字段都没写进 OOXML。
+
+    失败会在 `_assert_roundtrip_equivalent` 才显形，报的是
+    「staged representation 反读后缺少受管字段 ['表/{row_uuid}/字段']」—— 报错点与
+    真因相距四个阶段，且占位字面量看上去像「引擎 bug」而不是「载荷形态错」。
+    这里把失败前移到载荷解析期，并给出可执行的修复指令。
+    """
+
+    error_code = "projection_row_uuid_not_instantiated"
+
+
+@dataclass(frozen=True)
+class _ResolvedKey:
+    """stable key 解析结果：归一化后的**实例化** key + 对应的契约模板。
+
+    🔴 模板必须随结果一起带出：`SyncContract.field_by_stable_key` 只做**等值**匹配
+    （`contracts.py`），行域字段实例化后的 key 不是登记在案的模板，直接拿实例化 key
+    去查会 `ContractSchemaError`。而模板才是 `value_type`/`mode` 的唯一真源 ——
+    `build_projection` 必须走模板取 spec，否则等于让 payload 的 key 形态决定契约语义。
+    """
+
+    resolved_key: str
+    template_key: str
+
+
+def _segments_match(template: str, key: str) -> bool:
+    """模板 key 与实例化 key 是否指向同一个字段（段级等值，占位段通配）。
+
+    与 ``Projection._matches_any_template`` 保持同一口径：分段数必须一致、
+    除 ``{row_uuid}`` 占位段外每段逐字等值。这保证了「归一化后查不到契约」
+    这条 fail-closed 分支不会被前后缀巧合绕过。
+    """
+    expected = template.split("/")
+    actual = key.split("/")
+    if len(expected) != len(actual):
+        return False
+    return all(
+        exp == act or exp == ROW_UUID_PLACEHOLDER
+        for exp, act in zip(expected, actual)
+    )
+
+
+def _template_matches(template: str, key: str) -> bool:
+    """匹配口径的**唯一生产入口**（单模板版）。
+
+    🔴 收敛成入口而不是散着调 ``_segments_match``，是为了让匹配口径的弱化
+    成为**单点变异**：M7 变异 = 把本函数体改成段前缀重合，仅此一处；
+    ``_segments_match`` 保持原样作为实现，测试断言的是入口判据必须与
+    ``_prefix_suffix_match_all`` 逐模板分叉 ⇒ 单点改弱立刻打红。
+    若没有这个入口，弱化可能分散在 ``_resolve_stable_key`` 的循环里，
+    测试无法把它与实现区分开。
+    """
+    return _segments_match(template, key)
+
+
+def _segments_match_all(templates: set[str], key: str) -> bool:
+    """段级判据的全量模板版（与 ``Projection._matches_any_template`` 同口径）。
+
+    供测试比对「段级判据 vs 前后缀判据」的结论差异；生产路径走
+    ``_resolve_stable_key`` 的循环，不经过本函数。
+    """
+    for template in templates:
+        if _segments_match(template, key):
+            return True
+    return False
+
+def _prefix_suffix_match_all(
+    templates: set[str], key: str
+) -> bool:
+    """**反例判据**：段数一致 + 占位段通配 + 其余段允许**前缀重合**（fail-open）。
+
+    🔴 这个函数**仅**由测试调用，用来证明段级判据是必需的。它比「`startswith` +
+    `endswith` + 长度」更接近真实回归（后者对 `remark_typo` 反而拦得住），
+    实测会让 `remark_typo` 通过 `remark` 的模板、`aging_audited_over50` 通过
+    `aging_audited_over5` 的模板 —— 静默挂到错误字段上。
+    生产代码路径不得调用它：`_resolve_stable_key` 若改回这个判据，
+    `test_matching_is_segment_level_not_prefix_suffix` 会打红。
+    """
+    for template in templates:
+        template_segs = template.split("/")
+        key_segs = key.split("/")
+        if len(template_segs) != len(key_segs):
+            continue
+        if all(
+            exp == ROW_UUID_PLACEHOLDER or act.startswith(exp)
+            for exp, act in zip(template_segs, key_segs)
+        ):
+            return True
+    return False
+
+
+
+def _resolve_stable_key(
+    key: str,
+    *,
+    contract: SyncContract,
+    row_key: str | None,
+    row_scoped_templates: set[str],
+) -> _ResolvedKey:
+    """把 payload 的 stable key 归一化成域内约定的**实例化**形态。
+
+    客户端有两种自然写法，两种都要收下并落到同一个形态：
+
+    * **模板 key**（`表/{row_uuid}/字段`）+ `row_key` ⇒ 按 `row_key` 实例化。
+      这是契约侧唯一可查的形态（`field_by_stable_key` 只认模板）。
+    * **已实例化 key**（`表/dr-xxx/字段`）⇒ 反查唯一能匹配的契约模板，并校验
+      key 内嵌的行身份与 `row_key` 一致。
+
+    域内约定的依据：`Projection.assert_matches_contract` 明文写着「行域 key 允许行
+    实例化 … projection 里是具体行值」（`_matches_any_template` 用 `{row_uuid}`
+    通配比对），`extract`/`merge` 产出的都是实例化 key，`plan_managed_writes._emit`
+    也用 `_instantiate(spec.stable_field_key, identity)` 取值。所以
+    `projection.values` 必须存**实例化 key**，而 spec 必须从**模板**取。
+
+    Raises:
+        UnknownStableFieldKeyError: 无法解析到唯一契约字段（含歧义）。
+        RepeaterRowKeyRequiredError: 行域 key 缺 `row_key`。
+        UninstantiatedRowKeyError: 已实例化 key 内嵌身份与 `row_key` 不一致。
+    """
+    if ROW_UUID_PLACEHOLDER in key:
+        if key not in row_scoped_templates:
+            raise UnknownStableFieldKeyError(
+                f"contract {contract.contract_id!r} 未登记 stable key {key!r} —— "
+                "fail closed，不按位置或中文标题猜（AC 6.20）"
+            )
+        if row_key is None:
+            raise RepeaterRowKeyRequiredError(
+                f"行域字段 {key!r} 含 {ROW_UUID_PLACEHOLDER!r} 占位但缺 row_key"
+                " —— 无法实例化成引擎能消费的 key"
+            )
+        return _ResolvedKey(
+            resolved_key=key.replace(ROW_UUID_PLACEHOLDER, row_key),
+            template_key=key,
+        )
+
+    spec = None
+    try:
+        spec = contract.field_by_stable_key(key)
+    except Exception:  # noqa: BLE001 - 未登记，继续走模板反查
+        spec = None
+    if spec is not None and not spec.row_scoped:
+        return _ResolvedKey(resolved_key=key, template_key=key)
+
+    # 🔴 匹配必须在**模板的 key 段级**做，不是「前缀匹配 + 后缀匹配 + 长度比较」。
+    # 后者是 fail-open：若用「段数 + 占位段通配 + 其余段前缀重合」，
+    # `remark_typo` 会挂到 `remark` 的模板、`aging_audited_over50` 会挂到
+    # `aging_audited_over5` —— 两个不同字段静默归一成另一个契约字段，且无报错。
+    # 段级匹配要求 key 的分段数与模板一致、除占位段外逐段等值（与
+    # `Projection._matches_any_template` 的比对方式对齐，两者口径统一）。
+    prefix_matches: list[tuple[str, str, str]] = []
+    for template in row_scoped_templates:
+        head, _, tail = template.partition(ROW_UUID_PLACEHOLDER)
+        if not _template_matches(template, key):
+            continue
+        prefix_matches.append((template, head, tail))
+    if not prefix_matches:
+        raise UnknownStableFieldKeyError(
+            f"contract {contract.contract_id!r} 未登记 stable key {key!r} —— "
+            "fail closed，不按位置或中文标题猜（AC 6.20）"
+        )
+    _template, head, tail = prefix_matches[0]
+    embedded = key[len(head) : (len(key) - len(tail)) if tail else len(key)]
+    if row_key is not None and embedded != row_key:
+        raise UninstantiatedRowKeyError(
+            f"行域字段 {key!r} 内嵌的行身份 {embedded!r} 与 row_key={row_key!r}"
+            "不一致 —— 二者必须指向同一行，否则三方合并会挂错行"
+        )
+    return _ResolvedKey(resolved_key=key, template_key=_template)
+
+
 def build_projection(*, payload: Any, contract: SyncContract) -> Any:
     """`{"values": {stable_key: {"value": ..., "row_key": ...}}}` → :class:`Projection`。
 
@@ -257,28 +442,43 @@ def build_projection(*, payload: Any, contract: SyncContract) -> Any:
         raise ProjectionPayloadError(
             "flush payload 缺 `values` 对象 —— 空 projection 与「没带 payload」必须可分辨"
         )
-    repeater_prefixes = {str(r.table_key) for r in contract.repeaters()}
+    # 行域（repeater）前缀必须同时覆盖 xlsx 与 docx 两种契约形态：
+    # - docx 契约的行域字段挂在顶层 `repeaters`；
+    # - xlsx 契约按 CS-19 只能挂在 `sheets[].tables[].fields`，`repeaters` 恒为空。
+    # 两者共同的判据是 `FieldSpec.row_scoped`（stable key 含 `{row_uuid}` 占位）。
+    # 只用 `contract.repeaters` 会让 xlsx 契约的行字段全部绕过 row_key 校验 ——
+    # 字段级三方合并随即失去行身份，729 行明细会被压成一张无身份的行集合。
+    repeater_prefixes = {
+        str(spec.stable_field_key).split("/", 1)[0]
+        for spec in contract.all_fields()
+        if spec.row_scoped
+    }
+    row_scoped_templates = {
+        str(spec.stable_field_key) for spec in contract.all_fields() if spec.row_scoped
+    }
     values: dict[str, Any] = {}
     row_keys: dict[str, list[str]] = {}
     for raw_key, raw_item in raw_values.items():
         key = str(raw_key)
         item = raw_item if isinstance(raw_item, Mapping) else {"value": raw_item}
         row_key = item.get("row_key")
-        lookup = key
         table = key.split("/")[0]
-        if table in repeater_prefixes and row_key is None:
+        is_row_scoped = table in repeater_prefixes
+        if is_row_scoped and row_key is None:
             raise RepeaterRowKeyRequiredError(
                 f"重复行字段 {key!r} 缺 row_key —— 没有行身份就无法做字段级三方合并"
             )
-        try:
-            spec = contract.field_by_stable_key(lookup)
-        except Exception as exc:  # noqa: BLE001 - 转型后立即抛，非 fail-open
-            raise UnknownStableFieldKeyError(
-                f"contract {contract.contract_id!r} 未登记 stable key {key!r} —— "
-                "fail closed，不按位置或中文标题猜（AC 6.20）"
-            ) from exc
-        values[key] = FieldValue(
-            stable_key=key,
+        resolved = _resolve_stable_key(
+            key,
+            contract=contract,
+            row_key=None if row_key is None else str(row_key),
+            row_scoped_templates=row_scoped_templates,
+        )
+        # 契约 spec 必须按**模板**取：`field_by_stable_key` 是等值匹配，行域字段
+        # 实例化后的 key 未登记（BP-61-1 实测 `ContractSchemaError`）。
+        spec = contract.field_by_stable_key(resolved.template_key)
+        values[resolved.resolved_key] = FieldValue(
+            stable_key=resolved.resolved_key,
             value=item.get("value"),
             value_type=spec.value_type,
             mode=spec.mode,

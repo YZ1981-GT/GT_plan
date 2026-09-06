@@ -1375,7 +1375,7 @@
    "must_fix_before": "step 6 publish_per_entry_contract（contract 的 sheet_key 必须落在完整 sheet 名上；L4 还须把 bondBranch 纳入 key）",
    "source_refs": [
     "backend/app/routers/wp_onlyoffice_router.py#L301",
-    "backend/app/routers/wp_onlyoffice_router.py#L624",
+    "backend/app/routers/wp_onlyoffice_router.py#L630",
     "audit-platform/frontend/src/components/workpaper/GtL4BondsPayable.vue#L143",
     "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L172",
     "backend/wp_templates/L/L4 应付债券.xlsx"
@@ -1884,10 +1884,10 @@
   "why_this_key_exists": "tasks.md 的 Task 54 正文点名「核验 sheet 粒度与 router 参数」。本节冻结三件可复算的事：① 权威册的每张 sheet 是否有 HTML 子组件承载（还是落到 OO 兜底渲染器）；② 宿主的 dispatch code 与权威 sheet 是否一一对应；③ 把 dispatch code 当 router 的 `sheet_name` 参数时，按 router 自己的匹配规则会命中几张 sheet。",
   "router": {
    "endpoint": "GET /api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-config",
-   "endpoint_site": "backend/app/routers/wp_onlyoffice_router.py#L624",
+   "endpoint_site": "backend/app/routers/wp_onlyoffice_router.py#L630",
    "handler": "get_sheet_onlyoffice_config",
    "sheet_resolution_site": "backend/app/routers/wp_onlyoffice_router.py#L301",
-   "sheet_resolution_rule": "`_hide_non_target_sheets(file_path, target_sheet)`：先按 `ws.title == target_sheet` 精确匹配；找不到则退化为 `target_sheet in ws.title or ws.title.endswith(target_sheet)` 并取**第一个**命中；仍找不到就不隐藏（安全降级，OO 打开整册）。",
+   "sheet_resolution_rule": "`_hide_non_target_sheets(file_path, target_sheet)` 委派给 `workpaper_sync.excel_sheet_visibility.resolve_target_sheet(names, target)`：先按 `name == target` 精确匹配；找不到则退化为 `target in name or name.endswith(target)` 并取**第一个**命中；仍找不到就不隐藏（安全降级，OO 打开整册）。规则语义未变，2026-09-03 只换了实现载体 —— 原先用 openpyxl 全量重写整本 workbook（K11 实测丢 20 个 zip 部件、共享公式主格 12→0、缓存值写成空标签 `<v></v>`、样式索引全表重排），现改为 zip 级只改 `xl/workbook.xml` 的 `state`/`activeTab`，并由 `_assert_only_workbook_part_changed` 逐部件字节比对兜住。",
    "frontend_caller": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L172",
    "frontend_param_expression": "sheets/${encodeURIComponent(props.sheetName)}/onlyoffice-config",
    "why_fuzzy_matters": "模糊匹配意味着「参数是尾码」和「参数是完整 sheet 名」在多数情况下都能工作，于是同码 sheet 的歧义**不会报错**，只会静默打开第一张。这类缺陷没有异常、没有日志，只能靠现算 code→sheet 的命中数发现。"

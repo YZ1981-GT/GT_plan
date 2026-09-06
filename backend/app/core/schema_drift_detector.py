@@ -98,6 +98,22 @@ class SchemaDriftDetector:
         "checklist_responses",
         # custom_account_packages: 裸 SQL 迁移建表
         "custom_account_packages",
+        # ── V154 Excel 模板覆盖层版本台账（有意不做 ORM 映射）────────────────────
+        # 🔴 与下面 V149 那两张「未接通结构」不同：本表三层全接通
+        #    （迁移 V154 + services/wp_template_override.py 的 6 个 async 函数 +
+        #     routers/wp_template_override_router.py 已注册进 router_registry）。
+        #    不映射 ORM 是**设计裁决**，理由是表上的三条约束全靠 DB 承载：
+        #      · trg_wptov_immutable    —— 除 is_current 外全列不可变
+        #      · trg_wptov_forbid_delete —— 禁止物理删除（回滚只改 is_current）
+        #      · uq_wptov_one_current_per_scope —— is_current 唯一性靠部分唯一索引
+        #    而 is_current 的转移必须走 CAS 式两步（先 demote 取回父版本再 INSERT，
+        #    见 record_override_version）。一旦映射进 ORM，任何 `row.is_current = True`
+        #    或 `session.delete(row)` 都能绕过这套顺序，Requirement 4.3「不删行」与
+        #    Property 16「每次保存都接上父版本」就失去可执行判据。
+        #    → 表名单一真源 = wp_template_override.OVERRIDE_VERSION_TABLE。
+        #    本条与「无 ORM 模型」双向锁死，见 tests/test_schema_drift_detector.py
+        #    的 test_v154_override_version_table_allowlisted_and_unmapped。
+        "workpaper_template_override_version",
         # ── V149 MCP scoped token（dsh-agent-panel-integration Task 25）────────────
         # 🔴 这两张表当前是**未接通的结构**，不是历史残留：
         #    V149 注释写「持久化，跨进程可见」，而实现 `services/ai_chat/mcp_token.py`
@@ -107,6 +123,22 @@ class SchemaDriftDetector:
         #      补 ORM 模型，而不是让它长期停留在 allowlist 里。
         "ai_chat_mcp_call_log",
         "ai_chat_mcp_token_revocations",
+        # ── V155 OO 内容修订号（有意不做 ORM 映射）──────────────────────────────
+        # 🔴 与上面 V149 那两张「未接通结构」不同：本表三层全接通
+        #    （迁移 V155 + services/onlyoffice_room_identity.py 的
+        #     `_content_revision` 读 / `bump_oo_content_revision` 写，后者由 D2 的
+        #     push_html_to_excel 在真的改写受管内容后调用）。
+        #    不映射 ORM 是**设计裁决**：`revision` 的推进只允许走那条
+        #      INSERT ... ON CONFLICT (wp_id, entry_id)
+        #        DO UPDATE SET revision = <表名>.revision + 1
+        #    —— 自增在 DB 侧原子完成，并发两次改写各得一个新号。一旦映射进 ORM，
+        #    任何 `row.revision = x` 都能绕过它：读-改-写竞态下两次改写拿到同一个号
+        #    ⇒ doc_key 不轮转 ⇒ 正好退回本表要解决的「服务端已写 756 行、OO 仍显示
+        #    空模板」那个缺陷（V155 表头注释记的浏览器实测）。
+        #    → 表名单一真源 = onlyoffice_room_identity.OO_CONTENT_REVISION_TABLE。
+        #    本条与「无 ORM 模型」双向锁死，见 tests/test_schema_drift_detector.py
+        #    的 test_v155_oo_content_revision_table_allowlisted_and_unmapped。
+        "working_paper_oo_content_revision",
     })
 
     # 列级 allowlist：DB 有但 ORM 不需映射的列（历史残留 / 已弃用 / 有意只走裸 SQL）

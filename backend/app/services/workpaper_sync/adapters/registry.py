@@ -582,10 +582,7 @@ class WorkpaperSyncAdapterRegistry:
             provider = _load_entry_provider(item)
             ids = tuple(await provider(self, session=session))
             if not ids:
-                reasons[item.entry_id] = (
-                    f"provider {item.provider_module}.attach_pilot_adapters 返回空元组 —— "
-                    "供给已到位但 provider 侧仍有前置未过（见其自身抛出的原因）"
-                )
+                reasons[item.entry_id] = _describe_provider_block(item)
                 continue
             registered.extend(ids)
             registered_entries.append(item.entry_id)
@@ -1238,6 +1235,36 @@ def _load_entry_provider(item: ManifestRegistrationPlanItem) -> Any:
         )
     return attach
 
+
+def _describe_provider_block(item: "ManifestRegistrationPlanItem") -> str:
+    """provider returned an empty tuple -> recompute its own precondition as an explicit reason.
+
+    The provider early-exit branches are `return ()`, not a raise, so the old text
+    (see its own raised reason) pointed at an exception that never exists. When supply
+    is satisfied but nothing registers, the caller could only see returned empty
+    tuple while the real cause -- manifest capability not yet adjudicated
+    bidirectional -- was discarded. AC 5.12 requires an explicit reason, so this
+    reuses the provider own precondition function rather than writing a second one.
+
+    Only the provider own narrow selection error is caught; anything else propagates
+    (a broad except here would re-create the fail-open this fixes).
+    """
+    module_path = item.provider_module or ""
+    module = importlib.import_module(module_path)
+    selection_error = getattr(module, "PilotSelectionError", None)
+    assert_capability = getattr(module, "assert_manifest_capability_enabled", None)
+    if callable(assert_capability) and isinstance(selection_error, type):
+        try:
+            assert_capability()
+        except selection_error as exc:
+            return (
+                f"provider {module_path}.attach_pilot_adapters 返回空元组，其"
+                f"自身 capability 前置未过: {exc}"
+            )
+    return (
+        f"provider {module_path}.attach_pilot_adapters 返回空元组，而 capability "
+        "前置现算为已通过 -- 早退分支未留下原因，需在 provider 侧补显式原因"
+    )
 
 async def _describe_entry_supply(*, session: Any, entry_id: str) -> str | None:
     """查供给：够了返回 `None`，不够返回**显式原因**。

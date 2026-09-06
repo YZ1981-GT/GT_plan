@@ -145,6 +145,21 @@ def _strip_comments(source: str) -> str:
     return source
 
 
+def _strip_docstrings(source: str) -> str:
+    """剥 Python 三引号字符串块，行号保持不变。
+
+    🔴 `_strip_comments` 只处理 `#` / `//` / `/* */` / `<!-- -->`，**不碰 docstring**。
+    对 Python 生产源做「某个符号是否真的被用到」的判据时必须先剥 docstring ——
+    否则 docstring 里叙述性提到的符号名会被当成真实引用（本文件的
+    `test_router_delegates_visibility_to_the_zip_level_service` 首版就栽在这里：
+    router 的 docstring 记录了 openpyxl 那版的实测毁坏，判据于是恒红）。
+
+    只剥三引号块，不剥单引号/双引号字面量 —— 后者常是判据要找的真实字符串。
+    """
+    return re.sub(r'"""(?:.|\n)*?"""|\'\'\'(?:.|\n)*?\'\'\'',
+                  _blank_keep_newlines, source)
+
+
 def _vue_template(source: str) -> str:
     """取 `<template>` 顶层块（不被内层 `<template v-if>` 提前截断），行号保留。"""
     start = source.find("<template>")
@@ -517,14 +532,115 @@ class TestGuardSelfChecks:
         assert any(s.endswith(" ") for s in l4), f"L4 册应有尾随空格的 sheet 名，实得 {l4}"
 
     def test_router_matcher_replicates_the_real_source_rule(self) -> None:
-        """`_router_matches` 不是凭印象写的 —— 现读 router 源码证明规则就是 contains/endswith。"""
-        src = _strip_comments(_cached_text(OO_ROUTER))
-        i = src.find("def _hide_non_target_sheets")
-        assert i > 0, "router 里找不到 _hide_non_target_sheets"
-        body = src[i:i + 2500]
-        assert "ws.title == target_sheet" in body, "精确匹配分支不在源码里 ⇒ 复刻规则已过期"
-        assert "target_sheet in ws.title" in body, "contains 分支不在源码里 ⇒ 复刻规则已过期"
-        assert "ws.title.endswith(target_sheet)" in body, "endswith 分支不在源码里"
+        """`_router_matches` 不是凭印象写的 —— 直接与真源实现**逐条行为比对**。
+
+        🔴 2026-09-03 判据升级。原判据是在 router 源码里找
+        `ws.title == target_sheet` / `target_sheet in ws.title` /
+        `ws.title.endswith(target_sheet)` 三个字符串。两个毛病：
+
+        1. **锁死了实现细节**。sheet 可见性改写已从 openpyxl 全量重写换成 zip 级
+           外科手术（原实现在 K11 上实测丢 20 个 zip 部件、把 12 个共享公式组展平、
+           把缓存值写成空标签 `<v></v>`；详见
+           `app/services/workpaper_sync/excel_sheet_visibility` 的模块 docstring）。
+           那三个 openpyxl 惯用法随之消失，判据会把一次**修复**判成红。
+        2. **是「字符存在」型判据**，证不出规则等价。把 `in` 改成 `startswith`
+           而字符串仍在源码里，照样绿。
+
+        现改为：import 匹配规则的真源 `resolve_target_sheet`，用**真实 L 册
+        sheet 名**（含前导/尾随空格、同尾码重名、半角括号）做输入矩阵，逐条比对
+        「首个命中」。规则任何一侧改动都会打红，且改不成"字符还在但行为变了"。
+        """
+        from app.services.workpaper_sync.excel_sheet_visibility import (
+            resolve_target_sheet,
+        )
+
+        sheets: list[str] = []
+        for book in sorted(L_TEMPLATE_DIR.glob("*.xlsx")):
+            if book.name.startswith("~$"):
+                continue
+            sheets.extend(_sheet_names(book))
+        assert len(sheets) > 50, f"L 册 sheet 名样本只有 {len(sheets)} 个 ⇒ 分母可疑"
+        assert any(s != s.strip() for s in sheets), (
+            "样本里没有带前后空格的 sheet 名 ⇒ 最易错的形态没被覆盖"
+        )
+
+        # 目标矩阵：完整 sheet 名 + 尾码片段 + 一个必然落空的
+        targets = sorted({*sheets, *re.findall(r"L\d+(?:-\d+)?[A-Z]?", " ".join(sheets))})
+        targets.append("绝不存在的表名XYZ")
+
+        exact_hits = fallback_hits = misses = 0
+        for target in targets:
+            replicated = _router_matches(target, sheets)
+            expected = replicated[0] if replicated else None
+            assert resolve_target_sheet(sheets, target) == expected, (
+                f"目标 {target!r}：复刻规则给 {expected!r}，"
+                f"真源给 {resolve_target_sheet(sheets, target)!r} ⇒ 两侧已分叉"
+            )
+            if target in sheets:
+                exact_hits += 1
+            elif replicated:
+                fallback_hits += 1
+            else:
+                misses += 1
+
+        # 三条分支都必须被真实走到，否则等价性论证是空转
+        assert exact_hits > 0, "矩阵里没有精确命中 ⇒ 该分支未被检验"
+        assert fallback_hits > 0, "矩阵里没有 contains/endswith 回退命中 ⇒ 该分支未被检验"
+        assert misses > 0, "矩阵里没有落空用例 ⇒ None 分支未被检验"
+
+    def test_router_delegates_visibility_to_the_zip_level_service(self) -> None:
+        """router 必须把可见性改写交给 zip 级实现，且不得再全量重写 workbook。
+
+        🔴 这是上面那条判据换掉字符串锚点后必须补上的一条：只比对匹配规则等价
+        并不能防止有人把实现换回 `openpyxl.load_workbook()` + `wb.save()`。
+        """
+        # 🔴 `_strip_comments` 只剥 `#` 行注释与 `/* */`，**不剥 Python docstring**。
+        #    这两个函数的 docstring 里逐条记录了 openpyxl 那版的实测毁坏（"openpyxl"
+        #    出现十余次），不剥掉就会把一次修复判成"又用了 openpyxl" —— 首版正是这么
+        #    自己把自己打红的。故这里额外剥三引号块，再判。
+        src = _strip_docstrings(_strip_comments(_cached_text(OO_ROUTER)))
+        for func, delegate in (
+            ("_hide_non_target_sheets", "apply_single_sheet_visibility"),
+            ("_ensure_all_sheets_visible", "restore_all_sheets_visible"),
+        ):
+            i = src.find(f"def {func}")
+            assert i > 0, f"router 里找不到 {func}"
+            j = src.find("\ndef ", i + 1)
+            body = src[i : j if j > 0 else len(src)]
+            assert delegate in body, f"{func} 未委派给 {delegate} ⇒ 可能又自己重写 workbook"
+            assert "openpyxl" not in body, (
+                f"{func} 里又出现 openpyxl —— 全量重写会丢 zip 部件/共享公式/缓存值，"
+                f"K11 实测 37 个部件掉到 19 个"
+            )
+            assert ".save(" not in body, f"{func} 里出现 .save( ⇒ 疑似整本落盘"
+
+    def test_docstring_stripper_actually_strips(self) -> None:
+        """反向自检：剥离器真的在剥，且没顺手剥掉代码。
+
+        上一条判据完全依赖 `_strip_docstrings`。若它是空操作，判据恒红（docstring
+        里的实测记录会命中）；若它剥多了，判据恒绿（真的 openpyxl 调用也被剥掉）。
+        两个方向都得钉住。
+        """
+        sample = (
+            'def f():\n'
+            '    """里面写了 openpyxl 三个字。"""\n'
+            '    return 1\n'
+            'def g():\n'
+            "    '''单引号 docstring 也要剥 openpyxl。'''\n"
+            '    import openpyxl\n'
+            '    return openpyxl\n'
+        )
+        stripped = _strip_docstrings(sample)
+        assert stripped.count("openpyxl") == 2, (
+            f"应只剩 g() 里两处真实引用，实得 {stripped.count('openpyxl')} 处：{stripped!r}"
+        )
+        assert "import openpyxl" in stripped, "真实 import 被剥掉了 ⇒ 判据会恒绿"
+        assert stripped.count("\n") == sample.count("\n"), "行号被改变 ⇒ 其他按行号的判据会失真"
+        # 真实 router 源码上也得非空转
+        raw = _strip_comments(_cached_text(OO_ROUTER))
+        assert raw.count("openpyxl") > _strip_docstrings(raw).count("openpyxl"), (
+            "router 源码里 docstring 提到的 openpyxl 一个都没被剥 ⇒ 剥离器对真实输入失效"
+        )
 
     def test_l_cycle_denominator_is_non_vacuous(self, l_files: list[pathlib.Path]) -> None:
         assert len(l_files) > 100, f"L 域生产文件只有 {len(l_files)} 个 ⇒ 分母可疑"

@@ -1,8 +1,8 @@
 {
   "generated_from": "backend/data/workpaper_writer_inventory.json",
-  "inventory_digest": "b2bde05b4a25bc5b51f01914d4589836326a5884b4c4812e56bc3a503e46e58b",
-  "inventory_source_digest": "97fe18550ee8e935762a2057c533cfdf46b3e5ad2f883dcc3aedc30ef6250333",
-  "matrix_digest": "fc3f9dce93ad1ed50a56baa15ec4bde3de49dc3e8a396798af31329228a751bc",
+  "inventory_digest": "93d18368d2eaac1573ade96cc5b8ba6324406276c9fd02fd6ac741e0437a9327",
+  "inventory_source_digest": "261ba31bd2e9dd98a98af84d4f2dae120af83706c06646bfc90c6767120fbd18",
+  "matrix_digest": "0f6f811d7b038546bb9f149b20cc990277be33ed141c9b094707da83b133c363",
   "policy_modules": [
     "app.routers.excel_html",
     "app.routers.wp_onlyoffice_router",
@@ -30,7 +30,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -60,7 +60,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -90,7 +90,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -116,7 +116,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -146,7 +146,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -174,7 +174,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -204,7 +204,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "html_save",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -234,7 +234,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -262,7 +262,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -290,7 +290,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -320,7 +320,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -350,7 +350,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -406,7 +406,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "html_save",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -436,7 +436,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19",
-      "domain": null,
+      "domain": "oo_callback",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -494,7 +494,36 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.routers.knowledge_base",
+      "note": null,
+      "qualname": "_project_kb_dir",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/routers/knowledge_base.py",
+      "status": "deferred",
+      "writer_id": "app.routers.knowledge_base::_project_kb_dir"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -522,7 +551,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -552,7 +581,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -584,7 +613,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -613,7 +642,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -869,7 +898,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -897,7 +926,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -925,7 +954,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -953,7 +982,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1288,7 +1317,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "65",
-      "domain": null,
+      "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -1320,7 +1349,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1346,7 +1375,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1375,7 +1404,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1404,7 +1433,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -1435,7 +1464,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1465,7 +1494,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1495,7 +1524,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1525,7 +1554,65 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.bulk_tab.bulk_async_runner",
+      "note": null,
+      "qualname": "_run_export",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/bulk_tab/bulk_async_runner.py",
+      "status": "deferred",
+      "writer_id": "app.services.bulk_tab.bulk_async_runner::_run_export"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability",
+          "raw_file_path_construction"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "raw_file_path_construction"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.deliverable_package_service",
+      "note": null,
+      "qualname": "DeliverablePackageService.run_package_job",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/deliverable_package_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.deliverable_package_service::DeliverablePackageService.run_package_job"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1553,7 +1640,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1579,7 +1666,36 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "raw_file_path_construction"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "out_of_task12_scope",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.export_progress_service",
+      "note": null,
+      "qualname": "ExportProgressService._run_export",
+      "reason": "非 Task 12 第 4 条点名的三类分叉（wp_file_resolver / WOPI / storage-version）；属附件、预览、模板下载、A17x docx sync 等旁路 resolver，由 Task 19/20 的 writer 矩阵归零与 Task 66/67 删前清册统一裁决",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/export_progress_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.export_progress_service::ExportProgressService._run_export"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20,66,67",
+      "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -1609,7 +1725,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": null,
-      "domain": null,
+      "domain": "wopi",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1640,7 +1756,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": null,
-      "domain": null,
+      "domain": "wopi",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1752,7 +1868,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": null,
-      "domain": null,
+      "domain": "wopi",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1784,7 +1900,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [
@@ -1814,7 +1930,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1845,7 +1961,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -1871,7 +1987,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "19,20,66,67",
-      "domain": null,
+      "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -2084,7 +2200,7 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": null,
-      "domain": null,
+      "domain": "history_restore",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -2144,7 +2260,71 @@
     {
       "adjudication_owner_task": "71",
       "blocking_task": "36",
-      "domain": null,
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_own_docx_or_none"
+        ]
+      },
+      "group": "template_finder",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_finder",
+      "note": null,
+      "qualname": "_find_docx_by_index_or_disk",
+      "reason": "【Task 58 已收口的部分】find_template_file_any 的子码判据原先写死 ^A\\d+-\\d+ ⇒ B/S 子码落进主码分支并被「终极回退：用主表」抢到父级 XLSX；2026-08-29 逐条实测 28 个 word-template wp_code 里 9 个（B18-3-1/B18-3-2/B2-1/B2-11/B2-3/B2-6/B2-8/B40-1/B40-2）都有自己的 DOCX 却全部解析到父级 XLSX。现在该函数把自有-DOCX 探测**提到 A-only 分支之前**并委派 workpaper_sync.word_resolution.resolve_own_docx_or_none（内部走 canonical_paths.pick_most_specific，类型门 fail closed），见 POLICY_BY_WRITER 里该 writer 的 migrated 裁决与 backend/data/workpaper_word_template_adjudication.json 的 50 行裁决清册。【仍未迁移的部分】find_all_template_files 与 find_template_file 的 xlsx 多文件 glob（范围式命名 `D2-1至D2-4 …xlsx` 等）不在 Word lane 内，换成统一 resolver 需要该 entry 已有 published representation（Task 36 供给），与 wp_onlyoffice_router 同一条阻塞，故归属 Task 71",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_template_finder.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_finder::_find_docx_by_index_or_disk"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_own_docx_or_none"
+        ]
+      },
+      "group": "template_finder",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_finder",
+      "note": null,
+      "qualname": "_find_docx_on_disk",
+      "reason": "【Task 58 已收口的部分】find_template_file_any 的子码判据原先写死 ^A\\d+-\\d+ ⇒ B/S 子码落进主码分支并被「终极回退：用主表」抢到父级 XLSX；2026-08-29 逐条实测 28 个 word-template wp_code 里 9 个（B18-3-1/B18-3-2/B2-1/B2-11/B2-3/B2-6/B2-8/B40-1/B40-2）都有自己的 DOCX 却全部解析到父级 XLSX。现在该函数把自有-DOCX 探测**提到 A-only 分支之前**并委派 workpaper_sync.word_resolution.resolve_own_docx_or_none（内部走 canonical_paths.pick_most_specific，类型门 fail closed），见 POLICY_BY_WRITER 里该 writer 的 migrated 裁决与 backend/data/workpaper_word_template_adjudication.json 的 50 行裁决清册。【仍未迁移的部分】find_all_template_files 与 find_template_file 的 xlsx 多文件 glob（范围式命名 `D2-1至D2-4 …xlsx` 等）不在 Word lane 内，换成统一 resolver 需要该 entry 已有 published representation（Task 36 供给），与 wp_onlyoffice_router 同一条阻塞，故归属 Task 71",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_template_finder.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_finder::_find_docx_on_disk"
+    },
+    {
+      "adjudication_owner_task": "71",
+      "blocking_task": "36",
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -2166,16 +2346,47 @@
       "qualname": "find_all_template_files",
       "reason": "本函数只服务 xlsx 多文件底稿（范围式命名 `D2-1至D2-4 …xlsx`），不在 Task 58 的 Word lane 内；Task 58 只把它的 A-only 正则提成命名常量（`_LEGACY_A_ONLY_SUB_CODE_RE`），行为逐字节不变（全量比对差异 0）。换成统一 resolver 需要该 entry 已有 published representation（Task 36 供给），与 wp_onlyoffice_router 同一条阻塞，归属 Task 71",
       "resolver_identities": [
-        "find_template_file_any"
+        "<ad_hoc_path_construction>"
       ],
       "source_path": "backend/app/services/wp_template_finder.py",
       "status": "deferred",
       "writer_id": "app.services.wp_template_finder::find_all_template_files"
     },
     {
+      "adjudication_owner_task": "71",
+      "blocking_task": "36",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability",
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": [
+          "resolve_own_docx_or_none"
+        ]
+      },
+      "group": "template_finder",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_finder",
+      "note": null,
+      "qualname": "find_template_file",
+      "reason": "【Task 58 已收口的部分】find_template_file_any 的子码判据原先写死 ^A\\d+-\\d+ ⇒ B/S 子码落进主码分支并被「终极回退：用主表」抢到父级 XLSX；2026-08-29 逐条实测 28 个 word-template wp_code 里 9 个（B18-3-1/B18-3-2/B2-1/B2-11/B2-3/B2-6/B2-8/B40-1/B40-2）都有自己的 DOCX 却全部解析到父级 XLSX。现在该函数把自有-DOCX 探测**提到 A-only 分支之前**并委派 workpaper_sync.word_resolution.resolve_own_docx_or_none（内部走 canonical_paths.pick_most_specific，类型门 fail closed），见 POLICY_BY_WRITER 里该 writer 的 migrated 裁决与 backend/data/workpaper_word_template_adjudication.json 的 50 行裁决清册。【仍未迁移的部分】find_all_template_files 与 find_template_file 的 xlsx 多文件 glob（范围式命名 `D2-1至D2-4 …xlsx` 等）不在 Word lane 内，换成统一 resolver 需要该 entry 已有 published representation（Task 36 供给），与 wp_onlyoffice_router 同一条阻塞，故归属 Task 71",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_template_finder.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_finder::find_template_file"
+    },
+    {
       "adjudication_owner_task": null,
       "blocking_task": null,
-      "domain": null,
+      "domain": "export_storage_resolver",
       "evidence": {
         "function_found": true,
         "function_self_written_markers": [],
@@ -2197,7 +2408,7 @@
       "qualname": "find_template_file_any",
       "reason": null,
       "resolver_identities": [
-        "find_template_file"
+        "<ad_hoc_path_construction>"
       ],
       "source_path": "backend/app/services/wp_template_finder.py",
       "status": "migrated",
@@ -2258,6 +2469,34 @@
     {
       "adjudication_owner_task": null,
       "blocking_task": "17,58",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "bare_exists_reachability"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "template_provisioning",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "resolver",
+      "module": "app.services.wp_template_init_service",
+      "note": null,
+      "qualname": "get_workpaper_storage_path",
+      "reason": "模板初始化属 provisioning，不是内容解析；instrumentation 发布后由 Task 17/58 一并处理",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_template_init_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_template_init_service::get_workpaper_storage_path"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "17,58",
       "domain": "template_provisioning",
       "evidence": {
         "function_found": true,
@@ -2282,6 +2521,36 @@
       "source_path": "backend/app/services/wp_template_init_service.py",
       "status": "deferred",
       "writer_id": "app.services.wp_template_init_service::init_workpaper_from_template"
+    },
+    {
+      "adjudication_owner_task": null,
+      "blocking_task": "19,20",
+      "domain": "export_storage_resolver",
+      "evidence": {
+        "function_found": true,
+        "function_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "function_unified_entry_calls": [],
+        "module_self_written_markers": [
+          "manual_backend_root"
+        ],
+        "module_unified_entry_calls": []
+      },
+      "group": "export_storage",
+      "intended_status": "deferred",
+      "is_resolver_fork": true,
+      "kind": "writer_resolver",
+      "module": "app.services.wp_xlsx_export_service",
+      "note": null,
+      "qualname": "_resolve_template_path",
+      "reason": "_resolve_template_path 是第 4 份模板路径副本，随 Task 19/20 writer 矩阵归零一并收敛",
+      "resolver_identities": [
+        "<ad_hoc_path_construction>"
+      ],
+      "source_path": "backend/app/services/wp_xlsx_export_service.py",
+      "status": "deferred",
+      "writer_id": "app.services.wp_xlsx_export_service::_resolve_template_path"
     },
     {
       "adjudication_owner_task": null,
@@ -2323,27 +2592,27 @@
   "stats": {
     "by_group": {
       "custom": 2,
-      "export_storage": 2,
+      "export_storage": 3,
       "f2_word": 10,
       "legacy_excel_html": 13,
       "legacy_file_path": 5,
       "oo_room": 7,
-      "out_of_task12_scope": 25,
+      "out_of_task12_scope": 29,
       "storage_version": 2,
-      "template_finder": 2,
-      "template_provisioning": 3,
+      "template_finder": 5,
+      "template_provisioning": 4,
       "upload_import": 1,
       "wopi": 6
     },
     "by_status": {
-      "deferred": 64,
+      "deferred": 73,
       "migrated": 14
     },
-    "deferred": 64,
+    "deferred": 73,
     "migrated": 14,
     "regressed": 0,
-    "resolver_fork_count": 63,
-    "row_count": 78
+    "resolver_fork_count": 72,
+    "row_count": 87
   },
   "task": "Wave 1 Task 12",
   "unified_entry_calls": [

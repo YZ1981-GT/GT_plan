@@ -155,7 +155,12 @@ REAL_D2_ITEM_COUNT = 24
 #: 39 = 21 个标量列 + 3 组 × 6 段账龄列（源 xlsx 的真实列数，`max_column == 39`）。
 EXPECTED_FIELD_COUNT = 39
 EXPECTED_PROTECTED_COUNT = 3
-EXPECTED_TEMPLATE_ROW_COUNT = P.LAST_DATA_ROW - P.FIRST_DATA_ROW + 1  # 13
+#: 权威模板的**物理**骨架行数（`A13..A24` 字面量 1..12 + `A25` 占位 `……`）= 13。
+#:
+#: 🔴 BP-21 起它**不再等于**受管行数：`A25` 是排版占位行（续行省略号），不是业务行。
+EXPECTED_PHYSICAL_SKELETON_ROWS = 13
+#: 受管行数 = 物理骨架 − 尾部排版占位行 = 12（`A13..A24`）。
+EXPECTED_TEMPLATE_ROW_COUNT = P.LAST_DATA_ROW - P.FIRST_DATA_ROW + 1  # 12
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -256,18 +261,27 @@ def sheet_part(instrumented: EI.InstrumentedWorkbook) -> str:
     return _sheet_part_of(instrumented.instrumented_bytes, P.MANAGED_SHEET)
 
 
-#: 唯一的 boolean 列（`AK 是否函证`），fixture 按**生产落盘形态** `<v>1</v>` 写。
+#: 唯一的 boolean 列（`AK 是否函证`），fixture 按**生产落盘形态**写。
 #:
-#: 🔴 不是随手选的形态：`excel_materialize._write_kind_for(boolean)` 归到
-#: `number_literal`，`_render_number(True)` 渲染成 `1`。写成 Python `True` 会让
-#: `patch_cells` 落出 `<v>False</v>`，openpyxl `_cast_number('False')` 直接抛
-#: `ValueError`、整份 workbook 不可打开（首轮实测 14 例 ERROR），而那**不是**生产形态。
+#: 🔴 BP-22 起生产形态是 OOXML **真布尔格** `t="b"` + `<v>1|0</v>`
+#: （`excel_materialize._write_kind_for(boolean)` → `CellWriteKind.boolean_literal`）。
+#: 之前它归 `number_literal`、落 `<v>1</v>` 无 `t` ⇒ extract 读回 int ⇒
+#: `normalize_value` 拒绝折叠 0/1 ⇒ 每行一条 `type_normalization_failure`。
+#: 本 fixture 必须跟着生产走：镜像旧形态会让「缺陷已修」这件事在判据上看不见。
+#:
+#: 落盘手法仍走 `__BOOL1__` / `__BOOL0__` 占位串 + :func:`_promote_boolean_cells`：
+#: `patch_cells` 直接写 Python `True` 会落出 `<v>False</v>`，openpyxl
+#: `_cast_number('False')` 抛 `ValueError`、整份 workbook 不可打开（首轮实测 14 例 ERROR）。
 BOOLEAN_COLUMN = "AK"
 
 
 @pytest.fixture(scope="module")
 def base_bytes(instrumented: EI.InstrumentedWorkbook, sheet_part: str) -> bytes:
-    """把 36 个 editable 列逐行写满业务值（公式列不写，留模板公式）。"""
+    """把 36 个 editable 列逐行写满业务值（公式列不写，留模板公式）。
+
+    🔴 BP-22：boolean 列写成**真布尔格**（生产形态），于是基线 extract 的 schema 异常
+    从「每行一条」变成 **0 条**。
+    """
     cells: dict[str, Any] = {}
     written_columns: set[str] = set()
     for row in range(P.FIRST_DATA_ROW, P.LAST_DATA_ROW + 1):
@@ -276,7 +290,7 @@ def base_bytes(instrumented: EI.InstrumentedWorkbook, sheet_part: str) -> bytes:
                 continue
             written_columns.add(column)
             if value_type == "boolean":
-                cells[f"{column}{row}"] = 1 if row % 2 == 0 else 0
+                cells[f"{column}{row}"] = "__BOOL1__" if row % 2 == 0 else "__BOOL0__"
             elif value_type == "amount":
                 cells[f"{column}{row}"] = 100 + row
             elif value_type == "integer":
@@ -285,7 +299,9 @@ def base_bytes(instrumented: EI.InstrumentedWorkbook, sheet_part: str) -> bytes:
                 cells[f"{column}{row}"] = f"值{column}{row}"
     assert len(written_columns) == 36, sorted(written_columns)
     assert BOOLEAN_COLUMN in written_columns
-    return patch_cells(instrumented.instrumented_bytes, sheet_part, cells)
+    return _promote_boolean_cells(
+        patch_cells(instrumented.instrumented_bytes, sheet_part, cells), sheet_part
+    )
 
 
 @pytest.fixture(scope="module")
@@ -785,15 +801,29 @@ class TestContractIsGroundedInTheTemplate:
     def test_three_formula_columns_are_really_formulas_in_the_template(
         self, worksheet: Any
     ) -> None:
-        """39 次比对（3 列 × 13 行）：逐格公式文本必须与登记模板逐字相等。"""
+        """39 次比对（3 列 × **13 行物理骨架**）：逐格公式文本必须与登记模板逐字相等。
+
+        🔴 BP-21：逐行公式是**物理**模板事实，覆盖整个骨架（含 `A25` 那行排版占位）——
+        所以按 `TEMPLATE_PHYSICAL_LAST_ROW` 迭代。第二段单独断言「受管区内那 12 行也全都
+        有公式」，两个口径各自被取证、不互相掩盖。
+        """
         seen = 0
         for column, template in sorted(P.FORMULA_TEMPLATES.items()):
-            for row in range(P.FIRST_DATA_ROW, P.LAST_DATA_ROW + 1):
+            for row in range(P.FIRST_DATA_ROW, P.TEMPLATE_PHYSICAL_LAST_ROW + 1):
                 assert worksheet[f"{column}{row}"].value == template.format(r=row), (
                     f"{column}{row}"
                 )
                 seen += 1
-        assert seen == 3 * EXPECTED_TEMPLATE_ROW_COUNT == 39, seen
+        assert seen == 3 * EXPECTED_PHYSICAL_SKELETON_ROWS == 39, seen
+
+        managed = sum(
+            1
+            for column, template in P.FORMULA_TEMPLATES.items()
+            for row in range(P.FIRST_DATA_ROW, P.LAST_DATA_ROW + 1)
+            if worksheet[f"{column}{row}"].value == template.format(r=row)
+        )
+        assert managed == 3 * EXPECTED_TEMPLATE_ROW_COUNT == 36, managed
+        assert managed < seen, "受管区必须是物理骨架的真子集（否则 BP-21 没有生效）"
         declared = {
             spec[0]: spec[2] for spec in P.MANAGED_FIELD_SPECS if spec[1] in P.FORMULA_TEMPLATES
         }
@@ -812,7 +842,7 @@ class TestContractIsGroundedInTheTemplate:
             value = worksheet[f"H{row}"].value
             assert not (isinstance(value, str) and value.startswith("=")), (row, value)
             checked += 1
-        assert checked == EXPECTED_TEMPLATE_ROW_COUNT == 13
+        assert checked == EXPECTED_TEMPLATE_ROW_COUNT == 12
         mode = next(spec[2] for spec in P.MANAGED_FIELD_SPECS if spec[1] == "H")
         assert mode == "editable"
 
@@ -868,8 +898,11 @@ class TestContractIsGroundedInTheTemplate:
         spec = P.instrumentation_spec()
         assert P._col_index(P.UUID_COL) == P._col_index(P.MANAGED_LAST_COL) + 1
         assert spec.table_ref == f"A{P.FIRST_DATA_ROW}:{P.UUID_COL}{P.LAST_DATA_ROW}"
-        assert spec.row_count == EXPECTED_TEMPLATE_ROW_COUNT == 13
+        assert spec.row_count == EXPECTED_TEMPLATE_ROW_COUNT == 12
+        # 🔴 BP-21：footer 与受管末行之间隔着那行排版占位 ⇒ 不再相邻
         assert spec.footer_row == P.FOOTER_ROW > P.LAST_DATA_ROW
+        assert P.FOOTER_ROW == P.TEMPLATE_PHYSICAL_LAST_ROW + 1 == 26
+        assert spec.footer_row > spec.last_data_row + 1
 
     def test_mutated_contract_payload_is_rejected(self) -> None:
         """反向自检：把一个 formula 字段挪出 formula_mask 必须被 `parse_contract` 拒。"""
@@ -1224,7 +1257,8 @@ class TestProperty60BudgetsFailVisible:
         binding: X.ExcelIdentityBinding,
     ) -> None:
         total = EXPECTED_TEMPLATE_ROW_COUNT * 39
-        assert total == 507
+        # 🔴 BP-21：468 = 12 受管行 × 39 字段（原 507 = 13 × 39，那 13 行含占位行）
+        assert total == 468
         extract(
             base_path, definitions, binding, limits=scaled_limits(max_projection_fields=total)
         )
@@ -1305,16 +1339,17 @@ class TestChunkedSidecarAndRoundtrip:
     def test_baseline_extract_reads_back_every_managed_field(
         self, base_outcome: X.ExcelExtractOutcome, instrumented: EI.InstrumentedWorkbook
     ) -> None:
-        assert base_outcome.stats.field_count == EXPECTED_TEMPLATE_ROW_COUNT * 39 == 507
+        assert base_outcome.stats.field_count == EXPECTED_TEMPLATE_ROW_COUNT * 39 == 468
         assert base_outcome.stats.table_row_counts == {
             P.ROWS_TABLE_KEY: EXPECTED_TEMPLATE_ROW_COUNT
         }
         assert base_outcome.stats.carrier_tier is ExtractCarrierTier.instrumented_identity
-        # 唯一的异常来自已登记的 boolean 缺口（见 `TestBooleanCellIsAKnownUpstreamIncoherence`）。
-        assert {anomaly.stable_field_key.rsplit("/", 1)[1] for anomaly in base_outcome.anomalies} == {
-            "is_confirmation"
-        }
-        assert len(base_outcome.anomalies) == EXPECTED_TEMPLATE_ROW_COUNT == 13
+        # 🔴 BP-22 前这里是「每行一条 boolean 缺口异常」，现在**零异常**
+        #    （见 `TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell`）。
+        assert base_outcome.anomalies == (), [
+            (a.kind.value, a.stable_field_key, a.detail[:80])
+            for a in base_outcome.anomalies
+        ]
         source_uuids = set(instrumented.row_uuids.values())
         assert len(source_uuids) == EXPECTED_TEMPLATE_ROW_COUNT
         for identity in source_uuids:
@@ -1334,7 +1369,9 @@ class TestChunkedSidecarAndRoundtrip:
                 key = P.stable_key_for(column_key, identity)
                 assert base_outcome.formula_inventory[key] == template.format(r=row)
                 seen += 1
-        assert seen == 3 * EXPECTED_TEMPLATE_ROW_COUNT == 39, seen
+        # 🔴 BP-21：36 = 3 列 × **12 受管行**。模板物理上有 39 个，第 13 行是 `A25`
+        #    那行排版占位 —— 它已不在受管区，其公式属未管理区域，不进 formula_inventory。
+        assert seen == 3 * EXPECTED_TEMPLATE_ROW_COUNT == 36, seen
 
     def test_unmanaged_region_coverage_is_not_empty(
         self, base_outcome: X.ExcelExtractOutcome
@@ -1361,7 +1398,7 @@ class TestChunkedSidecarAndRoundtrip:
         assert header["contract_id"] == P.PILOT_ADAPTER_ID
         assert header["table_key"] == P.ROWS_TABLE_KEY
         assert header["sheet"] == P.MANAGED_SHEET
-        assert len(fields) == outcome.stats.field_count == 507
+        assert len(fields) == outcome.stats.field_count == 468
         by_key = {row["stable_key"]: row for row in fields}
         for key, value in outcome.projection.values.items():
             assert by_key[key]["value_type"] == value.value_type.value
@@ -1413,7 +1450,8 @@ class TestChunkedSidecarAndRoundtrip:
         small = scaled_limits(peak_memory_budget_bytes=limits.chunk_bytes * 4)
         outcome = extract(base_path, definitions, binding, limits=small)
         assert outcome.stats.rows_per_chunk == 4
-        assert outcome.stats.chunk_count == -(-EXPECTED_TEMPLATE_ROW_COUNT // 4) == 4
+        # 🔴 BP-21：12 受管行 / 每块 4 行 = 3 块（原 13 行向上取整得 4 块）
+        assert outcome.stats.chunk_count == -(-EXPECTED_TEMPLATE_ROW_COUNT // 4) == 3
         assert (
             outcome.projection.values
             == extract(base_path, definitions, binding).projection.values
@@ -1436,7 +1474,7 @@ class TestChunkedSidecarAndRoundtrip:
             contract=contract,
         )
         assert report.equivalent is True
-        assert len(report.compared_keys) == EXPECTED_TEMPLATE_ROW_COUNT * 36 == 468
+        assert len(report.compared_keys) == EXPECTED_TEMPLATE_ROW_COUNT * 36 == 432
         assert report.missing_keys == () and report.unexpected_keys == ()
 
     def test_roundtrip_verifier_catches_a_single_changed_field(
@@ -1660,12 +1698,15 @@ class TestUpstreamDebtsAreVisibleFacts:
     def test_remaining_debts_are_registered_and_mutually_distinct(self) -> None:
         """剩余欠账各自独立可辨（合成一条会让其余的撤销条件无处可查）。
 
-        原第一条 `UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER` 已由 Task 75 结清并删除；
-        计数**从 `__all__` 现算**（不写死 3），于是再删/再加一条都会被这里抓到。
+        已结清并删除的两条：
+        * `UPSTREAM_DEBT_PUBLISHED_IDENTITY_OBSERVER` —— Task 75；
+        * `UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP` —— **BP-22**（改走 OOXML 真布尔格
+          `t="b"`，见 `TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell`）。
+
+        计数**从 `__all__` 现算**（不写死数字），于是再删/再加一条都会被这里抓到。
         """
         notes = {
             P.UPSTREAM_DEBT_DYNAMIC_FAMILY_GATED_ON_MOUNT_CARDINALITY,
-            P.UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP,
         }
         exported = [n for n in (P.__all__ or ()) if n.startswith("UPSTREAM_DEBT_")]
         assert len(notes) == len(exported), sorted(exported)
@@ -1674,19 +1715,39 @@ class TestUpstreamDebtsAreVisibleFacts:
             assert "owner" in note, note[:40]
 
 
-class TestBooleanCellIsAKnownUpstreamIncoherence:
+class TestBooleanCellRoundTripsThroughARealOoxmlBooleanCell:
     """**Validates: Requirements 6.11 / 6.12**
 
-    `UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP` 的三段链条 + 反向自检。这一组的价值在于：
-    「声明了 `value_type=boolean` 的 Excel 受管格永远进冲突」原本是**看不见**的 ——
-    materialize 写得下去、extract 读得回来、roundtrip verifier 还会因为 `True == 1`
-    在 Python 里为真而**误判等值**，只有 schema 异常那一路会暴露它。
+    ═══ BP-22：这一组从「钉住缺陷」翻成「钉住修复」═════════════════════════════
+
+    原状（`UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP`，已删）：`value_type=boolean` 的 Excel
+    受管格端到端**不自洽** —— `_write_kind_for` 把它归 `number_literal` ⇒ 落盘
+    `<c r="AK13"><v>1</v></c>`（无 `t`）⇒ extract 用 openpyxl 读回 **int 1** ⇒
+    `merge.normalize_value(1, boolean)` 明令拒绝折叠 ⇒ **每一行**一条
+    `type_normalization_failure`。
+
+    它原本是**看不见**的：materialize 写得下去、extract 读得回来、roundtrip verifier 还会
+    因为 `True == 1` 在 Python 里为真而**误判等值**，只有 schema 异常那一路会暴露它。
+    首版发布链把它顶到地面：D2 卡在 `roundtrip_verified`，
+    `ValueNormalizationError: boolean 字段只接受真 bool 或 'true'/'false'，实得 0`。
+
+    修法取「写入侧落 OOXML 真布尔格 `t="b"`」而**不是**「让 `normalize_value` 折叠 0/1」：
+    后者会让「整数 1 被当成 true」这类真实类型错误静默通过，那条拒绝是对的。
+    openpyxl 写真 `bool` 时本来就落 `t="b"`（实测），读回是真 `bool` ⇒ 往返自洽；
+    也消除了两条写入路径（zip/XML 与 openpyxl）此前的形态分歧。
     """
 
-    def test_materializer_writes_boolean_as_a_bare_number_literal(self) -> None:
+    def test_materializer_writes_boolean_as_a_real_ooxml_boolean_cell(self) -> None:
+        """判据落在**落盘字节**上，不只是枚举值。
+
+        只断言 `CellWriteKind` 时，把 `_cell_xml` 的 `t="b"` 分支删掉仍会判 GREEN
+        （枚举没变）—— 那就成了「改了没红」的守卫缺陷。
+        """
         from app.services.workpaper_sync.excel_materialize import (
+            CellWrite,
             CellWriteKind,
-            _render_number,
+            EditableCellWriteError,
+            _cell_xml,
             _write_kind_for,
         )
 
@@ -1696,9 +1757,72 @@ class TestBooleanCellIsAKnownUpstreamIncoherence:
             if field.column_key == "is_confirmation"
         )
         assert spec.value_type.value == "boolean"
-        assert _write_kind_for(spec) is CellWriteKind.number_literal
-        assert _render_number(True) == "1"
-        assert _render_number(False) == "0"
+        assert _write_kind_for(spec) is CellWriteKind.boolean_literal
+
+        def _xml(value: Any) -> str:
+            return _cell_xml(
+                coord="AK13",
+                style="7",
+                write=CellWrite(
+                    coord="AK13",
+                    kind=CellWriteKind.boolean_literal,
+                    value=value,
+                    stable_field_key=P.stable_key_for("is_confirmation", "GTROW-X-0013"),
+                ),
+            )
+
+        # 真布尔 ⇒ `t="b"`；样式恒带回（AC 3.5）
+        assert _xml(True) == '<c r="AK13" s="7" t="b"><v>1</v></c>'
+        assert _xml(False) == '<c r="AK13" s="7" t="b"><v>0</v></c>'
+        # `None` ⇒ 空格而不是 `<v>0</v>`：后者把「未填」变成「填了 false」，
+        # 对「是否函证」这类审计字段是实质性语义错误
+        assert _xml(None) == '<c r="AK13" s="7"/>'
+        assert "<v>" not in _xml(None)
+
+        # 非 bool 值 fail closed —— 「0/1 不得当布尔写入」的正面判据
+        for wrong in (0, 1, "true", "1"):
+            with pytest.raises(EditableCellWriteError, match="value_type=boolean"):
+                _xml(wrong)
+
+    def test_number_literal_no_longer_claims_the_boolean_type(self) -> None:
+        """数值族**不再**包含 boolean —— 防止哪天有人把它加回去。
+
+        判据用 `_write_kind_for` 逐 `value_type` 现算，不抄一份清单：抄一份时把生产里的
+        boolean 分支删掉，这条仍会按自己那份清单判 GREEN。
+        """
+        from app.services.workpaper_sync.contracts import FieldMode, ValueType
+        from app.services.workpaper_sync.excel_materialize import (
+            CellWriteKind,
+            _write_kind_for,
+        )
+
+        class _S:
+            def __init__(self, value_type: Any) -> None:
+                self.mode = FieldMode.editable
+                self.value_type = value_type
+
+        by_kind: dict[Any, list[str]] = {}
+        for value_type in ValueType:
+            by_kind.setdefault(_write_kind_for(_S(value_type)), []).append(
+                value_type.value
+            )
+        assert by_kind[CellWriteKind.boolean_literal] == ["boolean"]
+        assert "boolean" not in by_kind[CellWriteKind.number_literal]
+        assert set(by_kind[CellWriteKind.number_literal]) == {
+            "amount",
+            "integer",
+            "rate",
+            "ratio",
+        }
+
+    def test_the_upstream_debt_registration_is_gone(self) -> None:
+        """欠账登记必须**真删**，不是改成注释留着。
+
+        判据用 `hasattr` 而不是查字符串：字符串判据会被 docstring 里的复盘说明满足。
+        """
+        assert not hasattr(P, "UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP")
+        exported = [n for n in (P.__all__ or ()) if n.startswith("UPSTREAM_DEBT_")]
+        assert "UPSTREAM_DEBT_BOOLEAN_CELL_ROUNDTRIP" not in exported
 
     def test_merge_refuses_to_fold_the_written_shape(self) -> None:
         from app.services.workpaper_sync.contracts import ValueType
@@ -1712,20 +1836,34 @@ class TestBooleanCellIsAKnownUpstreamIncoherence:
             with pytest.raises(ValueNormalizationError):
                 normalize_value(written, ValueType.boolean)
 
-    def test_extract_reports_one_anomaly_per_row_on_the_boolean_column_only(
+    def test_extract_reports_no_anomaly_on_the_boolean_column(
         self, base_outcome: X.ExcelExtractOutcome
     ) -> None:
-        from app.services.workpaper_sync.conflicts import SchemaAnomalyKind
+        """🔴 BP-22 前这里是「每行一条 `type_normalization_failure`」，现在是**零条**。
 
-        kinds = {anomaly.kind for anomaly in base_outcome.anomalies}
-        assert kinds == {SchemaAnomalyKind.type_normalization_failure}, kinds
-        assert len(base_outcome.anomalies) == EXPECTED_TEMPLATE_ROW_COUNT
-        columns = {
-            anomaly.stable_field_key.rsplit("/", 1)[1] for anomaly in base_outcome.anomalies
+        分母非空由 `base_outcome` 自己保证（12 行 × 39 字段 = 468 个值都真读出来了），
+        所以「零异常」不是空转。
+        """
+        assert base_outcome.anomalies == (), [
+            (a.kind.value, a.stable_field_key, a.detail[:80])
+            for a in base_outcome.anomalies
+        ]
+        assert len(base_outcome.projection.values) == (
+            EXPECTED_TEMPLATE_ROW_COUNT * 39
+        ), "分母塌了 ⇒「零异常」变成空转"
+
+    def test_the_boolean_column_reads_back_as_real_python_bools(
+        self, base_outcome: X.ExcelExtractOutcome
+    ) -> None:
+        """真布尔格读回来必须是 `bool`，且两个取值都出现过（不是恒 True/恒 False）。"""
+        values = {
+            base_outcome.projection.values[
+                P.stable_key_for("is_confirmation", identity)
+            ].value
+            for identity in base_outcome.projection.row_keys[P.ROWS_TABLE_KEY]
         }
-        assert columns == {"is_confirmation"}
-        # 其余 38 列一条异常都没有（否则这条判据在指别的问题）。
-        assert len(columns) == 1
+        assert values == {True, False}, values
+        assert all(isinstance(value, bool) for value in values), values
 
     def test_a_real_boolean_cell_would_extract_cleanly(
         self,
@@ -1759,7 +1897,7 @@ class TestBooleanCellIsAKnownUpstreamIncoherence:
         path.write_bytes(data)
         outcome = extract(path, definitions, binding)
         assert outcome.anomalies == (), outcome.anomalies
-        assert outcome.stats.field_count == EXPECTED_TEMPLATE_ROW_COUNT * 39 == 507
+        assert outcome.stats.field_count == EXPECTED_TEMPLATE_ROW_COUNT * 39 == 468
         values = {
             outcome.projection.values[
                 P.stable_key_for("is_confirmation", identity)

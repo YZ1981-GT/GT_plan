@@ -114,6 +114,7 @@ from app.services.excel_structure_fingerprint import (
     structure_fingerprint,
     visible_equivalence_report,
 )
+from app.services.workpaper_sync import excel_typography_rows as _typography
 from app.services.workpaper_sync.canonical_paths import (
     TEMPLATE_ROOT,
     PathBoundaryError,
@@ -1073,6 +1074,39 @@ def instrument_workbook_bytes(
     target_part = _sheet_part_for(workbook_xml, wb_rels_xml, spec.managed_sheet)
     if target_part not in entries:
         raise InstrumentationError(f"目标 sheet 部件不存在: {target_part}")
+
+    # ── BP-21 门：声明的受管行区间末行不得落在「排版占位行」上 ──────────────
+    #
+    # 中文审计模板普遍在数据区末尾放一行续行省略号（整格 `……`），紧跟其后才是 `合计`。
+    # 受管区行范围是派生的，派生规则「表头与合计之间都是数据行」会把它一并吞进受管区 ⇒
+    # materialize 试图把 `……` 按 `integer` 写回业务字段（首版发布实测卡在 H1 的 `A27`）。
+    #
+    # 🔴 为什么排在**这里**：本函数是「provider 声明的行区间」第一次遇上「模板真实字节」的
+    #    地方。往后一步（`uuids = {...}`）就已经按声明的区间给占位行发了 row UUID，那个
+    #    UUID 会进冻结 identity inventory，此后无论读侧怎么收缩都会被
+    #    `assert_identity_inventory_retained` 判成「OO 往返后丢了一个 row identity」——
+    #    实测过：只在 `resolve_managed_region` 收缩会撞 `IdentityRetentionError`。
+    #    区间、UUID 集合、冻结清册三者必须**同源**收缩，而它们的共同上游只有本函数。
+    #
+    # 🔴 为什么 fail closed 而不是引擎自动收缩：自动收缩会让 `GT_ROW_UUID_LAST_ROW` 写 27
+    #    而 UUID 只到 26，「声明与实况不符」自己是一类缺陷；且下一个 provider 作者永远不会
+    #    知道这条规则存在。fail closed 让他撞一次、改一次，而声明可被 digest 冻结。
+    #
+    # 全库实测 170 处 / 37 份模板 / 35 个 wp_code ⇒ 逐契约写 `excluded_rows` 必然遗漏，
+    # 故落成平台级门。判据实现在 `excel_typography_rows`（单一真源，验收脚本也消费它）。
+    _where = f"entry {spec.entry_id} / sheet {spec.managed_sheet!r}"
+    try:
+        _typography.assert_label_column_matches_spec(spec.table_ref, where=_where)
+        _typography.assert_last_data_row_is_not_typography_placeholder(
+            sheet_xml=entries[target_part].decode("utf-8", "replace"),
+            shared=_typography.read_shared_strings_from_entries(entries),
+            label_column=_typography.MANAGED_LABEL_COLUMN,
+            first_data_row=spec.first_data_row,
+            last_data_row=spec.last_data_row,
+            where=_where,
+        )
+    except _typography.TypographyRowError as exc:
+        raise InstrumentationError(str(exc)) from exc
 
     uuids = {row: spec.row_uuid(row) for row in range(spec.first_data_row, spec.last_data_row + 1)}
 

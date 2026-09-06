@@ -5601,3 +5601,84 @@ jobs:
         run: python backend/scripts/check/check_frontend_dangling_reference_gate.py
       - name: Mutation anchors static self-check (M01-M16)
         run: python backend/scripts/diagnose/mutate_frontend_dangling_reference_gate.py --check-anchors
+
+  projection-lane-adjudication:
+    # published-representation-production-path-and-lane-adjudication / Task 11.1
+    #
+    # 🔴 跑的是 `--offline`（只验 R3b 范围边界 + R4 capability 纪律），**不是**完整五项。
+    #    理由是环境事实，不是省事：R1/R2 度量的是「本仓库 dev 库里首版已落成」，
+    #    而 CI 每次起的是崭新空库。2026-09-05 实测（空临时 schema + V151/V152/V153
+    #    三个迁移跑完）：`working_paper_content_representation` 0 行、
+    #    `working_paper_sync_definition_bundle` 0 行
+    #      ⇒ R2 的「≥1 条 projection_contract representation」必不成立
+    #      ⇒ R1 的供给判据 B 为假 ⇒ 四个 pilot entry 全被拒
+    #    挂完整门只会得到一个恒红 job，而恒红的门很快会被人 skip 掉 —— 那比没有门更糟。
+    #
+    #    `--offline` 的报告会逐项列出未验证的三项并把 gate_version 打上 `+offline`
+    #    后缀，因此它在任何场合都不会被误读成完整验收。R1/R2/R3a 的验收留在
+    #    有数据的环境里人工跑（`python backend/scripts/check/... --json <path>`）。
+    #
+    # 这两步都是**只读**：R3b 走 AST + `git ls-files`，R4 读 manifest 文件。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: "[projection-lane] 范围边界与 capability 纪律（--offline，只读）"
+        run: python backend/scripts/check/check_projection_lane_adjudication.py --offline
+      - name: "[projection-lane] 变异锚点静态自检（九条，--check-anchors 只读）"
+        run: python backend/scripts/diagnose/mutate_projection_first_publication_guards.py --check-anchors
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # W spec（excel-workbook-wide-row-change-propagation）Task 26 / X1
+  #
+  # 两步都是**只读**且**不受上游就绪门约束**：
+  #   · 范围边界判据（Requirement 9.1–9.6）落在封闭词表取值域、配置真源的值、
+  #     N1 的 AST 上 —— 不碰 B/C 共改的 excel_row_shift.py / excel_materialize.py /
+  #     excel_extract.py 三个生产文件，因此门开门关都能跑。
+  #   · `--check-anchors` 只做锚点静态命中核对（不写盘、不跑变异），秒级。
+  #
+  # 🔴 为什么这里**不**挂 `--run all`：跑变异要逐条改守卫文件再还原，在 CI 上与
+  #    并发 job 争用工作树；且它需要基线全绿，而 W spec 尚在 Wave 5 收口
+  #    （`test_workbook_row_change_reachability.py` 现基线红：清册里 D2 已 propagated，
+  #    该文件仍断言 blocked —— C 在收口）。完整 `--run all` 的验收在本地做，
+  #    结论记在 spec 里；CI 只守「锚点没漂」这条低成本高价值的判据。
+  workbook-row-change-scope-and-mutation-anchors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: "[workbook-row-change] 范围边界判据（Requirement 9.1–9.6，只读）"
+        run: python -m pytest backend/tests/workpaper_sync/test_workbook_row_change_scope_boundary.py -q --no-header -p no:randomly
+      - name: "[workbook-row-change] 变异锚点静态自检（九条，--check-anchors 只读）"
+        run: python backend/scripts/diagnose/mutate_workbook_row_change_guards.py --check-anchors
+  # ─────────────────────────────────────────────────────────────────────────
+  # P spec（published-representation-production-path-and-lane-adjudication）
+  # BP-25：B60 的 `blocked_ooxml_gate` 解除路径裁决 —— 外部工作簿链接普查
+  #
+  # 这道门守的是一个**裁决的前提**，不是代码形态。裁决内容：`xlsx/b60/gt-b60-bundle`
+  # 恒落 `blocked_ooxml_gate`（`gate=external_relationships`）时，曾提出「那些外链是死
+  # 元数据，剔掉即可」这条省事路径。全库实测把它证伪了：
+  #
+  #   351 份权威模板 → 162 份含 `xl/externalLinks/` → **162/162 都真引用**
+  #   （14,146 处：definedName 10,263 + formula 3,883）→ 死元数据 **0 份**
+  #
+  # ⇒ 剔链接会静默改掉审计底稿的取数，那条路径不存在；放宽
+  #   `allow_external_relationships` 又会为 162/351 份模板削弱全局安全控制。
+  #   B60 因此维持 blocked，属**模板编制方** remediation 而非工程项。
+  #
+  # 判据形态是**归因型**：只断言「死元数据模板数 == 0」。一旦哪天真出现死元数据模板
+  # （模板编制方清理过链接），本门打红 = 提醒重新裁决，而不是默默让旧结论继续成立。
+  # 只读（openpyxl 都不用，纯 zipfile + 生产分词器），不碰任何泳道的生产文件。
+  b60-external-link-census:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: "[b60-gate] 权威模板外部链接普查（死元数据必须为 0，只读）"
+        run: python backend/scripts/check/check_template_external_links.py --expect-dead-metadata 0

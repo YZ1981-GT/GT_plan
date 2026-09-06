@@ -1,0 +1,1 @@
+{"authority_model":"projection_contract","content_authority":"structured_projection","entry_id":"xlsx/gt-g7-long-term-equity-main","merge_model":"stable_field_three_way","pilot_class":"g7_two_level_dynamic","required_slots":["template","instrumentation","contract"],"schema_version":"authority-model-definition:v1"}

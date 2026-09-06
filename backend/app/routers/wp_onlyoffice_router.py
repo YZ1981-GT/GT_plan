@@ -299,77 +299,83 @@ def _oo_file_is_xlsx_zip(path: Path) -> bool:
 
 
 def _hide_non_target_sheets(file_path: Path, target_sheet: str) -> None:
-    """用 openpyxl 将非目标 sheet 设为 hidden，让 OO 只显示目标 tab。
+    """将非目标 sheet 设为 hidden，让 OO 只显示目标 tab。
 
-    匹配逻辑：target_sheet 可能是完整名或末尾含编码，用 endswith 或 contains 匹配。
-    至少保留一个可见 sheet（否则 xlsx 无效）。
+    匹配逻辑：target_sheet 可能是完整名或末尾含编码，精确匹配优先，否则用
+    contains / endswith（规则由 `excel_sheet_visibility.resolve_target_sheet`
+    承载，与本函数历史行为逐条一致）。至少保留一个可见 sheet。
 
     幂等：目标 sheet 已是唯一可见且为活动 sheet 时不落盘（避免 mtime 变化
-    导致 doc_key 刷新、打断进行中的 OO 编辑会话）。
+    导致无谓刷新、打断进行中的 OO 编辑会话）。
+
+    ## 🔴 2026-09-03：实现从 openpyxl 全量重写换成 zip 级外科手术
+
+    原实现 `openpyxl.load_workbook()` + `wb.save()` 会重写整本 workbook。K11
+    实测毁坏（before → after）：zip 部件 **37 → 19**（丢 7 个
+    `printerSettings*.bin` + 6 个 `worksheets/_rels/*.rels` + `sharedStrings.xml`
+    + `calcChain.xml` + 批注与 customXml）、共享公式主格 **12 → 0**（整组被
+    展平）、缓存值 **716 → 478 且余下写成空标签 `<v></v>`**、样式索引全表重排
+    （`s="94"` → `s="218"`）。这条路径在**每次切换 sheet 时都跑一次**，改坏的是
+    用户正在 OO 里编辑并会被回写的那份文件。
+
+    `excel_materialize.select_write_strategy` 早已判定 openpyxl 在本项目
+    351 个模板上一个都不安全；此处曾绕过那道门。
+
+    隐藏 sheet 本身无害 —— Excel / OO 里隐藏的 sheet 照样参与计算，跨 sheet
+    公式引用（实测 188 份模板共 81,955 处）指向隐藏 sheet 完全正常。所以行为
+    不变，只把实现换成「除 `xl/workbook.xml` 外一个字节都不动」，并由
+    `_assert_only_workbook_part_changed` 结构性自检兜住。
+
+    失败时**不落盘**（临时文件先写、成功才顶替），并记 ERROR 而非 WARNING ——
+    原来的 `except Exception: logger.warning` 正是这类毁坏能长期无声发生的原因。
     """
+    from app.services.workpaper_sync.excel_sheet_visibility import (
+        apply_single_sheet_visibility,
+    )
+
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(str(file_path))
-        if len(wb.sheetnames) <= 1:
-            wb.close()
-            return
-
-        # 找到目标 sheet（精确匹配优先，否则 endswith / contains）
-        target_ws = None
-        for ws in wb.worksheets:
-            if ws.title == target_sheet:
-                target_ws = ws
-                break
-        if not target_ws:
-            for ws in wb.worksheets:
-                if target_sheet in ws.title or ws.title.endswith(target_sheet):
-                    target_ws = ws
-                    break
-        if not target_ws:
-            # 无法匹配，不隐藏（安全降级）
-            wb.close()
-            return
-
-        # 幂等短路：目标已可见 + 活动，且其余全部隐藏 → 无需改写文件
-        already_ok = (
-            target_ws.sheet_state == 'visible'
-            and wb.active == target_ws
-            and all(ws.sheet_state == 'hidden' for ws in wb.worksheets if ws is not target_ws)
+        outcome = apply_single_sheet_visibility(file_path, target_sheet)
+    except Exception as exc:  # noqa: BLE001 — 可见性是体验优化，不该 500 掉编辑器
+        logger.error(
+            "sheet 可见性改写失败（文件未被修改）%s target=%r: %s: %s",
+            file_path.name, target_sheet, type(exc).__name__, exc,
         )
-        if already_ok:
-            wb.close()
-            return
-
-        # 设置目标为活动 sheet，其余隐藏
-        for ws in wb.worksheets:
-            if ws == target_ws:
-                ws.sheet_state = 'visible'
-            else:
-                ws.sheet_state = 'hidden'
-        wb.active = wb.worksheets.index(target_ws)
-        wb.save(str(file_path))
-        wb.close()
-    except Exception as e:
-        logger.warning("_hide_non_target_sheets failed for %s: %s", file_path.name, e)
+        return
+    if outcome.changed:
+        logger.info(
+            "sheet 可见性已改写 %s：可见=%s 隐藏 %d 张 activeTab=%s",
+            file_path.name, outcome.visible, len(outcome.hidden), outcome.active_tab,
+        )
+    elif outcome.reason == "target_not_matched":
+        logger.warning(
+            "sheet 可见性未改：目标 %r 在 %s 里匹配不到任何 sheet",
+            target_sheet, file_path.name,
+        )
 
 
 def _ensure_all_sheets_visible(file_path: Path) -> None:
     """「完整Excel」页签：把共享工作簿的全部 sheet 恢复可见（幂等，无变化不落盘）。
 
     共享文件曾被 _hide_non_target_sheets 隐藏为单 sheet，整册编辑前需恢复。
+
+    与 `_hide_non_target_sheets` 同因换成 zip 级实现 —— 见那里的实测毁坏记录。
     """
+    from app.services.workpaper_sync.excel_sheet_visibility import (
+        restore_all_sheets_visible,
+    )
+
     try:
-        import openpyxl
-        wb = openpyxl.load_workbook(str(file_path))
-        if all(ws.sheet_state == 'visible' for ws in wb.worksheets):
-            wb.close()
-            return
-        for ws in wb.worksheets:
-            ws.sheet_state = 'visible'
-        wb.save(str(file_path))
-        wb.close()
-    except Exception as e:
-        logger.warning("_ensure_all_sheets_visible failed for %s: %s", file_path.name, e)
+        outcome = restore_all_sheets_visible(file_path)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "恢复全部 sheet 可见失败（文件未被修改）%s: %s: %s",
+            file_path.name, type(exc).__name__, exc,
+        )
+        return
+    if outcome.changed:
+        logger.info(
+            "已恢复 %s 的全部 %d 张 sheet 为可见", file_path.name, len(outcome.visible)
+        )
 
 
 # doc_key 不再由本模块生成。

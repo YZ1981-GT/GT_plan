@@ -1119,7 +1119,18 @@ class TestResolverMigrationMatrix:
             if r["module"] == "app.services.wp_template_finder"
         }
         assert rows, "wp_template_finder 未进矩阵（Requirement 9.4 点名的分叉）"
-        assert set(rows) == {"find_template_file_any", "find_all_template_files"}, (
+        # Task 74 the detector fix recovered three more rows in this module:
+        # `_record_ad_hoc_path` now resolves module-level path constants, so the
+        # `TEMPLATES_DIR / ...` lookups that the d1262c80 file split had made
+        # invisible are back in the denominator. The set is still enumerated
+        # writer-by-writer on purpose -- see this test docstring.
+        assert set(rows) == {
+            "find_template_file_any",
+            "find_all_template_files",
+            "find_template_file",
+            "_find_docx_by_index_or_disk",
+            "_find_docx_on_disk",
+        }, (
             f"矩阵里的 finder writer 集合变了: {sorted(rows)}"
         )
 
@@ -1152,6 +1163,15 @@ class TestResolverMigrationMatrix:
         assert "58" not in str(deferred.get("blocking_task") or ""), (
             "Task 58 已落地，blocking_task 不得再指向它（否则矩阵声称一个已完成的阻塞）"
         )
+
+        # The three recovered rows are helpers of the same template-library lane:
+        # none of them is on the Word lane Task 58 migrated, so each must still
+        # carry a non-empty blocking_task that does not point at the done Task 58.
+        for name in ("find_template_file", "_find_docx_by_index_or_disk", "_find_docx_on_disk"):
+            row = rows[name]
+            assert row["status"] == "deferred", name
+            assert str(row.get("blocking_task") or "").strip(), name
+            assert "58" not in str(row.get("blocking_task") or ""), name
 
     def test_oo_router_deferral_is_registered_with_912_reason(self, matrix: dict):
         """Requirement 9.12 的未迁移登记必须显式点名（防悄悄放过）。"""

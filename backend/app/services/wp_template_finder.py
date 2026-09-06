@@ -8,6 +8,7 @@ sheet 名归一化 / 历史遗留 sheet 过滤工具。
 """
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import re
@@ -116,12 +117,16 @@ def _code_prefix_boundary_ok(filename: str, wp_code: str) -> bool:
 
 
 def find_template_file(wp_code: str) -> Path | None:
-    """根据 wp_code 查找主模板文件
+    """根据 wp_code 查找主模板文件（**权威目录**解析）
 
     优先匹配：含"审定表"或"常规程序"的文件 > 文件名最短的。
     对于多文件底稿（如 D2 有 D2-1至D2-4），返回审定表文件。
     对于子表（如 D2-2/E1-3），如果独立文件不存在，回退到主表文件
     （主表 xlsx 通常包含所有子表 sheet，如 "D2-1至D2-4 应收账款-审定表明细表"）。
+
+    🔴 本函数体是**权威侧**解析。模块末尾会把同名的模块属性重绑定为「覆盖层优先」的
+    薄封装，并把本函数留在 :data:`find_template_file_unresolved` 上（见文件末尾
+    「公开入口 —— 覆盖层薄封装」一节的理由）。
     """
     index = _load_index()
     # 精确匹配
@@ -233,10 +238,14 @@ def _resolve_most_specific_docx(wp_code: str) -> Path | None:
 
 
 def find_all_template_files(wp_code: str) -> list[Path]:
-    """查找 wp_code 对应的所有模板文件（多文件底稿）"""
+    """查找 wp_code 对应的所有模板文件（多文件底稿，**权威目录**解析）。
+
+    A 子码分支调 ``find_template_file_any_unresolved`` 而不是公开入口，保持权威侧闭环
+    —— 否则 ``resolve_all_templates`` 会经它再次进入覆盖层。
+    """
     is_sub_code = bool(_LEGACY_A_ONLY_SUB_CODE_RE.match(wp_code))
     if is_sub_code:
-        single = find_template_file_any(wp_code)
+        single = find_template_file_any_unresolved(wp_code)
         return [single] if single else []
 
     index = _load_index()
@@ -288,7 +297,7 @@ def _find_docx_by_index_or_disk(wp_code: str) -> Path | None:
 
 
 def find_template_file_any(wp_code: str) -> Path | None:
-    """Find template file of any format (xlsx/xlsm/docx/doc)
+    """Find template file of any format (xlsx/xlsm/docx/doc)（**权威目录**解析）
 
     P2-2: 扩展模板查找支持 docx/doc 格式。
     优先返回 xlsx/xlsm，其次 docx/doc。
@@ -338,7 +347,7 @@ def find_template_file_any(wp_code: str) -> Path | None:
         return None
 
     # 主程序表：xlsx 优先
-    result = find_template_file(wp_code)
+    result = find_template_file_unresolved(wp_code)
     if result:
         return result
     index = _load_index()
@@ -372,3 +381,86 @@ def list_available_templates() -> list[dict]:
             "size_kb": e["size_kb"],
         })
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 公开入口 —— 覆盖层薄封装（spec excel-template-override-layer Task 8）
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 上面三个 `def` 是**权威目录**解析。这里把它们各留一个 `*_unresolved` 别名给
+# `wp_template_override` 当定位基准，再把三个**公开名**重绑定为「覆盖层优先」的薄封装。
+#
+# ## 🔴 为什么用「模块末尾重绑定」而不是把实现改名成 `*_unresolved`
+#
+# 改名试过，被一条既有判据打红：`test_task58_word_canonical_resolver.py` 的
+# `test_finder_no_longer_uses_a_only_regex_for_sub_code_decision` 用 **AST** 断言
+# 「名为 `find_template_file_any` 的 FunctionDef 里，对 `_resolve_most_specific_docx`
+# 的调用早于 `_LEGACY_A_ONLY_SUB_CODE_RE.match`」—— 它锁的是「统一 Word resolver 没成
+# 死代码」这件事。把实现改名后，该名字下的函数体变成三行薄封装，判据必红。
+#
+# 重绑定同时满足两侧：AST 看到的 `FunctionDef` 仍是原实现（Task 58 判据绿），
+# 运行时的模块属性是覆盖层优先的 wrapper（Requirement 2.1 生效）。
+#
+# `functools.wraps` 保住 `__wrapped__`，于是 `inspect.signature` 仍报
+# `(wp_code)` —— Requirement 2.3「签名与返回类型不变」也不破。
+#
+# ## 🔴 旧签名只能解析到事务所层，这是有意的
+#
+# 四层优先级是 `project > group_custom > firm_default > authoritative`，其中
+# `project` / `group_custom` 需要 `project_id` / `group_id`。旧入口只收 `wp_code`，
+# 所以经它解析时那两层**不参与**。这不是缺陷：Requirement 2.3 要求签名不变，给旧入口
+# 加参数会波及全库约 50 个调用点。需要项目级覆盖的新代码直接用
+# `wp_template_override.resolve_template(wp_code, project_id=..., group_id=...)`，
+# 它同时给出 `origin` / `version_id` / `sha256`（Requirement 2.2）。
+#
+# 于是旧调用方**自动**获得事务所级覆盖（"改一次模板对所有项目生效"正是这个场景），
+# 项目级覆盖要求调用方显式声明它在哪个项目里 —— 解析结果不再依赖隐式上下文。
+
+#: 权威侧解析（不经覆盖层）。`wp_template_override` 用它们作定位基准与扩展名参照；
+#: 若它回调公开入口就会成环。
+find_template_file_unresolved = find_template_file
+find_all_template_files_unresolved = find_all_template_files
+find_template_file_any_unresolved = find_template_file_any
+
+
+@functools.wraps(find_template_file_unresolved)
+def _find_template_file_override_first(wp_code: str) -> Path | None:
+    from app.services.wp_template_override import resolve_template
+
+    resolution = resolve_template(wp_code)
+    return resolution.path if resolution is not None else None
+
+
+@functools.wraps(find_all_template_files_unresolved)
+def _find_all_template_files_override_first(wp_code: str) -> list[Path]:
+    from app.services.wp_template_override import resolve_all_templates
+
+    return [r.path for r in resolve_all_templates(wp_code)]
+
+
+@functools.wraps(find_template_file_any_unresolved)
+def _find_template_file_any_override_first(wp_code: str) -> Path | None:
+    from app.services.wp_template_override import resolve_template_any
+
+    resolution = resolve_template_any(wp_code)
+    return resolution.path if resolution is not None else None
+
+
+_find_template_file_override_first.__doc__ = (
+    "根据 wp_code 查找主模板文件（覆盖层优先，回落权威目录）。\n\n"
+    "权威侧实现见 `find_template_file_unresolved`；带来源标记的版本见 "
+    "`wp_template_override.resolve_template`。"
+)
+_find_all_template_files_override_first.__doc__ = (
+    "查找 wp_code 对应的所有模板文件（覆盖层**逐份**优先，回落权威目录）。\n\n"
+    "同一 wp_code 的多份权威文件里只覆盖了一份时，其余仍返回权威文件 —— "
+    "整组一起换掉会让「改一份」变成「必须全改」。"
+)
+_find_template_file_any_override_first.__doc__ = (
+    "Find template file of any format（覆盖层优先，回落权威目录）。\n\n"
+    "权威侧实现见 `find_template_file_any_unresolved`。"
+)
+
+find_template_file = _find_template_file_override_first
+find_all_template_files = _find_all_template_files_override_first
+find_template_file_any = _find_template_file_any_override_first

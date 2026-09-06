@@ -41,11 +41,32 @@
     {
       "id": "BP-61-1",
       "kind": "binding",
+      "measured_2026_09_04": {
+        "capability_of_that_entry": "single_onlyoffice",
+        "manifest_capability_counts": {
+          "bidirectional": 0,
+          "single_html": 5,
+          "single_onlyoffice": 180,
+          "unreachable": 1
+        },
+        "manifest_entry_count": 186,
+        "manifest_entry_with_current_representation": [
+          "xlsx/gt-g7-long-term-equity-main"
+        ],
+        "measured_by_probe": "registry._describe_entry_supply 逐 entry 真跑 + build_manifest_registration_plan + build_production_registry（该 entry 的 plan item 的 `blocked_reason` 实测已变 None）",
+        "of_which_manifest_entry": 1,
+        "of_which_opaque_namespace": 1,
+        "registered_adapter_ids": [],
+        "supply_gate_rejects_remaining": 185,
+        "supply_gate_verdict_for_that_entry": "None（放行）",
+        "why_still_binding": "供给门已放行 1 个 entry，但 `registered_adapter_ids` 仍为空 —— 注册还要求该 entry 的 manifest capability 为 `bidirectional`，实测仍是 `single_onlyoffice`。⇒ 约束未解除，根因由「无 representation」移到「capability 未翻转」",
+        "working_paper_sync_entry_state_rows_total": 2
+      },
       "measured_by": "gate.binding_constraint_is_measured / arm_a + arm_b",
-      "owner_task": "36/77（finalize gate）与 ContentMutationService.commit —— 不属 Task 61",
+      "owner_task": "供给侧 = published-representation-production-path-and-lane-adjudication spec（首版发布宿主）；capability 翻转侧 = manifest 重生成 + `approved_source_digest` 人工复核（Task 67 登记的复核方）—— 均不属 Task 61",
       "scope": "platform_wide_not_f2_specific",
       "unblocks": "Task 61 正文第一句的准入条件（resolver 返回 published representation）",
-      "what": "`working_paper_sync_entry_state` 全表 0 行 ⇒ 没有任何 entry 有 current published representation ⇒ `registry._describe_entry_supply` 对 **186 个** planned entry 全部给出拒绝原因，`registered_adapter_ids` 恒为空。"
+      "what": "**185 / 186** planned entry 没有 current published representation ⇒ `registry._describe_entry_supply` 对它们全部给出拒绝原因，`registered_adapter_ids` 仍为空。"
     },
     {
       "id": "BP-61-2",
@@ -826,7 +847,7 @@
     "P69": "evidence 由逐 scenario 实体与服务端重算闭合",
     "P71": "evidence 随环境、runner 与 immutable definition bundle 变化失效"
   },
-  "registry_digest": "e415fbc7e8e0f0a178f80ae9b4fdcf07ff7a62a6ea13955bf755bdcfa42fb0f5",
+  "registry_digest": "90ba362301656a13dda3c97064d3011d38a02fe8e85ba841e06e6696c37ad36b",
   "requirements_claimed_but_not_declared": [],
   "requirements_without_probe": [],
   "scenario_denominator": {

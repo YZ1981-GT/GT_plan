@@ -1,0 +1,230 @@
+{
+  "schema_version": "mutate-projection-first-publication/1",
+  "spec": "published-representation-production-path-and-lane-adjudication",
+  "task": "10.1",
+  "elapsed_sec": 64.84,
+  "baseline": {
+    "backend/tests/workpaper_sync/test_projection_first_publication.py": {
+      "failures": [],
+      "passed": 27
+    },
+    "backend/tests/workpaper_sync/test_projection_lane_registry.py": {
+      "failures": [],
+      "passed": 45
+    }
+  },
+  "min_baseline_passed": {
+    "backend/tests/workpaper_sync/test_projection_lane_registry.py": 36,
+    "backend/tests/workpaper_sync/test_projection_first_publication.py": 20
+  },
+  "mutation_total": 9,
+  "verdict_counts": {
+    "RED": 7,
+    "RED(+其它)": 2
+  },
+  "all_red": true,
+  "results": [
+    {
+      "id": "M1",
+      "path": "backend/app/services/workpaper_sync/projection_lane_registry.py",
+      "test": "backend/tests/workpaper_sync/test_projection_lane_registry.py",
+      "want": [
+        "test_any_entry_id_under_the_opaque_prefix_is_opaque",
+        "test_every_declared_lane_id_is_reachable_from_an_entry_id",
+        "test_l1_branch_precedes_the_manifest_lookup_in_source_order",
+        "test_opaque_entry_id_is_adjudicated_opaque",
+        "test_opaque_raises_lane_is_opaque_with_lane_id",
+        "test_opaque_verdict_holds_even_with_an_empty_manifest",
+        "test_real_opaque_representation_entry_is_opaque"
+      ],
+      "why": "opaque entry_id **永不在 manifest 里** ⇒ L1 后移后它先撞 L2 的 undecided，L1 成为不可达分支。后果：已有 opaque representation 的底稿被判「判据不足」，首版入口会拿它去发 projection 首版 —— 那会覆盖用户的权威 OOXML。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_any_entry_id_under_the_opaque_prefix_is_opaque",
+        "test_every_declared_lane_id_is_reachable_from_an_entry_id",
+        "test_opaque_entry_id_is_adjudicated_opaque",
+        "test_opaque_raises_lane_is_opaque_with_lane_id",
+        "test_opaque_verdict_holds_even_with_an_empty_manifest",
+        "test_real_opaque_representation_entry_is_opaque"
+      ],
+      "want_hit": [
+        "test_any_entry_id_under_the_opaque_prefix_is_opaque",
+        "test_every_declared_lane_id_is_reachable_from_an_entry_id",
+        "test_opaque_entry_id_is_adjudicated_opaque",
+        "test_opaque_raises_lane_is_opaque_with_lane_id",
+        "test_opaque_verdict_holds_even_with_an_empty_manifest",
+        "test_real_opaque_representation_entry_is_opaque"
+      ],
+      "passed_under_mutation": 6,
+      "baseline_failures": []
+    },
+    {
+      "id": "M2",
+      "path": "backend/app/services/workpaper_sync/projection_lane_registry.py",
+      "test": "backend/tests/workpaper_sync/test_projection_lane_registry.py",
+      "want": [
+        "test_all_sixteen_states_are_actually_exercised",
+        "test_each_single_false_breaks_satisfaction",
+        "test_satisfaction_equals_conjunction_over_all_16_states"
+      ],
+      "why": "四条判据合成一条 ⇒ 「有 approved bundle」被当成「供给成立」。而 B/C/D 分别管「有 current representation」「它绑的是 projection_contract bundle」「磁盘契约 digest 与 slot digest 一致」—— 少任一条都会让首版入口对着一个身份已漂移的对象动手。",
+      "verdict": "RED(+其它)",
+      "new_failures": [
+        "test_a_true_b_false_names_both",
+        "test_all_sixteen_states_are_actually_exercised",
+        "test_diagnostic_is_generic_not_a_hardcoded_pair",
+        "test_diagnostic_stops_at_the_first_false",
+        "test_each_single_false_breaks_satisfaction[projection_bundle_provisioned]",
+        "test_each_single_false_breaks_satisfaction[published_representation_current]",
+        "test_each_single_false_breaks_satisfaction[representation_contract_digest_matches]",
+        "test_each_single_false_breaks_satisfaction[representation_follows_projection_contract]",
+        "test_entry_id_is_in_the_diagnostic",
+        "test_first_false_criterion_is_named[projection_bundle_provisioned-A]",
+        "test_first_false_criterion_is_named[published_representation_current-B]",
+        "test_first_false_criterion_is_named[representation_contract_digest_matches-D]",
+        "test_first_false_criterion_is_named[representation_follows_projection_contract-C]",
+        "test_satisfaction_equals_conjunction_over_all_16_states"
+      ],
+      "want_hit": [
+        "test_all_sixteen_states_are_actually_exercised",
+        "test_satisfaction_equals_conjunction_over_all_16_states"
+      ],
+      "passed_under_mutation": 14,
+      "baseline_failures": []
+    },
+    {
+      "id": "M3",
+      "path": "backend/app/services/workpaper_sync/projection_lane_registry.py",
+      "test": "backend/tests/workpaper_sync/test_projection_lane_registry.py",
+      "want": [
+        "test_broken_session_raises_instead_of_returning_false_facts",
+        "test_source_reraises_rather_than_returning_a_default"
+      ],
+      "why": "fail-open 掩盖接线错误：「四条皆假」是**已知**供给不足，「查不出来」是**未知**。把后者伪装成前者，会让权限缺失、schema 漂移、连接故障全部长得像「这个 entry 还没发首版」，于是首版入口照发 —— 而它其实可能已经有 representation。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_broken_session_raises_instead_of_returning_false_facts",
+        "test_source_reraises_rather_than_returning_a_default"
+      ],
+      "want_hit": [
+        "test_broken_session_raises_instead_of_returning_false_facts",
+        "test_source_reraises_rather_than_returning_a_default"
+      ],
+      "passed_under_mutation": 2,
+      "baseline_failures": []
+    },
+    {
+      "id": "M4",
+      "path": "backend/app/services/workpaper_sync/projection_first_publication.py",
+      "test": "backend/tests/workpaper_sync/test_projection_first_publication.py",
+      "want": [
+        "test_absent_current_representation_passes_criterion_three",
+        "test_existing_current_representation_is_rejected"
+      ],
+      "why": "首版入口被拿去覆盖既有 representation。判据 ③ 要求判据 B 为 **False** ——取反后，「已经有 current published representation」反而成了准入条件，而「还没有」被拒。后果：本入口会对着一个用户正在用的 representation 发「首版」，把它的代际链踩掉；同 content version 的新代际本该走 Task 36/77 的 finalize gate。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_absent_current_representation_passes_criterion_three",
+        "test_existing_current_representation_is_rejected"
+      ],
+      "want_hit": [
+        "test_absent_current_representation_passes_criterion_three",
+        "test_existing_current_representation_is_rejected"
+      ],
+      "passed_under_mutation": 2,
+      "baseline_failures": []
+    },
+    {
+      "id": "M5",
+      "path": "backend/app/services/workpaper_sync/projection_first_publication.py",
+      "test": "backend/tests/workpaper_sync/test_projection_first_publication.py",
+      "want": [
+        "test_b60_authoritative_bytes_are_rejected_with_a_named_gate"
+      ],
+      "why": "B60 的 `external_relationships` 静默通过 ⇒ 带外部链接的权威字节被当成 substrate 发布。那是安全策略裁决的对象（`xl/externalLinks/_rels/externalLink1.xml.rels`），不是可以顺手放宽的技术细节。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_b60_authoritative_bytes_are_rejected_with_a_named_gate"
+      ],
+      "want_hit": [
+        "test_b60_authoritative_bytes_are_rejected_with_a_named_gate"
+      ],
+      "passed_under_mutation": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "M6",
+      "path": "backend/app/services/workpaper_sync/projection_first_publication.py",
+      "test": "backend/tests/workpaper_sync/test_projection_first_publication.py",
+      "want": [
+        "test_publish_never_passes_a_null_adapter"
+      ],
+      "why": "绕开 `_assert_authority_shape`：它要求 `adapter` / `contract` / `mutation.projection` 三者非空。以空 adapter 提交等于让 representation 落库时没有任何授权形态校验 —— 那道门是「不得产出无人能反读的 representation」的唯一保证。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_publish_never_passes_a_null_adapter"
+      ],
+      "want_hit": [
+        "test_publish_never_passes_a_null_adapter"
+      ],
+      "passed_under_mutation": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "M7",
+      "path": "backend/app/services/workpaper_sync/projection_first_publication.py",
+      "test": "backend/tests/workpaper_sync/test_projection_lane_registry.py",
+      "want": [
+        "test_scanner_passes_on_the_current_tree"
+      ],
+      "why": "第二真源：lane 归属一旦有两处判定，两处就会各自演化。本仓库已付过学费 ——`opaque-` 前缀的唯一构造处是 `writer_migration.opaque_entry_id`，唯一判定处必须是 `adjudicate_lane`。全仓 AST 扫描器就是为此存在的。",
+      "verdict": "RED(+其它)",
+      "new_failures": [
+        "test_scanner_passes_on_the_current_tree",
+        "test_shape_validation_sites_are_classified_as_shape"
+      ],
+      "want_hit": [
+        "test_scanner_passes_on_the_current_tree"
+      ],
+      "passed_under_mutation": 2,
+      "baseline_failures": []
+    },
+    {
+      "id": "M8",
+      "path": "backend/scripts/fix/fix_projection_first_publication.py",
+      "test": "backend/tests/workpaper_sync/test_projection_first_publication.py",
+      "want": [
+        "test_apply_rolls_back_only_the_failing_entry",
+        "test_apply_uses_one_session_per_entry"
+      ],
+      "why": "一处失败全部回滚：四个 entry 里 H1 与 D2 各自被不同原因挡住（实测），共用事务时 G7 的成功提交会被它们连带回滚 —— 那正是 2026-09-04 首轮「四个 entry 一个都发不出去、库里 0 新增行」形态的加剧版。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_apply_uses_one_session_per_entry"
+      ],
+      "want_hit": [
+        "test_apply_uses_one_session_per_entry"
+      ],
+      "passed_under_mutation": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "M9",
+      "path": "backend/scripts/fix/fix_projection_first_publication.py",
+      "test": "backend/tests/workpaper_sync/test_projection_first_publication.py",
+      "want": [
+        "test_apply_actually_awaits_publish_first_generation"
+      ],
+      "why": "假绿第①源（additive 死代码）：`publish_first_generation` 写好了、测试单独测它，但宿主只是引用而不 await ⇒ `--apply` 什么也不发，而测试全绿。本仓库这条形态已发生过，不是理论风险。",
+      "verdict": "RED",
+      "new_failures": [
+        "test_apply_actually_awaits_publish_first_generation"
+      ],
+      "want_hit": [
+        "test_apply_actually_awaits_publish_first_generation"
+      ],
+      "passed_under_mutation": 1,
+      "baseline_failures": []
+    }
+  ]
+}

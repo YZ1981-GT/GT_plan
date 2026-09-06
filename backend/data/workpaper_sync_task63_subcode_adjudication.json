@@ -7,6 +7,41 @@
         "adapter_registration"
       ],
       "id": "BP-16",
+      "measured": {
+        "b_subcode_count": 9,
+        "b_subcodes_with_own_entry": [],
+        "b_subcodes_with_own_entry_count": 0,
+        "catch_all_entry_ids": [
+          "docx/gt-wp-renderer",
+          "docx/workpaper-word-editor",
+          "docx/wp-popup-docx-editor",
+          "xlsx/cash-flow-verification",
+          "xlsx/gt-c-control-test",
+          "xlsx/gt-custom-wp-editor",
+          "xlsx/gt-wp-renderer",
+          "xlsx/shared/cycle-standalone-procedure-shell"
+        ],
+        "covering_catch_all_entry": "docx/gt-wp-renderer",
+        "covering_catch_all_entry_present": true,
+        "criterion": "9 个 B 子码里，有几个能在某条 manifest entry 的 `wp_match.wp_code_patterns` 里**逐字命中** —— 大于 0 即 BP-16 可复议。",
+        "docx_entry_ids": [
+          "docx/gt-a10-bundle",
+          "docx/gt-a12-bundle",
+          "docx/gt-a16-bundle",
+          "docx/gt-a17-bundle",
+          "docx/gt-wp-renderer",
+          "docx/workpaper-word-editor",
+          "docx/wp-popup-docx-editor"
+        ],
+        "docx_entry_ids_with_wp_code_patterns": [
+          "docx/gt-a10-bundle",
+          "docx/gt-a12-bundle",
+          "docx/gt-a16-bundle",
+          "docx/gt-a17-bundle"
+        ],
+        "manifest_entry_total": 186,
+        "manifest_sha256": "f0ec376201a1013568e79e8e7bbd12a8e013ef21ee730fb04f5753142bf22a03"
+      },
       "must_fix_before": "为任一 B 子码装载生产契约 / 注册 adapter",
       "numbering_note": "续接 F2 lane 的 BP-1..BP-15（本记录消费它们、不改它们）。",
       "observable_consequences": [
@@ -28,12 +63,23 @@
         "published_representation"
       ],
       "id": "BP-17",
+      "measured": {
+        "assert_may_publish_defined_in": "app/services/workpaper_sync/word_sdt_engine.py",
+        "assert_may_publish_raises_without_bundle": true,
+        "candidate_state_hardwired": "awaiting_contract",
+        "candidate_targets_hardwired_none": true,
+        "criterion": "① `assert_may_publish` 的定义处仍在 `word_sdt_engine.py`，且其守卫条件仍是「非 bundle_bound 或 bundle is None ⇒ 抛」；② candidate 登记处仍把 `target_contract_definition_id` / `target_definition_bundle_id` 双双写死 None。两条同时成立 ⇒ 本 lane 无论如何都到不了 published representation。",
+        "word_instrumentation_sha256": "8dd415624a494aaf50794d54983a04be5d68e608008e08fb3ea59e5046e3525d",
+        "word_sdt_engine_sha256": "20eca15665c1432b4c652e1a8748e7025d826b5691a0a5ad6034d7eaf3d0c827"
+      },
       "must_fix_before": "Task 77 WordEntryFinalizeGate.finalize_candidate 可被调用",
       "observable_consequences": [
         "WordInstrumentationUpgrader.stage_and_register_candidate 写死 target_definition_bundle_id=None / state=awaiting_contract",
         "finalize 时 candidate.target_definition_bundle_id is None ⇒ PerEntryContractUnapprovedError"
       ],
+      "scope_note": "🔴 判据是 **lane 内**的，不是平台级行数。2026-09-04 实测平台侧已有 23 条 definition artifact / 9 个 bundle / 4 条 current published representation（属 b60 / d2 / g7 / h1 与 opaque lane），但 `document_type='docx'` 的 representation 仍为 0、9 个 B 子码在四张表里各为 0 行。按平台行数判会把别的 lane 的产出误读成本 lane 解除 —— Task 61 的 BP-61-1 已在 2026-09-03 踩过这个坑。",
       "source_refs": [
+        "backend/app/services/workpaper_sync/word_sdt_engine.py",
         "backend/app/services/workpaper_sync/word_instrumentation.py",
         "backend/app/services/workpaper_sync/word_entry_gate.py"
       ],
@@ -47,6 +93,17 @@
         "evidence"
       ],
       "id": "BP-18",
+      "measured": {
+        "blocking_task_field": "59,60,61",
+        "criterion": "禁令清单必须**逐字包含** `app/services/workpaper_sync/adapters/word.py`，且该路径在磁盘上仍不存在。只断言「清单非空 + 逐项不存在」会被改名绕过（Task 64 M13）。",
+        "forbidden_paths": [
+          "app/services/workpaper_sync/adapters/word",
+          "app/services/workpaper_sync/adapters/word.py"
+        ],
+        "forbidden_paths_all_absent": true,
+        "real_target_is_listed": true,
+        "registry_sha256": "e82ef5b69e8c08685a13027e5125fe6ba0edfdb755e7e94ecdb95132f87e1eb9"
+      },
       "must_fix_before": "把任一 B 子码的 capability 从 null 改成 bidirectional",
       "observable_consequences": [
         "9 个 entry 的 verification_state 只能是 UNVERIFIABLE",
@@ -56,10 +113,12 @@
       "source_refs": [
         "backend/app/services/workpaper_sync/adapters/registry.py",
         "backend/data/workpaper_sync_f2_word_lane_publication.json",
+        "backend/data/workpaper_task61_word_pilot_gate_probes.json",
         ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/tasks.md"
       ],
       "status": "open",
-      "what": "`registry.PENDING_ENGINE_ADAPTERS` 仍禁止 `adapters/word.py`，放行门写明是 Task 61 （真实 OO 9.4 F2 Word gate）；Task 61 当前 `[-]`，其 BP-10~BP-15 六条全部 open。"
+      "upstream_correction": "🔴 首版 BP-18 的措辞里有一句「其 BP-10~BP-15 六条全部 open」，已被 Task 61 自己 2026-09-01 的记录**证伪**：那四条平台欠账由 Tasks 75/76/77 解除，Task 61 改登记 BP-61-1/2/3，其中唯一 binding 的是 BP-61-1（published representation 供给，`scope=platform_wide_not_f2_specific`，生产者是 `ContentMutationService.commit(...)` 与 Tasks 36/77 的 finalize gate，**owner 不在 Task 61 也不在 Task 63**）。本轮起 BP-18 不再转述 Task 61 的内部阻塞编号 —— 转述上游编号是这次失准的根因，改为只断言本记录能直接现算的两件事（禁令在位 + 目标文件不存在）。",
+      "what": "`registry.PENDING_ENGINE_ADAPTERS` 仍禁止 `adapters/word.py`（禁令清单逐字包含该路径，磁盘上该文件仍不存在），放行门写明是 Task 61（真实 OO 9.4 F2 Word gate）；Task 61 复选框现扫仍是 `[-]`。"
     },
     {
       "blocks": [
@@ -758,7 +817,23 @@
     }
   ],
   "generated_by": "backend/scripts/gen/generate_workpaper_task63_subcode_adjudication.py",
-  "record_digest": "2fe3ab8a846f8135483e18aa88344313f8ee34f53f0b7244dbe410a9a2d250ba",
+  "record_digest": "dcad86c8194ab1f0ee8f07e030b3ed315bbd5abe7bc0310b020f2c47ef0f1b60",
+  "residency_reverification": {
+    "date": "2026-09-04",
+    "not_advanced_because": "四条全部 still_open。其中 BP-20（字段身份基础）的解除动作是**业务输入**而非编码：需底稿模板编制方为这 9 份 DOCX 引入 `${token}`，或逐份裁定每个 `××` 的业务语义。只要 BP-20 未解除，就不存在合法的 stable_field_key，任何 per-entry contract 都不得发布 —— 即便 BP-16（manifest entry）将来因 Task 67 重生成而解除，9 个 entry 仍是 UNVERIFIABLE。",
+    "verdicts": {
+      "BP-16": "still_open",
+      "BP-17": "still_open",
+      "BP-18": "still_open",
+      "BP-20": "still_open"
+    },
+    "why": "Task 63 是**有意驻留**任务，不是被中断的任务。驻留证据写于 2026-08-31，其后 Tasks 62/64/67/75/76/77 均有落地，故每轮接手先**重验**四条阻塞而不是复述结论。本块登记的是重验结果本身，让下一轮能一眼看出「上次算到哪、判据是什么」。",
+    "wording_corrections_applied": [
+      "BP-18 删掉转述上游编号的那句「Task 61 的 BP-10~BP-15 六条全部 open」（已被 Task 61 自己的记录证伪），改为只断言本记录可直接现算的两件事。",
+      "BP-17 的 source_refs 补上 `word_sdt_engine.py` —— `assert_may_publish` 的定义处在那里，首版只列了 word_instrumentation / word_entry_gate，读者按 refs 找不到那个「恒抛」的方法。",
+      "BP-16 / BP-17 / BP-18 各挂一个 `measured` 现算块，把散文判据换成可复算的结构事实。"
+    ]
+  },
   "s33rev_carrier_hint": {
     "candidate_carrier": {
       "derived_wp_code": "S33-1",
@@ -811,6 +886,10 @@
   },
   "schema_version": "task63-subcode-adjudication:v1",
   "sources": {
+    "adapter_registry": {
+      "path": "backend/app/services/workpaper_sync/adapters/registry.py",
+      "sha256": "e82ef5b69e8c08685a13027e5125fe6ba0edfdb755e7e94ecdb95132f87e1eb9"
+    },
     "adjudication_ledger": {
       "path": "backend/data/workpaper_word_template_adjudication.json",
       "sha256": "86c772dcbffd0d1c6341463798e972df0977f507f7a102a66532c791cacd0e0a"
@@ -819,9 +898,21 @@
       "path": "backend/app/data/wp_code_overrides.json",
       "sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394"
     },
+    "entry_manifest": {
+      "path": "backend/data/workpaper_sync_entry_manifest.json",
+      "sha256": "f0ec376201a1013568e79e8e7bbd12a8e013ef21ee730fb04f5753142bf22a03"
+    },
     "template_index": {
       "path": "backend/wp_templates/_index.json",
       "sha256": "7d1b57e50da2e1431e100e9f304c30f05f9da815b596a2eab651999f153fd4dd"
+    },
+    "word_instrumentation": {
+      "path": "backend/app/services/workpaper_sync/word_instrumentation.py",
+      "sha256": "8dd415624a494aaf50794d54983a04be5d68e608008e08fb3ea59e5046e3525d"
+    },
+    "word_sdt_engine": {
+      "path": "backend/app/services/workpaper_sync/word_sdt_engine.py",
+      "sha256": "20eca15665c1432b4c652e1a8748e7025d826b5691a0a5ad6034d7eaf3d0c827"
     }
   },
   "spec": "workpaper-html-onlyoffice-bidirectional-writeback-closure",

@@ -1108,8 +1108,15 @@ class WorkpaperRepresentationCandidateEvent(Base):
         _UUID, ForeignKey("users.id"), nullable=True
     )
     correlation_id: Mapped[str] = mapped_column(sa.String(200), nullable=False)
+    # 🔴 `'{}'` 而不是 `'{}'::jsonb` —— 与本文件上方 `operation_ids` 同一条理由
+    #    （Task 12 复盘已写明，这里 2026-09-05 又犯了一次并由 D 报出）：
+    #    带 `::jsonb` 的文本被 SQLAlchemy 原样塞进 `CREATE TABLE`，SQLite 解析到 `:`
+    #    直接 `unrecognized token: ":"` ⇒ 任何走 `Base.metadata.create_all(sqlite)` 的
+    #    测试在 setup 阶段 ERROR（实测 `test_d4_ipo_trigger` 2 条 collection ERROR）。
+    #    真实表由 V151 SQL 创建，ORM 的 server_default 只影响 DDL 生成；PG 对 jsonb 列的
+    #    `DEFAULT '{}'` 会隐式转型，两种写法在真实库上等价 ⇒ 去掉 `::jsonb` 无行为变化。
     detail: Mapped[dict] = mapped_column(
-        JSONB, nullable=False, server_default=sa.text("'{}'::jsonb")
+        JSONB, nullable=False, server_default=sa.text("'{}'")
     )
     created_at: Mapped[datetime] = mapped_column(
         _TS, nullable=False, server_default=sa.func.now()

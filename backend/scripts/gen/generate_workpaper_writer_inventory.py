@@ -32,6 +32,7 @@ import sys
 import tempfile
 from collections import Counter, defaultdict
 from pathlib import Path
+from collections.abc import Mapping
 from typing import Any
 
 _REPO = Path(__file__).resolve().parents[3]
@@ -90,6 +91,12 @@ _RESOLVER_SYMBOLS: frozenset[str] = frozenset(
 )
 #: The one resolver Requirement 9.11 designates as the canonical entry point.
 _CANONICAL_RESOLVER = "resolve_wp_file"
+
+#: Directory names that root a workpaper artifact path. A `<expr> / "<root>"` construction
+#: is the second-authority shape Requirement 9.11 wants surfaced.
+_WORKPAPER_PATH_ROOTS: frozenset[str] = frozenset(
+    {"storage", "workpapers", "excel_html", "wp_storage", "wp_templates"}
+)
 
 _ARTIFACT_WRITE_ATTRS: frozenset[str] = frozenset(
     {"write_bytes", "write_text", "copy2", "copyfile", "copyfileobj", "replace"}
@@ -493,7 +500,12 @@ def _record_call(facts: _FunctionFacts, call: ast.Call) -> None:
     _record_sql_update_values(facts, call)
 
 
-def _record_ad_hoc_path(facts: _FunctionFacts, node: ast.BinOp) -> None:
+def _record_ad_hoc_path(
+    facts: _FunctionFacts,
+    node: ast.BinOp,
+    *,
+    path_root_names: Mapping[str, str] | None = None,
+) -> None:
     """Record ``Path('storage') / ...`` style workpaper path construction.
 
     A second authority path (``storage/projects/{pid}/excel_html/{stem}.xlsx``) is exactly
@@ -507,19 +519,70 @@ def _record_ad_hoc_path(facts: _FunctionFacts, node: ast.BinOp) -> None:
         key = _constant_key(side)
         if key is not None:
             literals.append(key)
-        elif isinstance(side, ast.Call):
+            continue
+        if isinstance(side, ast.Call):
             for argument in side.args:
                 inner = _constant_key(argument)
                 if inner is not None:
                     literals.append(inner)
+            continue
+        # `TEMPLATES_DIR / relative`: the literal lives in the module-level
+        # binding, not lexically inside this function body.
+        if path_root_names:
+            referenced = dotted_name(side).rsplit(".", 1)[-1]
+            bound = path_root_names.get(referenced)
+            if bound is not None:
+                literals.append(bound)
     for literal in literals:
         lowered = literal.lower()
-        if lowered in {"storage", "workpapers", "excel_html", "wp_storage", "wp_templates"}:
+        if lowered in _WORKPAPER_PATH_ROOTS:
             facts.ad_hoc_paths.append({"line": node.lineno, "literal": literal})
             return
 
 
-def _collect_facts(function: ast.AST) -> _FunctionFacts:
+def _module_path_root_names(tree: ast.AST) -> dict[str, str]:
+    """Map module-level path-root constants to the root they resolve to.
+
+    Only module scope, and only the <expr> / literal shape -- the same shape
+    _record_ad_hoc_path recognises inline. Two passes let one intermediate constant
+    chain through, so a second hop does not reintroduce the blind spot.
+
+    Why this exists: the predicate used to fire only on a literal lexically inside
+    the function body, so the d1262c80 file split -- which moved two wp_template_finder
+    resolvers next to a hoisted TEMPLATES_DIR constant -- silently dropped both from
+    the denominator. Their overlay rows then read as no-longer-in-source, surfacing as
+    a stale-overlay hard failure that was really a detector blind spot. Pure code
+    movement must not change the denominator.
+    """
+    bound: dict[str, str] = {}
+    for _ in range(2):
+        for node in getattr(tree, 'body', []):
+            if not isinstance(node, (ast.Assign, ast.AnnAssign)):
+                continue
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            names = [t.id for t in targets if isinstance(t, ast.Name)]
+            if not names or node.value is None:
+                continue
+            value = node.value
+            if not isinstance(value, ast.BinOp) or not isinstance(value.op, ast.Div):
+                continue
+            for side in (value.left, value.right):
+                literal = _constant_key(side)
+                if literal is None and isinstance(side, ast.Call):
+                    for argument in side.args:
+                        literal = literal or _constant_key(argument)
+                if literal is None:
+                    literal = bound.get(dotted_name(side).rsplit('.', 1)[-1])
+                if literal is None:
+                    continue
+                if literal.lower() in _WORKPAPER_PATH_ROOTS:
+                    for name in names:
+                        bound[name] = literal
+    return bound
+
+def _collect_facts(
+    function: ast.AST, *, path_root_names: Mapping[str, str] | None = None
+) -> _FunctionFacts:
     facts = _FunctionFacts()
     # Destination bindings first: `_record_call` classifies each artifact write against
     # them, and the walk below does not visit statements in source order.
@@ -550,7 +613,7 @@ def _collect_facts(function: ast.AST) -> _FunctionFacts:
                 }:
                     facts.version_fields_read.add(f"parsed_data.{key}")
         elif isinstance(node, ast.BinOp):
-            _record_ad_hoc_path(facts, node)
+            _record_ad_hoc_path(facts, node, path_root_names=path_root_names)
         elif isinstance(node, ast.ExceptHandler):
             has_raise = any(isinstance(inner, ast.Raise) for inner in ast.walk(node))
             if not has_raise:
@@ -847,6 +910,7 @@ def collect_source_facts() -> tuple[list[dict[str, Any]], dict[str, dict[str, An
         module = _module_path(path)
         relative = str(path.relative_to(_REPO)).replace("\\", "/")
         import_bindings = _module_import_targets(tree)
+        path_root_names = _module_path_root_names(tree)
         for qualname, function in _iter_functions(tree):
             functions.append(
                 {
@@ -856,7 +920,9 @@ def collect_source_facts() -> tuple[list[dict[str, Any]], dict[str, dict[str, An
                     "qualname": qualname,
                     "line": function.lineno,
                     "is_async": isinstance(function, ast.AsyncFunctionDef),
-                    "facts_obj": _collect_facts(function),
+                    "facts_obj": _collect_facts(
+                        function, path_root_names=path_root_names
+                    ),
                     "import_bindings": import_bindings,
                 }
             )

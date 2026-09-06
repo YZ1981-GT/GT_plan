@@ -344,3 +344,184 @@ class TestMigrationParadigmFreeze:
         expected = {47, 48, 51, 69, 71}
         actual = set(deletion_plan.get("properties_verified", []))
         assert actual == expected, f"properties_verified = {actual}, expected {expected}"
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# 适配器字段契约：宿主访问的字段必须在 PilotBridgeAdapter 接口里真实存在
+# ════════════════════════════════════════════════════════════════════════════
+#
+# 为什么补这一节（2026-09-03 三个生产缺陷倒推）：
+#
+# Task 45 把 legacy composable 换成 `usePilotBridgeAdapter`，但两者 **API 表面不同**
+# （legacy: mode / ooAvailable / checking / checkOOHealth；
+#   adapter: currentMode / isOoAvailable / switching，且**刻意不做**健康探测）。
+# 宿主照旧按老名字取用，实测三处：
+#
+#   1. GtD2AccountsReceivable.vue  `dualMode.ooAvailable.value`
+#      → computed 求值即 `Cannot read properties of undefined (reading 'value')`
+#      → 点开 D2 任一子表整页崩「页面渲染出错」（浏览器实测 + 变异复现）
+#   2. GtH1FixedAssets.vue         `dual.checking`
+#      → undefined，模板 `:disabled="ooChecking"` 恒 falsy ⇒ 切换中不禁用（静默失效）
+#   3. GtB60Bundle.vue             `mainDual.checkOOHealth()`
+#      → onMounted 抛 `is not a function` ⇒ B60 整页崩
+#
+# 本节之前的 Task 45 守卫只查「宿主是否 import 了 adapter」这类**字符串存在**，
+# 三处全部照旧通过；`get_diagnostics`(Volar) / vitest / Vite transform 也全绿
+# （SFC 里从 composable 返回值取不存在的字段是 ESM 运行时错误）。
+# 故判据必须落到「字段名对不对得上真源接口」这个结构关系上。
+#
+# 真源字段**动态抽取**，不写死清单 —— 否则接口新增字段时守卫会误判。
+
+
+def _brace_block(src: str, start_idx: int) -> str:
+    """从 start_idx 之后第一个 `{` 起做花括号配对，返回块体（不含外层花括号）。
+
+    🔴 不用固定字符窗口截取：TS 的返回类型注解 `): Promise<{...}>` 之类会骗到
+    「第一个 `{`」，配对才稳。
+    """
+    i = src.index("{", start_idx)
+    depth = 0
+    for j in range(i, len(src)):
+        if src[j] == "{":
+            depth += 1
+        elif src[j] == "}":
+            depth -= 1
+            if depth == 0:
+                return src[i + 1 : j]
+    raise AssertionError("花括号未配对 —— 接口体截取失败")
+
+
+def _strip_ts_comments(src: str) -> str:
+    src = re.sub(r"/\*[\s\S]*?\*/", "", src)
+    src = re.sub(r"(?<!:)//[^\n]*", "", src)
+    return src
+
+
+def _adapter_interface_fields() -> set[str]:
+    """从 `export interface PilotBridgeAdapter { ... }` 抽出成员名（真源）。"""
+    src = (_SYNC / "usePilotBridgeAdapter.ts").read_text(encoding="utf-8")
+    m = re.search(r"export\s+interface\s+PilotBridgeAdapter\s*\{", src)
+    assert m, "找不到 PilotBridgeAdapter 接口声明 —— adapter 契约无从校验"
+    body = _strip_ts_comments(_brace_block(src, m.start()))
+    fields = set(re.findall(r"^\s*([A-Za-z_$][\w$]*)\s*[?:]", body, flags=re.M))
+    assert fields, "PilotBridgeAdapter 接口字段抽取为空 —— 抽取器失效"
+    return fields
+
+
+def _adapter_field_accesses(source: str) -> set[str]:
+    """抽出某宿主源码里对 adapter 返回值取用的字段名（实例访问 + 解构）。"""
+    src = _strip_ts_comments(source)
+    used: set[str] = set()
+
+    # 形式 A：const <名> = usePilotBridgeAdapter({...})  →  扫 <名>.<字段>
+    for name in re.findall(r"const\s+([A-Za-z_$][\w$]*)\s*=\s*usePilotBridgeAdapter\s*\(", src):
+        used |= set(re.findall(rf"\b{re.escape(name)}\.([A-Za-z_$][\w$]*)", src))
+
+    # 形式 B：const { a, b } = usePilotBridgeAdapter({...})
+    for m in re.finditer(r"const\s*\{", src):
+        try:
+            body = _brace_block(src, m.start())
+        except (AssertionError, ValueError):
+            continue
+        tail = src[src.index("}", m.start()) :]
+        if not re.match(r"\}\s*=\s*usePilotBridgeAdapter\s*\(", tail):
+            continue
+        for part in body.split(","):
+            key = part.split(":")[0].strip()
+            if re.fullmatch(r"[A-Za-z_$][\w$]*", key):
+                used.add(key)
+    return used
+
+
+def _adapter_consumer_hosts() -> list[pathlib.Path]:
+    """扫出所有实例化 adapter 的宿主（不写死清单，Wave 5 新增宿主自动纳入）。"""
+    hosts: list[pathlib.Path] = []
+    for path in _FRONTEND.rglob("*.vue"):
+        if "__tests__" in path.parts:
+            continue
+        try:
+            source = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        if "usePilotBridgeAdapter(" in _strip_ts_comments(source):
+            hosts.append(path)
+    return sorted(hosts)
+
+
+class TestPilotAdapterFieldContract:
+    """
+    **Validates: Requirements 11.1, 11.5**
+
+    宿主从 `usePilotBridgeAdapter` 取用的每个字段都必须在
+    `PilotBridgeAdapter` 接口里真实存在。
+    """
+
+    def test_scan_surface_is_not_empty(self) -> None:
+        """扫描面自检：宿主数与字段访问数都不能为 0（防判据空转恒绿）。"""
+        hosts = _adapter_consumer_hosts()
+        assert len(hosts) >= 4, (
+            f"只扫到 {len(hosts)} 个 adapter 宿主 —— Task 45 至少迁了四类 pilot，"
+            "扫描器可能失效"
+        )
+        total = sum(len(_adapter_field_accesses(h.read_text(encoding="utf-8"))) for h in hosts)
+        assert total > 0, "宿主字段访问抽取总数为 0 —— 抽取器失效，判据恒绿"
+
+    @pytest.mark.parametrize(
+        "host", _adapter_consumer_hosts(), ids=lambda p: p.name
+    )
+    def test_host_only_uses_declared_adapter_fields(self, host: pathlib.Path) -> None:
+        """宿主不得取用接口未声明的字段（运行时 undefined，四层验证全绿）。"""
+        truth = _adapter_interface_fields()
+        used = _adapter_field_accesses(host.read_text(encoding="utf-8"))
+        unknown = sorted(used - truth)
+        assert not unknown, (
+            f"{host.name} 取用了 PilotBridgeAdapter 未声明的字段 {unknown}。\n"
+            f"接口真源字段：{sorted(truth)}\n"
+            "这类写法运行时得到 undefined —— 取 `.value` 直接整页崩「页面渲染出错」，"
+            "当函数调用则抛 `is not a function`，而 Volar/vitest/Vite 三层全绿。\n"
+            "常见错配：ooAvailable→isOoAvailable / mode→currentMode / "
+            "checking→switching / checkOOHealth→已废除（健康探测归 bridge）"
+        )
+
+    def test_judgment_catches_wrong_field_names(self) -> None:
+        """反向自检：故意写错的字段必须被抽出并判为未声明（判据不恒真）。"""
+        truth = _adapter_interface_fields()
+
+        bad_instance = """
+        const dualMode = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
+        const opts = { disabled: !dualMode.ooAvailable.value }
+        void dualMode.checkOOHealth()
+        """
+        used = _adapter_field_accesses(bad_instance)
+        assert {"ooAvailable", "checkOOHealth"} <= used, "实例式字段访问抽取失效"
+        assert {"ooAvailable", "checkOOHealth"} <= (used - truth), (
+            "错误字段未被判为未声明 —— 判据失效"
+        )
+
+        bad_destructure = """
+        const { currentMode, ooAvailable } = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
+        """
+        used2 = _adapter_field_accesses(bad_destructure)
+        assert "ooAvailable" in used2 - truth, "解构式字段访问抽取失效"
+
+        good = """
+        const dual = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
+        const a = dual.currentMode.value
+        const b = dual.isOoAvailable.value
+        const c = dual.switching.value
+        """
+        assert not (_adapter_field_accesses(good) - truth), (
+            "正确字段被误判为未声明 —— 判据过严，会对合法宿主假红"
+        )
+
+    def test_comment_only_mention_does_not_count(self) -> None:
+        """注释里提到旧字段名不算取用（否则修复时写的说明注释会把判据打红）。"""
+        truth = _adapter_interface_fields()
+        source = """
+        const dual = usePilotBridgeAdapter({ entryId: 'x', wpId: w })
+        // 🔴 真源是 isOoAvailable，写 dual.ooAvailable 会整页崩
+        const b = dual.isOoAvailable.value
+        """
+        assert not (_adapter_field_accesses(source) - truth), (
+            "注释中的旧字段名被当成真取用 —— 会让带说明注释的正确代码假红"
+        )

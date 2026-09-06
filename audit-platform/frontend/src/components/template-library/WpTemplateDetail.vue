@@ -95,6 +95,165 @@
       </div>
     </div>
 
+    <!-- 1b. 模板来源与编辑（spec excel-template-override-layer Task 20） -->
+    <div class="gt-wpd-card" data-testid="wpd-override-card">
+      <div class="gt-wpd-card-title">
+        <el-icon><EditPen /></el-icon>模板来源与编辑
+        <div class="gt-wpd-ovr-actions">
+          <el-tooltip
+            :disabled="overrideEditable"
+            :content="overrideResolution?.not_editable_reason || ''"
+            placement="top"
+          >
+            <span>
+              <el-button
+                size="small"
+                type="primary"
+                :disabled="!overrideEditable"
+                :loading="overrideBusy"
+                data-testid="wpd-override-edit"
+                @click="onEditTemplate"
+              >
+                在线编辑
+              </el-button>
+            </span>
+          </el-tooltip>
+          <el-button
+            size="small"
+            :loading="overrideBusy"
+            data-testid="wpd-override-upload"
+            @click="onPickReplacementFile"
+          >
+            上传替换
+          </el-button>
+          <el-button
+            size="small"
+            text
+            data-testid="wpd-override-history"
+            @click="onOpenVersionHistory"
+          >
+            版本历史
+          </el-button>
+        </div>
+      </div>
+      <div class="gt-wpd-meta">
+        <div class="gt-wpd-meta-row">
+          <span class="gt-wpd-meta-label">当前来源</span>
+          <span class="gt-wpd-meta-value">
+            <el-tag
+              v-if="overrideResolution"
+              size="small"
+              :type="originTagType"
+              effect="light"
+              data-testid="wpd-override-origin"
+            >
+              {{ overrideResolution.origin_label }}
+            </el-tag>
+            <span v-else class="gt-wpd-empty">—</span>
+          </span>
+        </div>
+        <div class="gt-wpd-meta-row">
+          <span class="gt-wpd-meta-label">覆盖版本</span>
+          <span class="gt-wpd-meta-value">
+            <span v-if="overrideResolution?.version_id" class="gt-wpd-code">
+              {{ shortVersion(overrideResolution.version_id) }}
+            </span>
+            <span v-else class="gt-wpd-empty">未覆盖，使用权威模板</span>
+          </span>
+        </div>
+        <div v-if="overrideResolution && !overrideEditable" class="gt-wpd-meta-row">
+          <span class="gt-wpd-meta-label">在线编辑</span>
+          <span class="gt-wpd-meta-value gt-wpd-ovr-reason" data-testid="wpd-override-reason">
+            不可用 —— {{ overrideResolution.not_editable_reason }}
+            <br />可用「上传替换」产生覆盖版本，同样进版本表、同样可回滚。
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传替换的隐藏 file input（走与在线编辑同一条后端落盘路径，AC 5.5） -->
+    <input
+      ref="replacementInputRef"
+      type="file"
+      class="gt-wpd-hidden-file"
+      data-testid="wpd-override-file-input"
+      @change="onReplacementFileChosen"
+    />
+
+    <!-- 在线编辑弹窗：OnlyOffice 整本模式 -->
+    <el-dialog
+      v-model="editorOpen"
+      :title="`在线编辑模板 · ${wpCode}`"
+      width="92%"
+      top="4vh"
+      destroy-on-close
+      :close-on-click-modal="false"
+      @closed="onEditorClosed"
+    >
+      <div class="gt-wpd-ovr-editor-hint">
+        全部 sheet 已展开，可直接查看与修改 sheet 间公式。保存后会生成一个新的覆盖版本，
+        权威模板本身不被改动。
+      </div>
+      <div :id="editorContainerId" class="gt-wpd-ovr-editor"></div>
+    </el-dialog>
+
+    <!-- 版本历史 -->
+    <el-drawer v-model="versionsOpen" title="模板覆盖版本历史" size="46%">
+      <el-table
+        :data="overrideVersions"
+        size="small"
+        :border="false"
+        highlight-current-row
+        empty-text="该作用域下还没有覆盖版本"
+      >
+        <el-table-column label="版本" width="120">
+          <template #default="{ row }">
+            <span class="gt-wpd-code">{{ shortVersion(row.version_id) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="作用域" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" effect="plain">{{ row.scope_label }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="90">
+          <template #default="{ row }">
+            <el-tag v-if="row.is_current" size="small" type="success" effect="light">当前</el-tag>
+            <el-tag v-else size="small" type="info" effect="plain">历史</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="摘要" width="120">
+          <template #default="{ row }">
+            <span class="gt-wpd-code">{{ row.sha256.slice(0, 10) }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="110">
+          <template #default="{ row }">
+            <el-button
+              v-if="!row.is_current"
+              size="small"
+              text
+              type="primary"
+              @click="onPromoteVersion(row)"
+            >
+              回滚到此版本
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button
+          v-if="overrideResolution?.version_id"
+          type="danger"
+          plain
+          size="small"
+          @click="onDeleteOverride"
+        >
+          删除覆盖（回落权威模板）
+        </el-button>
+      </template>
+    </el-drawer>
+
     <!-- 1.5 高级查询入口按钮 (Req 14 AC 1) + 公式预设库入口 (Req 25.1) -->
     <div class="gt-wpd-card gt-wpd-card--actions">
       <TemplateLibraryButton
@@ -389,10 +548,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import {
   InfoFilled,
   Download,
+  EditPen,
   Files,
   FolderOpened,
   DataAnalysis,
@@ -400,6 +560,7 @@ import {
   DataLine,
   View,
 } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { api } from '@/services/apiProxy'
 import {
   templateLibraryMgmt as P_tlm,
@@ -667,11 +828,277 @@ async function loadAll() {
       loadSourceFiles(),
       loadPrefillFormulas(),
       loadCrossWpReferences(),
+      loadOverrideResolution(),
     ])
     // note_section 从 procedure_steps 或后续后端字段提取（暂从 prefill 中没有）
     noteSection.value = (template.value as any)?.note_section || ''
   } finally {
     loading.value = false
+  }
+}
+
+// ─── 模板覆盖层（spec excel-template-override-layer Task 20）────────────────
+//
+// 🔴 来源与版本号**只**取后端下发的字段（Property 21）。
+//    前端不得据文件名/路径推断来源 —— 那会在两处各写一份优先级规则，
+//    而覆盖层的优先级（project > group_custom > firm_default > 权威）只有后端知道。
+
+interface OverrideResolution {
+  wp_code: string
+  origin: string
+  origin_label: string
+  path_name: string
+  extension: string
+  sha256: string
+  version_id: string | null
+  editable_in_browser: boolean
+  not_editable_reason: string | null
+}
+
+interface OverrideVersionRow {
+  version_id: string
+  wp_code: string
+  authoritative_stem: string
+  scope: string
+  scope_label: string
+  sha256: string
+  is_current: boolean
+  parent_version_id: string | null
+  created_by: string | null
+  created_at: string | null
+}
+
+const overrideResolution = ref<OverrideResolution | null>(null)
+const overrideVersions = ref<OverrideVersionRow[]>([])
+const overrideBusy = ref(false)
+const editorOpen = ref(false)
+const versionsOpen = ref(false)
+const replacementInputRef = ref<HTMLInputElement | null>(null)
+const editorContainerId = 'gt-wpd-ovr-editor-container'
+let ooEditorInstance: any = null
+let currentSessionId = ''
+
+/** 是否可在浏览器内编辑 —— **取后端字段**，不在前端按扩展名判断。 */
+const overrideEditable = computed(() => overrideResolution.value?.editable_in_browser === true)
+
+/** 来源标签的配色。映射的是后端下发的 `origin` 值，不是文件名。 */
+const originTagType = computed<'success' | 'warning' | 'primary' | 'info'>(() => {
+  const origin = overrideResolution.value?.origin || ''
+  if (origin === 'authoritative') return 'info'
+  if (origin === 'override:project') return 'warning'
+  if (origin === 'override:group_custom') return 'primary'
+  return 'success'
+})
+
+function shortVersion(versionId: string): string {
+  return versionId.length > 10 ? versionId.slice(0, 8) : versionId
+}
+
+async function loadOverrideResolution() {
+  if (!props.wpCode) {
+    overrideResolution.value = null
+    return
+  }
+  try {
+    const data = await api.get(P_tlm.overrideResolution(props.wpCode))
+    overrideResolution.value = (data || null) as OverrideResolution | null
+  } catch {
+    // 模板库里没有该 wp_code（如自定义底稿）时后端返 404 —— 不是错误，只是没有可覆盖对象
+    overrideResolution.value = null
+  }
+}
+
+async function loadOverrideVersions() {
+  if (!props.wpCode) return
+  try {
+    const data = await api.get(P_tlm.overrideVersions(props.wpCode))
+    overrideVersions.value = (data || []) as OverrideVersionRow[]
+  } catch (e) {
+    handleApiError(e, '加载覆盖版本失败')
+    overrideVersions.value = []
+  }
+}
+
+async function onOpenVersionHistory() {
+  versionsOpen.value = true
+  await loadOverrideVersions()
+}
+
+function loadOnlyOfficeScript(baseUrl: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if ((window as any).DocsAPI) {
+      resolve()
+      return
+    }
+    const script = document.createElement('script')
+    script.src = `${baseUrl}/web-apps/apps/api/documents/api.js`
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('OnlyOffice api.js 加载失败'))
+    document.head.appendChild(script)
+  })
+}
+
+async function onEditTemplate() {
+  if (!props.wpCode || !overrideEditable.value) return
+  overrideBusy.value = true
+  try {
+    const data = await api.post(P_tlm.overrideEditSession(props.wpCode), {})
+    currentSessionId = data?.session_id || ''
+    const config = data?.onlyoffice_config
+    if (!config) {
+      ElMessage.error('后端未返回编辑器配置')
+      return
+    }
+    editorOpen.value = true
+    await nextTick()
+
+    const baseUrl = (import.meta as any).env?.VITE_ONLYOFFICE_URL || ''
+    if (!baseUrl) {
+      ElMessage.error('未配置 OnlyOffice 服务地址（VITE_ONLYOFFICE_URL）')
+      return
+    }
+    await loadOnlyOfficeScript(baseUrl)
+    const DocsAPI = (window as any).DocsAPI
+    if (!DocsAPI) {
+      ElMessage.error('OnlyOffice 编辑器不可用')
+      return
+    }
+    ooEditorInstance = new DocsAPI.DocEditor(editorContainerId, config)
+  } catch (e) {
+    handleApiError(e, '打开模板编辑器失败')
+  } finally {
+    overrideBusy.value = false
+  }
+}
+
+function onEditorClosed() {
+  if (ooEditorInstance?.destroyEditor) {
+    try {
+      ooEditorInstance.destroyEditor()
+    } catch {
+      // 编辑器已自行销毁
+    }
+  }
+  ooEditorInstance = null
+  currentSessionId = ''
+  // 关闭后刷新来源 —— 保存是异步的（OO callback），此时可能已产生新版本
+  void loadOverrideResolution()
+}
+
+function onPickReplacementFile() {
+  replacementInputRef.value?.click()
+}
+
+/** 打印设置（纸张/缩放/方向…）与被替换的那份不一致时提示。
+ *
+ * 🔴 不是错误：换模板顺带调打印设置是合法操作。但它在 UI 上完全看不见，
+ * 而审计底稿是要打印装订的 —— 悄悄从 A4 纵向变成 A3 横向，出片时才发现代价很大。
+ * 后端只对 xlsx/xlsm 比对，其余格式恒空数组。
+ */
+function notifyPageSetupChanges(changes: unknown): void {
+  if (!Array.isArray(changes) || changes.length === 0) return
+  const failed = changes.find((c: any) => c?.sheet_part === '<比对失败>')
+  if (failed) {
+    ElMessage.warning('已保存，但打印设置比对未能完成，请自行核对纸张与缩放')
+    return
+  }
+  const shown = changes
+    .slice(0, 3)
+    .map((c: any) => `${PAGE_SETUP_LABELS[c?.attribute] || c?.attribute}：${c?.before} → ${c?.after}`)
+    .join('；')
+  const more = changes.length > 3 ? ` 等 ${changes.length} 处` : ''
+  ElMessage.warning(`已保存。打印设置与原模板不同 —— ${shown}${more}`)
+}
+
+/** `pageSetup` 属性名 → 中文（UI 全中文化铁律）。未登记的属性直接显示原名。 */
+const PAGE_SETUP_LABELS: Record<string, string> = {
+  paperSize: '纸张',
+  scale: '缩放',
+  orientation: '方向',
+  fitToWidth: '横向页数',
+  fitToHeight: '纵向页数',
+  firstPageNumber: '起始页码',
+  useFirstPageNumber: '使用起始页码',
+  blackAndWhite: '黑白打印',
+  draft: '草稿质量',
+  copies: '打印份数',
+  pageOrder: '打印顺序',
+  cellComments: '批注打印',
+  errors: '错误值打印',
+}
+
+async function onReplacementFileChosen(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file || !props.wpCode) return
+
+  const expected = overrideResolution.value?.extension || ''
+  const actual = file.name.slice(file.name.lastIndexOf('.')).toLowerCase()
+  if (expected && actual !== expected) {
+    ElMessage.error(`扩展名必须与权威模板一致（需要 ${expected}，选择的是 ${actual}）`)
+    return
+  }
+
+  overrideBusy.value = true
+  try {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post(P_tlm.overrideUpload(props.wpCode), form)
+    ElMessage.success('已上传并生成新的覆盖版本')
+    notifyPageSetupChanges(data?.page_setup_changes)
+    await loadOverrideResolution()
+    if (versionsOpen.value) await loadOverrideVersions()
+  } catch (e) {
+    handleApiError(e, '上传替换失败')
+  } finally {
+    overrideBusy.value = false
+  }
+}
+
+async function onPromoteVersion(row: OverrideVersionRow) {
+  if (!props.wpCode) return
+  try {
+    await ElMessageBox.confirm(
+      `将把版本 ${shortVersion(row.version_id)} 置为当前版本。历史版本不会被删除，之后仍可回滚。`,
+      '回滚模板覆盖',
+      { type: 'warning', confirmButtonText: '确认回滚', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  overrideBusy.value = true
+  try {
+    await api.post(P_tlm.overridePromote(props.wpCode, row.version_id), {})
+    ElMessage.success('已回滚')
+    await Promise.all([loadOverrideResolution(), loadOverrideVersions()])
+  } catch (e) {
+    handleApiError(e, '回滚失败')
+  } finally {
+    overrideBusy.value = false
+  }
+}
+
+async function onDeleteOverride() {
+  if (!props.wpCode) return
+  try {
+    await ElMessageBox.confirm(
+      '删除覆盖后将回落到权威模板。版本记录不会被删除，之后仍可回滚到任一历史版本。',
+      '删除模板覆盖',
+      { type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消' },
+    )
+  } catch {
+    return
+  }
+  overrideBusy.value = true
+  try {
+    await api.delete(P_tlm.overrideDeleteCurrent(props.wpCode))
+    ElMessage.success('已删除覆盖，现在使用权威模板')
+    await Promise.all([loadOverrideResolution(), loadOverrideVersions()])
+  } catch (e) {
+    handleApiError(e, '删除覆盖失败')
+  } finally {
+    overrideBusy.value = false
   }
 }
 
@@ -737,6 +1164,35 @@ watch(
 </script>
 
 <style scoped>
+/* ─── 模板覆盖层（Task 20）───────────────────────────────────────────────── */
+.gt-wpd-ovr-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.gt-wpd-hidden-file {
+  display: none;
+}
+.gt-wpd-ovr-reason {
+  color: var(--el-color-warning);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.gt-wpd-ovr-editor-hint {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  border-left: 3px solid var(--el-color-warning);
+  background: var(--el-color-warning-light-9);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  line-height: 1.6;
+}
+.gt-wpd-ovr-editor {
+  width: 100%;
+  height: 72vh;
+}
+
 .gt-wpd {
   display: flex;
   flex-direction: column;

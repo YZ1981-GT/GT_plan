@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import logging
 import re
+from typing import Final
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -74,6 +75,18 @@ logger = logging.getLogger(__name__)
 
 #: 尚未发布任何新 representation 代际时使用的基线代际。
 BASELINE_GENERATION = 1
+
+#: V155 内容修订号表名 —— 单一真源，查询与漂移判据共用，避免两处各写一遍字面量。
+#:
+#: 🔴 本表**有意不做 ORM 映射**，并在 `SchemaDriftDetector.KNOWN_ALLOWLIST` 里登记：
+#: `revision` 的推进只允许走 :func:`bump_oo_content_revision` 里那条
+#: `INSERT ... ON CONFLICT DO UPDATE SET revision = revision + 1` —— 自增在 **DB 侧**
+#: 原子完成，并发的两次改写各得一个新号。一旦映射进 ORM，任何 `row.revision = x`
+#: 都能绕过原子自增（读-改-写竞态下两次改写会拿到同一个号 ⇒ doc_key 不轮转 ⇒
+#: 退回本表要解决的那个「OO 显示空模板」缺陷）。
+#: 与「无 ORM 模型」双向锁死，见 tests/test_schema_drift_detector.py 的
+#: test_v155_oo_content_revision_table_allowlisted_and_unmapped。
+OO_CONTENT_REVISION_TABLE: Final[str] = "working_paper_oo_content_revision"
 
 #: 「完整 Excel」视图在 entry_id 里的固定 slot 名。整册视图与单 sheet 视图是**两个**
 #: 文档视图（前者全部 sheet 可见、后者只留一张），必须是两个 room 身份，否则 OO 会把
@@ -146,8 +159,21 @@ async def resolve_room_doc_key(
         )
     ).scalar_one_or_none()
     if row is None:
+        # 无存活 room：generation = 基线 + **内容修订号**。
+        #
+        # 🔴 2026-09-06 浏览器实测抓出的缺陷：服务端把 756 行写进项目存储的 xlsx 后，
+        # OO 里仍显示空模板 —— 因为 doc_key 恒等于基线派生值，OO 按 key 命中自己的
+        # 服务端缓存、不再重新下载。
+        #
+        # 修订号与 mtime **不是**一回事（后者被 Property 6 明确禁止入 doc_key）：
+        # mtime 每次写盘都变、会打断在途协同；修订号只在服务端真的改写了受管内容时
+        # 才 +1（由改写方显式调 `bump_oo_content_revision`）。
+        # 且只在**无存活 room** 时生效 ⇒ 不影响进行中的会话。
+        revision = await _content_revision(db, wp_id=wp_id, entry_id=entry_id)
         return derive_doc_key(
-            wp_id=wp_id, entry_id=entry_id, generation=BASELINE_GENERATION
+            wp_id=wp_id,
+            entry_id=entry_id,
+            generation=BASELINE_GENERATION + revision,
         )
     if not doc_key_matches(doc_key=row.doc_key, wp_id=wp_id, entry_id=entry_id):
         # room 行上的 key 不是本域派生的 ⇒ 不沿用它（沿用等于把一个来源不明的身份
@@ -162,6 +188,50 @@ async def resolve_room_doc_key(
             wp_id=wp_id, entry_id=entry_id, generation=int(row.generation)
         )
     return row.doc_key
+
+
+async def _content_revision(db: AsyncSession, *, wp_id: UUID, entry_id: str) -> int:
+    """读 `(wp_id, entry_id)` 的内容修订号；无记录即 0。"""
+    raw = (
+        await db.execute(
+            sa.text(
+                f"SELECT revision FROM {OO_CONTENT_REVISION_TABLE} "
+                "WHERE wp_id = :wp AND entry_id = :entry"
+            ),
+            {"wp": str(wp_id), "entry": entry_id},
+        )
+    ).scalar_one_or_none()
+    try:
+        return max(int(raw or 0), 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+async def bump_oo_content_revision(
+    db: AsyncSession, *, wp_id: UUID, entry_id: str, reason: str
+) -> int:
+    """服务端改写了该 entry 的受管内容 ⇒ 推进修订号，使 doc_key 轮转。
+
+    调用方**必须**是真的改写了文件的那一步（如 D2 的 `push_html_to_excel`）。
+    只在内容真变时调 —— 无条件每次调等于把 mtime 语义搬回来，会打断在途协同会话。
+
+    :returns: 推进后的修订号
+    """
+    revision = (
+        await db.execute(
+            sa.text(
+                f"INSERT INTO {OO_CONTENT_REVISION_TABLE} "
+                "(wp_id, entry_id, revision, reason, updated_at) "
+                "VALUES (:wp, :entry, 1, :reason, now()) "
+                "ON CONFLICT (wp_id, entry_id) DO UPDATE SET "
+                f"revision = {OO_CONTENT_REVISION_TABLE}.revision + 1, "
+                "reason = EXCLUDED.reason, updated_at = now() "
+                "RETURNING revision"
+            ),
+            {"wp": str(wp_id), "entry": entry_id, "reason": reason[:128]},
+        )
+    ).scalar_one()
+    return int(revision)
 
 
 async def resolve_room_route_credential(
@@ -218,6 +288,8 @@ _LIVE_ROOM_STATES = tuple(
 
 __all__ = [
     "BASELINE_GENERATION",
+    "OO_CONTENT_REVISION_TABLE",
+    "bump_oo_content_revision",
     "WHOLE_WORKBOOK_SLOT",
     "WORD_TEMPLATE_SLOT",
     "sheet_entry_id",

@@ -104,6 +104,66 @@ def _record_stat_is(field: str, expected: object):
     return _check
 
 
+def _record_bp_measured_is(bp_id: str, field: str, expected: object):
+    """作用域自证：变异落在**那条 BP** 的 `measured` 里的那个字段上。
+
+    必需：`true` / `0` 这类值在整份记录里到处都是，只看「文件里出现了 false」
+    无法证明改的是 BP-18 的判据而不是别处的同名布尔。
+    """
+
+    def _check(mutated: bytes) -> bool:
+        try:
+            payload = json.loads(mutated.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return False
+        for bp in payload.get("blocking_preconditions") or []:
+            if bp.get("id") == bp_id:
+                return (bp.get("measured") or {}).get(field) == expected
+        return False
+
+    return _check
+
+
+def _record_bp_what_contains(bp_id: str, needle: str):
+    def _check(mutated: bytes) -> bool:
+        try:
+            payload = json.loads(mutated.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return False
+        for bp in payload.get("blocking_preconditions") or []:
+            if bp.get("id") == bp_id:
+                return needle in (bp.get("what") or "")
+        return False
+
+    return _check
+
+
+def _record_source_paths_exclude(path: str):
+    """作用域自证：`sources` 块里已不再登记该路径（只看 sources，不看全文）。"""
+
+    def _check(mutated: bytes) -> bool:
+        try:
+            payload = json.loads(mutated.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return False
+        paths = {v.get("path") for v in (payload.get("sources") or {}).values()}
+        return path not in paths
+
+    return _check
+
+
+def _record_reverification_verdict_is(bp_id: str, expected: object):
+    def _check(mutated: bytes) -> bool:
+        try:
+            payload = json.loads(mutated.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return False
+        verdicts = (payload.get("residency_reverification") or {}).get("verdicts") or {}
+        return verdicts.get(bp_id) == expected
+
+    return _check
+
+
 MUTATIONS: list[Mutation] = [
     # ═══ 载体三值 ═══════════════════════════════════════════════════════
     Mutation(
@@ -218,7 +278,14 @@ MUTATIONS: list[Mutation] = [
         id="M11", side="fe", path=EDITOR, kind="replace",
         anchor="  if (!isA16Mode.value && !hasNoUsableCarrier.value) {",
         new="  if (!isA16Mode.value) {",
-        want="不发起 template-structure / onlyoffice-config 请求",
+        # 🔴 2026-09-04 修：本条曾判 WRONG-TEST，**不是守卫缺陷也不是行为回归** ——
+        #    变异确实把该门的那条测试打红了（8/9 passed，红的正是它），但 `want` 里
+        #    写的是一个**已不存在的测试标题**（旧名 "不发起 template-structure /
+        #    onlyoffice-config 请求"）。前端 spec 在 2026-09-01 被改名成
+        #    "不发起结构化取数与 onlyoffice-config 请求"，`want` 随之过期。
+        #    教训：fe 侧 `want` 是**测试标题子串**，标题一改就悄悄失配，而四态里
+        #    WRONG-TEST 长得很像「污染残留」，容易被误判成守卫问题去改生产代码。
+        want="不发起结构化取数与 onlyoffice-config 请求",
         why="onMounted 的门控去掉 ⇒ 零载体底稿仍发两个注定失败的请求，"
             "失败又被降级成误导文案",
         tags=("fake_switch", "dom"),
@@ -390,6 +457,122 @@ MUTATIONS: list[Mutation] = [
             "「S33-REV 不在配置里」判据会把注释里的字样当成配置条目。"
             "反向自检必须打红，否则这个剥注释器就是不可信的",
         tags=("guard_self_check",),
+    ),
+    # ═══ 驻留重验判据（M24–M29，2026-09-04 新增）════════════════════════
+    #
+    # 这一组钉住的是**本轮新加的 `measured` 判据本身**。没有它们，`measured` 就是
+    # additive 死代码：下一轮读到 `b_subcodes_with_own_entry_count: 0` 无从判断那是
+    # 刚算的还是几个月前烧进去的常量（假绿第①源）。
+    Mutation(
+        id="M24", side="be", path=RECORD, kind="replace",
+        anchor='      "BP-20": "still_open"',
+        new='      "BP-20": "cleared"',
+        want=f"{U}.py::TestResidencyReverification::"
+             "test_verdicts_cover_every_blocking_precondition_that_blocks_this_lane",
+        wants=(
+            f"{U}.py::TestAdjudicationRecord::test_record_is_reproducible",
+        ),
+        why="只改重验结论那一行字宣称 BP-20 已解除，而 BP-20 的 status 仍是 open、"
+            "9 个 entry 仍是 UNVERIFIABLE ⇒ 「阻塞解除」变成一句可以单独改的话。"
+            "字段身份基础的解除是业务输入（引入 ${token} 或逐份裁定 ××），"
+            "不可能只由记录里一行字达成",
+        scope_check=_record_reverification_verdict_is("BP-20", "cleared"),
+        tags=("reverification", "gate"),
+    ),
+    Mutation(
+        id="M25", side="be", path=RECORD, kind="replace",
+        anchor='        "b_subcodes_with_own_entry_count": 0,',
+        new='        "b_subcodes_with_own_entry_count": 1,',
+        want=f"{U}.py::TestResidencyReverification::"
+             "test_bp16_manifest_criterion_is_recomputed_from_the_manifest",
+        wants=(
+            f"{U}.py::TestAdjudicationRecord::test_record_is_reproducible",
+        ),
+        why="谎报「已有 1 个 B 子码拿到自己的 manifest entry」⇒ BP-16 看起来快解除了。"
+            "守卫必须重新扫一遍 manifest 而不是采信这个数，否则这条判据只是个常量",
+        scope_check=_record_bp_measured_is("BP-16", "b_subcodes_with_own_entry_count", 1),
+        tags=("reverification", "bp16"),
+    ),
+    Mutation(
+        id="M26", side="be", path=RECORD, kind="replace",
+        anchor='        "real_target_is_listed": true,',
+        new='        "real_target_is_listed": false,',
+        want=f"{U}.py::TestResidencyReverification::"
+             "test_bp18_forbiddance_names_the_real_target_not_just_a_nonempty_list",
+        wants=(
+            f"{U}.py::TestAdjudicationRecord::test_record_is_reproducible",
+        ),
+        why="把「禁令清单逐字包含 adapters/word.py」这条事实改成 false ⇒ 记录不再声称"
+            "真实目标在禁令里。这正是 Task 64 M13 的教训：只断言「清单非空 + 逐项不存在」"
+            "会被改名绕过，必须断言包含那个真实路径",
+        scope_check=_record_bp_measured_is("BP-18", "real_target_is_listed", False),
+        tags=("reverification", "bp18", "gate"),
+    ),
+    Mutation(
+        id="M27", side="be", path=RECORD, kind="replace",
+        anchor='        "assert_may_publish_defined_in": '
+               '"app/services/workpaper_sync/word_sdt_engine.py",',
+        new='        "assert_may_publish_defined_in": '
+            '"app/services/workpaper_sync/word_entry_gate.py",',
+        want=f"{U}.py::TestResidencyReverification::"
+             "test_bp17_publish_gate_symbol_is_where_the_source_refs_say_it_is",
+        wants=(
+            f"{U}.py::TestAdjudicationRecord::test_record_is_reproducible",
+        ),
+        why="把发布门符号的定义处指到 `word_entry_gate.py`（那里只有**调用** "
+            "`definitions.binding.assert_may_publish()`，没有 def）⇒ 复现首版 BP-17 的"
+            "失准形态：source_refs 指的文件里找不到那个「恒抛」的方法。"
+            "刻意选一个**在 source_refs 里**的文件，这样只靠「refs 里有没有它」的判据会漏",
+        scope_check=_record_bp_measured_is(
+            "BP-17",
+            "assert_may_publish_defined_in",
+            "app/services/workpaper_sync/word_entry_gate.py",
+        ),
+        tags=("reverification", "bp17"),
+    ),
+    Mutation(
+        id="M28", side="be", path=RECORD, kind="replace",
+        anchor='      "what": "`registry.PENDING_ENGINE_ADAPTERS` 仍禁止 '
+               '`adapters/word.py`（禁令清单逐字包含该路径，磁盘上该文件仍不存在），'
+               '放行门写明是 Task 61（真实 OO 9.4 F2 Word gate）；'
+               'Task 61 复选框现扫仍是 `[-]`。"',
+        new='      "what": "`registry.PENDING_ENGINE_ADAPTERS` 仍禁止 '
+            '`adapters/word.py`，放行门写明是 Task 61；'
+            'Task 61 当前 `[-]`，其 BP-10~BP-15 六条全部 open。"',
+        want=f"{U}.py::TestResidencyReverification::"
+             "test_bp18_no_longer_restates_upstream_blocking_ids",
+        wants=(
+            f"{U}.py::TestAdjudicationRecord::test_record_is_reproducible",
+        ),
+        why="把 2026-08-31 那版**已被证伪**的措辞（转述 Task 61 的 BP-10~BP-15）放回去。"
+            "上游重编号是常态：Task 61 早已改登记 BP-61-1/2/3，转述上游编号必然失准。"
+            "反向判据必须拦住这种回退",
+        scope_check=_record_bp_what_contains("BP-18", "BP-10~BP-15"),
+        tags=("reverification", "bp18"),
+    ),
+    Mutation(
+        id="M29", side="be", path=RECORD, kind="replace",
+        # 🔴 刻意锚在 `path` 行而不是 `sha256` 行：digest 会随并发会话改动上游文件而变，
+        #    拿它当字面锚点必然周期性 ANCHOR-MISS（脚本缺陷会被误读成守卫缺陷）。
+        #    path 是稳定的，而把它改错同样能证明「digest 覆盖面」这条判据可失效。
+        scope='    "word_sdt_engine": {',
+        offset=1,
+        anchor='      "path": "backend/app/services/workpaper_sync/word_sdt_engine.py",',
+        new='      "path": "backend/app/services/workpaper_sync/word_resolution.py",',
+        want=f"{U}.py::TestResidencyReverification::"
+             "test_source_digests_cover_every_file_the_measured_criteria_read",
+        wants=(
+            f"{U}.py::TestAdjudicationRecord::test_record_is_reproducible",
+        ),
+        why="把 BP-17 判据所读源文件从 digest 覆盖面里换掉 ⇒ `word_sdt_engine.py` 不再被"
+            "锁 digest，「措辞对得上的是**今天那份**源码」这句话失去凭据。"
+            "锁 digest 不被校验时它只是装饰",
+        # 作用域自证只看 `sources` 块：该路径在 BP-17 的 source_refs 与 measured 里
+        # 仍会出现，用「全文不含」判会恒假 ⇒ ANCHOR-MISS（被误读成守卫缺陷）。
+        scope_check=_record_source_paths_exclude(
+            "backend/app/services/workpaper_sync/word_sdt_engine.py"
+        ),
+        tags=("reverification", "digest"),
     ),
 ]
 

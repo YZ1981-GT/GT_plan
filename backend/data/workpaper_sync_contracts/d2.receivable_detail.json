@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "b6bb140f720940e896b19fd07c72839d4086b5a55ac9fa789114d5c668b3b9aa",
+  "instrumentation_definition_sha256": "46f3c617175503757310f97e953a5c4d6e8e4c007e210949902500c5c452e694",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d2-accounts-receivable",
@@ -659,13 +659,15 @@
             }
           ],
           "footer_anchor": {
+            "carries_total_formula": true,
             "marker": "合计",
+            "note": "footer 行 A26 承载 30 条合计公式（E26..AH26 = SUM(x13:x25)，逐格实测）。区间末行 25 是 BP-21 的排版占位行，合计公式覆盖它属超集 ⇒ 对受管区末行 24 仍然成立。声明为真使结构性插行有权按声明位移量扩张该区间",
             "search_column": "A"
           },
           "formula_mask": [
-            "Q13:Q25",
-            "S13:S25",
-            "AB13:AB25"
+            "Q13:Q24",
+            "S13:S24",
+            "AB13:AB24"
           ],
           "header_rows": 2,
           "row_identity": {

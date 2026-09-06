@@ -389,7 +389,32 @@ class ProjectionMutation:
 
 @dataclass(frozen=True)
 class MaterializeResult:
-    """一次 materialize 的产物身份（staged，尚未 publish）。"""
+    """一次 materialize 的产物身份（staged，尚未 publish）+ 本次写盘冻结的结构性声明。
+
+    ═══ 为什么结构性声明要挂在这里（BP-23）═══════════════════════════════════
+
+    `verify_unmanaged_regions` 支持三个归一化入参（`row_shift` / `total_formula_rows` /
+    `propagation`），它们的语义是「**写盘之前冻结的声明**」—— 与声明一致的结构变化判等价，
+    声明之外的任何改动仍判漂移。
+
+    但那三个参数此前**没有任何生产调用方喂它们**：`ContentMutationService._stage_projection`
+    与首版发布宿主都只传 `before/after/contract` 三个参数。于是任何需要结构性插行的 entry
+    在未管理区域比对上必然打红 —— 参数存在、单测覆盖、生产零消费，正是本仓库反复登记的
+    「additive 注入即死代码」形态（假绿第①源）。
+
+    D2 首版发布是第一个真正触发它的 entry（729 行插入）：
+    * 不传 `row_shift` ⇒ `managed_sheet_unmanaged_cells` 238 → 632 判漂移；
+    * 传了 `row_shift` 但不传 `propagation` ⇒ 引用侧三张 sheet 的跨 sheet 公式
+      （`'明细表D2-2'!$AI$13:$AI$25` → `$AI$754`）判漂移。
+
+    ⇒ 声明必须从 materialize **显式流到** verifier。挂在本类而不是靠 adapter 实例状态：
+    实例状态会在「对另一对文件调 verify」时静默套用过期声明，而本类是随产物一起返回的值，
+    不存在张冠李戴。
+
+    🔴 三个字段类型标 `Any`：本模块是 adapter 协议层，不该为了类型标注引入
+    `excel_row_shift` / `excel_workbook_row_change` 两条 import 边（Word adapter 也用本类，
+    它们对它恒为默认值）。运行时形态由 `excel_materialize` 侧的断言把守。
+    """
 
     output_path: Path
     document_type: str
@@ -397,6 +422,12 @@ class MaterializeResult:
     structure_hash: str
     identity_inventory_sha256: str
     managed_field_count: int
+    #: 本次结构性插行声明（`excel_row_shift.RowShiftPlan | None`）。`None` = 未插行。
+    row_shift: Any = None
+    #: 契约声明「携带合计公式」的行号（位移**前**口径）。
+    total_formula_rows: tuple[int, ...] = ()
+    #: 本次工作簿级传播声明（`excel_workbook_row_change.WorkbookRowChangePlan | None`）。
+    workbook_row_change: Any = None
 
     def __post_init__(self) -> None:
         for name in ("artifact_sha256", "structure_hash", "identity_inventory_sha256"):

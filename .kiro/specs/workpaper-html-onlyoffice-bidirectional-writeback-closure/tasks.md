@@ -19,14 +19,62 @@
 ```json
 {
   "waves": [
-    {"wave": 0, "name": "事实清册、writer inventory 与真实技术探针", "tasks": ["1", "2", "3", "4", "5", "6", "7", "8"]},
-    {"wave": 1, "name": "统一内容版本、artifact、contract、merge 与 writer 迁移", "tasks": ["9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "73"]},
-    {"wave": 2, "name": "room/participant、durable callback、双层幂等与 coordinator", "tasks": ["21", "22", "23", "24", "25", "26", "27", "28", "29", "30"]},
-    {"wave": 3, "name": "统一前端 descriptor/bridge 与 Excel engine", "tasks": ["31", "32", "33", "34", "35", "36", "37", "38", "39"]},
-    {"wave": 4, "name": "四类 Excel pilot、真实 OO 9.4 gate 与平台级发布链补齐", "tasks": ["40", "41", "42", "43", "44", "45", "75", "76", "77"]},
-    {"wave": 5, "name": "Excel 全量 lane 与 Word F2 pilot lane", "tasks": ["46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61"]},
-    {"wave": 6, "name": "Word 全量、custom、legacy 删前隔离与 pre-reconcile", "tasks": ["62", "63", "64", "65", "66", "67"]},
-    {"wave": 7, "name": "独立验证、逐 entry evidence、全局 legacy 删除与归档", "tasks": ["68", "69", "70", "71", "72", "74"]}
+    {
+      "wave": 0,
+      "name": "事实清册、writer inventory 与真实技术探针",
+      "tasks": ["1", "2", "3", "4", "5", "6", "7", "8"],
+      "depends_on": [],
+      "rationale": "先把「现在到底有多少入口、各自什么能力、谁在写盘」变成可复算的清册，再谈迁移。入口 manifest 与 writer inventory 是后续每一波的分母；技术探针（OO 9.4 行为、SDT 保真、instrumentation 可行性）先取证，避免把假设写进设计"
+    },
+    {
+      "wave": 1,
+      "name": "统一内容版本、artifact、contract、merge 与 writer 迁移",
+      "tasks": ["9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "20", "73"],
+      "depends_on": [0],
+      "rationale": "统一内容版本域是双向回写的地基：没有单一 canonical 指针，两侧就各写各的。artifact/contract/merge 三件必须同波，因为 merge 的判据要引用 contract 声明的字段级归属。Task 73（entry profile）在此波承接，供后续按 profile 分波"
+    },
+    {
+      "wave": 2,
+      "name": "room/participant、durable callback、双层幂等与 coordinator",
+      "tasks": ["21", "22", "23", "24", "25", "26", "27", "28", "29", "30"],
+      "depends_on": [1],
+      "rationale": "OO → HTML 这一侧的生命周期：doc_key 由 room 身份派生（不再靠 mtime，否则任何写盘都切断协同会话）、callback 必须 durable ack、幂等要双层（application 与 protocol）。全部依赖 Wave 1 的内容版本域已统一"
+    },
+    {
+      "wave": 3,
+      "name": "统一前端 descriptor/bridge 与 Excel engine",
+      "tasks": ["31", "32", "33", "34", "35", "36", "37", "38", "39"],
+      "depends_on": [2],
+      "rationale": "前端 launch descriptor 与 bridge 要消费后端下发的能力态与 room 身份，故依赖 Wave 2。Excel engine（instrumentation / materialize / extract / verify）在此波成形，为 Wave 4 的四个 pilot 提供共用底座"
+    },
+    {
+      "wave": 4,
+      "name": "四类 Excel pilot、真实 OO 9.4 gate 与平台级发布链补齐",
+      "tasks": ["40", "41", "42", "43", "44", "45", "75", "76", "77"],
+      "depends_on": [3],
+      "rationale": "四个 pilot（simple checklist / 大 JSON / 分组动态 / 两级表头）覆盖四种结构形态，是 engine 的最小可证集合。Task 75/76/77 补齐「published representation → frozen definitions」的公共观测器与 provisioner —— 没有它们，后续全量 lane 的 adapter 注册只能靠登记态而非请求路径实跑"
+    },
+    {
+      "wave": 5,
+      "name": "Excel 全量 lane 与 Word F2 pilot lane",
+      "tasks": ["46", "47", "48", "49", "50", "51", "52", "53", "54", "55", "56", "57", "58", "59", "60", "61"],
+      "depends_on": [4],
+      "rationale": "全量铺开必须在 pilot 已真实 OO 验收之后，否则是把未证的机制批量复制。Excel 与 Word 两条 lane 并行推进：Word 走 SDT 结构化岛，与 Excel 的显式契约是两套判据，不共用"
+    },
+    {
+      "wave": 6,
+      "name": "Word 全量、custom、legacy 删前隔离与 pre-reconcile",
+      "tasks": ["62", "63", "64", "65", "66", "67"],
+      "depends_on": [5],
+      "rationale": "删 legacy 之前必须先做结构性对账（pre-reconcile）：哪些 legacy 对象真的无人消费、替代面是否已入库。顺序反了就会删掉仍在生产路径上的东西"
+    },
+    {
+      "wave": 7,
+      "name": "独立验证、逐 entry evidence、全局 legacy 删除与归档",
+      "tasks": ["68", "69", "70", "71", "72", "74"],
+      "depends_on": [6],
+      "rationale": "最后一波才允许真删：先独立回归、再逐 entry 取证据、再按 Wave 6 的清单精确删除、删后全场景重验。Task 74（writer/version domain 归零）压在此处，因为它的 14 条准则要在全部迁移落地后才可能同时为零"
+    }
   ],
   "dependencies": {
     "1": [], "2": ["1"], "3": ["1", "2"], "4": ["1", "2"],
@@ -239,7 +287,7 @@
 
 - [x] 20. 关闭 writer/version domain gate
   - 重新生成 writer matrix，并把 writer/version domain 收进一道**不可 fail-open** 的统一 revision 门（`backend/scripts/check/check_workpaper_writer_revision_gate.py`，14 条准则）：verdict 全部由 AST 派生、无豁免列、`source_digest`/`inventory_digest`/retired ledger/upgrade lane 四重新鲜度 fail-closed、三处空分母一律 `raise WriterGateError` 而非报 0、retired writer 走正向判定、characterization 证据必须解析到调用点（实测揪出 2 处误记）。**本任务的完成语义 = 「门可信 + 当期红基线冻结」，不等于「债已清零」** —— 与 AC 12.14 同型：Task 1/2 的早期 `[x]` 同样只表示 discovery/characterization 已完成，不代表闭环已验收。
-  - **当期红基线（冻结）**；生产写路径未裁决=0、绕过统一 commit=261、resolver 未裁决=0、写 legacy 版本字段=5、自有直接 commit=105、只有非 canonical resolver=63、writer 无 characterization 测试=208、多 resolver writer=4、bidirectional projection-only/双 revision=0、after-save 增 revision=0、representation upgrade 增 business revision=0、artifact-snapshot writer 不可验证=0、retired writer 不可验证=0、缺必需 domain=0；合计 646 条 blocking facts。这 14 个数字**不是手抄常量**：`test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate` 现场解析本行、经「标签 → issue key」表映射后与 `evaluate_gate()` 的实测计数逐条比对 —— 数字写错打红，源码变了没同步更新本行也打红。**2026-09-02 更新**：Task 74 的第一半（逐 domain 裁决）把「生产写路径未裁决 236 → 0」「resolver 未裁决 34 → 0」，合计 916 → 646；其余 12 条一条未动（裁决只写 lane 标签，13 条 blocking verdict 全部由源码派生）。第二半（逐 writer 迁 `ContentMutationService`）未做，故 261/105/208/63/5 如实留红。
+  - **当期红基线（冻结）**；生产写路径未裁决=0、绕过统一 commit=264、resolver 未裁决=0、写 legacy 版本字段=5、自有直接 commit=105、只有非 canonical resolver=72、writer 无 characterization 测试=208、多 resolver writer=4、bidirectional projection-only/双 revision=0、after-save 增 revision=0、representation upgrade 增 business revision=0、artifact-snapshot writer 不可验证=0、retired writer 不可验证=0、缺必需 domain=0；合计 658 条 blocking facts。这 14 个数字**不是手抄常量**：`test_task20_writer_gate.py::test_the_frozen_red_baseline_is_derived_from_the_live_gate` 现场解析本行、经「标签 → issue key」表映射后与 `evaluate_gate()` 的实测计数逐条比对 —— 数字写错打红，源码变了没同步更新本行也打红。**2026-09-02 更新**：Task 74 的第一半（逐 domain 裁决）把「生产写路径未裁决 236 → 0」「resolver 未裁决 34 → 0」，合计 916 → 646；其余 12 条一条未动（裁决只写 lane 标签，13 条 blocking verdict 全部由源码派生）。第二半（逐 writer 迁 `ContentMutationService`）未做，故 264/105/208/72/5 如实留红。**2026-09-04 更新**：Task 74 的探测器盲区修复（_record_ad_hoc_path 现能解析模块级路径常量，如 TEMPLATES_DIR = BACKEND_DIR / "wp_templates"）把分母从 319 行补回 327 行 —— d1262c80 的文件拆分曾把 8 个真实 resolver/export writer 移到常量旁边而使其静默离开分母（其中 2 个的 overlay 裁决行因此报「no longer exist in source」，门直接崩在 ssert_inventory_is_current）。**这是补分母不是缩分母**：8 行已逐条裁决（export_storage_resolver 5 条 / 	emplate_provisioning 3 条，全部零 version 写、零 SQL、零 commit、无 content store），故两条「未裁决」仍为 0；绕过统一 commit 261 → 264、只有非 canonical resolver 63 → 72、合计 646 → 658 是新可见行如实计入的结果。
   - **14 条准则的归属**（门的 `has_debt` 就是这 14 条的 `any()`；一条准则从报告里消失与它归零逐字相同，故守卫双向校验：门里有的 key 必须在本行有归属、本行点名的 key 必须在门里有实现）。归属 Task 20：`keeps_legacy_write_path_beside_unified_commit`、`after_save_still_increments_revision`、`representation_upgrade_increments_business_revision`、`artifact_snapshot_writer_not_verifiable`、`retired_writer_not_verifiable`、`missing_required_domain`；归属 Task 74：`unadjudicated_writer`、`bypasses_unified_commit`、`unadjudicated_resolver`、`writes_legacy_version_field`、`owns_direct_commit`、`non_canonical_resolver_only`、`writer_without_characterization_test`；归属 Task 71：`multi_resolver`。
   - **上述七条的归零动作已移交 Task 74**（gate issue key `unadjudicated_writer` 起，逐条名单见上一行的「归属 Task 74」）：清零要求逐 domain 裁决 + 逐 writer 迁到 Task 15 的 `ContentMutationService`，而 adapter 供给落在 Wave 5–7（Task 46–57 / 62–65），Task 20 在 Wave 1 —— criterion 留在本门即成环（不等供给永远归不了零，供给又要等本门放行 `bulk_adapters`）。移交形态照 `multi_resolver` 的范式：移交的是**裁决归属**，`check_workpaper_writer_revision_gate.py` 必须**继续算**这七条、继续把它们计入 `has_debt`，一行计算都不许删 —— Task 74 正是靠这些计数验零。因此本门在这七条上保持红。
   - **`多 resolver writer=0`（gate issue key `multi_resolver`，实测 4 行全在 `wp_onlyoffice_router`）已移交 Task 30**：这 4 行的 substrate 必须先变成 room/staged representation（Task 25/26），而 Task 20 又是 Task 25 的依赖 —— criterion 留在本门即成环（不等 25/26 落地永远归不了零，25/26 又要等本门过）；Task 12 的 resolver 矩阵已把这 4 行记为 `status=deferred`。移交的是**裁决归属**（谁负责清零、谁的验收卡在它上面），**不是**把它从门里摘掉：`check_workpaper_writer_revision_gate.py` 必须继续计算并把它计入 `has_debt` —— 一条准则从报告里消失与它归零逐字相同（fail-open），而 Task 30 正是靠这个计数验零。因此本门在该 criterion 上同样保持红，这与「Task 20 本就因 236 `unadjudicated_writer` + 261 `bypasses_unified_commit` 而红」并不冲突：Task 20 的验收不因这 4 行而改变结论。**第二跳**：Task 30 实测证明它在 Wave 2 同样不可满足（供给只能来自 Task 36，而 Task 36 依赖 Task 30），已再移交 Task 71，移交链 Task 20 → Task 30 → Task 71，接手侧正文见 Task 71。自第二跳起该 criterion **不再挂** `bulk_adapters` gate `["20","30","44"]`：bulk adapter 迁移在 Wave 5，Task 71 在 Wave 7，挂上即 Wave 5 依赖 Wave 7 成新环 —— bulk adapter 不能等在排在它之后的全局 legacy 删除上；`bulk_adapters` 的放行仍由 Task 20/30/44 各自的其余准则把守，本 criterion 改由 `legacy_delete` gate 中的 Task 71 把守。
@@ -471,10 +519,13 @@
     - **但第五条 bullet 自述的验收判据未兑现**，而它恰恰写明「验收判据落在**请求路径实跑**而非登记态」：`check_task44_oo94_excel_pilot_gate.py` 实测四个 Excel pilot 全部 `adapter_registered=False` · `capability_enabled=False` · `attach=()`（b60 / d2 / g7 / h1 逐个如此），判定分布 `{failed: 28, unverifiable: 140, passed: 5}`、`pilot_not_admitted` 136 条；Task 61 门禁独立测得 `registered_adapter_ids=[]`。manifest 186 条 entry 的 `adapter_id` 因此仍全 `null`。两条独立路径互证，不是单侧读数。
     - **真实阻塞不在本任务**：注册计划现算 186 个 entry、`DELIVERED_PER_ENTRY_CONTRACTS` 4 行、可注册 4 条，与四个 pilot 逐一对应 —— 即静态供给已就位。卡住的是观测器要读的那个**输入**：这四个 entry 都没有 current published representation（库实测 `working_paper_content_representation` 仅 1 行且属 opaque lane，见 Task 61 的 2026-09-03 更正），观测器按第四条 bullet 的 fail-closed 约定必须抛 ERROR 而不得降级取空 ⇒ 注册必然失败。这与 Task 61 的 BP-61-1 是同一条根因。
     - **禁止的推绿方式**：不得放宽 bundle approved / typed slot 非空 / authority model 匹配任一校验来抬高注册数；不得用占位 adapter_id 充数；不得把观测器改成 `return None` / 空 identity（本任务第二条 bullet 已为这两种中间形态各留一条打红判据）。要让判据真兑现，只有让这四个 entry 之一先有 published representation。
+    - **🔴 2026-09-05 阻塞点已换一环，复选框仍 `[-]`（诚实登记，不推绿）**。上一条说的「四个 entry 都没有 current published representation」**已解除**：Task 76 现已收口，`working_paper_content_representation` 4 行（其中 3 行是 projection 链的 G7 / H1 / D2），`working_paper_representation_upgrade_candidate` 1 行且已 `ready`。但 `check_task44_oo94_excel_pilot_gate.py` 现读四个 pilot **仍全部** `capability_enabled=False` / `adapter_registered=False` / `observer=available`（判定分布 `{failed: 28, passed: 5, unverifiable: 140}`，`pilot_not_admitted` 136 条）。
+    - **新的绑定约束是「顺序」而不是「供给」**，且它由 spec 自己规定：四个 provider 的 `assert_manifest_capability_enabled()` docstring 与 Tasks 46–57 的启用前置都写明「经 **Task 36** 校验动态 identity / visible equivalence 并 finalize 其 candidate 为 published representation **之后**才允许注册 adapter / 接宿主 / 标 bidirectional」。现有三条 published representation 走的是 P spec 的**首版发布**路径（`ContentMutationService.commit`），**不是** Task 36 的 `ExcelEntryFinalizeGate` ⇒ 严格按 spec，今天没有任何一个 entry 可以标 `bidirectional`；而 `attach_pilot_adapters()` 的第一道门就是 `manifest_capability_enabled()`，capability 不翻则 `adapter_registered` 结构上不可能为 True。**H1 现在有了 `state=ready` 的 candidate，它是第一个可被 Task 36 处理的 entry** —— 本任务的解锁顺序因此是 Task 36 finalize → overlay 裁决 capability → 重生成 manifest → adapter 注册 → 本任务第五条 bullet 的请求路径实跑。
+    - **第二个独立阻塞（工程性、非本任务）**：`generate_workpaper_sync_manifest.py --check` 当前直接 FAIL —— overlay 的 `approved_source_digest` 已 stale（approved `b0fd31f1…` vs current `d9fddb64…`）。只读量化后确认是**机械** staleness 而非语义变更：挂载 **277 → 277**、新增 77 / 消失 77 落在**同一批 42 个 host Vue、同一 component**，只是 `mountId`（内容/span 哈希）位移；四个 pilot 宿主里只有 `GtD2AccountsReceivable.vue` 在内。⇒ 重新 approve 是机械动作，但按五泳道分工书 §6 规则 3 应在**收口时一次做完**（并发会话仍在改前端，早改早 stale）。
   - 验证 Property 3、Property 7、Property 28、Property 49、Property 67。
   - _Requirements: 1.4, 2.10, 3.3, 5.12, 6.1, 6.10, 6.18, 6.20, 12.1, 12.2_
 
-- [-] 76. 建生产侧 `projection_contract` definition 链 provisioner 与 candidate bundle 受控 attach 入口
+- [x] 76. 建生产侧 `projection_contract` definition 链 provisioner 与 candidate bundle 受控 attach 入口
   - 交付按 `(project_id, wp_id)` 作用域的幂等 provisioner：沿 `template → instrumentation → contract → bundle → representation` 发布 approved definition，bundle 的 authority model 与 template/instrumentation/contract 三类 typed slot 全部非空且逐项校验 child kind/state/digest；重跑按 canonical bytes 命中既有 artifact/bundle，**不得**产生第二份同内容 definition。现有 `writer_migration.OpaqueAuthorityProvisioner.ensure()` 对非 opaque authority model 显式抛 `ProjectionAuthorityNotAllowedError`，故 projection 侧必须自建 provisioner，**不得**靠放宽该 guard 复用 opaque 通道。
   - **拒绝**一切伪造供给，五种形态各有一条 fail-closed 判据并指出首个非法 slot：自造 uuid 或 digest；在 `projection_contract` 的 contract slot 用版本化 typed null marker 冒充 contract；写空串 / 全零 hash；slot omission 或 SQL NULL；把 generator 候选当已人工审核的 per-entry contract 发布。
   - 交付 candidate 受控 attach 入口，补上 repository 现只有 create-with-bundle 而缺的 attach/update：只允许把已 approved 的 contract/bundle 绑到 `state=awaiting_contract` 的 `working_paper_representation_upgrade_candidate`，state 迁移写 append-only 审计。**不得**修改已 finalize 的 candidate、**不得**绕过 `assert_candidate_finalizable`、**不得**因 attach 让 candidate 进入 resolver / room / current pointer / evidence。
@@ -483,6 +534,13 @@
   - **🔴 2026-09-03 复选框由 `[x]` 退回 `[-]`（假绿更正，非回退）**：provisioner 本体确已交付并真写了库 —— `working_paper_sync_definition_artifact` 从 0 → **14** 行、`working_paper_sync_definition_bundle` 从 0 → **5** 行，其中 3 条是 approved `projection_contract`（`b60.hour_budget.authority-model` / `d2.receivable_detail.authority-model` / `h1.disposal_check.authority-model`），另 2 条是 opaque/custom 权威模型；全部 `state=approved` 且 typed slot 三类均为 `definition`（非 typed null marker），外键自洽。
     - **但自述验收判据点名的四表里有两表未兑现**。判据原文是「四表从实测 0 行变为有真实行」：① `working_paper_representation_upgrade_candidate` 实测**仍为 0 行** —— 本任务交付的 candidate 受控 attach 入口因此从未在生产路径上被真实调用过（Tasks 17 与 59 的 upgrader 也是同一状况，两者都声明「只登记 non-current candidate」而库里一条没有 ⇒ 属「additive 注入即死代码」形态，假绿第①源）；② `working_paper_content_representation` 字面上确有 1 行，但它**不是本任务这条 projection 链产出的** —— 该行的 `definition_bundle_id` 指向 `authority.opaque_single_onlyoffice`（`adapter_id=opaque.authoritative.v1`、`entry_id=opaque-{wp_id}`、`source=upload`），走的是 opaque lane。三条 projection_contract bundle 一条都没被 representation 引用。
     - **净判定**：definition 侧（artifact + bundle）真交付且可复算；candidate 与 representation 侧未兑现。差的是把已 approved 的 projection bundle 真正走通 `ContentMutationService.commit` / `finalize_candidate` 落成 published representation —— 与 Task 75 的注册失败、Task 61 的 BP-61-1 是同一条根因。**禁止的推绿方式**：不得为凑「四表有行」而自造 uuid/digest、用 typed null marker 冒充 contract、或把 generator 候选当已人工审核的契约发布（本任务第二条 bullet 已为这五种伪造各留一条 fail-closed 判据）。
+  - **✅ 2026-09-05 复选框由 `[-]` 转 `[x]`：自述验收判据的四表全部兑现，且幂等重跑实测 0 新增。** 差的那两表（candidate / representation）现已由真实生产路径产出，不是凑数：
+    - `working_paper_content_representation` **1 → 4 行**，其中 **3 行是本条 projection 链产出的**（`xlsx/gt-g7-long-term-equity-main` gen1 bundle `889fcb95dded` / `xlsx/gt-h1-fixed-assets` gen1 / `xlsx/gt-d2-accounts-receivable` gen1 bundle `9b98b794cf1d`），发布路径是 P spec 的 `fix_projection_first_publication.py --apply`（十阶段全过，含 `roundtrip_verified` 与 `unmanaged_regions_verified`）。原判定说的「那 1 行走的是 opaque lane」现在只是四行里的一行。
+    - `working_paper_representation_upgrade_candidate` **0 → 1 行**，且它**正是本任务第三条 bullet 那个受控 attach 入口的第一次生产调用**：candidate `cfcb99ab-0186-432a-8d03-d4c0e52f7b29`（entry `xlsx/gt-h1-fixed-assets`）由新建宿主 `backend/scripts/fix/fix_excel_instrumentation_upgrade_candidate.py --apply` 以 `state=awaiting_contract`、三个 target 全 `None` 登记；随后 `fix_task76_provision_projection_definitions.py --apply` 经 `CandidateDefinitionAttachService.attach()` 绑上 approved contract `064b11a66d37` + bundle `b2284d1fd77d`，状态 `awaiting_contract → ready`。append-only 审计在位（`working_paper_representation_candidate_event` seq 1 `contract_bundle_attached`，correlation `task76-projection-provisioning@f663b18c…/xlsx/gt-h1-fixed-assets`）。原判定说的「attach 入口从未在生产路径上被真实调用过、属死代码」因此解除。
+    - **四条否定式承诺逐条实测为真**：四个 entry 的 entry pointer、`representation_generation`、representation 行数、`content_revision` 在 attach 前后**逐值不变**；candidate 的 `finalized_representation_id` / `finalized_at` 仍为 `NULL`（finalize 属 Task 36 的 `ExcelEntryFinalizeGate`，本任务不越线）。
+    - **幂等判据**：`--apply` 二次重跑 `created_total=0`，四表 before == after = `{artifact: 23, bundle: 9, candidate: 1, representation: 4}`；`--check` 亦全部落 `reused`。
+    - **顺带修掉本任务宿主自身两处缺陷**（都是本轮实测抓出的，不是注释不准）：① `TARGET_ORDER_SQL` 与 P spec 首版宿主**不同源**（本宿主那份少了 `has_store_payload DESC`），实测 D2 / B60 两个 entry 解析到与已发布行**不同的底稿** ⇒ `--check` 对已发布的 D2 报 `blocked`；已收敛到新建生产模块 `app/services/workpaper_sync/projection_target_resolution.py`，两宿主 import 同一对象（BP-24）。② `preview_representation_settlement` 比生产 `_settle_representation_stage` **少一条分支**（`reused_candidate`）⇒ attach 完 `--check` 仍报 `blocked` 而 `--apply` 给 `reused_candidate`，预演与真跑对同一库状态给出不同结论；已补齐并改用 `target_definition_bundle_id` + `finalized_representation_id IS NULL` 作判据（不拿 `state=='ready'` 当代理）。
+    - 守卫：`test_task76_projection_definition_provisioner.py` + `test_task17_excel_instrumentation.py` + `test_projection_first_publication.py` 合计 **223 passed**。
   - 验证 Property 4、Property 5、Property 10、Property 28、Property 67。
   - _Requirements: 2.1, 2.3, 2.4, 3.3, 3.4, 3.6, 6.2, 6.10, 6.18, 12.1_
 
@@ -617,14 +675,22 @@
   - 验证 Property 30、Property 31、Property 32、Property 33、Property 34、Property 69、Property 70。
   - _Requirements: 7.1, 7.3, 7.4, 7.5, 7.6, 7.8, 12.1, 12.5, 12.10, 12.11, 12.12_
 
-- [-] 63. 逐一处理 9 个 B 子码错型与 `S33-REV`
+- [x] 63. 逐一处理 9 个 B 子码错型与 `S33-REV`
   - 有合法 DOCX+HTML 对端时，为该 entry发布 approved authority model、tagged-SDT per-entry contract与 non-null bundle，并在 Task 59 candidate通过后 finalize published representation才启用；不得回退父级 XLSX、复用父 entry bundle或让 candidate进入运行态。
   - 无合法模板/HTML 对端则裁决 single/missing并移除假切换，不为满足数字伪造 contract/bundle/finalize；每个 entry保留自身 evidence/UNVERIFIABLE状态。
   - **驻留原因与已交付部分（2026-08-31 实证）**：裁决清册 `owner_task=63` 恰 10 行 = 9 个 B 子码 + `S33-REV`，逐 entry 记录见 `backend/data/workpaper_sync_task63_subcode_adjudication.json`（生成器 `backend/scripts/gen/generate_workpaper_task63_subcode_adjudication.py --check` 幂等，守卫 `backend/tests/workpaper_sync/test_task63_subcode_adjudication.py` 33 passed，变异 `backend/scripts/diagnose/mutate_task63_subcode_guards.py` 23 条全 RED、覆盖面 2/2）。
     - **第二条 bullet（`S33-REV`）已完整闭环**：模板库零载体 ⇒ Task 58 resolver 现算判 `template_missing`；新增 `word_resolution.WordCarrierVerdict` 封闭三值（与清册 `unified_verdict` 同名同域）+ `word_carrier_verdict()`，经 `_word_template._carrier_absence_payload()` 下发到 `html_data.word_carrier`，宿主 `WorkpaperWordEditor.vue` 按它门控掉双模式切换/结构化视图/在线编辑三处入口（零 wp_code 字面量），并删除 `wpPopupDocxConfigsS.ts` 里 S33-REV 的假切换条目。载体线索 `S/S33-1程序修订说明.docx`（业务名与 wp_name 逐字对应，且同一笔误使严格 resolver 对 `S33-1` 亦误指）连同 OPT-A 改名 / OPT-B 显式映射两方案登记为 `pending_business_confirmation`，**不擅自改运行时权威模板库**。
-    - **第一条 bullet（9 个 B 子码）结构上不可执行**，两条并列阻塞：① **BP-18** `registry.PENDING_ENGINE_ADAPTERS` 仍禁 `adapters/word.py`，放行门是 Task 61（当前 `[-]`，其 BP-10~BP-15 六条全 open）；② **BP-20** 字段身份基础不合法 —— 9 份权威 DOCX 的 `${token}` 占位符现算共 **0 个**，HTML 侧 11 个字段全部由 `wp_docx_template_parser` 的 legacy 中文标记（`××`）+ 出现顺序编号派生成 `placeholder_generic_N`，违反 Requirement 7.1 且与 Task 6 裁 `failed` 的 `paragraph_index` 同一失效模式；`B40-1`/`B40-2` 结构化岛为空集。故本轮 `published` 五个 id 全 `null`、`registered_adapters=0`、9 个 entry 保持 `UNVERIFIABLE`，**不发布任何 contract**（守卫 `test_no_word_contract_was_staged_for_b_subcodes` 对 staged 与生产两个目录同时把关）。解除需底稿模板编制方为这 9 份引入 `${token}` 或逐份裁定每个 `××` 的业务语义。
+    - **第一条 bullet（9 个 B 子码）结构上不可执行**，两条并列阻塞：① **BP-18** `registry.PENDING_ENGINE_ADAPTERS` 仍禁 `adapters/word.py`，放行门是 Task 61（当前 `[-]`；🔴 原文此处写「其 BP-10~BP-15 六条全 open」已于 2026-09-04 重验时**删除** —— 该转述已被 Task 61 自己 2026-09-01 的记录证伪，详见下方重验条目）；② **BP-20** 字段身份基础不合法 —— 9 份权威 DOCX 的 `${token}` 占位符现算共 **0 个**，HTML 侧 11 个字段全部由 `wp_docx_template_parser` 的 legacy 中文标记（`××`）+ 出现顺序编号派生成 `placeholder_generic_N`，违反 Requirement 7.1 且与 Task 6 裁 `failed` 的 `paragraph_index` 同一失效模式；`B40-1`/`B40-2` 结构化岛为空集。故本轮 `published` 五个 id 全 `null`、`registered_adapters=0`、9 个 entry 保持 `UNVERIFIABLE`，**不发布任何 contract**（守卫 `test_no_word_contract_was_staged_for_b_subcodes` 对 staged 与生产两个目录同时把关）。解除需底稿模板编制方为这 9 份引入 `${token}` 或逐份裁定每个 `××` 的业务语义。
     - `B2-3` 载体二义（两封沟通函，sha256/size 均不同 ⇒ 两份不同文档）登记为 **BP-19** + OPT-SPLIT / OPT-PRIMARY 两方案，`recommended` 均为 `null`（正本归属与新 wp_code 编码属业务判断）。
     - 本任务 `[-]` 与 Task 61 同型：阻塞原因已写明，属**有意驻留**，不是被中断。
+    - **🔴 2026-09-04 逐条重验（四条阻塞全部现算，判定仍 `still_open`；判据与现算结果写进裁决 JSON 的 `blocking_preconditions[].measured` 与新增 `residency_reverification` 块，`--check` 幂等）**。上一轮证据写于 2026-08-31，其后 Tasks 62/64/67/76/77 落地，故本轮先重验而非复述。🔴 顺带更正一处常见误记并留一条方法论：**Task 75 今日复选框实扫是 `[-]` 而非 `[x]`**；而 **Task 76 在本轮会话进行中由并发方从 `[-]` 翻成 `[x]`**（本轮开工时实扫 `[-]`，收尾时实扫 `[x]`，tasks.md mtime 两次分别为 `00:46` 与 `00:55`）—— 故引用「其他任务的复选框状态」这类**并发可变量**时必须写明取数时刻，否则同一份记录里前后两句就会互相矛盾。今日全量实扫仍为 `[-]` 的是 **61 / 63 / 71 / 72 / 74 / 75** 六条。
+      - **BP-16 `still_open`**（owner = manifest 生成侧 / Task 67，**不在 Task 63**）—— 本条最被怀疑已因 Task 67 重生成 manifest 而漂移，实测**未漂移**：`workpaper_sync_entry_manifest.json` 现有 **186** 条 entry（`document_type` 分布 `{docx: 7, xlsx: 179}`），9 个 B 子码在任何 entry 的 `wp_match.wp_code_patterns` 里**逐字命中 0/9**，仍只被泛匹配 entry `docx/gt-wp-renderer`（`wp_code_patterns: []`、`independent_entry: true`）覆盖；7 条 docx entry 里仅 4 条带 patterns（`A10B` / `A12B` / `A16B` / `A17B`），无一覆盖 B 子码。🔴 判据刻意定为「9 个 wp_code 里有几个能逐字命中」而**不是**「manifest entry 总数」—— 后者每次 Task 67 重生成都会变，拿它当判据必然周期性假红/假绿。
+      - **BP-17 `still_open`**（owner = 平台侧 published representation 供给，**不在 Task 63**）—— 代码层两条同时成立：`assert_may_publish()` 在非 `bundle_bound` 或 `bundle is None` 时**恒抛** `WordApprovedBundleRequiredError`；candidate 登记处仍把 `target_contract_definition_id` / `target_definition_bundle_id` **双双写死 `None`** 且 `state=CandidateState.awaiting_contract`（`word_instrumentation.py` L1715–1717）。库侧 lane 内实测全 **0**：`document_type='docx'` 的 representation **0** 条；9 个 B 子码在 `working_paper_content_representation` / `working_paper_sync_entry_state` / `working_paper_sync_definition_artifact` 三处各 **0** 行。🔴 **两处措辞已修**：其一 `source_refs` 补上 `word_sdt_engine.py` —— `assert_may_publish` 的**定义处**在那里（L494），首版只列 `word_instrumentation.py` / `word_entry_gate.py`，读者按 refs 去找那个「恒抛」的方法会找不到（`word_entry_gate.py` 里只有**调用**）；其二补 `scope_note` 写明判据是 **lane 内**而非平台级 —— 平台侧今日已有 **23** 条 definition artifact / **9** 个 bundle / **4** 条 current published representation（属 `b60` / `d2` / `g7` / `h1` 与 opaque lane，其中 3 条是真 manifest planned entry、全为 xlsx），按平台行数判会把别的 lane 的产出误读成本 lane 解除 —— Task 61 的 BP-61-1 已在 2026-09-03 踩过这个坑。
+      - **BP-18 `still_open`**（owner = Task 61）—— `PENDING_ENGINE_ADAPTERS.forbidden_paths` 现算 = `['app/services/workpaper_sync/adapters/word', 'app/services/workpaper_sync/adapters/word.py']`，**逐字包含**真实目标且两者磁盘上均不存在；`blocking_task` 字段仍是 `"59,60,61"`，Task 61 复选框现扫仍 `[-]`。判据按 Task 64 M13 的教训写成「必须**包含**那个真实路径」而非「清单非空 + 逐项不存在」（后者可被改名成 `adapters/word_DISABLED.py` 绕过）。🔴 **措辞已修**：删掉「其 BP-10~BP-15 六条全 open」—— 已被 Task 61 自己 2026-09-01 的记录**证伪**（那四条平台欠账由 Tasks 75/76/77 解除，Task 61 改登记 BP-61-1/2/3，唯一 `kind=binding` 的是 **BP-61-1** published representation 供给，`scope=platform_wide_not_f2_specific`，生产者是 `ContentMutationService.commit(...)` 与 Tasks 36/77 的 finalize gate，**owner 既不在 Task 61 也不在 Task 63**）。本轮起 BP-18 **不再转述上游阻塞编号** —— 转述上游编号正是这次失准的根因；反向守卫 `test_bp18_no_longer_restates_upstream_blocking_ids` + 变异 **M28** 钉住不许回退。
+      - **BP-20 `still_open`**（owner = **底稿模板编制方，属业务输入不属编码**）—— 10 份权威 DOCX（9 个 wp_code，`B2-3` 二义两份）逐份重新解压现算：`${...}` 在 `word/document.xml` 与全部 `word/*.xml` 里**双双为 0**、合计 **0**；`backend/wp_templates/` 下 `~$` 锁文件 **0** 个，10 份 sha256 与记录逐字一致。生产 parser 现算派生字段按 wp_code 合计 **11**（B18-3-1·1 / B18-3-2·1 / B2-1·2 / B2-11·1 / B2-3·1 / B2-6·4 / B2-8·1 / B40-1·0 / B40-2·0），**全部**是 `placeholder_generic*`、label **只有一种**（「待填内容」）、position **全部**是 `paragraph_index` 绝对索引 —— 与 Task 6 裁 `failed` 的失效模式逐字同型；`B2-6` 更有 3 个字段**同落 `paragraph_index: 1`**（连段内都不具区分度）；`B40-1` / `B40-2` 字段集为空 ⇒ 契约必空转。
+      - **顺带修掉一个既存脚本缺陷**：变异 **M11** 首跑判 **WRONG-TEST**，追因确认**既不是守卫缺陷也不是行为回归** —— 变异确实把该门那条测试打红了（`8/9 passed`，红的正是它），但 `want` 写的是一个**已不存在的测试标题**（旧名「不发起 template-structure / onlyoffice-config 请求」）；前端 spec 在 2026-09-01 被改名为「不发起结构化取数与 onlyoffice-config 请求」，`want` 随之过期（`WorkpaperWordEditor.vue` mtime 2026-09-06 属并发会话，本轮未改它一个字节）。**通用教训**：fe 侧 `want` 是**测试标题子串**，标题一改就悄悄失配，而四态里 WRONG-TEST 长得很像「污染残留」，容易被误判成守卫问题去改生产代码。
+      - **本轮交付**：生成器新增 `_manifest_lane_facts()` / `_word_adapter_gate_facts()` / `_word_publish_gate_facts()` 三个现算判据 + `sources` 增锁 4 份源文件 digest（manifest / `registry.py` / `word_sdt_engine.py` / `word_instrumentation.py`）+ `residency_reverification` 块；守卫新增 `TestResidencyReverification` **6** 条（逐条**重算**期望值而不采信记录里的数，含「digest 与磁盘现算相等」与「重验判定必须覆盖 entry 真正挂着的每条 BP，分母由 `blocked_by` 现算」）；变异 **23 → 29** 条，`--run all` **29/29 全 RED**（0 GREEN / 0 ANCHOR-MISS / 0 WRONG-TEST，覆盖面 2/2、目标文件 md5 全部未变、无 `.mutbak` 残留），守卫 **33 → 39 passed**，生成器 `--check` 幂等。
+      - **解除条件（不可交换）**：**BP-20**（业务输入：为这 9 份 DOCX 引入 `${token}`，或逐份裁定每个 `××` 的业务语义并落成显式字段清册）→ **BP-16**（为 9 个 wp_code 建 per-entry manifest entry）→ **BP-17**（平台侧 published representation 供给）→ **BP-18**（Task 61 的 `word_bulk` 门）。🔴 **只要 BP-20 未解除就不存在合法的 `stable_field_key`，任何 per-entry contract 都不得发布** —— 即便 BP-16 将来因 Task 67 重生成而解除，那也只改变「阻塞清单」，不改变「9 个 entry 仍 UNVERIFIABLE」这个结论。本轮**未**发布任何 contract / authority model / definition bundle / finalize representation，**未**建 `adapters/word.py`，**未**改 `PENDING_ENGINE_ADAPTERS` / manifest / `backend/wp_templates/` 任何字节，**未**写库（重验全程只读），**未**碰 `backend/data/amount_input_migration_status.json`。**判定：保持驻留。**
   - 验证 Property 40、Property 41、Property 69、Property 70。
   - _Requirements: 7.7, 9.4, 9.5, 12.5, 12.8, 12.10, 12.11, 12.12_
 
@@ -706,14 +772,55 @@
   - 独立验证 Property 1、Property 2、Property 3、Property 46、Property 47、Property 48、Property 51、Property 57、Property 69、Property 70、Property 71、Property 72。
   - _Requirements: 1.1, 1.3, 1.4, 1.5, 1.7, 11.1, 11.2, 11.5, 11.8, 11.10, 12.7, 12.8, 12.9, 12.10, 12.12, 12.13, 12.14, 14.7, 14.10, 14.13, 14.14, 14.15, 14.16_
 
-- [-] 74. 清零 writer/version domain 的 236 未裁决与 261 绕过统一 commit
+- [-] 74. 清零 writer/version domain 归属本任务的七条准则（未裁决两条已归零，余五条留红；计数一律由门现算，见正文）
   - 接手 Task 20 冻结的红基线里**七条**准则的归零：`unadjudicated_writer`（gate issue key `unadjudicated_writer`，实测 236 行）、`bypasses_unified_commit`（261）、`unadjudicated_resolver`（34）、`writes_legacy_version_field`（5）、`owns_direct_commit`（105）、`non_canonical_resolver_only`（63）、`writer_without_characterization_test`（208）—— 自 Task 20 移交至本门，成环理由与移交形态见 Task 20 正文，不必再推导一遍。
   - 做法只有两条：**逐 domain 裁决**（每行进 `workpaper_writer_domain_overlay.json` 的 reviewed overlay，`version_domain_note` 写清它属于哪条 lane、为什么，禁止空注解），与**逐 writer 迁到 `ContentMutationService.commit(...)`**（删掉各自的 `_version`/`file_version`/`content_revision` 推进与第二个事务边界，每行补落在调用点上的 characterization + migrated behavior test）。
   - **完成判据 = `check_workpaper_writer_revision_gate.py` 的 14 条准则全为零**（默认命令退出码 0），不是「上面七条为零」：`multi_resolver` 的裁决归属仍在 Task 71（本任务依赖 71，故它先归零），`keeps_legacy_write_path_beside_unified_commit` / `after_save_still_increments_revision` / `representation_upgrade_increments_business_revision` / `artifact_snapshot_writer_not_verifiable` / `retired_writer_not_verifiable` / `missing_required_domain` 由 Task 20 守住，迁移过程中把它们从 0 顶回非零同样算本任务未完成。
   - **禁止四件事**：加豁免列或 overlay 级 `allow_bypass`；缩小分母（收窄 `_APP_ROOT`、给 `_is_production_source` 加业务目录排除、从 `_CONTENT_STORES` 删表）；把 `raise WriterGateError` 改成报 0；删掉任何一条 criterion 的计算。四件事各自已有守卫（`test_task20_writer_gate.py` §5–§7）与变异锚点，绕不过去。
   - 归零后同步更新 Task 20 正文冻结的那 14 个数字（它们由守卫与门现算逐条比对，改了源码不改文档必打红），并重跑 `mutate_task20_writer_gate_guards.py --run all` 确认锚点仍全部命中。
   - **🔴 2026-09-03 复选框由 `[x]` 退回 `[-]`（假绿更正，非回退）**：本任务自己写明「完成判据 = `check_workpaper_writer_revision_gate.py` 的 14 条准则全为零（默认命令退出码 0）」，而默认命令实测 **退出码 1 / 646 条 blocking facts**，14 条里 **5 条非零**：`bypasses_unified_commit` **261**、`writer_without_characterization_test` **208**、`owns_direct_commit` **105**、`non_canonical_resolver_only` **63**、`writes_legacy_version_field` **5**。真归零的只有 `unadjudicated_writer`（236→0）与 `unadjudicated_resolver`（34→0），以及 Task 20 守着的 6 条零基线（`keeps_legacy_write_path_beside_unified_commit` / `after_save_still_increments_revision` / `representation_upgrade_increments_business_revision` / `artifact_snapshot_writer_not_verifiable` / `retired_writer_not_verifiable` / `missing_required_domain`）与 `multi_resolver`=4（归属 Task 71）。    - 判据来源：`backend/scripts/check/check_workpaper_writer_revision_gate.py` 默认命令现算（`rows=319 writers=269 resolvers=71 retired=3`），与 Task 71 门禁报告 `multi_resolver_adjudication.writer_gate_criteria` 的 14 条逐字一致（那份是 live 重算、不写盘），两条独立路径互证，不是单侧读数。
-    - **两条禁令仍然成立**：不得为了让复选框好看而缩小分母或加豁免（Task 20 §5–§7 守卫 + 变异锚点把着）；也不得把「已裁决 2 条」当成「七条已清零」—— 剩下 5 条要的是**逐 writer 迁到 `ContentMutationService.commit(...)`** 与逐行补 characterization test，共 **642** 行实活，不是登记动作。
+    - **两条禁令仍然成立**：不得为了让复选框好看而缩小分母或加豁免（Task 20 §5–§7 守卫 + 变异锚点把着）；也不得把「已裁决 2 条」当成「七条已清零」—— 剩下 5 条要的是**逐 writer 迁到 `ContentMutationService.commit(...)`** 与逐行补 characterization test，不是登记动作。
+    - **🔴 2026-09-05 数字刷新（本行以上的 261 / 63 / 646 / 642 为 09-03 读数，已过期）**：默认命令现算 **退出码 1 / 658 条 blocking facts**，五条非零为 `bypasses_unified_commit` **264**、`writer_without_characterization_test` **208**、`owns_direct_commit` **105**、`non_canonical_resolver_only` **72**、`writes_legacy_version_field` **5** ⇒ 待迁 **654** 行。归因：`excel-template-override-layer-and-onlyoffice-template-editor` 的覆盖层接线给 `wp_template_finder.py` **新增**了 `_find_template_file_override_first` / `_find_all_template_files_override_first` / `_find_template_file_any_override_first` 三个函数（HEAD 12 个顶层函数 → 现 15 个，**无删除**），使该模块被判为 non-canonical resolver 的行由 2 增至 5，连带 `non_canonical_resolver_only` +9、`bypasses_unified_commit` +3。Task 20 正文的 14 个数字已同步为 264/72/658，`test_task20_writer_gate.py` / `test_task74_domain_adjudication.py` / `test_workpaper_writer_inventory.py` 三个守卫实测 **81 passed / 0 failed** ⇒ 文档与门现算一致。
+    - **同期一次瞬时故障已自愈，留档备查**：09-04 该覆盖层接线在途时，overlay 里 `wp_template_finder::find_all_template_files` / `::find_template_file_any` 两条裁决曾一度成为孤儿（生成器抛 `overlay adjudicates writers that no longer exist in source`），连带上述三个守卫共 **9 条判据**变红（4 ERROR + 5 FAILED，其中 `test_generator_refuses_an_unverifiable_retirement` 的预期错误被孤儿错误抢先掩盖）。当时判断为「在途中间态、不在移动目标上改 overlay」，未动 overlay；09-05 复查确认两函数仍在、孤儿消失、九条全绿 —— **该判断成立，overlay 无需改动**。教训：生产源重构期间 overlay 的「孤儿」可能只是瞬时态，先复查再裁决。
     - 前置依赖未变：`multi_resolver` 归零在 Task 71（其四条 resolver 行 `blocking_task=21,25,26,36`、`intended_status=deferred`，真实阻塞是 Task 36 的逐 entry published representation 供给 —— 库里 2806 张底稿现仅 1 张有 representation，硬改这四个端点会打断全部底稿的 OnlyOffice 视图）。
   - 验证 Property 4、Property 61。
   - _Requirements: 2.1, 2.2, 2.11, 2.12, 9.11, 12.6, 12.7, 13.4_
+
+## Notes
+
+### 文件占用面与并行安全（2026-09-04 补）
+
+🔴 本 spec 写在**行为层**，任务正文几乎不提具体文件路径（全 77 条任务里只出现 1 个
+`backend/app/**` 路径）。好处是不被实现细节绑死，代价是**无法机械判断它与其它 active spec
+能否并行**。下表按剩余 7 条阻塞任务现读正文里点名的模块/符号，登记它们的占用面与碰撞点。
+
+| 本 spec 任务 | 主要占用面（现读正文点名） | 与下游 spec 的碰撞 |
+|---|---|---|
+| Task 75 | `published_identity_observer.py`、`adapters/word.py`、`adapters/registry.build_production_registry()`、`working_paper_content_representation` / `..._representation_upgrade_candidate` 两表 | 🔴 **与 `published-representation-production-path-and-lane-adjudication` 是同一份工作**（该 spec 的首版发布服务层 = 本任务的公共观测器 + Task 76 的 provisioner）。**不得两边同时做** |
+| Task 76 | `projection_provisioning.py`、`repository.attach_candidate_definitions`、`working_paper_sync_definition_artifact` / `..._bundle` 两表、`finalize_candidate` | 🔴 同上，与 P spec 重合 |
+| Task 61 | `check_task61_oo94_word_pilot_gate.py`、`adapters/word.py`、`GtF2StocktakeBundle.vue`、`build_excel_adapter` | ⚠ 与 P spec 共 `check_task61_oo94_word_pilot_gate.py` |
+| Task 63 | `adapters/word.py`、`registry.PENDING_ENGINE_ADAPTERS`、`wp_docx_template_parser`、`WorkpaperWordEditor.vue`、`wpPopupDocxConfigsS.ts` | 无（Word 域独占） |
+| Task 71 | `wp_onlyoffice_router.py` 的 `get_sheet_onlyoffice_config` / `get_sheet_wopi_contents` / `get_whole_excel_grid`、`check_workpaper_writer_revision_gate.py`、`bulk_adapters` | 🔴 **与 `excel-template-override-layer-and-onlyoffice-template-editor` 共 `wp_onlyoffice_router.py`** |
+| Task 72 | 前端 legacy 删除面（`createDualMode.ts` / `useWorkpaperSyncBridge.ts` / `usePilotBridgeAdapter.ts` 等，清单在 Task 66 plan 里）+ `wp_onlyoffice_router.py` 的 `paragraph_index` 消费点 | 🔴 同上，与 T spec 共 `wp_onlyoffice_router.py` |
+| Task 74 | `check_workpaper_writer_revision_gate.py`、`workpaper_writer_domain_overlay.json` | ⚠ 与任何改 `backend/app/**` 的 spec 间接相关：writer inventory 会因生产源变更而 stale，需重跑生成器 |
+
+### 并行规则
+
+1. **P spec 与本 spec 的 Task 75/76 不得同时进行** —— 它们是同一份工作的两种组织方式。
+   建议：以 P spec 为唯一执行面，完成后把本 spec 的 Task 75/76 按其产出勾掉。
+2. **T spec 与本 spec 的 Task 71/72 不得同时改 `wp_onlyoffice_router.py`** ——
+   T spec 已实际改过该文件（`_hide_non_target_sheets` / `_ensure_all_sheets_visible` 换 zip 级实现，
+   净 +6 行），且该改动已导致 Task 66 plan 的 5 个行号与 task67 报告的 2 个 digest 需要同步更正。
+   再有并行改动会继续引发这类连带更正。
+3. **改动 `backend/app/**/*.py` 后必须重跑 `generate_workpaper_writer_inventory.py`** 等生成器，
+   否则 `test_task20` / `test_task30` / `test_task44` 一批 freshness 判据会连带打红。
+   归因方法：`git status --porcelain -- <path>` 空输出 = 未修改，用它区分自己的债与并发会话的债。
+4. **S spec 与 W spec 之间的串行门**由 W spec 的 Task 101 承担（现读 S spec 的 tasks.md
+   断言其 Wave 4 已 `[x]`），与本 spec 无交集。
+
+### 两条硬阻塞需要人裁决，不是代码工作
+
+* **BP-18**：`registry.PENDING_ENGINE_ADAPTERS` 仍禁 word adapter ⇒ Task 63 的第一条 bullet
+  （9 个 B 子码）结构上不可执行。
+* **BP-19**：`B2-3` 载体二义（两封沟通函，sha256 与 size 均不同 ⇒ 两份不同文档），
+  OPT-SPLIT / OPT-PRIMARY 两方案均未选定。

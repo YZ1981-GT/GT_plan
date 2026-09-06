@@ -71,6 +71,7 @@ from app.services.excel_structure_fingerprint import (  # noqa: E402
 from app.services.workpaper_sync import excel_extract as X  # noqa: E402
 from app.services.workpaper_sync import excel_instrumentation as EI  # noqa: E402
 from app.services.workpaper_sync import excel_materialize as M  # noqa: E402
+from app.services.workpaper_sync import excel_typography_rows as TR  # noqa: E402
 from app.services.workpaper_sync import pilot_h1_grouped_dynamic as P  # noqa: E402
 from app.services.workpaper_sync import pilot_harness as PH  # noqa: E402
 from app.services.workpaper_sync.adapters import registry as RG  # noqa: E402
@@ -142,8 +143,12 @@ EXPECTED_FIELD_COUNT = 25
 #: 3 = 2 个 formula 列（L/O）+ 1 个 auto_source 列（A 序号）。
 EXPECTED_PROTECTED_COUNT = 3
 EXPECTED_EDITABLE_COUNT = EXPECTED_FIELD_COUNT - EXPECTED_PROTECTED_COUNT
-#: 权威模板的物理骨架行数（`A13..A26` 字面量 1..14 + `A27` 占位 `……`）。
-EXPECTED_TEMPLATE_ROW_COUNT = P.LAST_DATA_ROW - P.FIRST_DATA_ROW + 1  # 15
+#: 权威模板的**物理**骨架行数（`A13..A26` 字面量 1..14 + `A27` 占位 `……`）= 15。
+#:
+#: 🔴 BP-21 起它**不再等于**受管行数：`A27` 是排版占位行（续行省略号），不是业务行。
+EXPECTED_PHYSICAL_SKELETON_ROWS = 15
+#: 受管行数 = 物理骨架 − 尾部排版占位行 = 14（`A13..A26`）。
+EXPECTED_TEMPLATE_ROW_COUNT = P.LAST_DATA_ROW - P.FIRST_DATA_ROW + 1  # 14
 #: 26 张 sheet（openpyxl 实测）。
 EXPECTED_SHEET_COUNT = 26
 #: 受管 sheet 的 merge 总数（openpyxl 实测）。
@@ -1065,16 +1070,32 @@ class TestContractIsGroundedInTheTemplate:
     def test_two_formula_columns_are_really_formulas_in_the_template(
         self, worksheet: Any
     ) -> None:
-        """30 次逐格比对（2 列 × 15 行）。"""
+        """30 次逐格比对（2 列 × **15 行物理骨架**）。
+
+        🔴 BP-21：逐行公式是**物理**模板事实，覆盖整个骨架（含 `A27` 那行排版占位）——
+        所以这里按 `TEMPLATE_PHYSICAL_LAST_ROW` 迭代，不按受管末行。第二段再单独断言
+        「受管区内的那 14 行也全都有公式」，于是两个口径各自被取证、不会互相掩盖。
+        """
         checked = 0
         for column, template in sorted(P.FORMULA_TEMPLATES.items()):
-            for row in range(FIRST, LAST + 1):
+            for row in range(FIRST, P.TEMPLATE_PHYSICAL_LAST_ROW + 1):
                 assert worksheet[f"{column}{row}"].value == template.format(r=row), (
                     column,
                     row,
                 )
                 checked += 1
-        assert checked == 30, checked
+        assert checked == 2 * EXPECTED_PHYSICAL_SKELETON_ROWS == 30, checked
+
+        # 受管区是它的真子集：14 行 × 2 列，且末行恰好是 LAST
+        managed = sum(
+            1
+            for column in P.FORMULA_TEMPLATES
+            for row in range(FIRST, LAST + 1)
+            if worksheet[f"{column}{row}"].value
+            == P.FORMULA_TEMPLATES[column].format(r=row)
+        )
+        assert managed == 2 * EXPECTED_TEMPLATE_ROW_COUNT == 28, managed
+        assert managed < checked, "受管区必须是物理骨架的真子集（否则 BP-21 没有生效）"
 
     def test_editable_columns_have_no_formula_in_the_template(
         self, worksheet: Any, raw_fields: list[dict[str, Any]]
@@ -1108,15 +1129,24 @@ class TestContractIsGroundedInTheTemplate:
             assert spec.cell.column in set(P.FORMULA_TEMPLATES), spec.stable_field_key
 
     def test_footer_marker_is_the_real_cell_text(self, worksheet: Any) -> None:
+        """footer 的 SUM 区间覆盖**物理**骨架，对受管区末行构成超集。
+
+        🔴 BP-21：模板里是 `SUM(I13:I27)`，末行 27 是排版占位行。它对受管末行 26 是
+        **超集**，而 `assert_footer_formula_covers_managed_rows` 的判据是
+        `last >= effective_last_row` ⇒ 收缩受管区不会让合计判据打红。
+        这条判据刻意断言「等于物理区间」而不是「覆盖受管区间」：后者用 `>=` 写会让
+        「模板把合计区间改小到 26」也通过，而那是模板漂移，必须打红。
+        """
         assert str(worksheet[f"A{P.FOOTER_ROW}"].value) == P.FOOTER_MARKER
-        # footer 的 SUM 区间必须恰好覆盖受管行区间（不是"大致覆盖"）。
         checked = 0
         for column in "IJKLMNO":
             assert worksheet[f"{column}{P.FOOTER_ROW}"].value == (
-                f"=SUM({column}{FIRST}:{column}{LAST})"
+                f"=SUM({column}{FIRST}:{column}{P.TEMPLATE_PHYSICAL_LAST_ROW})"
             )
             checked += 1
         assert checked == 7, checked
+        # 超集关系显式取证（这正是收缩受管区后合计判据仍成立的理由）
+        assert P.TEMPLATE_PHYSICAL_LAST_ROW > LAST
 
     def test_footer_anchor_never_hardcodes_a_row(self, contract: Any) -> None:
         anchor = contract.sheets[0].tables[0].footer_anchor
@@ -1393,38 +1423,97 @@ class TestSkeletonRowPolicy:
         assert P.skeleton_row_count(-5) == 1
 
     def test_zero_seed_does_not_yield_the_template_skeleton(self) -> None:
-        """seed=0 时**不得**退回模板自带的 15 行（预置空占位会被推成占位披露行）。"""
+        """seed=0 时**不得**退回模板自带的行数（预置空占位会被推成占位披露行）。"""
         assert P.skeleton_row_count(0) == 1
-        assert P.TEMPLATE_SKELETON_ROWS == EXPECTED_TEMPLATE_ROW_COUNT == 15
+        assert P.TEMPLATE_SKELETON_ROWS == EXPECTED_PHYSICAL_SKELETON_ROWS == 15
+        assert P.TEMPLATE_BUSINESS_SKELETON_ROWS == EXPECTED_TEMPLATE_ROW_COUNT == 14
         assert P.skeleton_row_count(0) != P.TEMPLATE_SKELETON_ROWS
-        for forbidden in (3, 5, 10, P.TEMPLATE_SKELETON_ROWS):
+        assert P.skeleton_row_count(0) != P.TEMPLATE_BUSINESS_SKELETON_ROWS
+        for forbidden in (
+            3,
+            5,
+            10,
+            P.TEMPLATE_SKELETON_ROWS,
+            P.TEMPLATE_BUSINESS_SKELETON_ROWS,
+        ):
             assert P.skeleton_row_count(0) != forbidden, forbidden
 
     def test_template_skeleton_row_count_is_derived_from_the_source(
         self, worksheet: Any
     ) -> None:
-        """15 这个数从源侧反推：`A13..A26` 是字面量 1..14、`A27` 是 `……`、`A28` 是 footer。"""
+        """两个数都从源侧反推：`A13..A26` 字面量 1..14、`A27` 是 `……`、`A28` 是 footer。
+
+        🔴 BP-21 的核心区分就在这条判据里：**物理**骨架 15 行与**业务**骨架 14 行不是同一
+        个数，差的那一行是 `A27` 的续行省略号。原实现把两者混成一个数（`observed =
+        FOOTER_ROW - FIRST` 恰好等于 15），于是占位行被当成第 15 条业务行送进 materialize，
+        `seq` 列按 `integer` 写回 `……` 直接失败。
+        """
         numbered = [
             row
             for row in range(FIRST, P.FOOTER_ROW)
             if isinstance(worksheet[f"A{row}"].value, int)
         ]
-        assert numbered == list(range(FIRST, FIRST + 14)), numbered
-        assert str(worksheet[f"A{FIRST + 14}"].value) == "……"
+        # 业务行 = 带整数序号的那些行，恰好是受管行区间
+        assert numbered == list(range(FIRST, LAST + 1)), numbered
+        assert len(numbered) == EXPECTED_TEMPLATE_ROW_COUNT == 14
+        assert numbered[-1] == LAST == 26
+
+        # 占位行紧跟业务行之后、footer 之前，且被生产判据认成排版占位
+        placeholder_row = LAST + 1
+        placeholder = str(worksheet[f"A{placeholder_row}"].value)
+        assert placeholder == "……"
+        assert TR.is_typography_placeholder(placeholder)
+        assert placeholder_row == 27
+        assert P.TEMPLATE_TYPOGRAPHY_TAIL_ROWS == 1
+
+        # footer 物理位置未随收缩变化
         assert str(worksheet[f"A{P.FOOTER_ROW}"].value) == P.FOOTER_MARKER
-        observed = P.FOOTER_ROW - FIRST
-        assert observed == P.TEMPLATE_SKELETON_ROWS == 15
+        assert P.FOOTER_ROW == 28
+
+        # 物理骨架 = 业务骨架 + 尾部占位行；两个数各自可从源侧独立反推
+        assert P.FOOTER_ROW - FIRST == P.TEMPLATE_SKELETON_ROWS == 15
+        assert (
+            P.TEMPLATE_SKELETON_ROWS
+            == P.TEMPLATE_BUSINESS_SKELETON_ROWS + P.TEMPLATE_TYPOGRAPHY_TAIL_ROWS
+        )
+
+    def test_managed_region_excludes_the_typography_row(self, worksheet: Any) -> None:
+        """反向自检：受管行区间内**没有**任何排版占位行，且占位行确实在区间外。
+
+        没有这条时，「受管区不含占位行」只由 `LAST_DATA_ROW` 的取值间接保证 ——
+        而那正是 BP-21 之前写错的那个值。
+        """
+        inside = [
+            row
+            for row in range(FIRST, LAST + 1)
+            if TR.is_typography_placeholder(str(worksheet[f"A{row}"].value or ""))
+        ]
+        assert inside == [], inside
+        assert TR.is_typography_placeholder(str(worksheet[f"A{LAST + 1}"].value))
 
     def test_skeleton_row_count_is_the_only_row_arithmetic(self) -> None:
         """源码级判据：模块里没有第二处「行数算术」。
 
         判据形态：`LAST_DATA_ROW` 的定义必须**经过** `skeleton_row_count(...)`，
-        且模块里除它之外没有别的 `FIRST_DATA_ROW + <数字>` 形态。
+        且模块里除它之外没有别的 `FIRST_DATA_ROW + <数字>` / `LAST_DATA_ROW + <数字>` 形态
+        （footer 那一处除外）。
         """
         source = Path(P.__file__).read_text(encoding="utf-8")
         assert (
-            "LAST_DATA_ROW: Final[int] = FIRST_DATA_ROW + "
-            "skeleton_row_count(TEMPLATE_SKELETON_ROWS) - 1" in source
+            "LAST_DATA_ROW: Final[int] = (\n"
+            "    FIRST_DATA_ROW + skeleton_row_count(TEMPLATE_BUSINESS_SKELETON_ROWS) - 1\n"
+            ")" in source
+        )
+        # 业务骨架必须由物理骨架**减去**尾部占位行得来，不得直接写 14
+        assert (
+            "TEMPLATE_BUSINESS_SKELETON_ROWS: Final[int] = (\n"
+            "    TEMPLATE_SKELETON_ROWS - TEMPLATE_TYPOGRAPHY_TAIL_ROWS\n"
+            ")" in source
+        )
+        # 物理末行必须由物理骨架推出，不得写死 27
+        assert (
+            "TEMPLATE_PHYSICAL_LAST_ROW: Final[int] = "
+            "FIRST_DATA_ROW + TEMPLATE_SKELETON_ROWS - 1" in source
         )
         tree = ast.parse(source)
         additions = [
@@ -1433,12 +1522,15 @@ class TestSkeletonRowPolicy:
             if isinstance(node, ast.BinOp)
             and isinstance(node.op, ast.Add)
             and isinstance(node.left, ast.Name)
-            and node.left.id in {"FIRST_DATA_ROW", "LAST_DATA_ROW"}
+            and node.left.id
+            in {"FIRST_DATA_ROW", "LAST_DATA_ROW", "TEMPLATE_PHYSICAL_LAST_ROW"}
             and isinstance(node.right, ast.Constant)
         ]
-        # 只允许 `LAST_DATA_ROW + 1`（footer 行）这一处常量加法。
+        # 🔴 只允许 `TEMPLATE_PHYSICAL_LAST_ROW + 1`（footer 紧跟物理骨架末行）这一处
+        #    常量加法。BP-21 之前是 `LAST_DATA_ROW + 1` —— 那个写法只在「占位行被误算成
+        #    业务行」时才恰好成立，收缩受管区后它会把 footer 指到占位行上。
         assert len(additions) == 1, [ast.dump(node) for node in additions]
-        assert additions[0].left.id == "LAST_DATA_ROW"
+        assert additions[0].left.id == "TEMPLATE_PHYSICAL_LAST_ROW"
         assert additions[0].right.value == 1
 
     def test_contract_declares_the_policy_not_a_hardcoded_count(
@@ -1453,8 +1545,14 @@ class TestSkeletonRowPolicy:
         spec = P.instrumentation_spec()
         assert spec.first_data_row == FIRST
         assert spec.last_data_row == LAST
-        assert spec.row_count == P.skeleton_row_count(P.TEMPLATE_SKELETON_ROWS)
-        assert spec.footer_row == LAST + 1 == P.FOOTER_ROW
+        # 🔴 BP-21：seed 是**业务**骨架而不是物理骨架
+        assert spec.row_count == P.skeleton_row_count(P.TEMPLATE_BUSINESS_SKELETON_ROWS)
+        assert spec.row_count == EXPECTED_TEMPLATE_ROW_COUNT == 14
+        # footer 与受管末行之间隔着那行排版占位 ⇒ 不再相邻
+        assert spec.footer_row == P.FOOTER_ROW == LAST + 1 + P.TEMPLATE_TYPOGRAPHY_TAIL_ROWS
+        assert spec.footer_row > spec.last_data_row + 1
+        # Table ref 随之收缩（这是 `resolve_managed_region` 的唯一区间来源）
+        assert spec.table_ref == f"A{FIRST}:{P.UUID_COL}{LAST}"
 
     def test_footer_must_sit_outside_the_managed_rows(self) -> None:
         """反向自检：把 footer 挪进受管行区间 ⇒ instrumentation 立刻抛。"""
@@ -1626,9 +1724,10 @@ class TestBaselineExtractOnTheRealTemplate:
     ) -> None:
         rows = base_outcome.projection.row_keys[P.ROWS_TABLE_KEY]
         assert len(rows) == EXPECTED_TEMPLATE_ROW_COUNT
+        # 🔴 BP-21：350 = 14 受管行 × 25 字段（原 375 = 15 × 25，那 15 行里含排版占位行）
         assert len(base_outcome.projection.values) == (
             EXPECTED_TEMPLATE_ROW_COUNT * EXPECTED_FIELD_COUNT
-        ) == 375
+        ) == 350
         assert base_outcome.anomalies == ()
         assert base_outcome.protected_findings == ()
         assert base_outcome.stats.table_row_counts == {
@@ -1638,8 +1737,13 @@ class TestBaselineExtractOnTheRealTemplate:
     def test_formula_columns_are_read_with_their_formula_text(
         self, base_outcome: X.ExcelExtractOutcome
     ) -> None:
-        """30 个公式格的公式文本进 `formula_inventory`，且与源模板逐字相同。"""
-        assert len(base_outcome.formula_inventory) == 30
+        """28 个公式格的公式文本进 `formula_inventory`，且与源模板逐字相同。
+
+        🔴 BP-21：28 = 2 列 × **14 受管行**。模板物理上有 30 个（2 × 15），第 15 行是
+        `A27` 那行排版占位 —— 它已不在受管区，其公式属未管理区域（由
+        `verify_unmanaged_regions` 把守），不进 `formula_inventory`。
+        """
+        assert len(base_outcome.formula_inventory) == 2 * EXPECTED_TEMPLATE_ROW_COUNT == 28
         for column, template in sorted(P.FORMULA_TEMPLATES.items()):
             column_key = next(
                 row[0] for row in P.MANAGED_FIELD_SPECS if row[1] == column
@@ -1664,8 +1768,20 @@ class TestBaselineExtractOnTheRealTemplate:
         assert report.inspected_aspects == X.UNMANAGED_ASPECTS
         coverage = dict(report.details["coverage"])
         assert coverage == {
-            "managed_sheet_unmanaged_cells": 485,
-            "managed_sheet_structure": 4,
+            # 🔴 BP-21：485 → 510（+25）。受管区从 13..27 收缩到 13..26 后，`A27` 那行
+            #    排版占位行的 25 个格从「受管」变成「未管理」⇒ 计数上升**正是** BP-21
+            #    生效的证据。它们此后由未管理区域比对把守（materialize 不碰它们）。
+            "managed_sheet_unmanaged_cells": 510,
+            # 🔴 4 → 6（spec excel-structural-row-insertion-and-shift-aware-verification
+            #    Requirement 1.3）：`_SHEET_STRUCTURE_BLOCKS` 补入了 `dimension` /
+            #    `hyperlinks` / `autoFilter` / `rowBreaks` 四项。H1 的受管 sheet
+            #    （减少检查表H1-8）实测含 `dimension` 1 个、`hyperlinks` 1 个，
+            #    `autoFilter` / `rowBreaks` 各 0 个 ⇒ 4 + 2 = 6。
+            #
+            #    这是**判据变严**而不是判据被破：那四类结构全部携带行号，插行必然改动
+            #    它们，而它们在补入之前**不在任何 aspect 里**（既不在这六个 tag 内，
+            #    受管 sheet part 又被 `_classify_parts` 整件排除）—— 改了没人看。
+            "managed_sheet_structure": 6,
             "other_sheet_parts": 25,
             "protected_parts": 1,
             "shared_strings_prefix": 0,
@@ -1695,10 +1811,22 @@ class TestBaselineExtractOnTheRealTemplate:
     def test_managed_sheet_structure_aspect_covers_the_style_sources(
         self, base_bytes: bytes, sheet_part: str
     ) -> None:
-        """`managed_sheet_structure` 的 4 项覆盖 = merge + cols + DV + protection 的真实存在。"""
+        """`managed_sheet_structure` 的 6 项覆盖 = 样式源 + 位移敏感结构的真实存在。
+
+        6 项 = `sheetPr` + `cols` + `mergeCells` + `dataValidations`（样式源，本来就在）
+        ＋ `dimension` + `hyperlinks`（位移敏感结构，spec
+        excel-structural-row-insertion-and-shift-aware-verification Requirement 1.3 补入）。
+        `autoFilter` / `rowBreaks` 在本模板上各 0 个 —— 它们的判据由该 spec 的
+        zip 级注入 fixture 承担（真实模板上全 0，在这里断言等于空转）。
+        """
         xml = _read_entries(base_bytes)[sheet_part].decode("utf-8")
         assert "<mergeCells" in xml
         assert "<cols" in xml
+        # 位移敏感结构的真实存在（补入 `_SHEET_STRUCTURE_BLOCKS` 的理由）
+        assert xml.count("<dimension") == 1, xml.count("<dimension")
+        assert xml.count("<hyperlinks") == 1, xml.count("<hyperlinks")
+        assert "<autoFilter" not in xml
+        assert "<rowBreaks" not in xml
         assert xml.count("<dataValidation ") == 2, xml.count("<dataValidation ")
         # 条件格式 0 条、sheetProtection 关 —— 与契约 review 里登记的一致。
         assert "<conditionalFormatting" not in xml
@@ -1836,15 +1964,25 @@ class TestProperty23And66StructuralOperations:
         contract: Any,
         region: Any,
     ) -> None:
-        """本表的受管区**已饱和**（footer 紧贴 `last_data_row`）⇒ 追加到 28 行会碰 footer。
+        """直接写到 footer 行 ⇒ 未管理区域 gate 必须报出来。
 
-        这条同时是未管理区域判据的**非空证明**：写到 footer 行后
-        `managed_sheet_unmanaged_cells` 从 485 变 486、gate 打红，而 `A28` 的 `合计`
+        🔴 BP-21 起受管区**不再紧贴** footer：中间隔着 `A27` 那行排版占位行
+        （`LAST + 1 == 27 != FOOTER_ROW == 28`）。所以这条不再能用「受管区已饱和」来
+        论证，改为**显式**写 footer 行 —— 判据要证的东西没变：往受管区外写一格，
+        「未管理区域等价」必须打红。
+
+        它同时是未管理区域判据的**非空证明**：写到 footer 行后
+        `managed_sheet_unmanaged_cells` 计数变化、gate 打红，而 `A28` 的 `合计`
         被当成 `seq` 读回来还会产生一条 `type_normalization_failure`。
         「未管理区域等价」因此不是空集恒真。
         """
-        new_row = LAST + 1
-        assert new_row == P.FOOTER_ROW, (new_row, P.FOOTER_ROW)
+        new_row = P.FOOTER_ROW
+        # 受管区与 footer 之间确实隔着排版占位行（BP-21 的可见后果）
+        assert LAST + 1 == P.TEMPLATE_PHYSICAL_LAST_ROW < P.FOOTER_ROW, (
+            LAST,
+            P.TEMPLATE_PHYSICAL_LAST_ROW,
+            P.FOOTER_ROW,
+        )
         path = workdir / "onto_footer.xlsx"
         path.write_bytes(
             add_row(
@@ -1858,15 +1996,36 @@ class TestProperty23And66StructuralOperations:
         )
         assert report.equivalent is False
         assert "managed_sheet_unmanaged_cells" in (report.first_difference or "")
-        assert "485" in (report.first_difference or "")
-        assert "486" in (report.first_difference or "")
+        # 🔴 BP-21：485/486 → 510/511（受管区收缩后 `A27` 那行的 25 个格转入未管理面）
+        assert "510" in (report.first_difference or "")
+        assert "511" in (report.first_difference or "")
         outcome = extract(path, definitions, binding)
         kinds = [item.kind.value for item in outcome.anomalies]
-        assert kinds == ["type_normalization_failure"], kinds
-        assert outcome.anomalies[0].stable_field_key == P.stable_key_for(
-            "seq", uid(new_row)
+        # 🔴 BP-21：两条而不是一条。`add_row` 把 Table ref 撑到 28 后，受管区外的**两**行
+        #    都被卷进来：`A27` 的排版占位 `……` 与 `A28` 的 `合计`，两者都按 `seq`
+        #    (`value_type=integer`) 规范化失败。
+        #    这比原判据更强 —— 它同时证明「占位行在受管区外」与「footer 在受管区外」，
+        #    且碰它们都会显性化而不是静默取值。
+        assert kinds == ["type_normalization_failure"] * 2, kinds
+        by_detail = {item.stable_field_key: item.detail for item in outcome.anomalies}
+        assert len(by_detail) == 2, by_detail
+
+        # 占位行那一条：它没有 row UUID（instrumentation 只写到受管末行 26）⇒ 身份是**新铸**的
+        placeholder = [
+            key for key, detail in by_detail.items()
+            if f"A{P.TEMPLATE_PHYSICAL_LAST_ROW}" in detail
+        ]
+        assert len(placeholder) == 1, by_detail
+        assert placeholder[0].endswith("/seq"), placeholder
+        assert "MINTED" in placeholder[0], (
+            "占位行不该带 instrumentation 写的 row UUID —— 带了说明它仍被当业务行"
         )
-        assert P.FOOTER_MARKER in outcome.anomalies[0].detail
+        assert "……" in by_detail[placeholder[0]]
+
+        # footer 那一条：身份是测试自己写进去的
+        footer_key = P.stable_key_for("seq", uid(new_row))
+        assert footer_key in by_detail, sorted(by_detail)
+        assert P.FOOTER_MARKER in by_detail[footer_key]
 
     def test_lost_row_identity_is_a_retention_failure(
         self,
@@ -1948,18 +2107,37 @@ class TestProperty23And66StructuralOperations:
         assert "multi_location_divergence" in kinds, kinds
         assert outcome.identity_inventory.duplicate_row_uuids == (uid(FIRST),)
 
-    def test_structural_insert_beyond_the_skeleton_fails_closed(
+    def test_structural_insert_beyond_the_skeleton_plans_a_row_shift(
         self,
         base_bytes: bytes,
         base_outcome: X.ExcelExtractOutcome,
         contract: Any,
         binding: X.ExcelIdentityBinding,
     ) -> None:
-        """merged projection 里出现没有物理行的 identity ⇒ materialize fail closed。
+        """merged projection 里出现没有物理行的 identity ⇒ **算出插行计划**（不再 fail closed）。
 
-        这是 Task 38 登记的约束（结构性插删行连同 unmanaged-region policy 一起留给后续），
-        本 pilot 只把它钉成可打红的事实：`max(seed,1)` 的骨架决定了能落几行，超出即拒绝，
-        **不是**静默丢行。
+        ═══ 这条判据的期望值被两件事合法地改过 ═══════════════════════════════════
+
+        原状：Task 38 把结构性插删行留给后续，于是「超出骨架」一律
+        `RowSetDivergenceError`。本判据当时钉的是那个 fail-closed。
+
+        现状两个前置都已满足：
+
+        1. spec `excel-structural-row-insertion-and-shift-aware-verification` 的 Wave 4
+           把 `excel_row_shift` 接进了 `plan_managed_writes`；
+        2. 本 pilot 的契约（BP-21 那一轮）如实声明了
+           `footer_anchor.carries_total_formula = True`（`I28..O28` 实测 7 条
+           `SUM(x13:x27)`）⇒ 引擎**有权**按声明的位移量扩张合计区间。
+           不声明时它仍 fail closed（`blocked_total_formula_not_extendable`），
+           那条语义没有被放宽。
+
+        ⇒ 期望值改成「插行计划的形态正确」。**判据没有变弱**：原判据要防的是「静默丢行」，
+        本判据末段直接断言那个新 identity 真的落成了写入（丢行会打红）。
+
+        🔴 插入点 27 的业务含义：它恰在受管末行 26 之后、`A27` 那行排版占位之前 ⇒
+        新数据行插进去后，续行省略号被推到 28、footer 推到 29，省略号仍留在数据行**下方**。
+        这正是 BP-21 把占位行剔出受管区后想要的结果；若占位行仍算业务行，插入点会是 28
+        （footer 上），那是错的。
         """
         spec = contract.field_by_stable_key(P.stable_key_for("original_cost"))
         extra = "disp-brand-new-row"
@@ -1979,14 +2157,31 @@ class TestProperty23And66StructuralOperations:
                 + (extra,)
             },
         )
-        with pytest.raises(M.RowSetDivergenceError, match=extra):
-            M.plan_managed_writes(
-                projection=projection, contract=contract, region=base_outcome.region,
-                binding=binding, scan=base_outcome.scan,
-                substrate_entries=_read_entries(base_bytes),
-                substrate_formulas=base_outcome.formula_inventory,
-                runtime_binding={"GT_FOOTER_ROW": str(P.FOOTER_ROW)},
-            )
+        plan = M.plan_managed_writes(
+            projection=projection,
+            contract=contract,
+            region=base_outcome.region,
+            binding=binding,
+            scan=base_outcome.scan,
+            substrate_entries=_read_entries(base_bytes),
+            substrate_formulas=base_outcome.formula_inventory,
+            runtime_binding={"GT_FOOTER_ROW": str(P.FOOTER_ROW)},
+        )
+
+        shift = plan.row_shift
+        assert shift is not None, "多出一个行身份却没算插行计划 —— 那会静默丢行"
+        assert shift.count == 1, shift
+        assert shift.table_key == P.ROWS_TABLE_KEY, shift
+        # 插入点紧跟**受管**末行，而不是紧跟 footer
+        assert shift.insert_at == LAST + 1 == 27, shift
+        assert shift.insert_at == P.TEMPLATE_PHYSICAL_LAST_ROW, shift
+        assert shift.insert_at < P.FOOTER_ROW, shift
+        # 样式源是最后一条**业务**行（不是占位行）
+        assert shift.style_from == LAST == 26, shift
+
+        # 🔴 反向判据：新 identity 必须真的落成写入，不得被静默丢掉
+        written_rows = {write.row_key for write in plan.writes if write.row_key}
+        assert extra in written_rows, sorted(written_rows)[:5]
 
     def test_footer_formula_range_still_covers_the_managed_rows(
         self, base_bytes: bytes, base_outcome: X.ExcelExtractOutcome
@@ -3000,7 +3195,9 @@ class TestProductionWiring:
         blob = P.contract_file_path().read_bytes()
         assert b"\r\n" not in blob
         assert blob.endswith(b"\n")
-        assert len(blob) == 24931, len(blob)
+        # 🔴 24931 → 25272：BP-21（受管区收缩 + 物理末行常量）与 Open Gate 5
+        #    （`footer_anchor.carries_total_formula` + note）各改了契约 payload。
+        assert len(blob) == 25272, len(blob)
 
 
 class TestPilotIntroducesNoResolverDebt:
@@ -3059,7 +3256,10 @@ class TestPilotIntroducesNoResolverDebt:
             )
         )
         entries = payload["entries"]
-        assert len(entries) == 319, len(entries)
+        # Task 74 detector fix: _record_ad_hoc_path now resolves module-level path
+        # constants, so eight resolvers the d1262c80 file split had hidden are back in
+        # the denominator (319 -> 327). Widening, not narrowing -- all eight are adjudicated.
+        assert len(entries) == 327, len(entries)
         mine = [
             row
             for row in entries

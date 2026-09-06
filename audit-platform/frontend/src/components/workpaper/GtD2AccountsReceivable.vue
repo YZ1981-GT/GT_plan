@@ -285,8 +285,10 @@ import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
-// Task 45: legacy useD2EntryDualMode deleted — pilot host now delegates to sync bridge.
-import { usePilotBridgeAdapter, type PilotRenderMode } from './sync/usePilotBridgeAdapter'
+// 2026-09-06: 换成真同步 bridge。`usePilotBridgeAdapter` 只翻 ref + 写 localStorage，
+// 零 API 调用 ⇒ OO 侧永远是空表、HTML 侧永远看不到 OO 的编辑（实测业务行 0/756）。
+// `useD2SyncBridge` 在模式切换的两个边界上真调 push-to-excel / pull-from-excel。
+import { useD2SyncBridge } from './sync/useD2SyncBridge'
 // Re-export getSheetNameFromD2Code which was also in the deleted module.
 // The sheet name resolution function is kept inline since it's pure data.
 const D2_SHEET_MAP: Record<string, string> = {
@@ -303,7 +305,7 @@ function getSheetNameFromD2Code(code: string): string {
   if (code.includes('截止')) return code
   return code
 }
-type D2RenderMode = PilotRenderMode
+type D2RenderMode = 'html' | 'onlyoffice'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -402,8 +404,7 @@ const currentSheet = computed(() => normalizeD2SheetName(props.sheetName))
 const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 
 // ─── Task 45: bridge adapter replaces legacy useD2EntryDualMode ─────────────
-const dualMode = usePilotBridgeAdapter({
-  entryId: 'xlsx/gt-d2-accounts-receivable',
+const dualMode = useD2SyncBridge({
   wpId: toRef(props, 'wpId'),
   reloadHtml: () => formData.loadAll(),
 })
@@ -422,7 +423,11 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
+    // 🔴 真源是 usePilotBridgeAdapter 的 `isOoAvailable`（legacy useD2EntryDualMode 叫 ooAvailable）。
+    // 写成 `ooAvailable` 会让 computed 求值时炸
+    // 「页面渲染出错：Cannot read properties of undefined (reading 'value')」整页白屏，
+    // 而 get_diagnostics / vitest / Vite transform 三层全绿。
+    disabled: !dualMode.isOoAvailable.value,
   },
 ])
 

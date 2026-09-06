@@ -1,5 +1,7 @@
 {
-  "adjudication_digest": "c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
+  "adjudication_digest": "9207ccd7e1ddb8dd08c64ee136ae9cebe4b56461f51f285ec5750e376175620d",
+  "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
+  "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
     {
       "basis": {
@@ -14,7 +16,16 @@
       },
       "contract_id": "b60.hour_budget",
       "entry_id": "xlsx/b60/gt-b60-bundle",
-      "resolvable_today": true,
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-04",
+        "store_item_id": "",
+        "why_null": "该 provider 未声明 `STORE_ITEM_ID`（B60 工时预算是元数据表，不走 HTML 行集 store）⇒ 载荷落点判据对本条不适用，仍以 file_path 证据定码",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
       "wp_codes": [
         "B60-1"
       ]
@@ -26,14 +37,23 @@
           "D2A"
         ],
         "managed_excel_name": "明细表D2-2",
+        "superseded_verdict_note": "🔴 2026-09-04 更正：本条原裁决为 `D2-2`，依据是「受管 sheet 名 明细表D2-2 与 wp_index 的 D2-2『应收账款明细表』同名」。实测该依据不成立 —— 该 entry 的 HTML store item `D2-detail-rows` **全部落在 wp_code=D2 上**（2 个底稿，最大 866,972 B），`D2-2` 的 5 个底稿**一个都没有 store 载荷**。按 D2-2 发首版会得到一个空 projection：管道通了，但「HTML 侧数据真的进了 OO 文件」这条判据完全不被验证；更严重的是用户编辑的是 D2 底稿的 HTML，representation 挂在 D2-2 上会让两者永久失联。**名字相符不是判据，载荷落点才是。**",
         "template_relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
-        "wp_index_evidence": "wp_code=D2-2「应收账款明细表」5 行未删除、1 行有 file_path"
+        "wp_index_evidence": "wp_code=D2「应收账款审定表」39 行未删除、35 行有 file_path、2 行有 store 载荷；wp_code=D2-2「应收账款明细表」5 行未删除、1 行有 file_path、**0 行有 store 载荷**"
       },
       "contract_id": "d2.receivable_detail",
       "entry_id": "xlsx/gt-d2-accounts-receivable",
-      "resolvable_today": true,
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 866972,
+        "measured_at": "2026-09-04",
+        "store_item_id": "D2-detail-rows",
+        "wp_code_with_payload": "D2",
+        "wp_count_with_payload": 2
+      },
       "wp_codes": [
-        "D2-2"
+        "D2"
       ]
     },
     {
@@ -47,10 +67,26 @@
         "template_relative_path": "G/G7 长期股权投资.xlsx",
         "wp_index_evidence": "wp_code=G7「长期股权投资」4 行未删除、4 行有 file_path"
       },
-      "blocking_reason": "matcher 需先从「按 wp_code 路由」改成「按 entry 路由」（独立设计决策）",
       "contract_id": "g7.soe_subsidiary_disclosure",
       "entry_id": "xlsx/gt-g7-long-term-equity-main",
-      "resolvable_today": false,
+      "matcher_domain_conflict": {
+        "conflicting_entries": [
+          "xlsx/gt-g7-equity-method",
+          "xlsx/gt-g7-equity-subsidiary"
+        ],
+        "error": "RG-3 MatcherOverlapError",
+        "resolution": "把 matcher 从「按 wp_code 路由」改成「按 entry 路由」（独立设计决策，不在 provisioning 范围内）",
+        "why": "三个 entry 的真码同为 G7，以 wp_code 为 EntryMatcher 的域必然重叠"
+      },
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 32617,
+        "measured_at": "2026-09-04",
+        "store_item_id": "G7-main-disclosure-soe-v2",
+        "wp_code_with_payload": "G7",
+        "wp_count_with_payload": 3
+      },
+      "superseded_verdict_note": "🔴 2026-09-04 更正：本条原为 `resolvable_today: false` + `blocking_reason`「matcher 需改成按 entry 路由」，导致 Task 76 对 G7 完全不 provision，G7 的首版发布因此恒落 `blocked_missing_approved_bundle`。但那个 blocking reason 与 provisioning **无关** —— 本条 `basis.blocked_note` 自己就写着「本条裁决只供 provisioning 定位宿主，**不得**直接当 EntryMatcher 的域」。一个布尔把两种用途混在一起，于是文件自相矛盾：既声明两种用途要分开，又用同一个开关把两者一起关掉。已拆成 `resolvable_for_provisioning`（定位宿主底稿，G7 = true：4 个底稿全有文件、3 个有 store 载荷共 32,617 B）与 `matcher_domain_conflict`（matcher 域冲突，G7 非空 ⇒ 不得用作 matcher 域）。",
       "wp_codes": [
         "G7"
       ]
@@ -68,13 +104,27 @@
       },
       "contract_id": "h1.disposal_check",
       "entry_id": "xlsx/gt-h1-fixed-assets",
-      "resolvable_today": true,
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-04",
+        "store_item_id": "H1-8-rows",
+        "why_null": "`H1-8-rows` 全库 0 行有载荷（空表单是合法业务事实，不是缺数据）⇒ 载荷落点无法定码，本条仍以 file_path 证据定 `H1`（5 行未删除、5 行全有文件），且与宿主 `_index.json` 反查结果一致",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
       "wp_codes": [
         "H1"
       ]
     }
   ],
   "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",
+  "basis_rule_precedence": [
+    "① **store 载荷落点优先**（2026-09-04 新增，D2 实测栽过）：该 entry 的 `STORE_ITEM_ID` 实际落在哪个 wp_code 上，那就是目标码。理由：published representation 必须挂在**用户真正编辑其 HTML 的**那个底稿上，否则两者永久失联，且首版会发出空 projection。判据落在载荷，不落在名字。",
+    "② store 载荷不适用时（provider 无 `STORE_ITEM_ID`，或该 item 全库 0 行有载荷）才退到 file_path 证据 + 受管 sheet 名比对。",
+    "🔴 **`managed_excel_name` 与某个 wp_code 同名不是判据。** D2 就是这么错的：受管 sheet 名『明细表D2-2』与 wp_index 的 `D2-2`『应收账款明细表』完美同名，但载荷全在 `D2`。同名只是线索，反面例子见 H1 条的 `not_h1_8_because`。"
+  ],
   "not_fixing_the_heuristic_here": "本轮**不改** `_source_match()` 的正则：修正它会让 `gt-g7-equity-method` / `gt-g7-equity-subsidiary` / `gt-g7-long-term-equity-main` 三个 entry 的码同时收敛到 `G7`，而 Task 43 对 g7 的选型依据正是 `G7L` 的**matcher 域独占**（见 adapters/registry.py 的 RG-3 说明）—— 一改就撞 `MatcherOverlapError`。那需要把 matcher 从「按 wp_code 路由」改成「按 entry 路由」，是独立设计决策。本文件先把 provisioning 与那个启发式**解耦**，使幻影码不再致害。",
   "review_status": "reviewed",
   "schema_version": "entry-wp-code-adjudication:v1",

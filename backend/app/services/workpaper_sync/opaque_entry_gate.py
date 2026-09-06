@@ -507,11 +507,14 @@ CUSTOM_LANE_ROOM_DEBT: Final[Mapping[str, Any]] = {
 #: `offline_upload` / `wopi_put_file` 落 `opaque-{wp_id}`。这**不是**可以顺手统一的
 #: 事情：entry_id 是 `.versions/{wp_id}/representations/{entry_id}/` 的目录名，也是
 #: `working_paper_sync_scope_index` 的 scope 分量，改口径等于给已发布的
-#: representation 换 scope。真库实测 `working_paper_content_representation` 与
-#: `working_paper_content_version` 当前**均为 0 行**，所以今天改是零迁移成本的；但
-#: 「该不该合并」本身是业务裁决（custom 底稿的 wp_code 是用户自定义的、可改名，而
-#: wp_id 不可改名 —— 用 wp_code 当 scope 的代价是改名即换 scope），归 Task 67 的
-#: structural pre-reconcile 统一裁决。此处只把事实与代价记清楚，不擅自合并。
+#: representation 换 scope。
+#:
+#: 🔴 2026-09-04 更正：Task 65 当时记的「三表均为 0 行 ⇒ 今天改是零迁移成本」**已过期**。
+#: 实测见 `measured_migration_cost` 里逐次带时点的读数 —— 迁移成本已经不是零了，
+#: 每发一份 representation 就再涨一点。「该不该合并」本身仍是业务裁决（custom 底稿的
+#: wp_code 是用户自定义的、可改名，而 wp_id 不可改名 —— 用 wp_code 当 scope 的代价是
+#: 改名即换 scope），归 Task 67 的 structural pre-reconcile 统一裁决。此处只把事实与
+#: 代价记清楚，不擅自合并。
 ENTRY_ID_NAMESPACE_SPLIT_NOTE: Final[Mapping[str, Any]] = {
     "lanes_using_wp_code": ("custom_cells",),
     "lanes_using_wp_code_with_sheet": ("f2_stocktake_plan", "f2_stocktake_summary"),
@@ -520,11 +523,39 @@ ENTRY_ID_NAMESPACE_SPLIT_NOTE: Final[Mapping[str, Any]] = {
         "同一 wp 的同一份权威文件在两种口径下落到两个 entry_id，各自有独立 entry "
         "pointer / representation generation；rollback 与 evidence 查不到对方的行。"
     ),
-    "measured_migration_cost_at_task65": {
-        "working_paper_content_version_rows": 0,
-        "working_paper_content_representation_rows": 0,
-        "working_paper_content_application_rows": 0,
-    },
+    #: 🔴 逐次带时点，**不覆盖**旧读数：这张表的价值恰在于「代价随时间涨」这条趋势，
+    #: 只留最新一行会让「当初以为是零成本」这个判断错误消失得无影无踪。
+    "measured_migration_cost": (
+        {
+            "measured_at": "task65",
+            "working_paper_content_version_rows": 0,
+            "working_paper_content_representation_rows": 0,
+            "working_paper_content_application_rows": 0,
+            "note": "当时结论「零迁移成本」成立",
+        },
+        {
+            "measured_at": "2026-09-04",
+            "working_paper_content_version_rows": 2,
+            "working_paper_content_representation_rows": 2,
+            "working_paper_content_application_rows": 0,
+            "working_paper_sync_entry_state_rows": 2,
+            "note": (
+                "两份 representation 分属**两条不同的 lane**：1 份 opaque "
+                "(`opaque-017624e2…`，adapter `opaque.authoritative.v1`) + 1 份 "
+                "projection (`xlsx/gt-g7-long-term-equity-main`，authority model "
+                "`projection_contract`)。⇒ 「零迁移成本」已不成立"
+            ),
+        },
+    ),
+    #: 🔴 本登记表裁决的**范围边界**。加这一条是因为它极易被误读成「统管所有 entry_id
+    #: 口径」：它只管 opaque lane **内部**的 `wp_code` / `wp_id` / `wp_code_with_sheet`
+    #: 三种口径分叉，**不涉及** projection lane 与 opaque lane 之间怎么分 ——
+    #: 后者归 `projection_lane_registry` 的 L1~L5 裁决（那里的 entry_id 是 manifest
+    #: entry_id，形如 `xlsx/gt-h1-fixed-assets`，与本表的 `opaque-` 命名空间不相交）。
+    "scope_boundary": (
+        "opaque lane 内部的三种 entry_id 口径分叉；不含 projection vs opaque 的 lane 归属"
+    ),
+    "lane_attribution_owner": "projection_lane_registry.adjudicate_lane（L1~L5）",
     "adjudication_owner_task": "67",
 }
 

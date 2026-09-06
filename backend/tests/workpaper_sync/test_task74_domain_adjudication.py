@@ -51,7 +51,7 @@ _EVIDENCE = (
 
 #: Task 20 冻结的红基线里这两条的实测值 —— Task 74 的第一半就是把它们清成 0。
 #: 数字不是手抄：`test_adjudicating_clears_exactly_two_criteria` 摘掉裁决后现场重量，两侧必须相等。
-_UNADJUDICATED_BEFORE = {"unadjudicated_writer": 236, "unadjudicated_resolver": 34}
+_UNADJUDICATED_BEFORE = {"unadjudicated_writer": 239, "unadjudicated_resolver": 39}
 
 #: 本任务新加的两条 lane。加 lane 不是加豁免，两条判据在下面各守一面。
 _NEW_LANES = ("unified_commit_substrate", "read_only_evaluation")

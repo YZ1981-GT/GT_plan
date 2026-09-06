@@ -40,9 +40,9 @@ export interface WorkpaperSyncManifestEntry {
   hasBrowserEvidence: boolean
 }
 
-export const WORKPAPER_SYNC_MANIFEST_DIGEST = "8b4f15a5e012f71870cdffb533c906968bb43c036cb9725fd4ec9428a039ef28"
+export const WORKPAPER_SYNC_MANIFEST_DIGEST = "51fd7a6a7c7eeb45f76de55a1446de97efd7eafc4d6d3f6d5839e79556e57291"
 
-export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "13961b0c8494be5d979d9c5a110c66a70a5da87c9005fa60d0311b9628ece766"
+export const WORKPAPER_SYNC_PROFILE_SOURCE_DIGEST = "49dc7fb2bacc2fb3ad1eaf8496047eb18966a9aa16a9009ba18559cf52383f44"
 
 export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "by_component": {
@@ -51,8 +51,9 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "WorkpaperWordEditor": 4
   },
   "capability_counts": {
+    "bidirectional": 3,
     "single_html": 5,
-    "single_onlyoffice": 180,
+    "single_onlyoffice": 177,
     "unreachable": 1
   },
   "dispatcher_count": 1,
@@ -63,7 +64,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
   "entry_count": 186,
   "host_count": 185,
   "independent_entry_count": 142,
-  "legacy_fake_bidirectional_count": 141,
+  "legacy_fake_bidirectional_count": 138,
   "mount_count": 276,
   "parent_duplicate_count": 43,
   "room_model_counts": {
@@ -79,7 +80,7 @@ export const WORKPAPER_SYNC_MANIFEST_STATS = {
     "xlsx.editable.shared.single.room_service_wired.v1": 178,
     "xlsx.unreachable.none.single.room_service_wired.v1": 1
   },
-  "unadjudicated_count": 136,
+  "unadjudicated_count": 133,
   "unreachable_count": 1
 } as const
 
@@ -2541,7 +2542,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-d2-accounts-receivable",
@@ -2549,13 +2550,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3567,7 +3564,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-g7-long-term-equity-main",
@@ -3575,13 +3572,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",
@@ -3660,7 +3653,7 @@ export const WORKPAPER_SYNC_MANIFEST = [
     }
   },
   {
-    "capability": "single_onlyoffice",
+    "capability": "bidirectional",
     "documentType": "xlsx",
     "editability": "editable",
     "entryId": "xlsx/gt-h1-fixed-assets",
@@ -3668,13 +3661,9 @@ export const WORKPAPER_SYNC_MANIFEST = [
     "hasContractEvidence": false,
     "hostPath": "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue",
     "independentEntry": true,
-    "migrationState": "legacy_fake_bidirectional",
+    "migrationState": "adapter_registered",
     "parentEntryId": null,
-    "reasonCodes": [
-      "template_only_open",
-      "no_durable_forcesave_ack",
-      "missing_adapter"
-    ],
+    "reasonCodes": [],
     "roomModel": "shared",
     "roomServiceState": "room_service_wired",
     "scenarioProfileId": "xlsx.editable.shared.single.room_service_wired.v1",

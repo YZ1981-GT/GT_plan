@@ -25,10 +25,15 @@ import {
   entrySyncNotice,
 } from '../workpaperEntrySyncNotice'
 
-/** D 循环 7 个独立 entry —— 与 backend/data/workpaper_sync_d_cycle_manifest_slice.json 同集合。 */
-const D_CYCLE_ENTRY_IDS = [
+/**
+ * D 循环**尚未接通**双向回写的 entry。
+ *
+ * 🔴 D2 于 2026-09-06 接通（`useD2SyncBridge` + 后端 `/d2-sync/*`），故从本集合移出。
+ * 它的判据改由下面「已接通的 entry 不显示警告」那条承担 —— 那条现在读**生产常量**，
+ * 不再自己造一个 `registered` 数组，否则常量改了测试也不会红（假绿第③源）。
+ */
+const D_CYCLE_NOT_WIRED_ENTRY_IDS = [
   'xlsx/gt-d1-notes-receivable',
-  'xlsx/gt-d2-accounts-receivable',
   'xlsx/gt-d3-prepaid-accounts',
   'xlsx/gt-d4-operating-revenue',
   'xlsx/gt-d5-receivables-financing',
@@ -37,8 +42,8 @@ const D_CYCLE_ENTRY_IDS = [
 ] as const
 
 describe('entrySyncNotice — 未注册 adapter 的入口必须给可操作原因（AC 1.4）', () => {
-  it('D 循环 7 个 entry 全部拿到非空通知', () => {
-    for (const entryId of D_CYCLE_ENTRY_IDS) {
+  it('尚未接通的 D 循环 entry 全部拿到非空通知', () => {
+    for (const entryId of D_CYCLE_NOT_WIRED_ENTRY_IDS) {
       const notice = entrySyncNotice(entryId)
       expect(notice, entryId).not.toBeNull()
       expect(notice!.level, entryId).toBe('not_synchronized')
@@ -48,20 +53,32 @@ describe('entrySyncNotice — 未注册 adapter 的入口必须给可操作原�
     }
   })
 
-  it('已注册 adapter 的 entry 不再显示该警告（另一侧真分母）', () => {
-    const registered = ['xlsx/gt-d2-accounts-receivable']
-    expect(entrySyncNotice('xlsx/gt-d2-accounts-receivable', registered)).toBeNull()
-    // 同一次调用里未登记的那些仍要有通知 —— 证明判据是逐 entry 的，不是全局开关
-    expect(entrySyncNotice('xlsx/gt-d1-notes-receivable', registered)).not.toBeNull()
+  it('已接通的 entry 不再显示该警告（读生产常量，不自造分母）', () => {
+    // 分母取**生产常量本身** —— 若有人把 D2 从常量里删掉，这条会红。
+    expect(SYNC_ADAPTER_REGISTERED_ENTRY_IDS.length).toBeGreaterThan(0)
+    for (const entryId of SYNC_ADAPTER_REGISTERED_ENTRY_IDS) {
+      expect(entrySyncNotice(entryId), entryId).toBeNull()
+    }
+    // 逐 entry 判定而非全局开关：同一次调用里未接通的仍要有通知
+    expect(entrySyncNotice('xlsx/gt-d1-notes-receivable')).not.toBeNull()
+  })
+
+  it('D2 已接通 —— 它必须在已注册集合里且不出警告', () => {
+    expect([...SYNC_ADAPTER_REGISTERED_ENTRY_IDS]).toContain(
+      'xlsx/gt-d2-accounts-receivable',
+    )
+    expect(entrySyncNotice('xlsx/gt-d2-accounts-receivable')).toBeNull()
   })
 
   it('空 entryId 不产生通知（宿主没传 entry 时不挂无主警告）', () => {
     expect(entrySyncNotice('')).toBeNull()
   })
 
-  it('当前登记表为空 —— 与 registry 的 adapter_registered=False 一致', () => {
-    expect([...SYNC_ADAPTER_REGISTERED_ENTRY_IDS]).toEqual([])
-  })
+  // 🔴 这里曾有一条 `expect([...SYNC_ADAPTER_REGISTERED_ENTRY_IDS]).toEqual([])`。
+  // 它把「空集合」锁成了基线 ⇒ 一旦真接通某个 entry（把它加进常量），测试反而打红，
+  // 于是这条断言实际在**阻止**能力上线，同时让「恒显未互通」看起来是通过状态。
+  // 这是假绿第③源（守卫把错值当基线锁死）的标准形态，已随 D2 接通一并删除。
+  // 现在的判据是逐 entry 的行为等值（见上面两条），不锁集合的具体长度。
 })
 
 describe('可操作原因的内容判据', () => {

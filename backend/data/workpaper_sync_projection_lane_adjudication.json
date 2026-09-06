@@ -1,0 +1,94 @@
+{
+  "gate_version": "projection-lane-adjudication-gate/1",
+  "spec": "published-representation-production-path-and-lane-adjudication",
+  "task": "9.1",
+  "task44_gate_version": "task44-gate/1",
+  "checks": {
+    "R1_supply_gate_admits_stage_one": {
+      "requirement": "12.6 阶段一：供给门放行（判据落在供给门返回值，不落在 adapter_registered）",
+      "entries_observed": 4,
+      "entries_admitted_by_supply_gate": 1,
+      "admitted_entry_ids": [
+        "xlsx/gt-g7-long-term-equity-main"
+      ],
+      "passed": true,
+      "rows": [
+        {
+          "entry_id": "xlsx/b60/gt-b60-bundle",
+          "supply_gate_admits": false,
+          "supply_gate_reason": "该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）—— approved bundle 与 candidate 受控 attach 是 Task 76 的交付，published representation 则由 `ContentMutationService.commit(...)`（首版 content version）与 Task 36 / 77 的 finalize gate（同 content version 的新代际）产出（Task 77 更正首版的误记）；candidate 永不可作为运行态 substrate（AC 6.18 / Property 67）",
+          "adapter_registered_reported_only": false,
+          "capability_enabled_reported_only": false
+        },
+        {
+          "entry_id": "xlsx/gt-d2-accounts-receivable",
+          "supply_gate_admits": false,
+          "supply_gate_reason": "该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）—— approved bundle 与 candidate 受控 attach 是 Task 76 的交付，published representation 则由 `ContentMutationService.commit(...)`（首版 content version）与 Task 36 / 77 的 finalize gate（同 content version 的新代际）产出（Task 77 更正首版的误记）；candidate 永不可作为运行态 substrate（AC 6.18 / Property 67）",
+          "adapter_registered_reported_only": false,
+          "capability_enabled_reported_only": false
+        },
+        {
+          "entry_id": "xlsx/gt-g7-long-term-equity-main",
+          "supply_gate_admits": true,
+          "supply_gate_reason": null,
+          "adapter_registered_reported_only": false,
+          "capability_enabled_reported_only": false
+        },
+        {
+          "entry_id": "xlsx/gt-h1-fixed-assets",
+          "supply_gate_admits": false,
+          "supply_gate_reason": "该 entry 还没有 current published representation（`working_paper_sync_entry_state` 无行）—— approved bundle 与 candidate 受控 attach 是 Task 76 的交付，published representation 则由 `ContentMutationService.commit(...)`（首版 content version）与 Task 36 / 77 的 finalize gate（同 content version 的新代际）产出（Task 77 更正首版的误记）；candidate 永不可作为运行态 substrate（AC 6.18 / Property 67）",
+          "adapter_registered_reported_only": false,
+          "capability_enabled_reported_only": false
+        }
+      ],
+      "stage_two_owner": "capability 翻转 = manifest 重生成 + `approved_source_digest` 人工复核（Task 67 登记的复核方）—— 不属本 spec，Requirement 7.8 禁止绕过该复核门",
+      "task44_result_distribution": {
+        "failed": 28,
+        "passed": 5,
+        "unverifiable": 140
+      }
+    },
+    "R2_projection_representation_exists": {
+      "requirement": "8.1 / 8.4：至少一条 projection_contract representation 且 entry 非 opaque 命名空间",
+      "representation_rows_total": 2,
+      "projection_contract_rows": 1,
+      "manifest_backed_projection_rows": 1,
+      "manifest_backed_entry_ids": [
+        "xlsx/gt-g7-long-term-equity-main"
+      ],
+      "passed": true,
+      "upgrade_candidate_rows_informational_only": 0,
+      "candidate_note": "candidate 表行数只作信息报告 —— 它是首版落成**之后**才可能出现的结果，不是首版的前置条件"
+    },
+    "R3a_candidate_cannot_produce_first_generation": {
+      "requirement": "design.md C1：candidate 路径结构上产不出首版",
+      "source_representation_id_is_nullable": "NO",
+      "source_representation_id_has_fk": true,
+      "passed": true,
+      "why": "`source_representation_id` NOT NULL + 外键 ⇒ candidate 必须指向一个**已存在**的 representation 作为来源 ⇒ 它天然不能是「第一份」。首版只能走`ContentMutationService.commit`"
+    },
+    "R3b_scope_boundary_structural_absence": {
+      "requirement": "12.1~12.5：范围边界的结构缺席",
+      "deliverables_checked": 5,
+      "out_of_scope_references": [],
+      "untracked_new_migrations": [],
+      "passed": true,
+      "note": "判据在**剥 docstring 之后**做 —— 交付物的注释里正当地叙述了这些名字（解释为什么不碰），不剥会把叙述当成真实引用"
+    },
+    "R4_capability_change_discipline": {
+      "requirement": "7.8 / 9.3：capability 翻转须经 approved_source_digest 人工复核",
+      "manifest_capability_counts": {
+        "single_html": 5,
+        "single_onlyoffice": 180,
+        "unreachable": 1
+      },
+      "bidirectional_entry_ids": [],
+      "bidirectional_present": false,
+      "passed": true,
+      "note": "manifest 里没有 `bidirectional` entry ⇒ 本条无需检查（阶段二未发生）。这**不是**空转豁免：一旦出现，下面的复核判据立即生效"
+    }
+  },
+  "checks_failing": [],
+  "passed": true
+}

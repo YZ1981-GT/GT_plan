@@ -302,9 +302,37 @@ class ExcelSyncAdapter:
         return published
 
     def verify_unmanaged_regions(
-        self, *, before: Path, after: Path, contract: SyncContract
+        self,
+        *,
+        before: Path,
+        after: Path,
+        contract: SyncContract,
+        row_shift: Any = None,
+        total_formula_rows: Any = (),
+        propagation: Any = None,
     ) -> UnmanagedRegionReport:
-        """未管理区域比对。判据实现全部在 Task 37，本层只解析受管区域后转手。"""
+        """未管理区域比对。判据实现全部在 Task 37，本层只解析受管区域后转手。
+
+        三个归一化入参都是本次 materialize **写盘之前冻结**的声明，由
+        :class:`~app.services.workpaper_sync.adapters.base.MaterializeResult` 随产物带出：
+
+        * `row_shift`（`excel_row_shift.RowShiftPlan | None`）—— 结构性插行声明。给了它，
+          verifier 就用同一份声明把 after 侧**受管 sheet** 的行号反向归一化后再比对；
+        * `total_formula_rows` —— 契约声明携带合计公式的行（位移前口径），合计区间的
+          合法扩张按它求值；
+        * `propagation`（`excel_workbook_row_change.WorkbookRowChangePlan | None`）——
+          工作簿级传播声明。给了它，verifier 才知道**引用侧 sheet** 上那些跨 sheet 公式的
+          行号改写是本次声明过的（`'明细表D2-2'!$AI$25` → `$AI$754`），否则整桶
+          `other_sheet_parts` 判漂移。
+
+        三者都是**声明值而非观测值** ⇒ 与声明一致判等价、声明之外的任何改动仍判漂移。
+        事后从 diff 推断等于让被检查对象自己声明自己合法（design.md 拒绝方案第 3 条）。
+
+        🔴 默认值让它保持**纯增量**：都不传时行为与加参数之前逐字相同，既有调用方
+        （含 `adapters/base` 协议里只声明三个参数的实现）不受影响。
+        类型标 `Any` 而不是 import 那两个 plan 类型：本层只做转手，不碰它们的任何成员，
+        标死类型反而给本模块加两条不必要的 import 边。
+        """
         self._assert_same_contract(contract, where="verify_unmanaged_regions")
         with zipfile.ZipFile(after) as zf:
             region = resolve_managed_region(
@@ -317,6 +345,9 @@ class ExcelSyncAdapter:
             region=region,
             binding=self.binding,
             limits=self._limits,
+            row_shift=row_shift,
+            total_formula_rows=total_formula_rows,
+            propagation=propagation,
         )
 
 

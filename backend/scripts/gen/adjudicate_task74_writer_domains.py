@@ -317,6 +317,34 @@ def _reaches_html_data(entry: dict[str, Any]) -> bool:
 
 #: 逐 writer_id 精确裁决（lane 由这一行自己的角色决定，不能靠模块名归并）。
 _EXPLICIT: dict[str, tuple[str, str, str]] = {
+    # da Task 74 detector fix: rows recovered when _record_ad_hoc_path learned to
+    # resolve module-level path constants. Each one is a real production resolver that
+    # the old literal-only predicate could not see -- not a new write path.
+    "app.routers.knowledge_base::_project_kb_dir": (
+        "export_storage_resolver",
+        "Composes the per-project knowledge-base directory under the storage tree itself, answering where this project KB files live without going through the canonical resolver",
+        "Listing or serving KB files is not a content application, so no version field may move here. The debt is the resolver split: while this row keeps its own path arithmetic, a relocated storage root silently changes what the reader sees",
+    ),
+    "app.services.bulk_tab.bulk_async_runner::_run_export": (
+        "export_storage_resolver",
+        "The bulk-tab export job composes its own output path under the storage tree and writes the produced bytes there, publishing a derived deliverable rather than workpaper business content",
+        "No business revision may move on an export publish. Convergence means the output path comes from one canonical storage entry instead of this job own arithmetic",
+    ),
+    "app.services.deliverable_package_service::DeliverablePackageService.run_package_job": (
+        "export_storage_resolver",
+        "Packages deliverables into an archive under the storage tree: it composes the path, writes the package bytes, and records job progress on its own session",
+        "Packaging is a read-then-publish of derived bytes, so no content revision moves. The debt is that the archive path and the canonical resolver are two answers to where a workpaper file lives",
+    ),
+    "app.services.wp_template_init_service::get_workpaper_storage_path": (
+        "export_storage_resolver",
+        "Resolves the per-workpaper storage directory by composing the path itself, so provisioning and export both depend on this second entry into the storage namespace",
+        "A path resolver applies no content, so no version field may move here. Convergence means one canonical entry for the workpaper storage root",
+    ),
+    "app.services.wp_xlsx_export_service::_resolve_template_path": (
+        "export_storage_resolver",
+        "Resolves the xlsx export template from the template library and swaps the rendered file into place, the same role as the sibling export rows already in this lane",
+        "Rendering an export is not a content application. The debt is the resolver split between the template library lookup and the canonical workpaper resolver",
+    ),
     # ── 统一提交协议自己的写入原语 ────────────────────────────────────────
     "app.services.workpaper_sync.repository::WorkpaperSyncRepository.bump_content_revision": (
         "unified_commit_substrate",

@@ -989,10 +989,10 @@
     "P66": "Excel identity 经真实 OO 往返保留",
     "P69": "evidence 由逐 scenario 实体与服务端重算闭合"
   },
-  "registry_digest": "0a5789bc9677afaa3d476ef3c39c183d77d33178615c92c36c9dc3563793259a",
+  "registry_digest": "9f0be76f475e1af27662036f81fa32e1ad65c7d2bc6c65cdba1ce50d0ac7ae9d",
   "requirements_without_probe": [],
   "schema_version": "task44-probe-registry:v1",
-  "task_body_sha256": "cee755fdabea3e7dc21b028896c890d67ef9b179ef35963014bcfef35ed9b250",
+  "task_body_sha256": "b7ce721ca2104ff3f837f945e14b8cd13011ac4499f3c4775b54585400f9cbca",
   "task_number": 44,
   "task_requirements": [
     "10.10",

@@ -277,8 +277,11 @@ onMounted(async () => {
       loadRenderData(),
       loadChapterDefinitions(),
     ])
-    // OnlyOffice 健康探测（不阻塞首屏，供在线编辑门控）
-    void mainDual.checkOOHealth()
+    // 🔴 这里曾调 `mainDual.checkOOHealth()` —— usePilotBridgeAdapter 没有该方法
+    // （OO 健康探测已收归 bridge 的 materialize 协议，适配器刻意不做）。
+    // 结果是 onMounted 抛 `mainDual.checkOOHealth is not a function`
+    // ⇒ B60 整页崩成「页面渲染出错」（finally 不吞异常）。
+    // 在线编辑门控现在读 `mainDual.isOoAvailable`，不需要宿主自行探测。
   } finally {
     loading.value = false
   }

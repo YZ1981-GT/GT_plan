@@ -74,6 +74,73 @@ export function stripHtmlComments(source: string): string {
   return source.replace(/<!--[\s\S]*?-->/g, '')
 }
 
+/**
+ * 逐字符标记「该位置是否处于字符串/模板字面量**内部**」（引号本身标 false）。
+ *
+ * 🔴 为什么需要它：`stripJsComments` 有意保留字符串内容（否则 `'https://x'` 会被
+ * 当行注释截断），于是**数据文件里记录的代码快照**也留在扫描面上。实测
+ * `sync/workpaperSyncLegacyBaseline.generated.ts` 是一个 `.ts` 数据文件，形如
+ * `{ "snippet": "import { useB60DualMode } from './composables/useB60DualMode'" }` ——
+ * 那些 legacy 模块**已按计划删除**，于是 §1 判据被 8 条假红长期钉在红灯上。
+ *
+ * 后果不是"多报几条"这么轻：守卫一旦长期红，输出就没人再看，
+ * 真缺陷会混在同一堆里溜过去。2026-09-03 实测溜过一条 ——
+ * `d2/D2TabAnalysis.vue` 把 `@/composables/useExcelIO` 写成
+ * `../composables/useExcelIO`，Vite transform 500，点开 D2-5 直接整页崩。
+ *
+ * 故 import 提取改用 **statement-position 口径**：`import`/`export` 关键字本身
+ * 必须不在字符串内。specifier 自己在引号里是正常的，只看关键字位置即可区分。
+ */
+export function computeStringMask(source: string): Uint8Array {
+  const mask = new Uint8Array(source.length)
+  let i = 0
+  const n = source.length
+  let quote: string | null = null
+
+  while (i < n) {
+    const c = source[i]
+    const next = source[i + 1]
+
+    if (quote) {
+      if (c === '\\') {
+        mask[i] = 1
+        if (i + 1 < n) mask[i + 1] = 1
+        i += 2
+        continue
+      }
+      if (c === quote) {
+        quote = null // 收尾引号本身不算内部
+        i += 1
+        continue
+      }
+      mask[i] = 1
+      i += 1
+      continue
+    }
+
+    if (c === '"' || c === "'" || c === '`') {
+      quote = c // 起始引号本身不算内部
+      i += 1
+      continue
+    }
+
+    // 注释已由 stripJsComments 剥除，这里无需再处理
+    if (c === '/' && next === '/') {
+      while (i < n && source[i] !== '\n') i += 1
+      continue
+    }
+    if (c === '/' && next === '*') {
+      i += 2
+      while (i < n && !(source[i] === '*' && source[i + 1] === '/')) i += 1
+      i += 2
+      continue
+    }
+
+    i += 1
+  }
+  return mask
+}
+
 // ---------------------------------------------------------------------------
 // 文件遍历
 // ---------------------------------------------------------------------------
@@ -188,14 +255,22 @@ export interface BrokenReference {
   specifier: string
 }
 
-/** 扫出一批文件里所有解析失败的模块引用。 */
+/**
+ * 扫出一批文件里所有解析失败的模块引用。
+ *
+ * 只认 **statement-position** 的 import/export（关键字不在字符串字面量内），
+ * 见 `computeStringMask` 的 docstring —— 否则数据文件里记录的代码快照
+ * 会把判据长期钉红，真缺陷随之被淹没。
+ */
 export function findBrokenModuleReferences(files: string[]): BrokenReference[] {
   const broken: BrokenReference[] = []
   for (const file of files) {
     const code = stripJsComments(readSource(file))
+    const inString = computeStringMask(code)
     MODULE_SPECIFIER_RE.lastIndex = 0
     let m: RegExpExecArray | null
     while ((m = MODULE_SPECIFIER_RE.exec(code)) !== null) {
+      if (inString[m.index]) continue // 字符串里的代码快照，不是真引用
       const spec = m[1]
       if (!isResolvableSpecifier(spec)) continue
       if (moduleExists(file, spec)) continue

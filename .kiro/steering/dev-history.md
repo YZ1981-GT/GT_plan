@@ -4421,3 +4421,204 @@ F 类披露 Tab 共 4 个：F1 预付款项（五、7/八、7）/ F2 存货（�
 - **🔴 K 类源披露 sheet 逐字事实（2026-08-09 openpyxl 实测，写常量前照抄勿猜）**：**K0 无披露 sheet**（11 个 sheet 全是函证程序/汇总/替代/舞弊评价）⇒ 披露侧只有 13 循环 × 2 = 26 张，**全部 `visible`**。**括号写法 7 种并存**：`（上市公司）`全全 10 张 · `（国企）`全全 11 张 · **K1 `(上市公司）` 前半后全** · **K3 `(上市公司)` / `(国企)` 全半角** · **K5 `（上市公司)` 前全后半** · **K6 `(国企）` 前半后全** · **K7 `（国有企业）`**（唯一用「国有企业」）⇒ 按 `== "附注披露信息（上市公司）"` 精确匹配漏 K1/K3/K5；按 `"国企" in name` 漏 K7。**账龄只在 K1/K3 出现**（其余 11 循环 22 张 sheet 零命中）：K1 listed 行维度 6 档 `1年以内`/`1至2年`…`5年以上` + 月度细分；**K1 soe 首档是 `1年以内（含1年）`**（与 listed 不同字面）且出现两处（r7 主表、r49 账龄组合）；账龄作**列**维度 4 处（K1 listed D124/D137、soe D103/D126）。**K3 soe A12 把按性质表的标签列列头写成 `账  龄`**（listed 侧同格是 `项 目`，数据行是 押金/保证金/其他 = 款项性质）= **源模板错**。**源模板另有 8 类自身缺陷**（登记不照抄）：K1 两版共 **11 处 `=#REF!`** 断链（listed r125-129/r138-140、soe r104-108/r127-129）· K1 listed r94 / soe r65 分组标签行缓存值 `--` 且不参与合计 · K1 listed r101 / soe r72「本期转销」三个阶段列缺公式 · K1 soe r80-83 存在 `【负数】`/`【正数】` 文字占位 · **K6 listed D16 缓存值是文字 `C=A+B=报表数`、K6 soe D19 是 `A+B=报表数`**（说明文字占了数据格）· **K11 两版注文明确「本科目明细表按正数填列、披露表按负数填列」**（符号口径相反，同步时必须翻转）· K12 两版 r14 是**空白公式行**（夹在 `……` 与合计之间）· K3 两版 A7 应付利息 / A8 应付股利 **无任何公式**（纯手工）。
 - **🔴🔴🔴 K 类 `k_cycle_specs.py` 声明表有 **9 处 row_code 错位、其中 4 处是活的取数错误**（2026-08-09 本会话逐条对账 `report_config` 四变体实测，**推翻该文件 docstring 里那张「实证表」**）**：该 docstring 自称「DB 只读实证」，但把 listed 与 soe 两侧行号**整体记错一档**。实测（`applicable_standard NOT LIKE 'project:%'`，按 row_name 反查）：**正确落点全部是「两准则同号」** —— 其他应付款 **`BS-050`**（soe_standalone/listed_standalone 均 `TB('2241')+TB('2231')`，**含应付利息 2231**）· 预计负债 **`BS-065`** · 递延收益 **`BS-066`** · 持有待售资产 **`BS-012`**(`TB('1481')`) · 持有待售负债 **`BS-051`**(`TB('2245')`) · 销售费用 `IS-004` · 管理费用 `IS-005` · 其他收益 `IS-010` · 资产减值损失 `IS-017` · 营业外收入 `IS-020` · 营业外支出 `IS-021`。而声明表的 **`row_code_soe` 全线错位**：K3→`BS-075`(soe 侧名对但 **formula NULL**) · K4→`BS-081`(**实收资本 `TB('4001')`**) · K5→`BS-094`(NULL) · K6→`BS-024`(**长期股权投资 `TB('1511')`**) · K7→`BS-095`(NULL) · K8→`IS-022`(**利润总额，派生行**) · **K9→`IS-023`(减：所得税费用 `TB('6801')`)** · K10→`IS-030`(其他综合收益，NULL) · K11→`IS-038`(NULL) · K12→`IS-041`(NULL) · K13→`IS-043`(NULL)；listed 侧另有 K6→`BS-015`(**流动资产合计**，ROW 派生) · K7→`BS-069`(**非流动负债合计**，ROW 派生)。**四处活的错数**（公式非 NULL 且科目在客户表存在 ⇒ `resolve_report_line_accounts` 解析成功、兜底码永不生效）：**K9 soe 取到所得税费用 `6801`**（`account_chart` standard 9/client 7 项目均有，`direction=debit` 故不会被备抵拆分挡住 ⇒ 管理费用审定表显示所得税费用金额）· **K4 soe 取到实收资本 `4001`**（`direction=credit`，而 K4 未声明 `is_liability`/`gross_direction` ⇒ 被 `split_gross_provision` 判成**备抵**、`gross` 变空 ⇒ 表现为「恒空」而非错数，掩盖了错位）· **K6 soe 取到长期股权投资 `1511`**（`direction=debit`、8 客户项目有 ⇒ 持有待售资产审定表显示长期股权投资余额）· **K8 soe 指向派生行 `IS-022`**（`ROW()` 组合，`extract_signed_codes` 抽不出 `TB()` ⇒ codes 空 ⇒ 退兜底 6601，结果正确但溯源谎报）。**K5/K7/K11/K12/K13 的 soe 行 formula 为 NULL ⇒ 退兜底码 ⇒ 金额正确、只有溯源失真**（`resolved_from` 谎报 fallback）。**K6/K4 的「宁缺勿造」判断亦被推翻** —— docstring 称 `1481`/`2245` 在三表零命中，实测 `account_chart` **client 侧各有 1 个项目**（`1481 持有待售资产 debit` / `1482 持有待售资产减值准备` / `2245 持有待售负债 credit`）且 `report_config` 的 `BS-012`/`BS-051`/`IMP-007`(`TB('1482')`) **公式都在** ⇒ 应改指正确行号并保留「无该科目时空取数」的降级，而不是把整个循环钉死成不可取数。**判据教训**：per-cycle `_specs.py` 里「listed/soe 两套行号」的写法极易错位，因为**多数报表行两准则同号**（差异只在少数科目）；且「公式为 NULL」会让错位以「恒空」形态潜伏。→ 立 spec 时必须用「按 row_name 反查 + 四变体全列」的 SQL 逐条对账，**不能信任何文件里的既有实证表**。
 - **🔴 `KCycleSpec.spec_for()` 只挑**一个** row_code，没有第二次机会（2026-08-09 再证）**：与 L 侧 `pick_row_codes` 返回「尝试顺序」不同。故 soe 分支行号写错时**不会**回落到 listed 正确行，只能退 `fallback_standard`；若错行恰好有公式且科目存在，就直接取到别的科目的钱。该文件 docstring 已写明这点却仍错了 11 条，说明**注释警示不能替代机器校验**。
+
+
+---
+
+## 2026-09-06 · HTML↔OnlyOffice 双向回写：spec 全绿但生产零接线（实测取证）
+
+**结论：`workpaper-html-onlyoffice-bidirectional-writeback-closure` 72/72 全 `[x]`，但双向回写在生产链路上完全未通。后端引擎已可用，前端是空壳。**
+
+### 实测证据链（六环，逐环独立可复现）
+
+1. **浏览器实测**：D2 底稿（`1cf770c2-...`）`明细表D2-2` 页面常显红字「两侧数据未互通 — 结构化视图与在线编辑各自独立保存，互不同步」。HTML 侧 756 行 / 合计 62,351,277.16；两条 el-alert 显示 `D2-1审定表合计(0.00)` 与 `TB科目1122审定额(0.00)` 双双为 0 ⇒ 两侧确实各自独立。OnlyOffice iframe 真加载（`localhost:8080/9.4.0-.../spreadsheeteditor`）。
+
+2. **前端门是硬编码空集**：`components/workpaper/sync/workpaperEntrySyncNotice.ts` 的 `SYNC_ADAPTER_REGISTERED_ENTRY_IDS: readonly string[] = []`，`entrySyncNotice()` 默认参数取它 ⇒ **任何 entry 恒返回「未互通」通知**。零 API 调用，前端无法知道后端真实能力。该组件 `GtEntrySyncCapabilityNotice` 已挂进 **43 个宿主**（D/F/G/H 循环），即 43 处恒显「不互通」。
+
+3. **后端运行时其实注册成功了 3 个**（决定性反证）：真实 DB session 跑 `build_production_registry().register_from_manifest()` 实测
+   `registered_adapter_ids = ['d2.receivable_detail','g7.soe_subsidiary_disclosure','h1.disposal_check']`，
+   `planned_count=186`，仅 `xlsx/b60/gt-b60-bundle` 被拦（原因：无 current published representation）。
+   ⇒ **后端能力是活的，前端把它当成 0。**
+
+4. **供给早已到位，注释与登记表却仍写「0 行」**：`registry.py` 的 `DELIVERED_PER_ENTRY_CONTRACTS` 四条全部硬写 `adapter_registered: False`，reason 里写「三表实测 0 行」。实测 PG：`working_paper_sync_definition_bundle` **9 行全 approved**（7 条真 contract definition + 2 条 marker）、`working_paper_content_representation` **9 行**（D2/G7/H1 各有 `generation=1, reason=content_commit`，最近 2026-09-06 04:00）、`working_paper_sync_entry_state` **5 行**（D2/G7/H1 `has_current=True`）。⇒ 登记表的 `adapter_registered=False` 与 reason 文案**已与事实脱钩**，是过期常量而非当前判据。
+
+5. **主 manifest 与前端/守卫读的 slice 两个口径**（假绿真正的机制）：
+   - `backend/data/workpaper_sync_entry_manifest.json`：D2/G7/H1 三条 **`capability=bidirectional` + `adapter_id` 非空**
+   - `backend/data/workpaper_sync_d_cycle_manifest_slice.json`：D2 仍 `capability=None, adapter_id=None`
+   - 守卫 `test_task46_d_cycle_migration.py::TestAc14HonestModeVisibility` 读的是 **slice**，且判据方向是「slice 里没 adapter ⇒ 前端不得登记」；前端 vitest 更有一条 `expect([...SYNC_ADAPTER_REGISTERED_ENTRY_IDS]).toEqual([])` **把空集合锁成基线**。
+   ⇒ 三方（主 manifest / slice / 前端常量）互不相等，而守卫只在「slice ↔ 前端常量」这条已经对齐的边上比对 ⇒ 恒绿。**假绿第③源（守卫把错值当基线锁死）的标准形态**，同时叠加第②源（读静态 JSON 而非运行时真实注册结果）。
+
+6. **引擎从未被生产实例化**：`useWorkpaperSyncBridge(` 全仓命中 9 处 —— **8 处在 `__tests__`，唯一的生产命中是它自己的定义行**（`useWorkpaperSyncBridge.ts:320`）。`WorkpaperSyncEditorHost` / `StatusBar` / `RecoveryPanel` / `ConflictDialog` / `DetailsDrawer` 五个 UI 组件**只 import 类型和 `describeBridgeFailure`，从不构造 bridge**；`<WorkpaperSyncEditorHost>` 标签在生产模板里**零挂载**。生产代码 import `workpaperSyncApi` 的只有 bridge 自己 + `workpaperSyncOperationTracker`。
+
+### 真正的断点：`usePilotBridgeAdapter` 是空壳胶水
+
+四个 pilot 宿主（`GtD2AccountsReceivable` / `GtG7LongTermEquityMain` / `GtH1FixedAssets` / `b60/GtB60Bundle`+`GtB60DocxPane`）调的 `sync/usePilotBridgeAdapter.ts`，其 docstring 声称「底层**全部委派给** sync bridge 的 manifest capability 和 mode storage」，实现里**一个 bridge 调用都没有**：
+- `switchMode()` 只做 `currentMode.value = target` + `localStorage.setItem` + 可选 `reloadHtml()/flushBeforeOo()` 回调
+- `isOoAvailable = ref(true)` 硬编码常真（注释自己承认「bridge 负责可用性判断，适配器默认开启」）
+- `ooConfig` 注释写明「仅作兼容占位，不再承载真实 config」
+- 无 `materialize` / `confirm-descriptor` / `forcesave` / `pending-mutations` 任何调用
+
+⇒ 用户点「在线编辑」只是翻了个 ref，OnlyOffice 打开的是项目存储里的独立 xlsx；切回 HTML 只是 `reloadHtml()` 重查数据库。**两条路径物理隔离，这就是「未互通」的真因。**
+
+### 后端 17 个 sync 端点全部已存在且未被调用
+
+`/api/projects/{pid}/workpapers/{wp_id}/sync/entries/{entry_id:path}/` 下：`pending-mutations` / `materialize` / `rooms/{room_id}/confirm-descriptor` / `rooms/{room_id}/forcesave` / `close-intents` / `recovery-cases`(+claim/download/download-only/timeline) / `operations/{id}`(+conflicts/timeline/resolve/retry) / `versions/{id}/rollback`，外加 `/api/workpaper-sync/rooms/{room_id}/onlyoffice-callback`。**但没有任何端点暴露「哪些 entry 已注册 adapter」** —— 这正是前端硬编码 `[]` 的那个值，属能力缺口而非接线遗漏。
+
+### 改进建议（按依赖顺序，前两条是解锁项）
+
+1. **加 capability 查询端点 + 前端改为运行时取值**：新增 `GET .../sync/entries/{entry_id}/capability`（或批量版），返回 `register_from_manifest()` 的真实 outcome（registered / blocked + reason）。前端删掉 `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 常量改为异步查询，`entrySyncNotice` 的 reason 直接用后端 reason ⇒ 43 处提示自动从「恒不互通」变成逐 entry 真实态。**同时必须删掉那条 `toEqual([])` 基线断言**，否则改对反被打红。
+2. **同步三处口径并加双向锁死守卫**：`DELIVERED_PER_ENTRY_CONTRACTS.adapter_registered` 与 reason 文案按实测更新（D2/G7/H1 → True，b60 保持 False 并写真实原因）；`d_cycle_manifest_slice.json` 的 D2 条目与主 manifest 对齐；守卫判据从「读 slice 静态字段」改为「跑一次真实 `register_from_manifest` 比对」，否则下次仍是同一个假绿。
+3. **`usePilotBridgeAdapter` 真接 bridge，或直接删掉换 `WorkpaperSyncEditorHost`**：它自己的「删除条件」注释已写明终态是宿主直接渲染 `WorkpaperSyncEditorHost`。当前它是「看起来接了、实际没接」的最贵形态（Vue 传不存在的 prop / 绑不存在的字段类坑的同族）。至少让 `switchMode('onlyoffice')` 真走 `materialize` → `confirm-descriptor`，切回时真走 `forcesave` → 等 ack → 再 `reloadHtml`。
+4. **b60 的 published representation 供给补齐**：它是四 pilot 里唯一真被后端拦住的，原因明确（`working_paper_sync_entry_state` 无该 entry 行）。产生者是 `ContentMutationService.commit(...)` 首版 content version，属可执行动作。
+5. **加一条端到端 DOM 判据当第四边**（G7 收口的经验直接适用）：现有 887+ 前端测试与 29 条变异全没拦住「bridge 从未被实例化」，因为**没有一条把「用户点切换」与「sync API 是否真被调用」串起来断言**。建议加 Playwright 或 vitest+mock-fetch 级判据：点「在线编辑」后必须观测到 `materialize` 请求，否则红。这条能同时防住第 3 项回退。
+
+### 沉淀的通用教训
+
+- **「spec 100% 全绿」与「能力在生产可用」是两个正交事实**。本例 72/72 全 `[x]`、Task 45 明确写了「legacy 已删除、改为委派 bridge」，但委派层是空壳 ⇒ 验收判据全落在「legacy 是否已删」而没有一条落在「新路径是否真通」。**删除旧路径不等于接通新路径**，两侧都要有判据。
+- **fail-open 的静态变体**：`isOoAvailable = ref(true)` / `SYNC_ADAPTER_REGISTERED_ENTRY_IDS = []` 这类「硬编码常量替代真实查询」比 `except Exception` 更难发现 —— 它连异常都不产生，四层验证全绿，只有拿运行时真实结果反证才暴露。判「某能力是否真生效」必须**跑一次真实调用并比对**，不能读声明常量。
+- **多份 manifest/slice 并存时，守卫必须锁在「运行时结果」这条边上**。锁在任意两份静态文件之间都可能双双过期而互相印证（本例 slice 与前端常量完美对齐、却都与主 manifest 和运行时相反）。
+
+
+---
+
+## 2026-09-06（续）· D2 双向回写**真接通**：从「spec 全绿但零接线」到浏览器实测可用
+
+承接同日上一条调查结论（引擎已交付但生产零调用）。本轮把 D2 明细表接通并全程实测。
+
+### 交付物
+
+| 文件 | 作用 |
+|---|---|
+| `backend/app/services/workpaper_sync/d2_bidirectional_bridge.py` | 双向桥（复用已交付引擎，不自造映射） |
+| `backend/app/routers/d2_sync_router.py` | 3 端点：`status` / `push-to-excel` / `pull-from-excel` |
+| `backend/migrations/V155__oo_content_revision.sql` | OO 内容修订号表（doc_key 轮转用） |
+| `audit-platform/frontend/src/components/workpaper/sync/useD2SyncBridge.ts` | 真调 API 的 bridge（替换空壳 `usePilotBridgeAdapter`） |
+| `onlyoffice_room_identity.py` +59 行 | `bump_oo_content_revision` / `_content_revision` + 无 room 时 generation 取 `基线+修订号` |
+| `router_registry/workpaper.py` · `GtD2AccountsReceivable.vue` · `workpaperEntrySyncNotice.ts` + 其 spec | 接线与判据更新 |
+
+### 实测判据（全部通过）
+
+* **离线**：756 行 → 29,484 字段 → xlsx → 读回，**diff=0**
+* **HTTP 端点**：push 200（756 行 / 29,484 字段）；status 显示 Excel 业务行 0→756、表范围 `A13:AN768`；pull 200 后**直接查 PG** 拿到 Excel 侧新值
+* **浏览器**：点「在线编辑」→ 文件 105,414→238,863 字节 → **OO 里真渲染出 756 行**（序号 755/756/757 + 第 770 行合计）；「两侧数据未互通」消失
+* **幂等**：push ×3 全成功、footer 稳定不累积位移；**3 轮往返行数恒定 756**
+* **变异检验**：把 `SYNC_ADAPTER_REGISTERED_ENTRY_IDS` 改回 `[]` ⇒ 2 例 RED（正是预期那两条）
+
+### 🔴 引擎 fail-closed 连续抓出 6 个真缺陷（全是会毁数据的）
+
+按撞到的顺序，每一条都值得记：
+
+1. **`ProtectedRegionWriteError`** —— 契约声明 Q/S/AB 为 formula 列，模板只在骨架 13..24 有公式，第 25 行起为空 ⇒ 按 `FORMULA_TEMPLATES` 逐行实例化（不自己拼公式串）。
+2. **`RowIdentityWriteError`** —— 我把表范围起始写成 `HEADER_LEAF_ROW`(12)，插桩给**表头**mint 了身份而 projection 里没有它。起始必须是 `FIRST_DATA_ROW`(13)。
+3. **`FooterFormulaRangeError`** —— footer `SUM(E13:E25)` 只覆盖到 25 行而受管区已到 768 ⇒ **合计漏算 743 行**，审计合计数直接错。
+4. **`FooterAnchorDriftError`（两次，形态不同）** —— ① 数据覆盖了第 26 行的 footer ⇒ `合计` marker 消失；② 我用 openpyxl 自己搬 footer ⇒ 引擎拒绝，因为 `GT_FOOTER_ROW` 是冻结值且 extract 仍按契约 `static_row` 反读，跟着 marker 写会造成**写在新行、反读旧行**的静默错值。**正解 = 声明式 `RowShiftPlan` + `shift_sheet_rows`**（它同时位移 footer、按 `total_formula_rows` 扩张合计区间、按 `style_from` 造新行），并在位移后**同步更新 `_GT_SYNC` 的 `GT_FOOTER_ROW`**。
+5. **`IdentityRetentionError`** —— 先播种身份再搬 footer，把第 26 行刚写的身份一起搬走了 ⇒ 丢 1 个 identity。**四步顺序是判据**：扩容(含 footer 位移) → 播种身份 → 铺公式 → 扩表范围。
+6. **每轮行数 +1（756→757→…）** —— 这条**引擎没拦住**，是我自己实测发现：受管区外（footer 行）残留身份 ⇒ extract 读回幽灵行 ⇒ 下轮按 757 扩容，无限增长。已加 fail-closed 守卫：**受管区内身份数必须恰等于 store 行数，且区外零残留**。
+
+### 🔴 关键根因：OO 显示旧内容 ≠ 文件没写进去
+
+**用户实测指出的缺陷**：磁盘文件已 228,711 字节 / 756 行，但 **OO 里仍显示空模板**。
+根因 = doc_key 由 `(wp_id, entry_id, generation)` 派生、**刻意与 mtime 解耦**（Task 21 / AC 2.7 / Property 6，防一次写盘就打断协同会话），无 room 时恒取 `BASELINE_GENERATION=1` ⇒ 重写文件不换 key ⇒ **OO 按 key 命中自己的服务端缓存，根本不重新下载**。
+
+解法 = 引入**内容修订号**（V155）：与 mtime 的区别正是判据 —— mtime 每次写盘都变，修订号只在服务端真改写了受管内容时由改写方显式 +1；且只在**无存活 room** 时参与派生，不影响在途会话。实测 doc_key `-g1 → -g2 → -g3` 逐轮轮转，OO 每次都重新拉取。
+
+**教训**：判「写进去了没有」必须落到**用户看得见的那一层**（OO 渲染的 DOM/截图），不能只查磁盘字节 —— 中间还隔着一层服务端缓存。这与 G7 的「守卫只比数据层、从不看 DOM」是同一族假绿。
+
+### 🔴 三个 entry_id 命名空间极易混（实测踩过）
+
+同一张 D2-2 明细表有**三个**不同 id，用错就「改了没生效」：
+
+| 用途 | 值 | 谁读 |
+|---|---|---|
+| 工作簿内真实 sheet 名 | `明细表D2-2` | openpyxl / 契约受管区 |
+| sync manifest entry_id | `xlsx/gt-d2-accounts-receivable` | 契约 / adapter registry |
+| **OO room entry_id** | `xlsx-sheet/D2-2/D2-2` | **doc_key 派生** |
+
+我第一版用 `MANAGED_SHEET` + wp_index 码拼出 `xlsx-sheet/D2/明细表D2-2`，修订号推进到一个**没人读的键**上，表现为「代码改了但 OO 还是旧内容」。**实测定法**：调一次 `onlyoffice-config` 拿真实 `document.key`，再与 `sheet_entry_id(...)` 的派生值逐字比对，命中的那组才是对的（实测 `wp_code` 与 `sheet_name` **都**是 `D2-2`）。
+
+### 顺带修掉的假绿
+
+`workpaperEntrySyncNotice.spec.ts` 里有一条 `expect([...SYNC_ADAPTER_REGISTERED_ENTRY_IDS]).toEqual([])` —— 把空集合锁成基线，**一旦真接通某个 entry 反而打红**，等于用测试**阻止**能力上线，同时让「43 个宿主恒显未互通」看起来是通过状态。已删，改成逐 entry 行为等值判据（读生产常量当分母，常量被改回空即红 —— 变异已验证）。
+
+### 并发协作注意
+
+* `wp_onlyoffice_router.py` 有 **120 行不是我的改动**（并发会话在编），`test_task25_materialize_coordinator_pg.py` 的 `tampered_identity` 参数化用例本就红。**判定归属的做法**：把我的文件换成 HEAD 版本再跑 —— HEAD 版 **8 失败**、我的版本 **1 失败** ⇒ 不是我引入的，我的改动反而让失败更少。
+* 用 `Copy-Item` 换回自己版本后**必须 `git diff --stat` 复核**（我这次是 `59 增 1 删`，纯新增没覆盖他人；字节数从 16,614 变 12,876 只是 CRLF/LF 归一化，不是丢内容）。
+* 别用 `git stash`：工作树有大量并发会话在途改动。
+
+### 遗留（未做，建议单独立项）
+
+* **仅 D2 接通**，G7/H1/b60 三个 pilot 宿主仍挂空壳 `usePilotBridgeAdapter`（零 API 调用），其 `GtEntrySyncCapabilityNotice` 仍显示「未互通」—— 那是事实，不是 bug。复用本轮 bridge 的四步顺序即可推广。
+* **有存活 room 时修订号不参与派生**（刻意为之，防打断会话）⇒ 若 OO 会话开着，push 的新内容要等会话结束才可见。完整解法是走 room 的 `refresh_required_at` / `refresh_reason` 通知前端提示刷新。
+* **账龄列全 0** 导致 OO 里第 771 行红字「账龄与审定不匹」+ 账龄占比 0.00%。实测 store 源数据的 `agingPrior/*` 等本身就是 0，**非本次引入**，属 D2 取数问题。
+* 合计行显示 `##########` 仅列宽不足，非数值错误。
+
+
+---
+
+## 2026-09-06（三）· D2-2 三块内容全打通：表头 / 审计说明 / 审计结论
+
+承上一条（明细行已通）。用户指出表头行、审计说明、审计结论还没同步，并给出通用原则：
+**「HTML 底稿都是按 Excel/Word 模板精细化打磨的，主要内容应可以匹配」** —— 适用所有底稿。
+
+### 源模板实测坐标（`明细表D2-2`）
+
+| 区块 | 坐标 | 性质 |
+|---|---|---|
+| 表头编制信息 | `A3`/`A4`/`F3`/`F4`/`J3`/`J4` | **全是 `data_type='f'` 跨表公式**（`=底稿目录!A2..A7`） |
+| 索引号 | `R3`='索引号：' `S3`='D2-2' | 模板字面量 |
+| 审计说明 | `A29`='三、审计说明：' 正文 30..32 | 空、无合并，可写 |
+| 审计结论 | `A33`='四、审计结论：' 正文 34..35 | 空、无合并，可写 |
+
+### 🔴 表头是**单向下行**，不是双向（三重证据）
+
+1. **模板侧**：D2-2 表头格是公式，真源在「底稿目录」sheet 的 `A2..A7`。直接写那些格会**覆盖公式**、永久破坏模板联动。
+2. **平台侧**：`GET /api/workpapers/{wp_id}/preparation-info` **只有 GET、没有 PUT/POST**；6 字段全部从 `Project` / `working_paper` / 人员表**派生**。
+3. **UI 侧**：`GtWpPreparationHeader.vue` 全是 `el-descriptions-item` 纯文本插值、**零 input**（我一度被截图里 `el-descriptions` 的 border 单元格误当成输入框，读源码才确认）。
+
+⇒ 正确义务只有一条：**把系统权威值填到「底稿目录」的引用源格**，让 Excel 表头公式自然算出正确值。实测 `A3..J4` 六个公式**原样保留**（`header_formula_kept=true`）。
+
+### 🔴 字段命名有两套，混用会「填进去的和 UI 显示的不是同一个」
+
+| 服务 | 口径 | 谁在用 |
+|---|---|---|
+| `wp_preparation_info_service.build_preparation_info` | `entity_name` / `period_end` / `preparer` / `prep_date` / `reviewer` / `review_date` | **前端「编制信息」面板**（`GET /preparation-info`） |
+| `wp_header_data_service.get_header_data` | `entityName` / `period` / `preparedDate` / `reviewedDate` | HTML 表格渲染 / 导出 |
+
+我首版用了 camelCase 那套，实测填进 Excel 的是 `重庆和平药房连锁有限责任公司`（不带 `_2024`）且编制日期为空；换成 `preparation-info` 口径后变成 `..._2024` / `2026-07-24`，与截图 UI 逐字一致。**判据**：填 Excel 的值必须与用户在 UI 上看到的那个面板同源。
+
+### 🔴 叙述块定位必须按 marker，不能按「模板行号 + 行数推算 offset」
+
+首版写 `_narrative_row_offset(row_count) = max(row_count - 骨架容量, 0)`，756 行推出 offset=744 ⇒ 标题应在 773 行。**实测标题在 772**（差 1），守卫如实打红 422「标题行 A773 为空」。
+
+根因：`shift_sheet_rows` 只位移受管区内携带行号的结构，**叙述块跟不跟着动、动多少取决于插入点与它的相对位置**，用行数反推必错。改成 `locate_narrative_titles()` 按 A 列标题字面量扫描定位（与引擎 `assert_footer_anchor_stable` 同一判据），正文容量 = 本块标题下一行 .. 下一块标题前一行（末块用模板声明行数）⇒ 即使两块间距被插行改变也不会写串区。
+
+**通用教训**：凡「受管区之外、会被插行位移」的块，一律**按 marker 定位**，不按行号算术。这与 footer 那条（引擎拒绝跟着 marker 写、要求声明式位移）不矛盾 —— footer 有冻结元数据 `GT_FOOTER_ROW` 做期望值，叙述块没有，所以只能按 marker 找。
+
+### 补齐的 HTML 缺口
+
+`D2TabDetail.vue` 此前**只有「审计说明」、缺「审计结论」**（源模板 A33 明确有），导致 Excel 里的结论无处回写。已补：
+* 两块标题改为带模板编号的「三、审计说明」「四、审计结论」，与源模板逐字对齐
+* 新 item_id `D2-detail-audit-conclusion` + `saveDetailConclusion()`
+* 加 `watch(allResponses)` —— pull 后 `allResponses` 整体替换，不 watch 则用户在 OO 改完切回结构化视图仍看到旧值（「改了没生效」的假象）
+* `:rows="3"` → `:autosize="{minRows:3}"`（长文本可见）
+
+### 实测判据（6/6 通过）
+
+```
+html_to_excel_note   ✅ 两行文本写到标题(772)下
+html_to_excel_concl  ✅ 写到标题(776)下
+header_formula_kept  ✅ A3..J4 仍是 =底稿目录!A2 等公式
+excel_to_html_note   ✅ 库里变「【OO改动】…」
+excel_to_html_concl  ✅ 同上
+rows_unchanged       ✅ 恒定 756 行（明细行未受影响）
+```
+浏览器实测：两块标题都在、两个 textarea 都显示回写内容。前端 vitest 11 例通过。
+
+### 设计要点（可复用到其他底稿）
+
+* **叙述块走独立标量通道，不塞进 `MANAGED_FIELD_SPECS`**：契约 projection 按 `{table}/{row_uuid}/{field}` 索引，叙述文本**没有行身份**，塞进去会破坏 row identity 语义、且 materialize 会拿它当行数据去对齐。
+* **写入时机在 materialize 之后**：叙述块在受管区外，materialize 不碰它；放在之后写可确保引擎的受管区规划（含 footer 锚点校验）看到的是未被扰动的结构。
+* **`_split_narrative` 绝不截断丢字**：超出容量的行**全部并入最后一行**。审计说明是审计证据，丢内容比排版难看严重得多。
+* **pull 只回写叙述块、不回写表头**（越权 + 会被下次渲染覆盖）；`status` 端点如实标注 `header_sync: "one_way_to_excel"`，避免前端误以为能从 Excel 改编制人。
+* **`_write_narratives` 只写内容真变了的项**：无谓 UPDATE 会刷 `updated_at`，让复核看到假的「刚被改过」。

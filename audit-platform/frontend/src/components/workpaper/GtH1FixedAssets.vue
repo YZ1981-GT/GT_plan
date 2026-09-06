@@ -425,7 +425,11 @@ const currentMode = dual.currentMode
 const modeOptions = dual.modeOptions
 const _rawOnModeChange = dual.onModeChange
 const isOoAvailable = dual.isOoAvailable
-const ooChecking = dual.checking
+// 🔴 适配器没有 `checking`（它不做 OO 健康探测，那是 bridge 的 materialize 职责）。
+// 写 `dual.checking` 得到 undefined，模板 `:disabled="ooChecking"` 恒 falsy ⇒
+// 切换过程中下拉不禁用、"OnlyOffice 不可用"标签的门控也失准，且四层验证全绿。
+// 语义对应项是 `switching`（模式切换进行中）。
+const ooChecking = dual.switching
 
 /** C1: 目录/程序表不支持在线编辑 */
 function onModeChange(val: string | number | boolean): void {

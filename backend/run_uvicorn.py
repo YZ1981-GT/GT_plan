@@ -72,4 +72,18 @@ from uvicorn.main import main  # noqa: E402
 
 
 if __name__ == "__main__":
-    main()
+    # 🔴 windows_expand_args=False 不可删：uvicorn 的 main 是 click 命令，click 在
+    # Windows 上默认 windows_expand_args=True，会把 sys.argv 里的 glob 按 **当前工作
+    # 目录** 展开（Linux 由 shell 展开，Windows 由 click 自己 glob）。
+    #
+    # start-dev.bat 传的 `--reload-exclude "tmp_*"` 引号会被 cmd/MSVCRT 剥掉，裸
+    # `tmp_*` 进 argv 后被 click 展开成 backend/ 下的全部 tmp_* 文件：第 1 个当作
+    # --reload-exclude 的值，其余全部溢出成位置参数 ⇒ 后端起不来，只报
+    #     Error: Got unexpected extra arguments (tmp_check_resolve.py tmp_...)
+    # 而完全看不出是 --reload-exclude 的锅。
+    #
+    # `*.pyc` / `*.json` 那两个 --reload-exclude 长期没炸只是侥幸：backend/ 根下这
+    # 两类文件恰好为 0 个，glob 无匹配时 click 原样保留 —— 根目录一旦落一个 .json
+    # 就会以同样方式炸。这些 pattern 本就该原样交给 uvicorn 的 reload 过滤器（它
+    # 内部用 fnmatch 自己匹配），任何 argv 层展开都是错的。
+    main(windows_expand_args=False)

@@ -149,6 +149,19 @@ from app.services.workpaper_sync.excel_entry_gate import (
     FrozenEntryDefinitions,
     assert_metadata_sheet_excluded,
 )
+
+# 🔴 `excel_row_shift` 是**纯函数层**（零 I/O、零写入面、模块级只 import `models`），
+#    不在 `FORBIDDEN_DOWNSTREAM_MODULES` 里 ⇒ 本模块可以依赖它而不违反
+#    `assert_no_materializer_dependency`（那条禁的是 materializer / rematerializer /
+#    adapters.excel 三个**写入侧**模块）。方向是 verifier → 纯函数，不是 verifier → 写入侧。
+from app.services.workpaper_sync.excel_row_shift import (
+    STRUCTURE_BARE_ROW_ATTRS,
+    STRUCTURE_ROW_BEARING_ATTRS,
+    STRUCTURE_ROW_BEARING_TEXT_TAGS,
+    RowShiftPlan,
+    remap_a1_rows,
+    unextend_total_formula,
+)
 from app.services.workpaper_sync.limits import SyncLimits, load_limits
 from app.services.workpaper_sync.merge import (
     ContractIndex,
@@ -266,7 +279,44 @@ _MAIN_NS: Final[str] = "http://schemas.openxmlformats.org/spreadsheetml/2006/mai
 _COL_ELEMENT_RE: Final[re.Pattern[str]] = re.compile(r"<col\b[^>]*/?>")
 _COL_ATTR_RE: Final[re.Pattern[str]] = re.compile(r"\b(?P<key>[A-Za-z]+)=\"(?P<value>[^\"]*)\"")
 
-#: 受管 sheet 上要逐字节锁死的结构块（merge / 列宽隐藏 / 数据验证 / 条件格式 / 保护）。
+#: 受管 sheet 上要逐元素锁死的结构块。
+#:
+#: 前六项是原始清单（merge / 列宽隐藏 / 数据验证 / 条件格式 / 保护 / sheet 属性）。
+#:
+#: ═══ 后四项：`dimension` / `hyperlinks` / `autoFilter` / `rowBreaks` ══════════
+#:
+#: 它们在本 spec 之前**不在任何 aspect 里** —— 既不在这六个 tag 内，而受管 sheet part
+#: 又被 `_classify_parts` 的 `managed_parts` 整件排除。后果不是「它们被允许改」，而是
+#: 「改了没人看」：任何往受管 sheet 里插行的实现都会顺手改动它们（四项全部携带行号），
+#: 而 verifier 一声不响 —— 那是假绿的入口，不是通行证。
+#:
+#: 补进来的顺序是刻意的（spec §Rollout 第 1 步）：**先让它们能红，再让位移函数动它们**。
+#: 反过来做就等于「先改后补检查」，中间那段时间的产物无人复核。
+#:
+#: 实测存在性（`backend/wp_templates/` 权威模板，各自的受管 sheet）：
+#:
+#:   模板  受管 sheet              sheet part   dimension  hyperlinks  autoFilter  rowBreaks
+#:   K11   审定表K11-1              sheet3.xml       1           1          0         0
+#:   B60   B60-1工时预算与控制表      sheet2.xml       1           1          0         0
+#:   D2    明细表D2-2               sheet8.xml       1           1          0         0
+#:   H1    减少检查表H1-8            sheet12.xml      1           1          0         0
+#:   G7    附注披露信息（国企）        sheet5.xml       1           0          0         0
+#:
+#: 🔴 上表 K11 一行**首版记错过两处**，已复测更正：受管 sheet 是
+#:   `审定表K11-1` = `xl/worksheets/sheet3.xml`（sheet4 是「附注披露信息（上市公司）」，
+#:   不是受管 sheet），且它的 `hyperlinks` 实测为 **1** 不是 0。冻结事实写错的代价不是
+#:   注释不准，而是会把「该结构需不需要造注入变体」的判断整个带偏。
+#:
+#: ⇒ `dimension` 五个模板各 1 个、`hyperlinks` 除 G7 外各 1 个 ⇒ 这两项可直接用真实模板
+#:   做非空验证；`autoFilter` / `rowBreaks` 在全部实测模板上都是 0，其判据必须用**真实
+#:   模板的合法变体**（zip 级注入该元素）验证，不得手搓最小 xlsx —— 那会让判据在空集上恒真。
+#:
+#: 🔴 扩充本身会改变 `managed_sheet_structure` 的 digest 值与 coverage 计数。这是**预期**：
+#:   digest 是比对用的中间值，before/after 两侧同时变化不影响等价性判定；受影响的只有
+#:   「断言具体 coverage 数值」的用例（实测恰一处：`test_task42_h1_grouped_dynamic_pilot`
+#:   的 `"managed_sheet_structure": 4` → 6）。
+#:
+#: Spec: excel-structural-row-insertion-and-shift-aware-verification（Requirement 1.3 / 1.4）
 _SHEET_STRUCTURE_BLOCKS: Final[tuple[str, ...]] = (
     "sheetPr",
     "cols",
@@ -274,6 +324,11 @@ _SHEET_STRUCTURE_BLOCKS: Final[tuple[str, ...]] = (
     "dataValidations",
     "conditionalFormatting",
     "sheetProtection",
+    # ── 本 spec 新增（Requirement 1.3）────────────────────────────
+    "dimension",
+    "hyperlinks",
+    "autoFilter",
+    "rowBreaks",
 )
 
 
@@ -1179,6 +1234,31 @@ def _part_digest(zf: zipfile.ZipFile, name: str, *, limits: SyncLimits) -> str:
     return digest.hexdigest()
 
 
+def _propagation_normalised_digest(
+    zf: zipfile.ZipFile, name: str, *, plan: Any, limits: SyncLimits
+) -> str:
+    """引用侧 sheet 的 **propagation-aware** digest（Requirement 5.1）。
+
+    把计划**声明**的传播条目逐条逆替换回改前口径后再算 digest。于是三条同时成立
+    （与 `row_shift` 归一化同一条纪律）：
+
+    * 实测传播 == 声明 ⇒ 逆归一化后与 before 侧逐字节相等 ⇒ 判等价；
+    * 实测传播 != 声明 ⇒ 有条目找不到或有残留差异 ⇒ 仍判漂移；
+    * 传播之外的任何改动（值 / 样式 / 别的公式）⇒ 逆替换碰不到它们 ⇒ 仍判漂移。
+
+    🔴 归一化的**单一真源**是 N1 的 `normalise_propagated_part` —— 这里不重写一份
+    逆替换逻辑。抄第二份必然与执行侧漂移。
+    """
+    from app.services.workpaper_sync.excel_workbook_row_change import (
+        normalise_propagated_part,
+    )
+
+    raw = b"".join(_iter_zip_chunks(zf, name, limits=limits))
+    text = raw.decode("utf-8", "replace")
+    normalised, _reverted = normalise_propagated_part(text, plan, part=name)
+    return hashlib.sha256(normalised.encode("utf-8")).hexdigest()
+
+
 def _sheet_parts(zf: zipfile.ZipFile) -> dict[str, str]:
     """`sheet 名 → sheet part`（含隐藏 sheet）。"""
     sheets, _ = _sheet_part_map(zf)
@@ -1244,21 +1324,103 @@ def _xml_unescape(text: str) -> str:
     return out.replace("&apos;", "'").replace("&amp;", "&")
 
 
+#: 单个单元格坐标（`列+行`）。归一化只动行号，列标逐字保留。
+_CELL_COORD_RE: Final[re.Pattern[str]] = re.compile(r"^(?P<col>[A-Z]{1,3})(?P<row>\d+)$")
+
+
+def _is_total_row(
+    normalised_ref: str, row_shift: RowShiftPlan, total_rows: frozenset[int]
+) -> bool:
+    """该格（**已归一化**的坐标）是否落在契约声明「携带合计公式」的行上。
+
+    `total_formula_rows` 是位移**前**口径，而归一化后的坐标也是位移前口径 ⇒ 直接比。
+    """
+    if not total_rows:
+        return False
+    found = _CELL_COORD_RE.match(normalised_ref)
+    return found is not None and int(found.group("row")) in total_rows
+
+
+def _normalise_cell_ref(
+    ref: str, *, row_shift: RowShiftPlan, inserted: frozenset[int]
+) -> str:
+    """after 侧格坐标 → before 侧口径。新插入行返回空串（= 调用方跳过它）。"""
+    found = _CELL_COORD_RE.match(ref)
+    if found is None:
+        return ref
+    row = int(found.group("row"))
+    if row in inserted:
+        return ""
+    return f"{found.group('col')}{row_shift.unshift(row)}"
+
+
+def _normalise_structure_element(element: Any, *, row_shift: RowShiftPlan) -> None:
+    """把一个结构块元素（含后代）里携带行号的属性/文本**就地**归一化回位移前口径。
+
+    🔴 就地改的是 `ET.iterparse` 产出的**内存中**元素，随后只用于算 digest；
+    artifact 字节一个都不动（Requirement 6.7 / Property 19）。
+
+    「哪些属性/文本携带行号」不在本模块手写第二份 —— 三张表由
+    `excel_row_shift.ROW_BEARING_STRUCTURES` **派生**，且该模块 import 期自检
+    「每一项恰好落进一个归一化桶」。加新结构时不做决定就会打红。
+    """
+
+    def _remap(row: int) -> int:
+        return row_shift.unshift(row)
+
+    for node in element.iter():
+        tag = node.tag.rsplit("}", 1)[-1]
+        for name in STRUCTURE_ROW_BEARING_ATTRS.get(tag, ()):
+            value = node.attrib.get(name)
+            if value:
+                node.attrib[name] = remap_a1_rows(value, remap=_remap)
+        for name in STRUCTURE_BARE_ROW_ATTRS.get(tag, ()):
+            value = node.attrib.get(name)
+            if value and value.isdigit():
+                node.attrib[name] = str(_remap(int(value)))
+        if tag in STRUCTURE_ROW_BEARING_TEXT_TAGS and node.text:
+            node.text = remap_a1_rows(node.text, remap=_remap)
+
+
 def _managed_sheet_cell_digest(
-    zf: zipfile.ZipFile, part: str, *, managed: frozenset[str]
+    zf: zipfile.ZipFile,
+    part: str,
+    *,
+    managed: frozenset[str],
+    row_shift: RowShiftPlan | None = None,
+    total_formula_rows: Sequence[int] = (),
 ) -> tuple[str, int]:
     """受管 sheet 上**非受管**单元格的 digest（流式 iterparse，逐格喂 hash）。
 
     只保留 `<c>` 的 `r` / `t` / `s` 属性与 `<v>` / `<f>` 文本 —— 这些就是「这个格是什么」
     的全部；不建整棵 DOM，也不把 sheet 读进一个大字符串。
+
+    ═══ `row_shift`：shift-aware 归一化（Requirement 6.1~6.5）═══
+
+    非空时按 `plan.unshift` 把 after 侧的行号**反向归一化**回位移前口径再喂 hash，于是
+    「与声明一致的插行」两侧 digest 相等。三条边界写成代码而不是注释：
+
+    1. **新插入行的格整体跳过** —— 它们属受管区域（Requirement 6.5）。不跳过的后果不是
+       「多算一点」：`plan.unshift` 在新行区间上是**恒等映射**，于是新行会与 before 侧
+       同号的原始行**别名**，两侧拿同一个行号比不同的内容 ⇒ 必假红。
+    2. **`managed` 判定用归一化后的坐标** —— `managed` 是 before 侧口径（由 before 侧的
+       region/scan 算出），after 侧的坐标必须先归一化再查表。
+    3. **只归一化行号**，`t` / `s` / `f` / `v` 四项照旧逐字喂 hash（Requirement 6.6）——
+       归一化救不了「值被改了」「样式被改了」「公式被改了」。
+
+    `row_shift=None` 时行为与本 spec 之前**逐字节相同**（纯增量，Requirement 6.4）。
     """
     digest = hashlib.sha256()
     counted = 0
+    inserted = frozenset(row_shift.inserted_rows) if row_shift is not None else frozenset()
+    total_rows = frozenset(int(row) for row in total_formula_rows)
     with zf.open(part, "r") as src:
         for event, element in ET.iterparse(src, events=("end",)):
             if not element.tag.endswith("}c") and element.tag != "c":
                 continue
             ref = element.attrib.get("r", "")
+            if ref and row_shift is not None:
+                ref = _normalise_cell_ref(ref, row_shift=row_shift, inserted=inserted)
             if ref and ref not in managed:
                 value = ""
                 formula = ""
@@ -1270,6 +1432,21 @@ def _managed_sheet_cell_digest(
                         formula = child.text or ""
                     elif tag == "is":
                         value = "".join(node.text or "" for node in child.iter())
+                if formula and row_shift is not None and _is_total_row(ref, row_shift, total_rows):
+                    # 🔴 契约授权扩张的合计行：先还原扩张，再按 unshift 归一化行号。
+                    #    只 unshift 还原不了扩张 —— 那正是扩张的语义（区间真的变大了）。
+                    formula = unextend_total_formula(formula, plan=row_shift)
+                elif formula and row_shift is not None:
+                    # 🔴 公式文本里的 A1 **行号**同样要归一化（Requirement 6.2 说的是
+                    #    「行号」，不是「`r` 属性」）。位移会把非受管格的公式一起带走 ——
+                    #    K11 实测 `C28` 的 `C26-C27` → `C28-C29`、`H26` 的 `G26-D26` →
+                    #    `G28-D28`。只归一化 `r` 的话这些格必判漂移，Property 17
+                    #    （与计划一致的插行使全部 aspect 判等价）根本不可能成立。
+                    #
+                    #    归一化走 `excel_row_shift.remap_a1_rows` 这唯一入口 ⇒ 跨 sheet
+                    #    引用、带数字函数名、字符串字面量三类不会被误改；列标也不动，
+                    #    所以「把 B 列改成 C 列」照旧判漂移（Requirement 6.6）。
+                    formula = remap_a1_rows(formula, remap=row_shift.unshift)
                 digest.update(
                     "|".join(
                         [
@@ -1286,14 +1463,22 @@ def _managed_sheet_cell_digest(
     return digest.hexdigest(), counted
 
 
-def _sheet_structure_digest(zf: zipfile.ZipFile, part: str) -> tuple[str, int]:
-    """受管 sheet 的结构块（merge / cols / 数据验证 / 条件格式 / 保护）digest。"""
+def _sheet_structure_digest(
+    zf: zipfile.ZipFile, part: str, *, row_shift: RowShiftPlan | None = None
+) -> tuple[str, int]:
+    """受管 sheet 的结构块（merge / cols / 数据验证 / 条件格式 / 保护 / …）digest。
+
+    `row_shift` 非空时，结构块里携带行号的属性与元素文本先按 `plan.unshift` 归一化再
+    序列化（Requirement 6.2）。`None` 时行为逐字节不变。
+    """
     digest = hashlib.sha256()
     found = 0
     with zf.open(part, "r") as src:
         for event, element in ET.iterparse(src, events=("end",)):
             tag = element.tag.rsplit("}", 1)[-1]
             if tag in _SHEET_STRUCTURE_BLOCKS:
+                if row_shift is not None:
+                    _normalise_structure_element(element, row_shift=row_shift)
                 digest.update(tag.encode("utf-8"))
                 digest.update(ET.tostring(element, encoding="utf-8"))
                 found += 1
@@ -1386,11 +1571,26 @@ def unmanaged_region_digest(
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
     shared_strings_limit: int | None = None,
+    row_shift: RowShiftPlan | None = None,
+    total_formula_rows: Sequence[int] = (),
+    propagation: Any | None = None,
 ) -> UnmanagedRegionDigest:
     """算一份 artifact 的未管理区域 digest（供 rematerialize 前后比对）。
 
     `shared_strings_limit` 由 before 侧的 `<si>` 计数决定：after 侧只比前 N 个，于是
     「追加新字符串」合法、「改动已有条目」打红。
+
+    `row_shift` 非空时对受管 sheet 的两个 aspect 做 **shift-aware 归一化**
+    （逐格坐标 + 结构块里的行号）。它只能给 **after 侧**：before 侧本来就是位移前口径，
+    两侧都归一化等于什么都没归一化。
+
+    `propagation`（`WorkbookRowChangePlan`）非空时对 **`other_sheet_parts`** 桶里被
+    传播触及的 part 做 **propagation-aware 归一化**：按计划**声明**的条目逐条逆替换回
+    改前口径。同样只给 after 侧。
+
+    🔴 没有这个参数时，工作簿级传播会让引用侧 sheet 的字节变化被判成漂移 —— 那不是
+    「安全的保守」，而是让传播功能**永远无法通过验证**。而归一化必须按**声明**做，
+    不能按观测：见 `normalise_propagated_part` 的 docstring。
     """
     lim = limits or load_limits()
     managed_coords = _managed_coordinates(
@@ -1402,12 +1602,18 @@ def unmanaged_region_digest(
         coverage: dict[str, int] = {}
 
         cell_digest, cell_count = _managed_sheet_cell_digest(
-            zf, region.sheet_part, managed=managed_coords
+            zf,
+            region.sheet_part,
+            managed=managed_coords,
+            row_shift=row_shift,
+            total_formula_rows=total_formula_rows,
         )
         aspects["managed_sheet_unmanaged_cells"] = cell_digest
         coverage["managed_sheet_unmanaged_cells"] = cell_count
 
-        struct_digest, struct_count = _sheet_structure_digest(zf, region.sheet_part)
+        struct_digest, struct_count = _sheet_structure_digest(
+            zf, region.sheet_part, row_shift=row_shift
+        )
         aspects["managed_sheet_structure"] = struct_digest
         coverage["managed_sheet_structure"] = struct_count
 
@@ -1417,13 +1623,32 @@ def unmanaged_region_digest(
         aspects["shared_strings_prefix"] = shared_digest
         coverage["shared_strings_prefix"] = shared_count
 
+        # 🔴 归一化必须覆盖计划点名的**每一个** part，不能只覆盖 `other_sheet_parts`。
+        #
+        #    首版只归一化了引用侧 sheet 那一桶，接到真实入口后 K11 端到端**当场打红**：
+        #    definedNames 的传播改的是 `xl/workbook.xml`，它落在 **`workbook_and_styles`**
+        #    桶里 ⇒ 那一桶仍按逐字节比对 ⇒ 判漂移。
+        #
+        #    这个缺口只有在真实入口上才暴露：N1 的 helper 判据只喂引用侧 sheet，
+        #    永远碰不到 workbook.xml。
+        propagated_parts = (
+            {entry.part for entry in propagation.propagations}
+            if propagation is not None
+            else set()
+        )
         for aspect in UNMANAGED_ASPECTS:
             if aspect in aspects:
                 continue
             parts = buckets[aspect]
             aspects[aspect] = canonical_digest(
                 {
-                    part: _part_digest(zf, part, limits=lim)
+                    part: (
+                        _propagation_normalised_digest(
+                            zf, part, plan=propagation, limits=lim
+                        )
+                        if part in propagated_parts
+                        else _part_digest(zf, part, limits=lim)
+                    )
                     for part in sorted(parts)
                 }
             )
@@ -1461,11 +1686,25 @@ def verify_unmanaged_regions(
     binding: ExcelIdentityBinding,
     scan: RowIdentityScan | None = None,
     limits: SyncLimits | None = None,
+    row_shift: RowShiftPlan | None = None,
+    total_formula_rows: Sequence[int] = (),
+    propagation: Any | None = None,
 ) -> UnmanagedRegionReport:
     """Task 38 的 `verify_unmanaged_regions` 的**共用实现**。
 
     返回 Task 13 的 :class:`UnmanagedRegionReport`（不另立一套报告类型），`equivalent=False`
     时必须给出首个差异位置（该类型的 `__post_init__` 会强制这一点）。
+
+    ═══ `row_shift`：为什么这不是放宽判据（Requirement 6.9）═══
+
+    归一化用的是 **materialize 之前冻结的声明值** `plan.count`，不是从 diff 事后推断出的
+    观测值。于是三条同时成立：
+
+    * 实测位移量 == 声明 ⇒ 归一化后行号对得上 ⇒ 判等价；
+    * 实测位移量 != 声明 ⇒ 归一化后行号对不上 ⇒ 仍判漂移；
+    * 非位移性改动（值 / 样式 / 公式 / 别的部件）⇒ 归一化碰不到它们 ⇒ 仍判漂移。
+
+    事后推断位移量等于让被检查对象自己声明自己合法，那才是放宽（design.md 拒绝方案第 3 条）。
     """
     lim = limits or load_limits()
     base = unmanaged_region_digest(
@@ -1484,6 +1723,12 @@ def verify_unmanaged_regions(
         scan=scan,
         limits=lim,
         shared_strings_limit=base.coverage["shared_strings_prefix"],
+        # 🔴 只给 after 侧：before 侧本来就是位移前口径。两侧都归一化 = 什么都没归一化。
+        row_shift=row_shift,
+        # 契约授权扩张的合计行 —— 同样是**写盘之前冻结的声明**，不是从 diff 观测的。
+        total_formula_rows=total_formula_rows,
+        # 工作簿级传播的**声明**条目 —— 同上，只给 after 侧。
+        propagation=propagation,
     )
     for aspect in UNMANAGED_ASPECTS:
         if base.aspects[aspect] != target.aspects[aspect]:

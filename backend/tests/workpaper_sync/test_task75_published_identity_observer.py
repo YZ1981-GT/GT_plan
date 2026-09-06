@@ -2044,3 +2044,104 @@ def _real_registration_ids() -> set[str]:
             await engine.dispose()
 
     return asyncio.run(_run())
+
+
+# == provider early-exit must yield an explicit reason, not a dangling pointer ==
+
+
+def test_provider_block_reason_names_the_real_capability_gate() -> None:
+    """**Validates: Requirements 1.4, 5.12**
+
+    The provider early-exit branches are `return ()`, not a raise. The original
+    outcome text said to consult the provider own raised reason, which never
+    exists -- so when supply was satisfied but nothing registered, the actual
+    cause was discarded. This pins the reason to the real gate so it cannot
+    degrade back into a dangling pointer.
+    """
+    from app.services.workpaper_sync.adapters.registry import (
+        ManifestRegistrationPlanItem,
+        _describe_provider_block,
+        build_production_registry,
+    )
+    from app.services.workpaper_sync.entry_profile import Capability, capability_of
+
+    registry = build_production_registry()
+    open = [
+        item
+        for item in registry.registration_plan
+        if item.blocked_reason is None and item.provider_module
+    ]
+    assert open, "注册计划里没有任何未被计划挡住的 entry -- 刦据本躯成空"
+
+    for item in open:
+        entry = registry.manifest_entries[item.entry_id]
+        reason = _describe_provider_block(item)
+        # The reason must name the provider it is about.
+        assert item.provider_module in reason, item.entry_id
+        # And it must never point at an exception that does not exist.
+        assert "讷其自身抛出的原因" not in reason, (
+            f"{item.entry_id}: reason still points at a non-existent raise"
+        )
+        # While capability is not yet bidirectional, the reason must say so
+        # and quote the measured value -- that is the actionable fact.
+        if capability_of(entry) is not Capability.bidirectional:
+            assert "capability" in reason, item.entry_id
+            assert capability_of(entry).value in reason, (
+                f"{item.entry_id}: reason does not quote the measured capability"
+            )
+
+
+def test_the_empty_provider_branch_is_wired_to_the_reason_helper() -> None:
+    """**Validates: Requirements 5.12**
+
+    The sibling test calls `_describe_provider_block` directly, so it stays green
+    even if the production branch stops calling it (measured: reverting the call
+    site left it passing -- a guard defect, not a code fix). This pins the wiring:
+    the empty-ids branch of `register_from_manifest` must assign its reason from
+    the helper, not from a literal.
+    """
+    import ast
+    import inspect
+
+    from app.services.workpaper_sync.adapters import registry as reg_mod
+
+    tree = ast.parse(inspect.getsource(reg_mod.WorkpaperSyncAdapterRegistry))
+    fn = next(
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.AsyncFunctionDef) and n.name == "register_from_manifest"
+    )
+
+    # Find the `if not ids:` branch and check what it assigns into `reasons`.
+    called: list[str] = []
+    literal_only = False
+    for node in ast.walk(fn):
+        if not isinstance(node, ast.If):
+            continue
+        test = node.test
+        is_not_ids = (
+            isinstance(test, ast.UnaryOp)
+            and isinstance(test.op, ast.Not)
+            and isinstance(test.operand, ast.Name)
+            and test.operand.id == "ids"
+        )
+        if not is_not_ids:
+            continue
+        for stmt in node.body:
+            if not isinstance(stmt, ast.Assign):
+                continue
+            calls = [
+                c.func.id
+                for c in ast.walk(stmt.value)
+                if isinstance(c, ast.Call) and isinstance(c.func, ast.Name)
+            ]
+            called.extend(calls)
+            if not calls:
+                literal_only = True
+
+    assert "_describe_provider_block" in called, (
+        "register_from_manifest 的 `if not ids` 分攬没有调 _describe_provider_block "
+        "reverting it to a fixed literal makes the reason point at a raise that never happens"
+    )
+    assert not literal_only, (
+        "该分攬把 reason 赋值成一个不含调用的字面量 -- 其用户看不到真正原因"
+    )

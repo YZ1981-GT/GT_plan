@@ -814,13 +814,45 @@ class TestConsumptionHost:
         assert APPLY_SCRIPT.name in production_callers, production_callers
 
     def test_apply_script_resolves_targets_from_a_single_source(self) -> None:
-        """`entry → wp_code` 只有一份真源（provider 的 `PILOT_WP_CODES`），不写第二份清单。"""
+        """`entry → wp_code` 只有一份真源 —— **reviewed 裁决表**，不写第二份清单。
+
+        🔴 2026-09-04 更正判据。本条原先断言宿主必须
+        `getattr(provider, "PILOT_WP_CODES")`，与
+        `test_task76_wp_code_adjudication.py::test_resolve_targets_does_not_read_PILOT_WP_CODES`
+        **方向完全相反** —— 两条守卫互相否定，其中必有一条恒红。实测（对 HEAD 版宿主源码
+        跑同一条 AST 判据）确认恒红的是本条：宿主早已改读裁决表，本条是裁决表引入**之前**
+        的设计残留。
+
+        为什么真源换了：`PILOT_WP_CODES` 追溯到 manifest 的 `wp_code_patterns`，那是
+        `generate_workpaper_sync_manifest._source_match()` 从宿主 Vue 文件名 CamelCase 抽的
+        启发式产物，正则会把下一个词首字母吞进来，产出 `D2A` / `G7L` / `H1F` 三个在
+        `wp_index` 里 **0 命中**的幻影码 ⇒ 四份契约全部 unresolved，且给出的原因还是错的。
+        真源改为 `backend/data/workpaper_sync_entry_wp_code_adjudication.json`
+        （`review_status: reviewed`）。
+
+        判据仍落在「真的做了一次取值」而非「源码里出现过这个名字」：本函数的
+        `unresolved_reason` 文案里正当地提到了 `PILOT_WP_CODES`（解释为什么不用它），
+        子串判据会假绿（本轮变异 M20 实测 GREEN）。
+        """
         node = function_node(APPLY_SCRIPT, "resolve_targets")
-        # 🔴 判据必须是「真的做了一次属性取值」，不能是「源码里出现过这个名字」：
-        # 本函数的 `unresolved_reason` 文案里正当地提到了 `PILOT_WP_CODES`，
-        # 于是 `"PILOT_WP_CODES" in ast.dump(node)` 在写死清单后照样绿
-        # （本轮变异 M20 实测 GREEN）。
-        lookups = [
+        attributes = {
+            inner.attr for inner in ast.walk(node) if isinstance(inner, ast.Attribute)
+        } | {inner.id for inner in ast.walk(node) if isinstance(inner, ast.Name)}
+
+        # ① 必须真的调了裁决表加载器（不是在注释里提它）
+        loader_calls = [
+            inner
+            for inner in ast.walk(node)
+            if isinstance(inner, ast.Call)
+            and isinstance(inner.func, ast.Name)
+            and inner.func.id == "load_wp_code_adjudication"
+        ]
+        assert loader_calls, (
+            "宿主没调 `load_wp_code_adjudication()` ⇒ entry→wp_code 又成了第二份清单"
+        )
+
+        # ② 反向：不得回落到会产幻影码的启发式
+        phantom = [
             inner
             for inner in ast.walk(node)
             if isinstance(inner, ast.Call)
@@ -830,10 +862,71 @@ class TestConsumptionHost:
             and isinstance(inner.args[1], ast.Constant)
             and inner.args[1].value == "PILOT_WP_CODES"
         ]
-        assert lookups, "宿主没从 provider 现取 `PILOT_WP_CODES` ⇒ wp_code 成了第二份清单"
-        attributes = {
-            inner.attr for inner in ast.walk(node) if isinstance(inner, ast.Attribute)
-        } | {inner.id for inner in ast.walk(node) if isinstance(inner, ast.Name)}
+        assert not phantom, (
+            "宿主又从 provider 取 `PILOT_WP_CODES` 了 —— 那是 manifest 文件名启发式的"
+            "产物，实测产 D2A / G7L / H1F 三个 wp_index 0 命中的幻影码"
+        )
+
+        # ③ provisioning 准入判据必须**下标取值**，且缺键必须先被拦住。
+        #
+        # 🔴 判据不能只查「字符串出现过」：改成 `verdict.get(KEY, True)` 时字符串照样在，
+        #    而语义已经从「缺键即抛」翻成「缺键默认放行」= fail-open。故判据落在两处**语法
+        #    形态**：(a) 存在 `verdict[KEY]` 形态的下标取值；(b) 不存在以该键为第一实参的
+        #    `.get(KEY, <默认>)` 调用。
+        KEY = "resolvable_for_provisioning"
+        subscripts = [
+            inner
+            for inner in ast.walk(node)
+            if isinstance(inner, ast.Subscript)
+            and isinstance(inner.slice, ast.Constant)
+            and inner.slice.value == KEY
+        ]
+        assert subscripts, (
+            f"宿主没有 `verdict[{KEY!r}]` 形态的下标取值 ⇒ 「该 entry 能否定位宿主底稿」"
+            "这条准入没了；旧键 `resolvable_today` 把它与 matcher 域冲突混在一个布尔里，"
+            "实测让 G7 恒不 provision"
+        )
+        defaulted = [
+            inner
+            for inner in ast.walk(node)
+            if isinstance(inner, ast.Call)
+            and isinstance(inner.func, ast.Attribute)
+            and inner.func.attr == "get"
+            and len(inner.args) == 2
+            and isinstance(inner.args[0], ast.Constant)
+            and inner.args[0].value == KEY
+        ]
+        assert not defaulted, (
+            f"宿主用 `.get({KEY!r}, <默认>)` 取准入判据 —— 缺键默认放行是 fail-open："
+            "「裁决表漏填」会被静默当成「已裁决可解析」"
+        )
+        # 🔴 判据必须是「该比较**门控了一个 raise**」，不能只是「存在这样一个比较」：
+        #    把 `if KEY not in verdict:` 短路成 `if False and KEY not in verdict:` 时
+        #    Compare 节点仍在，只查存在性的判据照样绿（本轮变异 M1 实测 GREEN）。
+        #    故要求：存在一个 `ast.If`，其 test **恰为**该 Compare（不是被 `and` 包起来的
+        #    子项），且 body 里有 `raise`。
+        def _is_missing_key_compare(test: ast.expr) -> bool:
+            return (
+                isinstance(test, ast.Compare)
+                and len(test.ops) == 1
+                and isinstance(test.ops[0], ast.NotIn)
+                and isinstance(test.left, ast.Constant)
+                and test.left.value == KEY
+            )
+
+        guarded_raises = [
+            inner
+            for inner in ast.walk(node)
+            if isinstance(inner, ast.If)
+            and _is_missing_key_compare(inner.test)
+            and any(isinstance(stmt, ast.Raise) for stmt in ast.walk(inner))
+        ]
+        assert guarded_raises, (
+            f"宿主没有「`{KEY!r} not in verdict` 直接门控一个 raise」的缺键拦截 —— "
+            "缺键会走到下标取值抛 KeyError，而那条错误不带「该键是准入判据、"
+            "不得默认放行」的可读诊断；把该比较包进 `False and …` 也算没有拦截"
+        )
+
         assert "DELIVERED_PER_ENTRY_CONTRACTS" in attributes, (
             "宿主没从交付登记表现算 entry 集合"
         )

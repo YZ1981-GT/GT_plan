@@ -1,0 +1,3827 @@
+{
+ "affected_templates": [
+  {
+   "managed_sheet_candidates": [
+    "表头"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "采用新金融工具准则衔接影响数核对A1-18"
+   ],
+   "referencing_sites": 4,
+   "rel_path": "A/A1-18 采用新金融工具准则衔接影响数核对 N.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审计程序A11（财报+内控）",
+    "期后事项审定表A11-1",
+    "期后事项调查问卷A11-2",
+    "期后内控事项调查问卷A11-3"
+   ],
+   "referencing_sites": 24,
+   "rel_path": "A/A11 期后事项程序表.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "调整事项汇总表"
+   ],
+   "marker_keys": [
+    "insert_row",
+    "item_n"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "TB",
+    "TB(期初)"
+   ],
+   "referencing_sites": 9744,
+   "rel_path": "A/A2-1、A2-2单体报表试算.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "复核记录",
+    "项目现场负责人复核（适用于财报审计）"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A21-1 项目现场负责人复核表及复核记录（适用于财报审计）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " A22-1-1 复核记录",
+    "A22-1 项目负责经理复核(适用于财报审计)"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A22-1 项目负责经理复核(适用于财报审计).xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A22-2项目负责经理复核表（适用于内控审计）",
+    "复核记录参考模板"
+   ],
+   "referencing_sites": 12,
+   "rel_path": "A/A22-2 项目负责经理复核表（适用于内控审计）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A23-1 项目合伙人复核（适用于财报审计）",
+    "复核记录"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A23-1 项目合伙人复核(适用于财报审计).xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A23-2 项目合伙人复核表（适用于内控审计）",
+    "复核记录参考模板"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A23-2 项目合伙人复核表（适用于内控审计）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "项目质量复核合伙人复核表（独立复核）A24-1-1",
+    "项目质量复核合伙人复核记录A24-1-1-1"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A24-1  项目质量复核合伙人复核表及记录（财务报表审计-适用非大型国企）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "项目质量复核合伙人复核表（独立复核）A24-1-2",
+    "项目质量复核合伙人复核记录A24-1-2-1"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A24-1 项目质量复核合伙人复核表及记录（财务报表审计-适用大型国企）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "复核记录参考模板A24-2-1",
+    "项目质量复核合伙人复核表-适用于内控审计A24-2"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A24-2 项目质量复核合伙人复核(适用于内控审计).xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "复核记录A25-1-1",
+    "质量控制复核人复核表A25-1"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A25-1 质量控制复核人复核表及复核记录(适用于财报审计-适用大型国企).xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "复核记录A25-1-1",
+    "质量控制复核人复核表A25-1"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A25-1 质量控制复核表及复核记录(适用于财报审计-适用非大型国企).xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "复核记录参考模板A25-2-1",
+    "质量控制复核人复核表A25-2"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A25-2 质量控制复核表及复核记录(适用于内控审计).xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "上年PL审定",
+    "合并BS汇总",
+    "合并CF汇总",
+    "合并PL汇总",
+    "合并报表调整 ",
+    "年初BS审定",
+    "往来交易抵销",
+    "权益抵销",
+    "母公司BS汇总",
+    "母公司CF汇总",
+    "母公司PL汇总",
+    "母公司报表调整",
+    "母公司汇总抵销",
+    "母公司账项调整",
+    "说明"
+   ],
+   "marker_keys": [
+    "insert_row",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " ",
+    "Q2-4 EPS-ROE(新)",
+    "TB合并CF",
+    "TB母公司CF",
+    "上年PL审定",
+    "合并BS汇总",
+    "合并CF汇总",
+    "合并PL汇总",
+    "合并TB损益",
+    "合并TB负债",
+    "合并TB资产",
+    "合并报表调整 ",
+    "审定合并BS",
+    "审定合并CF",
+    "审定合并PL",
+    "已审横向BS",
+    "已审横向PL",
+    "已审比率分析",
+    "已审纵向BS",
+    "已审纵向PL",
+    "年初BS审定",
+    "往来交易抵销",
+    "报表格式",
+    "期初核对BS",
+    "期初核对PL",
+    "权益抵销",
+    "母公司BS汇总",
+    "母公司CF汇总",
+    "母公司PL汇总",
+    "母公司TB损益",
+    "母公司TB负债",
+    "母公司TB资产",
+    "母公司报表调整",
+    "母公司汇总抵销",
+    "母公司账项调整",
+    "母已审横向BS",
+    "母已审横向PL",
+    "母已审比率分析",
+    "母已审纵向BS",
+    "母已审纵向PL"
+   ],
+   "referencing_sites": 7078,
+   "rel_path": "A/A3-1、-2 合并报表试算-2019.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "上年PL审定",
+    "合并BS汇总",
+    "合并CF汇总",
+    "合并PL汇总",
+    "合并报表调整 ",
+    "年初BS审定",
+    "往来交易抵销",
+    "权益抵销",
+    "母公司BS汇总",
+    "母公司CF汇总",
+    "母公司PL汇总",
+    "母公司报表调整",
+    "母公司汇总抵销",
+    "母公司账项调整",
+    "说明"
+   ],
+   "marker_keys": [
+    "insert_row",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " ",
+    "Q2-4 EPS-ROE(新)",
+    "TB合并CF",
+    "TB母公司CF",
+    "上年PL审定",
+    "合并BS汇总",
+    "合并CF汇总",
+    "合并PL汇总",
+    "合并TB损益",
+    "合并TB负债",
+    "合并TB资产",
+    "合并报表调整 ",
+    "审定合并BS",
+    "审定合并CF",
+    "审定合并PL",
+    "已审横向BS",
+    "已审横向PL",
+    "已审比率分析",
+    "已审纵向BS",
+    "已审纵向PL",
+    "年初BS审定",
+    "往来交易抵销",
+    "报表格式",
+    "期初核对BS",
+    "期初核对PL",
+    "权益抵销",
+    "母公司BS汇总",
+    "母公司CF汇总",
+    "母公司PL汇总",
+    "母公司TB损益",
+    "母公司TB负债",
+    "母公司TB资产",
+    "母公司报表调整",
+    "母公司汇总抵销",
+    "母公司账项调整",
+    "母已审横向BS",
+    "母已审横向PL",
+    "母已审比率分析",
+    "母已审纵向BS",
+    "母已审纵向PL"
+   ],
+   "referencing_sites": 8272,
+   "rel_path": "A/A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "专项应付款",
+    "信用减值损失",
+    "债权投资",
+    "其他债权投资",
+    "其他应收款",
+    "其他权益工具投资",
+    "其他流动负债",
+    "其他非流动金融资产",
+    "净敞口套期收益",
+    "可供出售金融资产",
+    "应付债券",
+    "应付票据",
+    "应付职工薪酬",
+    "应付账款",
+    "应收利息",
+    "应收账款",
+    "所得税费用",
+    "持有待售资产",
+    "持有至到期投资",
+    "政府补助",
+    "生产性生物资产（公允价值计量）",
+    "生产性生物资产（成本计量）",
+    "短期借款",
+    "营业外支出",
+    "营业外收入",
+    "财务费用",
+    "货币资金",
+    "递延收益",
+    "长期应付款",
+    "长期应付职工薪酬",
+    "长期应收款",
+    "预付款项",
+    "预收款项"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "Word附注",
+    "应收利息、应收股利、其他应收款",
+    "现金流量表主表",
+    "现金流量表附表",
+    "长期应付款及专项应付款"
+   ],
+   "referencing_sites": 1069,
+   "rel_path": "A/A3-5 合并附注汇总-2019.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "专项应付款",
+    "信用减值损失",
+    "债权投资",
+    "其他债权投资",
+    "其他应收款",
+    "其他权益工具投资",
+    "其他流动负债",
+    "其他非流动金融资产",
+    "净敞口套期收益",
+    "可供出售金融资产",
+    "应付债券",
+    "应付票据",
+    "应付职工薪酬",
+    "应付账款",
+    "应收利息",
+    "应收账款",
+    "所得税费用",
+    "持有待售资产",
+    "持有至到期投资",
+    "政府补助",
+    "生产性生物资产（公允价值计量）",
+    "生产性生物资产（成本计量）",
+    "短期借款",
+    "营业外支出",
+    "营业外收入",
+    "财务费用",
+    "货币资金",
+    "递延收益",
+    "长期应付款",
+    "长期应付职工薪酬",
+    "长期应收款",
+    "预付款项",
+    "预收款项"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "Word附注",
+    "应收利息、应收股利、其他应收款",
+    "现金流量表主表",
+    "现金流量表附表",
+    "长期应付款及专项应付款"
+   ],
+   "referencing_sites": 1069,
+   "rel_path": "A/A3-6 母公司附注汇总-2019.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "A3-8商誉减值测试"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A3-8-1可收回金额测试"
+   ],
+   "referencing_sites": 3,
+   "rel_path": "A/A3-7内部往来核对表、A3-8商誉减值测试.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A5-1-1列示于现金流量表的现金及现金等价物",
+    "A5-1-3相关报表勾稽关系核对",
+    "A5-1-4现金流量核查",
+    "A5-1-6其他现金流量",
+    "A5-1现金流量审计程序"
+   ],
+   "referencing_sites": 20,
+   "rel_path": "A/A5-1 现金流量表审计.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A5-2 财务承诺",
+    "A5-2-1 承诺事项审定表"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "A/A5-2 承诺事项.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "A5-3 或有事项审计程序",
+    "A5-3-1 或有事项审定表",
+    "A5-3-2预计负债审定表",
+    "A5-3-3调查问卷"
+   ],
+   "referencing_sites": 16,
+   "rel_path": "A/A5-3 或有事项.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "明细分析表A5-4-2",
+    "表头"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表A5-4",
+    "明细分析表A5-4-2",
+    "检查表A5-4-3",
+    "附注披露信息（上市公司）A5-4-1",
+    "附注披露信息（国企）A5-4-1"
+   ],
+   "referencing_sites": 175,
+   "rel_path": "A/A5-4 持续经营净利润和终止经营净利润.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "RP 020-1",
+    "RP 020-3",
+    "RP 036-1",
+    "RP 065-1",
+    "RP 065-2"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "RP 020",
+    "RP 036",
+    "RP 065"
+   ],
+   "referencing_sites": 6,
+   "rel_path": "A/A6-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "B11-1股东大会、董事会等会议记录的摘录",
+    "B11-2评价企业内部控制评价报告",
+    "B11-3被审计单位的公开信息记录",
+    "B11检查相关信息程序表"
+   ],
+   "referencing_sites": 24,
+   "rel_path": "B/B11 检查相关信息或文件记录程序表.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "B12A 与管理层访谈程序",
+    "B12A-1与管理层访谈记录",
+    "B12B 与治理层访谈程序",
+    "B12B-1与治理层访谈记录",
+    "B12C 与其他人员访谈程序",
+    "B12C-1 与其他人员访谈记录"
+   ],
+   "referencing_sites": 36,
+   "rel_path": "B/B12 与相关人员访谈程序及记录.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "B18 了解内部审计程序表",
+    "B18-1对内部审计的评价的记录",
+    "B18-2与内部审计人员讨论利用其工作的计划的记录"
+   ],
+   "referencing_sites": 18,
+   "rel_path": "B/B18 了解内部审计程序表.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "B19识别关联方程序表"
+   ],
+   "referencing_sites": 6,
+   "rel_path": "B/B19 识别关联方程序表.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "RP 020-1",
+    "RP 020-3",
+    "RP 036-1",
+    "RP 062",
+    "RP 062-1",
+    "RP 062-2"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "RP 020",
+    "RP 036",
+    "RP 062",
+    "RP 062-1",
+    "RP 062-2"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "B/B30-13-1 财务报告文件包（含经审计的财务报表及附注等）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "B51-1 识别舞弊风险因素（虚假报告）",
+    "B51-2 识别舞弊风险因素（侵占资产）"
+   ],
+   "referencing_sites": 12,
+   "rel_path": "B/B51 舞弊风险因素（三因素分析）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "C22 IT一般控制测试"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "NS-1",
+    "NS-3",
+    "NS-4",
+    "NS-5.1",
+    "NS-5.2",
+    "NS-5.3",
+    "NS-5.4",
+    "NS-6.1",
+    "NS-6.2",
+    "PE-3a",
+    "PE-3d",
+    "PE-5",
+    "PE-6",
+    "PE-7",
+    "PE-8",
+    "PM-3",
+    "PM-4b",
+    "PM-4c",
+    "PM-4e",
+    "PM-5",
+    "PM-6",
+    "SA-10",
+    "SA-11",
+    "SA-12",
+    "SA-13",
+    "SA-14",
+    "SA-3",
+    "SA-4c",
+    "SA-5",
+    "SA-7",
+    "SA-9"
+   ],
+   "referencing_sites": 61,
+   "rel_path": "C/C22 IT一般控制测试.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "C24-0汇总表"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "细节测试C24A"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "C/C24 会计分录 - 细节测试.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "函证差异检查表（示例）",
+    "函证差异调节表D0-4",
+    "函证程序舞弊风险评价表D0-8",
+    "函证程序表D0A",
+    "函证结果汇总表D0-1",
+    "合同负债及销售替代程序D0-5",
+    "应收及销售替代程序D0-6",
+    "核实被函证单位信息D0-2",
+    "跟函函证过程控制D0-3",
+    "邮件传真回函可靠性验证D0-7"
+   ],
+   "referencing_sites": 81,
+   "rel_path": "D/D0 收入循环函证.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "原值明细表（按类别）D1-2",
+    "坏账准备明细表D1-4",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方关系及交易检查表D1-11",
+    "原值明细表（按客户）D1-3",
+    "原值明细表（按类别）D1-2",
+    "坏账准备明细表D1-4",
+    "坏账准备转回、核销检查表D1-16",
+    "审定表D1-1",
+    "应收票据业务模式分析D1-6",
+    "应收票据坏账准备会计政策检查D1-14",
+    "应收票据坏账准备测试表D1-15",
+    "应收票据备查簿核对D1-7",
+    "应收票据审计程序表D1A",
+    "应收票据检查表D1-13",
+    "应收票据监盘D1-10",
+    "应收票据质押检查表D1-12",
+    "应收票据贴息检查表D1-9",
+    "应收票据贴现、票据已背书未到期明细表D1-8",
+    "调整分录汇总表D1-5",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 155,
+   "rel_path": "D/D1 应收票据.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表D2-1",
+    "底稿目录",
+    "明细表D2-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "implemented",
+   "referencing_sheets": [
+    "坏账准备明细表D2-3",
+    "审定表D2-1",
+    "应收账款实质性程序表D2A",
+    "明细表D2-2",
+    "调整分录汇总表D2-4",
+    "附注披露信息(上市公司)",
+    "附注披露信息(上市公司）D2-1",
+    "附注披露信息(国企)",
+    "附注披露信息（国企）D2-1"
+   ],
+   "referencing_sites": 123,
+   "rel_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+   "state": "propagated"
+  },
+  {
+   "managed_sheet_candidates": [
+    "坏账准备计提会计政策检查D2-8",
+    "坏账准备转回（收回）、核销检查表D2-11",
+    "应收坏账准备测算D2-9",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方及交易检查表D2-6",
+    "坏账准备计提会计政策检查D2-8",
+    "坏账准备转回（收回）、核销检查表D2-11",
+    "应收坏账准备测算D2-9",
+    "应收账款业务模式分析D2-13",
+    "应收账款检查表D2-7",
+    "应收账款质押出售情况检查表D2-12",
+    "附注披露信息(上市公司）D2-1",
+    "附注披露信息（国企）D2-1",
+    "预期信用损失的计量测试D2-10"
+   ],
+   "referencing_sites": 153,
+   "rel_path": "D/D2-6至D2-13  应收账款 -检查（Leap应对措施-检查）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "账龄1年以上的预收账款检查表D3-5",
+    "预收账款明细表D3-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联关系及交易检查表D3-6",
+    "审定表D3-1",
+    "调整分录汇总表D3-3",
+    "账龄1年以上的预收账款检查表D3-5",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)",
+    "预收账款分析表D3-4",
+    "预收账款实质性程序表D3A",
+    "预收账款明细表D3-2",
+    "预收账款检查表D3-7"
+   ],
+   "referencing_sites": 135,
+   "rel_path": "D/D3 预收账款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "出口收入电子口岸系统核对D4-16",
+    "营业收入发生检查表D4-14",
+    "营业收入完整性检查表D4-15",
+    "营业收入截止测试（单据到账）D4-18",
+    "营业收入截止测试（账到单据）D4-17",
+    "营业收入账面金额与ERP系统核对记录D4-13",
+    "销售折扣与折让检查D4-19",
+    "销售退货检查表 D4-20"
+   ],
+   "referencing_sites": 63,
+   "rel_path": "D/D4-13至D4-20主营业务收入-检查（Leap应对措施-检查）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "主营业务收入明细表D4-2",
+    "其他业务收入明细表D4-3",
+    "营业收入审定表D4-1",
+    "营业收入审计程序表D4A",
+    "营业收入调整分录汇总D4-4"
+   ],
+   "referencing_sites": 30,
+   "rel_path": "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "境外销售收入检查D4-26",
+    "客户、供应商等资金流水检查D4-32",
+    "客户信息核查清单D4-28",
+    "客户信息检查表D4-29",
+    "客户访谈记录 D4-31",
+    "客户访谈记录汇总表D4-30",
+    "收入与开具发票金额比较分析D4-23",
+    "程序表D4-22A",
+    "第三方回款检查D4-24",
+    "经销商检查D4-25",
+    "访谈记录与核对示例",
+    "识别未披露的关联方D4-27",
+    "重要指标分析表D4-22"
+   ],
+   "referencing_sites": 90,
+   "rel_path": "D/D4-22至D4-32营业收入-IPO 上市 新三板 重组 舞弊应对.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他业务收入合同测算表D4-34",
+    "其他业务收入截止性测试D4-36",
+    "其他业务收入检查表D4-35",
+    "其他业务毛利率分析表D4-33"
+   ],
+   "referencing_sites": 28,
+   "rel_path": "D/D4-33至D4-36 其他业务收入.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "毛利率分析表D4-7"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "产品销售价格分析D4-11",
+    "毛利率分析表D4-7",
+    "重要产品毛利分析D4-8",
+    "重要客户结构分析D4-9",
+    "重要客户销售价格分析D4-10",
+    "重要指标分析D4-6"
+   ],
+   "referencing_sites": 40,
+   "rel_path": "D/D4-6至D4-11营业收入 - 分析程序（Leap应对措施-分析程序）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "应收款项融资明细表D5-2",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表D5",
+    "应收款项融资公允价值测算表D5-4",
+    "应收款项融资审计程序表D5A",
+    "应收款项融资明细表D5-2",
+    "调整分录汇总表D5-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 66,
+   "rel_path": "D/D5 应收款项融资.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联关系及交易检查D6-5",
+    "减值准备测算D6-8",
+    "减值准备转回、核销检查表D6-9",
+    "合同资产减值准备会计政策检查D6-7",
+    "合同资产减值准备明细表D6-3",
+    "合同资产实质性程序表 D6A",
+    "合同资产检查表D6-6",
+    "审定表D6-1",
+    "明细表D6-2",
+    "调整分录汇总表D6-4",
+    "附注披露信息(上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 76,
+   "rel_path": "D/D6 合同资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方关系及交易检查表D7-6",
+    "合同负债分析表D7-4",
+    "合同负债实质性程序表 D7A",
+    "合同负债检查表D7-7",
+    "审定表D7-1",
+    "明细表D7-2",
+    "调整分录汇总表D7-3",
+    "账龄1年以上合同负债检查表D7-5",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)"
+   ],
+   "referencing_sites": 67,
+   "rel_path": "D/D7 合同负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "函证结果汇总表E0-1",
+    "底稿目录",
+    "核实被函证单位信息E0-2",
+    "货币资金发函记录表E0-3",
+    "银行函证其他信息核对表E0-5"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "借款发函记录表E0-4",
+    "函证程序舞弊风险评价表E0-8",
+    "函证程序表-原版本备份",
+    "函证程序表E0A",
+    "函证结果汇总表-旧版",
+    "函证结果汇总表E0-1",
+    "函证结果汇总表E0-1 (备份)",
+    "函证结果汇总表E0-1（原）",
+    "参考用-往来函证程序",
+    "回函情况汇编",
+    "应付银行承兑汇票发函记录表E0-5",
+    "核实被函证单位信息E0-2",
+    "核实被函证单位信息F1-10-原",
+    "理财产品发函记录表E0-6",
+    "货币资金及借款函证结果汇总表-旧版",
+    "货币资金发函记录表E0-3",
+    "跟函函证过程控制E0-7",
+    "邮件传真回函核对记录F1-12",
+    "银行函证其他信息核对表E0-5"
+   ],
+   "referencing_sites": 1058,
+   "rel_path": "E/E0 货币资金 - 函证（Leap应对措施-函证）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "银行存款及其他货币资金明细表(人民币及外币)E1-3",
+    "银行存款及其他货币资金明细表(仅人民币)E1-3",
+    "附注披露信息(上市公司)"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "已开立银行账户清单核对表E1-10",
+    "库存现金（人民币）盘点表E1-7",
+    "库存现金（外币）盘点表E1-8",
+    "数字货币明细表E1-4",
+    "现金明细表E1-2",
+    "调整分录汇总E1-5",
+    "货币资金实质性程序表E1A",
+    "货币资金审定表E1-1",
+    "银行存单盘点表E1-9",
+    "银行存款余额调节表E1-6",
+    "银行存款及其他货币资金明细表(人民币及外币)E1-3",
+    "银行存款及其他货币资金明细表(仅人民币)E1-3",
+    "银行账户情况承诺E1-11",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)"
+   ],
+   "referencing_sites": 691,
+   "rel_path": "E/E1-1至E1-11 货币资金- 审定表明细表（Leap-常规程序）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "函证差异检查表（示例）",
+    "函证差异调节表F0-4",
+    "函证程序舞弊风险评价表F0-8",
+    "函证程序表F0A",
+    "函证结果汇总表F0-1",
+    "应付及采购替代程序F0-6",
+    "核实被函证单位信息F0-2",
+    "跟函函证过程控制F0-3",
+    "邮件传真回函可靠性验证F0-7",
+    "预付及采购替代程序F0-5"
+   ],
+   "referencing_sites": 82,
+   "rel_path": "F/F0 存货循环函证.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方及交易检查表F1-6",
+    "实质性分析F1-4",
+    "审定表F1-1",
+    "明细表F1-2",
+    "调整分录汇总F1-3",
+    "长期挂款检查表F1-5",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)",
+    "预付账款实质性程序表F1A",
+    "预付账款检查表F1-7"
+   ],
+   "referencing_sites": 68,
+   "rel_path": "F/F1 预付账款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "一、原材料明细表F2-3",
+    "七、发出商品F2-9",
+    "三、周转材料、低值易耗品，包装物明细表F2-5",
+    "二、材料采购、在途物资明细表F2-4",
+    "六、库存商品明细表F2-8",
+    "底稿目录",
+    "明细汇总表F2-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "一、原材料明细表F2-3",
+    "七、发出商品F2-9",
+    "三、周转材料、低值易耗品，包装物明细表F2-5",
+    "九、开发成本F2-11",
+    "二、材料采购、在途物资明细表F2-4",
+    "五、委托加工物资明细表F2-7",
+    "八、开发产品F2-10",
+    "六、库存商品明细表F2-8",
+    "十、合同履约成本F2-12",
+    "十一、消耗性生物资产F2-13",
+    "四、自制半成品明细表F2-6",
+    "存货实质性程序表F2A",
+    "存货审定表F2-1",
+    "明细汇总表F2-2",
+    "调整分录汇总F2-14",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 475,
+   "rel_path": "F/F2-1至F2-14 存货及跌价准备-审定明细表类（Leap-常规程序）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "截止测试-入库（记账凭证至原始凭证）F2-29"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "截止测试-出库（原始凭证至记账凭证）F2-32",
+    "截止测试-出库（记账凭证至原始凭证）F2-31"
+   ],
+   "referencing_sites": 2,
+   "rel_path": "F/F2-29至F2-35 存货及跌价准备 -检查类（Leap应对措施-检查）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "主要产品生产成本及单耗分析表F2-64",
+    "供应商信息核查表F2-70",
+    "供应商核查清单F2-69",
+    "供应商访谈记录F2-72",
+    "供应商访谈记录汇总表F2-71",
+    "关联方采购定价公允性核查（市场价）F2-66",
+    "关联方采购定价公允性核查（询价函）F2-65",
+    "原材料单价分析F2-62",
+    "原材料采购价格分析表F2-61",
+    "存货产量与产能、能耗分析表F2-63",
+    "程序表F2-61A",
+    "访谈记录与核对示例",
+    "识别未披露的关联方F2-67",
+    "重要供应商结构分析F2-68"
+   ],
+   "referencing_sites": 91,
+   "rel_path": "F/F2-61至F2-72 存货及跌价准备-IPO 上市 新三板 重组 舞弊应对.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表F3-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方及交易检查表F3-6",
+    "审定表F3-1",
+    "应付票据实质性程序表F3A ",
+    "应付票据检查表F3-7",
+    "应付票据（带息）利息测算表F3-4",
+    "明细表F3-2",
+    "调整分录汇总F3-3",
+    "逾期票据检查F3-5",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)"
+   ],
+   "referencing_sites": 90,
+   "rel_path": "F/F3 应付票据.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表F4-1",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "供应商融资检查表F4-9",
+    "关联方及交易检查表F4-6",
+    "实质性分析F4-4",
+    "审定表F4-1",
+    "应付账款实质性程序表F4A",
+    "应付账款检查表F4-8",
+    "明细表F4-2",
+    "未入账检查表F4-7",
+    "调整分录汇总F4-3",
+    "长期挂账检查表F4-5",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)"
+   ],
+   "referencing_sites": 97,
+   "rel_path": "F/F4 应付账款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "与上年度比较分析表F5-5",
+    "主营业务成本月度明细表F5-2",
+    "其他业务成本明细表F5-3",
+    "成本倒轧表F5-7",
+    "营业务成本审定表F5-1",
+    "营业成本实质性程序表F5A",
+    "调整分录汇总F5-4",
+    "重大调整核查表F5-8",
+    "销售数量与结转成本数量核对明细表F5-6"
+   ],
+   "referencing_sites": 63,
+   "rel_path": "F/F5 营业成本.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "函证差异核对表G0-3（证券投资）",
+    "函证差异核对表G0-4(非证券投资)",
+    "函证程序舞弊风险评价表F0-8",
+    "函证程序表G0A",
+    "函证结果汇总表G0-1",
+    "替代程序检查表G0-6",
+    "核实被函证单位信息G0-2",
+    "跟函函证过程控制G0-3",
+    "邮件传真回函可靠性验证G0-7"
+   ],
+   "referencing_sites": 82,
+   "rel_path": "G/G0 投资循环函证.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表G1-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "业务模式分析G1-8",
+    "交易性金融资产实质性程序表G1A ",
+    "公允价值测试表G1-6",
+    "分类的适当性检查表G1-9",
+    "合同现金流量特征分析G1-10",
+    "审定表G1-1",
+    "收益测算表G1-5",
+    "明细表G1-2",
+    "有价证券监盘表G1-11",
+    "有价证券盘点倒轧表G1-12",
+    "检查表G1-13",
+    "第三层次公允价值计量的调节表G1-7",
+    "结存表G1-4",
+    "衍生金融工具核查表G1-14",
+    "调整分录汇总G1-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 389,
+   "rel_path": "G/G1 交易性金融资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表G10-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "交易性金融负债实质性程序表G10A",
+    "公允价值测试表G10-5",
+    "凭证检查表G10-7",
+    "分类的适当性检查表G10-4",
+    "审定表G10-1",
+    "明细表G10-2",
+    "第三层次公允价值计量的调节表G10-6",
+    "衍生金融工具核查表G10-8",
+    "调整分录汇总G10-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 84,
+   "rel_path": "G/G10 交易性金融负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "凭证检查表G11-5",
+    "审定表G11-1",
+    "投资收益实质性程序表G11A",
+    "投资收益实质性程序表G11A-修订前",
+    "收益率分析表G11-4",
+    "明细分析表G11-2",
+    "调整分录汇总G11-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 62,
+   "rel_path": "G/G11 投资收益.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "公允价值测试表G12-4",
+    "净敞口套期收益审计程序表G12A",
+    "净敞口套期收益审计程序表G12A-修订前",
+    "凭证检查表G12-6",
+    "审定表G12-1",
+    "明细表G12-2",
+    "调整分录汇总G12-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "风险净敞口检查表G12-5"
+   ],
+   "referencing_sites": 70,
+   "rel_path": "G/G12 净敞口套期收益.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "公允价值变动收益审计程序表G13A",
+    "公允价值变动收益审计程序表G13A-修订前",
+    "审定表G13-1",
+    "明细表G13-2",
+    "调整分录汇总G13-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 49,
+   "rel_path": "G/G13 公允价值变动收益.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "信用减值损失审计程序表G14A",
+    "信用减值损失审计程序表G14A -修订前",
+    "审定表G14-1",
+    "明细表G14-2",
+    "调整分录汇总G14-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 49,
+   "rel_path": "G/G14 信用减值损失.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "凭证检查表G2-8",
+    "利息测算表G2-5",
+    "坏账准备明细表G2-3",
+    "审定表G2-1",
+    "应收利息坏账准备测算G2-7",
+    "应收利息实质性程序表G2A",
+    "明细表G2-2",
+    "调整分录汇总G2-4",
+    "长期未收回款项检查表G2-6",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 77,
+   "rel_path": "G/G2 应收利息.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表G3-1",
+    "应收股利实质性程序表G3A",
+    "明细表G3-2",
+    "测算及检查表G3-4",
+    "调整分录汇总G3-3",
+    "长期未收回款项检查表G3-5",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 61,
+   "rel_path": "G/G3 应收股利.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "公允价值测试表G8-4",
+    "其他权益工具投资实质性程序表G8A",
+    "凭证检查表G8-6",
+    "审定表G8-1",
+    "指定的适当性检查表G8-5",
+    "明细表G8-2",
+    "调整分录汇总G8-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 63,
+   "rel_path": "G/G8 其他权益工具投资.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表G9-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "公允价值测试表G9-4",
+    "其他非流动金融资产实质性程序表G9A",
+    "凭证检查表G9-6",
+    "审定表G9-1",
+    "明细表G9-2",
+    "第三层次公允价值计量的调节表G9-5",
+    "调整分录汇总G9-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 229,
+   "rel_path": "G/G9 其他非流动金融资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "函证程序舞弊风险评价表H0-7",
+    "函证程序表H0A",
+    "函证结果汇总表H0-1",
+    "差异核对表H0-4",
+    "替代程序H0-5",
+    "核实被函证单位信息H0-2",
+    "跟函函证过程控制H0-3",
+    "邮件传真回函可靠性验证H0-6"
+   ],
+   "referencing_sites": 62,
+   "rel_path": "H/H0 固定资产循环函证.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表H2-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联交易检查表H2-17",
+    "减值测算表H2-15",
+    "减少检查表H2-9",
+    "分析表H2-4",
+    "利息资本化测算表（无专门借款）H2-10",
+    "利息资本化测算表（有专门借款）H2-11",
+    "可收回金额测试表H2-16",
+    "在建工程实质性程序表H2A",
+    "在建工程审核记录H2-6",
+    "增加检查表H2-8",
+    "审定表H2-1",
+    "工程造价比较表H2-7",
+    "明细表H2-2",
+    "监盘小结H2-14",
+    "监盘计划H2-12",
+    "盘点检查表H2-13",
+    "调整分录汇总H2-3",
+    "转固时点检查表H2-5",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 247,
+   "rel_path": "H/H2 在建工程.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表（公允价值模式）H3-2",
+    "明细表（成本模式）H3-2"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "互转审核表H3-6",
+    "产权核对表H3-12",
+    "会计政策会计估计检查表H3-4",
+    "公允价值复核表H3-8",
+    "关联交易检查表H3-13",
+    "减值测算表H3-10",
+    "可收回金额测试表H3-11",
+    "增减检查表（公允价值模式）H3-5",
+    "增减检查表（成本模式）H3-5",
+    "审定表（公允价值模式）H3-1",
+    "审定表（成本模式）H3-1",
+    "投资性房地产实质性程序表H3A",
+    "折旧测算表（成本模式不含减值）H3-7",
+    "折旧测算表（成本模式含减值）H3-7",
+    "明细表（公允价值模式）H3-2",
+    "明细表（成本模式）H3-2",
+    "盘点检查表H3-9",
+    "租金收入测算表H3-14",
+    "调整分录汇总H3-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 275,
+   "rel_path": "H/H3 投资性房地产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表H4-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联交易检查表H4-9",
+    "减值测算表H4-7",
+    "减少检查表H4-5",
+    "可收回金额测试表H4-8",
+    "增加检查表H4-4",
+    "审定表H4-1",
+    "工程物资实质性程序表H4A",
+    "明细表H4-2",
+    "盘点检查表H4-6",
+    "调整分录汇总H4-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 150,
+   "rel_path": "H/H4 工程物资.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表H5-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "会计政策会计估计检查表H5-5",
+    "关联交易检查表H5-17",
+    "减值测算表H5-14",
+    "减少检查表H5-8",
+    "分析表H5-6",
+    "可收回金额测试表H5-15",
+    "增加检查表H5-7",
+    "审定表H5-1",
+    "折耗分配分析表H5-13",
+    "折耗测算表（不含减值）H5-12",
+    "折耗测算表（含减值）H5-12",
+    "明细表H5-2",
+    "权属检查表H5-16",
+    "油气资产实质性程序表H5A",
+    "监盘小结H5-11",
+    "监盘计划H5-9",
+    "盘点检查表H5-10",
+    "经营租出油气资产检查表H5-18",
+    "融资租出油气资产检查表H5-19",
+    "调整分录汇总H5-3",
+    "闲置检查表H5-4",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 267,
+   "rel_path": "H/H5 油气资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "固定资产清理实质性程序表H6A",
+    "审定表H6-1",
+    "明细表H6-2",
+    "检查表H6-4",
+    "调整分录汇总H6-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 42,
+   "rel_path": "H/H6 固定资产清理.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表（公允价值模式）H7-2",
+    "明细表（成本模式）H7-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "互转审核表H7-14",
+    "会计政策估计检查表H7-4",
+    "公允价值复核表H7-13",
+    "关联交易检查表H7-17",
+    "减值测算表H7-15",
+    "减少检查表（公允价值模式）H7-7",
+    "减少检查表（成本模式）H7-7",
+    "分析表H7-5",
+    "可收回金额测试表H7-16",
+    "增加检查表（公允价值模式）H7-6",
+    "增加检查表（成本模式）H7-6",
+    "审定表（公允价值模式）H7-1",
+    "审定表（成本模式）H7-1",
+    "折旧分配分析表H7-12",
+    "折旧测算表（不含减值）-直线法H7-11",
+    "折旧测算表（含减值）H7-11",
+    "明细表（公允价值模式）H7-2",
+    "明细表（成本模式）H7-2",
+    "生物资产实质性程序表H7A",
+    "监盘小结H7-10",
+    "监盘计划H7-8",
+    "盘点检查表H7-9",
+    "调整分录汇总H7-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 427,
+   "rel_path": "H/H7 生产性生物资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "使用权资产 租赁负债初始及后续计量（按年）H8-6",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "使用权资产 租赁负债初始及后续计量（按年）H8-6",
+    "使用权资产 租赁负债初始及后续计量（按月）H8-6",
+    "使用权资产实质性程序表H8A",
+    "关联交易检查表H8-14",
+    "减少检查表H8-12",
+    "可收回金额测试表H8-11",
+    "审定表H8-1",
+    "折旧分配分析表H8-9",
+    "明细表H8-2",
+    "租赁变更H8-7",
+    "租赁期的确定H8-5",
+    "租赁的识别H8-4",
+    "调整分录汇总H8-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 109,
+   "rel_path": "H/H8 使用权资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表H9-1",
+    "未确认融资费用明细表H9-3",
+    "租赁负债实质性程序表H9A",
+    "租赁负债明细表H9-2",
+    "调整分录汇总H9-4",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 42,
+   "rel_path": "H/H9 租赁负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表I1-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "使用寿命检查表I1-7",
+    "减值准备测试表I1-12",
+    "可收回金额测试I1-13",
+    "审定表I1",
+    "摊销分配分析表I1-9",
+    "摊销测算表（不含减值）I1-10（剩余年限法）",
+    "摊销测算表（含减值）I1-11",
+    "无形资产减少明细表I1-6",
+    "无形资产增加检查表I1-5",
+    "无形资产实质性程序 I1A",
+    "无形资产摊销减值政策检查表I1-4",
+    "无形资产权属检查表I1-8",
+    "明细表I1-2",
+    "调整分录汇总I1-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 766,
+   "rel_path": "I/I1 无形资产、累计摊销及减值准备.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表I2-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "fillable",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "会计政策检查I2-4",
+    "减值准备测试表I2-15",
+    "可收回金额测试I2-16",
+    "委外研发检查表I2-11",
+    "实质性分析I2-5",
+    "审定表I2-1",
+    "开发支出实质性程序I2A",
+    "截止性测试（单据到账）I2-14",
+    "截止性测试（账到单据）I2-13",
+    "明细表I2-2",
+    "研发人员工时检查表I2-10",
+    "研发人员认定检查表I2-9",
+    "研发材料投入检查表I2-8",
+    "研发项目构成明细表I2-7",
+    "研发项目资本化时点判断I2-6",
+    "调整分录汇总I2-3",
+    "针对性检查表I2-12",
+    "附注披露（上市公司）",
+    "附注披露（国有企业）"
+   ],
+   "referencing_sites": 335,
+   "rel_path": "I/I2 开发支出.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "商誉减值测试I3-6",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "入账价值测算表I3-4",
+    "可收回金额测试I3-7",
+    "商誉减值测试I3-6",
+    "商誉实质性程序 I3A",
+    "复核公司减值测试过程及结论I3-8",
+    "审定表I3-1",
+    "明细表I3-2",
+    "调整分录汇总I3-3",
+    "针对性检查表I3-5",
+    "附注披露（上市公司）",
+    "附注披露（国有企业）"
+   ],
+   "referencing_sites": 72,
+   "rel_path": "I/I3 商誉.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表I4-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表I4-1",
+    "摊销政策检查表I4-4",
+    "摊销测算I4-6",
+    "摊销测算表I4-7（工作量法）",
+    "明细表I4-2",
+    "调整分录汇总I4-3",
+    "针对性检查表I4-5",
+    "长期待摊费用实质性程序 I4A",
+    "附注披露（上市公司）",
+    "附注披露（国有企业）"
+   ],
+   "referencing_sites": 235,
+   "rel_path": "I/I4 长期待摊费用.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表I5-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他非流动资产实质性程序 I5A",
+    "审定表I5-1",
+    "明细表I5-2",
+    "调整分录汇总I5-3",
+    "针对性检查表I5-4",
+    "附注披露（上市公司）",
+    "附注披露（国有企业）"
+   ],
+   "referencing_sites": 470,
+   "rel_path": "I/I5 其他非流动资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表I6-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "fillable",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他针对性检查表I6-4",
+    "审定表I6-1",
+    "截止性测试（单据到账）I6-6",
+    "截止性测试（账到单据）I6-5",
+    "明细表I6-2",
+    "研发费用实质性程序 I6A",
+    "调整分录汇总I6-3",
+    "附注披露（上市公司）",
+    "附注披露（国有企业）"
+   ],
+   "referencing_sites": 222,
+   "rel_path": "I/I6 研发费用.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表J1-2 "
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "与同行业对比分析表J1-5",
+    "分配情况检查表J1-7",
+    "审定表J1-1 ",
+    "应付职工薪酬余额及期后事项检查表J1-11-删除",
+    "应付职工薪酬实质性程序表 J1A",
+    "明细表J1-2 ",
+    "月度分析表J1-4",
+    "检查表J1-8",
+    "职工薪酬政策统计表J1-12-删除",
+    "股份支付检查表J1-10-删除",
+    "计提情况检查表J1-6",
+    "调整分录汇总表J1-3",
+    "辞退福利检查表J1-10",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）",
+    "非货币性福利检查表J1-9"
+   ],
+   "referencing_sites": 414,
+   "rel_path": "J/J1 应付职工薪酬.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表J2-1",
+    "底稿目录",
+    "明细表J2-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表J2-1",
+    "明细表J2-2",
+    "计提情况检查表J2-4",
+    "调整分录汇总表J2-3",
+    "长期应付职工薪酬实质性程序表 J2A",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 433,
+   "rel_path": "J/J2 长期应付职工薪酬-设定受益计划净资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "股份支付实质性程序表 J3A",
+    "股份支付情况表J3-1",
+    "股份支付检查表J3-2"
+   ],
+   "referencing_sites": 21,
+   "rel_path": "J/J3 股份支付.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他应付款替代程序K0-6",
+    "其他应收款替代程序K0-5",
+    "函证差异调节表K0-4",
+    "函证程序舞弊风险评价表K0-8",
+    "函证程序表K0A",
+    "函证结果汇总表K0-1",
+    "核实被函证单位信息K0-2",
+    "跟函函证过程控制K0-3",
+    "邮件传真回函可靠性验证K0-7"
+   ],
+   "referencing_sites": 84,
+   "rel_path": "K/K0 管理循环函证.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "坏账准备测算K1-8",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "三阶段划分检查表K1-7",
+    "信用减值损失会计政策检查K1-6",
+    "关联方及交易检查表K1-11",
+    "其他应收款检查表K1-12",
+    "坏账准备明细表K1-3",
+    "坏账准备测算K1-8",
+    "坏账准备转回（收回）、核销检查表K1-9",
+    "大额其他应收款情况分析表K1-5",
+    "实质性程序表 K1A",
+    "审定表K1-1",
+    "明细表K1-2",
+    "调整分录汇总K1-4",
+    "长期未收回款项检查表K1-10",
+    "附注披露信息(上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 109,
+   "rel_path": "K/K1 其他应收款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表K10-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他收益检查表K10-6",
+    "实质性程序表K10A",
+    "审定表K10-1",
+    "应收政府补助检查表K10-5",
+    "政府补助核对表K10-4",
+    "明细表K10-2",
+    "调整分录汇总K10-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 142,
+   "rel_path": "K/K10 其他收益.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表K11-1",
+    "底稿目录",
+    "明细表K11-2"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "实质性程序表 K11A",
+    "审定表K11-1",
+    "明细表K11-2",
+    "调整分录汇总K11-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 287,
+   "rel_path": "K/K11 资产减值损失.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表K12-1",
+    "底稿目录",
+    "明细表K12-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "实质性程序表K12A",
+    "审定表K12-1",
+    "明细表K12-2",
+    "营业外收入检查表K12-4",
+    "调整分录汇总K12-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 155,
+   "rel_path": "K/K12 营业外收入.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表K13-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "实质性程序表K13A",
+    "审定表K13-1",
+    "明细表K13-2",
+    "营业外支出检查表K13-4",
+    "调整分录汇总K13-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 111,
+   "rel_path": "K/K13 营业外支出.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "fillable"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他流动资产检查表表K2-6",
+    "合同取得成本明细表K2-4",
+    "实质性程序表 K2A",
+    "审定表K2-1",
+    "摊销测算表K2-5",
+    "明细表K2-2",
+    "调整分录汇总K2-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 63,
+   "rel_path": "K/K2 其他流动资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方及交易检查表K3-6",
+    "其他应付款检查表K3-7",
+    "大额其他应付款情况分析表K3-4",
+    "实质性程序表K3A",
+    "审定表K3-1",
+    "明细表K3-2",
+    "调整分录汇总K3-3",
+    "长期挂账检查表K3-5",
+    "附注披露信息(上市公司)",
+    "附注披露信息(国企)"
+   ],
+   "referencing_sites": 72,
+   "rel_path": "K/K3 其他应付款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他流动负债检查表 K4-4",
+    "实质性程序表 K4A",
+    "审定表 K4-1",
+    "明细表 K4-2",
+    "调整分录汇总 K4-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 49,
+   "rel_path": "K/K4 其他流动负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表 K5-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "产品质量保修检查表 K5-4",
+    "实质性程序表 K5A",
+    "审定表 K5-1",
+    "弃置费用检查表 K5-5",
+    "明细表 K5-2",
+    "未决诉讼检查表 K5-6",
+    "调整分录汇总 K5-3",
+    "附注披露信息（上市公司)",
+    "附注披露信息（国企）",
+    "预计负债检查表 K5-7"
+   ],
+   "referencing_sites": 209,
+   "rel_path": "K/K5 预计负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "初始确认检查表K6-4",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "减值准备测试表（后续计量） K6-5",
+    "初始确认检查表K6-4",
+    "处置组减值测试表（后续计量） K6-6",
+    "实质性程序表 K6A",
+    "审定表 K6-1",
+    "明细表K6-2",
+    "检查表（不再满足持有待售）K6-7",
+    "调整分录汇总 K6-3",
+    "附注披露信息(国企）",
+    "附注披露信息（上市公司）"
+   ],
+   "referencing_sites": 110,
+   "rel_path": "K/K6 持有待售资产和负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "实质性程序表K7A",
+    "审定表K7-1",
+    "明细表K7-2",
+    "测算表K7-4",
+    "调整分录汇总K7-3",
+    "递延收益检查表K7-5",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 56,
+   "rel_path": "K/K7 递延收益.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表K8-1",
+    "底稿目录",
+    "明细表K8-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "合同检查表K8-5",
+    "实质性分析K8-4",
+    "实质性程序表K8A",
+    "审定表K8-1",
+    "截止性测试(从记账凭证至原始凭证）K8-6",
+    "截止性测试（从原始凭证至记账凭证）K8-7",
+    "明细表K8-2",
+    "调整分录汇总K8-3",
+    "销售费用检查表K8-8",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 298,
+   "rel_path": "K/K8 销售费用.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表K9-1",
+    "底稿目录",
+    "明细表K9-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "合同检查表K9-5",
+    "实质性分析K9-4",
+    "实质性程序表K9A",
+    "审定表K9-1",
+    "截止性测试(从记账凭证至原始凭证）K9-6",
+    "截止性测试（从原始凭证至记账凭证）K9-7",
+    "明细表K9-2",
+    "管理费用检查表K9-8",
+    "调整分录汇总K9-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 472,
+   "rel_path": "K/K9 管理费用.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "函证差异检查表（示例）",
+    "函证差异调节表L0-4",
+    "函证程序舞弊风险评价表L0-7",
+    "函证程序表F0A",
+    "函证结果汇总表L0-1",
+    "核实被函证单位信息L0-2",
+    "跟函函证过程控制L0-3",
+    "邮件传真回函可靠性验证L0-6",
+    "长期应付款替代程序L0-5"
+   ],
+   "referencing_sites": 79,
+   "rel_path": "L/L0 债务循环函证.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "短期借款检查表L1-9"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " 短期借款实质性程序表L1A",
+    "利息测算表L1-5",
+    "审定表L1-1",
+    "底稿目录",
+    "征信报告核对表L1-4",
+    "抵质押资产检查表L1-8",
+    "明细表L1-2",
+    "短期借款检查表L1-9",
+    "调整分录汇总L1-3",
+    "贷款合同检查L1-6",
+    "逾期贷款检查表L1-7",
+    "附注披露信息核对（上市公司）",
+    "附注披露信息核对（国企）"
+   ],
+   "referencing_sites": 77,
+   "rel_path": "L/L1 短期借款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "应付利息检查表L2-4",
+    "应付利息调整分录汇总L2-3",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表L2-1",
+    "应付利息实质性程序表L2A",
+    "应付利息检查表L2-4",
+    "应付利息调整分录汇总L2-3",
+    "底稿目录",
+    "明细表L2-2",
+    "附注披露（上市公司）信息",
+    "附注披露（国企）信息"
+   ],
+   "referencing_sites": 48,
+   "rel_path": "L/L2 应付利息.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "利息测算表L3-5",
+    "审定表L3-1",
+    "征信报告核对表L3-4",
+    "抵质押资产检查表L3-8",
+    "明细表L3-2",
+    "调整分录汇总L3-3",
+    "贷款合同检查L3-6",
+    "逾期贷款检查表L3-7",
+    "长期借款实质性程序表L3A",
+    "长期借款检查表L3-9",
+    "附注披露信息核对（上市公司）",
+    "附注披露（国企）信息核对"
+   ],
+   "referencing_sites": 76,
+   "rel_path": "L/L3 长期借款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "应付债券后续计量(分期付息到期一次还本)L4-7",
+    "应付债券后续计量(到期一次还本付息)L4-7",
+    "应付债券检查表L4-9",
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "划分为金融负债的其他金融工具明细表L4-3",
+    "审定表L4-1",
+    "应付债券初始计量L4-6",
+    "应付债券后续计量(分期付息到期一次还本)L4-7",
+    "应付债券后续计量(到期一次还本付息)L4-7",
+    "应付债券实质性程序表L4A ",
+    "应付债券明细表L4-2",
+    "应付债券检查表L4-9",
+    "应付债券账面核对(分期付息到期一次还本) L4-8",
+    "应付债券账面核对(到期一次还本付息)L4-8",
+    "底稿目录",
+    "权益与负债划分检查表L4-5",
+    "调整分录汇总L4-4",
+    "附注披露信息核对（上市公司）",
+    "附注披露信息核对（国企）"
+   ],
+   "referencing_sites": 137,
+   "rel_path": "L/L4 应付债券.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表L5-2",
+    "未确认融资费用明细表L5-3"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "关联方及交易检查表L5-6",
+    "审定表L5-1",
+    "明细表L5-2",
+    "未确认融资费用明细表L5-3",
+    "未确认融资费用测算表L5-5",
+    "调整分录汇总L5-4",
+    "长期应付款实质性程序表L5A",
+    "长期应付款检查表L5-7",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 177,
+   "rel_path": "L/L5 长期应付款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表L6-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "专项应付款实质性程序表L6A",
+    "审定表L6-1",
+    "明细表L6-2",
+    "检查表L6-4",
+    "调整分录汇总L6-3",
+    "附注披露（上市公司）信息",
+    "附注披露（国企）信息"
+   ],
+   "referencing_sites": 292,
+   "rel_path": "L/L6 专项应付款.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "其他非流动负债检查表L7-4",
+    "底稿目录",
+    "调整分录汇总L7-3"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他非流动负债实质性程序表L7A",
+    "其他非流动负债检查表L7-4",
+    "审定表L7-1",
+    "底稿目录",
+    "明细表L7-2",
+    "调整分录汇总L7-3",
+    "附注披露信息(国企)",
+    "附注披露信息（上市公司）"
+   ],
+   "referencing_sites": 49,
+   "rel_path": "L/L7 其他非流动负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表L8-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "实质性程序表L8A",
+    "审定表L8-1",
+    "截止性测试L8-5",
+    "明细表L8-2",
+    "调整分录汇总L8-3",
+    "财务费用检查表L8-6",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）",
+    "非金融机构利息支出测算表L8-4"
+   ],
+   "referencing_sites": 266,
+   "rel_path": "L/L8 财务费用.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "审定表M1-1",
+    "底稿目录",
+    "明细表M1-2"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "外币汇率测算表M1-4",
+    "审定表M1-1",
+    "应付股利实质性程序表M1",
+    "应付股利（利润）检查表M1-6",
+    "应付股利（利润）测算表M1-5",
+    "明细表M1-2",
+    "调整分录汇总M1-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 143,
+   "rel_path": "M/M1 应付股利（利润）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他权益工具实质性程序表 M10A",
+    "其他权益工具实质性程序表 Q10A (修订前)",
+    "其他权益工具检查表M10-5",
+    "审定表M10-1",
+    "明细表M10-2",
+    "调整分录汇总M10-3",
+    "负债与权益区分检查表M10-4",
+    "附注披露信息核对（上市公司）",
+    "附注披露信息核对（国企）"
+   ],
+   "referencing_sites": 59,
+   "rel_path": "M/M10 其他权益工具.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " 实收资本实质性程序表 M2A",
+    "外币投资汇率测算表M2-4",
+    "实收资本（股本）检查表M2-5",
+    "审定表M2-1",
+    "明细表（上市公司）M2-2",
+    "明细表（非上市公司）M2-2",
+    "调整分录汇总M2-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 61,
+   "rel_path": "M/M2 实收资本（股本）.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "reserved"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " 库存股实质性程序表 M3A",
+    "外币投资汇率测算表M3-4",
+    "审定表M3-1",
+    "库存股检查表M3-5",
+    "明细表M3-2",
+    "调整分录汇总M3-3",
+    "附注披露信息（上市公司）"
+   ],
+   "referencing_sites": 46,
+   "rel_path": "M/M3 库存股.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表M4-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表M4-1",
+    "明细表M4-2",
+    "调整分录汇总M4-3",
+    "资本公积实质性程序表 M4A",
+    "资本公积检查表M4-4",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 85,
+   "rel_path": "M/M4 资本公积.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表M5-1",
+    "明细表M5-2",
+    "盈余公积实质性程序表 M5A",
+    "盈余公积检查表M5-5",
+    "盈余公积计提检查表M5-4",
+    "调整分录汇总M5-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 53,
+   "rel_path": "M/M5 盈余公积.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表M6-1",
+    "明细表M6-2",
+    "未分配利润实质性程序表 M6A ",
+    "未分配利润实质性程序表 Q6A  (修订前)",
+    "未分配利润检查表M6-4",
+    "调整分录汇总M6-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 53,
+   "rel_path": "M/M6 未分配利润.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    " 专项储备实质性程序表 M7A ",
+    "专项储备支出检查表M7-5",
+    "专项储备计提测试表M7-4",
+    "审定表M7-1",
+    "明细表M7-2",
+    "调整分录汇总M7-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 53,
+   "rel_path": "M/M7 专项储备.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "一般风险准备实质性程序表 M8A ",
+    "一般风险准备实质性程序表 Q8A  (修订前)",
+    "一般风险准备测试表M8-4",
+    "审定表M8-1",
+    "明细表M8-2",
+    "调整分录汇总M8-3",
+    "针对性测试M8-5-删除",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 59,
+   "rel_path": "M/M8 一般风险准备.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "明细表M9-2"
+   ],
+   "marker_keys": [
+    "add_row",
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "其他综合收益实质性程序表 M9A",
+    "其他综合收益核对表M9-4",
+    "审定表M9-1",
+    "明细表M9-2",
+    "调整分录汇总M9-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国有企业）"
+   ],
+   "referencing_sites": 146,
+   "rel_path": "M/M9 其他综合收益.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "递延所得税资产明细表N1-2",
+    "附注披露信息（上市公司）"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "可用以后年度税前利润弥补的亏损检查表的N1-5",
+    "调整分录汇总N1-3",
+    "递延所得税资产审定表N1-1",
+    "递延所得税资产审计程序表的N1A",
+    "递延所得税资产明细表N1-2",
+    "递延所得税资产（负债）测算表N1-4",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 193,
+   "rel_path": "N/N1 递延所得税资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "出口退税核对表N2-7",
+    "出口退税额复核示例",
+    "土地增值税测算表N2-10",
+    "增值税测算表N2-6",
+    "应交其他税费测算表N2-8",
+    "应交税费审定表N2-1",
+    "应交税费审计程序表N2A",
+    "应交税费审计程序表O1A （原底稿）",
+    "应交税费明细表N2-2",
+    "应交税费检查表N2-11",
+    "应交税金认定表N2-5",
+    "房产税测算表N2-9",
+    "税收政策检查N2-4",
+    "调整分录汇总表N2-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 108,
+   "rel_path": "N/N2 应交税费.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "递延所得税负债明细表N3-2"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "调整分录汇总表N3-3",
+    "递延所得税负债审定表N3-1",
+    "递延所得税负债审计程序表的N3A",
+    "递延所得税负债明细表N3-2"
+   ],
+   "referencing_sites": 96,
+   "rel_path": "N/N3 递延所得税负债.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "税金及附加审定表N4-1",
+    "税金及附加审计程序表N4A ",
+    "税金及附加明细表N4-2",
+    "调整分录汇总表N4-3",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企）"
+   ],
+   "referencing_sites": 34,
+   "rel_path": "N/N4 税金及附加.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "底稿目录",
+    "所得税费用明细表N5-2",
+    "税收优惠明细表N5-6",
+    "纳税调整明细表N5-5"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "item_n",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "加计扣除研发费用情况明细表N5-6-1",
+    "当期所得税费用计算表N5-4",
+    "所得税审计程序表N5A",
+    "所得税费用审定表N5-1",
+    "所得税费用明细表N5-2",
+    "税收优惠明细表N5-6",
+    "纳税调整明细表N5-5",
+    "调整分录汇总表N5-3",
+    "财产损失明细表N5-7",
+    "递延所得税费用核对表N5-8",
+    "附注披露信息（上市公司）",
+    "附注披露信息（国企",
+    "高新技术企业认定条件检查表N5-6-2"
+   ],
+   "referencing_sites": 181,
+   "rel_path": "N/N5 所得税费用.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "S1-1对法律法规的考虑记录表",
+    "S1-2沟通记录",
+    "违反法规行为S1"
+   ],
+   "referencing_sites": 3,
+   "rel_path": "S/S1 对被审计单位违反法规行为的考虑2019.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表S10-1",
+    "对环境事项的考虑S10",
+    "附、内控调查表S10-2"
+   ],
+   "referencing_sites": 12,
+   "rel_path": "S/S10 对环境事项的考虑.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "对被审计单位使用服务机构的考虑S11"
+   ],
+   "referencing_sites": 1,
+   "rel_path": "S/S11 利用服务机构活动.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "基本每股收益计算表S15-2",
+    "审定表S15-1",
+    "审计程序S15",
+    "稀释每股收益计算表S15-3"
+   ],
+   "referencing_sites": 16,
+   "rel_path": "S/S15 每股收益和净资产收益率.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "套期活动S16"
+   ],
+   "referencing_sites": 1,
+   "rel_path": "S/S16 套期活动.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "首次接受委托时对期初余额的审计S2"
+   ],
+   "referencing_sites": 4,
+   "rel_path": "S/S2 首次接受委托时对期初余额的审计2019.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_single",
+    "item_n",
+    "self_fill"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "开发支出资本化分析表S21-2",
+    "成本归集与分摊检查表S21-3",
+    "摊销政策检查表S21-4",
+    "数据资产S21",
+    "数据资产的基本情况S21-1"
+   ],
+   "referencing_sites": 25,
+   "rel_path": "S/S21 数据资产.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "会计估计变更审计程序S3-2",
+    "会计政策变更和前期差错更正S3-1",
+    "参考-简化的追溯调整法（首次执行日）",
+    "审定表",
+    "简化的追溯调整法（1）S3-9",
+    "简化的追溯调整法（2）S3-10",
+    "简化的追溯调整法（2）S3-10 (2)",
+    "首次执行新收入准则的调整S3-6",
+    "首次执行新租赁准则的调整S3-8",
+    "首次执行新金融工具准则的调整S3-4"
+   ],
+   "referencing_sites": 28,
+   "rel_path": "S/S3 会计政策变更、前期差错会计、估计变更2020.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "商业实质的判断S4-2",
+    "审定表S4-1",
+    "非货币性资产交换审计程序S4"
+   ],
+   "referencing_sites": 12,
+   "rel_path": "S/S4 非货币性资产交换202401.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "债务重组审计程序S5",
+    "债务重组损益确认时点S5-2",
+    "审定表S5-1"
+   ],
+   "referencing_sites": 12,
+   "rel_path": "S/S5 债务重组202401.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii",
+    "ellipsis_double",
+    "ellipsis_single"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表S6-1",
+    "对大股东及关联方资金占用和违规担保情况审核程序S6 "
+   ],
+   "referencing_sites": 8,
+   "rel_path": "S/S6 对大股东及关联方资金占用和违规担保情况审核程序.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "审定表S8-1",
+    "租赁S8"
+   ],
+   "referencing_sites": 8,
+   "rel_path": "S/S8 租赁.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "表头（请先填写）"
+   ],
+   "marker_keys": [
+    "dots_ascii"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "内部控制调查表S9-2",
+    "审定表S9-1",
+    "对电子商务的考虑S9"
+   ],
+   "referencing_sites": 12,
+   "rel_path": "S/S9 对电子商务的考虑.xlsx",
+   "state": "blocked"
+  },
+  {
+   "managed_sheet_candidates": [
+    "前瞻性调整D2-10-1（量化分析）",
+    "变量相关性分析D2-10-2",
+    "预期信用损失的计量测试D2-10"
+   ],
+   "marker_keys": [
+    "ellipsis_double",
+    "ellipsis_single",
+    "self_fill",
+    "xx_placeholder"
+   ],
+   "reason": "no_projection_contract",
+   "referencing_sheets": [
+    "前瞻性调整D2-10-1（打分卡)",
+    "前瞻性调整D2-10-1（量化分析）",
+    "变量相关性分析D2-10-2",
+    "多重共线性分析D2-10-2",
+    "预期信用损失的计量测试D2-10",
+    "预期信用损失的计量测试D2-10 "
+   ],
+   "referencing_sites": 145,
+   "rel_path": "_reference/应收账款预期信用损失计提及保理合同分析参考示例.xlsx",
+   "state": "blocked"
+  }
+ ],
+ "contracted_entries": [
+  {
+   "contract_id": "b60.hour_budget",
+   "entry_id": "xlsx/b60/gt-b60-bundle",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A3",
+      "A5"
+     ],
+     "excel_name": "B60-1工时预算与控制表",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    }
+   ],
+   "propagation_demand_sites": 0,
+   "reason": "no_propagation_demand",
+   "state": "out_of_scope",
+   "template_present": true,
+   "template_relative_path": "B/B60-1 审计项目工时预算与控制表.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "d2.receivable_detail",
+   "entry_id": "xlsx/gt-d2-accounts-receivable",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A11"
+     ],
+     "excel_name": "明细表D2-2",
+     "has_dynamic_rows": true,
+     "referenced_rows": [
+      13,
+      25,
+      26
+     ],
+     "referencing_sheets": [
+      "审定表D2-1",
+      "附注披露信息(上市公司)",
+      "附注披露信息(上市公司）D2-1",
+      "附注披露信息(国企)"
+     ],
+     "referencing_sites": 52
+    }
+   ],
+   "propagation_demand_sites": 52,
+   "reason": "implemented",
+   "state": "propagated",
+   "template_present": true,
+   "template_relative_path": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "g7.soe_subsidiary_disclosure",
+   "entry_id": "xlsx/gt-g7-long-term-equity-main",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A62",
+      "A78"
+     ],
+     "excel_name": "附注披露信息（国企）",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    }
+   ],
+   "propagation_demand_sites": 0,
+   "reason": "no_propagation_demand",
+   "state": "out_of_scope",
+   "template_present": true,
+   "template_relative_path": "G/G7 长期股权投资.xlsx",
+   "template_sha256_matches": true
+  },
+  {
+   "contract_id": "h1.disposal_check",
+   "entry_id": "xlsx/gt-h1-fixed-assets",
+   "managed_sheets": [
+    {
+     "anchors": [
+      "A10"
+     ],
+     "excel_name": "减少检查表H1-8",
+     "has_dynamic_rows": true,
+     "referenced_rows": [],
+     "referencing_sheets": [],
+     "referencing_sites": 0
+    }
+   ],
+   "propagation_demand_sites": 0,
+   "reason": "no_propagation_demand",
+   "state": "out_of_scope",
+   "template_present": true,
+   "template_relative_path": "H/H1 固定资产.xlsx",
+   "template_sha256_matches": true
+  }
+ ],
+ "denominators": {
+  "affected_templates": 136,
+  "cf_formula_cross": 6,
+  "chart_parts": 8,
+  "cross_sheet_formulas": 72825,
+  "cross_sheet_sites": 144154,
+  "d2_managed_sheet_sites": 52,
+  "defined_name_builtin_self_scope": 2457,
+  "defined_name_cross": 5002,
+  "defined_name_target_not_in_workbook": 2001,
+  "defined_name_user_cross_sheet": 252,
+  "defined_name_user_self_scope": 292,
+  "delivered_contract_entries": 4,
+  "dv_formula_cross": 8,
+  "external_sites": 2908,
+  "extreme_combinations": 10,
+  "extreme_max_sites": 63240,
+  "hyperlink_location_cross": 3480,
+  "hyperlink_location_in_workbook": 3138,
+  "hyperlink_location_not_in_workbook": 321,
+  "k11_managed_sheet_rows": 19,
+  "k11_managed_sheet_sites": 114,
+  "max_host_name_collisions": 39,
+  "pivot_parts": 0,
+  "resolvable_cross_sheet_formulas": 70117,
+  "resolvable_cross_sheet_sites": 140726,
+  "sheet_name_looks_like_a1_sites": 18491,
+  "sqref_ref_cross": 0,
+  "templates_with_cross_sheet": 182,
+  "templates_with_resolvable_cross_sheet": 174,
+  "templates_with_unresolvable_targets": 18,
+  "three_d_sites": 0,
+  "unresolvable_cross_sheet_sites": 3428,
+  "xlsx_total": 351
+ },
+ "extremes": [
+  {
+   "gate3_measured_ms": 1158,
+   "perf_threshold_ms": 2000,
+   "rel_path": "C/C24 会计分录 - 细节测试.xlsx",
+   "sheet": "2025假期清单",
+   "sites": 63240
+  },
+  {
+   "gate3_measured_ms": 201,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A2-1、A2-2单体报表试算.xlsx",
+   "sheet": "调整事项汇总表",
+   "sites": 9744
+  },
+  {
+   "gate3_measured_ms": 201,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A2-1、A2-2单体报表试算.xlsx",
+   "sheet": "未审报表",
+   "sites": 5169
+  },
+  {
+   "gate3_measured_ms": 181,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+   "sheet": "报表格式",
+   "sites": 3659
+  },
+  {
+   "gate3_measured_ms": 201,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A2-1、A2-2单体报表试算.xlsx",
+   "sheet": "报表格式",
+   "sites": 3177
+  },
+  {
+   "gate3_measured_ms": 163,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A3-1、-2 合并报表试算-2019.xlsx",
+   "sheet": "报表格式",
+   "sites": 3137
+  },
+  {
+   "gate3_measured_ms": 181,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A3-4 合并报表试算（含金融企业报表项目）-清洁版-2019.xlsx",
+   "sheet": "母公司汇总抵销",
+   "sites": 2720
+  },
+  {
+   "gate3_measured_ms": 201,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A2-1、A2-2单体报表试算.xlsx",
+   "sheet": "审定报表",
+   "sites": 1732
+  },
+  {
+   "gate3_measured_ms": 163,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A3-1、-2 合并报表试算-2019.xlsx",
+   "sheet": "母公司汇总抵销",
+   "sites": 1604
+  },
+  {
+   "gate3_measured_ms": 163,
+   "perf_threshold_ms": 2000,
+   "rel_path": "A/A3-1、-2 合并报表试算-2019.xlsx",
+   "sheet": "权益抵销",
+   "sites": 1246
+  }
+ ],
+ "host_ambiguity": {
+  "B60-1工时预算与控制表": {
+   "bound_host": "B/B60-1 审计项目工时预算与控制表.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "减少检查表H1-8": {
+   "bound_host": "H/H1 固定资产.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "明细表D2-2": {
+   "bound_host": "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [],
+   "templates_containing": 1
+  },
+  "附注披露信息（国企）": {
+   "bound_host": "G/G7 长期股权投资.xlsx",
+   "bound_host_is_among_them": true,
+   "other_hosts_sample": [
+    "D/D1 应收票据.xlsx",
+    "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+    "D/D4收入底稿.xlsx",
+    "D/D5 应收款项融资.xlsx",
+    "D/D6 合同资产.xlsx"
+   ],
+   "templates_containing": 39
+  }
+ },
+ "host_resolution": "contract.template.relative_path + template_sha256（内容寻址）—— 禁止按 sheet 名或 manifest 的 wp_code_patterns 定位（AC 6.5）",
+ "placeholder_markers": {
+  "add_row": {
+   "sheets": 54,
+   "templates": 16
+  },
+  "continued": {
+   "sheets": 1,
+   "templates": 1
+  },
+  "dots_ascii": {
+   "sheets": 38,
+   "templates": 28
+  },
+  "ellipsis_double": {
+   "sheets": 625,
+   "templates": 140
+  },
+  "ellipsis_single": {
+   "sheets": 730,
+   "templates": 163
+  },
+  "fillable": {
+   "sheets": 3,
+   "templates": 3
+  },
+  "insert_row": {
+   "sheets": 18,
+   "templates": 4
+  },
+  "item_n": {
+   "sheets": 40,
+   "templates": 24
+  },
+  "renameable": {
+   "sheets": 0,
+   "templates": 0
+  },
+  "reserved": {
+   "sheets": 2,
+   "templates": 2
+  },
+  "self_fill": {
+   "sheets": 56,
+   "templates": 37
+  },
+  "xx_placeholder": {
+   "sheets": 465,
+   "templates": 150
+  }
+ },
+ "reasons": [
+  "no_projection_contract",
+  "pending_implementation",
+  "no_propagation_demand",
+  "implemented"
+ ],
+ "spec": "excel-workbook-wide-row-change-propagation",
+ "states": [
+  "propagated",
+  "blocked",
+  "out_of_scope"
+ ],
+ "task": "Wave 0 Task 24 (Requirements 6.1~6.5, 8.5)"
+}

@@ -17,7 +17,12 @@ import GtIndexChip from '../GtIndexChip.vue'
 import GtReviewTrigger from '../GtReviewTrigger.vue'
 import { DisplayPrefs_Key } from '../composables/displayPrefsKey'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
-import { createExcelJsWorkbook, loadExcelJsWorkbook } from '../composables/useExcelIO'
+// 🔴 真源是 `src/composables/useExcelIO.ts`（平台级 Excel IO 单一入口），
+// **不在** `components/workpaper/composables/` 下 —— 上一行的 `../composables/displayPrefsKey`
+// 才是那个目录。写成 `../composables/useExcelIO` 会让 Vite 解析失败（transform 500），
+// 该 tab 是 defineAsyncComponent 动态载入 ⇒ 点开 D2-5 直接崩「页面渲染出错：
+// Failed to fetch dynamically imported module」。其余三个调用方都用下面这个别名路径。
+import { createExcelJsWorkbook, loadExcelJsWorkbook } from '@/composables/useExcelIO'
 
 const props = defineProps<{
   wpId: string

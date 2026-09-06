@@ -622,6 +622,22 @@ class DynamicColumnSpec:
 class FooterAnchorSpec:
     marker: str
     search_column: str
+    #: 该 footer 行是否携带**合计公式**（`SUM(...)` 之类，区间随受管行区间伸缩）。
+    #:
+    #: Spec: excel-structural-row-insertion-and-shift-aware-verification
+    #: （Requirement 5.1~5.4）
+    #:
+    #: 为真时结构性插行允许把合计区间末行随受管区间一起**扩张**（Requirement 4.4），
+    #: 且扩张后 `assert_footer_formula_covers_managed_rows` 通过；为假时**不改写**该 footer
+    #: 的任何公式，保持既有 fail-closed 语义（Requirement 4.5）。
+    #:
+    #: 🔴 默认 `False` 是纯增量的关键：契约 JSON 未给该键时行为与本 spec 之前逐字相同
+    #: （Requirement 5.2）。改默认值会让**全部**既有契约的语义静默变化。
+    #:
+    #: 🔴 字段名刻意不含 `row` / `row_index` / `row_number` —— 那三个键名被 CS-12 明令禁止
+    #: 写进 `footer_anchor`（footer 会随行新增下移，不得写死行号）。本字段声明的是
+    #: 「这一行有没有合计公式」这个**性质**，不是位置。
+    carries_total_formula: bool = False
 
 
 @dataclass(frozen=True)
@@ -972,7 +988,24 @@ def _parse_footer_anchor(raw: Any, *, location: str) -> FooterAnchorSpec:
         raise ContractSchemaError(
             f"{location}: footer_anchor.search_column 形态非法: {search_column!r}"
         )
-    return FooterAnchorSpec(marker=marker.strip(), search_column=search_column)
+    # ── `carries_total_formula`（Requirement 5.1 / 5.2）────────────────
+    #
+    # 🔴 首版**静默丢弃**了这个键：契约里写了它也不起作用，而「写了没生效」比「没这个
+    #    功能」更贵 —— 契约作者以为声明过了，引擎其实在按默认值 False 走 fail-closed。
+    #    所以这里既要解析，也要对非法取值 fail closed（不接受 `"true"` 这种字符串：
+    #    JSON 有真正的布尔类型，接受字符串等于给「拼错了也当真」留口子）。
+    carries = raw.get("carries_total_formula", False)
+    if not isinstance(carries, bool):
+        raise ContractSchemaError(
+            f"{location}: footer_anchor.carries_total_formula 必须是布尔值，"
+            f"实得 {carries!r}（{type(carries).__name__}）—— 不接受字符串/数字形态，"
+            "否则拼错的取值会被静默当成真"
+        )
+    return FooterAnchorSpec(
+        marker=marker.strip(),
+        search_column=search_column,
+        carries_total_formula=carries,
+    )
 
 
 def _parse_table(

@@ -3,7 +3,7 @@
  * D2TabDetail — 明细表D2-2 (39列宽表)
  * 横向滚动, 固定前2列, 关联方橙色背景, 搜索过滤, 虚拟滚动>30行
  */
-import { computed, h, inject, ref, toRef, type Ref } from 'vue'
+import { computed, h, inject, ref, toRef, watch, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useD2Detail, type DetailRow } from '../composables/useD2Detail'
 import { useD2AiGenerate } from '../composables/useD2AiGenerate'
@@ -118,11 +118,26 @@ const CREDIT_RISK_OPTIONS = ['单项计提', '账龄组合', '客户类型组合
 const { generateAndConfirm, aiAvailable } = useD2AiGenerate(toRef(props, 'wpId'))
 const importing = ref(false)
 const detailNote = ref('')
+const detailConclusion = ref('')
 
 function loadDetailNote(): void {
   detailNote.value = props.allResponses.get('D2-detail-audit-note')?.remark || ''
+  detailConclusion.value = props.allResponses.get('D2-detail-audit-conclusion')?.remark || ''
 }
 loadDetailNote()
+
+// 从 Excel 侧回写（pull）后 allResponses 会被整体替换 —— 必须跟着刷新，
+// 否则用户在 OO 里改了审计说明、切回结构化视图仍看到旧值（改了没生效的假象）。
+watch(
+  () => [
+    props.allResponses.get('D2-detail-audit-note')?.remark,
+    props.allResponses.get('D2-detail-audit-conclusion')?.remark,
+  ],
+  ([note, conclusion]) => {
+    if ((note || '') !== detailNote.value) detailNote.value = note || ''
+    if ((conclusion || '') !== detailConclusion.value) detailConclusion.value = conclusion || ''
+  },
+)
 
 async function handleImportFromAux(): Promise<void> {
   if (props.isReadonly) return
@@ -152,6 +167,13 @@ function saveDetailNote(): void {
   props.allResponses.set('D2-detail-audit-note', { item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value })
   window.dispatchEvent(new CustomEvent('d2:save-items', {
     detail: { items: [{ item_id: 'D2-detail-audit-note', conclusion: null, remark: detailNote.value }] },
+  }))
+}
+
+function saveDetailConclusion(): void {
+  props.allResponses.set('D2-detail-audit-conclusion', { item_id: 'D2-detail-audit-conclusion', conclusion: null, remark: detailConclusion.value })
+  window.dispatchEvent(new CustomEvent('d2:save-items', {
+    detail: { items: [{ item_id: 'D2-detail-audit-conclusion', conclusion: null, remark: detailConclusion.value }] },
   }))
 }
 
@@ -453,20 +475,38 @@ function handleEdit(row: DetailRow, field: string, value: any) {
       <span class="total-value">期末审定: {{ displayPrefs.fmtAmount(totalRow.currentAudited as number) }}</span>
       <span class="total-value">期后回款: {{ displayPrefs.fmtAmount(totalRow.postPayment as number) }}</span>
     </div>
-    <!-- 审计说明 -->
+    <!-- 审计说明（源模板 A29「三、审计说明：」，正文 30..32） -->
     <div class="audit-note-block">
       <div class="audit-note-header">
-        <span>审计说明</span>
+        <span>三、审计说明</span>
         <GtReviewTrigger section-id="D2-detail-audit-note" />
         <el-button v-if="aiAvailable && !isReadonly" size="small" text type="primary" @click="onAiDetailNote">🤖 AI生成</el-button>
       </div>
       <el-input
         v-model="detailNote"
         type="textarea"
-        :rows="3"
+        :autosize="{ minRows: 3 }"
         :disabled="isReadonly"
         placeholder="明细表编制说明..."
         @change="saveDetailNote"
+      />
+    </div>
+
+    <!-- 审计结论（源模板 A33「四、审计结论：」，正文 34..35）
+         🔴 补齐项：此前 HTML 侧缺这一块，与源模板不对齐，导致 Excel 里的
+         审计结论无处回写。两侧字段必须与模板一一对应。 -->
+    <div class="audit-note-block">
+      <div class="audit-note-header">
+        <span>四、审计结论</span>
+        <GtReviewTrigger section-id="D2-detail-audit-conclusion" />
+      </div>
+      <el-input
+        v-model="detailConclusion"
+        type="textarea"
+        :autosize="{ minRows: 2 }"
+        :disabled="isReadonly"
+        placeholder="基于上述审计程序，对应收账款明细的审计结论..."
+        @change="saveDetailConclusion"
       />
     </div>
   </div>

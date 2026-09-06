@@ -742,6 +742,34 @@ R3 的改法有既成机制：该门的 `binding_constraint_facts(arms)` 用 arm
 
 **Validates: Requirements 11.4**
 
+### Property 36: 宿主的目标底稿解析只有一份真源
+
+*For any* 已交付 entry，宿主算出的目标码族恒等于 reviewed 裁决表对该 entry 声明的
+`wp_codes`；宿主内不存在任何写死的 wp_code 字面量、也不读 manifest 的
+`wp_code_patterns` / provider 的 `PILOT_WP_CODES` 这类文件名启发式产物。
+
+2026-09-04 实测出的必要性：宿主原先按 `_index.json` 反查模板路径得 wp_code，与 reviewed
+裁决表**分歧 2/4**，且两边各错一处（B60 反查错、D2 裁决表错）。变异检验实测该缺口
+**GREEN** —— 把宿主的解析换成写死的 `("D2",)` 时**没有任何判据打红**。
+
+**Validates: Requirements 6.4, 6.5**
+
+### Property 37: 叠加层丢占位 None 但保留清空动作
+
+*For any* substrate 基线与 store projection 的组合：store 侧取值为 `None` 且基线**不含**该
+键的字段不进 merged projection（那是 provider 为固定形状矩阵吐出的**占位**，不是业务事实）；
+而 store 侧取值为 `None` 且基线**含**该键的字段**必须**进 merged projection（那是审计师
+「清空这一格」的真实动作）。
+
+2026-09-04 实测出的必要性：G7 的 `minority_financials` 是 10×10 矩阵，
+`build_store_projection` 吐 **100 个显式 None** 的 amount 字段，而 substrate 上那 100 格
+为空（`extract` 对空格不产键）⇒ materialize 把 None 写成 `0`，反读 100 处全部
+`None → 0` 不等值，`_assert_roundtrip_equivalent` 判 `roundtrip_projection_mismatch`。
+变异检验实测该缺口 **GREEN** —— 去掉「基线不含该键」这半个条件时无任何判据打红，
+而那半个条件正是清空语义的唯一保护。
+
+**Validates: Requirements 5.2, 5.4**
+
 ## Rollout
 
 1. **裁决先行**：交付 `projection_lane_registry` + 与 `OPAQUE_AUTHORITY_LANES` 的双向锁 + 无第二真源守卫。此时一行库都不写，四条供给判据先在只读侧可观测。

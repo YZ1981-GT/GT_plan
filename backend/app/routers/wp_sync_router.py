@@ -63,6 +63,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.services.wp_visibility.action_matrix import (
+    _DEDICATED_ENTRYPOINT as _MATRIX_DEDICATED_ENTRYPOINT,
+    _DEDICATED_READ_ACTION as _MATRIX_DEDICATED_READ_ACTION,
+)
 from app.services.workpaper_sync.adapters.registry import (
     WorkpaperSyncAdapterRegistry,
     build_production_registry,
@@ -146,6 +150,15 @@ USER_SYNC_PREFIX = (
     "/api/projects/{project_id}/workpapers/{wp_id}/sync/entries/{entry_id:path}"
 )
 
+#: 统一门（`wp_visibility`）里本域用的 entrypoint / action。
+#:
+#: 🔴 **从 `action_matrix` 现取，不抄字面量**：矩阵是九维精确匹配且「未登记即拒绝」
+#: （Req 7.4），所以这两个值必须与登记侧同源。抄一份字面量的后果不是「更清晰」，
+#: 而是矩阵那边改名后本域**恒 404** 且没有任何测试会红 —— 这正是本行修复前的形态
+#: （`entrypoint="workpaper.sync"` 全域零登记，每个 sync 端点对每个用户恒 404）。
+_VISIBILITY_ENTRYPOINT: str = _MATRIX_DEDICATED_ENTRYPOINT
+_VISIBILITY_READ_ACTION: str = _MATRIX_DEDICATED_READ_ACTION
+
 router = APIRouter(prefix="", tags=["wp-sync"])
 
 #: DocServer 调用面：不发用户 Bearer，自带 room/generation/doc_key 服务凭证。
@@ -228,8 +241,30 @@ class WpGateVisibilityProbe:
             ctx = await enforce_wp_gate(
                 self._db,
                 self._user,
-                entrypoint="workpaper.sync",
-                action="dedicated_read",
+                # 🔴 entrypoint 必须是 **ActionMatrix 已登记**的那一个。
+                #
+                #    此前这里写 `entrypoint="workpaper.sync"`，而 `wp_visibility` 全域
+                #    对该字符串**零登记** ⇒ `ActionMatrix.lookup()` 恒返回 None ⇒
+                #    `_match_grants()` 恒空 ⇒ 统一门按 Req 7.4「未登记 action / route /
+                #    method 一律默认拒绝」记 `action_denied` 并抛 `ExternalNotFound`
+                #    ⇒ 本探针把它翻成 `project_visible=False` ⇒ guard 抛
+                #    `ScopeProjectNotVisibleError` ⇒ **每个 sync 端点对每个用户恒 404**。
+                #
+                #    这是接线缺口而非权限数据问题：真库实测 admin 在目标项目有
+                #    `project_assignments`（role=manager，未删）、底稿与项目均未软删，
+                #    四个 action（read/write/dedicated_read/dedicated_write）却全部
+                #    deny，安全 outbox 里 reason 逐条为 `action_denied` 而**不是**
+                #    `not_delegated` —— 后者才是「没派工」的编码。
+                #
+                #    改用 `workpaper.dedicated_subroute` 不放宽任何权限：该族的登记
+                #    语义正是「wp 绑定的专属组件子路由，按 HTTP method 分类」——
+                #    full_power（lead/admin/supervisor_scope）与 assignee 可读可写，
+                #    reviewer / History_Only 只授 `dedicated_read`（`_entry(..., "read")`）
+                #    且 `g.readonly and entry.access_mode == "mutation"` 那条继续拦写。
+                #    sync 端点全部形如 `/api/projects/{p}/workpapers/{wp}/sync/...`，
+                #    与该族的资源绑定形态一致。
+                entrypoint=_VISIBILITY_ENTRYPOINT,
+                action=_VISIBILITY_READ_ACTION,
                 method="GET",
                 wp_id=wp_id,
                 project_id=project_id,
