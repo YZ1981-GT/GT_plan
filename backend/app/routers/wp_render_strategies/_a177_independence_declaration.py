@@ -98,9 +98,15 @@ async def _load_team_members(project_id, db) -> list[dict]:
     try:
         result = await db.execute(
             sa.text(
-                "SELECT u.display_name "
+                # 🔴 原实现是 `JOIN users u ON pa.staff_id = u.id` 取 `u.display_name`，
+                #    两处都错：users 无 display_name 列，且 staff_id 指向的是
+                #    staff_members 不是 users —— 真库实测该 JOIN 匹配 0 行
+                #    （pa.staff_id → staff_members 匹配 52 行，→ users 匹配 0 行）。
+                #    即使补上列名，这个查询也永远返回空。
+                #    正确范式见 routers/wp_template_download.py 的 B3-1 成员名单查询。
+                "SELECT sm.name AS display_name "
                 "FROM project_assignments pa "
-                "JOIN users u ON pa.staff_id = u.id "
+                "JOIN staff_members sm ON pa.staff_id = sm.id "
                 "WHERE pa.project_id = :pid "
                 "ORDER BY pa.created_at"
             ),

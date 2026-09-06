@@ -21,8 +21,10 @@ async def _wp_map(db: AsyncSession, project_id: UUID) -> dict[str, str]:
     result = await db.execute(
         sa.text(
             """
-            SELECT wp_code, wp_id FROM wp_index
-            WHERE project_id = :pid AND wp_code LIKE 'A17%'
+            -- wp_index 无 wp_id 列；wp_id 须经 working_paper.wp_index_id 反查
+            SELECT wi.wp_code, wp.id AS wp_id FROM wp_index wi
+            LEFT JOIN working_paper wp ON wp.wp_index_id = wi.id
+            WHERE wi.project_id = :pid AND wi.wp_code LIKE 'A17%'
             """
         ),
         {"pid": str(project_id)},

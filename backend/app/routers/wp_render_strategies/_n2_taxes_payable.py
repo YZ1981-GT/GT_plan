@@ -398,7 +398,9 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
     try:
         rp_rows = (await ctx.db.execute(
             sa.text(
-                "SELECT party_name FROM related_party_registry "
+                # related_party_registry 的名称列真名是 `name`（无 party_name 列）；
+                # 用别名保持下游 r.party_name 不变。
+                "SELECT name AS party_name FROM related_party_registry "
                 "WHERE project_id = :pid AND is_deleted = false"
             ),
             {"pid": str(ctx.project_id)},

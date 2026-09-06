@@ -90,11 +90,13 @@ async def list_sub_documents(
     result = await db.execute(
         sa_text(
             """
-            SELECT wp_code, wp_id
-            FROM wp_index
-            WHERE project_id = :pid
-              AND wp_code LIKE 'A17-%'
-              AND wp_code <> 'A17-1'
+            -- wp_index 无 wp_id 列；wp_id 须经 working_paper.wp_index_id 反查
+            SELECT wi.wp_code, wp.id AS wp_id
+            FROM wp_index wi
+            LEFT JOIN working_paper wp ON wp.wp_index_id = wi.id
+            WHERE wi.project_id = :pid
+              AND wi.wp_code LIKE 'A17-%'
+              AND wi.wp_code <> 'A17-1'
             """
         ),
         {"pid": str(project_id)},
@@ -648,7 +650,7 @@ async def ai_generate_chapter(
         sa_text(
             """
             SELECT wp.id FROM working_paper wp
-            JOIN wp_index wi ON wi.wp_id = wp.id
+            JOIN wp_index wi ON wp.wp_index_id = wi.id
             WHERE wi.project_id = :pid AND wi.wp_code = 'A17-1'
             LIMIT 1
             """

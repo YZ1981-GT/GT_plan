@@ -575,7 +575,9 @@ async def _load_project_context(ctx: RenderContext) -> dict[str, Any]:
     try:
         # 客户名+模板类型从 projects 表获取
         result = await ctx.db.execute(
-            sa.text("SELECT project_name, template_type FROM projects WHERE id = :pid"),
+            # projects 的客户名列真名是 `name`（无 project_name 列）；
+            # 用别名保持下游 row.project_name 不变。
+            sa.text("SELECT name AS project_name, template_type FROM projects WHERE id = :pid"),
             {"pid": str(ctx.project_id)},
         )
         row = result.fetchone()

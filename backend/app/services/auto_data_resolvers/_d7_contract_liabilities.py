@@ -117,13 +117,13 @@ async def _resolve_d7_ledger_analysis(
     # 借方发生额按对方科目分拆
     debit_result = await db.execute(
         sa.text("""
-            SELECT COALESCE(counter_account_code, '未知') AS counter_acct,
+            SELECT COALESCE(counterpart_account, '未知') AS counter_acct,
                    COALESCE(SUM(debit_amount), 0) AS total
             FROM tb_ledger
             WHERE project_id = :pid AND year = :year AND is_deleted = false
               AND account_code = '2205'
               AND debit_amount > 0
-            GROUP BY counter_account_code
+            GROUP BY counterpart_account
             ORDER BY total DESC
         """),
         {"pid": str(project_id), "year": year},
@@ -142,13 +142,13 @@ async def _resolve_d7_ledger_analysis(
     # 贷方发生额按对方科目分拆
     credit_result = await db.execute(
         sa.text("""
-            SELECT COALESCE(counter_account_code, '未知') AS counter_acct,
+            SELECT COALESCE(counterpart_account, '未知') AS counter_acct,
                    COALESCE(SUM(credit_amount), 0) AS total
             FROM tb_ledger
             WHERE project_id = :pid AND year = :year AND is_deleted = false
               AND account_code = '2205'
               AND credit_amount > 0
-            GROUP BY counter_account_code
+            GROUP BY counterpart_account
             ORDER BY total DESC
         """),
         {"pid": str(project_id), "year": year},

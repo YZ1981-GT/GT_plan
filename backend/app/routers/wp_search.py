@@ -97,10 +97,11 @@ async def search_workpapers(
         # 搜索附件
         if not scope or scope == "attachment":
             stmt = text("""
-                SELECT id, original_filename, 'attachment' as source
+                -- attachments 的列真名是 original_file_name（无 original_filename）
+                SELECT id, original_file_name, 'attachment' as source
                 FROM attachments
                 WHERE project_id = :pid
-                  AND original_filename ILIKE :q
+                  AND original_file_name ILIKE :q
                   AND is_deleted = false
                 LIMIT :lim
             """)

@@ -113,9 +113,17 @@ async def _resolve_d3_ledger_analysis(
 
     try:
         # 借方发生额按对方科目分拆
+        #
+        # 🔴 列名真名是 `counterpart_account`（原写 `counter_account_code` 不存在，
+        #    该查询从未成功执行过，异常被下方 except 吞掉 ⇒ 表现为「本项目无数据」）。
+        # 🔴 数据可用性警示：`tb_ledger.counterpart_account` 真库填充率仅 **0.2%**
+        #    （2026-09-06 实测 15,162 / 6,954,511 行非空）。因此本查询修好后
+        #    绝大多数行会落进 `COALESCE(..., '未知')` 那一档 —— 这是**数据侧缺口**
+        #    而非 SQL 缺陷。消费方在展示「按对方科目分拆」时应能接受
+        #    「未知」占绝对多数，不要据此判断取数逻辑有问题。
         debit_result = await db.execute(
             sa.text("""
-                SELECT COALESCE(counter_account_code, '未知') AS counter,
+                SELECT COALESCE(counterpart_account, '未知') AS counter,
                        COALESCE(SUM(debit_amount), 0) AS amount
                 FROM tb_ledger
                 WHERE project_id = :pid
@@ -123,7 +131,7 @@ async def _resolve_d3_ledger_analysis(
                   AND is_deleted = false
                   AND account_code LIKE '2203%'
                   AND debit_amount > 0
-                GROUP BY counter_account_code
+                GROUP BY counterpart_account
                 ORDER BY amount DESC
             """),
             {"pid": str(project_id), "year": year},
@@ -136,7 +144,7 @@ async def _resolve_d3_ledger_analysis(
         # 贷方发生额按对方科目分拆
         credit_result = await db.execute(
             sa.text("""
-                SELECT COALESCE(counter_account_code, '未知') AS counter,
+                SELECT COALESCE(counterpart_account, '未知') AS counter,
                        COALESCE(SUM(credit_amount), 0) AS amount
                 FROM tb_ledger
                 WHERE project_id = :pid
@@ -144,7 +152,7 @@ async def _resolve_d3_ledger_analysis(
                   AND is_deleted = false
                   AND account_code LIKE '2203%'
                   AND credit_amount > 0
-                GROUP BY counter_account_code
+                GROUP BY counterpart_account
                 ORDER BY amount DESC
             """),
             {"pid": str(project_id), "year": year},

@@ -197,7 +197,7 @@ async def _load_cross_chapter_summaries(
             sa_text(
                 """
                 SELECT wp.id FROM working_paper wp
-                JOIN wp_index wi ON wi.wp_id = wp.id
+                JOIN wp_index wi ON wp.wp_index_id = wi.id
                 WHERE wi.project_id = :pid AND wi.wp_code = 'B1-4'
                 LIMIT 1
                 """

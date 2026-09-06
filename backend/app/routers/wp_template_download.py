@@ -200,9 +200,10 @@ async def download_template_prefilled(
             member_rows = (
                 await db.execute(
                     text(
+                        # project_assignments 的角色列真名是 `role`（无 role_type）
                         "SELECT sm.name FROM staff_members sm "
                         "JOIN project_assignments pa ON pa.staff_id = sm.id "
-                        "WHERE pa.project_id = :pid ORDER BY pa.role_type, sm.name"
+                        "WHERE pa.project_id = :pid ORDER BY pa.role, sm.name"
                     ),
                     {"pid": project_id},
                 )

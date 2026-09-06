@@ -94,9 +94,11 @@ async def render(ctx: RenderContext) -> dict | None:
         a173_wp_id: str | None = None
         idx = await db.execute(
             sa.text(
-                "SELECT wp_id FROM wp_index "
-                "WHERE project_id = :pid AND wp_code = 'A17-3' "
-                "AND wp_id IS NOT NULL LIMIT 1"
+                # wp_index 无 wp_id 列；wp_id 须经 working_paper.wp_index_id 反查。
+                # 原 `AND wp_id IS NOT NULL` 的意图由 INNER JOIN 承担。
+                "SELECT wp.id AS wp_id FROM wp_index wi "
+                "JOIN working_paper wp ON wp.wp_index_id = wi.id "
+                "WHERE wi.project_id = :pid AND wi.wp_code = 'A17-3' LIMIT 1"
             ),
             {"pid": str(ctx.project_id)},
         )
