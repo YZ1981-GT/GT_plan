@@ -1055,15 +1055,47 @@ class FinalizeSignals:
     #: `return ()` 且**一次库都不读**（Task 41 因 raise 导致整条 sync 路由 500 后改的），
     #: 而 Task 40 的版本先查 entry_state。把这个差异量出来，顺序被重排时守卫会打红。
     attach_session_reads: int = 0
+    #: 真实**请求路径**注册结果；`None` = 拿不到真库（**不是** False）。
+    #: 为什么不能用 `registered_adapter_ids`（registry 快照恒空）见
+    #: `_task44_request_path_probe` 的模块 docstring。
+    request_path_registered_adapter_ids: tuple[str, ...] | None = None
+    #: 拿不到真库时的原因（供 `unverifiable` 与 `failed` 分型，不得混为一谈）。
+    request_path_detail: str = ""
+    #: 本 pilot 的 adapter_id（由 probe 填入，不另立真源）。
+    adapter_id_probe: str = ""
+
+    @property
+    def adapter_registered_on_request_path(self) -> bool | None:
+        """请求路径上该 adapter 是否真注册。`None` = 拿不到真库，无法判定。
+
+        🔴 与 `adapter_registered` 分开保留：后者是「无 session 的 registry 快照」，
+        它恒 False 这件事**本身**要被守卫钉住（防有人把它当供给判据用回去）。
+        """
+        if self.request_path_registered_adapter_ids is None:
+            return None
+        return self.adapter_id_probe in self.request_path_registered_adapter_ids
+
+    @property
+    def refuses_without_representation(self) -> bool:
+        """无 published representation 时接线点**必须拒绝**（返回空元组）。
+
+        🔴 判据方向不可反：原 `admitted` 写的是 `bool(attach_without_representation)`，
+        要求「没有 representation 也返回 adapter_id」—— 那正是 RG-18 / AC 1.4 禁止的
+        伪双向，provider 正确行为就是 `return ()` ⇒ 该合取项要求被禁止的行为，
+        结构上不可满足，使任何 pilot 永不可准入。正确的不变量是反过来的。
+        """
+        return self.attach_without_representation == ()
 
     @property
     def admitted(self) -> bool:
-        """🔴 四项**全部**成立才算准入。缺一项即该 entry 不进入测试范围。"""
+        """四项**全部**成立才算准入：capability 已裁决 + **请求路径**真注册
+        （不是恒空的 registry 快照）+ observer 可用 + 无 representation 时确实拒绝
+        （反向不变量，证明注册不是无条件的）。"""
         return (
             self.capability_enabled
-            and self.adapter_registered
+            and self.adapter_registered_on_request_path is True
             and self.published_identity_observer == "available"
-            and bool(self.attach_without_representation)
+            and self.refuses_without_representation
         )
 
     def as_dict(self) -> dict[str, Any]:
@@ -1073,6 +1105,16 @@ class FinalizeSignals:
             "capability_reject": self.capability_reject,
             "adapter_registered": self.adapter_registered,
             "registered_adapter_ids": list(self.registered_adapter_ids),
+            "adapter_registered_on_request_path": (
+                self.adapter_registered_on_request_path
+            ),
+            "request_path_registered_adapter_ids": (
+                None
+                if self.request_path_registered_adapter_ids is None
+                else list(self.request_path_registered_adapter_ids)
+            ),
+            "request_path_detail": self.request_path_detail,
+            "refuses_without_representation": self.refuses_without_representation,
             "published_identity_observer": self.published_identity_observer,
             "observer_detail": self.observer_detail,
             "attach_without_representation": list(self.attach_without_representation),
@@ -1151,6 +1193,14 @@ def probe_finalize_signals(module: Any) -> FinalizeSignals:
             )
         )
     )
+    # ⑤ 真实**请求路径**注册：带真库 session 跑 `register_from_manifest`。
+    #
+    # 🔴 这一项才是「adapter 到底注册上了没有」的判据。信号 ② 那个 registry 快照恒空
+    #    （Task 75 起 `build_production_registry()` 只绑定计划），拿它当供给判据会
+    #    在供给完备时仍报 False —— 2026-09-06 实测两口径给出相反结论。
+    #    拿不到真库时返回 `None`（=> `unverifiable`），**不得**记成 False（=> `failed`）：
+    #    「环境不可得」与「实现没做」必须分型，混为一谈会制造假红。
+    request_ids, request_detail = _probe_request_path_registration()
     return FinalizeSignals(
         capability_enabled=capability_enabled,
         capability_reject=capability_reject,
@@ -1161,7 +1211,26 @@ def probe_finalize_signals(module: Any) -> FinalizeSignals:
         attach_without_representation=without,
         attach_with_representation_without_bundle=without_bundle,
         attach_session_reads=empty_session.calls,
+        request_path_registered_adapter_ids=request_ids,
+        request_path_detail=request_detail,
+        adapter_id_probe=adapter_id,
     )
+
+
+def _probe_request_path_registration() -> tuple[tuple[str, ...] | None, str]:
+    """委派 `_task44_request_path_probe`（伴生模块，判据真源在那里）。
+
+    保留这层薄转发是为了**替身可插拔**：`gate_probe_admission_is_state_sensitive`
+    用 `setattr(this_module, "_probe_request_path_registration", ...)` 替身化本函数，
+    直接引用伴生模块的名字就没有这个注入点了。
+    """
+    _ensure_backend_on_path()
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    from _task44_request_path_probe import probe_request_path_registration
+
+    return probe_request_path_registration()
 
 
 def collect_pilot_facts(ref: PilotRef) -> PilotFacts:
@@ -1973,33 +2042,75 @@ def gate_probe_admission_is_state_sensitive() -> tuple[bool, str, dict[str, Any]
         saved_registry = registry_module.build_production_registry
 
         async def _attach(_registry: Any, *, session: Any) -> tuple[str, ...]:
-            return (str(module.PILOT_ADAPTER_ID),)
+            # 🔴 替身必须**保持**「无 published representation 就拒绝」这条不变量。
+            #
+            # 原替身返回 `(PILOT_ADAPTER_ID,)` 来模拟「已注册」，那与修正后的判据
+            # `refuses_without_representation`（要求空元组）直接矛盾 ⇒ 替身态永不可
+            # admitted，自检恒红。「已注册」这件事现在由请求路径信号的替身表达，
+            # 而这里探的是「饿死状态下会不会伪注册」，答案必须是不会。
+            return ()
 
         class _Stand:
             def registrations(self) -> tuple[Any, ...]:
                 return (type("R", (), {"adapter_id": str(module.PILOT_ADAPTER_ID)})(),)
 
+        # 🔴 请求路径信号也必须能被替身翻转，否则本自检测不到它。
+        #
+        # 2026-09-06 踩到过：新增 `request_path_registered_adapter_ids` 后忘了在这里
+        # 替身化，于是「真实态」与「替身态」在**已注册**的三个 pilot 上都是 admitted=True，
+        # `flipped` 恒 False ⇒ 自检打红。方向是补替身，**不是**把该信号从判据里删掉。
+        this_module = sys.modules[__name__]
+        saved_probe = _probe_request_path_registration
         try:
             setattr(module, "assert_manifest_capability_enabled", lambda **_k: None)
             setattr(module, "resolve_published_frozen_definitions", _observer)
             setattr(module, "attach_pilot_adapters", _attach)
             registry_module.build_production_registry = lambda: _Stand()  # type: ignore[assignment]
+            setattr(
+                this_module,
+                "_probe_request_path_registration",
+                lambda: ((str(module.PILOT_ADAPTER_ID),), "替身：请求路径已注册"),
+            )
             substituted = probe_finalize_signals(module)
         finally:
             for name, value in saved.items():
                 setattr(module, name, value)
             registry_module.build_production_registry = saved_registry  # type: ignore[assignment]
-        flipped = real.admitted != substituted.admitted
+            setattr(this_module, "_probe_request_path_registration", saved_probe)
+        # 🔴 判据不再是「real != substituted」。
+        #
+        # 那个写法预设「真实态必然 False」——2026-09-06 修好测法后 d2/g7/h1 的真实态
+        # 已经是 admitted=True，于是 real == substituted，自检反而打红（把「实现真做好了」
+        # 误判成「本门读的是死值」）。本自检真正要证明的是**判定随信号变化**，
+        # 所以正确判据是反向的：把信号压成「未就绪」时必须变 False。
+        saved_probe2 = _probe_request_path_registration
+        try:
+            setattr(
+                this_module,
+                "_probe_request_path_registration",
+                lambda: ((), "替身：请求路径未注册"),
+            )
+            starved = probe_finalize_signals(module)
+        finally:
+            setattr(this_module, "_probe_request_path_registration", saved_probe2)
+        flipped = substituted.admitted is True and starved.admitted is False
         all_flipped = all_flipped and flipped
         observed[ref.pilot_class] = {
             "real_admitted": real.admitted,
             "substituted_admitted": substituted.admitted,
+            "starved_admitted": starved.admitted,
             "flipped": flipped,
             "real_observer": real.published_identity_observer,
             "substituted_observer": substituted.published_identity_observer,
+            "real_request_path": (
+                None
+                if real.request_path_registered_adapter_ids is None
+                else list(real.request_path_registered_adapter_ids)
+            ),
         }
     detail = (
-        "四个 pilot 的准入判定在替身下全部由 False 翻成 True ⇒ 本门读的是真实状态"
+        "四个 pilot 的准入判定在「信号就绪」下为 True、在「信号饿死」下为 False "
+        "⇒ 本门读的是真实状态"
         if all_flipped
         else f"有 pilot 的判定未随信号改变：{observed}"
     )
@@ -2350,7 +2461,9 @@ def _print_report(report: Mapping[str, Any]) -> None:
         )
         print(
             f"       finalize：capability_enabled={signals['capability_enabled']} "
-            f"adapter_registered={signals['adapter_registered']} "
+            f"adapter_on_request_path={signals['adapter_registered_on_request_path']} "
+            f"(registry快照={signals['adapter_registered']}, 恒空属设计) "
+            f"refuses_without_repr={signals['refuses_without_representation']} "
             f"observer={signals['published_identity_observer']} "
             f"attach={signals['attach_without_representation'] or '()'}"
         )
