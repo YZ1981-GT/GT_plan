@@ -36,6 +36,7 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import http from '@/utils/http'
+import type { ForceSaveResult } from './sync/forceSaveTypes'
 
 // ─── Props / Emits ───
 const props = withDefaults(defineProps<{
@@ -52,6 +53,12 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{
   'fallback': []
+  /** 文档已耐久落盘（后端确认磁盘文件内容变了），载荷是 forcesave 回执 */
+  'incoming-durable': [payload: ForceSaveResult]
+  /** 强制保存命令被接受但超时内未落盘 —— 调用方不得据此读文件 */
+  'save-requested': [payload: ForceSaveResult]
+  /** 强制保存失败（命令未送达 / 被拒） */
+  'save-error': [reason: string]
 }>()
 
 // ─── State ───
@@ -260,6 +267,63 @@ function handleFallback(reason?: string) {
   console.warn('[GtOnlyOfficeSheet] fallback triggered, reason:', reason)
   emit('fallback')
 }
+
+// ─── 强制保存（可 await 的耐久确认）───
+//
+// 🔴 为什么不用编辑器侧的 `customization.forcesave` 或 `docEditor.downloadAs`：
+// 前者只是让 OO 自己定期存，前端拿不到「已耐久」信号；后者把文件交给浏览器下载，
+// 根本不经过后端落盘链路。真正能证明落盘的只有「后端命令 OO 保存 + 后端确认磁盘
+// 文件内容变了」，所以这里只做一件事：调后端 forcesave 端点并如实转达三态。
+//
+// 2026-09-06 D2-2 实测教训：切回结构化视图时 OO 的编辑还在容器缓存里，
+// 12 秒后才落盘。没有这个 await，回写读到的必然是旧文件。
+const forceSaving = ref(false)
+
+async function forceSave(): Promise<ForceSaveResult> {
+  if (forceSaving.value) {
+    return { accepted: false, durable: false, detail: '已有强制保存在进行中' }
+  }
+  forceSaving.value = true
+  try {
+    const { data } = await http.post(
+      `/api/workpapers/${props.wpId}/d2-sync/forcesave`,
+      {},
+    )
+    const payload = (data?.data ?? data) as Partial<ForceSaveResult>
+    const result: ForceSaveResult = {
+      accepted: payload?.accepted === true,
+      durable: payload?.durable === true,
+      detail: String(payload?.detail || ''),
+      // 🔴 必须原样带上 artifact 指纹：调用方要把它回传给 pull，
+      // 服务端据此做第二道陈旧校验。只取三个字段会把它丢掉，
+      // 表现为「pull 请求体是 {}、服务端那道门永远拿不到判据」（复测实录）。
+      artifact: payload?.artifact,
+      outcome: payload?.outcome,
+    }
+    if (result.durable) {
+      emit('incoming-durable', result)
+    } else if (result.accepted) {
+      // 命令被接受但超时内没落盘 —— 明确区分于 durable，调用方必须拒绝读文件
+      emit('save-requested', result)
+    } else {
+      emit('save-error', result.detail || '强制保存未被接受')
+    }
+    return result
+  } catch (err: any) {
+    const reason =
+      err?.response?.data?.detail ||
+      err?.response?.data?.message ||
+      err?.message ||
+      '未知错误'
+    emit('save-error', String(reason))
+    // 🔴 不吞成 durable:true。拿不到确认就如实报失败，让调用方拒绝回写。
+    return { accepted: false, durable: false, detail: String(reason) }
+  } finally {
+    forceSaving.value = false
+  }
+}
+
+defineExpose({ forceSave, forceSaving })
 
 // ─── 生命周期 ───
 onMounted(() => {

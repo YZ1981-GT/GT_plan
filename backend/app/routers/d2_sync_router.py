@@ -17,16 +17,22 @@ forcesave ack 联动）。本 router 是**同一批引擎函数**的直连入口
 
 from __future__ import annotations
 
+import asyncio
+import hashlib
 import json
 import logging
+import time
 from pathlib import Path
 from typing import Mapping
 from uuid import UUID
 
+import httpx
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
@@ -34,6 +40,29 @@ from app.models.workpaper_models import WorkingPaper, WpIndex
 from app.services.workpaper_sync import d2_bidirectional_bridge as bridge
 
 logger = logging.getLogger(__name__)
+
+#: 发 `c=forcesave` 的 HTTP 超时（秒）。OO 契约实测恒立即返回 200，给足余量即可。
+_FORCESAVE_HTTP_TIMEOUT_S = 10.0
+
+#: 等「磁盘文件真的变了」的上限（秒）。
+#: OO 收到 forcesave 后要「导出 → callback → 后端下载 → 覆盖写盘」四步，
+#: 2026-09-06 实测 1260 行 / 315KB 的往返约 1~3 秒，12 秒留足慢盘余量。
+#: 🔴 超时**不**降级成成功：如实返回 `durable=False`，由调用方拒绝 pull。
+_FORCESAVE_DURABLE_TIMEOUT_S = 12.0
+
+#: 轮询磁盘的间隔（秒）。
+_FORCESAVE_POLL_INTERVAL_S = 0.3
+
+# ── forcesave 出站结果的三态 ──────────────────────────────────────────
+#
+# 刻意用三态而不是布尔：「命令已接受」与「已经不需要保存」在**能不能回写**上
+# 结论相反，压成一个 bool 必然有一方被误判（2026-09-06 复测实证）。
+#: OO 接受了命令，还会有 callback 落盘 ⇒ 需要等磁盘变化。
+_FORCESAVE_ACCEPTED = "accepted"
+#: OO 明确回报无未保存改动 ⇒ 磁盘已是最新，**无需等待**即可回写。
+_FORCESAVE_NOTHING_TO_SAVE = "nothing_to_save"
+#: 命令未送达或被拒 ⇒ 不得回写。
+_FORCESAVE_REJECTED = "rejected"
 
 router = APIRouter(prefix="/api/workpapers", tags=["working-papers", "d2-sync"])
 
@@ -315,21 +344,255 @@ async def d2_push_to_excel(
     return {"ok": True, "oo_content_revision": revision, **report.as_dict()}
 
 
-@router.post("/{wp_id}/d2-sync/pull-from-excel")
-async def d2_pull_from_excel(
+def _artifact_fingerprint(artifact: Path) -> dict:
+    """canonical 文件的陈旧判据基线：mtime_ns + size + 内容 sha256。
+
+    🔴 三者都要：mtime 在同秒内重写可能不变、size 在等长改动下也不变，
+    只有 sha256 能证明「内容真的换了」。反过来单用 sha256 又拿不到「谁更新」的
+    时间序，故三者同时冻结。
+    """
+    st = artifact.stat()
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    return {"mtime_ns": st.st_mtime_ns, "size": st.st_size, "sha256": digest}
+
+
+@router.post("/{wp_id}/d2-sync/forcesave")
+async def d2_forcesave(
     wp_id: UUID,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> dict:
-    """OnlyOffice → 结构化视图：读回 Excel 的受管值并落库。
+    """命令 OnlyOffice 把当前编辑**落盘**，并等到磁盘文件真的变化才返回。
 
-    在**从「在线编辑」切回「结构化视图」时**调用，保证表格显示 Excel 里的最新编辑。
+    ═══ 为什么必须有这个端点 ═══
+
+    `pull_excel_to_html` 读的是磁盘 canonical 文件，而 OO 的编辑在编辑器销毁后才由
+    容器异步保存。2026-09-06 浏览器实测的时序（真库 + OO 9.4）：
+
+    ```
+    19:51:19  用户切回结构化视图 → pull 读到 19:41:12 的旧文件（AL13=0）
+              并把 0 写回 store，覆盖 HTML 侧刚录的 13571.99
+              接口却返回 {"ok":true,"rows_persisted":1260}
+    19:51:31  OO 才真正落盘（AL13=88888.77）—— 此时已无人再 pull
+    ```
+
+    ⇒ 两侧永久分叉，且伴随一条「已从在线编辑回写 1260 行」的成功文案。
+
+    ═══ 返回语义（刻意区分三态，不合并成「成功」）═══
+
+    * `durable=True`  文件已耐久（sha256 变了或本来就没有在编辑）——**只有这个**允许 pull
+    * `durable=False` + `accepted=True`  命令已被 OO 接受但超时内未落盘 ⇒ 调用方**必须**拒绝 pull
+    * 4xx/5xx  命令根本没送达
+
+    🔴 不 fail-open：拿不到耐久确认就如实返回 `durable=False`，绝不返回成功让
+    调用方去读旧文件。AC 11.3 明令「不得统一显示同步成功」。
     """
     project_id, _code, artifact = await _load_context(wp_id, db)
     if not artifact.is_file():
         raise HTTPException(
             status_code=409, detail=f"OnlyOffice 文件不存在：{artifact.name}"
         )
+
+    before = _artifact_fingerprint(artifact)
+
+    from app.services.onlyoffice_room_identity import (
+        resolve_room_doc_key,
+        sheet_entry_id,
+    )
+
+    entry = sheet_entry_id(
+        wp_code=_OO_SHEET_PARAM, sheet_name=_OO_SHEET_PARAM, whole_workbook=False
+    )
+    doc_key = await resolve_room_doc_key(db, wp_id=wp_id, entry_id=entry)
+
+    outcome, detail = await _issue_forcesave(doc_key)
+    accepted = outcome in (_FORCESAVE_ACCEPTED, _FORCESAVE_NOTHING_TO_SAVE)
+
+    after = before
+    if outcome == _FORCESAVE_NOTHING_TO_SAVE:
+        # 无待保存内容 ⇒ 磁盘就是权威版本，不必等（等也永远等不到变化）。
+        durable = True
+    elif outcome == _FORCESAVE_ACCEPTED:
+        # 等磁盘真的变化 —— 这才是「已耐久」，Command Service 的 HTTP 200 不算。
+        durable = False
+        deadline = time.monotonic() + _FORCESAVE_DURABLE_TIMEOUT_S
+        while time.monotonic() < deadline:
+            await asyncio.sleep(_FORCESAVE_POLL_INTERVAL_S)
+            if not artifact.is_file():
+                continue
+            after = _artifact_fingerprint(artifact)
+            if after["sha256"] != before["sha256"]:
+                durable = True
+                break
+    else:
+        durable = False
+
+    return {
+        "ok": True,
+        "outcome": outcome,
+        "accepted": accepted,
+        "durable": durable,
+        "doc_key": doc_key,
+        "detail": detail,
+        "artifact": {"before": before, "after": after},
+        "project_id": str(project_id),
+    }
+
+
+def _assert_not_stale(artifact: Path, fingerprint: Mapping) -> None:
+    """磁盘文件必须是「forcesave 确认落盘后的那一份」，否则 409。
+
+    `fingerprint` 是 `/d2-sync/forcesave` 回执里的 `artifact`，形如
+    ``{"before": {...}, "after": {...}}``。判据：
+
+    * 若 forcesave 期间 **没**观察到变化（before.sha256 == after.sha256），
+      而磁盘现在仍是那个 sha256 ⇒ OO 的编辑从未落盘，读它必然拿到旧值 ⇒ 拒绝。
+    * 若磁盘当前 sha256 既不等于 `after` 也不等于 `before` ⇒ 文件被第三方并发换掉，
+      本次 pull 的前置确认已失效 ⇒ 拒绝，让调用方重新走 forcesave。
+
+    只在 `fingerprint` 存在时生效；不带指纹的调用（如运维手动触发）不阻断，
+    但那种调用本身就不该用于「切回视图」路径。
+    """
+    before = dict(fingerprint.get("before") or {})
+    after = dict(fingerprint.get("after") or {})
+    before_sha = str(before.get("sha256") or "")
+    after_sha = str(after.get("sha256") or "")
+    if not before_sha and not after_sha:
+        return  # 指纹形状不认识：不假装校验过，直接放行由前端那道门负责
+
+    current_sha = hashlib.sha256(artifact.read_bytes()).hexdigest()
+
+    if before_sha and after_sha and before_sha == after_sha:
+        if current_sha == before_sha:
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    "在线编辑的内容尚未落盘 —— 磁盘上仍是切换前的那一份文件。"
+                    "为避免用旧数据覆盖你在结构化视图的录入，本次回写已取消。"
+                    "请回到在线编辑，等状态显示已保存后再切换。"
+                ),
+            )
+        return  # 磁盘已变新（forcesave 之后又落了一次），可读
+
+    if after_sha and current_sha != after_sha:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "OnlyOffice 文件在确认落盘后又被改动（可能有其他人正在编辑）—— "
+                "本次回写已取消，请重新切换以获取最新内容。"
+            ),
+        )
+
+
+async def _issue_forcesave(doc_key: str) -> tuple[str, str]:
+    """向 OO Command Service 发 `c=forcesave`。返回 (三态之一, 可读原因)。
+
+    三态见 `_FORCESAVE_ACCEPTED` / `_FORCESAVE_NOTHING_TO_SAVE` / `_FORCESAVE_REJECTED`。
+
+    ═══ 为什么不复用 `CommandServiceClient` ═══
+
+    `workpaper_sync.command_service.CommandServiceClient.forcesave()` 的第一个参数
+    类型是 `AcceptedRequest`——它只能由 room 协议的 Task 23 入口产出，用来在**类型层**
+    强制「先落库再出站」。D2 直连通道没有 room / request 行，硬造一个 `AcceptedRequest`
+    等于绕过那条不变量，比不用更糟。故这里直连 Command Service，且**不写任何 request 行**，
+    保持「直连通道不伪造 room 证据」。room 协议供给就绪后本函数应整体让位给 Task 23/24。
+
+    OO 契约实测：HTTP 恒 200，成败看 body 的 `error` 字段（0 = 已接受）。
+    """
+    base = str(getattr(settings, "ONLYOFFICE_URL", "") or "").strip().rstrip("/")
+    if not base:
+        return _FORCESAVE_REJECTED, "ONLYOFFICE_URL 未配置，无法发起强制保存"
+
+    payload: dict = {"c": "forcesave", "key": doc_key}
+    headers: dict[str, str] = {}
+    secret = str(getattr(settings, "ONLYOFFICE_JWT_SECRET", "") or "")
+    if secret:
+        from jose import jwt as jose_jwt
+
+        token = jose_jwt.encode(dict(payload), secret, algorithm="HS256")
+        payload["token"] = token
+        headers["Authorization"] = f"Bearer {token}"
+
+    try:
+        async with httpx.AsyncClient(timeout=_FORCESAVE_HTTP_TIMEOUT_S) as client:
+            resp = await client.post(
+                f"{base}/coauthoring/CommandService.ashx",
+                json=payload,
+                headers=headers,
+            )
+    except httpx.HTTPError as exc:
+        return (
+            _FORCESAVE_REJECTED,
+            f"Command Service 不可达：{type(exc).__name__}: {exc}"[:300],
+        )
+
+    if resp.status_code != 200:
+        return _FORCESAVE_REJECTED, f"Command Service 返回 HTTP {resp.status_code}"
+
+    try:
+        body = resp.json()
+    except ValueError:
+        return (
+            _FORCESAVE_REJECTED,
+            f"Command Service 响应不是 JSON：{resp.text[:160]!r}",
+        )
+
+    err = body.get("error")
+    if err == 0:
+        return _FORCESAVE_ACCEPTED, "强制保存命令已被 OnlyOffice 接受"
+    # 🔴 error=4 = 「文档无未保存改动」。它**不是**失败，而是「磁盘已经是最新」的
+    # 确凿证明 —— 没有任何待落盘内容，此时磁盘文件就是权威版本，可以直接回写。
+    # 2026-09-06 复测踩到过：把它只算 accepted 而不算 durable，会让「打开 OO 看了
+    # 一眼什么都没改就切回来」这种最常见的操作被误判成「尚未落盘」而拒绝回写。
+    if err == 4:
+        return _FORCESAVE_NOTHING_TO_SAVE, "文档无未保存改动，磁盘文件已是最新"
+    return _FORCESAVE_REJECTED, f"OnlyOffice 拒绝强制保存：error={err}"
+
+
+class _PullRequest(BaseModel):
+    """pull 的可选载荷：forcesave 冻结的耐久指纹。
+
+    前端把 `/d2-sync/forcesave` 回执里的 `artifact` 原样带回来，服务端据此判定
+    「我现在读的这份文件，是不是就是刚刚确认落盘的那一份」。
+    """
+
+    durable_fingerprint: dict | None = None
+
+
+@router.post("/{wp_id}/d2-sync/pull-from-excel")
+async def d2_pull_from_excel(
+    wp_id: UUID,
+    payload: _PullRequest | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> dict:
+    """OnlyOffice → 结构化视图：读回 Excel 的受管值并落库。
+
+    在**从「在线编辑」切回「结构化视图」时**调用，保证表格显示 Excel 里的最新编辑。
+
+    ═══ 陈旧校验（第二道门）═══
+
+    调用方应先调 `/d2-sync/forcesave` 拿到耐久确认，并把回执里的 `artifact`
+    作为 `durable_fingerprint` 带回来。本端点据此拒绝两种危险情形：
+
+    * `before.sha256 == 磁盘当前 sha256` 且 forcesave 当时**未**观察到变化
+      ⇒ 说明读的还是切换前那一份，OO 的编辑没落盘 ⇒ **409 不写库**；
+    * 磁盘 sha256 与 forcesave 观察到的 `after` 不一致且更旧 ⇒ 文件被并发换掉 ⇒ 409。
+
+    🔴 为什么不能只靠前端那道门：前端可以被绕过（直接打 API），而一次错误的
+    pull 会把陈旧值写满整张表、覆盖 HTML 侧的真实录入（2026-09-06 实测把
+    刚录的 13571.99 覆盖成 0，同时返回成功文案）。写库前的校验必须在服务端。
+    """
+    project_id, _code, artifact = await _load_context(wp_id, db)
+    if not artifact.is_file():
+        raise HTTPException(
+            status_code=409, detail=f"OnlyOffice 文件不存在：{artifact.name}"
+        )
+
+    fingerprint = (payload.durable_fingerprint if payload else None) or None
+    if fingerprint:
+        _assert_not_stale(artifact, fingerprint)
+
     base_rows = await _read_store_rows(wp_id, db)
     try:
         merged, report = bridge.pull_excel_to_html(
@@ -345,9 +608,15 @@ async def d2_pull_from_excel(
     narratives_changed = await _write_narratives(wp_id, project_id, narratives, db)
     await db.commit()
 
+    # 🔴 `rows_changed` 与 `rows_persisted` 是两件事，必须都给：
+    #   rows_persisted = 落库的总行数（永远等于全表）
+    #   rows_changed   = 本次**真的从 Excel 带回了新值**的行数
+    # 只报前者就会出现「回写 1260 行」却一个字都没变的假成功
+    #（2026-09-06 实测正是如此：读陈旧文件，每格都「回写」成旧值仍报全量成功）。
     return {
         "ok": True,
         "rows_persisted": len(merged),
+        "rows_changed": report.rows,
         "narratives_changed": narratives_changed,
         **report.as_dict(),
     }

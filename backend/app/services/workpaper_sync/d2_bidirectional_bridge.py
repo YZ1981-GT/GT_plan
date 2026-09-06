@@ -49,6 +49,12 @@ from app.services.workpaper_sync import excel_instrumentation as EI
 from app.services.workpaper_sync import excel_materialize as XM  # noqa: F401  (插行/写入)
 from app.services.workpaper_sync import pilot_d2_large_json as P
 from app.services.workpaper_sync.adapters.base import SubstrateRole
+from app.services.workpaper_sync.d2_store_value_equivalence import (
+    assign_store_value,
+)
+from app.services.workpaper_sync.d2_store_value_equivalence import (
+    same_store_value as _same_store_value,  # noqa: F401  (转发，判据真源在该模块)
+)
 from app.services.workpaper_sync.excel_entry_gate import (
     AdapterBuild,
     FrozenEntryDefinitions,
@@ -748,28 +754,16 @@ _FIELD_TO_STORE: Mapping[str, str] = {
 def _assign_store_value(target: dict[str, Any], field_id: str, value: Any) -> bool:
     """把一个受管字段值写回 store 行的正确位置。
 
-    嵌套路径**直接取契约声明的 store_key**（形如 `agingPrior/within1`，`/` 分段），
-    不在这里自造前缀表 —— 那会变成与契约并行的第二份映射真源，契约改了不会跟着改。
+    字段 → store 路径的映射在此解析（真源是契约的 `MANAGED_FIELD_SPECS`），
+    真正的「写不写 / 算不算变了」委派给 `d2_store_value_equivalence`
+    —— 那两个是纯函数，抽出去既让本模块不再膨胀，也让判据可独立测试。
 
-    :returns: 是否真的写了（用于统计，避免把「没写」算成「已同步」）
+    :returns: 值是否**真的发生了变化**（用于统计）
     """
     store_key = _FIELD_TO_STORE.get(field_id)
     if not store_key:
         return False
-
-    segments = [s for s in store_key.split("/") if s]
-    if not segments:
-        return False
-
-    cursor: dict[str, Any] = target
-    for seg in segments[:-1]:
-        nxt = cursor.get(seg)
-        if not isinstance(nxt, dict):
-            nxt = {}
-            cursor[seg] = nxt
-        cursor = nxt
-    cursor[segments[-1]] = value
-    return True
+    return assign_store_value(target, store_key, value)
 
 
 def pull_excel_to_html(
@@ -824,7 +818,8 @@ def pull_excel_to_html(
         by_id[rid] = dict(row)
         order.append(rid)
 
-    applied = 0
+    applied = 0  # 真发生变化的字段数
+    visited = 0  # 遍历到的可回写字段数（用于区分「没变」与「没读到」）
     touched_rows: set[str] = set()
     for key in projection.stable_keys():
         fv = projection.get(key)
@@ -839,6 +834,7 @@ def pull_excel_to_html(
             by_id[rid] = target
             order.append(rid)
         field_id = key.rsplit("/", 1)[-1]
+        visited += 1
         if _assign_store_value(target, field_id, fv.value):
             applied += 1
             touched_rows.add(rid)
@@ -855,6 +851,8 @@ def pull_excel_to_html(
 
     return merged, D2SyncReport(
         direction="excel_to_html",
+        # `rows` / `fields` 现在是**真变化**数：0 就意味着这次回写什么都没带回来
+        # （通常是读到了尚未落盘的陈旧文件），不再是「遍历了多少格」。
         rows=len(touched_rows),
         fields=applied,
         managed_sheet=P.MANAGED_SHEET,
@@ -862,6 +860,8 @@ def pull_excel_to_html(
         artifact_bytes=len(workbook_bytes),
         detail={
             "extracted_keys": len(projection.stable_keys()),
+            "visited_writable_fields": visited,
+            "rows_total": len(merged),
             "narratives": narratives,
         },
     )

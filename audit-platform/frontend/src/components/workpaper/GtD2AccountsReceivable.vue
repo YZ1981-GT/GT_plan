@@ -13,6 +13,24 @@
           size="small"
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d2-accounts-receivable" />
+        <!-- 运行时同步状态：区分「正在同步 / 不可用原因 / 上次结果」，不合并成一句「成功」 -->
+        <el-tag v-if="dualMode.switching.value" type="warning" size="small">
+          同步中…
+        </el-tag>
+        <el-tooltip
+          v-else-if="dualMode.unavailableReason.value"
+          :content="dualMode.unavailableReason.value"
+          placement="bottom"
+        >
+          <el-tag type="danger" size="small">在线编辑不可用</el-tag>
+        </el-tooltip>
+        <el-tooltip
+          v-else-if="dualMode.lastSync.value"
+          :content="dualMode.lastSync.value"
+          placement="bottom"
+        >
+          <el-tag type="success" size="small">已同步</el-tag>
+        </el-tooltip>
         <el-button
           v-if="canStartAiReview && props.sheetName"
           size="small"
@@ -74,8 +92,10 @@
       </el-alert>
 
       <!-- OnlyOffice 在线编辑 -->
+      <!-- ref 用于切回结构化视图前 `await forceSave()` 拿耐久确认，缺了它 pull 只能读旧文件 -->
       <GtOnlyOfficeSheet
         v-if="renderMode === 'onlyoffice'"
+        ref="ooSheetRef"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -399,14 +419,26 @@ const relatedParties = computed<string[]>(() => {
 const isLoading = ref(true)
 const onlyOfficeFallback = ref(false)
 
+/** OnlyOffice 编辑器实例引用 —— 切回结构化视图前用它 `await forceSave()`。 */
+const ooSheetRef = ref<InstanceType<typeof GtOnlyOfficeSheet> | null>(null)
+
 const currentSheet = computed(() => normalizeD2SheetName(props.sheetName))
 
 const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 
 // ─── Task 45: bridge adapter replaces legacy useD2EntryDualMode ─────────────
+//
+// 🔴 `flushBeforeOo` 必须传：HTML 侧录入走 debounce 落库，不 flush 就切到 OO 的话
+// push 推的是**上一次** debounce 落库的旧数据。2026-09-06 浏览器实测的时序：
+// Excel 写于 19:41:12.077、HTML store 落库于 19:41:14.771 —— push 早 2.7 秒，
+// 审计师刚录的「期后回款 13571.99」在 OO 里显示成 0。
+// bridge 早就定义并 await 了这个可选钩子，宿主漏传即静默失效
+// （Volar / vitest / get_diagnostics 三层全绿，只有浏览器暴露）。
 const dualMode = useD2SyncBridge({
   wpId: toRef(props, 'wpId'),
   reloadHtml: () => formData.loadAll(),
+  flushBeforeOo: () => formData.flushPendingSave(),
+  requestForceSave: () => ooSheetRef.value?.forceSave() ?? Promise.resolve(null),
 })
 
 const ooSheetName = computed(() =>

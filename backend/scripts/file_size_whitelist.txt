@@ -337,3 +337,12 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/task69Independen
 #     「顺序」与「每阶段的实测入参」跨文件。spec: published-representation-production-path
 audit-platform/frontend/src/components/workpaper/confirmation/GtConfirmationSummary.vue  1955
 audit-platform/frontend/src/views/TrialBalance.vue  4491
+
+#   d2_bidirectional_bridge.py —— **改动前即 1115 行已超限**（并发会话 2026-09-06 引入，
+#     随 commit eed3a34f 入库）；本次 D2 双向回写 P0 缺陷修复对它的**净增量为 0 行**：
+#     新增的两个纯函数（store 值等价判定 / 只在真变化时写）已按门禁提示抽成伴生模块
+#     `d2_store_value_equivalence.py`（91 行），宿主只留「字段 → store 路径」解析 + 委派。
+#     baseline 即改动前真实行数，不留膨胀空间。该文件确需按「push / pull / 观测」三段
+#     拆分（材料化与提取两条链各自 300+ 行），属独立打磨任务，不在本次缺陷修复范围。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure Task 41（2026-09-06 修复条目）
+backend/app/services/workpaper_sync/d2_bidirectional_bridge.py  1115
