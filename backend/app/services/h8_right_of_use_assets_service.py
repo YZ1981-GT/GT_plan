@@ -430,7 +430,7 @@ class H8RightOfUseAssetsService:
             result = await db.execute(
                 sa.text(
                     "SELECT cr.remark FROM checklist_responses cr "
-                    "JOIN working_papers wp ON wp.id = cr.wp_id "
+                    "JOIN working_paper wp ON wp.id = cr.wp_id "
                     "WHERE wp.project_id = :project_id "
                     "AND cr.item_id = :item_id "
                     "LIMIT 1"

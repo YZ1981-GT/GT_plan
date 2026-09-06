@@ -14,12 +14,15 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, Protocol, Sequence
 from uuid import UUID
 
 from .contracts import CanonicalFormulaTarget
+
+logger = logging.getLogger(__name__)
 
 
 # ─── Result types ────────────────────────────────────────────────────────────
@@ -191,7 +194,11 @@ class WorkpaperDomainReader:
                             except (json.JSONDecodeError, TypeError, ValueError):
                                 results[target.addr_id] = str(raw) if raw is not None else None
                 except Exception:
-                    pass
+                    # 同 note/report 域：静默 pass 会让「列改名 / 表缺失」永久隐形。
+                    logger.exception(
+                        "workpaper 域取值失败（wp=%s，%d 个 item_id 记 miss）",
+                        wp_id, len(batch_ids),
+                    )
 
         return results
 
@@ -234,10 +241,19 @@ class ReportDomainReader:
                     if period_col == "current"
                     else "prior_period_amount"
                 )
+                # 🔴 表名是 `financial_report`，不是 `report_rows` —— 后者从未建过。
+                #    2026-09-06 真库核实：`financial_report` 的
+                #    (project_id, year, report_type, row_code,
+                #     current_period_amount, prior_period_amount) 与本查询逐列对应，
+                #    所以这里**只是表名写错**，列全对。
+                #    该错误此前不可见的两个原因：①下面的 `except Exception: pass`
+                #    把 UndefinedTable 完全静默吞掉 ②裸 SQL 契约测试的提取正则不认
+                #    f-string 前缀 ⇒ 整段 SQL 从未进入扫描（两者已一并修）。
                 stmt = sa.text(
-                    f"SELECT row_code, {col_name} FROM report_rows "
+                    f"SELECT row_code, {col_name} FROM financial_report "
                     "WHERE project_id = :pid AND year = :yr "
-                    "AND report_type = :rtype AND row_code = ANY(:codes)"
+                    "AND report_type = :rtype AND row_code = ANY(:codes) "
+                    "AND is_deleted = false"
                 )
                 try:
                     result = await self._db.execute(
@@ -249,7 +265,11 @@ class ReportDomainReader:
                         if code in rows and rows[code] is not None:
                             results[target.addr_id] = Decimal(str(rows[code]))
                 except Exception:
-                    pass
+                    # 同 note 域：原 `pass` 吞掉了 `report_rows` 不存在这个事实。
+                    logger.exception(
+                        "report 域取值失败（project=%s year=%s type=%r，%d 个 row_code 记 miss）",
+                        pid, yr, rtype, len(batch_codes),
+                    )
 
         return results
 
@@ -267,8 +287,6 @@ class NoteDomainReader:
     ) -> dict[str, Decimal | str | None]:
         if not targets:
             return {}
-
-        import json
 
         import sqlalchemy as sa
 
@@ -288,17 +306,48 @@ class NoteDomainReader:
                 batch_cells = cells[i : i + self._batch_size]
                 batch_targets = group[i : i + self._batch_size]
 
+                # 🔴 附注**没有** per-cell 表：`disclosure_note_cells` 从未建过，
+                #    单元格值存在 `disclosure_notes.table_data`（jsonb）里，按 section
+                #    定位到行记录后再从 jsonb 取 (row, column)。
+                #    2026-09-06 真库核实：`note_section` 1043/1043 有值，而
+                #    `section_id` 仅 213/1043 ⇒ 定位**必须**以 note_section 为主、
+                #    section_id 兜底，只用后者会漏掉约 80% 的附注。
+                #    jsonb 的取值不自己再写一遍 —— 复用 adapters/note.py 的
+                #    `_get_cell_value`（它已处理 rows 为 list / dict 两种形态）。
                 stmt = sa.text(
-                    "SELECT cell_key, cell_value FROM disclosure_note_cells "
+                    "SELECT note_section, section_id, table_data FROM disclosure_notes "
                     "WHERE project_id = :pid AND year = :yr "
-                    "AND section_id = :section AND cell_key = ANY(:cells)"
+                    "AND (note_section = :section OR section_id = :section) "
+                    "AND is_deleted = false"
                 )
                 try:
                     result = await self._db.execute(
                         stmt,
-                        {"pid": pid, "yr": yr, "section": section, "cells": list(batch_cells)},
+                        {"pid": pid, "yr": yr, "section": section},
                     )
-                    rows = {r[0]: r[1] for r in result.fetchall()}
+                    from app.services.formula_runtime.adapters.note import (
+                        _get_cell_value,
+                    )
+
+                    table_data = None
+                    for r in result.fetchall():
+                        if r.table_data:
+                            table_data = r.table_data
+                            break
+
+                    rows: dict[str, Any] = {}
+                    if table_data:
+                        for cell in batch_cells:
+                            # locator 的 cell 形如 "{row}:{column}"
+                            # （见 coordinator._locator_of：note:{section}!{r}:{c}）
+                            if ":" in str(cell):
+                                row_key, col_key = str(cell).split(":", 1)
+                            else:
+                                row_key, col_key = str(cell), ""
+                            got = _get_cell_value(table_data, row_key, col_key)
+                            if got is not None:
+                                rows[cell] = got
+
                     for target, cell in zip(batch_targets, batch_cells):
                         if cell in rows:
                             raw = rows[cell]
@@ -308,7 +357,14 @@ class NoteDomainReader:
                             except Exception:
                                 results[target.addr_id] = str(raw) if raw is not None else None
                 except Exception:
-                    pass
+                    # 🔴 不得静默 `pass`：这里原本吞掉了「表根本不存在」这类接线错误
+                    #    （`disclosure_note_cells` 从未建过），于是 note 域引用恒取空、
+                    #    公式照算，四层守卫全绿 —— 正是 fail-open 掩盖接线错误那类最贵的坑。
+                    #    仍不向上抛（单 domain 失败不该炸整批取值），但**必须留 ERROR**。
+                    logger.exception(
+                        "note 域取值失败（project=%s year=%s section=%r，%d 个 cell 记 miss）",
+                        pid, yr, section, len(batch_cells),
+                    )
 
         return results
 
@@ -398,7 +454,14 @@ class FormulaValueLoader:
             try:
                 domain_values = await reader.read_batch(domain_targets)
             except Exception as exc:
-                # domain 级失败 → 全部 miss
+                # domain 级失败 → 全部 miss。
+                # 注意：本分支**捕不到** reader 内部已 try/except 掉的异常 —— 那些
+                # 只在 reader 自己的 logger.exception 里可见（曾经是 `pass`，于是
+                # `report_rows`/`disclosure_note_cells` 两张不存在的表连 issues 都不留）。
+                logger.error(
+                    "domain %r 批量取值失败，%d 个引用记 error：%s",
+                    domain, len(domain_targets), exc,
+                )
                 for t in domain_targets:
                     result.issues.append(
                         LoadIssue(addr_id=t.addr_id, kind="error", detail=str(exc))

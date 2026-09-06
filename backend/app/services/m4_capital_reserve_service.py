@@ -90,7 +90,7 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     result = await db.execute(
         sa.text("""
             SELECT wp.project_id, p.audit_year
-            FROM working_papers wp
+            FROM working_paper wp
             JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
         """),
@@ -280,9 +280,9 @@ async def import_data(
             item_id = f"M4-{sheet_suffix}-row-{row_idx - 1}"
             await db.execute(
                 sa.text("""
-                    INSERT INTO checklist_responses (id, workpaper_id, item_id, conclusion, status)
+                    INSERT INTO checklist_responses (id, wp_id, item_id, conclusion, status)
                     VALUES (:id, :wid, :iid, :conclusion, 'imported')
-                    ON CONFLICT (workpaper_id, item_id)
+                    ON CONFLICT (wp_id, item_id)
                     DO UPDATE SET conclusion = :conclusion, status = 'imported'
                 """),
                 {
@@ -377,7 +377,7 @@ async def get_j3_linkage(wp_id: str, db: AsyncSession) -> dict[str, Any]:
             sa.text("""
                 SELECT cr.conclusion
                 FROM checklist_responses cr
-                JOIN working_papers wp ON wp.id = cr.workpaper_id
+                JOIN working_paper wp ON wp.id = cr.wp_id
                 JOIN wp_index wi ON wi.project_id = wp.project_id
                     AND wi.wp_code = 'J3'
                 WHERE wp.project_id = :pid
@@ -399,7 +399,7 @@ async def get_j3_linkage(wp_id: str, db: AsyncSession) -> dict[str, Any]:
             sa.text("""
                 SELECT cr.conclusion
                 FROM checklist_responses cr
-                JOIN working_papers wp ON wp.id = cr.workpaper_id
+                JOIN working_paper wp ON wp.id = cr.wp_id
                 WHERE wp.project_id = :pid
                     AND cr.item_id LIKE 'M2-fx-diff%'
                 LIMIT 1
@@ -462,7 +462,7 @@ async def _load_responses(wp_id: str, db: AsyncSession) -> dict[str, dict[str, A
         sa.text(
             "SELECT item_id, conclusion, evidence, status "
             "FROM checklist_responses "
-            "WHERE workpaper_id = :wid"
+            "WHERE wp_id = :wid"
         ),
         {"wid": wp_id},
     )

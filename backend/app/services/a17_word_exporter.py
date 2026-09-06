@@ -295,7 +295,7 @@ class A17WordExporter:
 
             # 查询 project.business_category
             proj_result = await db.execute(
-                text("SELECT business_category FROM project WHERE id = :pid"),
+                text("SELECT business_category FROM projects WHERE id = :pid"),
                 {"pid": str(project_id)},
             )
             proj_row = proj_result.fetchone()

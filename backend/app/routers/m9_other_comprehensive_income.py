@@ -324,7 +324,7 @@ async def m9_tb_writeback(
 
     # 从 wp_id 获取 project_id
     wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_papers WHERE id = :wp_id"),
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
         {"wp_id": wp_id},
     )
     wp_row = wp_result.fetchone()

@@ -174,7 +174,7 @@ async def render(ctx: RenderContext) -> dict[str, Any]:
                 sa.text(
                     "SELECT item_id, conclusion, evidence, status "
                     "FROM checklist_responses "
-                    "WHERE workpaper_id = :wid"
+                    "WHERE wp_id = :wid"
                 ),
                 {"wid": str(ctx.wp_id)},
             )

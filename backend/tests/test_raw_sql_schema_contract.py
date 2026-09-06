@@ -91,8 +91,16 @@ def _extract_sql_strings(source: str) -> list[str]:
     """
     blocks: list[str] = []
     # 匹配 text( / sa.text( / sql_text( / _text( 后紧跟的字符串字面量
+    #
+    # 🔴 `(?:[frbFRB]{1,2})?` 这个前缀组不能省：没有它，**f-string 写的 SQL 整段被跳过**。
+    #    2026-09-06 实测代价 —— `formula_runtime/value_loader.py` 的
+    #    `f"SELECT row_code, {col_name} FROM report_rows "` 引用了一张**从未建过**的表，
+    #    而本测试长期全绿；该 reader 又被 `except Exception: pass` 完全静默吞掉，
+    #    于是「公式引用 report 域 → 静默取空 → 照算出错值」在四层守卫下全部隐形。
+    #    f-string 是拼动态列名/表名最常见的写法，恰恰是最该扫的那一类。
     call_re = re.compile(
         r"""(?:^|[^\w.])(?:sa\.text|sql_text|sa_text|_text|text)\s*\(\s*"""
+        r"""(?:[frbFRB]{1,2})?"""
         r"""(?:"{3}(.*?)"{3}|'{3}(.*?)'{3}|"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')""",
         re.DOTALL,
     )

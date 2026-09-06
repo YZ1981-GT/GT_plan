@@ -39,6 +39,20 @@ _ALLOWED_FILES = {
     "services/formula_engine.py",
     # 以下是 legacy adapter / deprecation shim 仍需暂时保留
     "services/formula_parse_utils.py",
+    # ── note_source_resolvers.py：附注 SUM 绑定的**行内**求和 ─────────────────
+    # 🔴 这条豁免与本守卫的意图**同向**，不是给它开后门：
+    #    `_resolve_formula_sum` 把 binding.cells 拼成 `ROW('c1') + ROW('c2') …`，
+    #    连同一份**内存** row_values 字典交给 evaluate_formula 求值，其 docstring
+    #    写明「复用既有 evaluate_formula 内核…不新造求值器，满足 Req1.2 / Property4」。
+    #    走不了 engine.execute_formula 的原因是两者形态不兼容（已核实 2026-09-06）：
+    #      · execute_formula 要 FormulaRecord + FormulaContext 两个结构化对象，
+    #        而这里只有一个临时字符串表达式，没有落库的公式定义；
+    #      · execute_formula **不支持** row_values（engine.py 内该标识符 0 次出现），
+    #        而本场景的值全部来自当前附注表的同表坐标，不经任何 domain reader。
+    #    强行改造 = 为「附注行内求和」凭空造一条 FormulaRecord，属功能改造而非修红，
+    #    且会把一个纯函数式求和变成需要 db/ownership 上下文的重路径。
+    #    → 因此登记豁免。**新增**消费者仍应被本守卫拦下（这正是它的价值）。
+    "services/note_source_resolvers.py",
 }
 
 

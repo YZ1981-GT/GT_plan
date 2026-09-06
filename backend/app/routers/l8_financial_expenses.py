@@ -56,7 +56,7 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
         sa.text("""
             SELECT wp.project_id, p.audit_year,
                    COALESCE(p.audit_period_end, MAKE_DATE(p.audit_year, 12, 31)) AS report_date
-            FROM working_papers wp
+            FROM working_paper wp
             JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
         """),

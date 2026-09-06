@@ -67,7 +67,7 @@ async def _get_wp_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     result = await db.execute(
         sa.text("""
             SELECT wp.project_id, p.audit_year
-            FROM working_papers wp
+            FROM working_paper wp
             JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
         """),
@@ -94,7 +94,7 @@ async def _load_responses(wp_id: str, db: AsyncSession) -> dict[str, dict[str, A
         sa.text("""
             SELECT item_id, value
             FROM checklist_responses
-            WHERE working_paper_id = :wp_id
+            WHERE wp_id = :wp_id
               AND item_id LIKE 'M6-%'
         """),
         {"wp_id": wp_id},
@@ -257,9 +257,9 @@ async def import_data(
             # UPSERT checklist_responses
             await db.execute(
                 sa.text("""
-                    INSERT INTO checklist_responses (working_paper_id, item_id, value)
+                    INSERT INTO checklist_responses (wp_id, item_id, value)
                     VALUES (:wp_id, :item_id, :value)
-                    ON CONFLICT (working_paper_id, item_id)
+                    ON CONFLICT (wp_id, item_id)
                     DO UPDATE SET value = EXCLUDED.value
                 """),
                 {"wp_id": wp_id, "item_id": item_id, "value": str(value)},

@@ -346,7 +346,7 @@ async def get_cross_wp_summary(project_id: str, db: Any) -> dict[str, Any]:
                 sa.text(
                     "SELECT cr.item_id, cr.conclusion "
                     "FROM checklist_responses cr "
-                    "JOIN working_papers wp ON wp.id = cr.wp_id "
+                    "JOIN working_paper wp ON wp.id = cr.wp_id "
                     "WHERE wp.project_id = :pid "
                     "AND cr.item_id LIKE 'N2-1-tax-accrual-%'"
                 ),

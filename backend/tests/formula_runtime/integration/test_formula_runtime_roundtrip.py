@@ -54,8 +54,8 @@ async def test_four_domain_real_write(
                     (id, refresh_id, unit_scope, before_value, domain,
                      target_locator, after_value, before_version, after_version)
                 VALUES
-                    (:sid, :rid, :scope, :bv::jsonb, :domain,
-                     :locator::jsonb, :av::jsonb, :bver, :aver)
+                    (:sid, :rid, :scope, CAST(:bv AS jsonb), :domain,
+                     CAST(:locator AS jsonb), CAST(:av AS jsonb), :bver, :aver)
             """),
             {
                 "sid": str(snapshot_id),
@@ -200,7 +200,7 @@ async def test_partial_success_conservation(
             VALUES
                 (:rid, :pid, 2025, :oid, 'partner', 'workpaper,report,note',
                  :hash, :cnt, 'partial_success',
-                 :detail::jsonb, 'partial_success')
+                 CAST(:detail AS jsonb), 'partial_success')
         """),
         {
             "rid": str(run_id),
@@ -220,7 +220,7 @@ async def test_partial_success_conservation(
                     (id, refresh_id, unit_scope, before_value, domain, after_value,
                      before_version, after_version)
                 VALUES (:sid, :rid, :scope, '{"v": 0}'::jsonb, 'workpaper',
-                        :av::jsonb, :bv, :aver)
+                        CAST(:av AS jsonb), :bv, :aver)
             """),
             {
                 "sid": str(uuid.uuid4()),
@@ -276,9 +276,9 @@ async def test_before_after_rollback_roundtrip(
                 (id, refresh_id, unit_scope, before_value, domain,
                  target_locator, after_value, before_version, after_version)
             VALUES
-                (:sid, :rid, 'report:revenue', :bv::jsonb, 'report',
+                (:sid, :rid, 'report:revenue', CAST(:bv AS jsonb), 'report',
                  '{"report_type": "IS", "row_code": "revenue"}'::jsonb,
-                 :av::jsonb, 'v1', 'v2')
+                 CAST(:av AS jsonb), 'v1', 'v2')
         """),
         {
             "sid": str(snapshot_id),
@@ -538,7 +538,9 @@ async def test_audit_snapshot_outbox_consistency(
             "rid": str(run_id),
             "pid": str(integration_project_id),
             "oid": str(uuid.uuid4()),
-            "hash": "consistency_" + "a" * 53,
+            # tb_snapshot_hash 是 varchar(64)（sha256 hex 宽度）；
+            # 原值 "consistency_" + "a"*53 = 65 字符，溢出一位 ⇒ StringDataRightTruncation。
+            "hash": "consistency_" + "a" * 52,
         },
     )
 
@@ -550,7 +552,7 @@ async def test_audit_snapshot_outbox_consistency(
                     (id, refresh_id, unit_scope, before_value, domain,
                      after_value, before_version, after_version)
                 VALUES (:sid, :rid, :scope, '{"v": 0}'::jsonb, 'workpaper',
-                        :av::jsonb, 'v0', :aver)
+                        CAST(:av AS jsonb), 'v0', :aver)
             """),
             {
                 "sid": str(uuid.uuid4()),

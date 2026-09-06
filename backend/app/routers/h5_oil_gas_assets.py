@@ -369,7 +369,7 @@ async def _load_rows_from_db(db: AsyncSession, wp_id: str, item_id: str) -> list
     result = await db.execute(
         sa.text("""
             SELECT remark FROM checklist_responses
-            WHERE working_paper_id = :wp_id AND item_id = :item_id
+            WHERE wp_id = :wp_id AND item_id = :item_id
             LIMIT 1
         """),
         {"wp_id": wp_id, "item_id": item_id},
@@ -389,9 +389,9 @@ async def _save_rows_to_db(db: AsyncSession, wp_id: str, item_id: str, rows: lis
     json_data = json.dumps(rows, ensure_ascii=False)
     await db.execute(
         sa.text("""
-            INSERT INTO checklist_responses (id, working_paper_id, item_id, remark, conclusion)
+            INSERT INTO checklist_responses (id, wp_id, item_id, remark, conclusion)
             VALUES (gen_random_uuid(), :wp_id, :item_id, :remark, NULL)
-            ON CONFLICT (working_paper_id, item_id)
+            ON CONFLICT (wp_id, item_id)
             DO UPDATE SET remark = :remark
         """),
         {"wp_id": wp_id, "item_id": item_id, "remark": json_data},

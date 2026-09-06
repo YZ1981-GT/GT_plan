@@ -37,7 +37,25 @@ from app.services.draft_refresh_service import PresetApplication, RefreshResult,
 
 
 def _run(coro):
-    return asyncio.get_event_loop().run_until_complete(coro)
+    """跑一个协程，**不依赖也不改动**主线程的全局 event loop 状态。
+
+    🔴 原实现是 `asyncio.get_event_loop().run_until_complete(coro)`，它依赖
+    「主线程存在一个当前 loop」这个隐含前提。该前提会被**同一次 pytest 运行里的
+    其他测试文件**打破：本仓库有多个测试在模块/import 期直接调 `asyncio.run()`
+    （`test_adjudication_adapter.py` L524/L559、`test_orchestrator_real_mutations.py`
+    L477/L547、`test_prefill_wp_prev_resolution.py` L466），而 `asyncio.run` 结束时
+    会关闭并**清空**主线程的 loop 状态 ⇒ 之后 `get_event_loop()` 直接抛
+    `RuntimeError: There is no current event loop in thread 'MainThread'`。
+    实测（2026-09-06）：本文件单跑 11 passed，与上述任一文件同批即 10 failed。
+    另外 `get_event_loop()` 在无运行 loop 时的这种用法自 Python 3.12 起已废弃。
+
+    → 自建自关：每次调用新建 loop、用完 close，既不读也不写全局状态。
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
 
 
 class _FakeDb:

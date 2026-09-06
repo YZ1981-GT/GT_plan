@@ -372,7 +372,7 @@ async def n2_tb_writeback(
 
     # 从 wp_id 获取 project_id
     wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_papers WHERE id = :wp_id"),
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
         {"wp_id": wp_id},
     )
     wp_row = wp_result.fetchone()
@@ -545,8 +545,9 @@ async def _load_project_context(wp_id: str, db: AsyncSession) -> dict[str, Any]:
     """从 wp_id 加载项目上下文信息供 AI 生成使用。"""
     result = await db.execute(
         sa.text("""
-            SELECT p.name AS client_name, p.audit_year, p.industry
-            FROM working_papers wp
+            SELECT p.name AS client_name, p.audit_year,
+                   p.business_category AS industry
+            FROM working_paper wp
             JOIN projects p ON p.id = wp.project_id
             WHERE wp.id = :wp_id
         """),

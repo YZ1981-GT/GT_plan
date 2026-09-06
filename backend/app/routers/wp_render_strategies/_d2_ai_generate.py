@@ -253,7 +253,7 @@ async def _load_d2_cross_context(wp_id: str, db: AsyncSession) -> dict[str, Any]
             sa.text("""
                 SELECT item_id, remark
                 FROM checklist_responses
-                WHERE workpaper_id = :wp_id
+                WHERE wp_id = :wp_id
                   AND item_id LIKE 'D2-%'
             """),
             {"wp_id": wp_id},

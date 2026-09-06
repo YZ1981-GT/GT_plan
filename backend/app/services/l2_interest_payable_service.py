@@ -267,7 +267,7 @@ class L2InterestPayableService:
         """从同project下的其他wp加载利息测算合计
 
         通过 cross-project JOIN:
-        working_papers wp1 (当前L2) JOIN working_papers wp2 (同project)
+        working_papers wp1 (当前L2) JOIN working_paper wp2 (同project)
         → checklist_responses cr (目标item_id)
         """
         total: float = 0.0
@@ -275,8 +275,8 @@ class L2InterestPayableService:
             result = await db.execute(
                 sa.text(
                     "SELECT cr.remark FROM checklist_responses cr "
-                    "JOIN working_papers wp1 ON wp1.id = cr.wp_id "
-                    "JOIN working_papers wp2 ON wp2.project_id = wp1.project_id "
+                    "JOIN working_paper wp1 ON wp1.id = cr.wp_id "
+                    "JOIN working_paper wp2 ON wp2.project_id = wp1.project_id "
                     "WHERE wp2.id = :wp_id "
                     "AND cr.item_id = :item_id "
                     "LIMIT 1"

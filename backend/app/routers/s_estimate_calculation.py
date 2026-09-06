@@ -152,7 +152,7 @@ async def s_estimate_tb_writeback(
     wp_result = await db.execute(
         sa.text(
             "SELECT wp.project_id, p.audit_year "
-            "FROM working_papers wp "
+            "FROM working_paper wp "
             "JOIN projects p ON p.id = wp.project_id "
             "WHERE wp.id = :wp_id"
         ),
@@ -251,7 +251,7 @@ async def s_estimate_tb_writeback_batch(
     wp_result = await db.execute(
         sa.text(
             "SELECT wp.project_id, p.audit_year "
-            "FROM working_papers wp "
+            "FROM working_paper wp "
             "JOIN projects p ON p.id = wp.project_id "
             "WHERE wp.id = :wp_id"
         ),
@@ -331,7 +331,7 @@ async def s_estimate_auto_data(
     wp_result = await db.execute(
         sa.text(
             "SELECT wp.project_id, p.audit_year "
-            "FROM working_papers wp "
+            "FROM working_paper wp "
             "JOIN projects p ON p.id = wp.project_id "
             "WHERE wp.id = :wp_id"
         ),

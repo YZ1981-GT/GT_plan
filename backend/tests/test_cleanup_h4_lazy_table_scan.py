@@ -62,6 +62,24 @@ INFRA_TABLES = {
     "schema_drift_log": "backend/app/core/schema_drift_detector.py",
 }
 
+# 一次性运维脚本建的表（**不在 `app/` 生产路径内**，不算绕 D6）
+#
+# 与 INFRA_TABLES 的区别：后者是后端进程启动/运行时依赖的基础设施；这一类只在
+# 人工执行 `backend/scripts/**` 下的运维脚本时才建，生产请求路径永不触达。
+# 判据（三条都要满足才归此类，否则应收口进迁移）：
+#   1. 建表语句在 `backend/scripts/` 下，`app/` 内零引用；
+#   2. 脚本本身是一次性/自愈用途（清理、诊断、补齐），不是业务功能；
+#   3. 该表已在 `SchemaDriftDetector.KNOWN_ALLOWLIST` 或与 ORM 单一真源对齐
+#      （不构成第二套 schema 真源）。
+# 前两张是清理脚本的回滚备份表（`--rollback` 依赖它们，故清理完成后仍保留）；
+# 第三张是「表缺失时快速自愈」脚本，其列集/索引集显式声明与 ORM + V033/V051/V101
+# 对齐（见脚本头部 R10.5 单一真源约束）。
+ONE_OFF_SCRIPT_TABLES = {
+    "_note_ai_text_backup": "backend/scripts/fix/_fix_clear_stale_ai_text_content.py",
+    "_note_text_markdown_backup": "backend/scripts/diagnose_note_text_markdown.py",
+    "custom_query_templates": "backend/scripts/_ensure_custom_query_tables.py",
+}
+
 # 本 spec 处理的表（已迁移入 D6）
 THIS_SPEC_TABLES = {"account_note_mapping", "consol_cell_comments"}
 
@@ -165,7 +183,10 @@ class TestH4LazyTableScan:
         """扫描结果中无未记录的懒建表（排除基础设施表 + 已迁移表）。"""
         files = _collect_python_files()
         found = _scan_lazy_create_tables(files)
-        all_known = set(KNOWN_LAZY_TABLES) | set(INFRA_TABLES) | set(MIGRATED_TO_D6_TABLES) | set(ELIMINATED_LAZY_TABLES)
+        all_known = (
+            set(KNOWN_LAZY_TABLES) | set(INFRA_TABLES) | set(MIGRATED_TO_D6_TABLES)
+            | set(ELIMINATED_LAZY_TABLES) | set(ONE_OFF_SCRIPT_TABLES)
+        )
         unknown = set(found.keys()) - all_known
         assert unknown == set(), (
             f"发现未记录的懒建表: {unknown}\n"
@@ -226,7 +247,10 @@ class TestH4Property:
         （业务表 + 基础设施表）。
         """
         found = _scan_lazy_create_tables(files)
-        all_known = set(KNOWN_LAZY_TABLES) | set(INFRA_TABLES) | set(MIGRATED_TO_D6_TABLES) | set(ELIMINATED_LAZY_TABLES)
+        all_known = (
+            set(KNOWN_LAZY_TABLES) | set(INFRA_TABLES) | set(MIGRATED_TO_D6_TABLES)
+            | set(ELIMINATED_LAZY_TABLES) | set(ONE_OFF_SCRIPT_TABLES)
+        )
         unknown = set(found.keys()) - all_known
         assert unknown == set(), (
             f"随机抽样发现未记录的懒建表: {unknown}\n"

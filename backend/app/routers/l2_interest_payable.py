@@ -475,8 +475,8 @@ async def l2_accrual_check(
         l1_result = await db.execute(
             sa.text(
                 "SELECT cr.remark FROM checklist_responses cr "
-                "JOIN working_papers wp1 ON wp1.id = cr.wp_id "
-                "JOIN working_papers wp2 ON wp2.project_id = wp1.project_id "
+                "JOIN working_paper wp1 ON wp1.id = cr.wp_id "
+                "JOIN working_paper wp2 ON wp2.project_id = wp1.project_id "
                 "WHERE wp2.id = :wp_id "
                 "AND cr.item_id = 'L1-interest-calc-rows' "
                 "LIMIT 1"
@@ -497,8 +497,8 @@ async def l2_accrual_check(
         l3_result = await db.execute(
             sa.text(
                 "SELECT cr.remark FROM checklist_responses cr "
-                "JOIN working_papers wp1 ON wp1.id = cr.wp_id "
-                "JOIN working_papers wp2 ON wp2.project_id = wp1.project_id "
+                "JOIN working_paper wp1 ON wp1.id = cr.wp_id "
+                "JOIN working_paper wp2 ON wp2.project_id = wp1.project_id "
                 "WHERE wp2.id = :wp_id "
                 "AND cr.item_id = 'L3-interest-calc-rows' "
                 "LIMIT 1"

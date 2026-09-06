@@ -105,7 +105,7 @@ async def export_data(
             sa.text(
                 "SELECT item_id, conclusion, evidence "
                 "FROM checklist_responses "
-                "WHERE workpaper_id = :wid AND item_id LIKE 'M10-2-row-%' "
+                "WHERE wp_id = :wid AND item_id LIKE 'M10-2-row-%' "
                 "ORDER BY item_id"
             ),
             {"wid": wp_id},
@@ -222,9 +222,9 @@ async def import_data(
         # upsert到checklist_responses
         await db.execute(
             sa.text(
-                "INSERT INTO checklist_responses (workpaper_id, item_id, conclusion, status) "
+                "INSERT INTO checklist_responses (wp_id, item_id, conclusion, status) "
                 "VALUES (:wid, :iid, :conclusion, 'imported') "
-                "ON CONFLICT (workpaper_id, item_id) "
+                "ON CONFLICT (wp_id, item_id) "
                 "DO UPDATE SET conclusion = :conclusion, status = 'imported'"
             ),
             {"wid": wp_id, "iid": item_id, "conclusion": conclusion_json},
@@ -295,7 +295,7 @@ async def get_classification_detail(
             sa.text(
                 "SELECT item_id, conclusion, evidence "
                 "FROM checklist_responses "
-                "WHERE workpaper_id = :wid AND item_id LIKE :prefix "
+                "WHERE wp_id = :wid AND item_id LIKE :prefix "
                 "ORDER BY item_id"
             ),
             {"wid": wp_id, "prefix": f"{_CLASSIFICATION_ITEM_PREFIX}%"},
@@ -356,7 +356,7 @@ async def get_classification_summary(
             sa.text(
                 "SELECT item_id, conclusion "
                 "FROM checklist_responses "
-                "WHERE workpaper_id = :wid AND item_id LIKE :prefix "
+                "WHERE wp_id = :wid AND item_id LIKE :prefix "
                 "ORDER BY item_id"
             ),
             {"wid": wp_id, "prefix": f"{_CLASSIFICATION_ITEM_PREFIX}%"},

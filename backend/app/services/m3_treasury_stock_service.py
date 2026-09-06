@@ -323,7 +323,7 @@ async def get_tb_seed(wp_id: str, db: AsyncSession) -> dict[str, Any]:
             await db.execute(
                 sa.text(
                     "SELECT w.project_id, p.audit_year "
-                    "FROM working_papers w "
+                    "FROM working_paper w "
                     "JOIN projects p ON w.project_id = p.id "
                     "WHERE w.id = :wp_id"
                 ),

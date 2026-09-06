@@ -43,7 +43,7 @@ async def check_industry_applicability(wp_id: str, db: AsyncSession) -> dict[str
                 SELECT p.business_category
                 FROM projects p
                 JOIN wp_index wi ON wi.project_id = p.id
-                JOIN working_papers wp ON wp.id = wi.wp_id
+                JOIN working_paper wp ON wp.wp_index_id = wi.id
                 WHERE wp.id = :wp_id
             """),
             {"wp_id": wp_id},

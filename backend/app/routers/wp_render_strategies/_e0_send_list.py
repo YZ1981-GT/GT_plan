@@ -200,7 +200,7 @@ async def _build_e05_prefill_from_f3(db, project_id) -> dict | None:
     # 读 F3-2 的行数据（在 checklist_responses 里）
     cr_query = sa.text("""
         SELECT value FROM checklist_responses
-        WHERE working_paper_id = :wp_id AND item_id = 'F3-2-rows'
+        WHERE wp_id = :wp_id AND item_id = 'F3-2-rows'
     """)
     cr_result = await db.execute(cr_query, {"wp_id": f3_wp_id})
     cr_row = cr_result.first()

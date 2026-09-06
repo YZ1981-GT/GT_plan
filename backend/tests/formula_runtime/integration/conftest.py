@@ -19,6 +19,7 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 
 # ─── PG availability detection ─────────────────────────────────────────────────
 
@@ -43,8 +44,34 @@ def _check_pg_connectivity() -> bool:
             conn = await asyncpg.connect(url, timeout=3)
             await conn.close()
 
-        asyncio.get_event_loop().run_until_complete(_probe())
-        return True
+        # 🔴 探活必须**完全不触碰主线程的 asyncio 状态** —— 本函数在 import 期执行，
+        #    而 import 期的任何 loop 操作都会波及**同一次 pytest 运行里的其他测试文件**：
+        #      · `get_event_loop().run_until_complete(...)`（原实现）→ 在主线程留下一个
+        #        全局 loop，与 pytest-asyncio 为每个测试新建的 loop 打架；
+        #      · `asyncio.run(...)`（一度改成这样，实测更糟）→ 跑完**关闭并清空**全局
+        #        loop 状态，导致后续依赖 `get_event_loop()` 的测试直接
+        #        `RuntimeError: There is no current event loop in thread 'MainThread'`。
+        #        实测代价：本文件 + test_draft_refresh_endpoint.py 同批 → 后者 10 个全挂，
+        #        而两者单跑各自全绿。
+        #    → 放到独立线程里跑一个自建自关的 loop：主线程 asyncio 状态零改动。
+        import threading
+
+        outcome: dict[str, bool] = {"ok": False}
+
+        def _runner() -> None:
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(_probe())
+                outcome["ok"] = True
+            except Exception:
+                outcome["ok"] = False
+            finally:
+                loop.close()
+
+        th = threading.Thread(target=_runner, daemon=True)
+        th.start()
+        th.join(timeout=10)
+        return outcome["ok"]
     except Exception:
         return False
 
@@ -58,32 +85,41 @@ PG_REACHABLE = _check_pg_connectivity()
 
 # ─── Engine + session factory (only instantiate if PG available) ────────────────
 
-_engine = None
-_session_factory = None
-
-
-def _get_engine():
-    global _engine
-    if _engine is None and PG_AVAILABLE:
-        connect_args = {"ssl": False} if os.getenv("DB_DISABLE_SSL", "True") == "True" else {}
-        _engine = create_async_engine(
-            DATABASE_URL,
-            echo=False,
-            pool_size=5,
-            max_overflow=5,
-            pool_pre_ping=True,
-            connect_args=connect_args,
-        )
-    return _engine
-
-
-def _get_session_factory():
-    global _session_factory
-    if _session_factory is None:
-        eng = _get_engine()
-        if eng is not None:
-            _session_factory = async_sessionmaker(eng, class_=AsyncSession, expire_on_commit=False)
-    return _session_factory
+# 🔴 **不要**把 engine 做成模块级单例（本文件曾经如此，代价见下）
+#
+# `pytest-asyncio` 给**每个** async 测试开一个新 event loop，测试结束即关闭。
+# 而 asyncpg 的连接是绑定在创建它的 loop 上的。一旦 engine 跨测试复用：
+#   第 1 个测试跑完 → loop 关闭 → 池里留着绑在死 loop 上的连接
+#   第 2 个测试取到那条连接 → `RuntimeError: Event loop is closed`
+#                             / `AttributeError: 'NoneType' object has no attribute 'send'`
+# 表现是「单跑全绿、同批从第二个起全挂」——本文件 6 个测试长期如此（2026-09-06 实测：
+# 单跑 7 个里 6 绿，同批 3 failed + 3 errors）。
+#
+# 修法两条同时用：
+#   1. engine 按测试创建、测试结束 `dispose()`，不跨 loop 复用；
+#   2. `poolclass=NullPool` —— 不做连接池，用完即关，杜绝「池里残留死连接」。
+# 代价是每个测试多一次 TCP 建连（本文件 7 个测试，可忽略）。
+#
+# 🔴 两条**各自独立充分**，不是「必须凑齐才生效」（2026-09-06 四组合实测）：
+#       A 每测试新建 + NullPool  → 7 passed
+#       B 共享 engine + NullPool → 7 passed
+#       C 每测试新建 + 默认池    → 7 passed
+#       D 共享 engine + 默认池   → 4 passed + 3 errors  ← 唯一打红，即原实现
+#   即「跨测试复用连接」才是真因：去掉池、或不共享 engine，任一即可。
+#   两条同时用属冗余加固；但**不要因为「另一条会兜住」而删掉其中一条** ——
+#   删到只剩 D 那种组合就会立刻回归，而它的表现是「单跑全绿、同批从第二个起挂」，
+#   极易被误判成偶发。
+def _make_engine():
+    """按调用方所在 event loop 新建 engine（调用方负责 dispose）。"""
+    if not PG_AVAILABLE:
+        return None
+    connect_args = {"ssl": False} if os.getenv("DB_DISABLE_SSL", "True") == "True" else {}
+    return create_async_engine(
+        DATABASE_URL,
+        echo=False,
+        poolclass=NullPool,
+        connect_args=connect_args,
+    )
 
 
 # ─── Fixtures ──────────────────────────────────────────────────────────────────
@@ -105,17 +141,24 @@ def _require_pg():
 
 @pytest_asyncio.fixture()
 async def pg_session() -> AsyncGenerator[AsyncSession, None]:
-    """Provide a real PG async session that rolls back after each test."""
-    factory = _get_session_factory()
-    if factory is None:
-        pytest.fail("PostgreSQL session factory unavailable")
+    """Provide a real PG async session that rolls back after each test.
 
-    async with factory() as session:
-        # Start a transaction that we will roll back after the test
-        async with session.begin():
-            yield session
-            # Rollback ensures test isolation — no committed side effects
-            await session.rollback()
+    engine 在本 fixture 内创建并 dispose —— 与测试的 event loop 同生命周期
+    （见文件上方 `_make_engine` 的注释：跨 loop 复用会让同批执行从第二个起全挂）。
+    """
+    engine = _make_engine()
+    if engine is None:
+        pytest.fail("PostgreSQL session factory unavailable")
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            # Start a transaction that we will roll back after the test
+            async with session.begin():
+                yield session
+                # Rollback ensures test isolation — no committed side effects
+                await session.rollback()
+    finally:
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture()
@@ -124,15 +167,20 @@ async def pg_committed_session() -> AsyncGenerator[AsyncSession, None]:
 
     CAUTION: Tests using this fixture create real data.
     Use unique IDs and clean up in teardown.
-    """
-    factory = _get_session_factory()
-    if factory is None:
-        pytest.fail("PostgreSQL session factory unavailable")
 
-    async with factory() as session:
-        yield session
-        # Cleanup: rollback any pending transaction
-        await session.rollback()
+    engine 同 `pg_session`：按测试创建 + dispose，不跨 event loop 复用。
+    """
+    engine = _make_engine()
+    if engine is None:
+        pytest.fail("PostgreSQL session factory unavailable")
+    factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    try:
+        async with factory() as session:
+            yield session
+            # Cleanup: rollback any pending transaction
+            await session.rollback()
+    finally:
+        await engine.dispose()
 
 
 @pytest_asyncio.fixture()

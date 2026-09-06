@@ -220,7 +220,7 @@ async def aggregate_interest_from_l_cycle(
         wp_result = await db.execute(
             sa.text("""
                 SELECT wp.id, wi.wp_code
-                FROM working_papers wp
+                FROM working_paper wp
                 JOIN wp_index wi ON wi.id = wp.wp_index_id
                 WHERE wp.project_id = :pid
                   AND wi.wp_code = ANY(:codes)

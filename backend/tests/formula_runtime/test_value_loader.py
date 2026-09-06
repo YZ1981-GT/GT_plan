@@ -319,6 +319,24 @@ st_target = st.builds(
 )
 
 
+def _run_sync(coro):
+    """在同步（Hypothesis）测试里跑协程，**不依赖也不改动**主线程全局 loop。
+
+    🔴 原写法 `asyncio.get_event_loop().run_until_complete(coro)` 依赖「主线程有
+    当前 loop」，而本仓库多处测试在模块/import 期调 `asyncio.run()`
+    （`test_adjudication_adapter.py` / `test_orchestrator_real_mutations.py` /
+    `test_prefill_wp_prev_resolution.py`），`asyncio.run` 结束会清空该状态 ⇒
+    之后 `get_event_loop()` 抛 `There is no current event loop in thread 'MainThread'`。
+    实测：本文件单跑 12 passed，与上述文件同批则这两个 PBT 必挂。
+    （`get_event_loop()` 的这种用法自 Python 3.12 起亦已废弃。）
+    """
+    loop = asyncio.new_event_loop()
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
+
 @settings(max_examples=5, deadline=None)
 @given(targets=st.lists(st_target, min_size=0, max_size=20))
 def test_property_dedup_canonical_resolve(targets: list[CanonicalFormulaTarget]):
@@ -337,7 +355,7 @@ def test_property_dedup_canonical_resolve(targets: list[CanonicalFormulaTarget])
 
     loader = FormulaValueLoader(readers=readers)  # type: ignore[arg-type]
 
-    result = asyncio.get_event_loop().run_until_complete(loader.load_many(targets))
+    result = _run_sync(loader.load_many(targets))
 
     # 结果中每个 unique addr_id 只出现一次
     unique_addrs = {t.addr_id for t in targets}
@@ -372,7 +390,7 @@ def test_property_batch_query_count(n_refs_per_domain: int, n_domains: int):
             )
 
     loader = FormulaValueLoader(readers=readers)  # type: ignore[arg-type]
-    asyncio.get_event_loop().run_until_complete(loader.load_many(targets))
+    _run_sync(loader.load_many(targets))
 
     # 核心断言：总查询数 = domain 数
     total_calls = sum(r.call_count for r in readers.values())
