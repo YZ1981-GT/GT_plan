@@ -19,6 +19,18 @@ from app.services.gate_rules_ai_content import AIContentMustBeConfirmedRule  # n
 
 logger = logging.getLogger(__name__)
 
+# 🔴 QC-19/20/24 的裁剪判据必须查 `workpaper_procedures`，不是 procedure_instances。
+#    历史缺陷（2026-09-06 修）：原查 procedure_instances 的 name / working_paper_id /
+#    trim_category / trim_status / trim_evidence_refs —— 真库**全都不存在**
+#    ⇒ 每次抛 UndefinedColumn，被各规则的 except 吞成 `return None`，
+#    而 return None 在 gate_engine 里等于「检查通过」⇒ 这三条 blocking 门禁
+#    自上线起从未拦下过任何违规（日志只剩一行 error，调用方看到的是"通过"）。
+#    裁剪真实落库见 services/wp_procedure_service.py 的 trim：
+#      status='not_applicable' + trimmed_by + trimmed_at + trim_reason
+#    映射：mandatory→is_mandatory=true；已裁剪→trimmed_at NOT NULL；缺证据→trim_reason 空。
+#    服务层虽已拦 is_mandatory，但门禁是**独立防线**（要能发现绕过服务层的写入），非冗余。
+#    契约守卫：tests/test_gate_rules_phase14_schema_contract.py
+
 
 # ── QC-19: mandatory 程序裁剪阻断 ──────────────────────────────
 
@@ -32,14 +44,12 @@ class QC19MandatoryTrimRule(GateRule):
         if not wp_id:
             return None
         try:
-            from app.models.workpaper_models import WorkingPaper
-            # 查找关联的 procedure_instances
+            # 判据表与历史缺陷见模块顶部说明
             stmt = text("""
-                SELECT id, name FROM procedure_instances
-                WHERE working_paper_id = :wp_id
-                  AND trim_category = 'mandatory'
-                  AND trim_status = 'trimmed'
-                  AND (is_deleted = false OR is_deleted IS NULL)
+                SELECT id, description FROM workpaper_procedures
+                WHERE wp_id = :wp_id
+                  AND is_mandatory = true
+                  AND trimmed_at IS NOT NULL
                 LIMIT 5
             """)
             result = await db.execute(stmt, {"wp_id": str(wp_id)})
@@ -56,7 +66,9 @@ class QC19MandatoryTrimRule(GateRule):
                 suggested_action="请恢复被裁剪的 mandatory 程序或走例外审批流程",
             )
         except Exception as e:
-            logger.error(f"[QC-19] check error: {e}")
+            # 不向上抛（单规则失败不阻断整体评估），但必须留 traceback ——
+            # 原实现正是靠丢弃它把「列不存在」静默成了「通过」。
+            logger.error(f"[QC-19] check error: {e}", exc_info=True)
             return None
 
 
@@ -72,13 +84,17 @@ class QC20ConditionalNoEvidenceRule(GateRule):
         if not wp_id:
             return None
         try:
+            # 与 QC-19 同源（见模块顶部）。映射：conditional → is_mandatory = false；
+            # 已裁剪 → trimmed_at NOT NULL；缺证据 → trim_reason 为 NULL 或空白。
+            # 该表无 trim_evidence_refs（jsonb 结构化引用数组）这一维度，故现阶段以
+            # 「裁剪理由是否填写」作为证据充分性的可执行判据；将来若补上该列，
+            # 应把判据升级为「引用数组非空」而不是继续沿用理由非空。
             stmt = text("""
-                SELECT id, name FROM procedure_instances
-                WHERE working_paper_id = :wp_id
-                  AND trim_category = 'conditional'
-                  AND trim_status = 'trimmed'
-                  AND (trim_evidence_refs IS NULL OR jsonb_array_length(trim_evidence_refs) = 0)
-                  AND (is_deleted = false OR is_deleted IS NULL)
+                SELECT id, description FROM workpaper_procedures
+                WHERE wp_id = :wp_id
+                  AND is_mandatory = false
+                  AND trimmed_at IS NOT NULL
+                  AND (trim_reason IS NULL OR btrim(trim_reason) = '')
                 LIMIT 5
             """)
             result = await db.execute(stmt, {"wp_id": str(wp_id)})
@@ -92,10 +108,10 @@ class QC20ConditionalNoEvidenceRule(GateRule):
                 severity=self.severity,
                 message=f"conditional 程序裁剪缺少证据引用（{len(rows)}项）",
                 location={"wp_id": str(wp_id), "section": "procedure_status", "procedure_ids": proc_ids},
-                suggested_action="请补充 trim_evidence_refs 后重新提交",
+                suggested_action="请补充裁剪理由（trim_reason）后重新提交",
             )
         except Exception as e:
-            logger.error(f"[QC-20] check error: {e}")
+            logger.error(f"[QC-20] check error: {e}", exc_info=True)
             return None
 
 
@@ -246,13 +262,15 @@ class QC24LLMTrimConflictRule(GateRule):
             return None
         try:
             # 检查是否有已确认的 AI 内容与被裁剪的程序冲突
+            #
+            # 与 QC-19/20 同源（见模块顶部）。procedure_instances 与
+            # workpaper_procedures 是两套程序表，此处按「同一底稿」(wp_id) 关联。
             stmt = text("""
                 SELECT g.id FROM wp_ai_generations g
-                JOIN procedure_instances p ON p.working_paper_id = g.wp_id
+                JOIN workpaper_procedures p ON p.wp_id = g.wp_id
                 WHERE g.wp_id = :wp_id
                   AND g.status = 'confirmed'
-                  AND p.trim_status = 'trimmed'
-                  AND (p.is_deleted = false OR p.is_deleted IS NULL)
+                  AND p.trimmed_at IS NOT NULL
                 LIMIT 1
             """)
             result = await db.execute(stmt, {"wp_id": str(wp_id)})
@@ -268,7 +286,7 @@ class QC24LLMTrimConflictRule(GateRule):
                 )
             return None
         except Exception as e:
-            logger.error(f"[QC-24] check error: {e}")
+            logger.error(f"[QC-24] check error: {e}", exc_info=True)
             return None
 
 
@@ -343,8 +361,10 @@ class QC26NoteSourceMappingMissingRule(GateRule):
                 )
                 return None
             # 检查附注关键披露是否缺少 source_cells 映射
+            # 注：标题列真名 section_title（无 title 列）；上面列守卫使本查询当前不执行，
+            # 但将来补上 is_key_disclosure/source_cells 后写错列名会立刻踩坑。
             stmt = text("""
-                SELECT dn.id, dn.title FROM disclosure_notes dn
+                SELECT dn.id, dn.section_title FROM disclosure_notes dn
                 WHERE dn.project_id = :project_id
                   AND dn.is_key_disclosure = true
                   AND (dn.source_cells IS NULL OR dn.source_cells = '[]'::jsonb)
