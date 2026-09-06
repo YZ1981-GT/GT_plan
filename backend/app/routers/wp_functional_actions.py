@@ -312,7 +312,7 @@ async def _fill_parsed_data(
 
     # 写回
     await db.execute(text(
-        "UPDATE working_paper SET parsed_data = :pd::jsonb WHERE id = :wp_id"
+        "UPDATE working_paper SET parsed_data = CAST(:pd AS jsonb) WHERE id = :wp_id"
     ), {"pd": json.dumps(parsed_data, ensure_ascii=False, default=str), "wp_id": str(wp_id)})
     await db.flush()
 

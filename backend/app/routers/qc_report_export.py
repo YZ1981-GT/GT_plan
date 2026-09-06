@@ -272,7 +272,7 @@ async def export_qc_report(
         await db.execute(
             sql_text(
                 "INSERT INTO app_audit_log (id, user_id, action, resource_type, resource_id, details, created_at) "
-                "VALUES (:id, :uid, :action, :rtype, :rid, :details::jsonb, :now)"
+                "VALUES (:id, :uid, :action, :rtype, :rid, CAST(:details AS jsonb), :now)"
             ),
             {
                 "id": str(uuid.uuid4()),

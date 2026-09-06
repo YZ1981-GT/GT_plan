@@ -275,7 +275,7 @@ class TemporaryGrantService:
         await self.db.execute(
             text(
                 "INSERT INTO app_audit_log (id, user_id, action, resource_type, resource_id, details) "
-                "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, :resource_id, :details::jsonb)"
+                "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, :resource_id, CAST(:details AS jsonb))"
             ),
             {
                 "user_id": str(user_id) if user_id else None,

@@ -1907,7 +1907,7 @@ class DraftRefreshService:
         event_key = f"{run_id}:{event_type}"
         stmt = sa.text("""
             INSERT INTO formula_runtime_outbox (id, event_key, run_id, event_type, payload, attempts)
-            VALUES (:id, :event_key, :run_id, :event_type, :payload::jsonb, 0)
+            VALUES (:id, :event_key, :run_id, :event_type, CAST(:payload AS jsonb), 0)
             ON CONFLICT (event_key) DO NOTHING
         """)
         try:

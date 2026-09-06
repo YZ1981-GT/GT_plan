@@ -179,7 +179,7 @@ async def submit_judgment(
     await db.execute(
         sql_text(
             "UPDATE eqcr_snapshots "
-            "SET snapshot_data = :data::jsonb, judgments = :judgments::jsonb "
+            "SET snapshot_data = CAST(:data AS jsonb), judgments = CAST(:judgments AS jsonb) "
             "WHERE id = :sid"
         ),
         {
@@ -194,7 +194,7 @@ async def submit_judgment(
         await db.execute(
             sql_text(
                 "INSERT INTO app_audit_log (id, user_id, action, resource_type, resource_id, details, created_at) "
-                "VALUES (:id, :uid, :action, :rtype, :rid, :details::jsonb, :now)"
+                "VALUES (:id, :uid, :action, :rtype, :rid, CAST(:details AS jsonb), :now)"
             ),
             {
                 "id": str(uuid.uuid4()),

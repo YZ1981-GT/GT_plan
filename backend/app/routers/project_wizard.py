@@ -506,7 +506,7 @@ async def update_parent_code(
                 "INSERT INTO app_audit_log "
                 "(id, user_id, action, resource_type, resource_id, details, created_at) "
                 "VALUES (gen_random_uuid(), :user_id, :action, :resource_type, "
-                ":resource_id, :details::jsonb, :now)"
+                ":resource_id, CAST(:details AS jsonb), :now)"
             ),
             {
                 "user_id": str(current_user.id),

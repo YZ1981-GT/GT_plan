@@ -212,7 +212,7 @@ async def create_snapshot(
     await db.execute(
         sql_text(
             "INSERT INTO eqcr_snapshots (id, project_id, year, created_by, created_at, snapshot_data, is_current) "
-            "VALUES (:id, :pid, :year, :uid, :now, :data::jsonb, TRUE)"
+            "VALUES (:id, :pid, :year, :uid, :now, CAST(:data AS jsonb), TRUE)"
         ),
         {
             "id": str(snapshot_id),

@@ -112,7 +112,7 @@ class AgingSegmentService:
         await self.db.execute(
             text("""
                 INSERT INTO aging_segments (id, wp_index_id, preset, segments, created_at, updated_at)
-                VALUES (gen_random_uuid(), :wp_id, :preset, :segments::jsonb, now(), now())
+                VALUES (gen_random_uuid(), :wp_id, :preset, CAST(:segments AS jsonb), now(), now())
                 ON CONFLICT (wp_index_id) DO UPDATE SET
                     preset = EXCLUDED.preset,
                     segments = EXCLUDED.segments,
