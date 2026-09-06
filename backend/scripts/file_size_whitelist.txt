@@ -13,6 +13,7 @@
 #   mutate_ie_lifecycle_guards.py —— 变异检验清单（54 条 Mutation 声明式常量 + 四态判读引擎），
 #     条目本身是数据不是逻辑；拆分后「守卫清单 ↔ 变异覆盖率」的分母核对会跨文件。
 #     spec: workpaper-import-export-lifecycle-closure Task 21 + x3 任务 14.1
+backend/app/services/workpaper_sync/projection_first_publication.py  1125
 backend/scripts/check/check_x3_deviation_registry.py  2474
 backend/scripts/diagnose/mutate_ie_lifecycle_guards.py  1290
 
@@ -330,5 +331,9 @@ audit-platform/frontend/src/components/workpaper/sync/__tests__/task69Independen
 #   test_projection_first_publication_pg.py —— 上者的真库判据（独立 schema + 一次
 #     asyncio.run 采集全阶段快照）。判据与它们共享的 `snap` fixture 必须同文件，
 #     否则每个测试各自 async 会污染共享连接池。spec: 同上 任务 F8
+#   projection_first_publication.py —— 首版 published representation 的**唯一**生产路径：
+#     五条准入 + 十阶段全链（instrument → OOXML 门 → 四项实测入参 → loader → adapter
+#     → store 叠加 → commit）。阶段顺序本身就是判据（少一段即假绿），拆分会让
+#     「顺序」与「每阶段的实测入参」跨文件。spec: published-representation-production-path
 audit-platform/frontend/src/components/workpaper/confirmation/GtConfirmationSummary.vue  1955
 audit-platform/frontend/src/views/TrialBalance.vue  4491

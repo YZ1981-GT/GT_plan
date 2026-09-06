@@ -65,6 +65,7 @@ design §Filesystem Layout 的发布协议是**可恢复协议**：
 
 from __future__ import annotations
 
+import logging
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -168,6 +169,11 @@ __all__ = [
     "build_html_content_mutation_service",
     "projection_canonical_digest",
 ]
+
+
+#: 只用于 BP-30 的过渡期退化告警（`plan.instrumentation` 缺失时的 structure_hash 回落）。
+#: 本模块的正常拒绝路径一律**抛类型化异常**而不是记日志 —— 日志不是判据。
+logger = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -619,6 +625,22 @@ class ContentCommitPlan:
     operation_id: uuid.UUID | None = None
     parent_version_id: uuid.UUID | None = None
     contract: SyncContract | None = None
+    #: 受管结构反读锚点（BP-30）。**只有 projection lane 需要**：它是发布时刻算
+    #: 「与请求时刻观测器同构」的 `structure_hash` 所需的四个锚点
+    #: （sheet_key / Excel Table displayName / row-uuid 列标 / 隐藏元数据 sheet 名）。
+    #:
+    #: 由发布宿主用
+    #: `publish_time_structure_hash.anchors_from_instrumentation_spec(provider.instrumentation_spec())`
+    #: 投影得到 —— 首版发布时刻那份 instrumentation definition 还没发布（它与
+    #: representation 同一次事务才成形），所以取不到冻结 payload；请求时刻观测器则从
+    #: 冻结 payload 走 `frozen_anchors_from_instrumentation`。两条来源同值由判据锁死。
+    #:
+    #: 为什么不让 plan 自己去读：plan 按设计**不持有任何 I/O 能力面**
+    #: （`assert_no_mutation_surface` 逐字段实测），读文件/读库都不允许。
+    #:
+    #: 留 `None` 时 `_stage_and_verify` 回落到旧的字节摘要口径并记 WARNING ——
+    #: 那是 BP-30 之前的语义，会让 observer 在请求时刻判「结构漂移」。
+    structure_anchors: Mapping[str, str] | None = None
     room_id: uuid.UUID | None = None
     application_id: uuid.UUID | None = None
     pending_mutation_id: uuid.UUID | None = None
@@ -1537,18 +1559,48 @@ class ContentMutationService:
         self._assert_roundtrip_equivalent(
             intended=projection, extracted=extracted, contract=plan.contract
         )
+        # 🔴 BP-23：把 materialize **写盘前冻结的**三个结构性声明喂给未管理区域比对。
+        #
+        #    此前这里只传 `before/after/contract`，于是 verifier 的
+        #    `row_shift` / `total_formula_rows` / `propagation` 三个入参**生产零消费** ——
+        #    参数在、单测在、没有任何调用方喂它们（假绿第①源「additive 注入即死代码」）。
+        #    后果：任何需要结构性插行的 entry 必在未管理区域比对上打红。
+        #    D2 首版实测（插 729 行）：不传 `row_shift` ⇒ `managed_sheet_unmanaged_cells`
+        #    238 → 632；只传 `row_shift` ⇒ 引用侧三张 sheet 的跨 sheet 公式仍判漂移。
+        #
+        #    判据没有被放宽：三者都是**声明值**而非观测值，apply 与 verify 用同一份 ⇒
+        #    「与声明一致」判等价、「声明之外的任何改动」仍判漂移。
         unmanaged = adapter.verify_unmanaged_regions(
-            before=plan.substrate_path, after=output, contract=plan.contract
+            before=plan.substrate_path,
+            after=output,
+            contract=plan.contract,
+            row_shift=materialized.row_shift,
+            total_formula_rows=materialized.total_formula_rows,
+            propagation=materialized.workbook_row_change,
         )
         unmanaged.assert_equivalent()
 
         # 🔴 Task 26 的「publish 前最后一道 fence」就在这里：extract 等值与未管理区域
         # 都已通过、artifact 尚未进入 `.versions` 命名空间。放到 publish 之后就只剩
         # 「已发布再回滚」，而 publish 是内容寻址的不可变发布，回滚只能留 orphan。
+        # 🔴 BP-30：projection lane 的 `structure_hash` 必须与**请求时刻**观测器
+        #    （`published_identity_observer.recompute_structure_hash`，与
+        #    `ExcelEntryFinalizeGate` 同构）算的是同一个量。
+        #
+        #    在此之前这里写的是 `materialized.structure_hash` =
+        #    `normalized_structure_hash(整份 xlsx 字节)`，即**文件字节**摘要；而 adapter
+        #    接线时观测器按「契约 + 受管结构坐标」重算 ⇒ 两个不可比的量相比，刚发布的
+        #    entry 也照样判 `ObservedIdentityDriftError` ⇒ bidirectional 结构上永为 0。
+        #
+        #    fence 与 representation 必须收到**同一个**值：fence 校验的是「即将发布的
+        #    这份身份」，两处不同就等于校验了一份、落库了另一份。
+        structure_hash = self._projection_structure_hash(
+            plan=plan, output=output, materialized=materialized
+        )
         if fence is not None:
             await fence.before_publish(
                 artifact_sha256=materialized.artifact_sha256,
-                structure_hash=materialized.structure_hash,
+                structure_hash=structure_hash,
                 identity_inventory_sha256=materialized.identity_inventory_sha256,
                 extracted_key_count=len(extracted.values),
             )
@@ -1582,9 +1634,38 @@ class ContentMutationService:
             projection=published_proj,
             materialize=materialized,
             unmanaged=unmanaged,
-            structure_hash=materialized.structure_hash,
+            structure_hash=structure_hash,
             identity_inventory_sha256=materialized.identity_inventory_sha256,
             extracted_key_count=len(extracted.values),
+        )
+
+    def _projection_structure_hash(
+        self, *, plan: ContentCommitPlan, output: Path, materialized: Any
+    ) -> str:
+        """projection lane 的 `structure_hash`（BP-30）。
+
+        有冻结 instrumentation ⇒ 走观测器的同一条链（受管结构坐标摘要）；
+        没有 ⇒ 回落旧的字节摘要并记 WARNING。
+
+        🔴 回落**不是**兜底设计，而是过渡期的显式退化：它保留了 BP-30 之前的语义，
+        因此 observer 在请求时刻仍会判「结构漂移」。判据从两侧钉住 ——
+        发布宿主必须传（AST），且真实 entry 上「observer 重算 == 冻结值」必须成立。
+        """
+        if plan.structure_anchors is None or plan.contract is None:
+            logger.warning(
+                "entry %s: 构造 plan 时未提供 structure_anchors/contract ⇒ structure_hash "
+                "回落字节摘要口径（BP-30 之前的语义）；请求时刻观测器会判结构漂移",
+                plan.entry_id,
+            )
+            return str(materialized.structure_hash)
+        from app.services.workpaper_sync.publish_time_structure_hash import (
+            compute_structure_hash_from_artifact,
+        )
+
+        return compute_structure_hash_from_artifact(
+            data=output.read_bytes(),
+            contract=plan.contract,
+            anchors=plan.structure_anchors,
         )
 
     async def _stage_authoritative(
