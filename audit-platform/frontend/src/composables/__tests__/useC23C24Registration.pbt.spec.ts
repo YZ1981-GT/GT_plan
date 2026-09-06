@@ -334,14 +334,24 @@ describe('Feature: c23-c24-journal-entry-testing, Property 7: 公式不可覆盖
         (entries) => {
           const result = calcBalanceIntegrity(entries)
 
-          // Manually compute expected values
-          const expectedDebit = Math.round(
-            entries.reduce((sum, e) => sum + (e.debit || 0), 0) * 100,
-          ) / 100
-          const expectedCredit = Math.round(
-            entries.reduce((sum, e) => sum + (e.credit || 0), 0) * 100,
-          ) / 100
-          const expectedBalanced = Math.abs(expectedDebit - expectedCredit) < 0.01
+          // 🔴 期望值必须与生产口径同构：**逐笔**进分到「分」后再累加整数分，
+          // 不是「先累加浮点再一次进分」。两者在单笔含亚分小数时会差 1 分 —— 例如
+          // 0.0950000062584877 + 0.005000000353902578：逐笔进分 = 0.10+0.01 = 0.11，
+          // 先求和再进分 = round(0.1000000066×100)/100 = 0.10。
+          // 逐笔进分是会计标准做法（每笔金额本身就只能到分），生产
+          // `calcBalanceIntegrity` 用的正是它；此处原写法是测试自己的口径错误，
+          // 曾让本属性在 fast-check 收缩出亚分反例时必红。
+          let expectedDebitCents = 0
+          let expectedCreditCents = 0
+          for (const e of entries) {
+            expectedDebitCents += Math.round((e.debit || 0) * 100)
+            expectedCreditCents += Math.round((e.credit || 0) * 100)
+          }
+          const expectedDebit = expectedDebitCents / 100
+          const expectedCredit = expectedCreditCents / 100
+          // 平衡判据也必须同构：生产比的是**整数分**是否严格相等，
+          // 不是浮点差 < 0.01（后者会把差 1 分内的不平衡误判成平衡）。
+          const expectedBalanced = expectedDebitCents === expectedCreditCents
 
           // Result must always equal recalculated value — user cannot override
           expect(result.debitTotal).toBeCloseTo(expectedDebit, 2)
@@ -371,9 +381,13 @@ describe('Feature: c23-c24-journal-entry-testing, Property 7: 公式不可覆盖
           const result2 = calcBalanceIntegrity(extended)
 
           // debitTotal must be greater than before (new debit added)
-          // Use raw sum comparison to avoid floating-point accumulation mismatch
-          const rawSum = entries.reduce((s, e) => s + (e.debit || 0), 0) + extraAmount
-          const expectedNewDebit = Math.round(rawSum * 100) / 100
+          // 🔴 同上：期望值按**逐笔进分**算，与生产 `calcBalanceIntegrity` 同构。
+          // 原写法「先把浮点全加起来再一次进分」在单笔含亚分小数时与生产差 1 分
+          // （实测反例 3952.07 vs 3952.08），属测试口径错误而非实现缺陷。
+          let expectedNewCents = 0
+          for (const e of entries) expectedNewCents += Math.round((e.debit || 0) * 100)
+          expectedNewCents += Math.round(extraAmount * 100)
+          const expectedNewDebit = expectedNewCents / 100
           expect(result2.debitTotal).toBeCloseTo(expectedNewDebit, 2)
           // creditTotal unchanged
           expect(result2.creditTotal).toBeCloseTo(result1.creditTotal, 2)

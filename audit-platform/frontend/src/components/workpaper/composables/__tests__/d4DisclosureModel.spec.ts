@@ -39,14 +39,21 @@ describe('buildD4TwoPeriodColumns', () => {
     expect(cols).toHaveLength(5)
   })
 
-  it('每列声明 group 或 flat（Property 13）', () => {
+  it('本表在 group / flat 之间明确表态，且两者不同表并存（Property 13）', () => {
     const cols = buildD4TwoPeriodColumns()
-    for (const col of cols) {
-      expect(
-        col.group || col.flat,
-        `列 ${col.key} 既无 group 又无 flat`,
-      ).toBeTruthy()
-    }
+    // 🔴 2026-09-06 修正判据口径：`flat` 是**表级**语义 —— 后端
+    // `note_sub_table_projector._extract_column_groups` 里
+    // `if any(d.get("flat") for d in defs): return []`，即**任一列**带 flat
+    // 就整表禁止分组推断。原判据「每列都必须声明 group 或 flat」是按列读的，
+    // 逼得两级表头表在标签列补 `flat: true` ⇒ 整表 group 全部失效，
+    // 两级表头渲染不出来（且与 disclosureColumnsCoverage 的「flat 与 group
+    // 互斥」判据直接冲突）。正确口径：整表二选一表态。
+    const hasGroup = cols.some(c => !!c.group)
+    const hasFlat = cols.some(c => c.flat === true)
+    expect(hasGroup || hasFlat, '本表既无 group 又无 flat → 后端会前缀反猜父表头').toBe(true)
+    expect(hasGroup && hasFlat, 'flat 与 group 同表并存 → flat 会整表抑制分组').toBe(false)
+    // 本表是两级表头（本期发生额 / 上期发生额）⇒ 必须走 group 一侧
+    expect(hasGroup).toBe(true)
   })
 
   it('main 变体叶子列名 = 收入/成本', () => {
@@ -77,10 +84,11 @@ describe('buildD4TwoPeriodColumns', () => {
     expect(cols[4].group).toBe('上期发生额')
   })
 
-  it('标签列为 is_label + flat', () => {
+  it('标签列为 is_label 且**不带** flat（本表是两级表头）', () => {
     const cols = buildD4TwoPeriodColumns()
     expect(cols[0].is_label).toBe(true)
-    expect(cols[0].flat).toBe(true)
+    // 🔴 flat 是表级语义：标在标签列会让整表 group 失效（后端 return []）。
+    expect(cols[0].flat).toBeUndefined()
     expect(cols[0].key).toBe('label')
   })
 })
@@ -98,14 +106,14 @@ describe('buildD4TransposeColumns', () => {
     expect(cols).toHaveLength(9)
   })
 
-  it('每列声明 group 或 flat（Property 13）', () => {
+  it('本表在 group / flat 之间明确表态，且两者不同表并存（Property 13）', () => {
     const cols = buildD4TransposeColumns()
-    for (const col of cols) {
-      expect(
-        col.group || col.flat,
-        `列 ${col.key} 既无 group 又无 flat`,
-      ).toBeTruthy()
-    }
+    // 口径同上：flat 是表级语义，两级表头表只能走 group 一侧。
+    const hasGroup = cols.some(c => !!c.group)
+    const hasFlat = cols.some(c => c.flat === true)
+    expect(hasGroup || hasFlat, '本表既无 group 又无 flat → 后端会前缀反猜父表头').toBe(true)
+    expect(hasGroup && hasFlat, 'flat 与 group 同表并存 → flat 会整表抑制分组').toBe(false)
+    expect(hasGroup).toBe(true)
   })
 
   it('列 key 使用 {categoryKey}_{revenue|cost} 稳定标识（Property 16）', () => {

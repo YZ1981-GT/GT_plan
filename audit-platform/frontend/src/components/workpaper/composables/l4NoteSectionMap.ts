@@ -68,7 +68,12 @@ export const L4_LEGACY_OBSOLETE_TABLES: ReadonlyArray<{ name: string; reason: st
 /** 上市主表：面值/利息调整/应计利息/合计 × 期末/上年年末 → 两级表头 */
 function buildListedMainColumns(): ColumnDef[] {
   return [
-    { key: 'label', label: '项目', is_label: true, flat: true },
+    // 🔴 不得标 `flat: true`：`flat` 的语义是「本表为单级表头」且标在**任意一列即对整表
+    // 生效**（见 `disclosureColumnDefs.ColumnDef.flat`）。本表数据列带 `group`（期末余额 /
+    // 上年年末余额）是**两级**表头，两者同表即矛盾声明 —— 后端会因 flat 跳过
+    // `_extract_column_groups`，两级表头渲染不出来（审计师看到 8 个重复的
+    // 「面值/利息调整/应计利息/合计」而分不清属于期末还是上年年末）。
+    { key: 'label', label: '项目', is_label: true },
     { key: 'endFaceValue', label: '面值', format: 'amount', group: '期末余额' },
     { key: 'endInterestAdj', label: '利息调整', format: 'amount', group: '期末余额' },
     { key: 'endAccruedInterest', label: '应计利息', format: 'amount', group: '期末余额' },
@@ -83,7 +88,8 @@ function buildListedMainColumns(): ColumnDef[] {
 /** 增减变动表（两版共用）：面值/利息调整/应计利息 × 期初/增加/减少/期末 → 两级 */
 function buildMovementColumns(): ColumnDef[] {
   return [
-    { key: 'label', label: '项目', is_label: true, flat: true },
+    // 同上：本表是两级表头（期初/本期增加/本期减少/期末余额四组），不得标 `flat`。
+    { key: 'label', label: '项目', is_label: true },
     { key: 'beginFaceValue', label: '面值', format: 'amount', group: '期初余额' },
     { key: 'beginInterestAdj', label: '利息调整', format: 'amount', group: '期初余额' },
     { key: 'beginAccruedInterest', label: '应计利息', format: 'amount', group: '期初余额' },

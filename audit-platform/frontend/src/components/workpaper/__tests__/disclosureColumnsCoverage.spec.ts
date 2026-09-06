@@ -368,6 +368,155 @@ const P1_ROUTE: Record<string, { spec: string; complete: boolean; note?: string 
     complete: true,
     note: 'G7 上市 §五、18：13 列两级表头（本期增减变动 8 子列）+ 动态列（entitySlots）零入参可调',
   },
+
+  // ── 2026-09-06 补登记：J/L/M 三类 29 个 builder ───────────────────────────
+  //
+  // 这些 builder 在各自循环推进时新增，但漏了本登记表 ⇒ 本用例长期红（实测 29 条
+  // missing）。登记的 spec **不是按命名猜的**：逐个实扫 `__tests__` 下 1466 个
+  // spec 文件，确认该文件确实 import 了这个 builder（或它所属的 NoteSectionMap
+  // 模块）才登记，登记后由本用例自己的 `brokenRef` 判据保证文件真实存在。
+  //
+  // `complete: false` 的含义按本表既有口径：该 spec 有逐表列头断言，但**未**做
+  // 「columns 键集 ≡ sub_table_data 数据键集」的恒等断言（P1 的完整形态）。
+  // 不把它们标 true 是为了不虚报覆盖度。
+
+  // J 循环（职工薪酬 / 应付职工薪酬）
+  buildJ1ListedColumns: {
+    spec: 'composables/__tests__/j1NoteSubtableContract.spec.ts',
+    complete: false,
+    note: 'J1 三张表 headers 均为单行 → 全表必标 flat（防后端按「本期」前缀反猜父表头）',
+  },
+  buildJ1SoeColumns: {
+    spec: 'composables/__tests__/j1NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '国企末列「期初余额」（上市为「上年年末数」），两版列头必须不同',
+  },
+  buildJ2ListedColumns: {
+    spec: '__tests__/j2NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildJ2SoeColumns: {
+    spec: '__tests__/j2NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+
+  // L2（应付利息 / 逾期未支付）
+  buildL2ListedColumns: {
+    spec: 'composables/__tests__/l2NoteSectionMap.spec.ts',
+    complete: false,
+  },
+  buildL2SoeColumns: {
+    spec: 'composables/__tests__/l2NoteSectionMap.spec.ts',
+    complete: false,
+  },
+  buildL2ListedInterestColumns: {
+    spec: 'composables/__tests__/l2NoteSectionMap.spec.ts',
+    complete: false,
+    note: '「应付利息」分表；与 Overdue 分表同属 L2 §五，键前缀不同不得互串',
+  },
+  buildL2ListedOverdueColumns: {
+    spec: 'composables/__tests__/l2NoteSectionMap.spec.ts',
+    complete: false,
+    note: '「逾期未支付的应付利息」分表',
+  },
+  buildL2SoeInterestColumns: {
+    spec: 'composables/__tests__/l2NoteSectionMap.spec.ts',
+    complete: false,
+  },
+  buildL2SoeOverdueColumns: {
+    spec: 'composables/__tests__/l2NoteSectionMap.spec.ts',
+    complete: false,
+  },
+
+  // L4（应付债券）—— 2026-09-06 同时修掉主表/增减变动表的 flat×group 矛盾声明
+  buildL4ListedColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: false,
+    note: '主表与增减变动表是**两级**表头（期末/上年年末、期初/增加/减少/期末）；'
+      + '标签列曾误标 flat: true 致后端跳过分组、两级表头渲染不出来，已移除',
+  },
+  buildL4SoeColumns: {
+    spec: 'composables/__tests__/lCycleNoteSubtableContract.spec.ts',
+    complete: false,
+    note: '国企主表是单级（债券名称/面值/发行日期/…）→ 保留 flat；增减变动表两级，不得标 flat',
+  },
+
+  // M 循环（所有者权益类）
+  buildM1ListedColumns: {
+    spec: 'composables/__tests__/m1K3KeyIsolation.spec.ts',
+    complete: false,
+    note: 'M1 与 K3 共章节 → 该 spec 断言两者子表键互不覆盖（浅合并不得互相抹掉）',
+  },
+  buildM1SoeColumns: {
+    spec: 'composables/__tests__/m1K3KeyIsolation.spec.ts',
+    complete: false,
+  },
+  buildM2ListedColumns: {
+    spec: 'composables/__tests__/m2NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM2SoeColumns: {
+    spec: 'composables/__tests__/m2NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM3Columns: {
+    spec: 'composables/__tests__/m3NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '库存股两版共用一份列定义（源 xlsx 两张披露 sheet 该节逐字一致）',
+  },
+  buildM6ListedColumns: {
+    spec: 'composables/__tests__/m6NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM6SoeColumns: {
+    spec: 'composables/__tests__/m6NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM8Columns: {
+    spec: 'composables/__tests__/m8NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '一般风险准备两版共用一份列定义',
+  },
+  buildM9ListedColumns: {
+    spec: 'composables/__tests__/m9NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM9SoeColumns: {
+    spec: 'composables/__tests__/m9NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM9ListedAllColumns: {
+    spec: 'composables/__tests__/m9NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '“All” 变体返回全部子表（Record 形态），与单表变体同源不得分叉',
+  },
+  buildM9SoeAllColumns: {
+    spec: 'composables/__tests__/m9NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM10ListedColumns: {
+    spec: 'composables/__tests__/m10NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM10SoeColumns: {
+    spec: 'composables/__tests__/m10NoteSubtableContract.spec.ts',
+    complete: false,
+  },
+  buildM10ListedBasicColumns: {
+    spec: 'composables/__tests__/m10NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '其他权益工具「基本情况」分表',
+  },
+  buildM10MovementColumns: {
+    spec: 'composables/__tests__/m10NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '「本期增减变动」分表（两版共用）',
+  },
+  buildM10HoldersColumns: {
+    spec: 'composables/__tests__/m10NoteSubtableContract.spec.ts',
+    complete: false,
+    note: '「持有人情况」分表',
+  },
   buildG7SoeColumns: {
     spec: 'composables/__tests__/g7NoteSubtableContract.spec.ts',
     complete: true,

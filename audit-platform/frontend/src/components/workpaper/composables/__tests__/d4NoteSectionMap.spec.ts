@@ -74,8 +74,11 @@ describe('d4NoteSectionMap', () => {
   it('listed 主表 5 列两级 group', () => {
     const p = buildD4SyncPayload('listed', 'wp-1', null, snapshot())
     const mainCols = p.columns['营业收入和营业成本']
-    // 标签列 flat + 4 数据列各带 group
-    expect(mainCols[0]).toMatchObject({ key: 'label', is_label: true, flat: true })
+    // 🔴 2026-09-06：标签列**不得**带 flat。`flat` 是表级语义（后端
+    // `_extract_column_groups` 里 `any(d.get("flat")) → return []` 整表禁分组），
+    // 本表是两级表头（本期/上期发生额），标签列标 flat 会让 4 个 group 全失效。
+    expect(mainCols[0]).toMatchObject({ key: 'label', is_label: true })
+    expect(mainCols[0].flat).toBeUndefined()
     expect(mainCols[1]).toMatchObject({ key: 'endRevenue', group: '本期发生额' })
     expect(mainCols[2]).toMatchObject({ key: 'endCost', group: '本期发生额' })
     expect(mainCols[3]).toMatchObject({ key: 'priorRevenue', group: '上期发生额' })
@@ -107,8 +110,9 @@ describe('d4NoteSectionMap', () => {
   it('listed（4）分解信息列转置 + 动态类别列 group（Req 6.3）', () => {
     const p = buildD4SyncPayload('listed', 'wp-1', null, snapshot())
     const timCols = p.columns['营业收入、营业成本按分解信息']
-    // 标签列 flat
-    expect(timCols[0]).toMatchObject({ key: 'label', flat: true })
+    // 同上：本表按类别分组（两级），标签列不得带 flat
+    expect(timCols[0]).toMatchObject({ key: 'label' })
+    expect(timCols[0].flat).toBeUndefined()
     // 类别列带 group
     expect(timCols[1]).toMatchObject({ key: 'cat_1_revenue', group: '消费品' })
     expect(timCols[2]).toMatchObject({ key: 'cat_1_cost', group: '消费品' })

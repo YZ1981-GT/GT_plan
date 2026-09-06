@@ -252,23 +252,28 @@ describe('AI 四处齐备（Property 25 / Req 8.3, 8.4）', () => {
 // ─── Property: builder 零入参可调 ──────────────────────────────────────────────
 
 describe('buildD4*Columns 零入参可调（Property 27 / Req 9.5, 9.6）', () => {
-  it('buildD4TwoPeriodColumns() 零参返回有效列集', () => {
+  // 🔴 2026-09-06：表态判据由**按列**改为**按表**。
+  // `flat` 是表级语义（后端 `_extract_column_groups`：任一列带 flat 即整表
+  // `return []` 禁分组），按列要求每列都有 group 或 flat 会逼两级表头表在标签列
+  // 补 flat，从而整表 group 全部失效、两级表头渲染不出来。
+  it('buildD4TwoPeriodColumns() 零参返回有效列集且整表表态', () => {
     const cols = buildD4TwoPeriodColumns()
     expect(cols.length).toBeGreaterThan(2)
-    for (const col of cols) {
-      expect(col.key).toBeTruthy()
-      // 每列应有 group 或 flat 表态
-      expect(col.group || col.flat).toBeTruthy()
-    }
+    for (const col of cols) expect(col.key).toBeTruthy()
+    const hasGroup = cols.some(c => !!c.group)
+    const hasFlat = cols.some(c => c.flat === true)
+    expect(hasGroup || hasFlat).toBe(true)
+    expect(hasGroup && hasFlat, 'flat 与 group 同表并存 → flat 会整表抑制分组').toBe(false)
   })
 
-  it('buildD4TransposeColumns() 零参返回有效列集', () => {
+  it('buildD4TransposeColumns() 零参返回有效列集且整表表态', () => {
     const cols = buildD4TransposeColumns()
     expect(cols.length).toBeGreaterThan(2)
-    for (const col of cols) {
-      expect(col.key).toBeTruthy()
-      expect(col.group || col.flat).toBeTruthy()
-    }
+    for (const col of cols) expect(col.key).toBeTruthy()
+    const hasGroup = cols.some(c => !!c.group)
+    const hasFlat = cols.some(c => c.flat === true)
+    expect(hasGroup || hasFlat).toBe(true)
+    expect(hasGroup && hasFlat).toBe(false)
   })
 
   it('buildD4ObligationColumns() 零参返回有效列集', () => {

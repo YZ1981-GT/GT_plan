@@ -80,14 +80,18 @@ function buildSoeColumns(): Record<string, any[]> {
 
 /**
  * P3 说明：D4 的两级表头表（主表/行业/地区/分解/试运行）使用混合分组 ——
- * 标签列声明 `flat:true`（单列 rowspan=2），数据列声明 `group`（两级 colspan=2）。
- * 共享 helper 的 `columnDeclState` 把同一张表内同时存在 flat+group 判为 "conflict"，
- * 但这是附注投影器已支持的混合分组形态（H1 范式），属正确行为。
- * 用 columnsPending 标注这些表跳过 P3，由下方 D4 专属断言替代校验。
+ * ═══ 2026-09-06：删除原 `columnsPending` 豁免 ═══
+ *
+ * 原注释称「标签列 flat + 数据列 group 是附注投影器已支持的混合分组形态（H1 范式）」，
+ * 并据此把 5 + 4 张表登记进 `columnsPending` 跳过 P3。**该前提与后端实现相反**：
+ * `note_sub_table_projector._extract_column_groups` 里
+ * `if any(isinstance(d, dict) and d.get("flat") for d in defs): return []`
+ * —— 任一列带 `flat` 就**整表**返回空分组、禁止任何分组渲染。
+ * 也就是说这些表的 `group` 声明全被标签列那个 `flat` 抑制掉了，两级表头从未生效。
+ *
+ * 生产侧已移除标签列的 `flat`（见 `d4DisclosureModel.ts`），这些表现在能正常表态，
+ * 故豁免登记按「已修好必删」一并移除，让 P3 真正把关。
  */
-const MIXED_GROUP_REASON =
-  '混合分组（标签列 flat + 数据列 group）是附注投影器已支持的形态，由 D4 专属 P14 校验'
-
 runDisclosureSubtableContract({
   cycle: 'D4',
   variants: [
@@ -96,25 +100,12 @@ runDisclosureSubtableContract({
       section: D4_NOTE_SECTION.listed,
       subtables: LISTED_SUBTABLE,
       columns: buildListedColumns(),
-      columnsPending: {
-        [LISTED_SUBTABLE.main]: MIXED_GROUP_REASON,
-        [LISTED_SUBTABLE.industry]: MIXED_GROUP_REASON,
-        [LISTED_SUBTABLE.region]: MIXED_GROUP_REASON,
-        [LISTED_SUBTABLE.timing]: MIXED_GROUP_REASON,
-        [LISTED_SUBTABLE.trialRun]: MIXED_GROUP_REASON,
-      },
     },
     {
       variant: 'soe',
       section: D4_NOTE_SECTION.soe,
       subtables: SOE_SUBTABLE,
       columns: buildSoeColumns(),
-      columnsPending: {
-        [SOE_SUBTABLE.main]: MIXED_GROUP_REASON,
-        [SOE_SUBTABLE.industry]: MIXED_GROUP_REASON,
-        [SOE_SUBTABLE.region]: MIXED_GROUP_REASON,
-        [SOE_SUBTABLE.timing]: MIXED_GROUP_REASON,
-      },
     },
   ],
 })

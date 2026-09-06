@@ -53,7 +53,15 @@ const LEAF_LABELS: Record<D4TwoPeriodVariant, { revenue: string; cost: string }>
 export function buildD4TwoPeriodColumns(variant: D4TwoPeriodVariant = 'main'): ColumnDef[] {
   const leaves = LEAF_LABELS[variant]
   return [
-    { key: 'label', label: '项 目', is_label: true, flat: true },
+    // 🔴 不得标 `flat: true`：`flat` 语义是「本表为单级表头」且标在**任意一列即对整表
+    // 生效**（见 `disclosureColumnDefs.ColumnDef.flat`）。本表数据列带 `group`
+    // （本期发生额 / 上期发生额）是**两级**表头，同表并存即矛盾声明 —— 后端会因 flat
+    // 跳过分组处理，两级表头渲染不出来（两组「收入/成本」看不出属于本期还是上期）。
+    // 🔴 标签列头取附注模板 `headers[0]` 字面 = `项目`（**无空格**）。
+    // 原写「项 目」（中间一个空格）与模板不一致 ⇒ 同步后表头错位；该缺陷此前被
+    // `d4NoteSubtableContract` 的 `columnsPending` 豁免掩盖（那条豁免的理由已被
+    // 后端源码证伪，见该 spec 顶部说明），移除豁免后 P5 立刻暴露。
+    { key: 'label', label: '项目', is_label: true },
     { key: 'endRevenue', label: leaves.revenue, format: 'amount', group: '本期发生额' },
     { key: 'endCost', label: leaves.cost, format: 'amount', group: '本期发生额' },
     { key: 'priorRevenue', label: leaves.revenue, format: 'amount', group: '上期发生额' },
@@ -129,7 +137,10 @@ export function buildD4TransposeColumns(
   categories: readonly D4TransposeCategory[] = D4_DEFAULT_CATEGORIES,
 ): ColumnDef[] {
   const cols: ColumnDef[] = [
-    { key: 'label', label: '项 目', is_label: true, flat: true },
+    // 同上：下面按 category 逐个 push 的列都带 `group: cat.label`，本表是两级表头，
+    // 不得标 `flat`（会让后端跳过分组，各类别的「收入/成本」失去父表头归属）。
+    // 标签列头同样取模板字面 `项目`（无空格）。
+    { key: 'label', label: '项目', is_label: true },
   ]
 
   for (const cat of categories) {
