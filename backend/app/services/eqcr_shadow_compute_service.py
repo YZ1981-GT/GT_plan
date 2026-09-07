@@ -340,10 +340,13 @@ class EqcrShadowComputeService:
                 # 从 financial_report 获取项目组报表数据摘要
                 from sqlalchemy import text
                 stmt = text("""
+                    -- financial_report 无 `amount` 列；本期金额真名是
+                    -- current_period_amount（另有 prior_period_amount）。
                     SELECT COUNT(*) as line_count,
-                           COALESCE(SUM(ABS(amount)), 0) as total_abs_amount
+                           COALESCE(SUM(ABS(current_period_amount)), 0) as total_abs_amount
                     FROM financial_report
                     WHERE project_id = :pid
+                      AND is_deleted = false
                 """)
                 result = await self.db.execute(stmt, {"pid": str(project_id)})
                 row = result.fetchone()
@@ -359,10 +362,12 @@ class EqcrShadowComputeService:
                 # 从 financial_report 获取现金流量表相关行
                 from sqlalchemy import text
                 stmt = text("""
+                    -- 同上：本期金额列真名 current_period_amount
                     SELECT report_type, COUNT(*) as line_count,
-                           COALESCE(SUM(amount), 0) as total_amount
+                           COALESCE(SUM(current_period_amount), 0) as total_amount
                     FROM financial_report
                     WHERE project_id = :pid
+                      AND is_deleted = false
                     GROUP BY report_type
                 """)
                 result = await self.db.execute(stmt, {"pid": str(project_id)})

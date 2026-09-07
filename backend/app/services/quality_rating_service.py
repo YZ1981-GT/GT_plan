@@ -238,10 +238,13 @@ class QualityRatingService:
         try:
             result = await db.execute(
                 sa_text(
+                    # wp_qc_results 无 project_id 列，只有 working_paper_id；
+                    # 项目维度须经 working_paper 关联。
                     "SELECT COUNT(*) as total, "
-                    "SUM(CASE WHEN passed = true THEN 1 ELSE 0 END) as passed_count "
-                    "FROM wp_qc_results "
-                    "WHERE project_id = :pid"
+                    "SUM(CASE WHEN q.passed = true THEN 1 ELSE 0 END) as passed_count "
+                    "FROM wp_qc_results q "
+                    "JOIN working_paper wp ON wp.id = q.working_paper_id "
+                    "WHERE wp.project_id = :pid"
                 ),
                 {"pid": str(project_id)},
             )

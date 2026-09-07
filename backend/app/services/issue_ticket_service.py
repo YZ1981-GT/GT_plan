@@ -88,8 +88,16 @@ class IssueTicketService:
 
         # 从 review_conversations 提取上下文
         from sqlalchemy import text as sa_text
+        # 🔴 review_conversations **无 wp_id 列**（原写法使本查询从未成功执行过）。
+        #    底稿关联由 (related_object_type, related_object_id) 表达，因此只有当
+        #    该会话确实挂在底稿上时才有 wp_id；挂在其他对象（实测当前全部为
+        #    'procedure_row_task'）时诚实返回 NULL，而不是硬取一个不相干的 id。
         stmt = sa_text("""
-            SELECT project_id, wp_id, title FROM review_conversations
+            SELECT project_id,
+                   CASE WHEN related_object_type IN ('working_paper', 'workpaper', 'wp')
+                        THEN related_object_id END AS wp_id,
+                   title
+            FROM review_conversations
             WHERE id = :cid LIMIT 1
         """)
         result = await db.execute(stmt, {"cid": str(conversation_id)})

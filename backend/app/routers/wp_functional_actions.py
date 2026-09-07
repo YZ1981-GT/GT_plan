@@ -186,8 +186,11 @@ async def _get_functional_type(
 ) -> str | None:
     """查询底稿的 functional_type（通过 wp_code 关联 classification 表）"""
     # 先获取底稿的 wp_code
+    # working_paper 无 wp_code 列 —— 它在 wp_index 上，须经 wp_index_id 关联
     result = await db.execute(text(
-        "SELECT wp_code FROM working_paper WHERE id = :wp_id AND project_id = :pid"
+        "SELECT wi.wp_code FROM working_paper wp "
+        "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+        "WHERE wp.id = :wp_id AND wp.project_id = :pid"
     ), {"wp_id": str(wp_id), "pid": str(project_id)})
     row = result.fetchone()
     if not row:

@@ -2631,7 +2631,10 @@ async def cell_writeback(
     # 查找 wp_id（workpaper 模块通过 wp_code + project_id 查找）
     if body.module == "workpaper":
         result = await db.execute(
-            text("SELECT id FROM working_paper WHERE wp_code = :code AND project_id = :pid LIMIT 1"),
+            # wp_code 在 wp_index 上（working_paper 无该列），须经 wp_index_id 关联
+            text("SELECT wp.id FROM working_paper wp "
+                 "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+                 "WHERE wi.wp_code = :code AND wp.project_id = :pid LIMIT 1"),
             {"code": body.wp_code, "pid": body.project_id},
         )
         wp_row = result.first()
@@ -2812,8 +2815,10 @@ async def cross_sheet_trace(
     # 查找 working_paper 的 parsed_data（限定 project_id，防跨项目 wp_code 撞车）
     result = await db.execute(
         text(
-            "SELECT id, parsed_data FROM working_paper "
-            "WHERE wp_code = :code AND project_id = CAST(:pid AS uuid) LIMIT 1"
+            # wp_code 在 wp_index 上（working_paper 无该列），须经 wp_index_id 关联
+            "SELECT wp.id, wp.parsed_data FROM working_paper wp "
+            "JOIN wp_index wi ON wi.id = wp.wp_index_id "
+            "WHERE wi.wp_code = :code AND wp.project_id = CAST(:pid AS uuid) LIMIT 1"
         ),
         {"code": wp_code, "pid": project_id},
     )

@@ -111,7 +111,14 @@ class NoteCustomSectionService:
         # 获取章节数据
         result = await self._db.execute(
             text("""
-                SELECT section_code, title, content, table_data, layer
+                -- 真实列名：section_id / section_title / text_content / level
+                -- （原 section_code / title / content / layer 全不存在）；
+                -- 用别名保持下游 section["title"] 等键名不变。
+                SELECT section_id    AS section_code,
+                       section_title AS title,
+                       text_content  AS content,
+                       table_data,
+                       level         AS layer
                 FROM disclosure_notes
                 WHERE id = :id
             """),

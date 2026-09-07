@@ -47,7 +47,9 @@ async def write_report_cell(
     # wp_id 在 report 模块中是 report_snapshot.id
     result = await db.execute(
         text("""
-            SELECT id, data, updated_at FROM report_snapshot
+            -- report_snapshot 无 updated_at 列；时间戳列真名是 generated_at。
+            -- 用别名保持下游按 updated_at 取值不变。
+            SELECT id, data, generated_at AS updated_at FROM report_snapshot
             WHERE id = :rid
             FOR UPDATE
         """),

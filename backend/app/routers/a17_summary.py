@@ -464,9 +464,11 @@ async def _load_a17_cross_doc_context(db, project_id) -> dict:
     idx = await db.execute(
         sa_text(
             """
-            SELECT wp_code, wp_id FROM wp_index
-            WHERE project_id = :pid
-              AND wp_code IN ('A17-3', 'A17-3-1', 'A17-7', 'A17-7A')
+            -- wp_index 无 wp_id 列；wp_id 须经 working_paper.wp_index_id 反查
+            SELECT wi.wp_code, wp.id AS wp_id FROM wp_index wi
+            LEFT JOIN working_paper wp ON wp.wp_index_id = wi.id
+            WHERE wi.project_id = :pid
+              AND wi.wp_code IN ('A17-3', 'A17-3-1', 'A17-7', 'A17-7A')
             """
         ),
         {"pid": str(project_id)},

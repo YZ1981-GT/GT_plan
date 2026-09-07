@@ -169,10 +169,15 @@ class SnapshotWriter:
         # Step 1: SELECT FOR UPDATE
         result = await db.execute(
             text("""
-                SELECT updated_at, parsed_data, wp_code, file_path, project_id
-                FROM working_paper
-                WHERE id = :wp_id
-                FOR UPDATE
+                -- working_paper 无 wp_code 列（在 wp_index 上）。
+                -- FOR UPDATE OF wp：只锁 working_paper 这一行，不锁被 JOIN 的
+                -- wp_index（后者是共享索引表，锁它会放大争用面）。
+                SELECT wp.updated_at, wp.parsed_data, wi.wp_code,
+                       wp.file_path, wp.project_id
+                FROM working_paper wp
+                LEFT JOIN wp_index wi ON wi.id = wp.wp_index_id
+                WHERE wp.id = :wp_id
+                FOR UPDATE OF wp
             """),
             {"wp_id": wp_id},
         )

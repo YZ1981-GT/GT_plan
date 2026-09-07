@@ -172,7 +172,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 318,
+      "line": 320,
       "module": "app.routers.a17_summary",
       "qualname": "independence_import_b3_periods",
       "resolver_identities": [],
@@ -671,6 +671,233 @@
         "writes_unified_content_revision": false
       },
       "writer_id": "app.routers.completion_phase::export_workpaper_word"
+    },
+    {
+      "adjudication": {
+        "domain": null,
+        "status": "unadjudicated"
+      },
+      "canonical_resolver": null,
+      "characterization_tests": [],
+      "content_stores_written": [],
+      "delegates_to_content_writer": [],
+      "facts": {
+        "ad_hoc_paths": [],
+        "after_save_calls": [],
+        "artifact_write_targets": [],
+        "artifact_writes": [],
+        "commit_receivers": [],
+        "content_fields_written": [],
+        "flush_receivers": [],
+        "representation_candidate_calls": [],
+        "resolver_calls": [
+          "_onlyoffice_storage_dir"
+        ],
+        "revision_bump_calls": [],
+        "side_effects": [],
+        "sql_update_columns": [],
+        "swallowed_exception_lines": [],
+        "unified_commit_calls": [],
+        "version_fields_read": [],
+        "version_fields_written": []
+      },
+      "is_async": true,
+      "kind": "resolver",
+      "line": 73,
+      "module": "app.routers.d2_sync_router",
+      "qualname": "_load_context",
+      "resolver_identities": [
+        "_onlyoffice_storage_dir"
+      ],
+      "source_path": "backend/app/routers/d2_sync_router.py",
+      "verdicts": {
+        "artifact_snapshot_only": false,
+        "bypasses_unified_commit": false,
+        "delegates_content_write": false,
+        "has_characterization_test": false,
+        "keeps_legacy_write_path_beside_unified_commit": false,
+        "multi_resolver": false,
+        "non_canonical_resolver_only": true,
+        "owns_direct_commit": false,
+        "swallows_exceptions": false,
+        "uses_save_orchestrator": false,
+        "writes_business_content": false,
+        "writes_legacy_version_field": false,
+        "writes_unified_content_revision": false
+      },
+      "writer_id": "app.routers.d2_sync_router::_load_context"
+    },
+    {
+      "adjudication": {
+        "domain": null,
+        "status": "unadjudicated"
+      },
+      "canonical_resolver": null,
+      "characterization_tests": [],
+      "content_stores_written": [
+        "checklist_responses"
+      ],
+      "delegates_to_content_writer": [],
+      "facts": {
+        "ad_hoc_paths": [],
+        "after_save_calls": [],
+        "artifact_write_targets": [],
+        "artifact_writes": [],
+        "commit_receivers": [],
+        "content_fields_written": [],
+        "flush_receivers": [],
+        "representation_candidate_calls": [],
+        "resolver_calls": [],
+        "revision_bump_calls": [],
+        "side_effects": [
+          "<sets checklist_responses.updated_at>"
+        ],
+        "sql_update_columns": [
+          "checklist_responses.remark"
+        ],
+        "swallowed_exception_lines": [],
+        "unified_commit_calls": [],
+        "version_fields_read": [],
+        "version_fields_written": []
+      },
+      "is_async": true,
+      "kind": "writer",
+      "line": 146,
+      "module": "app.routers.d2_sync_router",
+      "qualname": "_write_narratives",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/d2_sync_router.py",
+      "verdicts": {
+        "artifact_snapshot_only": false,
+        "bypasses_unified_commit": true,
+        "delegates_content_write": false,
+        "has_characterization_test": false,
+        "keeps_legacy_write_path_beside_unified_commit": false,
+        "multi_resolver": false,
+        "non_canonical_resolver_only": false,
+        "owns_direct_commit": false,
+        "swallows_exceptions": false,
+        "uses_save_orchestrator": false,
+        "writes_business_content": true,
+        "writes_legacy_version_field": false,
+        "writes_unified_content_revision": false
+      },
+      "writer_id": "app.routers.d2_sync_router::_write_narratives"
+    },
+    {
+      "adjudication": {
+        "domain": null,
+        "status": "unadjudicated"
+      },
+      "canonical_resolver": null,
+      "characterization_tests": [],
+      "content_stores_written": [
+        "checklist_responses"
+      ],
+      "delegates_to_content_writer": [],
+      "facts": {
+        "ad_hoc_paths": [],
+        "after_save_calls": [],
+        "artifact_write_targets": [],
+        "artifact_writes": [],
+        "commit_receivers": [
+          "db"
+        ],
+        "content_fields_written": [],
+        "flush_receivers": [],
+        "representation_candidate_calls": [],
+        "resolver_calls": [],
+        "revision_bump_calls": [],
+        "side_effects": [
+          "<sets checklist_responses.updated_at>"
+        ],
+        "sql_update_columns": [
+          "checklist_responses.remark"
+        ],
+        "swallowed_exception_lines": [],
+        "unified_commit_calls": [],
+        "version_fields_read": [],
+        "version_fields_written": []
+      },
+      "is_async": true,
+      "kind": "writer",
+      "line": 233,
+      "module": "app.routers.d2_sync_router",
+      "qualname": "_write_store_rows",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/d2_sync_router.py",
+      "verdicts": {
+        "artifact_snapshot_only": false,
+        "bypasses_unified_commit": true,
+        "delegates_content_write": false,
+        "has_characterization_test": false,
+        "keeps_legacy_write_path_beside_unified_commit": false,
+        "multi_resolver": false,
+        "non_canonical_resolver_only": false,
+        "owns_direct_commit": true,
+        "swallows_exceptions": false,
+        "uses_save_orchestrator": false,
+        "writes_business_content": true,
+        "writes_legacy_version_field": false,
+        "writes_unified_content_revision": false
+      },
+      "writer_id": "app.routers.d2_sync_router::_write_store_rows"
+    },
+    {
+      "adjudication": {
+        "domain": null,
+        "status": "unadjudicated"
+      },
+      "canonical_resolver": null,
+      "characterization_tests": [],
+      "content_stores_written": [],
+      "delegates_to_content_writer": [
+        "app.routers.d2_sync_router::_write_narratives",
+        "app.routers.d2_sync_router::_write_store_rows"
+      ],
+      "facts": {
+        "ad_hoc_paths": [],
+        "after_save_calls": [],
+        "artifact_write_targets": [],
+        "artifact_writes": [],
+        "commit_receivers": [
+          "db"
+        ],
+        "content_fields_written": [],
+        "flush_receivers": [],
+        "representation_candidate_calls": [],
+        "resolver_calls": [],
+        "revision_bump_calls": [],
+        "side_effects": [],
+        "sql_update_columns": [],
+        "swallowed_exception_lines": [],
+        "unified_commit_calls": [],
+        "version_fields_read": [],
+        "version_fields_written": []
+      },
+      "is_async": true,
+      "kind": "writer",
+      "line": 563,
+      "module": "app.routers.d2_sync_router",
+      "qualname": "d2_pull_from_excel",
+      "resolver_identities": [],
+      "source_path": "backend/app/routers/d2_sync_router.py",
+      "verdicts": {
+        "artifact_snapshot_only": false,
+        "bypasses_unified_commit": true,
+        "delegates_content_write": true,
+        "has_characterization_test": false,
+        "keeps_legacy_write_path_beside_unified_commit": false,
+        "multi_resolver": false,
+        "non_canonical_resolver_only": false,
+        "owns_direct_commit": true,
+        "swallows_exceptions": false,
+        "uses_save_orchestrator": false,
+        "writes_business_content": true,
+        "writes_legacy_version_field": false,
+        "writes_unified_content_revision": false
+      },
+      "writer_id": "app.routers.d2_sync_router::d2_pull_from_excel"
     },
     {
       "adjudication": {
@@ -3966,7 +4193,7 @@
       },
       "is_async": true,
       "kind": "writer",
-      "line": 273,
+      "line": 276,
       "module": "app.routers.wp_functional_actions",
       "qualname": "_fill_parsed_data",
       "resolver_identities": [],
@@ -12254,22 +12481,22 @@
           },
           {
             "attr": "replace",
-            "line": 222,
+            "line": 223,
             "target": "unclassified"
           },
           {
             "attr": "replace",
-            "line": 233,
+            "line": 234,
             "target": "unclassified"
           },
           {
             "attr": "replace",
-            "line": 283,
+            "line": 284,
             "target": "unclassified"
           },
           {
             "attr": "replace",
-            "line": 295,
+            "line": 296,
             "target": "unclassified"
           }
         ],
@@ -12289,9 +12516,9 @@
         "sql_update_columns": [],
         "swallowed_exception_lines": [
           149,
-          213,
-          259,
-          315
+          214,
+          260,
+          316
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -12339,7 +12566,7 @@
         "artifact_write_targets": [
           {
             "attr": "write_bytes",
-            "line": 742,
+            "line": 743,
             "target": "unclassified"
           }
         ],
@@ -12357,7 +12584,7 @@
         "side_effects": [],
         "sql_update_columns": [],
         "swallowed_exception_lines": [
-          743
+          744
         ],
         "unified_commit_calls": [],
         "version_fields_read": [],
@@ -12365,7 +12592,7 @@
       },
       "is_async": true,
       "kind": "writer_resolver",
-      "line": 659,
+      "line": 660,
       "module": "app.routers.wp_template_download",
       "qualname": "preview_template_as_pdf",
       "resolver_identities": [
@@ -14242,12 +14469,12 @@
         "artifact_write_targets": [
           {
             "attr": "replace",
-            "line": 198,
+            "line": 203,
             "target": "unclassified"
           },
           {
             "attr": "replace",
-            "line": 199,
+            "line": 204,
             "target": "unclassified"
           }
         ],
@@ -14265,8 +14492,8 @@
           "working_paper.parsed_data"
         ],
         "swallowed_exception_lines": [
-          274,
-          342
+          279,
+          347
         ],
         "unified_commit_calls": [],
         "version_fields_read": [
@@ -19843,7 +20070,7 @@
       "writer_id": "app.services.wp_xlsx_export_service::_sync_export_workpaper_xlsx"
     }
   ],
-  "inventory_digest": "93d18368d2eaac1573ade96cc5b8ba6324406276c9fd02fd6ac741e0437a9327",
+  "inventory_digest": "1401597ee82ef6e085ff5b9115f143402e875ba1aaa7723b8c95bf14be35c956",
   "overlay_digest": "4af30ef5b606d7366233b5327b14d5d52aa589604d14a7db4c94afcaeb0bd833",
   "representation_upgrade_lane": [
     {
@@ -19998,12 +20225,12 @@
     }
   ],
   "schema_version": 1,
-  "source_digest": "261ba31bd2e9dd98a98af84d4f2dae120af83706c06646bfc90c6767120fbd18",
+  "source_digest": "dd5e2de54dbbaa4bad5817976a4ddf979d1e31fc2ba99145f6f45b4e5ceeed81",
   "stats": {
     "artifact_snapshot_only_count": 1,
     "by_content_store": {
-      "<artifact_or_delegated_only>": 119,
-      "checklist_responses": 83,
+      "<artifact_or_delegated_only>": 120,
+      "checklist_responses": 85,
       "working_paper": 71
     },
     "by_domain": {
@@ -20019,39 +20246,40 @@
       "read_only_evaluation": 2,
       "rollback": 2,
       "template_provisioning": 18,
+      "unadjudicated": 4,
       "unified_commit_substrate": 1,
       "upload_import": 5,
       "wopi": 6
     },
     "by_kind": {
-      "resolver": 55,
-      "writer": 247,
+      "resolver": 56,
+      "writer": 250,
       "writer_resolver": 25
     },
-    "bypasses_unified_commit_count": 264,
-    "direct_commit_writer_count": 105,
+    "bypasses_unified_commit_count": 267,
+    "direct_commit_writer_count": 107,
     "keeps_legacy_write_path_beside_unified_commit_count": 0,
     "legacy_version_field_writer_count": 5,
     "multi_resolver_count": 4,
-    "non_canonical_resolver_only_count": 72,
-    "resolver_count": 80,
+    "non_canonical_resolver_only_count": 73,
+    "resolver_count": 81,
     "retired_by_domain": {
       "custom": 1,
       "export_storage_resolver": 1,
       "orchestrator_side_effect": 1
     },
     "retired_writer_count": 3,
-    "row_count": 327,
+    "row_count": 331,
     "save_orchestrator_writer_count": 4,
     "swallowing_writer_count": 115,
-    "unadjudicated_count": 0,
-    "unadjudicated_writer_count": 0,
+    "unadjudicated_count": 4,
+    "unadjudicated_writer_count": 3,
     "version_field_write_histogram": {
       "file_version": 5,
       "parsed_data.schema_version": 1
     },
-    "writer_count": 272,
-    "writer_without_characterization_test_count": 208,
+    "writer_count": 275,
+    "writer_without_characterization_test_count": 211,
     "writes_unified_content_revision_count": 1
   },
   "unified_commit_markers": [
