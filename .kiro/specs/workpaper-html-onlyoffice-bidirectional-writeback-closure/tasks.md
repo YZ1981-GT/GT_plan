@@ -544,6 +544,21 @@
       - **门禁实跑对比**：`pilot_not_admitted` 阻断 **152 → 34**、`failed` **28 → 16**、`passed` 5 → 5；三个 pilot 的 `adapter_on_request_path` 由 False 变 **True**，剩余阻断变成诚实原因（`real_onlyoffice_not_executed` / `execution_record_missing`，即真实 OO 场景尚未执行），不再是假的「adapter 没注册」。门**自身 5 项自检全绿**（此前 `gate.admission_is_state_sensitive` 恒红）。
       - 🔴 **顺带修掉自检自身的两处缺陷**：① 该自检的替身把 `attach_pilot_adapters` 换成返回 `(PILOT_ADAPTER_ID,)` 来模拟「已注册」，与修正后的 `refuses_without_representation` 直接矛盾 ⇒ 替身态永不可 admitted、自检恒红；改为替身**保持**空元组（「已注册」由请求路径信号的替身表达），探的才是「饿死状态下会不会伪注册」。② 自检原判据是 `real.admitted != substituted.admitted`，它**预设「真实态必然 False」** —— 测法修好后 d2/g7/h1 的真实态已是 True，于是 `real == substituted`，自检把「实现真做好了」误判成「本门读的是死值」；改为「信号就绪 ⇒ True、信号饿死 ⇒ False」的双向判据。这条教训通用：**任何形如 `real != substituted` 的状态敏感性判据都隐含了对真实态的假设，实现变好时会反过来打红**。
       - **仍未兑现的部分（不推绿）**：第五条 bullet 还要求「逐 entry 真实调用一次 render-config、materialize、extract 证明 adapter 可解析并返回 frozen identity」——本轮只证到注册成功与拒绝原因分型，三条请求路径的逐一实调**未做**；manifest 全部 entry 的 `adapter_id` 也仍非全部非 `null`（182 条缺自己的 per-entry 契约，属 Tasks 46~57）。真实 OO required scenarios 未按 Task 70 刷新前 evidence 保持 UNVERIFIABLE。故复选框**保持 `[-]`**。
+      - **✅ 2026-09-07 逐 entry 真调已兑现（第三条欠账解除，但复选框仍保持 `[-]`）**：新增伴生探针 `backend/scripts/check/_task75_entry_adapter_probe.py`，走的是**请求路径冻结的 adapter**（`register_from_manifest()` → `resolve_for_entry(entry_id).adapter`），不是重新 `build_excel_adapter()` 一份 —— 重造等于自我比对，测不出注册链路冻结的 definitions 是不是错的那份。published representation 的物理路径按四个 pilot provider 的同一口径现读（`resolve_visible_current_representation_id` → representation join `working_paper_artifact.relative_path`），不硬编码 —— manifest 里**没有** representation 路径字段，它是运行时供给。实测三条全部 `verified`：
+
+        | entry | adapter_id | stable keys | materialize→extract |
+        |---|---|---|---|
+        | `xlsx/gt-d2-accounts-receivable` | `d2.receivable_detail` | 28491 | round-trip 28491，sha256 `5c0735e1…` |
+        | `xlsx/gt-g7-long-term-equity-main` | `g7.soe_subsidiary_disclosure` | 5 | round-trip 5，sha256 `90649d9e…` |
+        | `xlsx/gt-h1-fixed-assets` | `h1.disposal_check` | 14 | round-trip 14，sha256 `2796e1a1…` |
+
+        三者 `contract_id` / `document_type` 与注册时契约逐字段一致，`artifact_kind='canonical'` / `state='published'` / `generation=1` / `reason='content_commit'`。
+
+        - **两个首跑实测缺陷（都是探针自己的，但都指向真实判据，故各自落成守卫）**：① `extract` / `materialize` 是**同步**方法（protocol 只有 `read_current_projection` / `stage_projection_mutation` 是 async），首跑三 entry 全报 `TypeError: object Projection can't be used in 'await' expression` —— 探针 `await` 了同步方法。这类错误一旦被混进断言会被读成「adapter 实现有问题」，故 `test_extract_is_called_sync_not_awaited` 锁死调用形态。② substrate 形态门首跑写成 `kind=='published'`，三 entry 静默变成 `3 unverifiable / 0 verified` —— artifact 表的 `kind` 与 adapter 构造时的 `substrate_role` 不是同一维，published representation 的 substrate 是 `(canonical, published)`。写错这一处**不抛错**，只产出看起来像「供给不足」的结果，故 `test_substrate_gate_uses_canonical_published` 锁死词表并禁止 `kind != "published"` 出现。
+        - **`failed` / `unverifiable` 分型是本轮新增的判据维度**，不是既有登记：拿不到真库 / 无 published representation / artifact 不在磁盘 ⇒ `unverifiable`（环境不可得）；adapter 抛异常 / identity 漂移 / 返回类型不对 ⇒ `failed`（实现缺陷）。`TestRealRun` 在无库 CI 上走 `registered==0` 分支并断言 `note` 非空，不记 failed。
+        - 守卫 `backend/tests/workpaper_sync/test_task75_entry_adapter_roundtrip.py` **10 passed**，含真库在场的 `TestRealRun`。
+        - **变异检验 4 条全 RED 且各命中预期项**：M1 `summary["failed"] += 1` → `["unverifiable"]` ⇒ RED（`test_failed_verdict_reaches_the_failed_counter`）；M2 删 `contract_id` 比对 ⇒ RED；M3 `await adapter.extract(` ⇒ RED（两条）；M4 `kind != "canonical"` → `"published"` ⇒ RED。**M1 首跑实测 GREEN** —— 原判据只数 `failed` 计数**槽位**（恒 4 处），而 M1 改的是分支里的下标字面；已改为数**所有** `failed` 下标字面（槽位 + 初始字典 + 3 个分支 = 5 处），改一处必然变少。这是「假绿第①源」的又一种变体：判据数的是不变量而不是会被改动的那一侧。
+      - **仍然不推绿的三条**：① manifest 全部 entry 的 `adapter_id` 仍非全部非 `null`（本探针实跑 `planned=186` / `registered=3` / `blocked_reason=183`，182 条缺自己的 per-entry 契约，属 Tasks 46~57）；② 真实 OO required scenarios 未按 Task 70 刷新；③ 依赖链上 Task 61 / 71 / 72 / 74 仍为 `[-]`（Task 74 归零依赖 Task 71）。故复选框**保持 `[-]`**，且按「任务标记不能假绿」不在此推绿。
   - 验证 Property 3、Property 7、Property 28、Property 49、Property 67。
   - _Requirements: 1.4, 2.10, 3.3, 5.12, 6.1, 6.10, 6.18, 6.20, 12.1, 12.2_
 
