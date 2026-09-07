@@ -346,3 +346,23 @@ audit-platform/frontend/src/views/TrialBalance.vue  4491
 #     拆分（材料化与提取两条链各自 300+ 行），属独立打磨任务，不在本次缺陷修复范围。
 #     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure Task 41（2026-09-06 修复条目）
 backend/app/services/workpaper_sync/d2_bidirectional_bridge.py  1115
+#   excel_row_shift.py —— **改动前即 2041 行已超限**（HEAD 现状）。本次净增 20 行，
+#     全部是同一个缺陷修复的必要部分：`sqref` 进 ROW_BEARING_STRUCTURES 清单 +
+#     `_handled("sqref", "text-a1-ranges")` 登记 + `_shift_element_text` 正则改为
+#     容忍命名空间前缀（`(?:\w+:)?`）。这三处必须同文件：清单、处理登记、实现是
+#     `assert_shift_handlers_cover_structures` 双向锁的三边，拆开会破坏 Property 1
+#     的「清单与实现逐项对齐」判据。baseline 2041 = 改动前真实行数，不留膨胀空间。
+#     该文件确需按「计划 / 阶段 A 受管区重编号 / 阶段 C-D 受管区外 / 验证器」拆分，
+#     属独立打磨任务，不在本次缺陷修复范围。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure（2026-09-07 D2-2 实测条目）
+backend/app/services/workpaper_sync/excel_row_shift.py  2041
+
+#   test_excel_row_shift.py —— **改动前即 951 行已超限**（HEAD 现状）。本次净增 47 行，
+#     是上面那个缺陷的守卫：`TestProperty9` 下新增 `test_xm_sqref_text_moves_alongside_the_attribute`
+#     （断言 `<x14ac:sqref>` 文本与 `dataValidation@sqref` 属性双侧同位移），外加
+#     Property 1 分母 15→16 与点名四项。守卫与被测对象同文件是既有范式（本文件
+#     已含 Property 1~10 的判据与反向自检），拆出去会让「清单变更」与「分母断言」
+#     失联 —— 那正是 `sqref` 这次被漏掉的形式（清单加了、循环加了、守卫全绿，
+#     实现却是空操作）。baseline 951 = 改动前真实行数。
+#     spec: 同上（2026-09-07 D2-2 实测条目）
+backend/tests/workpaper_sync/test_excel_row_shift.py  951

@@ -58,6 +58,7 @@ from app.services.cross_ref_service import cross_ref_service
 from app.services.project_audit_year import fetch_project_audit_year
 from app.services.workpaper_sync.content_mutation import (
     HtmlOnlyCommitPlan,
+    HtmlOnlyEntryHasRepresentationError,
     build_html_content_mutation_service,
     html_only_entry_id,
 )
@@ -354,6 +355,26 @@ async def save_html_data(
                 ),
                 "server_version": server_version,
                 "client_version": body.data_version,
+            },
+        ) from exc
+    except HtmlOnlyEntryHasRepresentationError as exc:
+        # 该底稿已绑定 OO representation（bidirectional entry），不能走 single_html lane。
+        # 前端应走 d2-sync / wp_sync_router 的双向保存路径，而非本端点。
+        # 返回 409 而非 500：这是业务状态冲突（能力不匹配），不是服务器故障。
+        logger.info(
+            "wp %s is bidirectional, rejecting html-only save: %s", wp_id, exc
+        )
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "bidirectional_entry_requires_sync_path",
+                "message": (
+                    "该底稿已绑定在线编辑（Excel），HTML 数据不能通过本接口单独保存。"
+                    "请使用双向同步接口（d2-sync 或 workpaper-sync）保存数据，"
+                    "或先在前端切换到「在线编辑」模式完成保存后再切回。"
+                ),
+                "wp_id": str(wp_id),
+                "entry_id": entry_id,
             },
         ) from exc
 

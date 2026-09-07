@@ -742,8 +742,16 @@ function onChildSaved(payload?: { sheet_name: string; html_data: Record<string, 
       html_data: payload.html_data,
       schema_version: payload.schema_version || 'v2025-R5',
     }).catch((e) => {
-      // 保存失败不阻断 UI，记录告警
-      console.warn('[WorkpaperEditor] HTML 底稿保存失败:', e)
+      // 409 是业务状态冲突，必须给用户明确指引；其余失败静默告警不阻断 UI。
+      // 🔴 原先这里只有 console.warn，用户会以为「保存成功」—— 实际数据一行都没落库
+      // （D2-2 这类已绑定 OO 的双向底稿，走本通道必然 409）。
+      const status = e?.response?.status ?? e?.status
+      const detail = e?.response?.data?.detail
+      if (status === 409) {
+        ElMessage.error(detail?.message || '该底稿已绑定在线编辑，请切换到「在线编辑」模式保存')
+      } else {
+        console.warn('[WorkpaperEditor] HTML 底稿保存失败:', e)
+      }
     })
   }
   eventBus.emit('workpaper:saved', {

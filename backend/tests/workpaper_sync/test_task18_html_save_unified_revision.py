@@ -550,9 +550,12 @@ def test_the_revision_conflict_is_translated_not_swallowed() -> None:
             _dotted(handler.type) if handler.type is not None else "<bare>"
             for handler in node.handlers
         }
-        assert caught == {"RevisionConflictError"}, (
-            f"只许捕获 RevisionConflictError，实得 {sorted(caught)} —— 宽泛 except 会把"
-            "「artifact 发布失败」「事务分裂」一起吞成 409，用户看到的原因是错的"
+        assert caught == {
+            "RevisionConflictError",
+            "HtmlOnlyEntryHasRepresentationError",
+        }, (
+            f"只许捕获这两个精确异常，实得 {sorted(caught)} —— 宽泛 except 会把"
+            "「artifact 发布失败」「事务分裂」一起吞成 409，用户看到的错误原因会归错类"
         )
         raised = {
             _dotted(inner.exc)

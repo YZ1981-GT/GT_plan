@@ -179,6 +179,10 @@ ROW_BEARING_STRUCTURES: Final[tuple[tuple[str, str], ...]] = (
     ("formula", "text-a1-ranges"),
     ("formula1", "text-a1-ranges"),
     ("formula2", "text-a1-ranges"),
+    # `<xm:sqref>` 是 x14:dataValidation 的扩展子元素（Excel 2010+），内容是 A1 范围文本
+    #（如 D13:D24 或 AN65539:AN65553），与 formula1 同性质。行位移时必须位移，否则数据
+    #验证继续指向旧行。
+    ("sqref", "text-a1-ranges"),
     ("table", "@ref"),
 )
 
@@ -1923,7 +1927,8 @@ def _shift_outside_sheetdata(
     _handled("formula", "text-a1-ranges")
     _handled("formula1", "text-a1-ranges")
     _handled("formula2", "text-a1-ranges")
-    for tag in ("formula", "formula1", "formula2"):
+    _handled("sqref", "text-a1-ranges")
+    for tag in ("formula", "formula1", "formula2", "sqref"):
         sheet_xml, delta = _shift_element_text(sheet_xml, tag=tag, plan=plan)
         _bump(f"{tag}@text", delta)
 
@@ -1943,7 +1948,22 @@ def _shift_element_text(
     `[1]Data!#REF!` 这类外部工作簿引用（全库实测存在）。这是保守侧。
     """
     changed = 0
-    pattern = re.compile(rf"(<{re.escape(tag)}\b[^>]*>)(?P<text>.*?)(</{re.escape(tag)}>)", re.S)
+    # 🔴 允许带命名空间前缀（如 `<xm:sqref>` / `<x14ac:sqref>`）。Excel 2010+ 的
+    # `<dataValidation>` 扩展子元素都挂在 x14 前缀下，裸 `<sqref>` 在生产工作簿里
+    # 实测不存在。不加前缀时，正则会把 `<xm:sqref>` 的尾巴匹配成 `<sqref>`、把文本
+    # `A10:C12` 当成标签属性吞掉 ⇒ 位移 0 处（2026-09-07 D2-2 实测打红）。
+    #
+    # 前缀用**非捕获** `(?:\w+:)?` 而不是捕获组 + backreference：实测
+    # `(?P<ns>\w+:)?<tag>...</(?P=ns)?tag>` 在 ns 为空时让 `<xm:sqref>` 整体匹配
+    # 失败（Rust regex 对「未参与匹配的捕获组 + 可选 backreference」处理不稳定），
+    # 反而把带前缀的场景全漏掉。同形前缀本身就是正确 XML，无需 backreference 约束；
+    # 错配产生的坏 XML 会被下游 xlsx 解析拦住。
+    pattern = re.compile(
+        rf"(?P<open><(?:\w+:)?{re.escape(tag)}\b[^>]*>)"
+        rf"(?P<text>.*?)"
+        rf"(?P<close></(?:\w+:)?{re.escape(tag)}>)",
+        re.S,
+    )
 
     def _one(match: re.Match[str]) -> str:
         nonlocal changed
@@ -1954,7 +1974,7 @@ def _shift_element_text(
         if new_text == text:
             return match.group(0)
         changed += 1
-        return f"{match.group(1)}{new_text}{match.group(3)}"
+        return f"{match.group('open')}{new_text}{match.group('close')}"
 
     return pattern.sub(_one, sheet_xml), changed
 

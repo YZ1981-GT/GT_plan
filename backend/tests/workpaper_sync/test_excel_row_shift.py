@@ -240,15 +240,17 @@ class TestProperty1ListedStructuresAreLockedToHandlers:
         )
         assert not (handled & delegated), "同一项既自己处理又登记为委派 ⇒ 双重位移"
         # 分母断言：清单不是空集，也不是被悄悄削短了。
-        # 15 = design.md §Data Model 的 12 项 + 全库实测后补入的 3 个「元素文本里的
-        # A1 引用」（`formula` / `formula1` / `formula2`，见生产模块的实测表）。
-        assert len(RS.ROW_BEARING_STRUCTURES) == 15, RS.ROW_BEARING_STRUCTURES
+        # 16 = design.md §Data Model 的 12 项 + 全库实测后补入的 4 个「元素文本里的
+        # A1 引用」（`formula` / `formula1` / `formula2` / `sqref`，见生产模块的实测表）。
+        # `sqref` 是 x14:dataValidation 扩展子元素，Excel 2010+ 工作簿实测会真实出现
+        # （D2-2 模板 AN65539:AN65553），与 formula1 同性质，行位移必须一并位移。
+        assert len(RS.ROW_BEARING_STRUCTURES) == 16, RS.ROW_BEARING_STRUCTURES
         assert delegated == {"table@ref"}, sorted(delegated)
         # `assert_shift_handlers_cover_structures` 的键是 `f"{tag}{attr}"`（无分隔符，
         # 与 `declared` 侧同构），所以 `("formula", "text-a1-ranges")` 拼出来是
         # `formulatext-a1-ranges` —— 上面的 `declared == handled | delegated` 已经逐项比过，
-        # 这里再点名三项是为了让「补入 formula/formula1/formula2」这件事本身可 falsify。
-        for tag in ("formula", "formula1", "formula2"):
+        # 这里再点名四项是为了让「补入 formula/formula1/formula2/sqref」这件事本身可 falsify。
+        for tag in ("formula", "formula1", "formula2", "sqref"):
             assert f"{tag}text-a1-ranges" in handled, (tag, sorted(handled))
             assert (tag, "text-a1-ranges") in RS.ROW_BEARING_STRUCTURES, tag
 
@@ -624,6 +626,51 @@ class TestProperty9DimensionCoversActualMaxRow:
                 assert ref not in merges_after, (
                     f"{ref} 在受管区之下却没被位移 —— 合并区会盖在旧行上"
                 )
+
+    def test_xm_sqref_text_moves_alongside_the_attribute(self, sheet_xml: str) -> None:
+        """`<x14ac:sqref>` 的**文本**必须位移，不能只位移 `dataValidation@sqref` 属性。
+
+        这两者是 Excel 2010+ 数据验证的同一件事的两种载体：属性是 OOXML 主规范，
+        `<x14ac:sqref>`（别名 `xm:sqref`）是 x14 扩展子元素（D2-2 模板实测
+        `AN65539:AN65553`）。只位移属性会让扩展侧继续指向旧行，Excel 打开后数据
+        验证覆盖范围错行而**不报错**（静默错行，与 formula1 的历史坑同源）。
+
+        注入用 `x14ac:` 前缀 —— 权威模板 K11 sheet4 声明的是 `xmlns:x14ac`
+        （不是常见的 `xmlns:xm`），用错前缀会让 ElementTree 报 `unbound prefix`，
+        那测的是 XML 解析而不是位移。
+        """
+        injected = sheet_xml.replace(
+            "</worksheet>",
+            '<dataValidations count="1">'
+            '<dataValidation type="list" allowBlank="1" sqref="B26:B30">'
+            "<x14ac:sqref>B26:B30</x14ac:sqref>"
+            "</dataValidation>"
+            "</dataValidations>"
+            "</worksheet>",
+        )
+        assert "<x14ac:sqref>B26:B30</x14ac:sqref>" in injected
+
+        plan = RS.RowShiftPlan(insert_at=28, count=2, style_from=25)
+        after, report = RS.shift_sheet_rows(injected, plan)
+
+        # 扩展子元素文本必须位移（这是本用例的主断言）
+        from xml.etree import ElementTree as ET
+
+        XM = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac"
+        root = ET.fromstring(after)
+        sqrefs = [e.text for e in root.iter("{%s}sqref" % XM)]
+        # B28, B29, B30 都 >= insert_at=28 → +2；B26, B27 不动
+        assert sqrefs == ["B26:B32"], f"<x14ac:sqref> 文本未正确位移: {sqrefs}"
+
+        # 属性侧同样位移，两侧必须一致
+        MAIN = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+        dv_attrs = [e.get("sqref") for e in root.iter("{%s}dataValidation" % MAIN)]
+        assert dv_attrs == ["B26:B32"], f"dataValidation@sqref 未正确位移: {dv_attrs}"
+        assert sqrefs == dv_attrs, (sqrefs, dv_attrs)
+
+        # 计数侧也要有记账，否则上面两个断言在「碰巧位移」时无从区分
+        assert report.shifted_refs.get("sqref@text", 0) >= 1, report.as_dict()
+        assert report.shifted_refs.get("dataValidation@sqref", 0) >= 1, report.as_dict()
 
 
 # ═══════════════════════════════════════════════════════════════════════════
