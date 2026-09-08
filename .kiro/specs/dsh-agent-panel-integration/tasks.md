@@ -433,3 +433,32 @@
 5. 地址 embedding、DSH SDK/Cordis 或运行时安全条件不满足时，相关任务保持阻塞并给出证据；不使用“功能隐藏了所以算完成”的口径。
 6. 生产目标是 6000 用户，不等于允许 6000 个 Agent 子进程。容量由 active/queue/backpressure 配置与实测决定，超限必须可见。
 7. 最终只保留一个消息模型、一个 SSE transport、一个核心聊天组件和一个服务端事件 schema；迁移完成即删除死代码。
+
+---
+## 归档收口核验（2026-09-08）
+
+归档前对 CLOSURE.md 记录的遗留项逐条复核，结论如下：
+
+### 假绿核验（CLOSURE §8 记的 3 条 Playwright failed）
+- **A · AC 1.7「面板打开后焦点进入输入区」= 真生产缺陷，已修**。
+  `PlatformAiChatPanel.vue` 生产代码里 `focus`/`autofocus`/`activeElement` 零命中 —— 面板打开后从不把焦点移到输入区，Playwright 该条恒红，而 Property 37（挂在 Task 11）只测了 focus trap / 焦点恢复，漏了「打开→初始焦点进输入区」这一子行为，故任何 vitest / 后端 Property 都看不出来。
+  修复：`watch(() => props.visible)` 可见且 `hostAvailable` 时 `nextTick` 后聚焦 `inputAreaRef` 内的 textarea，fail-safe（宿主不可用不抢焦点）。
+  新增 2 条可在 jsdom 复现的守卫到 `PlatformAiChatPanel.spec.ts`「AC 1.7 面板打开聚焦输入区」describe（用 ElInput→真 textarea 的局部 stub，绕开该测试环境未全局注册 Element Plus 的限制），均 passed。
+  变异检验两态干净 RED：移除 `textarea?.focus()` → 「焦点落到 textarea」RED；移除 `if (!hostAvailable.value) return` 门控 → 「宿主不可用时不抢焦点」RED；复原后基线全绿、无 MUTATION 残留。
+- **B · AC 3.4「无项目上下文禁用项目工具并显示中文原因」= 非假绿，生产正确**。
+  `ChatReviewModeBar` 无 v-if 始终渲染，`global_knowledge` 宿主 `canEnable=false` → 渲染中文 `disabledReason`「仅在底稿页面可用，当前为全局知识模式」；`platform-ai-chat-panel__scope.is-global` + `__hint` 均在。vitest 已严格覆盖：`PhaseBGateGuards.spec.ts` 的 P23「每种非 workpaper 宿主可区分中文原因」含 `['global_knowledge','全局知识']` + 变异锚点 FE-P23-D。e2e 该条 failed 纯因后端不可用致 `login()` 超时，非生产缺陷。CLOSURE §8 对 B 的「守卫层级不够」定性据此更正。
+- **C · AC 4.10「history 按时间正序」= 非假绿，生产正确**。
+  前端 `usePlatformAiChat.fetchHistory` 直接采用后端返回的 `messages` 顺序、不重排；排序由后端 Property 10（`test_task3_chat_persistence.py`，后端全绿）保证。e2e 该条 failed 因后端不可用发不出消息、history 空，非生产缺陷。
+
+### AC↔Property 覆盖缺口（CLOSURE §10 记 94/120）
+实扫三件套（行首锚定）确认：120 AC，design 的 40 条 Property `Validates` 覆盖 94，26 条零 Property，与 CLOSURE §10 清单逐一对上。抽查表明这 26 条**多数有其他形式的可执行守卫**（如 AC 1.1「不用 iframe」由 `PlatformAiChatPanel.spec.ts` 的「不使用 iframe/postMessage」+「DshPanel 不再含 iframe」覆盖），属「判据登记口径（未挂 Property 号）」而非「行为坏的假绿」，与 CLOSURE §10 自评「分布问题不是密度问题」一致。AC 12.3（无 egress）确为运行时真空，但 DSH 处于 feature flag 关闭 / Phase C 零生产流量，实际风险为零（CLOSURE §5 亦如此登记）。
+
+### 归档前如实登记的环境/并发状态（非本 spec 缺陷）
+- 归档核验在分支 `work/2026-09-02-workpaper-sync-closure`（双向回写 spec 分支）进行，工作树混入并发会话大量在途改动。
+- `WorkpaperEditor.vue` 的 vitest 守卫「使用 PlatformAiChatPanel 且传 :host」在工作树里红 —— 经 HEAD 双查，dsh spec 交付基线 `55c5e0fe` 版含该接线、守卫绿；工作树里被并发的双向回写会话删除了 AI 接线（`952a7fc5` 之后未提交改动）。按「同一文件禁与并发会话并行编辑」不碰，dsh spec 在其交付基线该条绿。
+- 后端 9980 在核验期间处于启动即卡死状态（`/api/health`、`/docs` 全超时），根因为工作树 47 个后端未提交改动（`core/events/*`、`startup_registry.py` 新增 + `main.py` 修改）—— 属双向回写 spec 的 startup 基础设施半成品，与 dsh 无关，故 Playwright 真跑不可行，B/C 改用读生产代码 + 现有 vitest/后端 Property 守卫定论。
+
+### 收口产物（待随分支入库）
+- `PlatformAiChatPanel.vue`（+11 行 focus 修复）
+- `PlatformAiChatPanel.spec.ts`（+60 行，2 条 AC 1.7 守卫 + ElInput stub helper）
+两文件均未与并发会话改动混于同一文件，diff 干净。

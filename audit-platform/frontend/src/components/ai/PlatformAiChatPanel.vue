@@ -667,7 +667,16 @@ watch(phase, (p) => {
 watch(
   () => props.visible,
   (val) => {
-    if (val) fetchHistory()
+    if (!val) return
+    fetchHistory()
+    // AC 1.7：面板打开后焦点进入输入区（可用时）。此前从无 focus 代码，
+    // 焦点停在触发按钮/body，Playwright「焦点进入输入区」恒红。
+    // fail-safe：宿主不可用（textarea disabled）或元素未挂载时不强抢焦点。
+    nextTick(() => {
+      if (!hostAvailable.value) return
+      const textarea = inputAreaRef.value?.querySelector<HTMLTextAreaElement>('textarea')
+      textarea?.focus()
+    })
   },
   { immediate: true },
 )

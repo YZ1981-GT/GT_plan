@@ -136,6 +136,66 @@ describe('PlatformAiChatPanel', () => {
     })
   })
 
+  // -------------------------------------------------------------------------
+  // AC 1.7：面板打开后焦点进入输入区
+  //
+  // 🔴 这条行为此前只有 Playwright 覆盖、生产代码里根本没有 focus 逻辑
+  //（`focus|autofocus|activeElement` 在 .vue 里零命中），于是 e2e「焦点进入
+  // 输入区」恒红而任何 vitest / 后端 Property 都看不出来 —— CLOSURE §8 记的假绿。
+  // 现补一层可在 jsdom 复现的守卫：visible false→true 且宿主可用时聚焦 textarea；
+  // 宿主不可用（textarea disabled）时不抢焦点。
+  // 必须 attachTo document.body，否则 jsdom 里 el.focus() 不改 activeElement。
+  // -------------------------------------------------------------------------
+  describe('AC 1.7 面板打开聚焦输入区', () => {
+    // 该测试环境未全局注册 Element Plus，裸 `el-input` 不会展开成原生
+    // <textarea>（既有用例正因此用 `if (textarea.exists())` 保护）。这里给
+    // el-input 一个渲染真实 <textarea> 并透传 disabled 的 stub，让「打开面板
+    // 聚焦输入区」这条真实 DOM 焦点行为在 jsdom 层可复现（不是查源码字符串）。
+    const ElInputTextareaStub = {
+      name: 'ElInput',
+      props: ['modelValue', 'disabled', 'type', 'rows', 'placeholder', 'ariaLabel'],
+      emits: ['update:modelValue'],
+      template:
+        '<textarea :disabled="disabled" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)"></textarea>',
+    }
+
+    function mountWithTextarea(host: AiHostRequest) {
+      return import('../PlatformAiChatPanel.vue').then(({ default: PlatformAiChatPanel }) =>
+        mount(PlatformAiChatPanel, {
+          attachTo: document.body,
+          props: { host, visible: false },
+          global: { plugins: [createPinia()], stubs: { ElInput: ElInputTextareaStub } },
+        }),
+      )
+    }
+
+    it('visible 由 false 变 true 且宿主可用时，焦点落到输入区 textarea', async () => {
+      const wrapper = await mountWithTextarea(makeHost())
+      const textarea = wrapper.find('textarea').element as HTMLTextAreaElement
+      // 打开前焦点不在输入区
+      expect(document.activeElement).not.toBe(textarea)
+
+      await wrapper.setProps({ visible: true })
+      await flushPromises()
+
+      expect(document.activeElement).toBe(textarea)
+      wrapper.unmount()
+    })
+
+    it('宿主不可用时不抢焦点', async () => {
+      const wrapper = await mountWithTextarea(makeUnavailableHost())
+      // 面板处于不可用态（focus 逻辑的 hostAvailable 门控就是据此关闭）
+      expect(wrapper.find('.platform-ai-chat-panel--unavailable').exists()).toBe(true)
+      const textarea = wrapper.find('textarea').element as HTMLTextAreaElement
+
+      await wrapper.setProps({ visible: true })
+      await flushPromises()
+
+      expect(document.activeElement).not.toBe(textarea)
+      wrapper.unmount()
+    })
+  })
+
   describe('两阶段 API 调用序列', () => {
     it('sendMessage 先 POST /runs 再 subscribe events_url', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
