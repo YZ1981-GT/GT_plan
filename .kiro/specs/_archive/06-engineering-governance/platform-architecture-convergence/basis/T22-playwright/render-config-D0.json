@@ -1,0 +1,20 @@
+{
+  "wp_code": "D0",
+  "wp_id": "f1dcd160-1b0a-4d31-9861-f7de009a6c18",
+  "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "kind": "confirmation",
+  "decision_trace_len": 11,
+  "sheet_types": [
+    "b-index",
+    "a-program-console",
+    "confirmation-summary",
+    "confirmation-entity-verify",
+    "confirmation-followup",
+    "confirmation-diff-reconcile",
+    "confirmation-diff-checklist",
+    "confirmation-alternative-d05",
+    "confirmation-alternative-d06",
+    "confirmation-reliability",
+    "confirmation-fraud-risk"
+  ]
+}

@@ -1,0 +1,67 @@
+[
+  {
+    "wp_code": "A14-4",
+    "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "decision_trace_len": 8,
+    "sheet_types": [
+      "d-form-table",
+      "h-static-doc",
+      "onlyoffice-sheet"
+    ]
+  },
+  {
+    "wp_code": "B50",
+    "wp_id": "9d4cad09-440a-4981-bcdc-b39f145d062d",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "decision_trace_len": 1,
+    "sheet_types": [
+      "b50-risk-assessment"
+    ]
+  },
+  {
+    "wp_code": "B50-1",
+    "wp_id": "68b35347-4e3a-43aa-a91d-c611149df9d2",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "decision_trace_len": 3,
+    "sheet_types": [
+      "h-static-doc"
+    ]
+  },
+  {
+    "wp_code": "D0",
+    "wp_id": "f1dcd160-1b0a-4d31-9861-f7de009a6c18",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "decision_trace_len": 11,
+    "sheet_types": [
+      "a-program-console",
+      "b-index",
+      "confirmation-alternative-d05",
+      "confirmation-alternative-d06",
+      "confirmation-diff-checklist",
+      "confirmation-diff-reconcile",
+      "confirmation-entity-verify",
+      "confirmation-followup",
+      "confirmation-fraud-risk",
+      "confirmation-reliability",
+      "confirmation-summary"
+    ]
+  },
+  {
+    "wp_code": "D2",
+    "wp_id": "e2c95d10-181d-4549-8910-d5ab5bc5edd1",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "decision_trace_len": 23,
+    "sheet_types": [
+      "b-index",
+      "confirmation-alternative-d06",
+      "confirmation-diff-reconcile",
+      "confirmation-entity-verify",
+      "confirmation-followup",
+      "confirmation-fraud-risk",
+      "confirmation-reliability",
+      "confirmation-summary",
+      "d2-accounts-receivable"
+    ]
+  }
+]

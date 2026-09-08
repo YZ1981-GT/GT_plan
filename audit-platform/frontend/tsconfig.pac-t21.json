@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "baseUrl": "."
+  },
+  "include": [
+    "src/__tests__/pac-t21-typecheck-probe.ts",
+    "src/__tests__/_helpers/pacNetworkGate.ts",
+    "src/types/renderConfig.ts",
+    "src/types/componentCapabilities.generated.ts",
+    "src/router/domains/auth.ts",
+    "src/components/workpaper/registry/types.ts",
+    "src/env.d.ts"
+  ]
+}

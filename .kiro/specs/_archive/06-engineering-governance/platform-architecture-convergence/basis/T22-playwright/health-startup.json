@@ -1,0 +1,255 @@
+{
+  "status": "complete",
+  "tasks": [
+    {
+      "name": "setup_logging",
+      "phase": "bootstrap",
+      "status": "ok",
+      "duration_ms": 1,
+      "detail": null
+    },
+    {
+      "name": "run_migrations",
+      "phase": "migration",
+      "status": "skipped",
+      "duration_ms": 0,
+      "detail": "GT_BOOTSTRAP_DONE=1"
+    },
+    {
+      "name": "migration_mark_complete",
+      "phase": "migration",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "acnr_redis_inject",
+      "phase": "infrastructure",
+      "status": "ok",
+      "duration_ms": 15,
+      "detail": null
+    },
+    {
+      "name": "register_event_handlers",
+      "phase": "handlers",
+      "status": "ok",
+      "duration_ms": 4,
+      "detail": null
+    },
+    {
+      "name": "register_a13_event_handlers",
+      "phase": "handlers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "register_phase_handlers",
+      "phase": "handlers",
+      "status": "ok",
+      "duration_ms": 45,
+      "detail": null
+    },
+    {
+      "name": "replay_startup_events",
+      "phase": "handlers",
+      "status": "ok",
+      "duration_ms": 5849,
+      "detail": null
+    },
+    {
+      "name": "validate_grammar_on_startup",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "check_gin_index_status",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 13,
+      "detail": null
+    },
+    {
+      "name": "check_libreoffice_health",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 33,
+      "detail": null
+    },
+    {
+      "name": "validate_procedure_rollout_config",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "validate_template_manifest",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 9,
+      "detail": null
+    },
+    {
+      "name": "run_schema_drift_check",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 111,
+      "detail": null
+    },
+    {
+      "name": "warm_render_caches",
+      "phase": "caches",
+      "status": "ok",
+      "duration_ms": 3,
+      "detail": null
+    },
+    {
+      "name": "check_attachment_security_gates",
+      "phase": "validation",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "start_epoch_subscriber",
+      "phase": "acnr",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "acnr_invalidation_outbox_start",
+      "phase": "acnr",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "recover_ai_chat_runs",
+      "phase": "ai",
+      "status": "ok",
+      "duration_ms": 26,
+      "detail": null
+    },
+    {
+      "name": "run_ai_chat_health_check",
+      "phase": "ai",
+      "status": "ok",
+      "duration_ms": 3,
+      "detail": null
+    },
+    {
+      "name": "acnr_catalog_snapshot_gc",
+      "phase": "acnr",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "sla_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 1,
+      "detail": null
+    },
+    {
+      "name": "import_recover_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "outbox_replay_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "audit_log_writer_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "budget_alert_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "dataset_purge_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "staged_orphan_cleaner",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "export_cleanup_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "time_machine_cleanup_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "procedure_dispatcher_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "invalidation_dispatcher_worker",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "ImportJobRunner.run_forever",
+      "phase": "workers",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "install_sigterm_handler",
+      "phase": "finalize",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    },
+    {
+      "name": "print_ready",
+      "phase": "finalize",
+      "status": "ok",
+      "duration_ms": 0,
+      "detail": null
+    }
+  ],
+  "task_count": 35,
+  "failed": [],
+  "skipped": [
+    "run_migrations"
+  ]
+}

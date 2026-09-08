@@ -366,3 +366,23 @@ backend/app/services/workpaper_sync/excel_row_shift.py  2041
 #     实现却是空操作）。baseline 951 = 改动前真实行数。
 #     spec: 同上（2026-09-07 D2-2 实测条目）
 backend/tests/workpaper_sync/test_excel_row_shift.py  951
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: platform-architecture-convergence（2026-09-08 归档入库）
+#
+# 三个设计上必须单文件的 PAC 骨架产物，拆分会让判据跨文件、损害可读性：
+#   startup_registry.py —— 冻结的启动任务有序序列（STARTUP_TASKS tuple +
+#     FROZEN_STARTUP_SEQUENCE_NAMES + criticality lock + executor + report 投影）。
+#     顺序本身就是契约（Task 10 特征测试锁定「交换相邻步骤即 RED」），序列声明与
+#     executor 拆开会让「冻结序列 ↔ 真实执行序列」的同构判据跨文件。
+#   wp_render_pipeline.py —— render-config 七阶段 planner（load_render_subject →
+#     resolve_classification_sources → resolve_scope_redirect → load_common_render_facts
+#     → plan_sheets → materialize_sheet → finalize_render_response）+ 显式不可变输入输出
+#     dataclass + decision trace。七阶段与其 dataclass 拆开会让「阶段顺序等价」判据失联。
+#   generate_component_capability_manifest.py —— capability manifest 生成器：AST/JSON/TS
+#     三源提取 + host policy 裁决 + 机器派生 exemptions + TS 投影渲染。提取器与它生成的
+#     manifest/投影/exemption 是同一处真源的多个投影，拆分会让 --check 的自洽判据跨文件。
+#   baseline 取当前真实行数（hook 计），门禁继续拦膨胀 >5%。
+backend/app/core/startup_registry.py  889
+backend/app/routers/wp_render_pipeline.py  1219
+backend/scripts/gen/generate_component_capability_manifest.py  852

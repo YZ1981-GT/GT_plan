@@ -1,0 +1,231 @@
+[
+  {
+    "id": "M01",
+    "side": "be",
+    "want": "test_swapping_adjacent_stages_would_red",
+    "why": "交换 Stage3 redirect 与 Stage4 facts ⇒ redirect 短路语义被破坏；阶段顺序锁必须准确 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 2 warnings in 20.00s",
+    "added": [
+      "test_render_pipeline_stage_guards.py::test_orchestrator_preserves_seven_stage_order",
+      "test_render_pipeline_stage_guards.py::test_swapping_adjacent_stages_would_red"
+    ],
+    "gone": [],
+    "hit": [
+      "test_render_pipeline_stage_guards.py::test_swapping_adjacent_stages_would_red"
+    ],
+    "added_files": [
+      "test_render_pipeline_stage_guards.py"
+    ],
+    "restored": true,
+    "seconds": 33.5
+  },
+  {
+    "id": "M02",
+    "side": "be",
+    "want": "test_planner_source_uses_host_policy_not_whitelist_literals",
+    "why": "在 plan_sheets 内重新引用白名单字面量 ⇒ host_policy 真源守卫必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 2 warnings in 20.20s",
+    "added": [
+      "test_render_pipeline_stage_guards.py::test_host_policy_fallback_wins_over_whitelist_membership",
+      "test_render_pipeline_stage_guards.py::test_planner_source_uses_host_policy_not_whitelist_literals"
+    ],
+    "gone": [],
+    "hit": [
+      "test_render_pipeline_stage_guards.py::test_planner_source_uses_host_policy_not_whitelist_literals"
+    ],
+    "added_files": [
+      "test_render_pipeline_stage_guards.py"
+    ],
+    "restored": true,
+    "seconds": 34.1
+  },
+  {
+    "id": "M03",
+    "side": "be",
+    "want": "test_publish_source_writes_and_queries_idempotency_key_equality",
+    "why": "把等值幂等查改回 trace_id.like ⇒ 确定缺陷回归；源码守卫必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 2 warnings in 20.18s",
+    "added": [
+      "test_task_event_bus_idempotency_auth.py::test_publish_persists_idempotency_key_and_dedups_by_equality",
+      "test_task_event_bus_idempotency_auth.py::test_publish_source_writes_and_queries_idempotency_key_equality"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task_event_bus_idempotency_auth.py::test_publish_source_writes_and_queries_idempotency_key_equality"
+    ],
+    "added_files": [
+      "test_task_event_bus_idempotency_auth.py"
+    ],
+    "restored": true,
+    "seconds": 34.1
+  },
+  {
+    "id": "M04",
+    "side": "be",
+    "want": "test_dispatch_records_awaits_every_event_bus_publish",
+    "why": "去掉 dispatch_records 的 await ⇒ 协程未执行；调用点守卫必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 3 warnings in 20.94s",
+    "added": [
+      "test_event_call_site_guards.py::test_dispatch_create_awaits_publish_side_effect_once",
+      "test_event_call_site_guards.py::test_dispatch_records_awaits_every_event_bus_publish"
+    ],
+    "gone": [],
+    "hit": [
+      "test_event_call_site_guards.py::test_dispatch_records_awaits_every_event_bus_publish"
+    ],
+    "added_files": [
+      "test_event_call_site_guards.py"
+    ],
+    "restored": true,
+    "seconds": 34.5
+  },
+  {
+    "id": "M05",
+    "side": "be",
+    "want": "test_frozen_sequence_names_match_registry",
+    "why": "把冻结序列反转 ⇒ 与 STARTUP_TASKS 行序不等价；顺序锁必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 2 warnings in 20.69s",
+    "added": [
+      "test_startup_registry.py::test_frozen_sequence_includes_legacy_lifespan_milestones",
+      "test_startup_registry.py::test_frozen_sequence_names_match_registry"
+    ],
+    "gone": [],
+    "hit": [
+      "test_startup_registry.py::test_frozen_sequence_names_match_registry"
+    ],
+    "added_files": [
+      "test_startup_registry.py"
+    ],
+    "restored": true,
+    "seconds": 34.5
+  },
+  {
+    "id": "M06",
+    "side": "be",
+    "want": "TestCiAttributionGuard::test_job_and_file_refs_exist",
+    "why": "改名独立 CI job ⇒ 归因守卫必须 RED（禁止静默消失）",
+    "verdict": "RED",
+    "summary": "1 failed, 54 passed, 2 warnings in 20.55s",
+    "added": [
+      "test_check_domain_boundaries.py::TestCiAttributionGuard::test_job_and_file_refs_exist"
+    ],
+    "gone": [],
+    "hit": [
+      "test_check_domain_boundaries.py::TestCiAttributionGuard::test_job_and_file_refs_exist"
+    ],
+    "added_files": [
+      "test_check_domain_boundaries.py"
+    ],
+    "restored": true,
+    "seconds": 34.1
+  },
+  {
+    "id": "M07",
+    "side": "fe",
+    "want": "单 beforeEach",
+    "why": "插入第二个 beforeEach ⇒ 拆分不得改成多守卫；完整性守卫必须 RED",
+    "verdict": "RED",
+    "summary": "39/41 passed, numFailedTestSuites=4",
+    "added": [
+      "route domain projection equality index.ts 仅有一个 beforeEach",
+      "前端引用完整性 · 判据自身不空洞 路由按域模块装配：domains 非空、index 引用域、layoutChildren 展开、单 beforeEach"
+    ],
+    "gone": [],
+    "hit": [
+      "前端引用完整性 · 判据自身不空洞 路由按域模块装配：domains 非空、index 引用域、layoutChildren 展开、单 beforeEach"
+    ],
+    "added_files": [
+      "FrontendReferenceIntegrity.spec.ts",
+      "routeDomainProjection.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 16.5
+  },
+  {
+    "id": "M08",
+    "side": "fe",
+    "want": "no startsWith classifier remains in registry barrel",
+    "why": "重新引入 startsWith/classifyDomain 运行时分类器 ⇒ Task 20 禁令守卫必须 RED",
+    "verdict": "RED",
+    "summary": "40/41 passed, numFailedTestSuites=2",
+    "added": [
+      "PAC T20: registry domain assembly no startsWith classifier remains in registry barrel"
+    ],
+    "gone": [],
+    "hit": [
+      "PAC T20: registry domain assembly no startsWith classifier remains in registry barrel"
+    ],
+    "added_files": [
+      "registryDomainSplit.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 16.6
+  },
+  {
+    "id": "M09",
+    "side": "be",
+    "want": "test_replay_actor_comes_from_current_user_not_request_body",
+    "why": "replay actor 改回信任请求体 operator_id ⇒ 授权缺陷回归（Req 9.6）；actor 来源守卫必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 2 warnings in 20.03s",
+    "added": [
+      "test_task_event_bus_idempotency_auth.py::test_replay_actor_comes_from_current_user_not_request_body",
+      "test_task_event_bus_idempotency_auth.py::test_router_does_not_pass_request_body_operator_to_replay"
+    ],
+    "gone": [],
+    "hit": [
+      "test_task_event_bus_idempotency_auth.py::test_replay_actor_comes_from_current_user_not_request_body"
+    ],
+    "added_files": [
+      "test_task_event_bus_idempotency_auth.py"
+    ],
+    "restored": true,
+    "seconds": 34.0
+  },
+  {
+    "id": "M10",
+    "side": "be",
+    "want": "test_startup_report_as_dict_isomorphic_to_injected_results",
+    "why": "startup 运行报告丢弃逐任务 name 字段 ⇒ 报告与 registry 不再同构（Req 6.2）；同构守卫必须 RED",
+    "verdict": "RED",
+    "summary": "2 failed, 53 passed, 2 warnings in 20.83s",
+    "added": [
+      "test_startup_registry.py::test_health_includes_startup_report",
+      "test_startup_registry.py::test_startup_report_as_dict_isomorphic_to_injected_results"
+    ],
+    "gone": [],
+    "hit": [
+      "test_startup_registry.py::test_startup_report_as_dict_isomorphic_to_injected_results"
+    ],
+    "added_files": [
+      "test_startup_registry.py"
+    ],
+    "restored": true,
+    "seconds": 34.6
+  },
+  {
+    "id": "M11",
+    "side": "fe",
+    "want": "展开恰好一次",
+    "why": "重复展开一个 route 域 ⇒ flatten 不再等价（Req 10.3）；路由域投影守卫必须 RED",
+    "verdict": "RED",
+    "summary": "40/41 passed, numFailedTestSuites=2",
+    "added": [
+      "route domain projection equality index.ts 将每个域导出展开恰好一次（layoutChildren + top-level routes）"
+    ],
+    "gone": [],
+    "hit": [
+      "route domain projection equality index.ts 将每个域导出展开恰好一次（layoutChildren + top-level routes）"
+    ],
+    "added_files": [
+      "routeDomainProjection.spec.ts"
+    ],
+    "restored": true,
+    "seconds": 17.0
+  }
+]

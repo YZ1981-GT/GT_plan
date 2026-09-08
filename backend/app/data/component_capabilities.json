@@ -1,0 +1,3623 @@
+{
+  "components": {
+    "a-program-console": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a1-11-signing-form": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a1-12-dual-checklist": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a1-15-disclosure-checklist": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a1-17-corresponding-data": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a1-dashboard": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a10-1-governance-communication": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a10-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a11-1-subsequent-events-inquiry": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a11-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a12-1-legal-confirmation": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a12-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a14-3-workbook": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a15-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a16-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a17-1-audit-summary": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a17-2-1-kam": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a17-3-1-consultation-execution": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a17-3-consultation-record": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a17-4-disagreement-record": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a17-6-closing-meeting": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a17-7-independence-declaration": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a17-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "a17-summary": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a18-1-regulatory-submission": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a18-2-regulatory-communication": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a2-adjustment-console": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a27-1-it-audit-memo": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a3-8-goodwill-impairment": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a3-consolidation-console": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a5-1-cashflow-audit": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "a8-1-other-info-representation": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a9-1-deficiency-letter": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "a9-2-deficiency-letter-governance": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "analytical-review": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "audit-legend": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "audit-sheet": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b-index": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b1-3-business-evaluation": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b1-4-due-diligence-report": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b1-5-kaa-check": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b1-risk-assessment": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b13-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b19-bundle": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b2-12-evaluation": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b2-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b22a-control-matrix": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b22b-control-matrix": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b22b-deficiency-evaluation": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b22c-design-effectiveness": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b23-process-control": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b30-group-audit": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b50-risk-assessment": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "b51-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "b60-strategy": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "bad-debt-sheet": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "c-control-test": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "c-note-table": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "c1-entity-level-control": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "c22-itgc-bundle": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "c23-journal-entry-control": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "c24-journal-entry-detail": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "c25-internal-audit-reliance": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "c26-info-processing-control": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "cf-verification": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "checklist-table": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-d05": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-d06": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-f05": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-f06": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-g06": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-h05": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-k05": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-k06": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-alternative-l05": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "confirmation-diff-checklist": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-diff-nonsecurities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-diff-reconcile": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-diff-securities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-entity-verify": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-followup": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-fraud-risk": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-hub": {
+      "has_backend_renderer": false,
+      "has_frontend_component": false,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "confirmation-reliability": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-send-list-e03": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "confirmation-send-list-e04": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "confirmation-send-list-e05": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "confirmation-summary": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "confirmation-wealth-list": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "confirmation",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_CONFIRMATION_COMPONENTS"
+      ],
+      "status": "active"
+    },
+    "contingent-liability": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": false,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "custom": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d-form-confirmation": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d-form-paragraph": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d-form-qa": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "d-form-review": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "d-form-table": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d1-notes-receivable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d2-accounts-receivable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d3-prepaid-accounts": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d4-operating-revenue": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d5-receivables-financing": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d6-contract-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "d7-contract-liabilities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "discontinued-operations": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": false,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "e-control-test": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "e1-monetary-fund": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f1-prepayment": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f2-inventory-main": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f2-inventory-special": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f2-inventory-valuation-impairment": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f2-stocktake-bundle": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f3-notes-payable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f4-accounts-payable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "f5-cost-of-sales": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g1-trading-financial-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g10-trading-financial-liabilities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g11-investment-income": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g12-net-hedge-gains": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g13-fair-value-changes": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g14-credit-impairment-loss": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g2-interest-receivable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g3-dividend-receivable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g4-bond-investment-ecl": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g4-bond-investment-main": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g4-bond-investment-sppi": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g5-long-term-receivable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g6-other-bond-investment-ecl": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g6-other-bond-investment-main": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g6-other-bond-investment-sppi": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g7-long-term-equity-main": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g7-long-term-equity-method": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g7-long-term-equity-subsidiary": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g8-other-equity-instruments": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "g9-other-noncurrent-financial": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "goodwill-impairment": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": false,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "h-static-doc": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "h1-fixed-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h10-asset-disposal-income": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h2-construction-in-progress": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h3-investment-property": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h4-engineering-materials": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h5-oil-gas-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h6-asset-disposal-clearing": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h7-biological-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "h8-right-of-use-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "h9-lease-liabilities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "i1-intangible-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "i2-development-expenditure": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "i3-goodwill": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "i4-long-term-prepaid": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "i5-other-noncurrent-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "i6-research-development-expense": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "independence-signing": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "j1-employee-compensation": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "j2-defined-benefit-plan": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "j3-share-based-payment": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k1-other-receivables": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k10-other-income": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k11-asset-impairment-loss": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k12-non-operating-income": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "k13-non-operating-expense": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "k2-other-current-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k3-other-payables": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k4-other-current-liabilities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k5-provisions": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k6-held-for-sale": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k7-deferred-income": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k8-selling-expenses": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "k9-admin-expenses": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "kam-workpaper": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "l1-short-term-loans": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l2-interest-payable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l3-long-term-loans": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l4-bonds-payable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l5-long-term-payables": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l6-special-payables": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l7-other-noncurrent-liabilities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "l8-financial-expenses": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m1-dividends-payable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m10-other-equity-instruments": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m2-paid-in-capital": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m3-treasury-stock": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m4-capital-reserve": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m5-surplus-reserve": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m6-retained-earnings": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m7-special-reserve": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m8-general-risk-reserve": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "m9-other-comprehensive-income": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "misstatement-summary": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "misstatement-workpaper": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "n1-deferred-tax-assets": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "n2-taxes-payable": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "n3-deferred-tax-liabilities": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "n4-taxes-and-surcharges": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "n5-income-tax-expense": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "procedure-table": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": false,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "redirect-materiality": {
+      "has_backend_renderer": false,
+      "has_frontend_component": false,
+      "host_policy": "redirect",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "regulatory-letter": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "report-analysis": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": false,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "review-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "review-checklist": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "s12-cpa-expert": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s13-mgmt-expert": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s14-accounting-estimate": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s15-eps-roe": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s20-revenue-deduction": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s21-data-asset": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s3-policy-change": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s32-fraud-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "s33-ann14-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides",
+        "_ONLYOFFICE_HTML_WHITELIST"
+      ],
+      "status": "active"
+    },
+    "s34-ipo-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s35-refinance-bundle": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s4-nonmonetary-exchange": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s5-debt-restructuring": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "s6-fund-occupation": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "segment-report": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": false,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    },
+    "skip": {
+      "has_backend_renderer": false,
+      "has_frontend_component": false,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "univer": {
+      "has_backend_renderer": true,
+      "has_frontend_component": false,
+      "host_policy": "univer",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH"
+      ],
+      "status": "active"
+    },
+    "word-template": {
+      "has_backend_renderer": true,
+      "has_frontend_component": true,
+      "host_policy": "html",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "RENDERER_DISPATCH",
+        "REGISTRY_LIST",
+        "HtmlComponentType",
+        "wp_code_overrides"
+      ],
+      "status": "active"
+    },
+    "wp-popup-signing": {
+      "has_backend_renderer": false,
+      "has_frontend_component": true,
+      "host_policy": "onlyoffice",
+      "override_allowed": true,
+      "owner": "workpaper-rendering",
+      "sources": [
+        "VALID_COMPONENT_TYPES",
+        "REGISTRY_LIST",
+        "HtmlComponentType"
+      ],
+      "status": "active"
+    }
+  },
+  "exemptions": [
+    {
+      "component_type": "a1-11-signing-form",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "a10-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "a11-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "a12-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "a14-3-workbook",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "a15-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "a16-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "a17-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "a17-summary",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "audit-legend",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "b13-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "b2-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "b22a-control-matrix",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "b22b-control-matrix",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "b22b-deficiency-evaluation",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "14d0bf4a757e008a"
+    },
+    {
+      "component_type": "b22c-design-effectiveness",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "b23-process-control",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "b30-group-audit",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "b51-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "bad-debt-sheet",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "14d0bf4a757e008a"
+    },
+    {
+      "component_type": "cf-verification",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "confirmation-alternative-d05",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-alternative-d06",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-alternative-f05",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-alternative-f06",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-diff-checklist",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-diff-reconcile",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-entity-verify",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-followup",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-fraud-risk",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-hub",
+      "owner": "workpaper-rendering",
+      "reason": "[manifest_only] Policy-only host (skip / redirect / hub) owned by neither RENDERER_DISPATCH nor htmlRendererRegistry; intentional asymmetry.",
+      "source_digest": "547f6f20cb3691a0"
+    },
+    {
+      "component_type": "confirmation-reliability",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-summary",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "confirmation-wealth-list",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "d7b51d665abd0a3e"
+    },
+    {
+      "component_type": "contingent-liability",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "1bea438d7894ac26"
+    },
+    {
+      "component_type": "custom",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "14d0bf4a757e008a"
+    },
+    {
+      "component_type": "d-form-confirmation",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "14d0bf4a757e008a"
+    },
+    {
+      "component_type": "d-form-paragraph",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "14d0bf4a757e008a"
+    },
+    {
+      "component_type": "d-form-qa",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "d-form-review",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "d-form-table",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "discontinued-operations",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "1bea438d7894ac26"
+    },
+    {
+      "component_type": "e-control-test",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "goodwill-impairment",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "1bea438d7894ac26"
+    },
+    {
+      "component_type": "h-static-doc",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "14d0bf4a757e008a"
+    },
+    {
+      "component_type": "independence-signing",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "kam-workpaper",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "misstatement-summary",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "misstatement-workpaper",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "procedure-table",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "1bea438d7894ac26"
+    },
+    {
+      "component_type": "redirect-materiality",
+      "owner": "workpaper-rendering",
+      "reason": "[manifest_only] Policy-only host (skip / redirect / hub) owned by neither RENDERER_DISPATCH nor htmlRendererRegistry; intentional asymmetry.",
+      "source_digest": "547f6f20cb3691a0"
+    },
+    {
+      "component_type": "regulatory-letter",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    },
+    {
+      "component_type": "report-analysis",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "1bea438d7894ac26"
+    },
+    {
+      "component_type": "review-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "s32-fraud-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s33-ann14-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "58d3a5807e2a98fa"
+    },
+    {
+      "component_type": "s34-ipo-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "s35-refinance-bundle",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "60e314db04b66a04"
+    },
+    {
+      "component_type": "segment-report",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "1bea438d7894ac26"
+    },
+    {
+      "component_type": "skip",
+      "owner": "workpaper-rendering",
+      "reason": "[manifest_only] Policy-only host (skip / redirect / hub) owned by neither RENDERER_DISPATCH nor htmlRendererRegistry; intentional asymmetry.",
+      "source_digest": "547f6f20cb3691a0"
+    },
+    {
+      "component_type": "univer",
+      "owner": "workpaper-rendering",
+      "reason": "[backend_only] Backend renderer with no htmlRendererRegistry entry (host handled outside the HTML registry, e.g. univer/onlyoffice); intentional asymmetry.",
+      "source_digest": "d73d6e0cbae80dc9"
+    },
+    {
+      "component_type": "wp-popup-signing",
+      "owner": "workpaper-rendering",
+      "reason": "[frontend_only] Pure frontend component with no backend renderer (RENDERER_DISPATCH absent); intentional asymmetry.",
+      "source_digest": "a7c67a1ff3d31a16"
+    }
+  ],
+  "schema_version": 1
+}

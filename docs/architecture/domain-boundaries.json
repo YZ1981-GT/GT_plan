@@ -1,0 +1,416 @@
+{
+  "schema_version": 1,
+  "domains": {
+    "core": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/__init__.py",
+        "backend/app/main.py",
+        "backend/app/deps.py",
+        "backend/app/core/**",
+        "backend/app/api/**",
+        "backend/app/middleware/**",
+        "backend/app/models/**",
+        "backend/app/schemas/**",
+        "backend/app/security/**",
+        "backend/app/permissions/**",
+        "backend/app/data/**"
+      ],
+      "may_depend_on": ["backend-routers"]
+    },
+    "events": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/event_handlers/**",
+        "backend/app/services/*event*",
+        "backend/app/routers/*event*",
+        "backend/app/workers/*event*",
+        "backend/app/workers/*outbox*",
+        "backend/app/workers/*dispatch*"
+      ],
+      "may_depend_on": ["core"]
+    },
+    "auth": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/*auth*",
+        "backend/app/routers/*auth*",
+        "backend/app/routers/users*.py",
+        "audit-platform/frontend/src/views/**/Login*.vue",
+        "audit-platform/frontend/src/views/**/auth/**",
+        "audit-platform/frontend/src/stores/*auth*",
+        "audit-platform/frontend/src/services/*auth*"
+      ],
+      "may_depend_on": ["core"]
+    },
+    "projects": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/*project*",
+        "backend/app/routers/*project*",
+        "audit-platform/frontend/src/components/project/**",
+        "audit-platform/frontend/src/views/**/project/**",
+        "audit-platform/frontend/src/views/**/Project*.vue",
+        "audit-platform/frontend/src/stores/*project*",
+        "audit-platform/frontend/src/services/*project*"
+      ],
+      "may_depend_on": ["core", "auth"]
+    },
+    "four-table": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/four_table/**",
+        "backend/app/services/d_cycle_extraction/**",
+        "backend/app/services/d4_extraction/**",
+        "backend/app/services/f2_extraction/**",
+        "backend/app/services/l_cycle_extraction/**",
+        "backend/app/services/e0_send_list/**",
+        "backend/app/services/*four_table*",
+        "backend/app/routers/*four_table*",
+        "backend/app/routers/*cycle*",
+        "audit-platform/frontend/src/components/**/*FourTable*",
+        "audit-platform/frontend/src/composables/**/*fourTable*",
+        "audit-platform/frontend/src/composables/**/*FourTable*"
+      ],
+      "may_depend_on": ["core", "projects", "events", "frontend-shared"]
+    },
+    "workpaper-rendering": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/routers/wp_render_*",
+        "backend/app/routers/wp_classification*",
+        "backend/app/services/wp_render*",
+        "backend/app/services/component_capability*",
+        "backend/app/schemas/render_config*",
+        "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
+        "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+        "audit-platform/frontend/src/components/workpaper/registry/**",
+        "audit-platform/frontend/src/composables/useWpRenderer.ts",
+        "audit-platform/frontend/src/types/renderConfig.ts",
+        "audit-platform/frontend/src/types/componentCapabilities*"
+      ],
+      "may_depend_on": ["core", "four-table", "events", "workpapers", "backend-services", "frontend-shared"]
+    },
+    "workpapers": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/wp_*",
+        "backend/app/services/workpaper*",
+        "backend/app/services/workpaper_sync/**",
+        "backend/app/services/wp_conversion/**",
+        "backend/app/services/wp_export/**",
+        "backend/app/services/wp_fill/**",
+        "backend/app/services/wp_scripts/**",
+        "backend/app/services/wp_visibility/**",
+        "backend/app/services/custom_template_ingestion/**",
+        "backend/app/services/guidance_publication_service.py",
+        "backend/app/services/project_guidance_supplement_service.py",
+        "backend/app/services/guidance_api_contract.py",
+        "backend/app/services/guidance_resolution_identity.py",
+        "backend/app/routers/wp_*",
+        "backend/app/routers/workpaper*",
+        "backend/app/routers/custom_template_ingestion.py",
+        "audit-platform/frontend/src/components/workpaper/**",
+        "audit-platform/frontend/src/views/workpaper-editor/**",
+        "audit-platform/frontend/src/views/workpaper-list/**",
+        "audit-platform/frontend/src/views/**/Workpaper*.vue",
+        "audit-platform/frontend/src/composables/useEditor*",
+        "audit-platform/frontend/src/composables/useSheet*",
+        "audit-platform/frontend/src/composables/useSanitize*",
+        "audit-platform/frontend/src/stores/*guidance*",
+        "audit-platform/frontend/src/stores/*workpaper*"
+      ],
+      "may_depend_on": ["core", "projects", "events", "four-table", "workpaper-rendering", "formula", "auth", "frontend-shared", "frontend-features"]
+    },
+    "formula": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/formula*",
+        "backend/app/services/formula_management/**",
+        "backend/app/services/formula_runtime/**",
+        "backend/app/services/*formula*",
+        "backend/app/routers/*formula*",
+        "audit-platform/frontend/src/components/formula/**",
+        "audit-platform/frontend/src/views/**/formula/**",
+        "audit-platform/frontend/src/shell/formula/**"
+      ],
+      "may_depend_on": ["core", "workpapers", "reports", "events", "frontend-shared", "workpaper-rendering", "frontend-features"]
+    },
+    "reports": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/report*",
+        "backend/app/services/*report*",
+        "backend/app/routers/report*",
+        "backend/app/routers/*report*",
+        "audit-platform/frontend/src/components/report/**",
+        "audit-platform/frontend/src/views/**/report/**",
+        "audit-platform/frontend/src/views/**/Report*.vue"
+      ],
+      "may_depend_on": ["core", "projects", "events", "four-table", "formula", "notes", "frontend-shared"]
+    },
+    "notes": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/note*",
+        "backend/app/services/*note*",
+        "backend/app/routers/note*",
+        "backend/app/routers/*note*",
+        "audit-platform/frontend/src/components/notes/**",
+        "audit-platform/frontend/src/components/disclosure/**",
+        "audit-platform/frontend/src/views/**/note*/**",
+        "audit-platform/frontend/src/views/**/Note*.vue"
+      ],
+      "may_depend_on": ["core", "projects", "events", "four-table", "formula", "reports", "frontend-shared"]
+    },
+    "import-export": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/import*",
+        "backend/app/services/export*",
+        "backend/app/services/ledger*",
+        "backend/app/services/import_engine/**",
+        "backend/app/services/ledger_import/**",
+        "backend/app/services/archive*",
+        "backend/app/services/archive_generators/**",
+        "backend/app/routers/import*",
+        "backend/app/routers/export*",
+        "backend/app/routers/ledger*",
+        "backend/app/routers/archive*",
+        "backend/app/workers/*import*",
+        "backend/app/workers/*export*",
+        "audit-platform/frontend/src/components/import/**",
+        "audit-platform/frontend/src/components/ledger-import/**",
+        "audit-platform/frontend/src/components/deliverable/**",
+        "audit-platform/frontend/src/views/ledger/**",
+        "audit-platform/frontend/src/views/**/Import*.vue",
+        "audit-platform/frontend/src/views/**/Export*.vue"
+      ],
+      "may_depend_on": ["core", "projects", "events", "workpapers", "four-table", "frontend-shared"]
+    },
+    "ai": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/ai_*",
+        "backend/app/services/ai_chat/**",
+        "backend/app/services/knowledge*",
+        "backend/app/services/doc_*",
+        "backend/app/services/vector*",
+        "backend/app/services/reference_doc*",
+        "backend/app/routers/ai*",
+        "backend/app/routers/*knowledge*",
+        "backend/app/routers/*doc*",
+        "audit-platform/frontend/src/components/ai/**",
+        "audit-platform/frontend/src/components/ai-chat/**",
+        "audit-platform/frontend/src/views/ai/**"
+      ],
+      "may_depend_on": ["core", "projects", "events", "workpapers", "auth", "frontend-shared"]
+    },
+    "evidence": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/evidence*",
+        "backend/app/services/evidence_governance/**",
+        "backend/app/routers/evidence*",
+        "audit-platform/frontend/src/components/evidence-governance/**",
+        "audit-platform/frontend/src/components/attachment/**",
+        "audit-platform/frontend/src/views/**/evidence*/**"
+      ],
+      "may_depend_on": ["core", "projects", "events", "workpapers", "frontend-shared"]
+    },
+    "procedures": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/procedure*",
+        "backend/app/services/*procedure*",
+        "backend/app/services/state_machines/**",
+        "backend/app/routers/procedure*",
+        "backend/app/routers/*procedure*",
+        "backend/app/workers/*procedure*",
+        "audit-platform/frontend/src/components/assignment/**",
+        "audit-platform/frontend/src/views/**/Procedure*.vue",
+        "audit-platform/frontend/src/views/**/MyProcedure*.vue"
+      ],
+      "may_depend_on": ["core", "projects", "events", "workpapers", "auth", "frontend-shared"]
+    },
+    "consolidation": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/consol*",
+        "backend/app/services/*consol*",
+        "backend/app/routers/consol*",
+        "backend/app/routers/*consol*",
+        "audit-platform/frontend/src/components/consolidation/**",
+        "audit-platform/frontend/src/views/**/consol*/**",
+        "audit-platform/frontend/src/views/**/Consol*.vue"
+      ],
+      "may_depend_on": ["core", "projects", "events", "reports", "notes", "four-table", "frontend-shared"]
+    },
+    "qc-review": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/qc*",
+        "backend/app/services/*review*",
+        "backend/app/services/eqcr*",
+        "backend/app/services/independence*",
+        "backend/app/services/audit_check/**",
+        "backend/app/services/consistency*",
+        "backend/app/services/consistency_gate/**",
+        "backend/app/routers/qc*",
+        "backend/app/routers/*review*",
+        "backend/app/routers/eqcr*",
+        "backend/app/routers/*independence*",
+        "audit-platform/frontend/src/components/qc/**",
+        "audit-platform/frontend/src/components/eqcr/**",
+        "audit-platform/frontend/src/components/review/**",
+        "audit-platform/frontend/src/components/consistency/**",
+        "audit-platform/frontend/src/views/qc/**",
+        "audit-platform/frontend/src/views/eqcr/**",
+        "audit-platform/frontend/src/views/independence/**"
+      ],
+      "may_depend_on": ["core", "projects", "events", "workpapers", "auth", "procedures", "frontend-shared"]
+    },
+    "backend-workers": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/workers/**"
+      ],
+      "may_depend_on": [
+        "core",
+        "events",
+        "projects",
+        "workpapers",
+        "import-export",
+        "procedures",
+        "four-table",
+        "reports",
+        "notes",
+        "ai",
+        "evidence",
+        "qc-review",
+        "consolidation",
+        "formula",
+        "auth",
+        "backend-services"
+      ]
+    },
+    "backend-services": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/services/**"
+      ],
+      "may_depend_on": [
+        "core",
+        "events",
+        "auth",
+        "projects",
+        "four-table",
+        "workpapers",
+        "workpaper-rendering",
+        "formula",
+        "reports",
+        "notes",
+        "import-export",
+        "ai",
+        "evidence",
+        "procedures",
+        "consolidation",
+        "qc-review"
+      ]
+    },
+    "backend-routers": {
+      "owners": ["platform"],
+      "paths": [
+        "backend/app/routers/**",
+        "backend/app/router_registry/**"
+      ],
+      "may_depend_on": [
+        "core",
+        "events",
+        "auth",
+        "projects",
+        "four-table",
+        "workpapers",
+        "workpaper-rendering",
+        "formula",
+        "reports",
+        "notes",
+        "import-export",
+        "ai",
+        "evidence",
+        "procedures",
+        "consolidation",
+        "qc-review",
+        "backend-services"
+      ]
+    },
+    "frontend-shell": {
+      "owners": ["platform"],
+      "paths": [
+        "audit-platform/frontend/src/main.ts",
+        "audit-platform/frontend/src/App.vue",
+        "audit-platform/frontend/src/env.d.ts",
+        "audit-platform/frontend/src/auto-imports.d.ts",
+        "audit-platform/frontend/src/components.d.ts",
+        "audit-platform/frontend/src/layouts/**",
+        "audit-platform/frontend/src/router/**",
+        "audit-platform/frontend/src/config/**",
+        "audit-platform/frontend/src/i18n/**",
+        "audit-platform/frontend/src/styles/**"
+      ],
+      "may_depend_on": [
+        "frontend-shared",
+        "auth",
+        "projects",
+        "workpapers",
+        "frontend-features",
+        "formula"
+      ]
+    },
+    "frontend-shared": {
+      "owners": ["platform"],
+      "paths": [
+        "audit-platform/frontend/src/shared/**",
+        "audit-platform/frontend/src/utils/**",
+        "audit-platform/frontend/src/types/**",
+        "audit-platform/frontend/src/constants/**",
+        "audit-platform/frontend/src/directives/**",
+        "audit-platform/frontend/src/permissions/**",
+        "audit-platform/frontend/src/services/**",
+        "audit-platform/frontend/src/stores/**",
+        "audit-platform/frontend/src/composables/**",
+        "audit-platform/frontend/src/generated/**",
+        "audit-platform/frontend/src/data/**",
+        "audit-platform/frontend/src/components/common/**",
+        "audit-platform/frontend/src/components/shared/**",
+        "audit-platform/frontend/src/components/layout/**"
+      ],
+      "may_depend_on": ["auth", "projects", "formula"]
+    },
+    "frontend-features": {
+      "owners": ["platform"],
+      "paths": [
+        "audit-platform/frontend/src/components/**",
+        "audit-platform/frontend/src/views/**"
+      ],
+      "may_depend_on": [
+        "frontend-shared",
+        "frontend-shell",
+        "auth",
+        "projects",
+        "workpapers",
+        "workpaper-rendering",
+        "four-table",
+        "formula",
+        "reports",
+        "notes",
+        "import-export",
+        "ai",
+        "evidence",
+        "procedures",
+        "consolidation",
+        "qc-review"
+      ]
+    }
+  }
+}
