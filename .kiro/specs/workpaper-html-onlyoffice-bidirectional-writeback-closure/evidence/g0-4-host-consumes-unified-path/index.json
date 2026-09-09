@@ -1,0 +1,59 @@
+{
+  "schema_version": "host-unified-path-evidence-index/v1",
+  "milestone": "HOST-CONSUMES-UNIFIED-PATH",
+  "state_policy": "host-consumes-unified-path/v1",
+  "review_status": "reviewed_negative_baseline",
+  "run_id": "g0-4-d2-2-negative-baseline-v1",
+  "denominator": [
+    "xlsx/gt-d2-accounts-receivable"
+  ],
+  "entries": [
+    {
+      "entry_id": "xlsx/gt-d2-accounts-receivable",
+      "identity": {
+        "manifest_entry_id": "xlsx/gt-d2-accounts-receivable",
+        "adapter_id": "d2.receivable_detail",
+        "host_path": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
+        "component_type": "d2-accounts-receivable",
+        "sheet_selector": "D2-2",
+        "physical_sheet": "明细表D2-2",
+        "artifact_name": "D2-2.xlsx",
+        "legacy_room_entry": "xlsx-sheet/D2-2/D2-2",
+        "pilot_matcher_wp_code": "D2A"
+      },
+      "source_checks": {
+        "secondary_revision_domain": {
+          "path": "backend/app/routers/d2_sync_router.py",
+          "sha256": "d4cbec9721fba0937965350fb17bfec84972dbb4b9256cd70938297cf4e54ba5",
+          "function": "d2_push_to_excel",
+          "forbidden_call": "_bump_oo_revision"
+        },
+        "capability": {
+          "path": "backend/app/routers/d2_sync_router.py",
+          "sha256": "d4cbec9721fba0937965350fb17bfec84972dbb4b9256cd70938297cf4e54ba5",
+          "function": "d2_sync_status",
+          "response_key": "bidirectional",
+          "server_computed_call": null
+        }
+      },
+      "artifacts": [
+        {
+          "channel": "network",
+          "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/network.json",
+          "sha256": "377c1229255bb933fed334bf3758c81d75d4b34d5caf24c9a78a5d21c45f756c"
+        },
+        {
+          "channel": "editor_config",
+          "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/editor-config.json",
+          "sha256": "24594e536907afa63fdf8eed93ff3a1d912f4023af4868ad28ed5d5907c522bc"
+        },
+        {
+          "channel": "database",
+          "path": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g0-4-host-consumes-unified-path/d2-2/database-snapshot.json",
+          "sha256": "84807f100ef20838317dbc404683d35ba7b3c6e5b3677aa84bd8b3d4878d8fb7"
+        }
+      ]
+    }
+  ],
+  "index_digest": "98abeca70bb80e37b15a862c9a06088e2c26d2ec54883047001122c202856216"
+}

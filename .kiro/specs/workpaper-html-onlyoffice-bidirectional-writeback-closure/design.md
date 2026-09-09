@@ -1,5 +1,10 @@
 # Design Document
 
+## 总控 G1-1 实施边界
+
+冻结身份只有 bundle typed slots，不假定 FrozenEntryDefinitions 含 instrumentation。复用 PublishedIdentityObserver 的 child digest、approved state、payload canonical digest 与 artifact 路径解析，提供按冻结 bundle 读取 anchors 的公共入口。三个业务宿主在构造 ContentCommitPlan 时传入 anchors；plan 仍是无 I/O 纯数据。Excel commit 与 candidate finalize 共同委托 compute_structure_hash_from_artifact 消费最终文件；Word 与权威 OOXML 不进入 Excel hash 路径。证据及回滚范围见 evidence/g1-1-publish-structure-hash/README.md；不得改动其他 owner 的 registry、Task75 测试、D2 router 或前端。
+
+
 ## Overview
 
 本设计采用“统一内容提交内核 + shared OO room/per-user lease + 显式 adapter contract + 可增强模板 + 入口 manifest + 分波迁移”。它解决的不是单个切换按钮，而是六个必须同时成立的闭环：

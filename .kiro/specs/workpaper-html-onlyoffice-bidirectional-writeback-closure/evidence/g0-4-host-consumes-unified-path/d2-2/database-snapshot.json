@@ -1,0 +1,37 @@
+{
+  "schema_version": "host-unified-path-database-evidence/v1",
+  "run_id": "g0-4-d2-2-negative-baseline-v1",
+  "entry_id": "xlsx/gt-d2-accounts-receivable",
+  "capture_kind": "runtime_database_snapshot",
+  "execution_status": "NOT_RUN",
+  "scenario_executed": false,
+  "read_only_capture": null,
+  "reason_code": "real_onlyoffice_roundtrip_not_executed",
+  "applications": [],
+  "operations": [],
+  "content_versions": [],
+  "oo_content_revision_delta": {
+    "observed": false,
+    "used_as_correctness_basis": null,
+    "before": null,
+    "after": null
+  },
+  "source_bindings": [
+    {
+      "path": "backend/app/models/workpaper_sync_models.py",
+      "sha256": "720a20b2fa2100803b73b992907215590bfa1b3615b1817d5cc304a4c12b6e1f",
+      "required_literals": [
+        "class WorkpaperContentApplication",
+        "class WorkpaperSyncOperation",
+        "class WorkpaperContentVersion"
+      ]
+    },
+    {
+      "path": "backend/app/services/workpaper_sync/models.py",
+      "sha256": "d1265f9b306d2354317b2d17b90712c1e0dba30de8026addb4a893d091caf6f0",
+      "required_literals": [
+        "class OperationState"
+      ]
+    }
+  ]
+}

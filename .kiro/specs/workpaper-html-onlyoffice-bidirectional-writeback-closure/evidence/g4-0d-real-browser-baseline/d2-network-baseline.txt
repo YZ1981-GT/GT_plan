@@ -1,0 +1,3 @@
+608. [GET] http://localhost:3030/api/workpapers/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/d2-sync/status => [200] OK
+
+Note: 514 static requests not shown, run with "static" option to see them.

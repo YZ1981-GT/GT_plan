@@ -1,5 +1,10 @@
 # Requirements Document
 
+## 总控 G1-1 执行约束
+
+本工作包仅统一 projection Excel 发布结构摘要：HTML materialize、OO rematerialize、rollback 必须从各自冻结 bundle 的 approved instrumentation child 读取并校验 payload，传入完整 anchors；缺 contract/anchors 必须拒绝，不回退 adapter 摘要。finalize 必须从最终 staged candidate bytes 调用共享计算器，禁止复制摘要公式。Word 保留独立结构摘要，custom/opaque 保留权威 bytes 摘要。测试必须覆盖最终 artifact 同值、拒绝路径及三个宿主实际传参，并以变异反证校验。禁止写业务库、rehash --apply、暂存或提交；本包不代表生产双向验收或 G1-2 迁移完成。
+
+
 ## Introduction
 
 本 spec 收口底稿模块 HTML（结构化视图）与 OnlyOffice（以下简称 OO）Excel/Word 的真实双向回写。目标不是让 184 个生产宿主继续各自维护一套“切模式”逻辑，而是建立平台同步内核、显式 adapter 契约和可审计的版本/冲突协议，再按入口清册逐一迁移。

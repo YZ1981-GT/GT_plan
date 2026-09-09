@@ -1,0 +1,32 @@
+{
+  "schema_version": "host-unified-path-editor-config-evidence/v1",
+  "run_id": "g0-4-d2-2-negative-baseline-v1",
+  "entry_id": "xlsx/gt-d2-accounts-receivable",
+  "capture_kind": "deterministic_source_config_trace",
+  "execution_status": "COMPLETED",
+  "positive_state_eligible": false,
+  "complete_for_negative_assertion": true,
+  "complete_for_positive_assertion": false,
+  "callback_url_template": "https://redacted.invalid/api/workpapers/{wp_id}/sheets/{sheet}/onlyoffice-callback",
+  "observed_query_keys": [],
+  "source_bindings": [
+    {
+      "path": "backend/app/routers/wp_onlyoffice_router.py",
+      "sha256": "f284846bdc719e36d404a242c45cd5921cbd4761768ff924aaf74317cf2e7ed6",
+      "required_literals": [
+        "f\"{base_url}/api/workpapers/{wp_id}/sheets/{sheet_name}/onlyoffice-callback\""
+      ]
+    },
+    {
+      "path": "backend/app/services/workpaper_sync/callback_route.py",
+      "sha256": "cce436e1dc919854691c871ace36294a2311e66423d6dc42c94cefbc33790ef9",
+      "required_literals": [
+        "URL_BOUND_PARAMS",
+        "\"room_id\"",
+        "\"generation\"",
+        "\"doc_key\"",
+        "\"route_credential_id\""
+      ]
+    }
+  ]
+}

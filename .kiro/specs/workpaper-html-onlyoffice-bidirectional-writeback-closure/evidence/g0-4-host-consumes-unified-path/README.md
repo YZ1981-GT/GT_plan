@@ -93,4 +93,10 @@
 
 ## 验收结果
 
-待实现与 clean-checkout 验收后回填；在此之前本卡保持 `IN_PROGRESS`。
+- generator `--apply` 与 `--check` 均通过；projection digest：`d6eff0d1e9ba97e57f9d052d839ed3fd09ac2e82c19f426f8acd04848c301ee5`。
+- targeted guard：`20 passed, 2 warnings`。
+- D2-2 entry `xlsx/gt-d2-accounts-receivable` 投影为 `REQUEST_PATH_LEGACY`；8 项事实为 4 个静态 `fail`、3 个运行态 `unverifiable`、1 个第二版本域 `fail`。
+- 顶层 `HOST-CONSUMES-UNIFIED-PATH` 仍为 `BLOCKED`，无 `REQUEST_PATH_VERIFIED`、`ONLYOFFICE_VERIFIED` 或 `CLOSED` 授权。
+- G0-4 只闭合了可复算的负例基线与 evaluator；未执行真实 Playwright network capture、OnlyOffice roundtrip 或业务数据库写入，因此不构成生产迁移完成证据。
+- 8 项覆盖变异已打红：删除任一 host predicate 会被 `_validate_host_path_definition` 拒绝。
+- staged `diff --check` 仅剩总控文档第 3～7 行已有的 Markdown hard-break 尾随双空格；未修改该既有格式。
