@@ -49,6 +49,21 @@ backend/app/services/doc_ai_context_builder.py  898
 backend/scripts/fix/fix_projection_first_publication.py  968
 backend/tests/_test_x3_keyfamily_property_criteria.py  808
 
+#   fix_projection_representation_rehash.py —— BP-30 遗留 structure_hash 的重投影修复宿主：
+#     两条修复路径（① 坐标漂移重投影：复用首版链、明确产新 content version；② 纯口径
+#     stale representation-only rehash：同 content version、经 RepresentationService
+#     产新 generation、content_revision 不变）+ 11 格封闭结算词表 + 每格 blocked→唯一解除
+#     动作映射。拆分会让「两路径的分流判据 ↔ 结算词表 ↔ 每格解除动作」跨文件；且 G1-2
+#     守卫用 `ast.parse(SCRIPT.read_text())` 在**本文件**的
+#     `_finalize_candidate_representation_only` 函数体上锁「出口必是 finalize_definition_upgrade
+#     而非 publish_first_generation」，representation-only 逻辑一旦搬走，该 AST 变异守卫就
+#     扫不到函数体、变异不再打红（假绿）。沿用同 spec 家族 fix_projection_first_publication.py
+#     的登记先例。baseline 取 check_file_size.py 的真实计数（splitlines 口径 1090），
+#     门禁继续拦膨胀 >5%。拆分方向：待 candidate 就绪、representation-only 真正走通 finalize
+#     后，把「准入判据表 + 结算词表」提为声明式数据模块，属独立任务。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure G1-2
+backend/scripts/fix/fix_projection_representation_rehash.py  1090
+
 #   custom_query.py —— **改动前即 2621 行已远超上限**（单文件承担 router + 14 个
 #     裸 SQL 取数器约 900 行）。本次净增 +255：新增 indicators 认证/归属校验、
 #     execute 收敛到 ExecuteCompatibilityAdapter、异常分类与 correlation_id、

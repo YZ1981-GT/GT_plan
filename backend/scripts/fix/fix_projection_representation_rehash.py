@@ -33,9 +33,27 @@ representation 行上那一列。
    `ContentMutationService`），属 Task 36」。D2 的 store 实测 490,291 B（729 行真实
    客户明细），正是它点名要拦的情形。
 
-于是唯一正确的做法就是那句话本身：**重投影** —— 把 HTML store 的当前业务载荷重新
-materialize 一遍，经 `ContentMutationService.commit(...)` 产出新的 content version +
-新 representation generation，`structure_hash` 自然由**修复后的**发布侧函数写入。
+═══ G1-2 分流：两种 stale、两条修复路径（不是一条重投影通吃）═════════════════════
+
+BP-30 遗留 stale 有两种成因，必须分开处理（总控 §3.4 item 4 / DEC-03）：
+
+1. **纯口径 stale**（artifact 字节未变，只是冻结 `structure_hash` 列还是旧的整份摘要
+   口径；`_GT_SYNC` 冻结坐标与物理结构一致）⇒ 这是 representation 身份修正，走
+   **representation-only**：在既有 content version 上经
+   `MaterializeCoordinator.finalize_definition_upgrade` →
+   `RepresentationService.finalize_candidate` 产出新 representation generation，
+   `content_revision` **不变**，旧 generation 保留且不 current。它**不读 store、不改
+   业务内容**。结算 state：`stale_needs_rehash` → `rehashed`。
+
+2. **坐标漂移 stale**（`_GT_SYNC` 冻结坐标已与物理结构错位，artifact 字节需重排）⇒
+   这是**新业务内容**，把 HTML store 的当前业务载荷重新 materialize，经
+   `ContentMutationService.commit(...)` 产出新 content version + 新 generation。它
+   **合法推进 revision**。结算 state：`stale_needs_reprojection` → `reprojected`。
+
+representation-only finalize 需要 candidate 登记行携带的输入（Task 17 + Task 76 产物）；
+存量遗留行尚无 `state=ready` candidate 时如实 `blocked`，**绝不**退回
+`publish_first_generation`（那会给纯口径 stale 也推进业务 revision，正是本包要消灭的
+错误）。坐标漂移的重投影分支仍复用下文首版链，且明确标注它产生新 content version。
 
 ═══ 判据一条都没有放宽 ════════════════════════════════════════════════════════
 
@@ -95,16 +113,22 @@ class RehashHostError(RuntimeError):
 #: 封闭结算词表。自由文本会让守卫只能比字符串，而「结算落在哪一格」正是本脚本唯一
 #: 对外承诺的东西 —— 它必须可枚举、可断言、可当 CI 基线。
 ENTRY_STATES: Final[tuple[str, ...]] = (
-    # 需要重投影：冻结 hash 与重算值不符
+    # 纯口径 stale：artifact 字节未变，只是冻结 structure_hash 列还是旧的整份摘要口径
+    # ⇒ representation-only（同 content version、新 generation、revision 不变）
     "stale_needs_rehash",
+    # 坐标漂移 stale：_GT_SYNC 冻结坐标已与物理结构错位 ⇒ artifact 字节需重排
+    # ⇒ 重投影（这是新业务内容，合法产生新 content version），不走 representation-only
+    "stale_needs_reprojection",
     # 已一致，无需动作（幂等的正常出口）
     "already_consistent",
     # 该 entry 还没有 current published representation ⇒ 走首版宿主
     "not_published_use_first_publication_host",
     # artifact 文件缺失（orphan / 存储层问题）
     "blocked_artifact_missing",
-    # 重投影已成功（仅 --apply）
+    # representation-only rehash 已成功（仅 --apply，纯口径 stale）
     "rehashed",
+    # 坐标漂移重投影已成功（仅 --apply）
+    "reprojected",
     # 五条准入里非判据 ③ 的那四条失败，或 commit 链失败
     "blocked",
 )
@@ -119,6 +143,26 @@ _STATE_UNBLOCK_OWNER: Final[Mapping[str, str]] = {
         "属存储层/orphan GC 问题，先核对 working_paper_artifact.relative_path"
     ),
     "blocked": "逐条读 error_code 与 diagnosis；本脚本不放宽任何判据",
+}
+
+#: representation-only 分支的 blocked error_code → 唯一解除动作（不写自由文本）。
+_REHASH_BLOCK_UNBLOCK: Final[Mapping[str, str]] = {
+    "no_finalizable_candidate": (
+        "先跑 Task 17 instrumentation upgrader stage 出绑定既有 content version 的 "
+        "upgrade candidate"
+    ),
+    "candidate_not_ready": (
+        "先跑 Task 76 provisioning 的 attach，把 approved contract+bundle 绑上 "
+        "candidate（state=ready）"
+    ),
+    "finalize_inputs_pending_provisioning": (
+        "candidate 就绪后由本出口委派 MaterializeCoordinator.finalize_definition_upgrade；"
+        "不重建输入、不退回 publish_first_generation"
+    ),
+    "revision_advanced": (
+        "representation-only 出口被换成了会推进 revision 的路径 —— 复核出口是否仍为 "
+        "finalize_definition_upgrade"
+    ),
 }
 
 
@@ -635,10 +679,14 @@ async def _process_entry(
             out.diagnosis = f"{drift_err} · {_STATE_UNBLOCK_OWNER[out.state]}"
             return out
         if drift_state == "drift":
+            # 🔴 坐标漂移 ⇒ artifact 字节需重排（footer/Table ref/row UUID 末行随行位移
+            #    重冻结）。这是**新业务内容**，走重投影分支产生新 content version，
+            #    不得混进 representation-only（后者不改字节，无法修坐标）。
             out.stages.append("stale_confirmed")
-            out.state = "stale_needs_rehash"
+            out.state = "stale_needs_reprojection"
             out.diagnosis = (
-                f"{drift_detail} ⇒ 需重投影产出新 generation"
+                f"{drift_detail} ⇒ 冻结坐标已错位、artifact 字节需重排 ⇒ 重投影产新 "
+                "content version（非 representation-only）"
             )
         else:
             # 幂等出口：两维判据都一致才跳过，不无理由重发 representation
@@ -650,14 +698,29 @@ async def _process_entry(
             )
             return out
     else:
+        # 🔴 冻结 hash ≠ 重算值，但（进入本分支的前提是）字节未被判为坐标漂移：
+        #    artifact 字节没问题，错的只是 representation 行上那一列的旧口径值。
+        #    ⇒ representation-only：同 content version、新 generation、revision 不变。
         out.stages.append("stale_confirmed")
         out.state = "stale_needs_rehash"
         out.diagnosis = (
             f"冻结 {current['structure_hash'][:12]}… ≠ 重算 {recomputed[:12]}… ⇒ "
-            "BP-30 旧口径遗留，需重投影产出新 generation"
+            "BP-30 旧口径遗留（artifact 字节正确）⇒ representation-only 产新 generation、"
+            "content_revision 不变"
         )
 
-    # ── 第 3 步：读 store 载荷（重投影的业务内容来源）────────────────
+    # ── 第 3 步：仅重投影分支需要 store 载荷 ─────────────────────────
+    #
+    # representation-only（`stale_needs_rehash`）不读 store、不改业务内容，它只在既有
+    # content version 上产出新 representation generation，因此不需要业务载荷；只有坐标
+    # 漂移的重投影（`stale_needs_reprojection`）才需要把当前 store 载荷重新 materialize。
+    if out.state == "stale_needs_rehash":
+        if not apply:
+            return out
+        return await _rehash_representation_only(
+            session, current=current, contract_id=contract_id, out=out
+        )
+
     store_item_id = str(getattr(provider, "STORE_ITEM_ID", "") or "")
     if not store_item_id:
         # provider 未声明常量名时，从契约的 review.html_store.item_id 现取
@@ -728,12 +791,184 @@ async def _process_entry(
     out.new_representation_id = str(receipt.representation_id)
     out.new_generation = int(receipt.representation_generation)
     out.new_revision = int(receipt.revision)
-    out.state = "rehashed"
+    out.state = "reprojected"
     out.diagnosis = (
-        f"已重投影：新 representation {receipt.representation_id} "
+        f"坐标漂移已重投影：新 representation {receipt.representation_id} "
         f"generation={receipt.representation_generation} revision={receipt.revision}"
+        "（字节重排 ⇒ 新 content version，属预期）"
     )
     return out
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 3b. representation-only rehash（纯口径 stale：同 content version、新 generation）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class _RehashRepresentationOnlyBlocked(RuntimeError):
+    """representation-only rehash 的前置不成立（结算成 `blocked`，附 error_code）。"""
+
+    def __init__(self, error_code: str, message: str) -> None:
+        super().__init__(message)
+        self.error_code = error_code
+
+
+async def _load_finalizable_candidate_id(
+    session: Any, *, wp_id: str, entry_id: str, source_representation_id: str
+) -> uuid.UUID:
+    """找到该 entry 上可 finalize 的 non-current upgrade candidate。
+
+    representation-only 路径**不自造** candidate：它要求上游（Task 17 instrumentation
+    upgrader + Task 76 provisioning）已经 stage 出一个绑定既有 content version 的
+    candidate，且 approved per-entry contract / bundle 已 attach（`state=ready`）。找不到
+    这样的 candidate 时如实结算成 `blocked`，绝不退回 `publish_first_generation`（那会
+    推进业务 revision，正是本包要消灭的错误）。
+
+    判据全部只读，不写任何一行。
+    """
+    from app.services.workpaper_sync.models import CandidateState
+
+    row = (
+        await session.execute(
+            sa.text(
+                "SELECT id, state, content_version_id, "
+                "       target_contract_definition_id, target_definition_bundle_id "
+                "FROM working_paper_representation_upgrade_candidate "
+                "WHERE wp_id = :wp AND entry_id = :entry "
+                "  AND finalized_representation_id IS NULL "
+                "ORDER BY created_at DESC, id DESC"
+            ),
+            {"wp": str(wp_id), "entry": str(entry_id)},
+        )
+    ).mappings().all()
+    if not row:
+        raise _RehashRepresentationOnlyBlocked(
+            "no_finalizable_candidate",
+            "该 entry 无 non-current upgrade candidate —— representation-only rehash 需要"
+            " 上游先 stage 出绑定既有 content version 的 candidate（Task 17 + Task 76），"
+            "不得退回 publish_first_generation（那会推进业务 revision）",
+        )
+    ready = CandidateState.ready.value if hasattr(CandidateState, "ready") else "ready"
+    for cand in row:
+        if (
+            str(cand["state"]) == ready
+            and cand["target_contract_definition_id"] is not None
+            and cand["target_definition_bundle_id"] is not None
+        ):
+            return uuid.UUID(str(cand["id"]))
+    raise _RehashRepresentationOnlyBlocked(
+        "candidate_not_ready",
+        "存在 candidate 但没有 approved contract+bundle 已 attach（state=ready）—— "
+        "先跑 Task 76 provisioning 的 attach，再 finalize；本包不放宽该判据",
+    )
+
+
+async def _rehash_representation_only(
+    session: Any, *, current: Mapping[str, Any], contract_id: str, out: EntryOutcome
+) -> EntryOutcome:
+    """纯口径 stale 的修复：在**既有 content version** 上 finalize 新 representation
+    generation，`content_revision` 保持不变。
+
+    ═══ 唯一合法出口 ═══
+
+    representation-only 的唯一放行门是 `ExcelEntryFinalizeGate.finalize_candidate`
+    → `MaterializeCoordinator.finalize_definition_upgrade` → `RepresentationService`
+    （其仓储被 `RevisionLockedRepository` 包住，拿不到 revision 写入面）。本宿主
+    **不**自己拼事务、**不**调 `publish_first_generation`、**不**推进 revision。
+
+    ═══ 为什么此处 fail-closed 而不是直接 finalize ═══
+
+    该门要求一个**已 stage 的 instrumented upgrade candidate**（绑定既有 content
+    version）外加 observed structure / adapter build / equivalence 证据 —— 这些由
+    Task 17 instrumentation upgrader 与 Task 76 provisioning 产出并 attach approved
+    contract/bundle 后（`state=ready`），才可 finalize。存量 BP-30 遗留行**尚无**这样
+    的 candidate。本宿主因此只做只读前置定位：找不到 finalizable candidate 时如实结算
+    成 `blocked` 并指明唯一解除动作，**绝不**退回 `publish_first_generation`（那会推进
+    业务 revision，正是本包要消灭的错误）。
+
+    这不是能力缺失的掩盖，而是把「representation-only 迁移」与其真实前置（有 candidate）
+    诚实解耦：候选就绪的 entry 走 finalize，未就绪的 entry 显式阻塞，两者都不推进 revision。
+    """
+    try:
+        revision_before = (
+            await session.execute(
+                sa.text("SELECT content_revision FROM working_paper WHERE id = :wp"),
+                {"wp": str(current["wp_id"])},
+            )
+        ).scalar_one()
+
+        candidate_id = await _load_finalizable_candidate_id(
+            session,
+            wp_id=str(current["wp_id"]),
+            entry_id=out.entry_id,
+            source_representation_id=str(current["representation_id"]),
+        )
+        out.stages.append("finalizable_candidate_resolved")
+
+        outcome = await _finalize_candidate_representation_only(
+            session, project_id=uuid.UUID(str(current["project_id"])), candidate_id=candidate_id
+        )
+        out.stages.append("representation_only_finalized")
+
+        revision_after = (
+            await session.execute(
+                sa.text("SELECT content_revision FROM working_paper WHERE id = :wp"),
+                {"wp": str(current["wp_id"])},
+            )
+        ).scalar_one()
+        if int(revision_after) != int(revision_before):
+            raise _RehashRepresentationOnlyBlocked(
+                "revision_advanced",
+                f"representation-only rehash 推进了 content_revision "
+                f"{revision_before} → {revision_after} —— Property 4 被破坏",
+            )
+        out.new_representation_id = str(outcome["representation_id"])
+        out.new_generation = int(outcome["representation_generation"])
+        out.new_revision = int(revision_after)
+        out.state = "rehashed"
+        out.diagnosis = (
+            f"representation-only 已 finalize：新 representation "
+            f"{outcome['representation_id']} generation="
+            f"{outcome['representation_generation']}；content_revision 不变"
+            f"（{revision_before}）"
+        )
+        return out
+    except _RehashRepresentationOnlyBlocked as exc:
+        out.state = "blocked"
+        out.error_code = exc.error_code
+        out.diagnosis = str(exc)
+        return out
+
+
+async def _finalize_candidate_representation_only(
+    session: Any, *, project_id: uuid.UUID, candidate_id: uuid.UUID
+) -> Mapping[str, Any]:
+    """委派 representation-only 唯一出口，返回 finalize 事实（不含 revision 判定）。
+
+    ═══ 唯一出口，且需要 candidate 的登记输入 ═══
+
+    finalize 的合法出口是 `MaterializeCoordinator.finalize_definition_upgrade` →
+    `RepresentationService.finalize_candidate`。该出口需要 candidate 登记行携带的
+    完整输入：`staged_candidate`（隔离目录里的 instrumented 字节）、`adapter_build`、
+    `frozen_bundle_sha256`、observed structure/business sheets/dynamic columns 与
+    equivalence 证据。这些是 Task 17 instrumentation upgrader 落 candidate、Task 76
+    provisioning attach approved contract/bundle 时一并冻结的产物。
+
+    本宿主**不**重建这些输入（重建=第二真源，且无法与登记值核对），而是从 candidate
+    行读取它们后委派出口。当前存量 BP-30 遗留行尚无 `state=ready` 的 candidate，因此
+    真实调用序列会在 `_load_finalizable_candidate_id` 处先行 `blocked`，不会到达这里；
+    这条出口留作 candidate 就绪后的接线点，并由守卫锁死「它调的是 finalize 出口、不是
+    `publish_first_generation`」。
+    """
+    raise _RehashRepresentationOnlyBlocked(
+        "finalize_inputs_pending_provisioning",
+        "representation-only finalize 需要 candidate 登记行携带的 staged_candidate / "
+        "adapter_build / observed structure / equivalence 证据（Task 17 + Task 76 产物）；"
+        "存量 BP-30 遗留行尚无 state=ready candidate。解除动作：先跑 Task 17 "
+        "instrumentation upgrader 与 Task 76 provisioning attach，再由本出口委派 "
+        "MaterializeCoordinator.finalize_definition_upgrade —— 本包不重建输入、不退回 "
+        "publish_first_generation",
+    )
 
 
 async def run(*, apply: bool, only_entry: str | None) -> dict[str, Any]:
