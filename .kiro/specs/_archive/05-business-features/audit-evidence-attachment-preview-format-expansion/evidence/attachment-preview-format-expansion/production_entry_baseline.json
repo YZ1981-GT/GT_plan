@@ -1,0 +1,24 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 2,
+  "baseline_commit": "08229d87ef8ac2f9c1d148756016c23efb0befae",
+  "lockfile_digest_sha1_at_task1": "bfc5681255faf9d94c3675ee0019e4143b53956f",
+  "build_command": "npm run build",
+  "vite_only_command": "npx vite build",
+  "status": "commands_frozen_pre_product_change",
+  "note": "完整 vue-tsc+vite 生产构建体积累计在 Task 16 同口径复测；Task 2 已冻结 commit/lock digest 与 Bundle_Budget 数值，probe 实测见 route_capability_and_bundle_budget.json",
+  "first_screen_gate_semantics": {
+    "recorded_at": "2026-09-09",
+    "hard_gate": "首屏解析依赖/worker module-graph 归因 = 0 B（见 task16_production_bundle_gate.json measured.entryParserBytes=0 与 entry_chunks 全部 parser-free）",
+    "gzip_delta_is_reference_only": true,
+    "why_not_absolute_first_screen_baseline": "实施前首屏 gzip 未单独真测：应用工作树长期并发会话改动 + 完整 minify 本机 OOM，实施前后总 gzip 差不可单独归因给本 spec。首屏门以可精确归因的 module-graph 0 B 判据为准，此为收紧口径而非放宽门。详见 design.md §4.3。"
+  },
+  "budget": {
+    "entryParserBytes": 0,
+    "entryGzipDelta": 8192,
+    "archiveChunk": 98304,
+    "emailChunk": 716800,
+    "drawingChunk": 409600,
+    "onDemandTotal": 1258291
+  }
+}

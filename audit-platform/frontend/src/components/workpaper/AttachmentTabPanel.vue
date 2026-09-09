@@ -80,6 +80,9 @@ import AttachmentDropZone from '@/components/workpaper/AttachmentDropZone.vue'
 import AttachmentPreviewDrawer, {
   type AttachmentForPreview,
 } from '@/components/common/AttachmentPreviewDrawer.vue'
+import {
+  LEGACY_CAPABILITIES,
+} from '@/components/attachment/preview/attachmentPreviewFormats'
 import OcrConfirmDialog from '@/components/attachment/OcrConfirmDialog.vue'
 import type { OcrConfirmPayload } from '@/components/attachment/OcrConfirmDialog.vue'
 import { api as httpApi } from '@/services/apiProxy'
@@ -91,6 +94,8 @@ interface AttachmentRow {
   file_size: number | null
   file_type: string | null
   created_at: string | null
+  ocr_status?: 'ok' | 'processing' | 'failed' | 'pending' | null
+  ocr_text?: string | null
 }
 
 const props = defineProps<{
@@ -104,7 +109,7 @@ const loading = ref(false)
 const drawerOpen = ref(false)
 const selected = ref<AttachmentForPreview | null>(null)
 
-const OFFICE_EXTS = ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']
+const OFFICE_EXTS = LEGACY_CAPABILITIES.attachmentTab.office
 
 function getExt(name: string): string {
   const idx = name.lastIndexOf('.')
@@ -112,16 +117,17 @@ function getExt(name: string): string {
 }
 
 function isOffice(name: string): boolean {
-  return OFFICE_EXTS.includes(getExt(name))
+  return (OFFICE_EXTS as readonly string[]).includes(getExt(name))
 }
 
 function iconFor(name: string): string {
   const ext = getExt(name)
-  if (ext === '.pdf') return '📄'
-  if (['.png', '.jpg', '.jpeg', '.gif'].includes(ext)) return '🖼️'
-  if (['.doc', '.docx'].includes(ext)) return '📝'
-  if (['.xls', '.xlsx'].includes(ext)) return '📊'
-  if (['.ppt', '.pptx'].includes(ext)) return '📽️'
+  const groups = LEGACY_CAPABILITIES.attachmentTab.iconGroups
+  if ((groups.pdf as readonly string[]).includes(ext)) return '📄'
+  if ((groups.image as readonly string[]).includes(ext)) return '🖼️'
+  if ((groups.word as readonly string[]).includes(ext)) return '📝'
+  if ((groups.excel as readonly string[]).includes(ext)) return '📊'
+  if ((groups.ppt as readonly string[]).includes(ext)) return '📽️'
   return '📎'
 }
 
@@ -172,9 +178,11 @@ function onPreview(att: AttachmentRow) {
   selected.value = {
     id: att.id,
     name: att.file_name,
-    mime_type: att.file_type || '',
+    type_hint: att.file_type || '',
     preview_url: P_att.preview(att.id),
     download_url: P_att.download(att.id),
+    ocr_status: att.ocr_status || undefined,
+    ocr_text: att.ocr_text || undefined,
   }
   drawerOpen.value = true
 }

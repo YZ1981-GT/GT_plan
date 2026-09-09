@@ -1,0 +1,7 @@
+From: a@example.com
+To: b@example.com
+Subject: e2e-preview
+MIME-Version: 1.0
+Content-Type: text/html; charset=utf-8
+
+<html><body><img src="https://evil.example/x.png"><p>hi</p></body></html>

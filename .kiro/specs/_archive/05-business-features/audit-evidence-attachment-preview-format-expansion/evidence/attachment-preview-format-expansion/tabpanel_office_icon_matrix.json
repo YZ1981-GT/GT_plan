@@ -1,0 +1,20 @@
+{
+  "component": "audit-platform/frontend/src/components/workpaper/AttachmentTabPanel.vue",
+  "office_exts_frozen": [".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"],
+  "office_exts_explicitly_excluded_vs_drawer": [".odt", ".ods", ".odp", ".rtf"],
+  "icon_groups": {
+    "pdf": [".pdf"],
+    "image": [".png", ".jpg", ".jpeg", ".gif"],
+    "word": [".doc", ".docx"],
+    "excel": [".xls", ".xlsx"],
+    "ppt": [".ppt", ".pptx"],
+    "default": []
+  },
+  "type_hint_wiring_fact": {
+    "api_field": "file_type",
+    "drawer_prop_today": "type_hint",
+    "mapping": "type_hint: att.file_type || ''",
+    "ocr_fields_on_preview_payload": true,
+    "note": "Task 13：file_type→type_hint，并传入 ocr_status/ocr_text"
+  }
+}

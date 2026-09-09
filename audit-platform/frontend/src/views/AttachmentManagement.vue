@@ -140,6 +140,9 @@
       :file-url="previewUrl"
       :file-name="previewName"
       :file-type="previewType"
+      :attachment-id="previewId"
+      :download-url="previewDownloadUrl"
+      :type-hint="previewType"
       @close="previewVisible = false"
     />
 
@@ -250,16 +253,16 @@ const ACCEPT_TYPES = [
   '.txt', '.csv', '.md',
   // 扫描件
   '.heic', '.heif',
-  // 压缩包
-  '.zip', '.rar', '.7z',
+  // 压缩包（含 tar/gzip；浏览器预览走 ExtendedFormatPreview）
+  '.zip', '.rar', '.7z', '.tar', '.gz', '.tgz',
   // 电子邮件
   '.eml', '.msg',
-  // CAD/签章
-  '.dwg', '.ofd',
+  // CAD/签章（dxf 可预览；dwg 仅下载提示）
+  '.dxf', '.dwg', '.ofd',
 ].join(',')
 
 /** 支持的文件类型说明（用于拖拽区提示） */
-const SUPPORTED_TYPES_DESC = 'PDF / Word / Excel / PPT / 图片 / 文本 / 扫描件 / 压缩包 / 邮件 / OFD'
+const SUPPORTED_TYPES_DESC = 'PDF / Word / Excel / PPT / 图片 / 文本 / 扫描件 / 压缩包 / 邮件 / DXF / OFD'
 
 // 统计 computed
 const totalSizeFormatted = computed(() => {
@@ -286,6 +289,8 @@ const previewVisible = ref(false)
 const previewUrl = ref('')
 const previewName = ref('')
 const previewType = ref('')
+const previewId = ref('')
+const previewDownloadUrl = ref('')
 
 // OCR 确认弹窗（单文件）
 const ocrConfirmVisible = ref(false)
@@ -464,6 +469,8 @@ function preview(row: any) {
   previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name
   previewType.value = row.file_type
+  previewId.value = row.id
+  previewDownloadUrl.value = P_att.download(row.id)
   previewVisible.value = true
 }
 

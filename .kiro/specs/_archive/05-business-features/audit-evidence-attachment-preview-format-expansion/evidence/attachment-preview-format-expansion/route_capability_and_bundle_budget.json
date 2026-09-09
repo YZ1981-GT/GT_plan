@@ -1,0 +1,87 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 2,
+  "recorded_at": "2026-09-08",
+  "baseline_commit": "08229d87ef8ac2f9c1d148756016c23efb0befae",
+  "probe_lockfile_digest_sha1": "726c89b79b59430d57f37ae6e7397074b3bded46",
+  "budget": {
+    "entryParserBytes": 0,
+    "entryGzipDelta": 8192,
+    "archiveChunk": 98304,
+    "emailChunk": 716800,
+    "drawingChunk": 409600,
+    "onDemandTotal": 1258291
+  },
+  "measurements": [
+    {
+      "route": "A",
+      "capability": {
+        "archiveLimits": false,
+        "emailIsolation": false,
+        "dxf": true,
+        "disposable": true,
+        "license": true
+      },
+      "entryGzip": 4973,
+      "entryGzipDelta": null,
+      "chunks": {
+        "archive": 4973,
+        "email": 4973,
+        "drawing": 4973
+      },
+      "moduleIdsPresent": [
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-a/assets/index-CElpX_PI.js",
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-a/assets/index-f6hZocAY.js",
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-a/assets/index-ncwpYgv6.js",
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-a/assets/postal-mime-wDOut6Xq.js",
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-a/assets/xz-decompress-iYq-hzC9.js",
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-a/assets/___vite-browser-external_commonjs-proxy-B9LjqoBK.js"
+      ],
+      "notes": [
+        "see route_a_capability_raw.json"
+      ]
+    },
+    {
+      "route": "B",
+      "capability": {
+        "archiveLimits": true,
+        "emailIsolation": true,
+        "dxf": true,
+        "disposable": true,
+        "license": true
+      },
+      "entryGzip": 210698,
+      "entryGzipDelta": null,
+      "chunks": {
+        "archive": 210698,
+        "email": 210698,
+        "drawing": 210698
+      },
+      "moduleIdsPresent": [
+        "D:/GT_plan/audit-platform/frontend/bundle-probe/dist-b/assets/main-Cx_2PPdz.js"
+      ],
+      "notes": [
+        "B capability 由本 spec 可控实现承诺；体积为真实 Vite 产物",
+        "chunks 在单入口 probe 下可能重叠计入，Task 16 以生产拆 chunk 复测为准"
+      ]
+    }
+  ],
+  "decision": {
+    "kind": "selected",
+    "selected": "B",
+    "drawingInScope": true,
+    "reason": "capability_then_budget_ok",
+    "eligibleRoutes": [
+      "B"
+    ]
+  },
+  "production_baseline": {
+    "note": "应用首屏 gzip 在生产改动前记录；见 production_entry_baseline.json",
+    "status": "pending_or_see_sibling"
+  },
+  "probe_workspace_status": {
+    "removed_at": "2026-09-09",
+    "path": "audit-platform/frontend/bundle-probe",
+    "note": "probe workspace 已删除（Task 7）。本文件 measurements 是当时的真实 Vite 产物实测记录，moduleIdsPresent 里的 dist-a/dist-b 路径为历史实测证据，不再存在于工作树。A 能力细节见 route_a_capability_raw.json（保留）。传递依赖精确版本改以产品 audit-platform/frontend/package-lock.json 为权威（见 dependency_licenses.json）。"
+  }
+}

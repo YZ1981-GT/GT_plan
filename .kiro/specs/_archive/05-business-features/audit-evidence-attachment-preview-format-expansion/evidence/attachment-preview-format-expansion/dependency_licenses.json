@@ -1,0 +1,76 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 2,
+  "recorded_at": "2026-09-08",
+  "baseline_commit": "08229d87ef8ac2f9c1d148756016c23efb0befae",
+  "route_selected": "B",
+  "drawing_provisionally_in_scope": true,
+  "direct_dependencies": [
+    {
+      "name": "fflate",
+      "version": "0.8.3",
+      "license": "MIT",
+      "enters_product_chunk": true,
+      "reason": "archive inflate/deflate 流式实际计数"
+    },
+    {
+      "name": "postal-mime",
+      "version": "3.0.0",
+      "license": "MIT-0",
+      "enters_product_chunk": true,
+      "reason": ".eml MIME 解析"
+    },
+    {
+      "name": "@kenjiuno/msgreader",
+      "version": "1.28.0",
+      "license": "Apache-2.0",
+      "enters_product_chunk": true,
+      "reason": ".msg OLE 邮件解析"
+    },
+    {
+      "name": "dxf-parser",
+      "version": "1.1.2",
+      "license": "MIT",
+      "enters_product_chunk": true,
+      "reason": "DXF → typed render model；若 Task 16 drawing 退出则移出产品依赖"
+    }
+  ],
+  "transitive_dependencies": [
+    {
+      "name": "@kenjiuno/decompressrtf",
+      "version": "0.1.4",
+      "license": "BSD-2-Clause",
+      "via": "@kenjiuno/msgreader",
+      "enters_product_chunk": true,
+      "note": ".msg RTF 正文解压；按需 email chunk"
+    },
+    {
+      "name": "iconv-lite",
+      "version": "0.6.3",
+      "license": "MIT",
+      "via": "@kenjiuno/msgreader",
+      "enters_product_chunk": true,
+      "note": ".msg 非 UTF-8 字符集解码；按需 email chunk"
+    },
+    {
+      "name": "loglevel",
+      "version": "1.9.2",
+      "license": "MIT",
+      "via": "dxf-parser",
+      "enters_product_chunk": true,
+      "note": "dxf-parser 内部日志；按需 drawing chunk"
+    }
+  ],
+  "transitive_note": "fflate@0.8.3 与 postal-mime@3.0.0 无运行时传递依赖。上列 3 条精确解析版本+license 从产品 audit-platform/frontend/package-lock.json 读取（2026-09-09），均在 allowed_licenses 内。",
+  "rejected_route_a": {
+    "packages": {
+      "@open-file-viewer/core": "0.1.44",
+      "@open-file-viewer/vue": "0.1.44"
+    },
+    "capability_eligible": false,
+    "license_note": "MIT 本体；optional peer @mlightcad/libredwg-web 为 GPL-3.0，probe 未安装且 lock 无已解析 node_modules 条目",
+    "enters_product_chunk": false
+  },
+  "transitive_versions_source": "audit-platform/frontend/package-lock.json（产品 lockfile，权威）；bundle-probe 已于 Task 7 删除，指针不再指向 probe lock",
+  "allowed_licenses": ["MIT", "MIT-0", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause"]
+}

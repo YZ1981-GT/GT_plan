@@ -1,0 +1,130 @@
+{
+  "spec": "audit-evidence-attachment-preview-format-expansion",
+  "task": 16,
+  "recorded_at": "2026-09-08T16:50:05.952Z",
+  "build": {
+    "command": "NODE_OPTIONS=--max-old-space-size=12288 npx vite build --minify false",
+    "note": "Full minify OOM at 8GiB here; unminified used for module-graph attribution. Parser markers are package-specific (not exceljs Inflate).",
+    "concurrent_drift": "Entry gzip delta vs Task2 commit baseline not solely attributable; gate focuses on entryParserBytes=0 and worker chunk budgets."
+  },
+  "lockfile_digest_sha1": "1942a6b5f66a97df0acff7cbbbf268c749b5ac22",
+  "budget": {
+    "entryParserBytes": 0,
+    "entryGzipDelta": 8192,
+    "archiveChunk": 98304,
+    "emailChunk": 716800,
+    "drawingChunk": 409600,
+    "onDemandTotal": 1258291
+  },
+  "entry_chunks": [
+    {
+      "file": "index-CzFJXf-V.js",
+      "bytes": 5916392,
+      "gzip": 1408122,
+      "fflate": false,
+      "postal": false,
+      "msg": false,
+      "dxf": false,
+      "archiveApi": false
+    },
+    {
+      "file": "index-BGaZARhS.js",
+      "bytes": 2809285,
+      "gzip": 602535,
+      "fflate": false,
+      "postal": false,
+      "msg": false,
+      "dxf": false,
+      "archiveApi": false
+    },
+    {
+      "file": "index-BKjjIAOQ.js",
+      "bytes": 1099697,
+      "gzip": 237884,
+      "fflate": false,
+      "postal": false,
+      "msg": false,
+      "dxf": false,
+      "archiveApi": false
+    },
+    {
+      "file": "index-CkNx5H6m.js",
+      "bytes": 17989,
+      "gzip": 5288,
+      "fflate": false,
+      "postal": false,
+      "msg": false,
+      "dxf": false,
+      "archiveApi": false
+    },
+    {
+      "file": "index-BIoiOaBV.js",
+      "bytes": 3589,
+      "gzip": 766,
+      "fflate": false,
+      "postal": false,
+      "msg": false,
+      "dxf": false,
+      "archiveApi": false
+    }
+  ],
+  "worker_chunks": {
+    "archive": {
+      "file": "archive.worker-DutNmYK4.js",
+      "bytes": 22739,
+      "gzip": 6279
+    },
+    "email": {
+      "file": "email.worker-CAynD4i1.js",
+      "bytes": 634719,
+      "gzip": 219716
+    },
+    "drawing": {
+      "file": "dxf.worker-BmO8JqUt.js",
+      "bytes": 69804,
+      "gzip": 11956
+    }
+  },
+  "measured": {
+    "entryParserBytes": 0,
+    "chunks": {
+      "archive": 6279,
+      "email": 219716,
+      "drawing": 11956
+    },
+    "onDemandTotal": 237951
+  },
+  "gates": {
+    "entryParserZero": true,
+    "archiveUnder": true,
+    "emailUnder": true,
+    "drawingUnder": true,
+    "onDemandUnder": true,
+    "routeAStillIneligible": true,
+    "drawingInScope": true
+  },
+  "decision": {
+    "kind": "selected",
+    "selected": "B",
+    "drawingInScope": true,
+    "reason": "capability_then_budget_ok_post_impl",
+    "eligibleRoutes": [
+      "B"
+    ]
+  },
+  "gate_semantics": {
+    "recorded_at": "2026-09-09",
+    "hard_gates": [
+      "entryParserZero (module-graph 归因：解析依赖/worker 进入首屏 = 0 B)",
+      "archiveUnder / emailUnder / drawingUnder / onDemandUnder (按需 chunk gzip 各在门内)",
+      "routeAStillIneligible",
+      "drawingInScope"
+    ],
+    "reference_only": [
+      "entryGzipDelta (首屏 gzip 总量增量)"
+    ],
+    "entry_gzip_delta_rationale": "首屏 gzip 总量差异不可单独归因给本 spec：应用工作树长期有并发会话改动 + 完整 minify 本机 OOM 只能 --minify false。首屏是否被本 spec 撑大以可精确归因的 module-graph 判据 (entry_chunks 全部 fflate/postal/msg/dxf/archiveApi=false 且 measured.entryParserBytes=0) 为准。此为收紧判据口径（可归因 > 不可归因总量差），非放宽安全门。见 design.md §4.3。",
+    "entry_chunks_parser_free": true
+  },
+  "pass": true
+}

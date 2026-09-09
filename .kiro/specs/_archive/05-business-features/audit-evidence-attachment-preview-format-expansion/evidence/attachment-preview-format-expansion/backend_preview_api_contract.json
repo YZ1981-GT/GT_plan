@@ -1,0 +1,24 @@
+{
+  "preview_endpoint": "GET /api/attachments/{attachment_id}/preview",
+  "download_endpoint": "GET /api/attachments/{attachment_id}/download",
+  "preview_whitelist_exts": [".pdf", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".doc", ".docx", ".xls", ".xlsx", ".csv"],
+  "preview_whitelist_includes_svg": true,
+  "preview_whitelist_excludes": [".bmp", ".zip", ".eml", ".msg", ".dxf", ".dwg", ".tar", ".gz", ".tgz", ".ppt", ".pptx"],
+  "non_whitelist_response_shape": {
+    "previewable": false,
+    "required_keys": ["previewable", "file_name", "file_type", "ocr_text", "download_url"]
+  },
+  "upload_rules": {
+    "size_limit_setting": "ATTACHMENT_MAX_UPLOAD_BYTES",
+    "default_bytes": 52428800,
+    "extension_whitelist": false,
+    "magic_whitelist": false,
+    "fact": "上传仅大小门；zip/eml/msg/dxf 仍可接受。本 spec 不改变准入。"
+  },
+  "guess_file_type": {
+    "image": ["jpg", "jpeg", "png", "gif", "bmp", "webp"],
+    "excel": ["xls", "xlsx", "csv"],
+    "word": ["doc", "docx"],
+    "else": "raw extension or unknown"
+  }
+}

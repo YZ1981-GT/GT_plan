@@ -90,6 +90,8 @@ function getRequestKey(config: InternalAxiosRequestConfig): string {
 }
 
 function addPending(config: InternalAxiosRequestConfig) {
+  // 附件预览等调用方可显式关闭去重：不进 pendingMap，且保留调用方 signal
+  if ((config as any)._dedupe === false) return
   const key = getRequestKey(config)
   // 跳过 FormData 上传请求（文件上传不参与去重）
   if (config.data instanceof FormData) return

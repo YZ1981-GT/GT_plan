@@ -65,6 +65,8 @@ const previewVisible = ref(false)
 const previewUrl = ref('')
 const previewName = ref('')
 const previewType = ref('')
+const previewId = ref('')
+const previewDownloadUrl = ref('')
 
 const ASSOC_LABEL: Record<string, string> = {
   evidence: '审计证据',
@@ -107,6 +109,8 @@ function preview(row: any) {
   previewUrl.value = P_att.preview(row.id)
   previewName.value = row.file_name
   previewType.value = row.file_type || ''
+  previewId.value = row.id
+  previewDownloadUrl.value = P_att.download(row.id)
   previewVisible.value = true
 }
 
@@ -367,6 +371,9 @@ function formatDate(d: string): string {
       :file-url="previewUrl"
       :file-name="previewName"
       :file-type="previewType"
+      :attachment-id="previewId"
+      :download-url="previewDownloadUrl"
+      :type-hint="previewType"
       @close="previewVisible = false"
     />
   </el-drawer>

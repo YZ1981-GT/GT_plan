@@ -92,7 +92,8 @@ class AttachmentLinkService:
     ) -> list[dict[str, Any]]:
         """获取底稿关联的附件列表"""
         stmt = sa.text(
-            "SELECT a.id, a.file_name, a.file_size, a.file_type, a.created_at "
+            "SELECT a.id, a.file_name, a.file_size, a.file_type, a.created_at, "
+            "a.ocr_status, a.ocr_text "
             "FROM attachments a "
             "WHERE a.reference_type = 'working_paper' "
             "AND a.reference_id = :wp_id "
@@ -109,6 +110,8 @@ class AttachmentLinkService:
                 "file_size": r.file_size,
                 "file_type": r.file_type,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                "ocr_status": r.ocr_status,
+                "ocr_text": r.ocr_text,
             }
             for r in rows
         ]

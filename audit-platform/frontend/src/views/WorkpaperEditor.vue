@@ -50,6 +50,10 @@
           <el-button size="small" @click="onShowVersions">
             <el-icon><Clock /></el-icon> 版本历史
           </el-button>
+          <!-- HTML 路径此前无「面板」入口；SidePanel/AttachmentTabPanel 仅挂在 Univer 分支会导致 Drawer_Host 不可达 -->
+          <el-badge :value="fineCheckFailCount" :max="99" :hidden="fineCheckFailCount === 0" type="danger">
+            <el-button size="small" @click="showSidePanel = !showSidePanel">📋 面板</el-button>
+          </el-badge>
         </div>
       </div>
 
@@ -263,22 +267,6 @@
       @save="onHtmlFormulaSave"
     />
 
-    <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式） -->
-    <el-drawer
-      v-model="showSidePanel"
-      direction="rtl"
-      size="400px"
-      :with-header="false"
-      :modal="false"
-      append-to-body
-    >
-      <WorkpaperSidePanel
-        :project-id="projectId"
-        :wp-id="wpId"
-        :wp-code="wpDetail?.wp_code"
-        @finecheck-update="fineCheckFailCount = $event"
-      />
-    </el-drawer>
   </div>
     </div><!-- /gt-wp-editor-main -->
 
@@ -341,9 +329,8 @@
     @marked="onReviewMarked"
   />
 
-  <!-- 非 Univer 编辑器的侧面板（共享） -->
+  <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式）— 提到 HTML/Univer 共用，供 AttachmentTabPanel → Drawer_Host -->
   <el-drawer
-    v-if="!useHtmlRenderer && componentType && componentType !== 'univer'"
     v-model="showSidePanel"
     direction="rtl"
     size="400px"
