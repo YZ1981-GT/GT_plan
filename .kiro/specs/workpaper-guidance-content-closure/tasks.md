@@ -272,14 +272,25 @@
     evidence `basis/T18-frontend-mutation-report.json`
   - _Requirements: 14.3, 14.4_
 
-- [~] 19. 广域引用回归、CI job 与 tracked 产物
+- [x] 19. 广域引用回归、CI job 与 tracked 产物
   - 按引用反查受影响测试；共享 workflow 只追加归因区间
   - clean checkout 核对 schema/fixtures/migrations/tests/mutation/evidence 文件均 tracked
   - WIP reconciliation 更新到磁盘最新正向与变异证据
   - 2026-09-09：已追加 CI `wgcc-guidance-backend-guards` / `wgcc-guidance-frontend-guards`；
     T17 批量 RED + directed 89 passed 登记于 `basis/T19-ci-and-tracking-status.json`。
     推荐 add 清单已冻结 `basis/T19-tracked-paths.json`（含 F-SHELL `rightRailArbiter` CI 依赖）。
-    **仍 BLOCKED**：正式产物大量 `??` 未 tracked，clean-checkout 门未过（需显式 git add/commit）。
+  - 2026-09-09 **clean-checkout PASS**：commit `196753f1b`
+    （566 files / +67432 −5310）；未 tracked 的 guidance 路径归零。
+    提交前实测：后端 guidance 套件 **245 passed**、T17 变异 **11/11 RED**、前端门 **37 passed**。
+  - 为过行数门禁抽了伴生模块（三个文件本次新超限，白名单会把欠账固化）：
+    `guidance_source_refs.py` 848→631（→`guidance_template_authority.py`）、
+    `guidance_inventory.py` 1366→只留静态分析（→`guidance_runtime_facts.py` +
+    `guidance_runtime_inventory.py`）、`wp_guidance_chat.py` 963→达标
+    （→`wp_guidance_chat_stream.py` + `wp_guidance_section_prompts.py`）；
+    既有 import 路径由模块 `__getattr__` 兼容，三个变异脚本锚点跟随迁移。
+  - 顺带修 G-C0 反向重复扫描器：子串匹配把 `import { type Foo }`（正是合规写法）
+    判成本地重复声明 → 改为声明式匹配；findings **8→0**，两条 F1 陈旧豁免删除，
+    并加正反对照测试防止守卫退化成空转。
   - _Requirements: 14.1, 14.2, 14.3, 14.6, 15.1, 15.6_
 
 - [x] 20. Playwright 三宿主、权限与 `F-SHELL` 消费实测

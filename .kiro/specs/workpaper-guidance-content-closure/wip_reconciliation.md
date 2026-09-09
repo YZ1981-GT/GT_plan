@@ -263,6 +263,14 @@ T16 从 `[~]`（§7.5 记「唯一非外部阻塞、可推进」）推进为 `[x
 - **T13 `[x]`**：store 四门 race（requestId/identity/epoch/revision）+ If-None-Match/304；cache key 用 sheetUid
 - **T14 `[x]`**：UI 分层 primary/overlays/extraction + completion + reasons/blockers；sanitize 既有
 
+### 8.13 2026-09-09 T19 收口 `[x]`
+
+- commit `196753f1b`：566 files / +67432 −5310；未 tracked guidance 路径 **0**
+- 提交前实测：guidance 套件 **245 passed**、T17 变异 **11/11 RED**、前端门 **37 passed**
+- 行数门禁 → 抽伴生模块：`guidance_template_authority` / `guidance_runtime_facts` / `guidance_runtime_inventory` / `wp_guidance_chat_stream` / `wp_guidance_section_prompts`；旧 import 由 `__getattr__` 兼容
+- G-C0 反向重复扫描器修复：`import { type Foo }` 不再误判为重复声明；findings 8→0，删 2 条陈旧豁免，加正反对照测试
+- **进度 18/23 → 19/23**；T7/T21/T22/T23 仍诚实 `[~]`
+
 ### 8.12 2026-09-09 T7 SourceRef 可行性核算
 
 - `diagnose_guidance_source_ref_feasibility.py`：264 单模板 + 30 父工作簿 sheet = **294 可挂**；14 ambiguous；65 无模板

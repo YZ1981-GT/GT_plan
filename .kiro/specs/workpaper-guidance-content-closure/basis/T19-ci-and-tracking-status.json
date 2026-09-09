@@ -22,18 +22,33 @@
     "scripts": 11
   },
   "cleanCheckoutGate": {
-    "verdict": "BLOCKED",
-    "reason": "formal guidance artefacts remain untracked (??); require explicit git add/commit before clean-checkout PASS",
+    "verdict": "PASS",
     "trackedPathsManifest": "basis/T19-tracked-paths.json",
-    "sampleUntrackedPrefixes": [
-      ".kiro/specs/workpaper-guidance-content-closure/",
-      "backend/data/guidance/",
-      "backend/app/services/guidance_*.py",
-      "backend/scripts/diagnose/mutate_guidance_*.py",
-      "backend/tests/test_guidance_*.py",
-      "audit-platform/frontend/src/shell/guidance/",
-      "audit-platform/frontend/e2e/workpaper-guidance-fshell.spec.ts"
-    ]
+    "commit": "196753f1b",
+    "commitStat": "566 files changed, 67432 insertions(+), 5310 deletions(-)",
+    "remainingUntrackedGuidancePaths": 0,
+    "preCommitGates": [
+      "file-size gate PASS (540 staged code files)",
+      "UTF-8 integrity PASS",
+      "gitleaks skipped locally (not installed; CI covers)"
+    ],
+    "fileSizeSplits": [
+      "guidance_source_refs.py 848->631 (guidance_template_authority.py)",
+      "guidance_inventory.py 1366->static only (guidance_runtime_facts.py + guidance_runtime_inventory.py)",
+      "wp_guidance_chat.py 963->under cap (wp_guidance_chat_stream.py + wp_guidance_section_prompts.py)"
+    ],
+    "gc0ScannerFix": {
+      "defect": "substring match treated `import { type Foo }` as a local re-declaration",
+      "findingsBefore": 8,
+      "findingsAfter": 0,
+      "staleExemptionsRemoved": 2,
+      "newGuard": "test_scanner_separates_type_only_imports_from_redeclarations"
+    }
+  },
+  "verificationBeforeCommit": {
+    "backendGuidanceSuite": 245,
+    "backendMutationBatch": "11/11 RED",
+    "frontendGuards": 37
   },
   "canonicalMigrationCheck": {
     "mode": "check",
