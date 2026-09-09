@@ -123,6 +123,9 @@ from app.services.workpaper_sync.repository import WorkpaperSyncRepository
 from app.services.workpaper_sync.request_application import RequestApplicationService
 from app.services.workpaper_sync.resolution import CanonicalResolutionService
 from app.services.workpaper_sync.rooms import RoomScope, RoomService
+from app.services.workpaper_sync.store_projection_response import (
+    compute_store_projection_response,
+)
 from app.services.workpaper_sync.timeline import SyncTimelineService
 from app.services.wp_visibility.denial import (
     EXTERNAL_NOT_FOUND_DETAIL,
@@ -299,6 +302,10 @@ _READ_ONLY_ACTIONS: frozenset[str] = frozenset(
         "read_conflicts",
         "read_timeline",
         "download_recovery_artifact",
+        # G4-0c：store-backed entry（如 D2）把整表 JSON 存在 checklist_responses 里，
+        # 前端不重造 39 列映射；本只读端点用 provider 的单一真源 `build_store_projection`
+        # 现算 projection 供 flush/materialize 使用。它只读 store，不写任何东西。
+        "read_store_projection",
     }
 )
 
@@ -622,6 +629,43 @@ async def create_pending_mutation(
             exc, status=classify_materialize_rejection(exc)
         ) from exc
     return receipt.as_dict()
+
+
+@router.get(USER_SYNC_PREFIX + "/store-projection")
+async def read_store_projection(
+    project_id: uuid.UUID,
+    wp_id: uuid.UUID,
+    entry_id: str,
+    svc: _SyncServices = Depends(_services),
+) -> dict[str, Any]:
+    """G4-0c：store-backed entry 的 projection **服务端现算**（只读）。
+
+    D2 这类 entry 把整张明细表以一条 `checklist_responses` JSON（`STORE_ITEM_ID`）承载。
+    前端**不重造** 39 列 → stable-key 的映射（那会是第二真源，Requirement 6.1）；本端点
+    用 provider 自己的单一真源 `build_store_projection` 现算，返回 flush/materialize 需要的
+    `{"values": {...}}` 与当前 `expected_revision`。
+
+    只读：不写库、不推 revision、不建 room。失败一律 fail visible（不返回空 projection ——
+    空 projection = 清空整表）。
+    """
+    scope = await _guard(
+        svc,
+        project_id=project_id,
+        wp_id=wp_id,
+        entry_id=entry_id,
+        action="read_store_projection",
+    )
+    registration = await _registration(svc, scope)
+    # 业务（provider 解析 / 读 store / 投影 / 拍平）住 service 伴生模块；本端点只映射状态码。
+    try:
+        return await compute_store_projection_response(
+            session=svc.session,
+            wp_id=wp_id,
+            entry_id=scope.entry_id,
+            registration=registration,
+        )
+    except SyncDomainError as exc:
+        raise _domain_error(exc, status=422) from exc
 
 
 @router.post(USER_SYNC_PREFIX + "/materialize")
