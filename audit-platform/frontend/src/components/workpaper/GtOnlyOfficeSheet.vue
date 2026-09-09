@@ -45,10 +45,21 @@ const props = withDefaults(defineProps<{
   projectId?: string
   wholeWorkbook?: boolean
   readonly?: boolean
+  /**
+   * forcesave 端点（可注入）。默认仍指 legacy `/d2-sync/forcesave` —— 保持现有 D2 与
+   * 全部 178 个仅挂载本组件的 entry 行为逐字节不变（它们从不调 `forceSave()`）。
+   *
+   * 🔴 G4-0a：抽出这个 prop 是为了让 D2 宿主迁到统一内核时能把它指向
+   * `POST {USER_SYNC_PREFIX}/rooms/{room_id}/forcesave`，而**不必**在共享组件里写死
+   * legacy URL。抽 prop 本身不改变任何默认行为（唯一调用方 `GtD2AccountsReceivable`
+   * 不传该 prop 时走默认值），因此对 178 个 entry 零影响。
+   */
+  forcesaveEndpoint?: string
 }>(), {
   projectId: '',
   wholeWorkbook: false,
   readonly: false,
+  forcesaveEndpoint: '',
 })
 
 const emit = defineEmits<{
@@ -285,9 +296,20 @@ async function forceSave(): Promise<ForceSaveResult> {
   }
   forceSaving.value = true
   try {
+    // 默认仍是 legacy 端点（行为不变）；宿主可注入统一端点做迁移。
+    const endpoint =
+      props.forcesaveEndpoint || `/api/workpapers/${props.wpId}/d2-sync/forcesave`
     const { data } = await http.post(
-      `/api/workpapers/${props.wpId}/d2-sync/forcesave`,
+      endpoint,
       {},
+      {
+        // 该请求最长会等待 callback 落盘。全局 POST 去重的 pending key 在响应阶段
+        // 可能因 body 已序列化而残留，导致用户保存后第二次切换直接 ERR_CANCELED。
+        // 组件自身的 forceSaving 已负责单飞，因此这里关闭全局去重才是正确 owner。
+        _dedupe: false,
+        // 错误由本组件归一成 ForceSaveResult，再由 bridge 显示一次，避免双重横幅。
+        _silent: true,
+      } as any,
     )
     const payload = (data?.data ?? data) as Partial<ForceSaveResult>
     const result: ForceSaveResult = {
