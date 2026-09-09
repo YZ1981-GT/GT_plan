@@ -1,23 +1,39 @@
 {
+  "schema_version": 2,
   "wp_code": "B60C",
   "title": "对国有企业年度财务报表审计的特殊考虑 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "补充国企年审专项报告清单、国资沟通时点与触发条件，以及重点关注领域的「风险—账户—总体应对—程序索引」安排。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "补充国企年审专项报告清单、国资沟通时点与触发条件，以及重点关注领域的「风险—账户—总体应对—程序索引」安排。",
+      "source_refs": []
     },
     {
-      "heading": "二、使用方法",
-      "content": "1. 矩阵勾选国企年审后编制\n2. 先勾选「国资沟通触发条件」，再填沟通时间计划表\n3. 重点领域按四列表填写并挂下游程序索引"
+      "key": "steps",
+      "title": "二、使用方法",
+      "content": "1. 矩阵勾选国企年审后编制\n2. 先勾选「国资沟通触发条件」，再填沟通时间计划表\n3. 重点领域按四列表填写并挂下游程序索引",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 关联：B60 / 主参审沟通底稿 / 相关专项报告底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 关联：B60 / 主参审沟通底稿 / 相关专项报告底稿",
+      "source_refs": []
     }
   ],
   "source": "static_json",
   "recommended_questions": [
     "哪些情形必须与国资委沟通？",
     "重点领域四列表如何与下游程序勾稽？"
-  ]
+  ],
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "4b0f7bb63fcc7e691270d30b51cc704c7a1665e22ca0db6c6cb311b38210be8e",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "ae82a927f135ce89a1a90ce88cc739136aa05cf1ffac3dba1531dd091f779e57"
+  }
 }

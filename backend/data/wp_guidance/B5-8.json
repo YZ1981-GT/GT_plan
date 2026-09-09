@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B5-8",
   "title": "B5-8 约定书附件 — 信息技术环境说明 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿为业务约定书配套附件（约定书附件 — 信息技术环境说明），补充约定书正文未详细约定的事项，使审计约定完整明确。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿为业务约定书配套附件（约定书附件 — 信息技术环境说明），补充约定书正文未详细约定的事项，使审计约定完整明确。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 根据项目实际情况填写本附件内容\n2. 与被审计单位管理层确认相关条款\n3. 经双方签字盖章后归档\n4. 如有变更须签订补充协议"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 根据项目实际情况填写本附件内容\n2. 与被审计单位管理层确认相关条款\n3. 经双方签字盖章后归档\n4. 如有变更须签订补充协议",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 附件条款不得与约定书正文冲突\n• 收费条款须经合伙人审批\n• 审计范围变更须重新评估风险并修改审计计划"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 附件条款不得与约定书正文冲突\n• 收费条款须经合伙人审批\n• 审计范围变更须重新评估风险并修改审计计划",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "3f3e69539c61c47cf42d8e73a465b59b11d7eb1c88bc15e8563552fbd3a930c7",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "5a2ee603726269f0680b09eefecdc5671dc8cb4161093d57e0b86c3b05f54f0c"
+  }
 }

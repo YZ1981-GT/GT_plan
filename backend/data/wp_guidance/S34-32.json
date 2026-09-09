@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S34-32",
   "title": "S34-32 证监会审核反馈问题分析与回复 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于记录证监会审核反馈问题的分析与回复，确保回复内容与审计底稿一致。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于记录证监会审核反馈问题的分析与回复，确保回复内容与审计底稿一致。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 逐项梳理证监会反馈问题\n2. 对照审计底稿整理相关证据和分析\n3. 编制回复意见初稿\n4. 与保荐人和发行人沟通确认口径\n5. 形成正式回复文件"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 逐项梳理证监会反馈问题\n2. 对照审计底稿整理相关证据和分析\n3. 编制回复意见初稿\n4. 与保荐人和发行人沟通确认口径\n5. 形成正式回复文件",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 回复内容须与审计底稿证据完全一致\n• 不得超出审计范围发表意见\n• 涉及会计判断的回复须经合伙人审批"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 回复内容须与审计底稿证据完全一致\n• 不得超出审计范围发表意见\n• 涉及会计判断的回复须经合伙人审批",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "14fb8f49ffc1d969b6dc6d0fca6f54ee3065086ecb523d5016ac32c70582b119",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "ccd7a5d90024f4d15662c61b6ccd8eee1bdadb10eab1e7263081a1a2d4fd0181"
+  }
 }

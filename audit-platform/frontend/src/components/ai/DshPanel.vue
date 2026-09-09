@@ -98,7 +98,27 @@
               </div>
             </div>
             <div class="dsh-panel-content">
-              <PlatformAiChatPanel :host="aiHost" :visible="modelValue" />
+              <div
+                v-if="matchedGuidanceContext"
+                class="dsh-panel-guidance-context"
+                role="status"
+                :title="`编制说明摘要：${matchedGuidanceContext.sourceDigest}`"
+              >
+                <span class="dsh-panel-guidance-context__sheet">
+                  {{ guidanceSheetLabel }}
+                </span>
+                <span class="dsh-panel-guidance-context__status">
+                  {{ guidanceStatusLabel }} · {{ matchedGuidanceContext.resolvedWpCode }}
+                </span>
+                <span class="dsh-panel-guidance-context__version">
+                  {{ matchedGuidanceContext.guidanceVersion }}
+                </span>
+              </div>
+              <PlatformAiChatPanel
+                :host="aiHost"
+                :visible="modelValue"
+                :sheet-name="guidanceSheetName"
+              />
             </div>
           </div>
         </div>
@@ -133,6 +153,7 @@ import { useRoute } from 'vue-router'
 import { ChatDotSquare, Link, DArrowRight } from '@element-plus/icons-vue'
 import { buildAmbientHost } from '@/composables/useAiHostContext'
 import { useDshPanelLayout } from '@/composables/useDshPanelLayout'
+import { useGuidancePanelStore, type GuidanceResolutionStatus } from '@/stores/guidancePanelStore'
 import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
 
 // ---------------------------------------------------------------------------
@@ -159,6 +180,40 @@ const aiHost = computed(() =>
     wpId: route.params.wpId ?? route.query.wp_id,
   }),
 )
+
+const guidanceStore = useGuidancePanelStore()
+const GUIDANCE_STATUS_LABELS: Record<GuidanceResolutionStatus, string> = {
+  exact: '精确说明',
+  parent_inherited: '沿用父级',
+  typed_fallback: '类型提示',
+  generic_fallback: '通用提示',
+  missing: '内容待补齐',
+  stale: '来源已过期',
+}
+
+/** 只把与当前全局 AI 宿主严格同 project/wp 的说明上下文交给聊天面板。 */
+const matchedGuidanceContext = computed(() => {
+  const host = aiHost.value.host
+  const context = guidanceStore.aiGuidanceContext
+  if (!guidanceStore.aiEnabled || !host || host.type !== 'workpaper' || !context) return null
+  if (host.id !== context.wpId || host.projectId !== context.projectId) return null
+  return context
+})
+const guidanceSheetName = computed(() => {
+  const context = matchedGuidanceContext.value
+  if (!context || context.wholeWorkbook) return undefined
+  return context.sheetName || undefined
+})
+const guidanceSheetLabel = computed(() => {
+  const context = matchedGuidanceContext.value
+  if (!context) return ''
+  if (context.wholeWorkbook) return '整册说明'
+  return context.sheetName || context.sheetCode || context.wpCode
+})
+const guidanceStatusLabel = computed(() => {
+  const status = matchedGuidanceContext.value?.resolutionStatus
+  return status ? GUIDANCE_STATUS_LABELS[status] : ''
+})
 
 // ---------------------------------------------------------------------------
 // 响应式布局
@@ -527,7 +582,46 @@ function openInNewWindow() {
 
 .dsh-panel-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
+  min-height: 0;
+}
+
+.dsh-panel-guidance-context {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  background: var(--el-color-primary-light-9, #f4f0fa);
+  color: var(--el-text-color-regular, #606266);
+  font-size: 11px;
+}
+
+.dsh-panel-guidance-context__sheet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: var(--el-color-primary, #4b2d77);
+}
+
+.dsh-panel-guidance-context__status,
+.dsh-panel-guidance-context__version {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dsh-panel-guidance-context__version {
+  grid-column: 1 / -1;
+  color: var(--el-text-color-secondary, #909399);
+}
+
+.dsh-panel-content :deep(.platform-ai-chat-panel) {
+  flex: 1;
   min-height: 0;
 }
 

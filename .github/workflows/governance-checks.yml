@@ -5684,6 +5684,59 @@ jobs:
         run: python backend/scripts/check/check_template_external_links.py --expect-dead-metadata 0
 
   # ─────────────────────────────────────────────────────────────────────────
+  # platform-architecture-convergence Tasks 13–15: domain boundary governance
+  # Independent attribution-style job — asserts only this checker + its tests.
+  # Do NOT use import-linter / grimp / dependency-cruiser.
+  domain-boundary-governance:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run domain boundary checker (exact debt baseline)
+        run: python backend/scripts/check/check_domain_boundaries.py
+      - name: Install governance self-test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run domain boundary checker self-tests
+        run: python -m pytest backend/tests/scripts/test_check_domain_boundaries.py -q
+      - name: Assert domain-boundary artifacts exist
+        run: |
+          set -e
+          test -f docs/architecture/domain-boundaries.json
+          test -f docs/architecture/DOMAIN_DEBT_BURNDOWN.md
+          test -f backend/scripts/check/baselines/domain-boundary-debt.json
+          test -f backend/scripts/check/check_domain_boundaries.py
+          test -f backend/tests/scripts/test_check_domain_boundaries.py
+
+  pac-skeleton-typecheck:
+    # platform-architecture-convergence: isolated PAC surface (full-repo vue-tsc OOMs)
+    # + network console gate unit tests (Playwright resource-error hardening)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: PAC network console gate unit tests
+        run: npx vitest run src/__tests__/pacNetworkGate.spec.ts
+      - name: PAC split-face type coverage (11 domains + 6 entry arrays)
+        run: npx vitest run --typecheck src/__tests__/pacDomainEntryTypes.spec.ts
+      - name: PAC isolated vue-tsc probe
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+        run: npx vue-tsc --noEmit -p tsconfig.pac-t21.json
+
+  # ─────────────────────────────────────────────────────────────────────────
   # audit-evidence-attachment-preview-format-expansion (APFE)
   # Attribution-style jobs: only this spec's frontend/backend guards + mutation anchors.
   apfe-attachment-preview-frontend-guards:
@@ -5729,3 +5782,110 @@ jobs:
           test -f .kiro/specs/_archive/05-business-features/audit-evidence-attachment-preview-format-expansion/evidence/attachment-preview-format-expansion/mutation_verdicts.json
           test -f .kiro/specs/_archive/05-business-features/audit-evidence-attachment-preview-format-expansion/evidence/attachment-preview-format-expansion/task16_production_bundle_gate.json
           test -f .kiro/specs/_archive/05-business-features/audit-evidence-attachment-preview-format-expansion/evidence/attachment-preview-format-expansion/artifact_manifest.json
+
+  # workpaper-guidance-content-closure (WGCC)
+  # Attribution-style: contract/inventory/resolution/handoff mutation anchors + FE host/UI.
+  wgcc-guidance-backend-guards:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend test deps
+        run: >
+          python -m pip install pytest==8.4.2 pytest-asyncio aiosqlite
+          sqlalchemy pydantic fastapi httpx
+      - name: Guidance directed pytest (contract/inventory/resolution/handoff)
+        run: >
+          python -m pytest
+          backend/tests/test_guidance_gc0_conformance.py
+          backend/tests/test_guidance_gid.py
+          backend/tests/test_guidance_handoff_consumer.py
+          backend/tests/test_guidance_api_task9.py
+          backend/tests/test_guidance_inventory_snapshots.py
+          -c backend/pytest.ini -q --tb=line
+      - name: Guidance mutation anchors (read-only batch)
+        run: python backend/scripts/diagnose/run_guidance_task17_mutations.py --check-anchors-only
+      - name: Guidance C0/G-ID/G-HANDOFF evidence exist
+        run: |
+          set -e
+          test -f backend/data/guidance/contracts/gc0/schema.json
+          test -f backend/data/guidance/contracts/gc0/evidence/gc0_evidence.json
+          test -f backend/data/guidance/contracts/gid/evidence/gid_evidence.json
+          test -f backend/data/guidance/contracts/ghandoff/evidence/ghandoff_consumer_evidence.json
+
+  wgcc-guidance-frontend-guards:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: audit-platform/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: audit-platform/frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Guidance host/store/UI unit guards
+        run: >
+          npx vitest run
+          src/composables/__tests__/htmlStableContextEmitter.spec.ts
+          src/composables/__tests__/useWpRendererSheetContext.spec.ts
+          src/stores/__tests__/guidancePanelStore.spec.ts
+          src/components/workpaper/guidance/__tests__
+          src/shell/formula/__tests__/rightRailArbiter.spec.ts
+          src/components/workpaper/GtWpRenderer.runtime-boundary.test.ts
+      - name: Guidance frontend mutation anchors (read-only)
+        working-directory: .
+        run: python backend/scripts/diagnose/mutate_guidance_frontend_host_ui_guards.py --check-anchors
+
+  # HTML ↔ OnlyOffice 双向回写总控 G0-1：8-spec program milestone 投影。
+  # 归因型独立 job；数据库探针在事务内 SET TRANSACTION READ ONLY 并反查
+  # transaction_read_only，连接/SQL 失败均非零退出，不允许 skip 或空分母假绿。
+  workpaper-sync-program-milestones:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: audit_platform
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform
+      API_BASE_URL: http://127.0.0.1:9
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/requirements.txt -q
+      - name: Bootstrap isolated schema and apply every migration
+        working-directory: backend
+        env:
+          PGPASSWORD: postgres
+          PYTHONPATH: ${{ github.workspace }}/backend
+        run: |
+          set -euo pipefail
+          psql -h localhost -U postgres -d audit_platform -c "CREATE EXTENSION IF NOT EXISTS vector;"
+          python scripts/seed/init_tables.py
+          psql -h localhost -U postgres -d audit_platform -c "DROP TABLE IF EXISTS ai_chat_action_receipts, ai_chat_tool_calls, ai_chat_attachments, ai_chat_runs CASCADE;"
+          python -c "import asyncio,sys; from app.core.migration_runner import MigrationRunner; r=asyncio.run(MigrationRunner(database_url='postgresql+asyncpg://postgres:postgres@localhost:5432/audit_platform').run_pending()); print('migrations executed:', len(r.executed), 'failed:', [f.version for f in r.failed]); sys.exit(1 if r.failed else 0)"
+      - name: Recompute and byte-check program milestone registry
+        run: python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check
+      - name: Program milestone guards (DAG, digests, evidence, live read-only DB)
+        run: python -m pytest backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py -q --tb=short

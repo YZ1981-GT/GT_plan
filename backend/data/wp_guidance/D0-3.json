@@ -1,11 +1,52 @@
 {
+  "schema_version": 2,
   "wp_code": "D0-3",
   "title": "跟函函证过程控制编制指引",
   "sections": [
-    { "title": "适用范围", "content": "本底稿适用于采用现场跟函方式实施的函证程序，记录注册会计师亲自前往被函证方跟进函证过程的控制情况。本底稿为可选底稿，仅采用跟函方式时编制。" },
-    { "title": "跟函控制要求", "content": "1. 了解被函证方处理函证的一般流程\n2. 确认签收人员的身份和权限\n3. 观察被函证方是否按正常业务流程处理函证回复" },
-    { "title": "身份权限确认", "content": "注册会计师应确认：签收人为对方财务负责人或授权人员，有权核实余额信息。可通过索要名片、观察员工卡、确认办公位置等方式验证。" },
-    { "title": "防串通舞弊", "content": "电话核实时：\n1. 号码须取自工商/官网/114等独立来源，非经办人提供\n2. 观察对方是否对函证内容表示意外（可能提示串通）\n3. 注意对方是否将电话转接至第三方" },
-    { "title": "签名要求", "content": "跟函人员应在完成过程控制后当场签署姓名及日期，对应正式底稿的手书签名。电子系统仅记录姓名+日期留痕。" }
-  ]
+    {
+      "key": "purpose",
+      "title": "适用范围",
+      "content": "本底稿适用于采用现场跟函方式实施的函证程序，记录注册会计师亲自前往被函证方跟进函证过程的控制情况。本底稿为可选底稿，仅采用跟函方式时编制。",
+      "source_refs": []
+    }
+  ],
+  "unmapped_sections": [
+    {
+      "title": "跟函控制要求",
+      "content": "1. 了解被函证方处理函证的一般流程\n2. 确认签收人员的身份和权限\n3. 观察被函证方是否按正常业务流程处理函证回复",
+      "source_refs": [],
+      "source_index": 1,
+      "classification": "unmapped"
+    },
+    {
+      "title": "身份权限确认",
+      "content": "注册会计师应确认：签收人为对方财务负责人或授权人员，有权核实余额信息。可通过索要名片、观察员工卡、确认办公位置等方式验证。",
+      "source_refs": [],
+      "source_index": 2,
+      "classification": "unmapped"
+    },
+    {
+      "title": "防串通舞弊",
+      "content": "电话核实时：\n1. 号码须取自工商/官网/114等独立来源，非经办人提供\n2. 观察对方是否对函证内容表示意外（可能提示串通）\n3. 注意对方是否将电话转接至第三方",
+      "source_refs": [],
+      "source_index": 3,
+      "classification": "unmapped"
+    },
+    {
+      "title": "签名要求",
+      "content": "跟函人员应在完成过程控制后当场签署姓名及日期，对应正式底稿的手书签名。电子系统仅记录姓名+日期留痕。",
+      "source_refs": [],
+      "source_index": 4,
+      "classification": "unmapped"
+    }
+  ],
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "a0d393d0fbf3a5006e5e36026d7eee9dd898cf9bced0bb47e1a70918a6c63363",
+    "legacy_section_count": 5,
+    "canonical_section_count": 1,
+    "unmapped_section_count": 4,
+    "canonical_body_digest": "167d09309f43c2726785d40d67aeb358d761d69bff8d39a7b06b48d8f5cc6123"
+  }
 }

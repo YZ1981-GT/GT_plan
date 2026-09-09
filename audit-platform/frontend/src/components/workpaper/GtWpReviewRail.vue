@@ -1,22 +1,29 @@
 <script setup lang="ts">
 /**
- * GtWpReviewRail — 右侧「底稿复核」竖向入口（参照 A17 复核面板 + 编制指导触发条）
+ * GtWpReviewRail — legacy host mount.
+ *
+ * Task 12: when WorkpaperCapabilityShell is active, this component renders
+ * nothing (shell owns review trigger/placement). Placement CSS is shell-owned.
  */
-import { inject, computed } from 'vue'
+import { inject, computed, type Ref } from 'vue'
 import { ChatDotRound } from '@element-plus/icons-vue'
 import GtReviewDot from './GtReviewDot.vue'
 import type { WorkpaperOpenReviewFn } from './composables/useWorkpaperReviewProvide'
+import { WORKPAPER_SHELL_ACTIVE_KEY } from '@/shell/formula/dshAssistBridge'
 
 const props = defineProps<{
   sectionId: string
   sectionLabel?: string
-  /** 相对视口垂直位置，避免与「编制指导」重叠 */
+  /** @deprecated Task 12 — shell owns vertical placement; ignored. */
   top?: string
 }>()
 
 const openReviewDialog = inject<WorkpaperOpenReviewFn | null>('openReviewDialog', null)
+const shellActive = inject<Ref<boolean> | undefined>(WORKPAPER_SHELL_ACTIVE_KEY, undefined)
 
+const suppressedByShell = computed(() => shellActive?.value === true)
 const label = computed(() => props.sectionLabel ?? props.sectionId)
+const visible = computed(() => Boolean(openReviewDialog) && !suppressedByShell.value)
 
 function onOpen(): void {
   if (!openReviewDialog) return
@@ -29,11 +36,11 @@ function onOpen(): void {
 
 <template>
   <div
-    v-if="openReviewDialog"
+    v-if="visible"
     class="gt-wp-review-rail"
-    :style="{ top: top ?? 'calc(50% - 72px)' }"
     role="button"
     tabindex="0"
+    aria-label="底稿复核"
     title="打开底稿复核对话"
     @click="onOpen"
     @keydown.enter="onOpen"
@@ -45,12 +52,10 @@ function onOpen(): void {
 </template>
 
 <style scoped>
+/* Task 12: flow-only styles for pre-shell hosts; shell owns absolute placement. */
 .gt-wp-review-rail {
-  position: fixed;
-  right: 0;
-  transform: translateY(-50%);
   writing-mode: vertical-rl;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 12px 6px;
@@ -59,16 +64,16 @@ function onOpen(): void {
   border-right: none;
   border-radius: 8px 0 0 8px;
   cursor: pointer;
-  z-index: 110;
-  transition: background 0.2s, box-shadow 0.2s;
   color: #d46b08;
   font-size: 12px;
   font-weight: 600;
-  box-shadow: -2px 0 8px rgba(212, 107, 8, 0.08);
 }
 .gt-wp-review-rail:hover {
   background: #ffe7ba;
-  box-shadow: -2px 0 12px rgba(212, 107, 8, 0.15);
+}
+.gt-wp-review-rail:focus-visible {
+  outline: 2px solid #d46b08;
+  outline-offset: 2px;
 }
 .gt-wp-review-rail__text {
   letter-spacing: 2px;

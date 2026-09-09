@@ -1,23 +1,39 @@
 {
+  "schema_version": 2,
   "wp_code": "B60B",
   "title": "对IPO申报财务报表审计的特殊考虑 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "补充 IPO/申报审计的专项报告清单、中介与专技委时点、延伸检查、资金流水及其他专项核查计划。正文以可填表为主，证监会要求以「依据索引」指向文号，细则在 S32/S33/S34 执行。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "补充 IPO/申报审计的专项报告清单、中介与专技委时点、延伸检查、资金流水及其他专项核查计划。正文以可填表为主，证监会要求以「依据索引」指向文号，细则在 S32/S33/S34 执行。",
+      "source_refs": []
     },
     {
-      "heading": "二、使用方法",
-      "content": "1. 适用性矩阵勾选 IPO/申报后编制\n2. 专项报告表勾选是否适用并填预计时间\n3. 延伸检查/流水核查填对象、时点、负责人、底稿索引\n4. 勿在本底稿粘贴法规长文"
+      "key": "steps",
+      "title": "二、使用方法",
+      "content": "1. 适用性矩阵勾选 IPO/申报后编制\n2. 专项报告表勾选是否适用并填预计时间\n3. 延伸检查/流水核查填对象、时点、负责人、底稿索引\n4. 勿在本底稿粘贴法规长文",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 关联：B60 / S32–S34 / 专技委相关底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 关联：B60 / S32–S34 / 专技委相关底稿",
+      "source_refs": []
     }
   ],
   "source": "static_json",
   "recommended_questions": [
     "延伸检查与资金流水分别索引哪些专项底稿？",
     "专项报告清单如何按业务约定书裁剪？"
-  ]
+  ],
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "75926d775beaf943873bc209b1834bed0f3e9dddceb70bb42b0853594249dc9d",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "1e003f1da85560e00600508853dce471e28e29740aad885b2ae86245085dd6d0"
+  }
 }

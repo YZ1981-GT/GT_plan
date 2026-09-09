@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "G5",
   "title": "G5 长期股权投资减值测试 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于测试长期股权投资减值准备的充分性，评估投资可收回金额的合理性。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于测试长期股权投资减值准备的充分性，评估投资可收回金额的合理性。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 按照投资循环程序表要求执行审计程序\n2. 获取投资协议、估值报告等支撑文件\n3. 核对投资变动与账务处理的一致性\n4. 形成本底稿结论并索引至程序表"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 按照投资循环程序表要求执行审计程序\n2. 获取投资协议、估值报告等支撑文件\n3. 核对投资变动与账务处理的一致性\n4. 形成本底稿结论并索引至程序表",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 长期股权投资减值迹象判断须谨慎\n• 公允价值计量的投资须评估估值技术的适当性\n• 关联方投资交易须特别关注定价公允性"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 长期股权投资减值迹象判断须谨慎\n• 公允价值计量的投资须评估估值技术的适当性\n• 关联方投资交易须特别关注定价公允性",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "4345cb18bab74cbde9af0cda56cca8a9ec3147c1744611d27752dea20f19d193",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "cda31e1bcd469212829e69be23b70013f34abab93c1e035379dbd8b9e12b13fc"
+  }
 }

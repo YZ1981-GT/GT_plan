@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "D6",
   "title": "D6 应收账款函证 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于记录应收账款函证程序的执行情况，验证应收账款的存在性和金额准确性。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于记录应收账款函证程序的执行情况，验证应收账款的存在性和金额准确性。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确定函证范围（大额+随机抽样）\n2. 编制函证控制表（发函日期/回函日期/金额差异）\n3. 对未回函项目实施替代程序\n4. 分析差异原因并确认最终审计结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确定函证范围（大额+随机抽样）\n2. 编制函证控制表（发函日期/回函日期/金额差异）\n3. 对未回函项目实施替代程序\n4. 分析差异原因并确认最终审计结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 函证须由审计人员直接控制发函和收函过程\n• 消极式函证仅适用于低风险且大量小余额场景\n• 差异须追查至原因（在途款/未达账/争议）"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 函证须由审计人员直接控制发函和收函过程\n• 消极式函证仅适用于低风险且大量小余额场景\n• 差异须追查至原因（在途款/未达账/争议）",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "e9d28e2664b7dbbf1aad8c2559a88d0b6767961db13138fe30159e32be89b686",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "f50cfc4a7de21bcb9cc742edafb59c36b87d8f15d83407d5a135f72b0c228a2e"
+  }
 }

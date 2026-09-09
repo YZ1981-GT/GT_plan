@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B1B",
   "title": "业务保持评价 — B1B 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "评估是否继续保持与现有客户的审计业务关系。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "评估是否继续保持与现有客户的审计业务关系。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "41e5e08b99708ee741d8de8d2404def7c26fc1df5023a43157c5389ab5045730",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "2f9a3a0faf46824357ec24ebc2b4828f7e21d831cc332c39e75258a161f7a153"
+  }
 }

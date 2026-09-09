@@ -172,6 +172,10 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
       })
     }
 
+    // 导航 facade 在 Shell 创建，必须显式绑定本 composable 创建的真实 API；
+    // 否则 custom nav/native tab/locate 都只会操作永远为 null 的另一份 ref。
+    opts.sheetNavFacade.bindUniverApi(api)
+
     // 5. 监听数据变化（dirty 标记 + sheet 切换）
     api.onCommandExecuted((command: any) => {
       if (DIRTY_COMMAND_PATTERNS.some(p => command.id?.includes(p))) {
@@ -202,8 +206,9 @@ export function useEditorUniver(opts: UseEditorUniverOptions): UseEditorUniverRe
     if (univerInstance) {
       try { univerInstance.dispose() } catch { /* ignore */ }
       univerInstance = null
-      univerAPI.value = null
     }
+    univerAPI.value = null
+    opts.sheetNavFacade.bindUniverApi(null)
   }
 
   return {

@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S11",
   "title": "抽样审计设计 — S11 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "设计和记录审计抽样方案，包括样本量确定和选取方法。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "设计和记录审计抽样方案，包括样本量确定和选取方法。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "c14c3d50d0e193608f66114557a6ad53e341c0f9ee94e3dc2b7a9a10b34bf0c3",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "965c5cc0cab2683f6625065a308060b6211fd6b419bde813a1cf2bcb57cd4759"
+  }
 }

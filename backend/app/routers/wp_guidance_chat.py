@@ -13,11 +13,10 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import AsyncGenerator
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +24,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.routers.wp_guidance_chat_stream import _MAX_HISTORY_ROUNDS, _stream_wp_chat
+from app.routers.wp_guidance_section_prompts import _SECTION_PROMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -53,119 +54,229 @@ class CustomGuidanceRequest(BaseModel):
     project_id: str = Field(..., description="项目 ID")
 
 
+async def _load_runtime_custom_guidance_entries(
+    *,
+    db: AsyncSession,
+    project_id: UUID,
+    wp_id: UUID,
+    wp_code: str,
+):
+    """只读已确认 custom guidance；普通补充文本不进入 exact 清册。"""
+    from app.services.field_override_service import FieldOverrideService
+    from app.services.guidance_inventory import normalize_runtime_custom_guidance
+    from app.services.project_audit_year import fetch_project_audit_year
+
+    year = await fetch_project_audit_year(db, project_id)
+    if year is None:
+        return ()
+    scope = f"wp_guidance_custom:{wp_code}:{project_id}"
+    batch = await FieldOverrideService(db).get_batch(project_id, year, scope)
+    return normalize_runtime_custom_guidance(batch, wp_id=str(wp_id))
+
+
 @router.get("/{wp_id}/guidance")
 async def get_workpaper_guidance(
     wp_id: str,
     sheet_code: str | None = None,
+    sheet_name: str | None = None,
+    whole_workbook: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    request: Request = None,
 ):
-    """获取底稿编制说明
+    """获取版本化、render-membership 约束的编制说明。
 
-    按优先级从模板 sheet / header / static JSON / fallback 提取，
-    结合 LRU + mtime 缓存。
-
-    Args:
-        sheet_code: 可选的 sheet 级编码（如 D0-1/D0-5），多 sheet 底稿切 tab 时传入。
-            优先按 sheet_code 查找专属 guidance JSON，找不到回退到父码 wp_code。
-
-    Returns:
-        {wp_code, wp_name, source, complexity, guidance: {sections, raw_text}, recommended_questions}
+    Task 8 AC#1: GuidanceMembershipError → 403。
+    Task 9 AC#1: 响应携带 service 计算的 ETag / responseVersion；
+    命中 If-None-Match 时返回 304 短路（route 无 request 时跳过协商）。
     """
-    # 验证 wp_id 格式
+    if_none_match = request.headers.get("if-none-match") if request is not None else None
     try:
         wp_uuid = UUID(wp_id)
     except (ValueError, TypeError):
         raise HTTPException(status_code=404, detail="无效的底稿 ID")
 
-    # 查询底稿信息：working_papers → wp_index
+    # 先复用九维门完成用户/项目/候选 sheet 授权，再读取 render 内容。最终
+    # membership 仍以 render-config sheets 为准，static/template 不得反向授权。
+    from app.services import guidance_inventory as inventory
+    from app.services import guidance_source_refs
+    from app.services.wp_visibility.entry_integration import gate_wp
+
+    gate_sheet_code = sheet_code or inventory.extract_sheet_code(sheet_name)
+    await gate_wp(
+        db,
+        current_user,
+        entrypoint="workpaper.dedicated_subroute",
+        action="dedicated_read",
+        method="GET",
+        wp_id=wp_uuid,
+        route_name="get_workpaper_guidance",
+        entry_family="workpaper",
+        requested_sheet_key=gate_sheet_code,
+    )
+
     from app.models.workpaper_models import WorkingPaper, WpIndex
 
     stmt = (
-        select(
-            WpIndex.wp_code,
-            WpIndex.wp_name,
+        select(WorkingPaper, WpIndex)
+        .join(WpIndex, WorkingPaper.wp_index_id == WpIndex.id)
+        .where(
+            WorkingPaper.id == wp_uuid,
+            WorkingPaper.is_deleted == False,  # noqa: E712
+            WpIndex.is_deleted == False,  # noqa: E712
         )
-        .join(WorkingPaper, WorkingPaper.wp_index_id == WpIndex.id)
-        .where(WorkingPaper.id == wp_uuid)
     )
-
-    result = await db.execute(stmt)
-    row = result.first()
-
+    row = (await db.execute(stmt)).first()
     if row is None:
         raise HTTPException(status_code=404, detail="底稿不存在")
+    working_paper, wp_index = row
+    wp_code = wp_index.wp_code
+    wp_name = wp_index.wp_name or ""
 
-    wp_code = row.wp_code
-    wp_name = row.wp_name or ""
+    from pathlib import Path
+    from pathlib import Path
+    from app.routers import wp_render_config, wp_render_config_helpers
 
-    # 多 sheet 底稿：优先使用 sheet_code 获取专属 guidance（如 D0-1.json）
-    # 找不到时回退到父码 wp_code（如 D0）
-    effective_code = sheet_code if sheet_code else wp_code
-
-    # 尝试定位模板路径（从 wp_templates 按 wp_code 推导）
-    template_path = _resolve_template_path(wp_code)
-
-    # 调用 GuidanceService 获取编制说明
-    from app.services.wp_guidance_service import GuidanceService
-
-    service = GuidanceService()
-    guidance_response = await service.get_guidance(
-        wp_code=effective_code,
-        wp_name=wp_name,
-        template_path=template_path,
+    raw_template_path = wp_render_config_helpers._resolve_template_path(working_paper, wp_code)
+    template_path = Path(raw_template_path) if raw_template_path else None
+    # inventory 分母必须基于 parent 的完整最终 render manifest；请求 sheet 只在
+    # resolve_render_sheet_context 阶段选择，不能先过滤成单页再冒充全量清册。
+    render_response = await wp_render_config._get_render_config_impl(
+        wp_uuid,
+        None,
+        db,
+        current_user,
     )
+    render_sheets = render_response.get("sheets", []) if isinstance(render_response, dict) else []
 
-    # 如果 sheet_code 级 guidance 提取结果是 fallback（通用提示），再试父码
-    if sheet_code and guidance_response.get("source") == "fallback":
-        guidance_response = await service.get_guidance(
-            wp_code=wp_code,
-            wp_name=wp_name,
-            template_path=template_path,
+    try:
+        resolved_sheet_code, sheet_identity_reason, _matched_fact = (
+            inventory.resolve_render_sheet_context(
+                parent_wp_code=wp_code,
+                render_sheets=render_sheets,
+                requested_sheet_code=sheet_code,
+                requested_sheet_name=sheet_name,
+                whole_workbook=whole_workbook,
+            )
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # 若 canonical identity 只能由 render manifest 裁决，再以该 key 做第二次 sheet gate。
+    if resolved_sheet_code and resolved_sheet_code != gate_sheet_code:
+        await gate_wp(
+            db,
+            current_user,
+            entrypoint="workpaper.dedicated_subroute",
+            action="dedicated_read",
+            method="GET",
+            wp_id=wp_uuid,
+            route_name="get_workpaper_guidance",
+            entry_family="workpaper",
+            requested_sheet_key=resolved_sheet_code,
         )
 
-    # 注入 ai_enabled 字段供前端 Tab 显隐（读 feature flag）
+    import asyncio
+
+    try:
+        authority_snapshot = await asyncio.to_thread(
+            guidance_source_refs.build_template_authority_snapshot,
+            parent_wp_code=wp_code,
+            render_sheets=render_sheets,
+            active_template_path=template_path,
+            template_version=str(render_response.get("template_version") or "") or None,
+            template_origin=str(getattr(working_paper, "source_type", "") or "") or None,
+        )
+        source_ref_contexts = guidance_source_refs.build_source_ref_contexts(
+            authority_snapshot,
+            render_sheets,
+        )
+        static_entries, template_facts, exemptions = await asyncio.gather(
+            asyncio.to_thread(
+                inventory.build_static_guidance_inventory,
+                source_ref_contexts=source_ref_contexts,
+            ),
+            asyncio.to_thread(
+                inventory.load_template_source_facts,
+                wp_code,
+                template_path=template_path,
+                template_version=str(render_response.get("template_version") or "") or None,
+                template_origin=str(getattr(working_paper, "source_type", "") or "") or None,
+            ),
+            asyncio.to_thread(inventory.load_runtime_exemptions, wp_code),
+        )
+        custom_entries = await _load_runtime_custom_guidance_entries(
+            db=db,
+            project_id=working_paper.project_id,
+            wp_id=wp_uuid,
+            wp_code=wp_code,
+        )
+        runtime_inventory = await asyncio.to_thread(
+            inventory.build_runtime_guidance_inventory,
+            parent_wp_code=wp_code,
+            render_sheets=render_sheets,
+            template_facts=template_facts,
+            static_entries=static_entries,
+            custom_entries=custom_entries,
+            exemptions=exemptions,
+            include_whole_workbook_context=whole_workbook,
+        )
+        runtime_entry = inventory.find_runtime_inventory_entry(
+            runtime_inventory,
+            sheet_code=resolved_sheet_code,
+            sheet_name=sheet_name,
+            whole_workbook=whole_workbook,
+        )
+    except (OSError, TypeError, ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        logger.error("guidance runtime inventory 无效 wp_id=%s wp_code=%s: %s", wp_id, wp_code, exc)
+        raise HTTPException(status_code=503, detail=f"编制说明清册无效：{exc}") from exc
+
+    from app.services.wp_guidance_service import GuidanceService
+
+    guidance_response = await GuidanceService().resolve_guidance(
+        parent_wp_code=wp_code,
+        requested_sheet_code=resolved_sheet_code,
+        wp_name=wp_name,
+        parent_template_path=template_path,
+        whole_workbook=whole_workbook,
+        runtime_entry=runtime_entry,
+        inventory_facts_digest=runtime_inventory.facts_digest,
+        inventory_run_id=runtime_inventory.run_id,
+    )
+    guidance_response.update(
+        {
+            "requested_sheet_name": sheet_name,
+            "sheet_identity_reason": sheet_identity_reason,
+            "whole_workbook": whole_workbook,
+            "inventory_run_id": runtime_inventory.run_id,
+            "inventory_facts_digest": runtime_inventory.facts_digest,
+            "inventory_entry_id": runtime_entry.entry_id if runtime_entry else None,
+            "inventory_entry_digest": runtime_entry.entry_digest if runtime_entry else None,
+            "runtime_guidance_status": runtime_entry.exact_status if runtime_entry else None,
+            "stale_reasons": list(runtime_entry.stale_reasons) if runtime_entry else [],
+            "guidance_required": runtime_entry.required if runtime_entry else None,
+            "guidance_context_kind": runtime_entry.context_kind if runtime_entry else None,
+            "template_authority_digest": authority_snapshot.facts_digest,
+            "template_authority_blockers": list(authority_snapshot.blockers),
+        }
+    )
+
     from app.core.config import settings
+
     guidance_response["ai_enabled"] = settings.WP_AI_SERVICE_ENABLED
 
+    # Task 9 AC#1：命中 If-None-Match 时以 304 短路，避免重复传输不变内容。
+    etag = guidance_response.get("etag")
+    if if_none_match and etag and if_none_match == etag:
+        return Response(status_code=304, headers={"ETag": etag})
     return guidance_response
 
 
 def _resolve_template_path(wp_code: str):
-    """尝试从 wp_templates 目录按 wp_code 推导模板路径
+    """AI chat 兼容入口；guidance GET 已复用实例优先的 render resolver。"""
+    from app.services.wp_template_finder import find_template_file_any
 
-    按循环字母（wp_code 首字母）+ 文件名模式查找。
-    """
-    from pathlib import Path
-
-    templates_root = Path(__file__).resolve().parent.parent.parent / "wp_templates"
-
-    if not templates_root.exists():
-        return None
-
-    # 从 wp_code 提取循环字母（首字母）
-    if not wp_code:
-        return None
-
-    cycle_letter = wp_code[0].upper()
-    cycle_dir = templates_root / cycle_letter
-
-    if not cycle_dir.exists():
-        return None
-
-    # 在循环目录下查找匹配的模板文件
-    # 尝试精确匹配：{wp_code}.xlsx, {wp_code}.docx
-    for ext in (".xlsx", ".xls", ".docx"):
-        candidate = cycle_dir / f"{wp_code}{ext}"
-        if candidate.exists():
-            return candidate
-
-    # 尝试模糊匹配：文件名包含 wp_code
-    for f in cycle_dir.iterdir():
-        if f.is_file() and wp_code in f.stem and f.suffix.lower() in (".xlsx", ".xls", ".docx"):
-            return f
-
-    return None
+    return find_template_file_any(wp_code)
 
 
 # ---------------------------------------------------------------------------
@@ -213,107 +324,6 @@ class AiGenerateTextRequest(BaseModel):
 
 class AiGenerateTextResponse(BaseModel):
     content: str
-
-
-# section → 默认 system prompt 映射（仅当调用方未显式传 prompt 时作兜底）。
-# 该端点对 section 不做拒绝式白名单校验，任意 section 均放行；此处仅为
-# voucher-review / cutoff-review 等已知场景提供针对性的默认复核提示词。
-_SECTION_PROMPTS: dict[str, str] = {
-    # 抽凭回写后复核：识别金额异常/无原始凭证/对方科目异常/重复入账/跨期等
-    "voucher-review": (
-        "你是资深审计师。请基于提供的抽样回写凭证，识别潜在异常"
-        "（金额异常、缺少原始凭证、对方科目异常、重复入账、跨期确认等），"
-        "逐条指出可疑凭证及理由，并给出复核意见，作为审计说明草稿供人工确认。"
-    ),
-    # 截止性测试回写后复核：识别收入/成本/费用的跨期确认问题
-    "cutoff-review": (
-        "你是资深审计师。请基于提供的截止性测试回写凭证，识别是否存在跨期确认"
-        "（收入/成本/费用提前或滞后确认）问题，逐条指出可疑凭证及理由，"
-        "并给出截止准确性的复核意见，作为审计说明草稿供人工确认。"
-    ),
-    # ─── J1 应付职工薪酬 附注披露说明（源模板逐段口径，spec j1-disclosure-template-alignment R5）
-    #
-    # 🔴 这 6 个 section 原本落到本模块末尾的通用兜底
-    # 「请根据提供的上下文信息生成专业的审计文本。」——等于放任模型自造披露内容。
-    # 每条 prompt 必须写明源模板 / CAS 9 口径 + 「不得虚构」约束。
-    "j1-disclosure-listed-short-term-note": (
-        "你是资深审计师，正在编制上市公司附注「应付职工薪酬 — 短期薪酬」的说明文字"
-        "（对应源模板说明区两条要求）。请分两点撰写：①本期为职工提供的各项非货币性福利的"
-        "形式及其计算依据；②依据短期利润分享计划提供的职工薪酬的计算依据。"
-        "口径依 CAS 9《职工薪酬》。**只使用上下文给出的数据，不得虚构福利形式、比例或金额**；"
-        "上下文未提供的事实用「（待补充：xxx）」占位，不要编造。"
-    ),
-    "j1-disclosure-listed-post-employment-note": (
-        "你是资深审计师，正在编制上市公司附注「应付职工薪酬 — 设定提存计划」的说明文字。"
-        "请说明企业设立或参与的设定提存计划的性质（基本养老保险、失业保险、企业年金等）、"
-        "计算缴费金额的公式或依据（计提基数与费率）。口径依 CAS 9；其他长期职工福利仅指"
-        "符合设定提存计划条件的部分。**不得虚构费率、缴费基数或计划名称**，"
-        "上下文未提供的用「（待补充：xxx）」占位。"
-    ),
-    "j1-disclosure-listed-severance-note": (
-        "你是资深审计师，正在编制上市公司附注「应付职工薪酬 — 辞退福利」的说明文字。"
-        "请说明辞退福利的性质、内容及计算依据，并区分预期在报告期末后 12 个月内完全支付的"
-        "部分与超过 1 年支付的部分（后者在长期应付职工薪酬列示）。口径依 CAS 9。"
-        "**不得虚构裁员方案、人数或补偿标准**，上下文未提供的用「（待补充：xxx）」占位。"
-    ),
-    "j1-disclosure-soe-soeNonMonetary-note": (
-        "你是资深审计师，正在编制国有企业附注「应付职工薪酬」说明第 1 条。"
-        "请说明企业本期为职工提供的各项非货币性福利的形式、金额及其计算依据"
-        "（国企口径下非货币性福利并入「其他短期薪酬」列示，不单独设行）。口径依 CAS 9。"
-        "**只使用上下文给出的数据，不得虚构福利形式或金额**，未提供的用「（待补充：xxx）」占位。"
-    ),
-    "j1-disclosure-soe-soeDefinedContribution-note": (
-        "你是资深审计师，正在编制国有企业附注「应付职工薪酬」说明第 2 条。"
-        "请说明企业设立或参与的设定提存计划的性质，以及计算缴费金额的公式或依据"
-        "（基本养老保险、失业保险、企业年金缴费的计提基数与费率）。口径依 CAS 9。"
-        "**不得虚构费率或缴费基数**，未提供的用「（待补充：xxx）」占位。"
-    ),
-    "j1-disclosure-soe-soeDefinedBenefit-note": (
-        "你是资深审计师，正在编制国有企业附注「应付职工薪酬」说明第 3 条。"
-        "若企业存在设定受益计划，请说明该计划的特征及与之相关的风险、在财务报表中确认的"
-        "金额及其变动、对未来现金流的影响、重大精算假设及有关敏感性分析等，"
-        "并注明「设定受益计划情况详见附注八、54」。口径依 CAS 9。"
-        "**不得虚构精算假设（折现率、死亡率、离职率等）或计划资产数据**；"
-        "若企业不存在设定受益计划，直接说明「本公司不存在设定受益计划」，不要编造内容。"
-    ),
-    # ─── D4 营业收入 8 个附注披露文本域（spec d4-four-table-extraction Task 7.2）────
-    # 前端 wpAiText 传 section='d4-disc-note-N'，本端点不做白名单拒绝，
-    # 但匹配到专属 prompt 后可避免退化到无指令泛化生成。
-    "d4-disc-note-1": (
-        "撰写（1）营业收入和营业成本主表的附注说明。依据审定表 D4-1 的主营/其他业务收入与成本"
-        "数据，说明构成与变动原因。不得虚构未提供的数据或事实，缺失部分用「待补充」占位。"
-    ),
-    "d4-disc-note-2": (
-        "撰写（2）按行业或产品类型划分的营业收入与营业成本说明。依据各行业/产品的本期与上期"
-        "收入及成本数据，说明各板块收入贡献与变动趋势。不得虚构未提供的行业或金额数据。"
-    ),
-    "d4-disc-note-3": (
-        "撰写（3）按地区划分的营业收入与营业成本说明。依据各地区本期与上期收入及成本数据，"
-        "说明地区分布特征及变动原因。不得虚构未提供的地区名称或金额，缺失用「待补充」占位。"
-    ),
-    "d4-disc-note-4": (
-        "撰写（4）收入分解信息的说明。依据按商品转让时间维度划分的分解表，说明各类别收入"
-        "确认时点或时段选择依据与占比情况。不得虚构分解维度或未提供的金额数据。"
-    ),
-    "d4-disc-note-5": (
-        "撰写（5）履约义务相关信息。依据 CAS14 收入准则，说明履约义务的履行时间、重要支付"
-        "条款、承诺转让商品的性质、代理人判断、退款义务与质量保证义务。"
-        "不得虚构未提供的合同条款或交易安排，缺失部分用「待补充」占位。"
-    ),
-    "d4-disc-note-6": (
-        "撰写（6）与剩余履约义务有关的信息。依据 CAS14 披露要求，说明分摊至尚未履行的"
-        "履约义务的交易价格总额及预计确认为收入的时间安排；如采用简化操作方法应提供定性说明。"
-        "不得虚构未提供的合同金额或时间安排。"
-    ),
-    "d4-disc-note-7": (
-        "撰写（7）重大合同变更或交易价格调整说明。依据实际变更事项说明内容、会计处理方法"
-        "及对收入确认的影响金额。不得虚构未提供的合同变更事项或金额。"
-    ),
-    "d4-disc-note-8": (
-        "撰写（8）试运行销售收入说明。依据准则解释第 15 号，说明固定资产试运行收入与研发"
-        "样品销售收入的确认依据、金额构成及成本抵减情况。不得虚构未提供的试运行数据或金额。"
-    ),
-}
 
 
 @router.post("/{wp_id}/ai/generate-text")
@@ -388,7 +398,6 @@ async def workpaper_ai_generate_text(
 # POST /api/workpapers/{wp_id}/ai-chat — 底稿级 AI 对话（SSE streaming）
 # ---------------------------------------------------------------------------
 
-_MAX_HISTORY_ROUNDS = 20  # 20 轮 = 40 条消息（user + assistant）
 
 
 @router.post("/{wp_id}/ai-chat")
@@ -512,137 +521,6 @@ async def workpaper_ai_chat(
         ),
         media_type="text/event-stream",
     )
-
-
-async def _stream_wp_chat(
-    wp_id: str,
-    query: str,
-    system_prompt: str,
-    user: User,
-    project_id: UUID,
-    wp_code: str = "",
-) -> AsyncGenerator[str, None]:
-    """SSE streaming 生成器：构建 messages → ai_service streaming → 收集回复 → 持久化
-
-    ⚠️ 自建独立 session：FastAPI 在端点 return StreamingResponse 时即关闭 get_db
-    的请求级 session，而本生成器在 response 返回后才被 ASGI 消费执行。
-
-    客户端断开时 try/finally 确保部分响应也被持久化到 DB。
-    """
-    from app.core.database import async_session
-    from app.services import doc_chat_persistence
-    from app.services.ai_service import AIService
-    from app.services.context_injector import ContextInjector
-
-    async with async_session() as db:
-        # ─── 检查 LLM 熔断器状态（提前 503 避免不必要的 RAG/history 查询）──
-        try:
-            ai_service = AIService(db)
-            if hasattr(ai_service, '_breaker') and ai_service._breaker and ai_service._breaker.state.name == 'open':
-                yield f"data: {json.dumps({'type': 'error', 'data': 'AI 服务暂不可用（熔断器已开启）'}, ensure_ascii=False)}\n\n"
-                yield f"data: {json.dumps({'type': 'done', 'data': {}}, ensure_ascii=False)}\n\n"
-                return
-        except Exception as e:
-            logger.debug("检查 LLM 熔断器状态失败，继续正常流程: %s", e)
-
-        # ─── RAG 知识库检索（降级：失败时继续无 RAG） ───────────────────
-        citations: list[dict] = []
-        rag_context = ""
-        try:
-            from app.services.knowledge_index_service import KnowledgeIndexService
-
-            ks = KnowledgeIndexService(db)
-            search_text = f"{wp_code} {query}"
-            hits = await ks.semantic_search(
-                project_id, search_text, scope="knowledge_doc", top_k=5
-            )
-            if hits:
-                rag_parts: list[str] = []
-                for hit in hits[:5]:
-                    text = hit.get("content", "")[:1000]  # 500 tokens ≈ 1000 chars
-                    source = hit.get("source_name", "")
-                    rag_parts.append(f"[{source}] {text}")
-                    citations.append({
-                        "source_type": "knowledge_doc",
-                        "source_id": hit.get("id", ""),
-                        "source_name": source,
-                    })
-                rag_context = "\n\n相关知识库参考：\n" + "\n---\n".join(rag_parts)
-        except Exception as e:
-            logger.warning(f"RAG 检索失败 (降级继续): {e}")
-
-        # 将 RAG 上下文追加到 system prompt
-        if rag_context:
-            system_prompt += rag_context
-
-        # ─── 发送 citations 作为首个 SSE 事件 ─────────────────────────────
-        if citations:
-            yield f"data: {json.dumps({'type': 'citations', 'data': citations}, ensure_ascii=False)}\n\n"
-
-        # 获取/创建会话（doc_type="workpaper", doc_id=wp_id）
-        session = await doc_chat_persistence.get_or_create_session(
-            db, "workpaper", wp_id, user.id, project_id
-        )
-
-        # 读取历史（限 20 轮 = 40 条消息）
-        history = await doc_chat_persistence.get_history(
-            db, "workpaper", wp_id, user.id, limit=_MAX_HISTORY_ROUNDS * 2
-        )
-
-        # 构建 LLM messages: [system] + history + [user query]
-        messages: list[dict[str, str]] = [
-            {"role": "system", "content": system_prompt},
-        ]
-        # 添加历史消息（最近 20 轮）
-        for msg in history[-((_MAX_HISTORY_ROUNDS) * 2):]:
-            messages.append({"role": msg["role"], "content": msg["content"]})
-        # 当前用户消息
-        messages.append({"role": "user", "content": query})
-
-        # 合并 system 消息（vLLM 约束）
-        messages = ContextInjector.merge_system_messages(messages)
-
-        # 记录用户消息到 DB + 提交
-        await doc_chat_persistence.append_message(db, session, "user", query)
-        await db.commit()
-
-        # 流式调用 ai_service — try/finally 确保部分响应持久化
-        full_response = ""
-        response_saved = False
-
-        try:
-            try:
-                stream_gen = await ai_service.chat_completion(
-                    messages=messages,
-                    stream=True,
-                    temperature=0.3,
-                )
-                async for chunk in stream_gen:
-                    full_response += chunk
-                    yield f"data: {json.dumps({'type': 'content', 'data': chunk}, ensure_ascii=False)}\n\n"
-            except Exception as e:
-                logger.exception("workpaper_ai_chat streaming 失败")
-                error_msg = "AI 服务暂不可用"
-                if "熔断" in str(e) or "circuit" in str(e).lower():
-                    error_msg = "AI 服务暂不可用（熔断器已开启）"
-                yield f"data: {json.dumps({'type': 'error', 'data': error_msg}, ensure_ascii=False)}\n\n"
-
-            # 记录助手回复到 DB + 提交（正常完成路径）
-            if full_response:
-                await doc_chat_persistence.append_message(db, session, "assistant", full_response)
-            await db.commit()
-            response_saved = True
-
-            # 发送完成事件
-            yield f"data: {json.dumps({'type': 'done', 'data': {}}, ensure_ascii=False)}\n\n"
-        finally:
-            # 确保部分响应也持久化（客户端断开时 generator 被 close）
-            if not response_saved and full_response:
-                try:
-                    await doc_chat_persistence.append_message(db, session, "assistant", full_response)
-                    await db.commit()
-                except Exception as e:
-                    logger.warning(f"部分响应持久化失败: {e}")
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,21 @@
+{
+  "task": 7,
+  "recordedAt": "2026-09-09T07:21:15.453772+00:00",
+  "catalogRunId": "cb16ff64-753d-4872-a3c7-cfc897f70bdc",
+  "catalogDigest": "ef2de76b724e2a29ff20c4087b66072fcf43067b618a7e8e9df0b5db21c162bf",
+  "stageAccounting": {
+    "counters": {
+      "gross_required": 373,
+      "effective_required": 373,
+      "complete": 0,
+      "pending": 373,
+      "blocked": 0,
+      "valid_exempted": 0,
+      "out_of_scope": 0
+    },
+    "pass": false
+  },
+  "workcardCount": 373,
+  "staticEntryCount": 373,
+  "policy": "no_generic_autofill"
+}

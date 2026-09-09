@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S10",
   "title": "利用专家工作 — S10 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录利用外部专家工作时的胜任能力评估和工作协调。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录利用外部专家工作时的胜任能力评估和工作协调。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "34d47eb65782447eed49ddd9adff02652536b69a3425d3f55e65b73018b94370",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "1fd4dcd2d7ff1b4778abb2c1c55ded05a536c4e66c8fd00902abb16888a05871"
+  }
 }

@@ -41,73 +41,131 @@
 import { ref, computed, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { api } from '@/services/apiProxy'
 import { eventBus, type CrossRefUpdatedPayload } from '@/utils/eventBus'
-import type { SheetContentType, FieldSourceContract } from '@/types/workpaperSemanticContract'
+import { resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
+import type { SheetContentType } from '@/types/workpaperSemanticContract'
+import type { WpComponentType } from '@/types/componentCapabilities.generated'
+import type { RenderConfig, SheetRenderConfig } from '@/types/renderConfig'
+import { projectSheetUid } from './sheetUidProjection'
+
+export type { WpComponentType } from '@/types/componentCapabilities.generated'
+export type {
+  CrossRefEntry,
+  RenderConfig,
+  RenderConfigWire,
+  SheetRenderConfig,
+  SheetRenderConfigWire,
+} from '@/types/renderConfig'
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
-/** componentType 白名单（9 类 + univer + skip） */
-export type WpComponentType =
-  | 'a-program-console'
-  | 'b-index'
-  | 'c-note-table'
-  | 'd-form-table'
-  | 'd-form-paragraph'
-  | 'd-form-qa'
-  | 'd-form-confirmation'
-  | 'd-form-review'
-  | 'e-control-test'
-  | 'h-static-doc'
-  | 'custom'
-  | 'audit-sheet'
-  | 'bad-debt-sheet'
-  | 'univer'
-  | 'skip'
-
-/** 跨底稿引用条目 */
-export interface CrossRefEntry {
-  wp_code: string
-  cell: string
+/** Guidance、公式与宿主导航共享的结构化 sheet 上下文。 */
+export interface WorkpaperSheetContext {
+  sheetName: string
+  sheetCode: string | null
+  /** G-ID stable uid from render-config; never invented from display name. */
+  sheetUid: string | null
+  sheetUidNullReason: string | null
+  host: 'html' | 'univer' | 'onlyoffice'
+  wholeWorkbook: boolean
+  /** Race stamps from HtmlStableContextEmitter (or Univer/OO host bridge). */
+  ownerEpoch?: number
+  contextRevision?: number
 }
 
-/** 单 sheet 渲染配置 */
-export interface SheetRenderConfig {
-  sheet_name: string
-  componentType: WpComponentType
-  schema: Record<string, any>
-  html_data: Record<string, any>
-  cross_refs: CrossRefEntry[]
-  /** Task 2.3: sheet 的业务语义类型（schema 显式 > 后端推断 > 前端启发式） */
-  sheet_type?: SheetContentType
-  /** Task 2.3: 关键字段来源契约映射 */
-  field_sources?: Record<string, FieldSourceContract>
-  /** Task 2.3: 关联程序状态引用（program_code 列表） */
-  program_status_refs?: string[]
+export interface EngineSheetIdentity {
+  id: string
+  name: string
 }
 
-/** render-config 端点完整响应 */
-export interface RenderConfig {
-  wp_id: string
-  wp_code: string
-  project_id: string
-  scope: 'standalone' | 'consolidated' | 'parent_only' | 'both'
-  is_real_workpaper: boolean
-  template_version: string
-  sheets: SheetRenderConfig[]
-  /** Sprint 4 Task 16: 自动刷数结果 */
-  fill_results?: Record<string, {
-    value: number | string | null
-    source: string
-    label: string
-    status: 'ok' | 'unavailable'
-  }>
-  /** B15/合并类: 重定向标志 */
-  redirect?: boolean
-  /** 重定向目标模块 */
-  delegated_module?: string
-  /** 重定向目标路径（如 /materiality） */
-  target_path?: string
-  /** 项目审计年度（project_audit_year 通用规则） */
-  audit_year?: number | null
+/**
+ * 从 render-config 的可见 sheet 中解析定位器。
+ * 初始 deep-link、页签、导航和 locate 共用同一名称归一化规则。
+ */
+export function resolveRenderSheet(
+  sheets: readonly SheetRenderConfig[],
+  locator: string | null | undefined,
+): SheetRenderConfig | null {
+  const resolvedName = resolveSheetNameByDeepLink(
+    sheets.map((sheet) => sheet.sheet_name),
+    locator,
+  )
+  if (!resolvedName) return null
+  return sheets.find((sheet) => sheet.sheet_name === resolvedName) ?? null
+}
+
+/** 将后端 sheet identity 投影为 HTML/OnlyOffice 的统一宿主 context。 */
+export function resolveWorkpaperSheetContext(
+  configWpId: string | null | undefined,
+  expectedWpId: string,
+  sheetName: string,
+  sheet: SheetRenderConfig | null | undefined,
+  wholeWorkbook = false,
+  parentWpCode: string | null | undefined = null,
+): WorkpaperSheetContext | null {
+  if (!configWpId || configWpId !== expectedWpId || !sheetName) return null
+  const isWholeWorkbook = wholeWorkbook || sheet?.whole_workbook === true
+  const isOnlyOffice = isWholeWorkbook
+    || sheet?.componentType === 'onlyoffice-sheet'
+    || sheet?.html_data?.onlyoffice === true
+  const sheetCode = isWholeWorkbook ? null : (sheet?.sheet_code ?? null)
+  const wpCode = parentWpCode?.trim() || ''
+  const projected = projectSheetUid({
+    parentWpCode: wpCode,
+    sheetCode,
+    sheetName,
+    wholeWorkbook: isWholeWorkbook,
+    explicitUid: sheet?.sheet_uid,
+    codeReason: sheet?.sheet_uid_null_reason || sheet?.sheet_code_reason,
+  })
+  // Prefer server-annotated uid when present; client projection is fallback only.
+  const sheetUid = sheet?.sheet_uid?.trim() || projected.sheetUid
+  const sheetUidNullReason = sheetUid
+    ? null
+    : (sheet?.sheet_uid_null_reason ?? projected.nullReason)
+  return {
+    sheetName,
+    sheetCode,
+    sheetUid,
+    sheetUidNullReason,
+    host: isOnlyOffice ? 'onlyoffice' : 'html',
+    wholeWorkbook: isWholeWorkbook,
+  }
+}
+
+/** Univer 的 engine sheet id 先映射真实名称，再消费 render-config 的 canonical uid/code。 */
+export function resolveUniverSheetContext(
+  engineSheets: readonly EngineSheetIdentity[],
+  activeSheetId: string | null | undefined,
+  renderSheets: readonly SheetRenderConfig[],
+  parentWpCode: string | null | undefined = null,
+): WorkpaperSheetContext | null {
+  if (!activeSheetId) return null
+  const engineSheet = engineSheets.find((sheet) => sheet.id === activeSheetId)
+  if (!engineSheet) return null
+  const renderSheet = resolveRenderSheet(renderSheets, engineSheet.name)
+  const sheetName = renderSheet?.sheet_name ?? engineSheet.name
+  const sheetCode = renderSheet?.sheet_code ?? null
+  const wpCode = parentWpCode?.trim() || ''
+  const projected = projectSheetUid({
+    parentWpCode: wpCode,
+    sheetCode,
+    sheetName,
+    wholeWorkbook: false,
+    explicitUid: renderSheet?.sheet_uid,
+    codeReason: renderSheet?.sheet_uid_null_reason || renderSheet?.sheet_code_reason,
+  })
+  const sheetUid = renderSheet?.sheet_uid?.trim() || projected.sheetUid
+  const sheetUidNullReason = sheetUid
+    ? null
+    : (renderSheet?.sheet_uid_null_reason ?? projected.nullReason)
+  return {
+    sheetName,
+    sheetCode,
+    sheetUid,
+    sheetUidNullReason,
+    host: 'univer',
+    wholeWorkbook: false,
+  }
 }
 
 // ─── Composable ──────────────────────────────────────────────────────────────

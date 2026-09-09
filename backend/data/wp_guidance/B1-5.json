@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B1-5",
   "title": "项目时间预算表 — B1-5 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "编制审计项目各阶段的工时预算和时间安排计划。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "编制审计项目各阶段的工时预算和时间安排计划。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "073547571bfe33afaa1ae1aeba0b95a117793778502f69eb22b274e5b76060a3",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "b44950f27ddc45846d0af9773bad97ae0d1e63fe7787c2aec239830b95e073ed"
+  }
 }

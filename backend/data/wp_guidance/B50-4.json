@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B50-4",
   "title": "B50-4 风险评估细分子表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿为 B50 风险评估主表的明细子表，用于记录特定认定层次重大错报风险的详细评估过程及应对方案。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿为 B50 风险评估主表的明细子表，用于记录特定认定层次重大错报风险的详细评估过程及应对方案。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 描述已识别的具体风险及其来源\n2. 评估风险的可能性和影响程度\n3. 确定风险等级（高/中/低）\n4. 制定认定层次进一步审计程序"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 描述已识别的具体风险及其来源\n2. 评估风险的可能性和影响程度\n3. 确定风险等级（高/中/低）\n4. 制定认定层次进一步审计程序",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 特别风险须单独标注并设计专门应对程序\n• 风险评估结论应与各循环程序表联动\n• 期间风险变化须及时更新评估"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 特别风险须单独标注并设计专门应对程序\n• 风险评估结论应与各循环程序表联动\n• 期间风险变化须及时更新评估",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "25a6f5a303d7881148991171a62be4ba0505539f6bb267c18f1436efcaf32414",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "63637bd299b29d843ad526acc50a8acace1dd29651988dc8df910d3ed8951fba"
+  }
 }

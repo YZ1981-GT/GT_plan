@@ -8,7 +8,54 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
+
+
+def _validated_runtime_entry(
+    *,
+    code: str = "A3-8",
+    status: str = "exact",
+    context_kind: str = "sheet",
+    blockers: tuple[str, ...] = (),
+):
+    from app.services.guidance_inventory import GuidanceSourceFact
+
+    facts = (
+        GuidanceSourceFact(
+            kind="static_guidance",
+            ref=f"/guidance/{code}.json",
+            digest="a" * 64,
+            origin="ok",
+        ),
+        GuidanceSourceFact(
+            kind="source_ref_validation",
+            ref=f"/guidance/{code}.json#source_refs",
+            digest="b" * 64,
+            origin="valid",
+        ),
+    )
+    entry = SimpleNamespace(
+        entry_id=f"entry-{code}",
+        entry_digest="c" * 64,
+        parent_wp_code="A3",
+        sheet_code=code,
+        sheet_name=code,
+        context_kind=context_kind,
+        required=status != "inherited",
+        exact_status=status,
+        missing_sections=(),
+        exact_blockers=blockers,
+        stale_reasons=(),
+        source_facts=facts,
+    )
+    entry.version_facts = lambda: {
+        "entry_id": entry.entry_id,
+        "entry_digest": entry.entry_digest,
+        "exact_status": entry.exact_status,
+    }
+    return entry
 
 
 # ---------------------------------------------------------------------------
@@ -203,3 +250,302 @@ class TestGetGuidance:
         response = await svc.get_guidance(wp_code="A17", template_path=None)
         assert response["source"] == "static_json"
         assert len(response["guidance"]["sections"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# 4. child/parent resolution 与版本元数据
+# ---------------------------------------------------------------------------
+
+
+class TestGuidanceResolution:
+    @staticmethod
+    def _result(source="static_json", *, complete=True):
+        from app.services.guidance_extractor import GuidanceResult, GuidanceSection
+        from app.services.guidance_inventory import CANONICAL_SECTION_KEYS
+
+        keys = CANONICAL_SECTION_KEYS if complete else ("steps",)
+        sections = [
+            GuidanceSection(
+                heading=key,
+                content=f"{key} content",
+                order=index,
+                key=key,
+                source_refs=[{"kind": "xlsx", "path": "backend/wp_templates/A/example.xlsx"}]
+                if source not in {"typed_fallback", "fallback"} else [],
+            )
+            for index, key in enumerate(keys)
+        ]
+        return GuidanceResult(
+            wp_code="A3-8",
+            source=source,
+            sections=sections,
+            raw_text="\n".join(section.content for section in sections),
+        )
+
+    @pytest.mark.asyncio
+    async def test_child_exact_short_circuits_parent_full_chain(self):
+        from unittest.mock import AsyncMock
+        from app.services.wp_guidance_service import GuidanceService
+
+        service = GuidanceService()
+        child = self._result()
+        service._extractor.extract_exact_static = AsyncMock(return_value=child)
+        service._extractor.extract_full = AsyncMock()
+
+        response = await service.resolve_guidance(
+            parent_wp_code="A3",
+            requested_sheet_code="A3-8",
+            wp_name="商誉减值测试",
+            runtime_entry=_validated_runtime_entry(),
+        )
+
+        assert response["requested_sheet_code"] == "A3-8"
+        assert response["resolved_wp_code"] == "A3-8"
+        assert response["inherited_from_parent"] is False
+        assert response["resolution_status"] == "exact"
+        assert response["resolution_reason"] == "child_exact_static"
+        service._extractor.extract_full.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_child_miss_enters_parent_typed_chain_without_child_template(self):
+        from unittest.mock import AsyncMock
+        from pathlib import Path
+        from app.services.wp_guidance_service import GuidanceService
+
+        service = GuidanceService()
+        parent = self._result("typed_fallback", complete=False)
+        service._extractor.extract_exact_static = AsyncMock(return_value=None)
+        service._extractor.extract_full = AsyncMock(return_value=parent)
+        template = Path("backend/wp_templates/A/parent.xlsx")
+
+        response = await service.resolve_guidance(
+            parent_wp_code="A3",
+            requested_sheet_code="A3-99",
+            parent_template_path=template,
+        )
+
+        service._extractor.extract_exact_static.assert_awaited_once_with(
+            "A3-99", validated_entry=None
+        )
+        service._extractor.extract_full.assert_awaited_once_with("A3", template)
+        assert response["resolved_wp_code"] == "A3"
+        assert response["inherited_from_parent"] is True
+        assert response["resolution_status"] == "parent_inherited"
+        assert response["source"] == "typed_fallback"
+        assert response["resolution_reason"].startswith("child_missing:")
+
+    @pytest.mark.asyncio
+    async def test_version_and_digest_are_stable_for_same_source_facts(self):
+        from unittest.mock import AsyncMock
+        from app.services.wp_guidance_service import GuidanceService
+
+        service = GuidanceService()
+        parent = self._result(complete=True)
+        service._extractor.extract_full = AsyncMock(return_value=parent)
+
+        first = await service.get_guidance("A3", "商誉")
+        second = await service.get_guidance("A3", "商誉")
+
+        assert first["guidance_version"] == second["guidance_version"]
+        assert first["source_digest"] == second["source_digest"]
+        assert first["guidance_version"].startswith("guidance-v2-")
+        assert first["generated_at"]
+        assert first["missing_sections"] == []
+        assert first["resolution_status"] == "invalid"
+        assert first["exact_blockers"] == ["source_ref_context_missing"]
+
+
+class TestRuntimeInventoryVersioning:
+    @staticmethod
+    def _entry(*, component_type: str = "d-form-table", stale: bool = False):
+        from app.services.guidance_inventory import (
+            GuidanceInventoryEntry,
+            build_runtime_guidance_inventory,
+        )
+
+        static = GuidanceInventoryEntry(
+            wp_code="A3-8",
+            path="/guidance/A3-8.json",
+            parse_status="ok",
+            source_digest="a" * 64,
+            exact_status="exact",
+            missing_sections=(),
+            reason="ok",
+            source_ref_status="valid",
+            source_ref_facts_digest="d" * 64,
+        )
+        render = {
+            "sheet_code": "A3-8",
+            "sheet_name": "商誉减值测试 A3-8",
+            "sheet_code_reason": "explicit_code",
+            "whole_workbook": False,
+            "componentType": component_type,
+        }
+        first = build_runtime_guidance_inventory(
+            parent_wp_code="A3",
+            render_sheets=[render],
+            static_entries=[static],
+            include_whole_workbook_context=False,
+        )
+        if not stale:
+            return first.entries[0], first.facts_digest
+        changed = build_runtime_guidance_inventory(
+            parent_wp_code="A3",
+            render_sheets=[{**render, "componentType": "onlyoffice"}],
+            static_entries=[static],
+            prior_entry_digests={first.entries[0].entry_id: first.entries[0].entry_digest},
+            include_whole_workbook_context=False,
+        )
+        return changed.entries[0], changed.facts_digest
+
+    @staticmethod
+    def _complete_result():
+        from app.services.guidance_extractor import GuidanceResult, GuidanceSection
+        from app.services.guidance_inventory import CANONICAL_SECTION_KEYS
+
+        sections = [
+            GuidanceSection(
+                heading=key,
+                content=f"{key} content",
+                order=index,
+                key=key,
+                source_refs=[{"kind": "xlsx", "path": "backend/wp_templates/A/example.xlsx"}],
+            )
+            for index, key in enumerate(CANONICAL_SECTION_KEYS)
+        ]
+        return GuidanceResult(
+            wp_code="A3-8",
+            source="static_json",
+            sections=sections,
+            raw_text="\n".join(section.content for section in sections),
+        )
+
+    @pytest.mark.asyncio
+    async def test_runtime_source_fact_changes_response_version(self):
+        from unittest.mock import AsyncMock
+        from app.services.wp_guidance_service import GuidanceService
+
+        service = GuidanceService()
+        service._extractor.extract_exact_static = AsyncMock(return_value=self._complete_result())
+        first_entry, first_inventory_digest = self._entry(component_type="d-form-table")
+        second_entry, second_inventory_digest = self._entry(component_type="onlyoffice")
+
+        first = await service.resolve_guidance(
+            parent_wp_code="A3",
+            requested_sheet_code="A3-8",
+            runtime_entry=first_entry,
+            inventory_facts_digest=first_inventory_digest,
+            inventory_run_id="run-a",
+        )
+        second = await service.resolve_guidance(
+            parent_wp_code="A3",
+            requested_sheet_code="A3-8",
+            runtime_entry=second_entry,
+            inventory_facts_digest=second_inventory_digest,
+            inventory_run_id="run-b",
+        )
+
+        assert first["guidance_version"] != second["guidance_version"]
+        assert first["source_digest"] != second["source_digest"]
+        assert first["inventory_entry_id"] == second["inventory_entry_id"]
+        assert first["inventory_entry_digest"] != second["inventory_entry_digest"]
+        assert first["inventory_run_id"] == "run-a"
+        assert second["inventory_run_id"] == "run-b"
+
+    @pytest.mark.asyncio
+    async def test_runtime_unmapped_blocker_prevents_complete_result_from_becoming_exact(self):
+        from unittest.mock import AsyncMock
+        from app.services.guidance_inventory import (
+            GuidanceInventoryEntry,
+            build_runtime_guidance_inventory,
+        )
+        from app.services.wp_guidance_service import GuidanceService
+
+        static = GuidanceInventoryEntry(
+            wp_code="A3-8",
+            path="/guidance/A3-8.json",
+            parse_status="ok",
+            source_digest="c" * 64,
+            exact_status="missing",
+            missing_sections=(),
+            reason="incomplete:unmapped_sections",
+            exact_blockers=("unmapped_sections",),
+            source_ref_status="valid",
+            source_ref_facts_digest="e" * 64,
+        )
+        inventory = build_runtime_guidance_inventory(
+            parent_wp_code="A3-8",
+            render_sheets=[{
+                "sheet_code": "A3-8",
+                "sheet_name": "商誉减值测试 A3-8",
+                "sheet_code_reason": "explicit_code",
+                "whole_workbook": False,
+                "componentType": "d-form-table",
+            }],
+            static_entries=[static],
+            include_whole_workbook_context=False,
+        )
+        service = GuidanceService()
+        service._extractor.extract_full = AsyncMock(return_value=self._complete_result())
+
+        response = await service.resolve_guidance(
+            parent_wp_code="A3-8",
+            requested_sheet_code="A3-8",
+            runtime_entry=inventory.entries[0],
+            inventory_facts_digest=inventory.facts_digest,
+            inventory_run_id="run-unmapped",
+        )
+
+        assert response["resolution_status"] == "missing"
+        assert response["runtime_guidance_status"] == "missing"
+        assert response["missing_sections"] == []
+        assert response["exact_blockers"] == ["unmapped_sections"]
+
+    @pytest.mark.asyncio
+    async def test_stale_runtime_entry_overrides_parent_inherited_success_wording(self):
+        from unittest.mock import AsyncMock
+        from app.services.wp_guidance_service import GuidanceService
+
+        service = GuidanceService()
+        service._extractor.extract_exact_static = AsyncMock(return_value=None)
+        service._extractor.extract_full = AsyncMock(return_value=self._complete_result())
+        stale_entry, inventory_digest = self._entry(stale=True)
+
+        response = await service.resolve_guidance(
+            parent_wp_code="A3",
+            requested_sheet_code="A3-8",
+            runtime_entry=stale_entry,
+            inventory_facts_digest=inventory_digest,
+            inventory_run_id="run-stale",
+        )
+
+        assert response["inherited_from_parent"] is True
+        assert response["resolution_status"] == "stale"
+        assert response["runtime_guidance_status"] == "stale"
+        assert response["stale_reasons"] == ["source_facts_changed"]
+        assert response["guidance_required"] is True
+
+    @pytest.mark.asyncio
+    async def test_whole_workbook_uses_parent_chain_with_explicit_context(self):
+        from unittest.mock import AsyncMock
+        from app.services.wp_guidance_service import GuidanceService
+
+        service = GuidanceService()
+        service._extractor.extract_full = AsyncMock(return_value=self._complete_result())
+
+        response = await service.resolve_guidance(
+            parent_wp_code="A3",
+            requested_sheet_code=None,
+            whole_workbook=True,
+            runtime_entry=_validated_runtime_entry(
+                code="A3",
+                status="inherited",
+                context_kind="whole_workbook",
+            ),
+        )
+
+        assert response["requested_sheet_code"] is None
+        assert response["resolved_wp_code"] == "A3"
+        assert response["inherited_from_parent"] is True
+        assert response["resolution_status"] == "parent_inherited"
+        assert response["resolution_reason"] == "whole_workbook_parent_context"

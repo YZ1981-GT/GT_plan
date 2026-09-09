@@ -1,0 +1,15 @@
+{
+  "contractVersion": "1.0",
+  "ackId": "ack-002",
+  "handoffId": "handoff-finalized-001",
+  "handoffDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "consumer": "guidance",
+  "consumerVersion": "guid-impl-1.0.0",
+  "verdict": "REJECTED",
+  "validatedDigests": {},
+  "reasonCodes": [
+    "missing-section:formulas",
+    "invalid-locator:custom_artifact"
+  ],
+  "recordedAt": "2026-09-07T00:00:00Z"
+}

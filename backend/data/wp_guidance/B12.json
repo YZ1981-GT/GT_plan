@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B12",
   "title": "了解被审计单位—组织架构与治理 — B12 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "了解被审计单位的组织架构、治理结构和内部管理体系。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "了解被审计单位的组织架构、治理结构和内部管理体系。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "cf8cb6c698c7f07555b81a577da92447d9307288bed0194269ab2e5ecbe03cce",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "c6b0e351cb7c216b69ae22cf826858d28a98356aa11670bcbb6348b894a7d00f"
+  }
 }

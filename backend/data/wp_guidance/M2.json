@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "M2",
   "title": "股东权益循环 — M2 底稿编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录股东权益循环相关审计程序的执行结果和发现。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录股东权益循环相关审计程序的执行结果和发现。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "3e5c391f8c72ed58c83e62a0454e49389d388b8aae577877490add6e95f2fbab",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "2cbe02533703d33bde27d6020fdf2a1b4407703d9983f361f78568709e997bcf"
+  }
 }

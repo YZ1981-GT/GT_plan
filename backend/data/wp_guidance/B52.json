@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B52",
   "title": "B52 风险汇总评估表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿汇总各循环认定层次风险评估结果，形成项目整体风险评估结论，为审计资源分配提供决策支持。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿汇总各循环认定层次风险评估结果，形成项目整体风险评估结论，为审计资源分配提供决策支持。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 汇总 B50/B51 系列各子表的评估结论\n2. 编制风险矩阵（认定×循环）\n3. 确定高风险领域及对应资源倾斜\n4. 与项目合伙人讨论并确认整体风险评估"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 汇总 B50/B51 系列各子表的评估结论\n2. 编制风险矩阵（认定×循环）\n3. 确定高风险领域及对应资源倾斜\n4. 与项目合伙人讨论并确认整体风险评估",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 风险汇总应覆盖所有重要科目和交易类别\n• 关注风险之间的关联性和叠加效应\n• 作为 B60 总体审计策略的核心输入"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 风险汇总应覆盖所有重要科目和交易类别\n• 关注风险之间的关联性和叠加效应\n• 作为 B60 总体审计策略的核心输入",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "bc504ccccfa9787ce5f4e2419dc8a338dff751ab924ab4120557c4af7027c0f4",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "5e1c3dd739ad63a60458f378a1968b274d01afb017fe2f5cbb3e058d3f388414"
+  }
 }

@@ -1,26 +1,41 @@
 {
+  "schema_version": 2,
   "wp_code": "S13",
   "title": "利用管理层的专家编制的信息形成审计证据 — S13 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录对管理层聘请的专家工作的审计程序执行情况，评价管理层专家的胜任能力、客观性及工作适当性，确定是否可以利用其编制的信息作为审计证据。适用于管理层使用专家（如评估师、精算师）编制财务报表相关信息的项目。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录对管理层聘请的专家工作的审计程序执行情况，评价管理层专家的胜任能力、客观性及工作适当性，确定是否可以利用其编制的信息作为审计证据。适用于管理层使用专家（如评估师、精算师）编制财务报表相关信息的项目。",
+      "source_refs": []
     },
     {
-      "heading": "二、适用准则",
-      "content": "• ISA 500.8 / CAS 1301 利用管理层的专家的工作\n• 中注协执业准则——审计证据\n• CAS 39 公允价值计量（涉及管理层专家估值时）"
+      "key": "steps",
+      "title": "三、编制步骤",
+      "content": "1. S13 程序表：明确管理层利用专家的原因和范围\n2. S13-1：评价管理层专家的胜任能力、专业素质和客观性\n3. S13-2：了解管理层专家的工作（方法/假设/数据来源）\n4. S13-3：评价管理层专家工作的适当性（总体评价）\n5. S13-3-1：审阅管理层专家报告\n6. S13-3-2/3-3/3-4：按domain分支详细评价（通用/股份支付/金融工具公允价值）",
+      "source_refs": []
     },
     {
-      "heading": "三、编制步骤",
-      "content": "1. S13 程序表：明确管理层利用专家的原因和范围\n2. S13-1：评价管理层专家的胜任能力、专业素质和客观性\n3. S13-2：了解管理层专家的工作（方法/假设/数据来源）\n4. S13-3：评价管理层专家工作的适当性（总体评价）\n5. S13-3-1：审阅管理层专家报告\n6. S13-3-2/3-3/3-4：按domain分支详细评价（通用/股份支付/金融工具公允价值）"
+      "key": "common_errors",
+      "title": "五、注意事项",
+      "content": "• 管理层专家与CPA专家（S12）的区别：S13处理的是管理层自行聘请的专家\n• 须评估管理层专家是否受到管理层的不当影响\n• 管理层专家的假设和方法须与行业惯例一致\n• 即使利用管理层专家的工作，也可能需要实施额外审计程序\n• domain 分支按实际情况选择，未选择的分支无需填写",
+      "source_refs": []
+    }
+  ],
+  "unmapped_sections": [
+    {
+      "title": "二、适用准则",
+      "content": "• ISA 500.8 / CAS 1301 利用管理层的专家的工作\n• 中注协执业准则——审计证据\n• CAS 39 公允价值计量（涉及管理层专家估值时）",
+      "source_refs": [],
+      "source_index": 1,
+      "classification": "unmapped"
     },
     {
-      "heading": "四、多分支渲染",
-      "content": "• general（通用）→ S13-3-2：适用于大多数评估/精算领域\n• share-based-payment（股份支付）→ S13-3-3：股份支付公允价值相关的管理层专家评价\n• financial-instrument-fair-value（金融工具公允价值）→ S13-3-4：金融工具公允价值相关的管理层专家评价\n• 根据项目实际情况选择对应分支"
-    },
-    {
-      "heading": "五、注意事项",
-      "content": "• 管理层专家与CPA专家（S12）的区别：S13处理的是管理层自行聘请的专家\n• 须评估管理层专家是否受到管理层的不当影响\n• 管理层专家的假设和方法须与行业惯例一致\n• 即使利用管理层专家的工作，也可能需要实施额外审计程序\n• domain 分支按实际情况选择，未选择的分支无需填写"
+      "title": "四、多分支渲染",
+      "content": "• general（通用）→ S13-3-2：适用于大多数评估/精算领域\n• share-based-payment（股份支付）→ S13-3-3：股份支付公允价值相关的管理层专家评价\n• financial-instrument-fair-value（金融工具公允价值）→ S13-3-4：金融工具公允价值相关的管理层专家评价\n• 根据项目实际情况选择对应分支",
+      "source_refs": [],
+      "source_index": 3,
+      "classification": "unmapped"
     }
   ],
   "recommended_questions": [
@@ -29,5 +44,14 @@
     "什么情况下需要对管理层专家的工作实施额外程序？",
     "S12和S13的分工边界如何界定？"
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "e2ede7de5c71d3d230efb6ed4bf2547f3d1875def0915d36f0f8c70ea545ddf1",
+    "legacy_section_count": 5,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 2,
+    "canonical_body_digest": "d9ec214e5a6a91fc0bd77550a28c8fec8ffaacdf0278c2a319ad9d1516dd654a"
+  }
 }

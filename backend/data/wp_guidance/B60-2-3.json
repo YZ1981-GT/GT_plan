@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B60-2-3",
   "title": "IT审计计划备忘录 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录 IT 团队参与程度、相关信息处理控制与 ITGC 测试计划、时间安排、缺陷评估与沟通机制，作为总体审计策略在 IT 领域的补充。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录 IT 团队参与程度、相关信息处理控制与 ITGC 测试计划、时间安排、缺陷评估与沟通机制，作为总体审计策略在 IT 领域的补充。",
+      "source_refs": []
     },
     {
-      "heading": "二、使用方法",
-      "content": "1. 首次承接或系统重大变更时，IT 应参加计划阶段项目组讨论后定稿\n2. 明确由 IT 测试的控制/数据与系统清单\n3. 发现事项写入 IT 审计总结备忘录并与项目组评估对财报程序的影响"
+      "key": "steps",
+      "title": "二、使用方法",
+      "content": "1. 首次承接或系统重大变更时，IT 应参加计划阶段项目组讨论后定稿\n2. 明确由 IT 测试的控制/数据与系统清单\n3. 发现事项写入 IT 审计总结备忘录并与项目组评估对财报程序的影响",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 备忘录范围变更须回写 B60 第十五章（如重大）\n• 关联：B60 / B60-2-1 / B60-2-2 / C 循环 IT 底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 备忘录范围变更须回写 B60 第十五章（如重大）\n• 关联：B60 / B60-2-1 / B60-2-2 / C 循环 IT 底稿",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "508c80a9dfa493f90f4b10f27d4ec64b94712e52b20a3c32b39ecc0b9efd189c",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "5097a5fb8046af0b25e4b6a886be11771241eafa12235e7e60c25f86e40eca2b"
+  }
 }

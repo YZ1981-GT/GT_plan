@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B23-15",
   "title": "B23-15 IT 贯穿性控制了解 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿记录对信息技术贯穿性控制的了解，包括程序变更、访问安全、数据备份恢复、IT运营等 ITGC 控制的穿行测试。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿记录对信息技术贯穿性控制的了解，包括程序变更、访问安全、数据备份恢复、IT运营等 ITGC 控制的穿行测试。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 识别关键 IT 应用系统及其控制点\n2. 对每项 ITGC 控制执行穿行测试\n3. 评价 IT 控制设计的有效性\n4. 记录控制缺陷及改进建议"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 识别关键 IT 应用系统及其控制点\n2. 对每项 ITGC 控制执行穿行测试\n3. 评价 IT 控制设计的有效性\n4. 记录控制缺陷及改进建议",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• ITGC 缺陷可能导致自动化控制全部不可依赖\n• 关注特权账户管理和职责分离\n• IT 控制缺陷评价应与 C22 底稿联动"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• ITGC 缺陷可能导致自动化控制全部不可依赖\n• 关注特权账户管理和职责分离\n• IT 控制缺陷评价应与 C22 底稿联动",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "dda90b99fc1bdbf05853c4d98d455ea2c5ca6ed06f6ff8646c5021ba4fe96c5b",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "8d85e2eb217d6db005b6e93023af52a49c7386724e23d2bd6a15bd5f5928eb6d"
+  }
 }

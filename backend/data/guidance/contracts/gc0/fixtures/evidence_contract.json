@@ -1,0 +1,26 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-gc0-001",
+  "runId": "run-gc0-2026-09-07",
+  "subject": {
+    "kind": "contract",
+    "contractId": "G-C0"
+  },
+  "contractVersions": {
+    "G-C0": "1.0"
+  },
+  "inventoryDigest": null,
+  "sourceDigests": {
+    "schema.json": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "operationIds": {},
+  "artifacts": [
+    {
+      "kind": "report",
+      "uri": "backend/data/guidance/contracts/gc0/schema.json",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-07T00:00:00Z"
+}

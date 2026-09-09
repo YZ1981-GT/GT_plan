@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "N2",
   "title": "税费循环 — N2 底稿编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录税费循环相关审计程序的执行结果和发现。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录税费循环相关审计程序的执行结果和发现。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "4a156a7e5784c37ddca7d63c0f58fe2f90aa52d67d742a95ed1e6bde39398da7",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "0ff617c2a4da284026d1a1d6ef4c67e76de0c95217bb07c521269fe67a7479cc"
+  }
 }

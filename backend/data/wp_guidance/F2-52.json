@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "F2-52",
   "title": "F2-52 存货盘亏/报废审批记录 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿记录存货盘亏、报废的审批程序核查，验证存货减少的合规性。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿记录存货盘亏、报废的审批程序核查，验证存货减少的合规性。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 按照程序表要求执行对应审计程序\n2. 获取并检查支撑性审计证据\n3. 记录审计发现并分析异常情况\n4. 形成本底稿结论并索引至程序表"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 按照程序表要求执行对应审计程序\n2. 获取并检查支撑性审计证据\n3. 记录审计发现并分析异常情况\n4. 形成本底稿结论并索引至程序表",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 存货审计关注存在性和计价两大认定\n• 大额存货变动须追查至原始凭证\n• 跌价准备评估须考虑行业特性和市场变化"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 存货审计关注存在性和计价两大认定\n• 大额存货变动须追查至原始凭证\n• 跌价准备评估须考虑行业特性和市场变化",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "dbea4cbd25db17f3472fb9bd690dbc74715ea9d628ea49a6a7a878db14ddf35e",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "55382729f6fd572338a147a62be75ca448b2d18b8dd0966533b4b0625297d668"
+  }
 }

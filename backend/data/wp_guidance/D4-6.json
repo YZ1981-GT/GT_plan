@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "D4-6",
   "title": "D4-6 销售循环 IPO 核查子表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿为销售循环 IPO 专项核查第 6 项程序的工作底稿，记录核查程序执行情况及发现。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿为销售循环 IPO 专项核查第 6 项程序的工作底稿，记录核查程序执行情况及发现。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 按照 IPO 专项核查指引要求执行对应程序\n2. 获取充分适当的核查证据\n3. 记录核查发现及分析结论\n4. 与招股说明书披露内容进行一致性核对"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 按照 IPO 专项核查指引要求执行对应程序\n2. 获取充分适当的核查证据\n3. 记录核查发现及分析结论\n4. 与招股说明书披露内容进行一致性核对",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• IPO 核查要求高于常规年报审计\n• 须关注报告期内收入政策一致性\n• 核查结论须支持保荐人核查意见"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• IPO 核查要求高于常规年报审计\n• 须关注报告期内收入政策一致性\n• 核查结论须支持保荐人核查意见",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "5d3d3773678377a6ae1fc610e6061df27ea56239263ac3ccd0a664a8bb7b6604",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "df71b88ae583691f37facf6b66d64538252c88f32dd6115ec37ea43df75f7040"
+  }
 }

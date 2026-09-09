@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B3",
   "title": "B3 独立性评价表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿系统评价项目组成员及事务所对被审计单位的独立性，确保符合中国注册会计师职业道德守则要求。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿系统评价项目组成员及事务所对被审计单位的独立性，确保符合中国注册会计师职业道德守则要求。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 项目组全员填写独立性声明\n2. 逐项检查五类威胁：自身利益、自我评价、过度推介、密切关系、外在压力\n3. 评估防范措施的充分性\n4. 形成独立性评价结论，报合伙人审批"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 项目组全员填写独立性声明\n2. 逐项检查五类威胁：自身利益、自我评价、过度推介、密切关系、外在压力\n3. 评估防范措施的充分性\n4. 形成独立性评价结论，报合伙人审批",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 长期服务（连续7年）须实施合伙人轮换\n• 非审计服务须单独评估是否构成自我评价威胁\n• 独立性受损不可通过防范措施消除时须辞退业务"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 长期服务（连续7年）须实施合伙人轮换\n• 非审计服务须单独评估是否构成自我评价威胁\n• 独立性受损不可通过防范措施消除时须辞退业务",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "62e9eda61e9a1a6b5dcb9358052872b9ba21ef1662499e51022a4e9c090514ce",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "8067f2c6fbce1220a76ca809a0421f7a57d941c14160c0be7a0cd4f86ea1a021"
+  }
 }

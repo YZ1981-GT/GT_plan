@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "F2-55",
   "title": "F2-55 生产成本归集与分配 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿记录生产成本归集与分配方法的审计，验证成本分配的合理性和一致性。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿记录生产成本归集与分配方法的审计，验证成本分配的合理性和一致性。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 按照程序表要求执行对应审计程序\n2. 获取并检查支撑性审计证据\n3. 记录审计发现并分析异常情况\n4. 形成本底稿结论并索引至程序表"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 按照程序表要求执行对应审计程序\n2. 获取并检查支撑性审计证据\n3. 记录审计发现并分析异常情况\n4. 形成本底稿结论并索引至程序表",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 存货审计关注存在性和计价两大认定\n• 大额存货变动须追查至原始凭证\n• 跌价准备评估须考虑行业特性和市场变化"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 存货审计关注存在性和计价两大认定\n• 大额存货变动须追查至原始凭证\n• 跌价准备评估须考虑行业特性和市场变化",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "3953da5e01f299e9a20449cdbfbe9968944add2fff9e116560003cf6be0b2577",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "65f31b378513e3a9f534acfcdf9d6b965d61e7238330fb203aa41df2513e8180"
+  }
 }

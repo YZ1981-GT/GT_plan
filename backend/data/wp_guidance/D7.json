@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "D7",
   "title": "D7 坏账准备测试 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于测试应收账款坏账准备计提的充分性和合理性，验证预期信用损失模型的适当性。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于测试应收账款坏账准备计提的充分性和合理性，验证预期信用损失模型的适当性。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 了解管理层坏账准备的计提政策和方法\n2. 检查账龄分析的准确性\n3. 评估预期信用损失率的合理性（迁移率/历史损失率）\n4. 检查个别认定坏账的充分性\n5. 重新计算坏账准备金额"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 了解管理层坏账准备的计提政策和方法\n2. 检查账龄分析的准确性\n3. 评估预期信用损失率的合理性（迁移率/历史损失率）\n4. 检查个别认定坏账的充分性\n5. 重新计算坏账准备金额",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 新金融工具准则下须采用预期信用损失模型\n• 关注账龄超过1年但未计提的大额应收款\n• 关联方应收款的可收回性需特别关注"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 新金融工具准则下须采用预期信用损失模型\n• 关注账龄超过1年但未计提的大额应收款\n• 关联方应收款的可收回性需特别关注",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "23f6a2120b867befb98ce9dbd2ac7d698c5830ee99f62b0de3d087f7dc266e01",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "82528559c01550b3e425d92c0f74d2392c3eac8e28e6b83f0ad953f3b34359b0"
+  }
 }

@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S9",
   "title": "S9 其他专项审计/鉴证 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于记录其他专项审计或鉴证业务（如清算审计、经济责任审计等）的程序执行。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于记录其他专项审计或鉴证业务（如清算审计、经济责任审计等）的程序执行。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 明确专项审计的目标和范围\n2. 制定专项审计计划\n3. 执行审计程序并获取证据\n4. 记录审计发现和结论\n5. 编制专项审计报告"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 明确专项审计的目标和范围\n2. 制定专项审计计划\n3. 执行审计程序并获取证据\n4. 记录审计发现和结论\n5. 编制专项审计报告",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 专项审计范围和报告格式可能与年报审计不同\n• 须明确委托方需求和报告使用者\n• 确保报告意见有充分审计证据支撑"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 专项审计范围和报告格式可能与年报审计不同\n• 须明确委托方需求和报告使用者\n• 确保报告意见有充分审计证据支撑",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "955ca30b47ff56c8aaaedb9815070f81e44032c48731d8eb5b42aefc859ce053",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "f22080f6448630567d60d9858cd095b607ea606c70f0bf27fc291af31cf2ccde"
+  }
 }

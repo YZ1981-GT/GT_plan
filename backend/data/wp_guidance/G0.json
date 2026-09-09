@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "G0",
   "title": "投资循环 — G0 底稿编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录投资循环相关审计程序的执行结果和发现。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录投资循环相关审计程序的执行结果和发现。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "44694cc4c367d082faf8b0f45568b64b19e5f11008b2f4a822192dbfe7e7c4ce",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "9dd64b0e39c425ba992891817058d8b8d1e2cb6e871b3577c07908560583e0a7"
+  }
 }

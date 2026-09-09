@@ -1,23 +1,44 @@
 {
+  "schema_version": 2,
   "wp_code": "H1",
   "title": "固定资产循环 — H1 底稿编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "记录固定资产循环相关审计程序的执行结果和发现。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "记录固定资产循环相关审计程序的执行结果和发现。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 从序时账/明细账获取相关科目数据\n2. 执行实质性程序并记录结果\n3. 将重要发现记录在底稿中\n4. 确保与审定表和程序表结论一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因"
-    },
-    {
-      "heading": "四、H1-17 运输设备权属检查要点",
-      "content": "1. 检查总体取自 H1-2 运输设备明细（可用「从 H1-2 带入」，按资产编号去重）\n2. 以机动车登记证书为权属核心证据；行驶证用于号牌/VIN/年检，不可替代登记证书\n3. 重点核对：所有人、车架号(VIN)、登记栏（抵押/查封）、年检截止日是否覆盖资产负债表日（过期自动标红）\n4. 抵押车辆用「同步抵押至附注」写入上市/国企附注受限资产子节（保留其他来源行）\n5. 逐项填写核对结论（相符/不符/未取得权证），例外事项写入审计说明"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确保数据来源可追溯\n• 关联底稿通过索引号链接\n• 异常项目须详细说明原因",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "unmapped_sections": [
+    {
+      "title": "四、H1-17 运输设备权属检查要点",
+      "content": "1. 检查总体取自 H1-2 运输设备明细（可用「从 H1-2 带入」，按资产编号去重）\n2. 以机动车登记证书为权属核心证据；行驶证用于号牌/VIN/年检，不可替代登记证书\n3. 重点核对：所有人、车架号(VIN)、登记栏（抵押/查封）、年检截止日是否覆盖资产负债表日（过期自动标红）\n4. 抵押车辆用「同步抵押至附注」写入上市/国企附注受限资产子节（保留其他来源行）\n5. 逐项填写核对结论（相符/不符/未取得权证），例外事项写入审计说明",
+      "source_refs": [],
+      "source_index": 3,
+      "classification": "unmapped"
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "556741ec8b795ad01d4f1329ababa5d595605263367cffe8d58e29bc4fd087bd",
+    "legacy_section_count": 4,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 1,
+    "canonical_body_digest": "75df4f68d73c8a7f20979677c5edbea3e29dd288cae35ed14604cf6d80ce6111"
+  }
 }

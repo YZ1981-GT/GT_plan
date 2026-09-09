@@ -1,23 +1,39 @@
 {
+  "schema_version": 2,
   "wp_code": "B60-3",
   "title": "利用专家工作计划（评估为主）— 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "以协议式计划明确专家工作性质、范围、目标、角色责任、沟通与保密。默认场景为资产评估；税务/法律/精算等可复用结构并在「专家类型」表勾选。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "以协议式计划明确专家工作性质、范围、目标、角色责任、沟通与保密。默认场景为资产评估；税务/法律/精算等可复用结构并在「专家类型」表勾选。",
+      "source_refs": []
     },
     {
-      "heading": "二、使用方法",
-      "content": "1. B60 三（四）涉及专家时编制\n2. 先勾选专家类型（领域）\n3. 明确对象、准则、假设方法、时间与工时\n4. 按准则评价专家胜任能力、客观性及工作恰当性"
+      "key": "steps",
+      "title": "二、使用方法",
+      "content": "1. B60 三（四）涉及专家时编制\n2. 先勾选专家类型（领域）\n3. 明确对象、准则、假设方法、时间与工时\n4. 按准则评价专家胜任能力、客观性及工作恰当性",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 关联：B60 三（四）/ 相关科目减值或公允价值底稿 / B60-1 专家工时"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 关联：B60 三（四）/ 相关科目减值或公允价值底稿 / B60-1 专家工时",
+      "source_refs": []
     }
   ],
   "source": "static_json",
   "recommended_questions": [
     "非评估类专家如何使用本模板？",
     "专家工作计划与 B60 主稿如何勾稽？"
-  ]
+  ],
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "843d2dc6f5904d0e0a15303cb6222cddcaec996bd9e9e03015e136a18cf69225",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "5354ccce6e308313fe627563b4aa16a3d3740c31af410f8043f1f252c94af262"
+  }
 }

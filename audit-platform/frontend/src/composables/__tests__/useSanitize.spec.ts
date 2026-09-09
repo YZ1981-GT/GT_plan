@@ -142,3 +142,14 @@ describe('useSanitize — Property 1: HTML 消毒保留安全标签并剥离危�
     )
   })
 })
+
+
+describe('useSanitize — guidance 扩展向量', () => {
+  it('剥离 javascript URL，同时保留安全 span chip', () => {
+    const result = sanitizeHtml(
+      '<a href="javascript:alert(1)">bad</a><span class="gt-guidance-wp-chip">D0-4b</span>',
+    )
+    expect(result).not.toMatch(/javascript:/i)
+    expect(result).toContain('<span class="gt-guidance-wp-chip">D0-4b</span>')
+  })
+})

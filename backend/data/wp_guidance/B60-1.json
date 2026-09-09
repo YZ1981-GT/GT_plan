@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B60-1",
   "title": "审计项目工时预算与控制表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "按职级与按任务记录工时/费用预算与实际，支撑 B60 资源配置；按阶段表按循环/SCOT+ 与控制测试/IT 分类，重大超支回写第十五章。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "按职级与按任务记录工时/费用预算与实际，支撑 B60 资源配置；按阶段表按循环/SCOT+ 与控制测试/IT 分类，重大超支回写第十五章。",
+      "source_refs": []
     },
     {
-      "heading": "二、使用方法",
-      "content": "1. 「B60-1工时预算与控制表」：按职级填预算/实际\n2. 「B60-1…（按阶段）」：按循环任务与控制/IT/其他任务填列，使用差异说明列\n3. 表末勾选是否已更新 B60 第十五章\n4. 索引号统一 B60-1"
+      "key": "steps",
+      "title": "二、使用方法",
+      "content": "1. 「B60-1工时预算与控制表」：按职级填预算/实际\n2. 「B60-1…（按阶段）」：按循环任务与控制/IT/其他任务填列，使用差异说明列\n3. 表末勾选是否已更新 B60 第十五章\n4. 索引号统一 B60-1",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 与 B60 三（二）（三）、B60-2-2 IT 工时一致\n• GT_Custom 为平台占位，无定制可忽略"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 与 B60 三（二）（三）、B60-2-2 IT 工时一致\n• GT_Custom 为平台占位，无定制可忽略",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "d802533ca9f7cce19312da34c9f7c5f45473ddb245d0c9fdeeea6d3087a0bec8",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "f8a6da5edffb48f427e5414dda6a86459cc0396e86887c82cf119017ffe8312f"
+  }
 }

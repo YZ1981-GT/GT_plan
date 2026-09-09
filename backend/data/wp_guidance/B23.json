@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B23",
   "title": "B23 业务循环控制流程了解汇总 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿汇总各业务循环控制流程了解的结果，为后续控制测试范围决策提供依据。各子表（B23-1~B23-14）分别记录不同循环的穿行测试。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿汇总各业务循环控制流程了解的结果，为后续控制测试范围决策提供依据。各子表（B23-1~B23-14）分别记录不同循环的穿行测试。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 汇总各循环穿行测试结论\n2. 识别各循环中拟依赖的关键控制\n3. 评估控制设计有效性的整体水平\n4. 确定后续控制测试的范围与策略"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 汇总各循环穿行测试结论\n2. 识别各循环中拟依赖的关键控制\n3. 评估控制设计有效性的整体水平\n4. 确定后续控制测试的范围与策略",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 汇总时应关注跨循环共享控制（如总账复核、期末关账流程）\n• 设计有效但运行无效的控制不应纳入依赖范围\n• 与 B50 风险评估结论保持一致"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 汇总时应关注跨循环共享控制（如总账复核、期末关账流程）\n• 设计有效但运行无效的控制不应纳入依赖范围\n• 与 B50 风险评估结论保持一致",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "d2a5666fb7697eea3c678380a5232ff35e28d2ab72f7e26c552fde36995dbe04",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "0e7b1fd2dfd9893149f0c1655e795f24f2c1eced634f11e5a66c5bcb34eed7f1"
+  }
 }

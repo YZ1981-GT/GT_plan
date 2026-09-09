@@ -1,27 +1,56 @@
 {
+  "schema_version": 2,
   "wp_code": "A24-2",
   "title": "项目质量复核合伙人复核表编制指引（内控审计）",
   "sections": [
     {
+      "key": "purpose",
       "title": "本表用途",
-      "content": "A24-2 是整合审计中 EQCR 对内控审计工作的独立复核。与 A24-1（财报口径）配合使用，重点关注内控审计意见的恰当性：重大缺陷的识别是否完整、评级是否准确、意见类型是否与缺陷评价一致。"
+      "content": "A24-2 是整合审计中 EQCR 对内控审计工作的独立复核。与 A24-1（财报口径）配合使用，重点关注内控审计意见的恰当性：重大缺陷的识别是否完整、评级是否准确、意见类型是否与缺陷评价一致。",
+      "source_refs": [],
+      "promoted_from_unmapped": true,
+      "source_index": 0
     },
+    {
+      "key": "evidence",
+      "title": "与其他底稿的关联",
+      "content": "• A24-1 EQCR（财报）- 同步进行\n• A23-2 合伙人复核（内控）- EQCR在其后\n• A14 内控缺陷 - 核心依据\n• A14-5 组合评价 - 逻辑验证",
+      "source_refs": [],
+      "promoted_from_unmapped": true,
+      "source_index": 2
+    },
+    {
+      "key": "common_errors",
+      "title": "注意事项",
+      "content": "1. 内控否定意见的项目 EQCR 须格外严格（否定意见对企业影响重大）\n2. EQCR 可能对缺陷评级有不同看法 → 须记录并解决\n3. EQCR 复核人须了解内控审计的特殊要求（非仅财报审计经验）\n4. 整合审计的 EQCR 两份复核表须同时完成方可签发\n5. 仅适用于需要 EQCR 的整合审计项目",
+      "source_refs": []
+    }
+  ],
+  "unmapped_sections": [
     {
       "title": "内控审计 EQCR 复核重点",
-      "content": "• 重大缺陷的识别是否存在遗漏（尤其企业层面控制）\n• 缺陷从「重要」升级为「重大」的判断标准是否一致\n• 组合评价（A14-5）逻辑是否充分\n• 内控审计意见措辞与缺陷描述的对应关系\n• 管理层对缺陷评级的异议是否恰当处理\n• 基准日后的内控变化是否影响意见\n• 内控意见与财报意见的逻辑协调\n• IT 缺陷的广泛影响是否充分评价"
-    },
-    {
-      "title": "与其他底稿的关联",
-      "content": "• A24-1 EQCR（财报）- 同步进行\n• A23-2 合伙人复核（内控）- EQCR在其后\n• A14 内控缺陷 - 核心依据\n• A14-5 组合评价 - 逻辑验证"
-    },
-    {
-      "title": "注意事项",
-      "content": "1. 内控否定意见的项目 EQCR 须格外严格（否定意见对企业影响重大）\n2. EQCR 可能对缺陷评级有不同看法 → 须记录并解决\n3. EQCR 复核人须了解内控审计的特殊要求（非仅财报审计经验）\n4. 整合审计的 EQCR 两份复核表须同时完成方可签发\n5. 仅适用于需要 EQCR 的整合审计项目"
+      "content": "• 重大缺陷的识别是否存在遗漏（尤其企业层面控制）\n• 缺陷从「重要」升级为「重大」的判断标准是否一致\n• 组合评价（A14-5）逻辑是否充分\n• 内控审计意见措辞与缺陷描述的对应关系\n• 管理层对缺陷评级的异议是否恰当处理\n• 基准日后的内控变化是否影响意见\n• 内控意见与财报意见的逻辑协调\n• IT 缺陷的广泛影响是否充分评价",
+      "source_refs": [],
+      "source_index": 1,
+      "classification": "unmapped"
     }
   ],
   "recommended_questions": [
     "EQCR对缺陷评级是否有不同看法？",
     "内控否定意见的论证是否经EQCR认可？",
     "整合审计两份EQCR是否同时完成？"
-  ]
+  ],
+  "migration": {
+    "kind": "unmapped_promoted",
+    "version": 2,
+    "legacy_content_digest": "93aedda91a96210b1ed95506d3df46595c57ac7f729eb361a4753f4c44204a68",
+    "legacy_section_count": 4,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 1,
+    "canonical_body_digest": "3df8d9e442110f29693955f8cbe2a185e44a201e02bd60a30aed9fa1d7d11bc2",
+    "promoted_keys": [
+      "purpose",
+      "evidence"
+    ]
+  }
 }

@@ -26,8 +26,18 @@
   <!-- V3 Req 11.6: 时光机面板 -->
   <TimeMachineDrawer ref="tmDrawerRef" module="workpaper" :instance-id="wpId" @restored="onTimeMachineRestored" />
 
-  <!-- 主内容区 + 编制指导面板（flex 并列布局） -->
-  <div class="gt-wp-editor-with-guidance">
+  <!-- 主内容区 + WorkpaperCapabilityShell（rail/location/capability 唯一 owner） -->
+  <WorkpaperCapabilityShell
+    class="gt-wp-editor-with-guidance"
+    :owner-epoch="shellOwnerEpoch"
+    :capability-epoch="shellCapabilityEpoch"
+    :snapshot="shellCapabilitySnapshot"
+    :location="shellLocation"
+    :guidance-controller="shellGuidanceController"
+    :shell-error="shellError"
+    :open-dsh="openShellDsh"
+    :close-dsh="closeShellDsh"
+  >
     <!-- 主内容区（flex: 1） -->
     <div class="gt-wp-editor-main">
       <!-- 底稿标题栏（HTML 渲染器路径）。导出/导入移至各 sheet 内工具栏；
@@ -184,8 +194,6 @@
             </div>
           </div>
         </el-popover>
-        <!-- AI 文档对话入口 -->
-        <el-button size="small" @click="showDocAiChat = true">💬 AI 对话</el-button>
         <!-- 独立按钮组（刷新取数等） -->
         <el-tooltip
           v-for="btn in toolbarButtons.filter((b) => b.group === 'standalone')"
@@ -244,7 +252,6 @@
       @saved="onChildSaved"
       @dirty-change="onDirtyChange"
       @sheet-switch="onSwitchSheet"
-      @locate-cell="onLocateCell"
     />
 
     <!-- Sprint 5.5: 查看公式详情弹窗 -->
@@ -270,18 +277,28 @@
   </div>
     </div><!-- /gt-wp-editor-main -->
 
-    <!-- 编制指导面板（右侧并列） -->
-    <WpGuidancePanel
-      v-if="wpDetail"
-      :wp-id="wpId"
-      :wp-code="wpDetail.wp_code || ''"
-      :wp-name="wpDetail.wp_name || ''"
-      :component-type="componentType || ''"
-      :project-id="projectId"
-      :year="projectYear || new Date().getFullYear() - 1"
-      :sheet-code="activeHtmlSheetCode"
-    />
-  </div><!-- /gt-wp-editor-with-guidance -->
+    <!-- 编制说明面板内容（trigger/placement 由 shell 拥有；G-RAIL adapter） -->
+    <template #guidance-panel>
+      <WpGuidancePanel
+        v-if="wpDetail"
+        shell-owned
+        :wp-id="wpId"
+        :wp-code="wpDetail.wp_code || ''"
+        :wp-name="wpDetail.wp_name || ''"
+        :component-type="componentType || ''"
+        :project-id="projectId"
+        :year="projectYear || new Date().getFullYear() - 1"
+        :sheet-code="activeSheetContext.sheetCode"
+        :sheet-name="activeSheetContext.sheetName"
+        :sheet-uid="activeSheetContext.sheetUid"
+        :sheet-uid-null-reason="activeSheetContext.sheetUidNullReason"
+        :host="activeSheetContext.host"
+        :whole-workbook="activeSheetContext.wholeWorkbook"
+        :owner-epoch="activeSheetContext.ownerEpoch ?? 0"
+        :context-revision="activeSheetContext.contextRevision ?? 0"
+      />
+    </template>
+  </WorkpaperCapabilityShell>
 
   <!-- 弹窗/抽屉（条件渲染，不占主布局） -->
   <CycleDialogHost
@@ -329,6 +346,12 @@
     @marked="onReviewMarked"
   />
 
+  <WpImportDialog
+    v-model="showWpImportEnhanced"
+    :project-id="projectId"
+    @imported="onWpImportEnhanced"
+  />
+
   <!-- R7-S3-05 Task 25：底稿右栏面板（抽屉模式）— 提到 HTML/Univer 共用，供 AttachmentTabPanel → Drawer_Host -->
   <el-drawer
     v-model="showSidePanel"
@@ -342,22 +365,10 @@
       :project-id="projectId"
       :wp-id="wpId"
       :wp-code="wpDetail?.wp_code"
+      :decision-trace="renderConfig?.decision_trace ?? null"
       @finecheck-update="fineCheckFailCount = $event"
     />
   </el-drawer>
-
-  <!-- AI 对话面板（统一内核；宿主契约由 useAiHostContext 的底稿 adapter 构造） -->
-  <PlatformAiChatPanel
-    :host="aiHost"
-    :visible="showDocAiChat"
-    @adopt="onDocAiAdopt"
-  />
-
-  <WpImportDialog
-    v-model="showWpImportEnhanced"
-    :project-id="projectId"
-    @imported="onWpImportEnhanced"
-  />
 </template>
 
 <script setup lang="ts">
@@ -373,9 +384,8 @@
  *
  * @see .kiro/specs/workpaper-editor-shrink-phase2/design.md §4.2
  */
-import { ref, computed, provide, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, provide, onMounted, onUnmounted, nextTick, watch, inject } from 'vue'
 import { useProjectStore } from '@/stores/project'
-import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { confirmLeave } from '@/utils/confirm'
@@ -387,6 +397,14 @@ import { useA13MisstatementBridge } from '@/composables/useA13MisstatementBridge
 import { useStaleRefresh } from '@/composables/useStaleRefresh'
 import { useCycleType } from '@/composables/useCycleType'
 import { useEditorMode } from '@/composables/useEditorMode'
+import {
+  resolveUniverSheetContext,
+  useWpRenderer,
+  type RenderConfig,
+  type SheetRenderConfig,
+  type WorkpaperSheetContext,
+} from '@/composables/useWpRenderer'
+import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
 import { useEditorToolbar } from '@/composables/useEditorToolbar'
 import { useEditorCycles } from '@/composables/useEditorCycles'
 import { useSheetNavFacade } from '@/composables/useSheetNavFacade'
@@ -413,12 +431,20 @@ import CycleDialogHost from './workpaper-editor/CycleDialogHost.vue'
 import VersionHistoryDrawer from './workpaper-editor/VersionHistoryDrawer.vue'
 import AuditNavDialog from './workpaper-editor/AuditNavDialog.vue'
 import ReviewMarkDialog from './workpaper-editor/ReviewMarkDialog.vue'
-import PlatformAiChatPanel from '@/components/ai/PlatformAiChatPanel.vue'
-import { buildWorkpaperHost } from '@/composables/useAiHostContext'
 import WpExportButton from '@/components/workpaper/WpExportButton.vue'
 import WpImportDialog from '@/components/workpaper/WpImportDialog.vue'
 import WpGuidancePanel from '@/components/workpaper/WpGuidancePanel.vue'
 import GtWpVersionTrail from '@/components/workpaper/version-trail/GtWpVersionTrail.vue'
+import WorkpaperCapabilityShell from '@/shell/formula/WorkpaperCapabilityShell.vue'
+import { GC0_CONTRACT_VERSION, type CanonicalWorkpaperLocation } from '@/shared/contracts/gc0'
+import type { WorkpaperCapabilitySnapshot, CapabilityDecision } from '@/shell/formula/workpaperCapabilitySnapshot'
+import { fetchWorkpaperCapabilitySnapshot } from '@/shell/formula/fetchCapabilitySnapshot'
+import { DSH_ASSIST_BRIDGE_KEY } from '@/shell/formula/dshAssistBridge'
+import {
+  createShellStructuredError,
+  type ShellStructuredError,
+} from '@/shell/formula/shellStructuredError'
+import { useGuidancePanelStore } from '@/stores/guidancePanelStore'
 import { Clock } from '@element-plus/icons-vue'
 
 // ─── 路由解析 ────────────────────────────────────────────────────────────────
@@ -427,6 +453,7 @@ const router = useRouter()
 const { canEdit } = useAuditContext()
 const projectId = computed(() => route.params.projectId as string)
 const wpId = computed(() => route.params.wpId as string)
+const { renderConfig } = useWpRenderer(wpId)
 // 深链 ?sheet= 初始激活底稿页签（无 ?cell= 的纯 Tab 导航，如附注→披露表跳转）。
 // GtWpRenderer 仅 initialSheet + locate-cell 事件切页；此前未接线导致纯 ?sheet= 被忽略回退底稿目录。
 const initialSheetFromQuery = computed<string | undefined>(() => {
@@ -437,7 +464,6 @@ const initialSheetFromQuery = computed<string | undefined>(() => {
 
 // ─── P0-6.1: ProjectContext + PermissionMatrix facade ────────────────────────
 const projectStore = useProjectStore()
-const guidancePanelStore = useGuidancePanelStore()
 const projectContext = computed(() => projectStore.currentProjectContext)
 const { can: canOp, whyCannot } = usePermissionMatrix()
 // DEPRECATED: 旧 canEdit 仍保留，后续逐步替换为 canOp('wp:edit')
@@ -484,7 +510,6 @@ const htmlFormulaWpContext = computed(() => {
   }
 })
 const showStaleImpactPanel = ref(false)
-const showDocAiChat = ref(false)
 const showWpImportEnhanced = ref(false)
 
 // ─── 复核对话线程列表（工具栏 popover）──────────────────────────────────────
@@ -576,6 +601,50 @@ const scenarioFilter = computed(() => {
 const measurementModelRef = computed(() => projectMeta.value?.measurement_model || 'cost')
 const sheetNavFacade = useSheetNavFacade(univerAPIRef, wpDetail, cycleType, scenarioFilter, measurementModelRef)
 const sheetNavActiveId = sheetNavFacade.activeSheetId
+const univerRenderSheets = ref<SheetRenderConfig[]>([])
+const univerSheetIdentityReady = ref(false)
+const univerWpCode = ref<string | null>(null)
+/** Univer/OnlyOffice host shares the same revision-owner contract as HTML Task 11. */
+const univerContextEmitter = createHtmlStableContextEmitter()
+let univerIdentityRequestId = 0
+
+/** Univer 不挂载 GtWpRenderer，故单独读取同一 render-config identity 目录。 */
+async function loadUniverSheetIdentityCatalog(): Promise<void> {
+  const requestId = ++univerIdentityRequestId
+  const requestedWpId = wpId.value
+  univerRenderSheets.value = []
+  univerWpCode.value = null
+  univerSheetIdentityReady.value = false
+  if (!requestedWpId || useHtmlRenderer.value) return
+  try {
+    const config = await httpApi.get<RenderConfig>(
+      `/api/workpapers/${requestedWpId}/render-config`,
+    )
+    if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
+    univerRenderSheets.value = Array.isArray(config?.sheets) ? config.sheets : []
+    univerWpCode.value = config?.wp_code ?? null
+  } catch {
+    if (requestId !== univerIdentityRequestId || requestedWpId !== wpId.value) return
+    // 目录不可用时仍允许以真实 engine name 请求，后端 guidance membership 继续 fail-closed。
+    univerRenderSheets.value = []
+    univerWpCode.value = null
+  } finally {
+    if (requestId === univerIdentityRequestId && requestedWpId === wpId.value) {
+      univerSheetIdentityReady.value = true
+    }
+  }
+}
+
+// 路由复用同一 Shell 时重建目录；切回 HTML 时使在途 Univer 响应失效。
+watch([wpId, useHtmlRenderer], ([, isHtml], [oldWpId, wasHtml]) => {
+  if (isHtml) {
+    univerIdentityRequestId += 1
+    univerRenderSheets.value = []
+    univerSheetIdentityReady.value = false
+  } else if (wpId.value !== oldWpId || wasHtml) {
+    void loadUniverSheetIdentityCatalog()
+  }
+})
 
 // ─── useEditorCycles 实例化 ─────────────────────────────────────────────────
 const { cycleDialogs, fCycle, iCycle, gCycle, kCycle, lCycle, mCycle, nCycle } = useEditorCycles({
@@ -755,12 +824,23 @@ function onDirtyChange(val: boolean) {
   dirty.value = val
 }
 
-function onSwitchSheet(_sheetId: string) {
-  // Sheet 切换由 UniverEditorCore 内部处理
+function updateUniverSheetContext(sheetId: string) {
+  if (!univerSheetIdentityReady.value) return
+  const context = resolveUniverSheetContext(
+    sheetNavFacade.flatSheets.value,
+    sheetId,
+    univerRenderSheets.value,
+    wpDetail.value?.wp_code || univerWpCode.value || null,
+  )
+  if (!context) return
+  // Univer native/custom/locate converge here — same revision owner as HTML emitter contract.
+  const publication = univerContextEmitter.publish(context)
+  if (publication) activeSheetContext.value = publication.context
 }
 
-function onLocateCell(_payload: { sheetName?: string; cellRef: string }) {
-  // 定位由 UniverEditorCore 内部处理
+function onSwitchSheet(sheetId: string) {
+  // Must publish; no-op would leave guidance/shell on stale sheet (Req 10.3).
+  updateUniverSheetContext(sheetId)
 }
 
 function onDialogApplied(_sheet: string) {
@@ -802,25 +882,6 @@ function onVersionSearchJump(payload: { versionId: string; sheet: string; cellRe
 
 function onReviewMarked() {
   eventBus.emit('review-mark:changed', { projectId: projectId.value, wpId: wpId.value })
-}
-
-// ─── AI 宿主上下文（dsh-agent-panel-integration Req 3.2/3.5） ─────────────────
-// 稳定标识 = working paper instance ID；年度传项目 audit_year，取不到就传 null
-// （不用「当前年份-1」兜底 —— 那会构造出与服务端反查值冲突的断言）。
-const aiHost = computed(() =>
-  buildWorkpaperHost({
-    wpId: wpId.value,
-    projectId: projectId.value,
-    auditYear: projectYear.value,
-  }),
-)
-
-// ─── AI 文档对话采纳 ─────────────────────────────────────────────────────────
-function onDocAiAdopt(payload: { content: string; messageId: string }) {
-  // 采纳事件由 DocAiChatPanel 内部调用 adoptContent API（走确认流）
-  // 父组件可在此做额外处理（如刷新底稿内容）
-  // D4: AI 内容已经过 wrap_ai_output_with_log → pending 状态，不直接写入
-  onChildSaved()
 }
 
 function onConflictResolved(_id: string, _resolution: string) {
@@ -878,14 +939,167 @@ function onHtmlSyncToDisclosureNotes(_payload: Record<string, any>) {
   // C 附注组件已直接调用 API，此处仅占位
 }
 
-// ─── HTML 渲染器 sheet 切换（guidance 联动）────────────────────────────────
-const activeHtmlSheetCode = ref<string>('')
+// ─── 结构化 sheet 上下文（guidance/公式/导航共用）────────────────────────────
+const activeSheetContext = ref<WorkpaperSheetContext>({
+  sheetName: '',
+  sheetCode: null,
+  sheetUid: null,
+  sheetUidNullReason: 'sheet_uid_unavailable',
+  host: 'univer',
+  wholeWorkbook: false,
+  ownerEpoch: 1,
+  contextRevision: 0,
+})
 
-function onHtmlSheetChange(sheetName: string) {
-  // 从 sheet 名提取子码（如"函证结果汇总表D0-1" → "D0-1"）
-  const m = sheetName.match(/([A-Z]\d+[A-Z]?(?:-\d+[a-z]?)*)\s*$/)
-  activeHtmlSheetCode.value = m ? m[1] : ''
+/** Task 12 shell bridge — live capability snapshot + DSH inject. */
+const shellOwnerEpoch = ref(1)
+const shellCapabilityEpoch = ref(1)
+const shellError = ref<ShellStructuredError | null>(null)
+const _deny: CapabilityDecision = {
+  allowed: false,
+  reasonCode: 'snapshot_uninitialized',
+  owner: 'workpaper-capability-matrix',
+  nextAction: '刷新后重试',
+  zhMessage: '能力快照尚未就绪，请稍候。',
 }
+const shellCapabilitySnapshot = ref<WorkpaperCapabilitySnapshot>({
+  snapshotVersion: '1.0',
+  subjectDigest: '',
+  ownerEpoch: 1,
+  expiresAt: '1970-01-01T00:00:00Z',
+  formulaView: _deny,
+  formulaEditUser: _deny,
+  formulaHistory: _deny,
+  aiReviewPage: _deny,
+  aiReviewBatch: _deny,
+  aiAssistChat: _deny,
+  humanReviewRead: _deny,
+  humanReviewWrite: _deny,
+  guidanceRead: _deny,
+})
+
+async function refreshShellCapability(): Promise<void> {
+  try {
+    const snap = await fetchWorkpaperCapabilitySnapshot({
+      wpId: wpId.value,
+      projectId: projectId.value,
+      ownerEpoch: shellOwnerEpoch.value,
+      sheetUid: activeSheetContext.value.sheetUid,
+    })
+    if (!snap) {
+      shellError.value = createShellStructuredError({
+        domain: 'capability',
+        reasonCode: 'snapshot_parse_failed',
+        zhMessage: '能力快照不可用，公共操作已暂时阻断。',
+        ownerEpoch: shellOwnerEpoch.value,
+        capabilityEpoch: shellCapabilityEpoch.value,
+      })
+      return
+    }
+    shellCapabilitySnapshot.value = snap
+    shellCapabilityEpoch.value = snap.ownerEpoch
+    shellError.value = null
+  } catch (err) {
+    shellError.value = createShellStructuredError({
+      domain: 'capability',
+      reasonCode: 'snapshot_fetch_failed',
+      zhMessage: '能力快照加载失败，请稍后重试。',
+      ownerEpoch: shellOwnerEpoch.value,
+      capabilityEpoch: shellCapabilityEpoch.value,
+      operation: 'capability-snapshot',
+    })
+    void err
+  }
+}
+
+watch(
+  () => [wpId.value, projectId.value, shellOwnerEpoch.value, activeSheetContext.value.sheetUid, activeSheetContext.value.wholeWorkbook] as const,
+  () => {
+    void refreshShellCapability()
+  },
+  { immediate: true },
+)
+
+const shellLocation = computed<CanonicalWorkpaperLocation | null>(() => {
+  if (!wpDetail.value) return null
+  const ctx = activeSheetContext.value
+  const host = (ctx.host === 'onlyoffice' || ctx.host === 'word' || ctx.host === 'grid' || ctx.host === 'html' || ctx.host === 'univer')
+    ? ctx.host
+    : 'html'
+  // G-ID: never invent sheetUid from display name; fall back to page/whole-workbook.
+  const sheetUid = ctx.sheetUid?.trim() || null
+  return {
+    contractVersion: GC0_CONTRACT_VERSION,
+    organizationId: projectId.value,
+    projectId: projectId.value,
+    fiscalYear: projectYear.value || new Date().getFullYear() - 1,
+    wpId: wpId.value,
+    wpCode: wpDetail.value.wp_code || '',
+    entryId: null,
+    host,
+    anchor: ctx.wholeWorkbook
+      ? { kind: 'whole_workbook' }
+      : sheetUid
+        ? { kind: 'sheet', sheetUid, sheetCode: ctx.sheetCode }
+        : { kind: 'page' },
+    display: { sheetName: ctx.sheetName || null, sectionLabel: null },
+    ownerEpoch: ctx.ownerEpoch ?? shellOwnerEpoch.value,
+    contextRevision: ctx.contextRevision ?? 1,
+  }
+})
+
+const guidancePanelStore = useGuidancePanelStore()
+const shellGuidanceController = computed(() => ({
+  isOpen: guidancePanelStore.isOpen,
+  hasDraft: false,
+  guidanceVersion: guidancePanelStore.guidanceData?.guidance_version ?? null,
+  open: () => guidancePanelStore.open(),
+  close: (_opts: { preserveDraft: boolean }) => guidancePanelStore.close(),
+}))
+
+const dshBridge = inject(DSH_ASSIST_BRIDGE_KEY, null)
+
+function openShellDsh(): void {
+  dshBridge?.open()
+}
+
+function closeShellDsh(opts: { preserveDraft: boolean }): void {
+  dshBridge?.close(opts)
+}
+
+function onHtmlSheetChange(context: WorkpaperSheetContext) {
+  activeSheetContext.value = context
+}
+
+// Univer custom nav、原生 tab 与 locate 最终都会更新 facade.activeSheetId；
+// engine id/name 在此与 render-config identity 目录合流，禁止前端正则猜 code。
+watch(
+  () => [
+    useHtmlRenderer.value,
+    univerSheetIdentityReady.value,
+    sheetNavActiveId.value,
+    sheetNavFacade.flatSheets.value.map((sheet) => `${sheet.id}:${sheet.name}`).join('|'),
+    univerRenderSheets.value.map((sheet) => `${sheet.sheet_name}:${sheet.sheet_code ?? ''}`).join('|'),
+  ] as const,
+  ([isHtml, identityReady, activeId]) => {
+    if (!isHtml && identityReady && activeId) updateUniverSheetContext(activeId)
+  },
+  { immediate: true },
+)
+
+watch(wpId, (nextId) => {
+  univerContextEmitter.resetOwner(`wp:${nextId || 'pending'}`)
+  activeSheetContext.value = {
+    sheetName: '',
+    sheetCode: null,
+    sheetUid: null,
+    sheetUidNullReason: 'sheet_uid_unavailable',
+    host: useHtmlRenderer.value ? 'html' : 'univer',
+    wholeWorkbook: false,
+    ownerEpoch: univerContextEmitter.getOwnerEpoch(),
+    contextRevision: 0,
+  }
+})
 
 function onHtmlJumpToReference(refCode: string) {
   if (!refCode) return
@@ -1045,6 +1259,8 @@ onMounted(() => {
       loading.value = false
       return
     }
+
+    await loadUniverSheetIdentityCatalog()
     if (componentType.value === 'univer' || !componentType.value) {
       // UniverEditorCore 内部处理 initUniver
       loading.value = false
@@ -1061,9 +1277,6 @@ onMounted(() => {
 
   // 加载复核对话线程列表
   loadReviewThreadList()
-
-  // 订阅 workpaper:locate-cell 事件
-  eventBus.on('workpaper:locate-cell', onLocateCellEvent)
 
   // wp-locate-foundation Task 4.2: 读 route.query.sheet / cell → 触发定位
   // 使用 nextTick + 短延迟确保 GtWpRenderer 已挂载
@@ -1088,7 +1301,6 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  eventBus.off('workpaper:locate-cell', onLocateCellEvent)
   window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
@@ -1113,11 +1325,6 @@ function onBeforeUnload(e: BeforeUnloadEvent) {
     e.preventDefault()
     e.returnValue = ''
   }
-}
-
-function onLocateCellEvent(payload: { wpId: string; sheetName?: string; cellRef: string }) {
-  if (payload.wpId !== wpId.value) return
-  // 委托给 UniverEditorCore 处理
 }
 </script>
 

@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "D2-5",
   "title": "D2-5 销售循环分析明细 — 客户集中度 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿分析销售收入的客户集中度，识别对主要客户的过度依赖风险。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿分析销售收入的客户集中度，识别对主要客户的过度依赖风险。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 统计前十大客户收入金额及占比\n2. 分析客户集中度变化趋势\n3. 评估客户流失对持续经营的影响\n4. 关注关联方客户交易的公允性"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 统计前十大客户收入金额及占比\n2. 分析客户集中度变化趋势\n3. 评估客户流失对持续经营的影响\n4. 关注关联方客户交易的公允性",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 单一客户收入超过50%须评估持续经营风险\n• 关注新增大客户的商业合理性\n• IPO 核查特别关注客户集中度披露的充分性"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 单一客户收入超过50%须评估持续经营风险\n• 关注新增大客户的商业合理性\n• IPO 核查特别关注客户集中度披露的充分性",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "8bfd523fb1462fef0c581b61f2a718fc6a270c8a17c86dff81c784328d95c78b",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "c8005bdd5b1224a77dd1e3284ad4ccf3e5d8ed57ad816b8f0e24a5624cc7c1e5"
+  }
 }

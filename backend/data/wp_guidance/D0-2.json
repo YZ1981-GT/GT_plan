@@ -1,26 +1,52 @@
 {
+  "schema_version": 2,
   "wp_code": "D0-2",
   "title": "核实被函证单位信息编制指引",
-  "sections": [
+  "sections": [],
+  "unmapped_sections": [
     {
       "title": "适用准则",
-      "content": "CAS 1312第十二条：注册会计师应当对被询证方的名称和地址等信息进行核实，包括对实际业务往来的对象是否为被函证方进行核实。"
+      "content": "CAS 1312第十二条：注册会计师应当对被询证方的名称和地址等信息进行核实，包括对实际业务往来的对象是否为被函证方进行核实。",
+      "source_refs": [],
+      "source_index": 0,
+      "classification": "unmapped"
     },
     {
       "title": "核实程序",
-      "content": "1. 通过企查查/天眼查核实单位全称、注册地址\n2. 比对被审计单位提供的联系信息与公开信息\n3. 确认联系人身份及其签收函件的权限\n4. 对电子函证平台的可靠性进行评估"
+      "content": "1. 通过企查查/天眼查核实单位全称、注册地址\n2. 比对被审计单位提供的联系信息与公开信息\n3. 确认联系人身份及其签收函件的权限\n4. 对电子函证平台的可靠性进行评估",
+      "source_refs": [],
+      "source_index": 1,
+      "classification": "unmapped"
     },
     {
       "title": "检查支持性文件",
-      "content": "核实时应检查：\n- 工商登记信息\n- 合同/协议中记载的对方信息\n- 以前年度函证记录\n- 银行对账单中的对方信息"
+      "content": "核实时应检查：\n- 工商登记信息\n- 合同/协议中记载的对方信息\n- 以前年度函证记录\n- 银行对账单中的对方信息",
+      "source_refs": [],
+      "source_index": 2,
+      "classification": "unmapped"
     },
     {
       "title": "确认联系人身份",
-      "content": "确认函签收人应为：\n- 对方单位的财务负责人或授权人员\n- 有权核实余额信息的相关人员\n\n警告：联系人不得为被审计单位人员推荐"
+      "content": "确认函签收人应为：\n- 对方单位的财务负责人或授权人员\n- 有权核实余额信息的相关人员\n\n警告：联系人不得为被审计单位人员推荐",
+      "source_refs": [],
+      "source_index": 3,
+      "classification": "unmapped"
     },
     {
       "title": "电子函证平台",
-      "content": "使用电子函证平台（确函宝/e-确认/中注协函证系统）时：\n1. 评估平台安全机制和行业认可度\n2. 确认发送/接收全过程被审计单位不介入\n3. 保留平台操作记录截图"
+      "content": "使用电子函证平台（确函宝/e-确认/中注协函证系统）时：\n1. 评估平台安全机制和行业认可度\n2. 确认发送/接收全过程被审计单位不介入\n3. 保留平台操作记录截图",
+      "source_refs": [],
+      "source_index": 4,
+      "classification": "unmapped"
     }
-  ]
+  ],
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "83dfea209fdfb7acfc0d8a7a0afb712c6da36858014090624c0667b49314f1b4",
+    "legacy_section_count": 5,
+    "canonical_section_count": 0,
+    "unmapped_section_count": 5,
+    "canonical_body_digest": "d82dafe80c8cb9c387ad6c714d74d3d41c3fd8e45ed459151257e64bbae53e12"
+  }
 }

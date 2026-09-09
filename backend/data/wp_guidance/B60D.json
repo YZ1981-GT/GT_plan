@@ -1,23 +1,39 @@
 {
+  "schema_version": 2,
   "wp_code": "B60D",
   "title": "向监管机构报送总体审计策略和具体审计计划的函副本 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "监管报送函副本存档（B60D）。内容来源于已定稿 B60；须填写报送存档信息（致达日期、收件人、方式、B60 版本日期、一致性）。不是集团策略底稿。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "监管报送函副本存档（B60D）。内容来源于已定稿 B60；须填写报送存档信息（致达日期、收件人、方式、B60 版本日期、一致性）。不是集团策略底稿。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 矩阵确认需报送\n2. 报送稿与 B60 一致；监管额外要求先改 B60\n3. 合伙人签署报送函；副本填存档信息表后归档"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 矩阵确认需报送\n2. 报送稿与 B60 一致；监管额外要求先改 B60\n3. 合伙人签署报送函；副本填存档信息表后归档",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 集团安排见 B60 第八章与 B30-2\n• B60 重大更新后评估是否补充报送"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 集团安排见 B60 第八章与 B30-2\n• B60 重大更新后评估是否补充报送",
+      "source_refs": []
     }
   ],
   "source": "static_json",
   "recommended_questions": [
     "报送存档信息表必填哪些字段？",
     "B60D 与集团审计安排有何区别？"
-  ]
+  ],
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "769d21c13e50b7156bbd9b9cf514af8c853a13abaaffe7c1e7a936e691b7fe8b",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "795d486c01416c0738ae53b658d516d241b6a7171673aec80a3d470d4ff3fed5"
+  }
 }

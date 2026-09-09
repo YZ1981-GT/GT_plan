@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B30",
   "title": "B30 总体审计应对措施 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿记录针对评估的财务报表层次重大错报风险所制定的总体应对措施（CAS 1211），确保审计应对方案整体充分适当。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿记录针对评估的财务报表层次重大错报风险所制定的总体应对措施（CAS 1211），确保审计应对方案整体充分适当。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 汇总 B50 风险评估中识别的报表层次风险\n2. 制定总体应对措施（加强督导、增加不可预见性、调整人员安排等）\n3. 评估是否需要利用专家工作\n4. 确定审计策略的整体基调"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 汇总 B50 风险评估中识别的报表层次风险\n2. 制定总体应对措施（加强督导、增加不可预见性、调整人员安排等）\n3. 评估是否需要利用专家工作\n4. 确定审计策略的整体基调",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 高风险项目须增加总体应对措施的力度\n• 总体应对措施应与具体审计程序（D~N各循环）衔接\n• 文档化应对措施的理由和预期效果"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 高风险项目须增加总体应对措施的力度\n• 总体应对措施应与具体审计程序（D~N各循环）衔接\n• 文档化应对措施的理由和预期效果",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "939ff806e972c1776b14c838205d8f33309bdf7a5f5369b847e0afaaaf6d191f",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "88fcf4a05920c23363765d5f21ce08bc70409c4edb3908839f8eeea597760891"
+  }
 }

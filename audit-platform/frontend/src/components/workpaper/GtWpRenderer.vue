@@ -295,7 +295,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Switch } from '@element-plus/icons-vue'
 import http from '@/utils/http'
-import { useWpRenderer, type WpComponentType } from '@/composables/useWpRenderer'
+import {
+  resolveRenderSheet,
+  resolveWorkpaperSheetContext,
+  useWpRenderer,
+  type WorkpaperSheetContext,
+  type WpComponentType,
+} from '@/composables/useWpRenderer'
+import { createHtmlStableContextEmitter } from '@/composables/htmlStableContextEmitter'
 import { useCellLocate, type LocateTarget } from '@/composables/useCellLocate'
 import { eventBus, type WorkpaperLocateCellPayload } from '@/utils/eventBus'
 import GtLoadingOverlay from '@/components/common/GtLoadingOverlay.vue'
@@ -326,7 +333,6 @@ import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
 import { resolveEffectiveAuditYear } from '@/utils/resolveAuditYear'
-import { normalizeSheetName, resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
 import { useWorkpaperScaffold } from '@/components/workpaper/composables/useWorkpaperScaffold'
 
 // ─── Types ───
@@ -353,7 +359,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'sheet-change': [sheetName: string]
+  'sheet-change': [context: WorkpaperSheetContext]
   'cell-focus': [payload: { sheet: string; cell: string }]
   'save-success': [payload: SavePayload]
   /** 子组件自行持久化后的纯通知（无 html_data），外层仅刷新不再 POST /save */
@@ -465,6 +471,9 @@ const augmentedSheets = computed(() => {
   ) {
     sheets.push({
       sheet_name: F1_CONFIRM_SHEET,
+      sheet_code: null,
+      sheet_code_reason: 'frontend_virtual_without_canonical_code',
+      whole_workbook: false,
       componentType: 'f1-prepayment',
       schema: null,
       html_data: { virtual: true, confirmation_procedure: true },
@@ -482,44 +491,49 @@ const visibleSheets = computed(() => {
   return nonSkip.length > 0 ? nonSkip : sheets
 })
 
+function resetSheetTransientState(): void {
+  onlyOfficeFallback.value = false
+  wholeExcelGridData.value = {}
+  wholeExcelSheets.value = []
+  wholeExcelActiveSheet.value = ''
+  wholeExcelTemplateName.value = ''
+}
+
+/** 所有页签激活入口的唯一选择器：先归一定位器，再只保存 canonical sheet_name。 */
+function selectSheet(locator: string | null | undefined): string | null {
+  if (locator === WHOLE_EXCEL_TAB && visibleSheets.value.length > 1) {
+    internalActiveSheetName.value = WHOLE_EXCEL_TAB
+    resetSheetTransientState()
+    return WHOLE_EXCEL_TAB
+  }
+  const resolved = resolveRenderSheet(visibleSheets.value, locator)
+  if (!resolved) return null
+  internalActiveSheetName.value = resolved.sheet_name
+  resetSheetTransientState()
+  return resolved.sheet_name
+}
+
 const activeSheetName = computed<string>({
   get() {
-    const sheets = augmentedSheets.value
+    const sheets = visibleSheets.value
     if (!sheets.length) return ''
-    // 优先用内部 ref（用户切换过）
-    if (internalActiveSheetName.value) {
-      // 完整Excel 合成页签：直接放行（不在 renderConfig.sheets 中）
-      if (internalActiveSheetName.value === WHOLE_EXCEL_TAB) return WHOLE_EXCEL_TAB
-      const exists = sheets.find(s => s.sheet_name === internalActiveSheetName.value)
-      if (exists) return internalActiveSheetName.value
+    if (internalActiveSheetName.value === WHOLE_EXCEL_TAB && visibleSheets.value.length > 1) {
+      return WHOLE_EXCEL_TAB
     }
-    // 否则匹配 initialSheet（三级匹配的单一真源 = resolveSheetNameByDeepLink）
-    if (props.initialSheet) {
-      const hit = resolveSheetNameByDeepLink(
-        sheets.map(s => s.sheet_name),
-        props.initialSheet,
-      )
-      if (hit) return hit
-    }
-    // 兜底：第一个非 skip 的 sheet
+    const selected = resolveRenderSheet(sheets, internalActiveSheetName.value)
+    if (selected) return selected.sheet_name
+    const initial = resolveRenderSheet(sheets, props.initialSheet)
+    if (initial) return initial.sheet_name
     return visibleSheets.value[0]?.sheet_name ?? sheets[0].sheet_name
   },
   set(name: string) {
-    internalActiveSheetName.value = name
-    onlyOfficeFallback.value = false  // 切换 sheet 时重置 OnlyOffice 降级状态
-    wholeExcelGridData.value = {}
-    wholeExcelSheets.value = []
-    wholeExcelActiveSheet.value = ''
-    wholeExcelTemplateName.value = ''
-    emit('sheet-change', name)
+    selectSheet(name)
   },
 })
 
-const activeSheet = computed(() => {
-  const sheets = augmentedSheets.value
-  if (!sheets.length) return null
-  return sheets.find(s => s.sheet_name === activeSheetName.value) ?? null
-})
+const activeSheet = computed(() =>
+  resolveRenderSheet(visibleSheets.value, activeSheetName.value),
+)
 
 // ─── 完整 Excel 页签（OnlyOffice 整本编辑，放在底稿目录右侧）───
 // 合成页签：所有多 sheet 底稿在「底稿目录」右侧注入一个「完整Excel」页签，
@@ -532,6 +546,11 @@ const tabSheets = computed(() => {
   if (sheets.length <= 1) return sheets
   const wholeExcelTab = {
     sheet_name: WHOLE_EXCEL_TAB,
+    sheet_code: null,
+    sheet_code_reason: 'whole_workbook_native_tab_unobservable',
+    sheet_uid: null,
+    sheet_uid_null_reason: 'whole_workbook',
+    whole_workbook: true,
     componentType: 'onlyoffice-sheet' as WpComponentType,
     schema: null,
     html_data: { onlyoffice: true, whole_workbook: true, sheet_name: WHOLE_EXCEL_TAB },
@@ -551,6 +570,41 @@ const tabSheets = computed(() => {
 
 /** 当前是否为「完整Excel」合成页签 */
 const isWholeExcelTab = computed<boolean>(() => activeSheetName.value === WHOLE_EXCEL_TAB)
+
+/** 当前宿主 context 只由 render-config identity 与 canonical 选中项投影。 */
+const currentSheetContext = computed<WorkpaperSheetContext | null>(() =>
+  resolveWorkpaperSheetContext(
+    renderConfig.value?.wp_id,
+    props.wpId,
+    activeSheetName.value,
+    activeSheet.value,
+    isWholeExcelTab.value,
+    renderConfig.value?.wp_code,
+  ),
+)
+
+/** Task 11: initial/deep-link/tab/navigate/locate/section/wp reset → 同一 emitter。 */
+const htmlContextEmitter = createHtmlStableContextEmitter()
+
+function emitSheetContext(): void {
+  const publication = htmlContextEmitter.publish(currentSheetContext.value)
+  if (publication) emit('sheet-change', publication.context)
+}
+
+// wp 切换先清空内部选择，并 bump ownerEpoch，避免跨底稿同名 sheet 残留。
+watch(() => props.wpId, (nextId) => {
+  internalActiveSheetName.value = ''
+  if (nextId) htmlContextEmitter.resetOwner(`wp:${nextId}`)
+}, { immediate: true })
+
+// 同一组件实例上的 deep-link 变化也必须覆盖旧的手工选择。
+watch(() => props.initialSheet, (locator) => {
+  if (locator) selectSheet(locator)
+}, { flush: 'sync' })
+
+// config load/reload、deep-link、手工 tab、navigate 与 locate 均只改变上述纯投影依赖，
+// 最终在此进入唯一 emitter；sheet_uid/sheet_code/componentType 变化也会重新发 context。
+watch(currentSheetContext, emitSheetContext, { immediate: true, flush: 'sync' })
 
 /**
  * 当前 sheet 是否为「附注披露表」（P0-2 同步状态条判据）。
@@ -764,7 +818,7 @@ const runtimeContextReady = computed(() => !loading.value && (!!renderConfig.val
 // html_data.project_context 同值）。交给 scaffold provide，宿主经
 // useHostApplicableStandards 取用，不再各写一份取值链。
 const runtimeApplicableStandards = computed<unknown>(
-  () => (renderConfig.value as any)?.applicable_standards,
+  () => renderConfig.value?.applicable_standards,
 )
 const runtime = useWorkpaperScaffold({
   wpId: wpIdRef,
@@ -790,52 +844,43 @@ function getSheetIcon(ct: string): string {
 const { locateCell } = useCellLocate()
 
 function onLocateCell(payload: WorkpaperLocateCellPayload) {
-  // 仅处理当前底稿的定位事件
-  if (payload.wpId !== props.wpId) return
-  // 如果渲染配置未就绪，忽略
-  if (!renderConfig.value) return
+  if (payload.wpId !== props.wpId || !renderConfig.value) return
 
-  const targetSheet = payload.sheetName
-  const sheets = renderConfig.value.sheets ?? []
-  const sheetExists = targetSheet
-    ? sheets.some(s => s.sheet_name === targetSheet)
-    : false
-  const needSwitchSheet = targetSheet && sheetExists && targetSheet !== activeSheetName.value
-
-  // 构建 LocateTarget
+  const requestedSheet = payload.sheetName
+  const resolvedSheet = requestedSheet
+    ? resolveRenderSheet(visibleSheets.value, requestedSheet)
+    : activeSheet.value
+  const canonicalSheetName = resolvedSheet?.sheet_name ?? activeSheetName.value
   const target: LocateTarget = {
     wp_code: payload.wpCode || '',
     wp_id: payload.wpId,
-    sheet_name: targetSheet || activeSheetName.value,
+    sheet_name: canonicalSheetName,
     cell_ref: payload.cellRef || null,
-    component_type: payload.componentType || componentType.value || null,
+    component_type: payload.componentType || resolvedSheet?.componentType || componentType.value || null,
     value: payload.value || null,
     label: payload.label || null,
   }
 
-  if (needSwitchSheet) {
-    // 切换 sheet，等 DOM 更新后再定位
-    activeSheetName.value = targetSheet!
-    nextTick(() => {
-      const success = locateCell(target)
-      if (!success) {
-        // cell 级定位失败，但 sheet 切换已成功（sheet 级降级）
-        ElMessage.info('已切换到目标 sheet，但未能精确定位到目标位置')
-      }
-    })
-  } else if (targetSheet && !sheetExists) {
-    // 目标 sheet 不存在，sheet 级也失败
+  if (requestedSheet && !resolvedSheet) {
     ElMessage.info('已打开底稿但未能定位到目标位置（可能已变更）')
-  } else {
-    // 同 sheet，直接定位
-    nextTick(() => {
-      const success = locateCell(target)
-      if (!success) {
-        // cell 级定位失败，无 sheet 切换可降级
-        ElMessage.info('已打开底稿但未能定位到目标位置（可能已变更）')
-      }
-    })
+    return
   }
+
+  const needSwitchSheet = Boolean(
+    resolvedSheet && resolvedSheet.sheet_name !== activeSheetName.value,
+  )
+  if (needSwitchSheet) selectSheet(resolvedSheet!.sheet_name)
+
+  nextTick(() => {
+    const success = locateCell(target)
+    if (!success) {
+      ElMessage.info(
+        needSwitchSheet
+          ? '已切换到目标 sheet，但未能精确定位到目标位置'
+          : '已打开底稿但未能定位到目标位置（可能已变更）',
+      )
+    }
+  })
 }
 
 onMounted(() => {
@@ -1025,17 +1070,8 @@ function onJumpToReference(refCode: string) {
 }
 
 function onJumpToSection(sheetName: string) {
-  // B-Index 架构图节点点击 → 切换到对应 sheet（同底稿内 sheet 切换）
   if (!sheetName || !renderConfig.value) return
-  const hit = resolveSheetNameByDeepLink(
-    (renderConfig.value.sheets ?? []).map(s => s.sheet_name),
-    sheetName,
-  )
-  if (hit) {
-    activeSheetName.value = hit
-  } else {
-    ElMessage.info('未找到对应底稿 sheet')
-  }
+  if (!selectSheet(sheetName)) ElMessage.info('未找到对应底稿 sheet')
 }
 
 /**
@@ -1066,18 +1102,10 @@ function onSwitchNavigate(sheetName: string) {
   switchPopoverVisible.value = false
 }
 
-/** 子组件 emit navigate-sheet → 切换当前 active tab 到目标 sheet */
+/** 子组件 emit navigate-sheet → 使用与 deep-link/locate 相同的 canonical 选择器。 */
 function onChildNavigateSheet(sheetName: string) {
   if (!sheetName) return
-  const hit = resolveSheetNameByDeepLink(
-    (renderConfig.value?.sheets ?? []).map(s => s.sheet_name),
-    sheetName,
-  )
-  if (hit) {
-    activeSheetName.value = hit
-  } else {
-    ElMessage.info(`未找到 sheet「${sheetName}」`)
-  }
+  if (!selectSheet(sheetName)) ElMessage.info(`未找到 sheet「${sheetName}」`)
 }
 
 function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: string }) {

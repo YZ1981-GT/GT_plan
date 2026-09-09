@@ -1,0 +1,435 @@
+{
+  "mode": "apply",
+  "repairOnly": false,
+  "filesChanged": 85,
+  "sectionsPromoted": 0,
+  "digestsRepaired": 85,
+  "files": [
+    {
+      "path": "backend/data/wp_guidance/A1-11.json",
+      "wp_code": "A1-11",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A1-12.json",
+      "wp_code": "A1-12",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A1-13.json",
+      "wp_code": "A1-13",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A1-14.json",
+      "wp_code": "A1-14",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A1-15.json",
+      "wp_code": "A1-15",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A1-16.json",
+      "wp_code": "A1-16",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A1.json",
+      "wp_code": "A1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A10-2.json",
+      "wp_code": "A10-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A10.json",
+      "wp_code": "A10",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A11.json",
+      "wp_code": "A11",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A12.json",
+      "wp_code": "A12",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A13.json",
+      "wp_code": "A13",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A14-1.json",
+      "wp_code": "A14-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A14-2.json",
+      "wp_code": "A14-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A14-4.json",
+      "wp_code": "A14-4",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A14-5.json",
+      "wp_code": "A14-5",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A14-6.json",
+      "wp_code": "A14-6",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A14.json",
+      "wp_code": "A14",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A15-1.json",
+      "wp_code": "A15-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A15.json",
+      "wp_code": "A15",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16-2.json",
+      "wp_code": "A16-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16-3.json",
+      "wp_code": "A16-3",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16-4.json",
+      "wp_code": "A16-4",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16-5.json",
+      "wp_code": "A16-5",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16-6.json",
+      "wp_code": "A16-6",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16-7.json",
+      "wp_code": "A16-7",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A16.json",
+      "wp_code": "A16",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A17-2.json",
+      "wp_code": "A17-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A17-4.json",
+      "wp_code": "A17-4",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A17-5.json",
+      "wp_code": "A17-5",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A17.json",
+      "wp_code": "A17",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A18-1.json",
+      "wp_code": "A18-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A2.json",
+      "wp_code": "A2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A21-1.json",
+      "wp_code": "A21-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A21-2.json",
+      "wp_code": "A21-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A22-1.json",
+      "wp_code": "A22-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A22-2.json",
+      "wp_code": "A22-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A23-1.json",
+      "wp_code": "A23-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A23-2.json",
+      "wp_code": "A23-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A24-1.json",
+      "wp_code": "A24-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A24-2.json",
+      "wp_code": "A24-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A25-1.json",
+      "wp_code": "A25-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A25-2.json",
+      "wp_code": "A25-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A28.json",
+      "wp_code": "A28",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A3-3.json",
+      "wp_code": "A3-3",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A3-5.json",
+      "wp_code": "A3-5",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A3-6.json",
+      "wp_code": "A3-6",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A3.json",
+      "wp_code": "A3",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A30.json",
+      "wp_code": "A30",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A31.json",
+      "wp_code": "A31",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A4-1.json",
+      "wp_code": "A4-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A4.json",
+      "wp_code": "A4",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A5-2.json",
+      "wp_code": "A5-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A5-3.json",
+      "wp_code": "A5-3",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A5-4.json",
+      "wp_code": "A5-4",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A6.json",
+      "wp_code": "A6",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A7-2.json",
+      "wp_code": "A7-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A7.json",
+      "wp_code": "A7",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A8-1.json",
+      "wp_code": "A8-1",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A8-2.json",
+      "wp_code": "A8-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A8.json",
+      "wp_code": "A8",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A9-2.json",
+      "wp_code": "A9-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/A9.json",
+      "wp_code": "A9",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C10-2.json",
+      "wp_code": "C10-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C10.json",
+      "wp_code": "C10",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C11-2.json",
+      "wp_code": "C11-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C11.json",
+      "wp_code": "C11",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C12-2.json",
+      "wp_code": "C12-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C12.json",
+      "wp_code": "C12",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C13-2.json",
+      "wp_code": "C13-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C13.json",
+      "wp_code": "C13",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C14-2.json",
+      "wp_code": "C14-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C14.json",
+      "wp_code": "C14",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C15-2.json",
+      "wp_code": "C15-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C15.json",
+      "wp_code": "C15",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C2.json",
+      "wp_code": "C2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C3.json",
+      "wp_code": "C3",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C4.json",
+      "wp_code": "C4",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C5.json",
+      "wp_code": "C5",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C6.json",
+      "wp_code": "C6",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C7.json",
+      "wp_code": "C7",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C8.json",
+      "wp_code": "C8",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C9-2.json",
+      "wp_code": "C9-2",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/C9.json",
+      "wp_code": "C9",
+      "moves": []
+    },
+    {
+      "path": "backend/data/wp_guidance/D0-1.json",
+      "wp_code": "D0-1",
+      "moves": []
+    }
+  ],
+  "policy": "no_invented_body_or_source_refs"
+}

@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B18",
   "title": "审计策略总结 — B18 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "汇总整体审计策略，包括审计范围、时间安排和方向。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "汇总整体审计策略，包括审计范围、时间安排和方向。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 收集并分析相关信息和资料\n2. 评估对审计计划和策略的影响\n3. 记录评估结论和后续行动计划\n4. 确保与整体审计策略保持一致",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 计划阶段底稿须在实质性程序前完成\n• 风险评估结论须传递到后续循环底稿\n• 如有重大变化须及时更新相关底稿",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "7cd18b4525bbb83c8008d07f02cd21533f03c84eed4b75bf853c01bbf90d597d",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "f8e0ef429c51133490c7553deb9f2d8b2afb5b268ca9617eae59c9ee4f67616a"
+  }
 }

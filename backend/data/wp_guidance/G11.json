@@ -1,23 +1,45 @@
 {
+  "schema_version": 2,
   "wp_code": "G11",
   "title": "投资循环 — G11 投资收益底稿编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "核实投资收益（6111）发生额的完整、准确与分类恰当；明细分析支撑审定表；调整分录分项回写保证勾稽。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "核实投资收益（6111）发生额的完整、准确与分类恰当；明细分析支撑审定表；调整分录分项回写保证勾稽。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制流程（G11-2 ↔ G11-3 ↔ G11-1）",
-      "content": "1. G11-2 明细分析：按与 G11-1 一致的 18 类项目填列本期/上期未审·调整·审定及占比；|变动率|>20% 须说明原因并索引。\n2. G11-3 调整分录：登记账项/报表调整，整表借贷平衡；仅 6111 账项调整净额（贷−借）按「回写行」分项写入 G11-1 与 G11-2。\n3. G11-1 审定表：核对合计与 TB/明细合计；重大变动原因与 G11-2 交叉索引。\n4. 附注披露与收益率分析、凭证检查（G11-4/G11-5）按需执行。"
-    },
-    {
-      "heading": "三、G11-3 类别口径",
-      "content": "• 账项调整：影响审定数，回写 G11-1/G11-2\n• 报表调整：仅影响列报/重分类，不回写审定调整列\n• 其他：按账项调整处理"
-    },
-    {
-      "heading": "四、注意事项",
-      "content": "• 损益类取发生额，勿按余额递推\n• 明细合计须与审定表合计一致\n• 权益法/处置等分项尽量指定回写行，避免全部落入「其他」\n• 关联底稿通过索引号链接（G7/G1/G8/G9 等）"
+      "key": "common_errors",
+      "title": "四、注意事项",
+      "content": "• 损益类取发生额，勿按余额递推\n• 明细合计须与审定表合计一致\n• 权益法/处置等分项尽量指定回写行，避免全部落入「其他」\n• 关联底稿通过索引号链接（G7/G1/G8/G9 等）",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "unmapped_sections": [
+    {
+      "title": "二、编制流程（G11-2 ↔ G11-3 ↔ G11-1）",
+      "content": "1. G11-2 明细分析：按与 G11-1 一致的 18 类项目填列本期/上期未审·调整·审定及占比；|变动率|>20% 须说明原因并索引。\n2. G11-3 调整分录：登记账项/报表调整，整表借贷平衡；仅 6111 账项调整净额（贷−借）按「回写行」分项写入 G11-1 与 G11-2。\n3. G11-1 审定表：核对合计与 TB/明细合计；重大变动原因与 G11-2 交叉索引。\n4. 附注披露与收益率分析、凭证检查（G11-4/G11-5）按需执行。",
+      "source_refs": [],
+      "source_index": 1,
+      "classification": "unmapped"
+    },
+    {
+      "title": "三、G11-3 类别口径",
+      "content": "• 账项调整：影响审定数，回写 G11-1/G11-2\n• 报表调整：仅影响列报/重分类，不回写审定调整列\n• 其他：按账项调整处理",
+      "source_refs": [],
+      "source_index": 2,
+      "classification": "unmapped"
+    }
+  ],
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "7934bc9fc533850ee7fd259241d6901ca116eed4c7f5b6235699859d9012ec97",
+    "legacy_section_count": 4,
+    "canonical_section_count": 2,
+    "unmapped_section_count": 2,
+    "canonical_body_digest": "c2ae053cb12a7f890e0c090aef2509d015c8a5e6a2dd496f18dbf2167ca4c59a"
+  }
 }

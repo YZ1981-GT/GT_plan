@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "K8",
   "title": "K8 管理费用明细测试 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于测试管理费用各明细项目的真实性和完整性，关注异常费用和期间费用截止。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于测试管理费用各明细项目的真实性和完整性，关注异常费用和期间费用截止。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 获取费用/损失明细表并核对总账\n2. 对大额或异常项目执行细节测试\n3. 检查费用归属期间的正确性\n4. 评估计提金额的合理性（如适用）\n5. 形成本底稿结论并索引至程序表"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 获取费用/损失明细表并核对总账\n2. 对大额或异常项目执行细节测试\n3. 检查费用归属期间的正确性\n4. 评估计提金额的合理性（如适用）\n5. 形成本底稿结论并索引至程序表",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 费用明细测试关注发生认定和完整性认定\n• 关注期末费用异常减少（可能存在跨期）\n• 减值损失评估须有充分支撑（评估报告/减值模型）"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 费用明细测试关注发生认定和完整性认定\n• 关注期末费用异常减少（可能存在跨期）\n• 减值损失评估须有充分支撑（评估报告/减值模型）",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "5be3109c5132a226268559ce846aa3518bec0592bce3e24b0786527dd3dbbb6b",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "00178f0ac03a71df6732bff022a7eca52c635b3eeba32751e41abc95ddee3771"
+  }
 }

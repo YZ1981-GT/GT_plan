@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S32",
   "title": "IPO 审计专项核查 — S32 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "IPO 项目的特殊审计关注点及证监会要求的专项核查程序。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "IPO 项目的特殊审计关注点及证监会要求的专项核查程序。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "50c91d07a62d744c79c11b03e7ad8c1a00147d41d104832a8aa25808c9f9d262",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "84992bda1e01442258c08d3c47ddcba9238edb843d2e469286b39e3dab52b633"
+  }
 }

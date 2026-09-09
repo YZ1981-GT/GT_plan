@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B30-5",
   "title": "B30-5 总体应对措施子表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿为总体应对措施（B30）的明细子表，记录第 5 项具体应对措施的详细安排及执行情况。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿为总体应对措施（B30）的明细子表，记录第 5 项具体应对措施的详细安排及执行情况。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 明确本项应对措施针对的具体风险\n2. 制定措施的执行方案及时间安排\n3. 记录执行结果及效果评价\n4. 如措施不充分须追加补充程序"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 明确本项应对措施针对的具体风险\n2. 制定措施的执行方案及时间安排\n3. 记录执行结果及效果评价\n4. 如措施不充分须追加补充程序",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 每项措施须明确责任人和完成时限\n• 措施执行效果应在项目总结时评价\n• 与 B30 主表结论保持一致"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 每项措施须明确责任人和完成时限\n• 措施执行效果应在项目总结时评价\n• 与 B30 主表结论保持一致",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "30fca8efa83e418beaba61fce314d26ae70db3a76884a21b8b4011e07fe7185c",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "379d1e9501e66610c056eee8ad882806964af9ea9aade8ba97be9b2f9c7c7836"
+  }
 }

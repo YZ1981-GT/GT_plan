@@ -1,0 +1,26 @@
+{
+  "task": 22,
+  "recordedAt": "2026-09-09T03:33:28.470269+00:00",
+  "verdict": "BLOCKED",
+  "reasonCodes": [
+    "x_handoff_conformance_partial",
+    "sync_gates_incomplete"
+  ],
+  "xPath": ".kiro/specs/custom-workpaper-template-ingestion-and-sync-closure/evidence/X-HANDOFF-CONFORMANCE.json",
+  "xMilestone": "X-HANDOFF-CONFORMANCE",
+  "xVerdict": "PARTIAL",
+  "xNotes": [
+    "finalize_saga + G-HANDOFF-CONSUMER 消费已落地（Task 11）",
+    "SYNC-ENTRY-NAMESPACE / SYNC-MULTI-RESOLVER 仍 BLOCKED，整册 runtime 端到端未宣称 PASS"
+  ],
+  "consumerPolicy": "guidance_does_not_modify_custom_runtime",
+  "projectionModesRequired": [
+    "candidate",
+    "finalized",
+    "confirmed_stale_rollback"
+  ],
+  "notes": [
+    "on_missing=BLOCKED until custom Task 19 publishes PASS X-HANDOFF-CONFORMANCE",
+    "G-HANDOFF-CONSUMER (guidance T16) and F-SHELL are available; custom SYNC still blocks"
+  ]
+}

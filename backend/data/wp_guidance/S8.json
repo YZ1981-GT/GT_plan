@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S8",
   "title": "利用内部审计工作 — S8 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "评估内部审计工作的可利用程度及对审计策略的影响。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "评估内部审计工作的可利用程度及对审计策略的影响。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "8d4de1f6e7be9d272ba878fb60d2029ddb44e86e571f994cd254e513fa3fe23a",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "63a17fe1b86f00d2c53bb7934b05fa0fdcdc8f76d2db80191e38eef6dbcdbd29"
+  }
 }

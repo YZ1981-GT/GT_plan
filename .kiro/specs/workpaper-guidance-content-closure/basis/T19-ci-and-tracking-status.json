@@ -1,0 +1,46 @@
+{
+  "task": 19,
+  "recordedAt": "2026-09-09T06:45:00.000Z",
+  "ciJobsAdded": [
+    "wgcc-guidance-backend-guards",
+    "wgcc-guidance-frontend-guards"
+  ],
+  "workflow": ".github/workflows/governance-checks.yml",
+  "directedPytestSubset": {
+    "passed": 89,
+    "files": [
+      "test_guidance_gc0_conformance.py",
+      "test_guidance_gid.py",
+      "test_guidance_handoff_consumer.py",
+      "test_guidance_api_task9.py",
+      "test_guidance_inventory_snapshots.py"
+    ]
+  },
+  "mutationBatch": {
+    "task17": "basis/T17-backend-mutation-report.json",
+    "allRed": true,
+    "scripts": 11
+  },
+  "cleanCheckoutGate": {
+    "verdict": "BLOCKED",
+    "reason": "formal guidance artefacts remain untracked (??); require explicit git add/commit before clean-checkout PASS",
+    "trackedPathsManifest": "basis/T19-tracked-paths.json",
+    "sampleUntrackedPrefixes": [
+      ".kiro/specs/workpaper-guidance-content-closure/",
+      "backend/data/guidance/",
+      "backend/app/services/guidance_*.py",
+      "backend/scripts/diagnose/mutate_guidance_*.py",
+      "backend/tests/test_guidance_*.py",
+      "audit-platform/frontend/src/shell/guidance/",
+      "audit-platform/frontend/e2e/workpaper-guidance-fshell.spec.ts"
+    ]
+  },
+  "canonicalMigrationCheck": {
+    "mode": "check",
+    "files": 373,
+    "changed": 0,
+    "unmapped": 159,
+    "errors": 0,
+    "note": "after T7 promote batch (308→159); still blocked by empty source_refs + missing sections + no publication"
+  }
+}

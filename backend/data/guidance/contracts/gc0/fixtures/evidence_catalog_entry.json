@@ -1,0 +1,23 @@
+{
+  "contractVersion": "1.0",
+  "evidenceId": "evidence-catalog-001",
+  "runId": "run-catalog-2026-09-07",
+  "subject": {
+    "kind": "catalog_entry",
+    "templateLineageId": "lineage-g4-1",
+    "templateVersionId": "v2025-rev2",
+    "wpCode": "G4-1",
+    "sheetUid": "sheet_g4_1"
+  },
+  "contractVersions": {
+    "G-C0": "1.0"
+  },
+  "inventoryDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "sourceDigests": {},
+  "operationIds": {
+    "extraction": "op-extract-001"
+  },
+  "artifacts": [],
+  "verdict": "PASS",
+  "recordedAt": "2026-09-07T00:00:00Z"
+}

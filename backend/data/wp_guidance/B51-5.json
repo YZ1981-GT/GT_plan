@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B51-5",
   "title": "B51-5 特别风险评估子表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于记录被识别为特别风险的重大错报风险评估，按 CAS 1211 要求对特别风险实施专门应对。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于记录被识别为特别风险的重大错报风险评估，按 CAS 1211 要求对特别风险实施专门应对。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 说明将该风险认定为特别风险的理由\n2. 评估相关控制的设计和执行有效性\n3. 制定有针对性的实质性程序\n4. 记录最终审计结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 说明将该风险认定为特别风险的理由\n2. 评估相关控制的设计和执行有效性\n3. 制定有针对性的实质性程序\n4. 记录最终审计结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 收入确认推定为特别风险（除非有理由推翻）\n• 管理层凌驾控制之上的风险不可排除\n• 特别风险不得仅依赖分析性程序"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 收入确认推定为特别风险（除非有理由推翻）\n• 管理层凌驾控制之上的风险不可排除\n• 特别风险不得仅依赖分析性程序",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "9e1471dd590909b57e1ed2f11ddc92189eafb5471ef4b2862b7ef521554e16f0",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "43c3414cd6d15830fa14160e5f638c5c0d02a3ad8b1441158c2ec08441341005"
+  }
 }

@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "D5",
   "title": "D5 收入截止测试 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿用于测试收入确认的截止是否正确，验证收入是否记录在正确的会计期间（CAS 13 收入准则）。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿用于测试收入确认的截止是否正确，验证收入是否记录在正确的会计期间（CAS 13 收入准则）。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 选取资产负债表日前后若干天的发货/验收记录\n2. 追踪至相应的收入确认凭证\n3. 核对发货日期、验收日期与收入确认日期的匹配性\n4. 记录截止差异及影响金额"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 选取资产负债表日前后若干天的发货/验收记录\n2. 追踪至相应的收入确认凭证\n3. 核对发货日期、验收日期与收入确认日期的匹配性\n4. 记录截止差异及影响金额",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 关注期末集中确认大额收入的情况\n• 电子商务收入关注发货/签收时点\n• 跨期收入金额超过重要性须做审计调整"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 关注期末集中确认大额收入的情况\n• 电子商务收入关注发货/签收时点\n• 跨期收入金额超过重要性须做审计调整",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "16559e4105d4d10c5c42e430f3bcf16ca55e1fc7cf54dfeae57afc5a48cd188a",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "fc31fec5c53c6de579772e2cacdf3cb1b3825414b4bcbeda18576e6235247567"
+  }
 }

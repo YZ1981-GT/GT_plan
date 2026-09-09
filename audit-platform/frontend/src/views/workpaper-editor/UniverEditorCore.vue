@@ -23,6 +23,7 @@ import { useCrossModuleRefs } from '@/composables/useCrossModuleRefs'
 import { useUserOverrides } from '@/composables/useUserOverrides'
 import { useStaleImpact } from '@/composables/useStaleImpact'
 import { type SheetNavFacadeAPI } from '@/composables/useSheetNavFacade'
+import { resolveSheetNameByDeepLink } from '@/utils/normalizeSheetName'
 import { eventBus } from '@/utils/eventBus'
 import type { WorkpaperDetail } from '@/services/workpaperApi'
 import type { CycleTypeFlags } from '@/composables/useCycleType'
@@ -56,7 +57,6 @@ const emit = defineEmits<{
   'saved': []
   'dirty-change': [dirty: boolean]
   'sheet-switch': [sheetId: string]
-  'locate-cell': [payload: { sheetName?: string; cellRef: string }]
 }>()
 
 const router = useRouter()
@@ -220,20 +220,20 @@ function onRetryLoad() {
 // ─── locate-cell 事件监听 ───────────────────────────────────────────────────
 
 eventBus.on('workpaper:locate-cell', (payload: any) => {
-  if (payload?.wpId === props.wpId) {
-    emit('locate-cell', { sheetName: payload.sheetName, cellRef: payload.cellRef })
-    // 如果有 sheetName，先切换到对应 sheet
-    if (payload.sheetName && univerAPI.value) {
-      const workbook = univerAPI.value.getActiveWorkbook?.()
-      if (workbook) {
-        const sheets = workbook.getSheets?.() || []
-        const target = sheets.find((s: any) => s.getSheetName?.() === payload.sheetName || s.getName?.() === payload.sheetName)
-        if (target) {
-          workbook.setActiveSheet?.(target)
-        }
-      }
-    }
-  }
+  if (payload?.wpId !== props.wpId || !payload.sheetName || !univerAPI.value) return
+  const workbook = univerAPI.value.getActiveWorkbook?.()
+  if (!workbook) return
+  const sheets = workbook.getSheets?.() || []
+  const resolvedName = resolveSheetNameByDeepLink(
+    sheets.map((sheet: any) => sheet.getSheetName?.() || sheet.getName?.() || ''),
+    payload.sheetName,
+  )
+  if (!resolvedName) return
+  const target = sheets.find((sheet: any) =>
+    (sheet.getSheetName?.() || sheet.getName?.()) === resolvedName,
+  )
+  const targetId = target?.getSheetId?.() || target?.getId?.()
+  if (targetId) onSwitchSheet(targetId)
 })
 
 // ─── Lifecycle ──────────────────────────────────────────────────────────────

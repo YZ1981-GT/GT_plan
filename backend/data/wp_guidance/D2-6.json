@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "D2-6",
   "title": "D2-6 销售循环分析明细 — 收入波动分析 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿对收入的月度/季度波动进行分析，识别异常收入确认模式。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿对收入的月度/季度波动进行分析，识别异常收入确认模式。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 编制收入月度/季度明细表\n2. 与上年同期对比分析波动原因\n3. 识别期末收入异常集中（四季度占比过高）\n4. 追查异常波动的业务背景和支撑凭证"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 编制收入月度/季度明细表\n2. 与上年同期对比分析波动原因\n3. 识别期末收入异常集中（四季度占比过高）\n4. 追查异常波动的业务背景和支撑凭证",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 期末突击收入是收入舞弊的典型特征\n• 关注收入波动与经营活动现金流的匹配性\n• 按产品线/地区分别分析收入变动趋势"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 期末突击收入是收入舞弊的典型特征\n• 关注收入波动与经营活动现金流的匹配性\n• 按产品线/地区分别分析收入变动趋势",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "55b9d7ae07b9f941491b0e7ccfaf03ea71e0b112944d909e69b2ff11f32caeb9",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "1d874528fac06704aaff25916e4ff2f763cba9ba7c51bfc2878cc402cc67d0c9"
+  }
 }

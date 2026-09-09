@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B60-2-1",
   "title": "IT复杂性判断表 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "判断本项目是否适用 IT 审计，并汇总拟纳入测试的应用系统/基础设施范围，作为 B60 信息技术安排及后续 IT 派工的依据。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "判断本项目是否适用 IT 审计，并汇总拟纳入测试的应用系统/基础设施范围，作为 B60 信息技术安排及后续 IT 派工的依据。",
+      "source_refs": []
     },
     {
-      "heading": "二、使用方法",
-      "content": "1. 访谈获取 IT profile，完成「是否适用」三类判断表\n2. 任一为「是」则继续填写测试范围，并同步完成 B22A-4-1 IT 概要\n3. 将结论回写 B60 第三章（六）适用情形勾选"
+      "key": "steps",
+      "title": "二、使用方法",
+      "content": "1. 访谈获取 IT profile，完成「是否适用」三类判断表\n2. 任一为「是」则继续填写测试范围，并同步完成 B22A-4-1 IT 概要\n3. 将结论回写 B60 第三章（六）适用情形勾选",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 测试范围应与对财务报表（及整合审计下对 ICFR）的影响相关\n• 关联：B60 / B60-2-2 / B60-2-3 / B22A-4-1"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 测试范围应与对财务报表（及整合审计下对 ICFR）的影响相关\n• 关联：B60 / B60-2-2 / B60-2-3 / B22A-4-1",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "fc1491ab2b6e4665de4ad0c9f75e74128115a5b133d56535f8372beb14bbcd9d",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "564a7dc7d2cf931c02516f18891a4f66e410abb025ee478f502a6339eb768528"
+  }
 }

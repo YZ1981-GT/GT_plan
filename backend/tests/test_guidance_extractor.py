@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -114,9 +113,9 @@ class TestStaticJsonLoading:
         assert result.source == "static_json"
         assert result.wp_code == "A17"
         assert len(result.sections) >= 1
-        # A17 应有编制目的/主要内容/编制步骤
-        headings = [s.heading for s in result.sections]
-        assert any("编制目的" in h for h in headings)
+        # legacy 标题可演进，但必须保留有内容的结构化章节，并识别核心“编制步骤”语义。
+        assert all(section.heading and section.content for section in result.sections)
+        assert any(section.key == "steps" for section in result.sections)
 
     def test_json_sections_preserve_order(self, extractor):
         """JSON sections 保持原始顺序"""
@@ -217,3 +216,126 @@ class TestTimeoutProtection:
         result = _run(extractor._try_with_timeout(slow_func, "test"))
         # 应在 5 秒内返回 None（超时）
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# 6. child exact 与 parent full static 语义
+# ---------------------------------------------------------------------------
+
+
+class TestExactStaticContract:
+    """child probe 只接受 schema v2 九段完整内容；full chain 保留 legacy。"""
+
+    @staticmethod
+    def _section(key: str) -> dict:
+        return {
+            "key": key,
+            "title": key,
+            "content": f"{key} 的权威内容",
+            "source_refs": [{"kind": "xlsx", "path": "backend/wp_templates/A/test.xlsx", "sheet": "说明"}],
+        }
+
+    def test_incomplete_static_does_not_match_child_exact_but_remains_in_full_chain(self, extractor):
+        from app.services.guidance_inventory import CANONICAL_SECTION_KEYS
+
+        code = "Z991-INCOMPLETE"
+        path = GUIDANCE_DIR / f"{code}.json"
+        path.write_text(json.dumps({
+            "schema_version": 2,
+            "wp_code": code,
+            "sections": [self._section(CANONICAL_SECTION_KEYS[0])],
+        }, ensure_ascii=False), encoding="utf-8")
+        try:
+            assert _run(extractor.extract_exact_static(code)) is None
+            full = _run(extractor.extract_full(code, None))
+            assert full.source == "static_json"
+            assert full.sections[0].key == CANONICAL_SECTION_KEYS[0]
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_unmapped_only_static_remains_visible_in_full_chain(self, extractor):
+        code = "Z992-UNMAPPED-ONLY"
+        path = GUIDANCE_DIR / f"{code}.json"
+        path.write_text(json.dumps({
+            "schema_version": 2,
+            "wp_code": code,
+            "sections": [],
+            "unmapped_sections": [{
+                "title": "待裁决专家提示",
+                "content": "这段真实方法论不能因迁移而消失。",
+                "source_refs": [],
+                "source_index": 0,
+            }],
+        }, ensure_ascii=False), encoding="utf-8")
+        try:
+            assert _run(extractor.extract_exact_static(code)) is None
+            full = _run(extractor.extract_full(code, None))
+            assert full.source == "static_json"
+            assert [(section.key, section.heading, section.content) for section in full.sections] == [
+                (None, "待裁决专家提示", "这段真实方法论不能因迁移而消失。")
+            ]
+            assert full.raw_text.count("这段真实方法论不能因迁移而消失。") == 1
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_unmapped_section_blocks_exact_without_hiding_any_content(self, extractor):
+        from app.services.guidance_inventory import CANONICAL_SECTION_KEYS
+
+        code = "Z993-UNMAPPED-BLOCKER"
+        path = GUIDANCE_DIR / f"{code}.json"
+        path.write_text(json.dumps({
+            "schema_version": 2,
+            "wp_code": code,
+            "sections": [self._section(key) for key in CANONICAL_SECTION_KEYS],
+            "unmapped_sections": [{
+                "title": "专项判断补充",
+                "content": "尚未裁决归属的补充判断。",
+                "source_refs": [{"kind": "xlsx", "path": "backend/wp_templates/A/test.xlsx"}],
+                "source_index": 9,
+            }],
+        }, ensure_ascii=False), encoding="utf-8")
+        try:
+            assert _run(extractor.extract_exact_static(code)) is None
+            full = _run(extractor.extract_full(code, None))
+            assert len(full.sections) == len(CANONICAL_SECTION_KEYS) + 1
+            assert [section.order for section in full.sections] == list(range(len(full.sections)))
+            assert full.sections[-1].key is None
+            assert full.sections[-1].content == "尚未裁决归属的补充判断。"
+            assert full.raw_text.count("尚未裁决归属的补充判断。") == 1
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_nine_sections_with_source_refs_match_child_exact(self, extractor):
+        from app.services.guidance_inventory import CANONICAL_SECTION_KEYS
+
+        code = "Z992-EXACT"
+        path = GUIDANCE_DIR / f"{code}.json"
+        path.write_text(json.dumps({
+            "schema_version": 2,
+            "wp_code": code,
+            "sections": [self._section(key) for key in CANONICAL_SECTION_KEYS],
+        }, ensure_ascii=False), encoding="utf-8")
+        try:
+            from app.services.guidance_inventory import GuidanceInventoryEntry
+
+            assert _run(extractor.extract_exact_static(code)) is None
+            validated = GuidanceInventoryEntry(
+                wp_code=code,
+                path=str(path),
+                parse_status="ok",
+                source_digest="a" * 64,
+                exact_status="exact",
+                missing_sections=(),
+                reason="ok",
+                source_ref_status="valid",
+                source_ref_facts_digest="b" * 64,
+            )
+            result = _run(
+                extractor.extract_exact_static(code, validated_entry=validated)
+            )
+            assert result is not None
+            assert result.source == "static_json"
+            assert [section.key for section in result.sections] == list(CANONICAL_SECTION_KEYS)
+            assert all(section.source_refs for section in result.sections)
+        finally:
+            path.unlink(missing_ok=True)

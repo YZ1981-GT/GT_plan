@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "B2-11",
   "title": "B2-11 前任审计师沟通记录 — 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "本底稿记录与前任审计师的沟通事项，获取必要的审计信息，评估承接业务的风险因素（CAS 1151 前任注册会计师）。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "本底稿记录与前任审计师的沟通事项，获取必要的审计信息，评估承接业务的风险因素（CAS 1151 前任注册会计师）。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确认已获得被审计单位授权同意前任沟通\n2. 编制沟通事项清单（重大会计政策分歧、管理层诚信问题、审计范围受限等）\n3. 记录沟通方式（面谈/书面/电话）及日期\n4. 汇总沟通结果，评估对承接决策的影响"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确认已获得被审计单位授权同意前任沟通\n2. 编制沟通事项清单（重大会计政策分歧、管理层诚信问题、审计范围受限等）\n3. 记录沟通方式（面谈/书面/电话）及日期\n4. 汇总沟通结果，评估对承接决策的影响",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 沟通须在签署业务约定书之前完成\n• 前任拒绝沟通应记录原因并评估额外风险\n• 涉及法律诉讼等敏感事项须征得法务部门意见"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 沟通须在签署业务约定书之前完成\n• 前任拒绝沟通应记录原因并评估额外风险\n• 涉及法律诉讼等敏感事项须征得法务部门意见",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "33882ccefcb93d5c0ac51f3a69e1806de6c4f013131243560551cb8ddc60b7ae",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "0445dfb6e17fedc17f518dceabf792bf131412d673cf5fabe22882f8035f561e"
+  }
 }

@@ -1,0 +1,54 @@
+{
+  "contractId": "G-HANDOFF-CONSUMER",
+  "task": 20,
+  "fShellConsumer": true,
+  "recordedAt": "2026-09-09T02:14:18.588Z",
+  "projectId": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "hostRuns": [
+    {
+      "host": "html",
+      "wp_code": "B50-1",
+      "wp_id": "68b35347-4e3a-43aa-a91d-c611149df9d2",
+      "shellSeen": true,
+      "guidanceOpened": true,
+      "fixedTriggerCount": 0,
+      "guidanceHttpStatus": 200,
+      "guidanceHttpCount": 2,
+      "provenanceVisible": true,
+      "completionVisible": true,
+      "screenshot": "D:\\GT_plan\\.kiro\\specs\\workpaper-guidance-content-closure\\basis\\T20-playwright\\html-B50-1.png",
+      "tabCount": 8
+    },
+    {
+      "host": "univer",
+      "wp_code": "A1-13",
+      "wp_id": "085ae719-d662-4e93-a282-a03c407cf871",
+      "shellSeen": true,
+      "guidanceOpened": false,
+      "fixedTriggerCount": 0,
+      "guidanceHttpStatus": 200,
+      "guidanceHttpCount": 5,
+      "provenanceVisible": false,
+      "completionVisible": false,
+      "screenshot": "D:\\GT_plan\\.kiro\\specs\\workpaper-guidance-content-closure\\basis\\T20-playwright\\univer-A1-13.png",
+      "tabCount": 5
+    },
+    {
+      "host": "onlyoffice",
+      "wp_code": "A14-4",
+      "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66",
+      "shellSeen": true,
+      "guidanceOpened": true,
+      "fixedTriggerCount": 0,
+      "guidanceHttpStatus": 200,
+      "guidanceHttpCount": 5,
+      "provenanceVisible": false,
+      "completionVisible": false,
+      "screenshot": "D:\\GT_plan\\.kiro\\specs\\workpaper-guidance-content-closure\\basis\\T20-playwright\\onlyoffice-A14-4.png",
+      "tabCount": 5
+    }
+  ],
+  "consoleErrorCount": 0,
+  "consoleSample": [],
+  "verdict": "PASS"
+}

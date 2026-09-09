@@ -1,19 +1,35 @@
 {
+  "schema_version": 2,
   "wp_code": "S17",
   "title": "非经常性损益审计底稿 — S17 编制说明",
   "sections": [
     {
-      "heading": "一、编制目的",
-      "content": "识别和验证非经常性损益项目的分类正确性和金额准确性。"
+      "key": "purpose",
+      "title": "一、编制目的",
+      "content": "识别和验证非经常性损益项目的分类正确性和金额准确性。",
+      "source_refs": []
     },
     {
-      "heading": "二、编制步骤",
-      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论"
+      "key": "steps",
+      "title": "二、编制步骤",
+      "content": "1. 确定本专项审计的适用条件和范围\n2. 设计并执行针对性的审计程序\n3. 记录执行结果和重要发现\n4. 评估对审计意见的影响并形成结论",
+      "source_refs": []
     },
     {
-      "heading": "三、注意事项",
-      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注"
+      "key": "common_errors",
+      "title": "三、注意事项",
+      "content": "• 确认该专项在本项目是否适用\n• 不适用时标注原因并交叉引用说明\n• 发现对审计意见有影响时须提请合伙人关注",
+      "source_refs": []
     }
   ],
-  "source": "static_json"
+  "source": "static_json",
+  "migration": {
+    "kind": "legacy_structure_preserved",
+    "version": 2,
+    "legacy_content_digest": "c8d6e7bba1168dd4598cb786b3a3c195da2c342f232ccafee488391c0a997657",
+    "legacy_section_count": 3,
+    "canonical_section_count": 3,
+    "unmapped_section_count": 0,
+    "canonical_body_digest": "05685f003d8833b1daa2a623903b0464b86543b8aaf9d63e349a699312c98995"
+  }
 }
