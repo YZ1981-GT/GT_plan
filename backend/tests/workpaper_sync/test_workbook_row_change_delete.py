@@ -64,9 +64,10 @@ TEMPLATE_ROOT = _BACKEND / "wp_templates"
 
 D2_REL = "D/D2-1至D2-4  应收账款- 审定表明细表（Leap-常规程序）.xlsx"
 D2_SHEET = "明细表D2-2"
-#: 🔴 数据区是 **13..25**，不是 11..25 —— `anchor='A11'` 是表头起点，
-#: `header_rows=2` ⇒ 数据首行 = 11 + 2 = 13。`formula_mask=('Q13:Q25',…)` 印证。
-D2_REGION = (13, 25)
+#: 🔴 数据区是 **13..24**（BP-21 后）—— `anchor='A11'` 是表头起点，`header_rows=2`
+#: ⇒ 数据首行 = 11 + 2 = 13；末行 24 由 `formula_mask=('Q13:Q24',…)` 印证。
+#: 第 25 行是排版占位 `……`（BP-21 剔出受管区），第 26 行是合计行。
+D2_REGION = (13, 24)
 #: 合计行（`A26` = `合计`，`footer_anchor.marker='合计'` 印证）。**不是**数据行。
 D2_FOOTER_ROW = 26
 
@@ -76,7 +77,7 @@ K11_REGION = (7, 25)
 
 EXPECTED: dict[str, Any] = {
     "d2_undeletable": (),
-    "d2_region_rows": 13,
+    "d2_region_rows": 12,
     "d2_footer_single_cell_refs": 24,
     "k11_undeletable_count": 19,
     "k11_dangling_per_row": 6,
@@ -171,11 +172,12 @@ class TestProperty35UndeletableRows:
             "锁死会让 D2 的删行功能永远失败"
         )
 
-    def test_d2_region_is_13_to_25_not_11_to_25(self) -> None:
-        """🔴 分母前提：D2 数据区是 **13..25**，不是 `anchor` 的 11。
+    def test_d2_region_is_13_to_24_not_11_to_25(self) -> None:
+        """🔴 分母前提：D2 数据区是 **13..24**（BP-21 后），不是 `anchor` 的 11、也不是 25。
 
-        `anchor='A11'` 是**表头**起点，`header_rows=2` ⇒ 数据首行 13。
-        判据从契约现算，不写死 —— 契约改了这里会红。
+        `anchor='A11'` 是**表头**起点，`header_rows=2` ⇒ 数据首行 13。末行由 BP-21 从 25
+        收缩为 24（25 是排版占位 `……`）。判据从契约的 `formula_mask` 现算，不写死 ——
+        契约改了这里会红。
         """
         from app.services.workpaper_sync.contracts import load_contract
 
@@ -183,9 +185,9 @@ class TestProperty35UndeletableRows:
         anchor_row = int("".join(ch for ch in table.anchor if ch.isdigit()))
         assert anchor_row == 11 and table.header_rows == 2
         assert anchor_row + table.header_rows == D2_REGION[0] == 13
-        # formula_mask 印证末行
-        assert any("13:" in m and m.endswith("25") for m in table.formula_mask), (
-            f"formula_mask {table.formula_mask} 未印证数据区 13..25"
+        # formula_mask 印证末行 24（BP-21 后）
+        assert any("13:" in m and m.endswith("24") for m in table.formula_mask), (
+            f"formula_mask {table.formula_mask} 未印证数据区 13..24"
         )
         assert D2_REGION[1] - D2_REGION[0] + 1 == EXPECTED["d2_region_rows"]
 
@@ -216,7 +218,8 @@ class TestProperty35UndeletableRows:
     def test_d2_rows_13_and_25_are_only_range_endpoints(
         self, d2: tuple[bytes, dict[str, str], N1.ReferenceScan]
     ) -> None:
-        """🔴 13/25 只作为**区间端点**出现，数据区内单格引用 0 处。
+        """🔴 区间端点里落在数据区内的只有 13（BP-21 后区间末行 24，范围端点 25 已在区外），
+        数据区内单格引用 0 处。
 
         这是「原文那三个数都不该在」的第二半证据。
         """
@@ -243,7 +246,7 @@ class TestProperty35UndeletableRows:
                 if row in region
             }
         )
-        assert endpoints == [13, 25], endpoints
+        assert endpoints == [13], endpoints
 
     def test_k11_blocks_every_row_in_region(
         self, k11: tuple[bytes, dict[str, str], N1.ReferenceScan]
@@ -288,7 +291,7 @@ class TestProperty35UndeletableRows:
     def test_multi_row_delete_widens_the_locked_set(
         self, d2: tuple[bytes, dict[str, str], N1.ReferenceScan]
     ) -> None:
-        """🔴 `count` 变大时锁定集必须相应变大 —— 删 13 行确实会让区间整体消失。
+        """🔴 `count` 变大时锁定集必须相应变大 —— 删满整个数据区确实会让区间整体消失。
 
         没有这条，把第②条写成恒不命中（即只看单格引用）也能让上面的 D2 判据绿，
         而那会漏掉「删光整个区间」这类真损坏。
@@ -300,15 +303,20 @@ class TestProperty35UndeletableRows:
             region_last_row=D2_REGION[1],
             count=1,
         )
+        # 🔴 range `$AI$13:$AI$25` 跨 13..25（末端 25 = 合计行前的排版占位行）。BP-21 后
+        #    数据区末行是 24，所以删满 12 行数据区**不足以**删光该 range（行 25 仍在）——
+        #    必须删到行 25 才会整体消失，即 count = 25 - 13 + 1 = 13。这正是「count 越大锁
+        #    定集越大」的证据：删不到 range 末端不锁，删到才锁全区。
+        collapse_count = 25 - D2_REGION[0] + 1  # = 13
         wide = N1.find_undeletable_rows(
             scan,
             region_first_row=D2_REGION[0],
             region_last_row=D2_REGION[1],
-            count=EXPECTED["d2_region_rows"],  # 13 行 = 整个数据区
+            count=collapse_count,
         )
         assert narrow == ()
         assert set(wide) == set(range(D2_REGION[0], D2_REGION[1] + 1)), (
-            f"删 13 行时应锁全区（`$AI$13:$AI$25` 会被删光），实得 {wide}"
+            f"删到 range 末端（`$AI$13:$AI$25` 会被删光）时应锁全区，实得 {wide}"
         )
 
     def test_degenerate_single_row_range_is_locked(self) -> None:

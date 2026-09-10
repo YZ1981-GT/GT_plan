@@ -382,6 +382,17 @@ backend/app/services/workpaper_sync/excel_row_shift.py  2041
 #     spec: 同上（2026-09-07 D2-2 实测条目）
 backend/tests/workpaper_sync/test_excel_row_shift.py  951
 
+#   test_workbook_row_change_delete.py —— **改动前即 810 行已超限**（splitlines 口径，HEAD 现状）。
+#     本次净增 78 行，是 BP-21 受符区末尾排版占位行的正确性修正：D2 数据区由 13..25 收缩为
+#     13..24（第 25 行是 BP-21 剔出的排版占位 `…`，第 26 行才是合计行），`D2_REGION`、
+#     `d2_region_rows`（13→12）、`formula_mask`（Q13:Q25→Q13:Q24）、区间端点断言（endpoints
+#     [13,25]→[13]）四处同步。守卫与被测对象（`excel_workbook_row_change` 的删除/悬空判据）
+#     同文件是既有范式（本文件已含 Property 35 undeletable rows 的判据与反向自检），拆出去会
+#     让「区间常量 ↔ 端点断言 ↔ collapse count」失联——那正是这次 BP-21 收缩差点漏掉的形式
+#     （区间改了、mask 改了，端点断言没同步则假绿）。baseline 888 = 当前真实行数，不留膨胀空间。
+#     spec: workpaper-html-onlyoffice-bidirectional-writeback-closure G2-2/G2-3
+backend/tests/workpaper_sync/test_workbook_row_change_delete.py  888
+
 # ═══════════════════════════════════════════════════════════════════════════
 # spec: platform-architecture-convergence（2026-09-08 归档入库）
 #
