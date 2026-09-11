@@ -24,6 +24,41 @@ logger = logging.getLogger(__name__)
 
 SEED_DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "report_config_seed.json"
 
+#: 比较类算子 —— 出现即视为「逻辑审核」（勾稽式），不能当自动运算去执行。
+_LOGIC_CHECK_TOKENS = ("==", "!=", ">=", "<=", "≈", "≠")
+
+#: 取数函数 —— 出现即视为「自动运算」（从四表/报表行/附注/底稿取值再算）。
+_AUTO_CALC_FUNCS = ("TB(", "SUM_TB(", "ROW(", "SUM_ROW(", "NOTE(", "WP(", "AUX(")
+
+
+def derive_formula_category(formula: str) -> str | None:
+    """由公式形态推导 ``formula_category``；判不准返回 ``None``。
+
+    判据（顺序敏感）：
+
+    1. 含比较算子（``==`` / ``>=`` / ``≠`` 等）⇒ ``logic_check``：这类是勾稽校验，
+       **绝不能**误标成 ``auto_calc``，否则「应用自动运算」会把校验式拿去当取数执行；
+    2. 含取数函数（``TB(`` / ``ROW(`` / ``NOTE(`` …）⇒ ``auto_calc``；
+    3. 其余（纯常量、看不出来源的表达式）⇒ ``None``，保持为空。
+
+    🔴 宁缺勿造：错分类比空分类更贵 —— 空分类只是看板上显示「未分类」，
+    错分类会进入批量执行链路。
+
+    单一真源：脚本 ``scripts/fix/fix_report_config_formula_category.py`` 与
+    service 的 :meth:`ReportConfigService.backfill_formula_categories` 都调本函数。
+    """
+    expr = (formula or "").strip()
+    if not expr:
+        return None
+    if any(token in expr for token in _LOGIC_CHECK_TOKENS):
+        return "logic_check"
+    # 单个 `=` 也算比较（排除 `==` 已在上面命中、以及 `>=`/`<=` 的组合形态）
+    if "=" in expr.replace(">=", "").replace("<=", "").replace("==", "").replace("!=", ""):
+        return "logic_check"
+    if any(func in expr.upper() for func in _AUTO_CALC_FUNCS):
+        return "auto_calc"
+    return None
+
 
 @dataclass
 class ConfigDiff:
@@ -157,11 +192,18 @@ class ReportConfigService:
         project_id: UUID,
         applicable_standard: str = "enterprise",
     ) -> int:
-        """将标准配置复制为项目级配置。
+        """将标准配置**全量**复制为项目级配置（``project:{project_id}``）。
 
-        项目级配置的 applicable_standard 格式为 "project:{project_id}"，
-        支持后续自定义修改而不影响标准模板。
-        返回克隆的行数。
+        .. deprecated::
+           新调用方请用 :meth:`materialize_project_presets`（``mode='sync'``）：
+
+           * 本方法是**一次性全量**克隆（含无公式的结构行），二次执行直接抛
+             ``ValueError`` ⇒ 无法增量补公式，落库量也是前者的数倍；
+           * 项目级行的唯一消费方是取数层，只按 ``formula`` 查，结构行落进来
+             不改变任何取数结果。
+
+           保留原因：``POST /api/report-config/clone``（``mode='strict'``，默认）
+           与 ``backend/tests/test_report_config.py`` 仍依赖这一语义。
         """
         project_standard = f"project:{project_id}"
 
@@ -189,6 +231,11 @@ class ReportConfigService:
                 row_name=src.row_name,
                 indent_level=src.indent_level,
                 formula=src.formula,
+                # 🔴 分类/说明/来源必须一起克隆：只复制 formula 会让项目级行全变
+                # 「未分类」且丢掉编制说明，公式管理中心里看不出这条公式是干什么的。
+                formula_category=src.formula_category,
+                formula_description=src.formula_description,
+                formula_source=src.formula_source,
                 applicable_standard=project_standard,
                 is_total_row=src.is_total_row,
                 parent_row_code=src.parent_row_code,
@@ -198,6 +245,163 @@ class ReportConfigService:
 
         await self.db.flush()
         return count
+
+    # ------------------------------------------------------------------
+    # 公式分类回填（幂等）
+    # ------------------------------------------------------------------
+    async def backfill_formula_categories(
+        self,
+        applicable_standard: str | None = None,
+        include_project_scoped: bool = False,
+    ) -> dict:
+        """给「有公式但无分类」的行回填 ``formula_category``（幂等）。
+
+        分类由公式形态推导，见 :func:`derive_formula_category`；推导不出的行**保持
+        为空**（宁缺勿造：错分类会让「应用自动运算」把校验式也拿去算）。
+
+        Args:
+            applicable_standard: 限定准则；省略则处理全部非项目级口径。
+            include_project_scoped: 是否一并处理 ``project:{id}`` 行（默认不处理，
+                避免一次调用同时改模板级与各项目级两类数据）。
+
+        Returns:
+            ``{scanned, filled, undecided, by_category}``
+        """
+        stmt = sa.select(ReportConfig).where(
+            ReportConfig.is_deleted == sa.false(),
+            ReportConfig.formula.isnot(None),
+            ReportConfig.formula != "",
+            sa.or_(
+                ReportConfig.formula_category.is_(None),
+                ReportConfig.formula_category == "",
+            ),
+        )
+        if applicable_standard:
+            stmt = stmt.where(ReportConfig.applicable_standard == applicable_standard)
+        elif not include_project_scoped:
+            stmt = stmt.where(ReportConfig.applicable_standard.not_like("project:%"))
+
+        rows = list((await self.db.execute(stmt)).scalars().all())
+        filled = 0
+        undecided = 0
+        by_category: dict[str, int] = {}
+        for row in rows:
+            category = derive_formula_category(row.formula or "")
+            if category is None:
+                undecided += 1
+                continue
+            row.formula_category = category
+            by_category[category] = by_category.get(category, 0) + 1
+            filled += 1
+
+        await self.db.flush()
+        return {
+            "scanned": len(rows),
+            "filled": filled,
+            "undecided": undecided,
+            "by_category": by_category,
+        }
+
+    # ------------------------------------------------------------------
+    # 预设公式落入项目（幂等，可重复执行）
+    # ------------------------------------------------------------------
+    async def materialize_project_presets(
+        self,
+        project_id: UUID,
+        applicable_standard: str | None = None,
+        overwrite: bool = False,
+    ) -> dict:
+        """把标准模板的**预设公式**落成项目级配置（``project:{id}``）。
+
+        与 :meth:`clone_report_config` 的区别（后者是一次性全量克隆、二次执行报错）：
+
+        * **幂等**：已存在的项目级行默认跳过，可重复执行；
+        * **只落有公式的行**：项目级行的唯一消费方是取数层
+          （``report_account_mapping`` / ``four_table.report_line_accounts`` /
+          ``semantic_account_resolver`` / ``i_cycle_accounts`` 都按
+          ``applicable_standard = 'project:{id}'`` 优先查 ``formula``），
+          无公式的结构行落进来只会翻倍数据量、不改变任何取数结果；
+        * **带分类/说明/来源**：公式管理中心要显示这些列。
+
+        Args:
+            project_id: 目标项目。
+            applicable_standard: 源标准（如 ``soe_standalone``）；省略时按项目派生。
+            overwrite: 项目级已有该行时是否用模板公式覆盖。
+
+        Returns:
+            ``{standard, project_standard, created, updated, skipped, master_with_formula}``
+        """
+        project_standard = f"project:{project_id}"
+        standard = applicable_standard or await self.resolve_applicable_standard(
+            self.db, project_id
+        ) or "enterprise"
+
+        master_rows = [
+            r
+            for r in await self.list_configs(applicable_standard=standard)
+            if (r.formula or "").strip()
+        ]
+
+        existing_result = await self.db.execute(
+            sa.select(ReportConfig).where(
+                ReportConfig.applicable_standard == project_standard,
+                ReportConfig.is_deleted == sa.false(),
+            )
+        )
+        existing = {
+            (
+                r.report_type.value if hasattr(r.report_type, "value") else str(r.report_type),
+                r.row_code,
+            ): r
+            for r in existing_result.scalars().all()
+        }
+
+        created = updated = skipped = 0
+        for src in master_rows:
+            key = (
+                src.report_type.value
+                if hasattr(src.report_type, "value")
+                else str(src.report_type),
+                src.row_code,
+            )
+            hit = existing.get(key)
+            if hit is not None:
+                if overwrite and hit.formula != src.formula:
+                    hit.formula = src.formula
+                    hit.formula_category = src.formula_category
+                    hit.formula_description = src.formula_description
+                    hit.formula_source = src.formula_source
+                    updated += 1
+                else:
+                    skipped += 1
+                continue
+            self.db.add(
+                ReportConfig(
+                    report_type=src.report_type,
+                    row_number=src.row_number,
+                    row_code=src.row_code,
+                    row_name=src.row_name,
+                    indent_level=src.indent_level,
+                    formula=src.formula,
+                    formula_category=src.formula_category,
+                    formula_description=src.formula_description,
+                    formula_source=src.formula_source,
+                    applicable_standard=project_standard,
+                    is_total_row=src.is_total_row,
+                    parent_row_code=src.parent_row_code,
+                )
+            )
+            created += 1
+
+        await self.db.flush()
+        return {
+            "standard": standard,
+            "project_standard": project_standard,
+            "created": created,
+            "updated": updated,
+            "skipped": skipped,
+            "master_with_formula": len(master_rows),
+        }
 
     # ------------------------------------------------------------------
     # 修改配置行

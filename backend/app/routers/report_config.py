@@ -72,12 +72,33 @@ async def clone_report_config(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """克隆标准配置到项目"""
+    """克隆标准配置到项目。
+
+    ``mode=sync``（默认）：幂等把**有公式的行**落成项目级配置（``project:{id}``），
+    供取数层按项目优先读取；可反复执行，返回 created/updated/skipped。
+
+    ``mode=strict``（legacy，需显式传）：全量克隆（含无公式结构行），项目级已存在则 400。
+    """
     svc = ReportConfigService(db)
     try:
+        if data.mode == "sync":
+            result = await svc.materialize_project_presets(
+                project_id=data.project_id,
+                applicable_standard=data.applicable_standard,
+                overwrite=data.overwrite,
+            )
+            await db.commit()
+            return {
+                "message": (
+                    f"已落入 {result['created']} 条项目级公式"
+                    f"（更新 {result['updated']}，跳过 {result['skipped']}）"
+                ),
+                "count": result["created"],
+                **result,
+            }
         count = await svc.clone_report_config(
             project_id=data.project_id,
-            applicable_standard=data.applicable_standard,
+            applicable_standard=data.applicable_standard or "enterprise",
         )
         await db.commit()
         return {"message": f"成功克隆 {count} 行配置", "count": count}

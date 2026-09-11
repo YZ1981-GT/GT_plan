@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -113,15 +113,34 @@ class ReportConfigRow(BaseModel):
     row_name: str
     indent_level: int = 0
     formula: str | None = None
+    # 🔴 分类/说明/来源必须随行下发：此前响应模型只有 formula，
+    # 导致 report_config 里已有的 formula_category 前端永远收不到 ⇒ 公式看板
+    # 满屏「未分类」，前端只能自己客户端兜底补 auto_calc（改一处数据看不出效果）。
+    formula_category: str | None = None
+    formula_description: str | None = None
+    formula_source: str | None = None
     applicable_standard: str
     is_total_row: bool = False
     parent_row_code: str | None = None
 
 
 class ReportConfigCloneRequest(BaseModel):
-    """克隆报表配置请求"""
+    """克隆报表配置请求。
+
+    ``mode``：
+      * ``sync``（**默认**）—— 幂等落入「有公式的行」，已存在则跳过
+        （``overwrite=true`` 时覆盖）。公式管理中心的「把报表预设落入项目」走这一档。
+      * ``strict``（legacy，需显式指定）—— 一次性全量克隆（含无公式的结构行）；
+        项目级已存在则 400。仅为兼容历史调用方保留。
+
+    🔴 默认值从 ``strict`` 改为 ``sync``：默认档应当是可重复执行、不炸的那个。
+    strict 二次调用直接 400，且会把无公式的结构行一并复制（取数层不看这些行）。
+    """
+
     project_id: UUID
-    applicable_standard: str = "enterprise"
+    applicable_standard: str | None = "enterprise"
+    mode: Literal["strict", "sync"] = "sync"
+    overwrite: bool = False
 
 
 # ===================================================================
