@@ -1,0 +1,25 @@
+{
+  "task": 15,
+  "recordedAt": "2026-09-08T17:19:15.558634+00:00",
+  "cases": [
+    {
+      "id": "T15-M01-second-formula-dialog",
+      "verdict": "RED",
+      "returncode": 1,
+      "tail": "ected\n+ Received\n\n- []\n+ [\n+   {\n+     \"disposition\": \"forbidden\",\n+     \"finding\": {\n+       \"detail\": \"formula manager entry\",\n+       \"kind\": \"formula-entry\",\n+       \"relativePath\": \"views/WorkpaperEditor.vue\",\n+     },\n+     \"reason\": \"duplicate capability carrier outside shell-owned allowlist\",\n+   },\n+ ]\n\n \u276f src/shell/formula/__tests__/fullInventoryGate.spec.ts:36:82\n     34|       expect(['reachable', 'exempted']).toContain(h.status)\n     35|     }\n     36|     expect(gate.duplicates.forbidden, JSON.stringify(gate.duplicates.f\u2026\n       |                                                                                  ^\n     37|     expect(gate.legacy.findings, JSON.stringify(gate.legacy.findings))\u2026\n     38|     expect(gate.staleEvidence).toEqual([])\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\n\n"
+    },
+    {
+      "id": "T15-M02-null-inventory-digest",
+      "verdict": "RED",
+      "returncode": 1,
+      "tail": "s 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  src/shell/formula/__tests__/fullInventoryGate.spec.ts > Task 15: full inventory gate > adjudicates five hosts, zero forbidden duplicates, pins inventoryDigest\nAssertionError: expected '' to match /^[a-f0-9]{64}$/\n\n- Expected: \n/^[a-f0-9]{64}$/\n\n+ Received: \n\"\"\n\n \u276f src/shell/formula/__tests__/fullInventoryGate.spec.ts:41:34\n     39|     expect(gate.spellingGuards.workoberKeyTypos).toEqual([])\n     40|     expect(gate.browserImportGuards.cryptoStaticImports).toEqual([])\n     41|     expect(gate.inventoryDigest).toMatch(/^[a-f0-9]{64}$/)\n       |                                  ^\n     42|     expect(gate.fshellEnvelope.inventoryDigest).toBe(gate.inventoryDig\u2026\n     43|     expect(DOMAIN_OWNED_FORMULA_EXCLUSIONS.length).toBeGreaterThanOrEq\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\n\n"
+    },
+    {
+      "id": "T15-M03-break-grid-exemption",
+      "verdict": "RED",
+      "returncode": 1,
+      "tail": " env config \"devdir\". This will stop working in the next major version of npm.\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af Failed Tests 1 \u23af\u23af\u23af\u23af\u23af\u23af\u23af\n\n FAIL  src/shell/formula/__tests__/fullInventoryGate.spec.ts > Task 15: full inventory gate > adjudicates five hosts, zero forbidden duplicates, pins inventoryDigest\nAssertionError: expected [ 'reachable', 'exempted' ] to include 'blocked'\n \u276f src/shell/formula/__tests__/fullInventoryGate.spec.ts:34:41\n     32|     expect(gate.hostAdjudications.map((h) => h.host)).toEqual([...DENO\u2026\n     33|     for (const h of gate.hostAdjudications) {\n     34|       expect(['reachable', 'exempted']).toContain(h.status)\n       |                                         ^\n     35|     }\n     36|     expect(gate.duplicates.forbidden, JSON.stringify(gate.duplicates.f\u2026\n\n\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af\u23af[1/1]\u23af\n\n"
+    }
+  ],
+  "allRed": true
+}

@@ -1,0 +1,17 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 消费 `G-C0` 并冻结 workpaper-route 红基线": [
+      {
+        "executionId": "4202afe5-90bb-422f-b9c1-e77e6a950a7c",
+        "chatSessionId": "sess_0d880eca-46ff-46d7-80ec-125ecb66c340",
+        "timestamp": 1788849195141
+      },
+      {
+        "executionId": "4202afe5-90bb-422f-b9c1-e77e6a950a7c",
+        "chatSessionId": "sess_0d880eca-46ff-46d7-80ec-125ecb66c340",
+        "timestamp": 1788849572702
+      }
+    ]
+  }
+}

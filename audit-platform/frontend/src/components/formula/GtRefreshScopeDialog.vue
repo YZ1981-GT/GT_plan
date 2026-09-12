@@ -318,7 +318,9 @@ async function onConfirm() {
   }
   submitting.value = true
   try {
-    const response = await http.post(draftRefresh.execute, {
+    // apiPaths 里该端点名为 `run`（`execute` 从未存在 ⇒ URL 恒 undefined，
+    // 一键刷新的 POST 打不出去）。既有守卫 GtRefreshScopeDialog.spec 已钉住真实 URL。
+    const response = await http.post(draftRefresh.run, {
       project_id: props.projectId,
       year: props.year,
       scopes: checkedScopes.value,

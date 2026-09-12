@@ -1,0 +1,82 @@
+{
+  "projectId": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+  "recordedAt": "2026-09-08T16:40:59.317Z",
+  "results": [
+    {
+      "host": "html",
+      "wp_code": "B50-1",
+      "wp_id": "68b35347-4e3a-43aa-a91d-c611149df9d2",
+      "shellVisible": true,
+      "capabilitySnapshotSeen": true,
+      "triggerCount": 3,
+      "primaryMounted": true,
+      "compatMounted": true,
+      "formulaDialogCount": 0,
+      "screenshots": [
+        "html-B50-1-1280.png",
+        "html-B50-1-1440.png",
+        "html-B50-1-1920.png"
+      ],
+      "consoleErrors": []
+    },
+    {
+      "host": "univer",
+      "wp_code": "A1-13",
+      "wp_id": "085ae719-d662-4e93-a282-a03c407cf871",
+      "shellVisible": true,
+      "capabilitySnapshotSeen": true,
+      "triggerCount": 2,
+      "primaryMounted": true,
+      "compatMounted": false,
+      "formulaDialogCount": 0,
+      "screenshots": [
+        "univer-A1-13-1280.png",
+        "univer-A1-13-1440.png",
+        "univer-A1-13-1920.png"
+      ],
+      "consoleErrors": []
+    },
+    {
+      "host": "onlyoffice",
+      "wp_code": "A14-4",
+      "wp_id": "342e8635-0a43-4c9a-b656-b1d7c879ef66",
+      "shellVisible": true,
+      "capabilitySnapshotSeen": true,
+      "triggerCount": 3,
+      "primaryMounted": true,
+      "compatMounted": true,
+      "formulaDialogCount": 0,
+      "screenshots": [
+        "onlyoffice-A14-4-1280.png",
+        "onlyoffice-A14-4-1440.png",
+        "onlyoffice-A14-4-1920.png"
+      ],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    },
+    {
+      "host": "word",
+      "wp_code": "A26-1",
+      "wp_id": "94a6056e-d533-4965-ae4e-bce9641d9342",
+      "shellVisible": true,
+      "capabilitySnapshotSeen": true,
+      "triggerCount": 3,
+      "primaryMounted": true,
+      "compatMounted": true,
+      "formulaDialogCount": 0,
+      "screenshots": [
+        "word-A26-1-1280.png",
+        "word-A26-1-1440.png",
+        "word-A26-1-1920.png"
+      ],
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ]
+    }
+  ]
+}

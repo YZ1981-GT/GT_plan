@@ -82,7 +82,7 @@ describe('Task 9: AI action taxonomy', () => {
       join(__dirname, '../../../components/workpaper/GtD2AccountsReceivable.vue'),
       'utf8',
     )
-    expect(d2).toContain('GtWpAiReviewToolbar')
+    expect(d2).not.toContain('GtWpAiReviewToolbar')
     expect(d2).not.toMatch(/@click="onCurrentSheetAiReview"/)
     expect(d2).not.toMatch(/本页AI复核/)
     for (const p of AI_REVIEW_BUSINESS_DUPLICATE_PATTERNS) {

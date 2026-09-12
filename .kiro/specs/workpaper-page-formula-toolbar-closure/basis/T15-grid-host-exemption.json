@@ -1,0 +1,11 @@
+{
+  "host": "grid",
+  "status": "exempted",
+  "owner": "workpaper-page-formula-toolbar-closure",
+  "reasonCode": "grid_host_absent_from_registry_and_project_inventory",
+  "expiresAt": "2026-12-31T23:59:59Z",
+  "sourceDigest": "sha256:t15-grid-absent-registry-2026-09-09",
+  "denominator": true,
+  "notes": "Denominator retains grid. No editable_grid / host=grid componentType in renderer registry or T14 project inventory. Shell must show BLOCKED (not fake DOM) if a grid host appears later without adapter.",
+  "recordedAt": "2026-09-09T00:00:00Z"
+}

@@ -150,7 +150,7 @@ const resolvedTokens = computed(() =>
 )
 
 function refreshView(): void {
-  mountable.value = arbiter.mountableTriggers()
+  mountable.value = arbiter.mountableTriggers().filter((rail) => rail.id !== 'ai-assist')
   const s = arbiter.getOpenState()
   openId.value = s.status === 'open' ? s.id : null
 }

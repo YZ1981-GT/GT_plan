@@ -1,0 +1,34 @@
+{
+  "recordedAt": "2026-09-09T00:30:00.000Z",
+  "artifacts": [
+    {
+      "path": "basis/T15-full-inventory-run.json",
+      "exists": true
+    },
+    {
+      "path": "basis/T15-grid-host-exemption.json",
+      "exists": true
+    },
+    {
+      "path": "basis/T14-playwright/host-matrix.json",
+      "exists": true
+    },
+    {
+      "path": "basis/T13-mutation-report.json",
+      "exists": true
+    },
+    {
+      "path": "evidence/F-SHELL/contract.json",
+      "exists": true
+    },
+    {
+      "path": "evidence/F-SHELL/envelope.json",
+      "exists": true
+    },
+    {
+      "path": "evidence/F-SHELL/INDEX.md",
+      "exists": true
+    }
+  ],
+  "inventoryDigest": "cb788c0c01b286f7af07e7c7e680eda4db41c89a16fb9fba27dd6a46a7e9301e"
+}

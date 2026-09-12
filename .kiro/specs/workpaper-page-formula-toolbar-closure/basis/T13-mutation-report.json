@@ -1,0 +1,59 @@
+{
+  "runId": "run-fshell-2026-09-08",
+  "recordedAt": "2026-09-08T15:55:40.135184Z",
+  "verdict": "PASS",
+  "directed": {
+    "status": "GREEN",
+    "returncode": 0,
+    "tail": "\n RUN  v3.2.4 D:/GT_plan/audit-platform/frontend\n\n ✓ src/shell/formula/__tests__/fShellConformance.spec.ts (15 tests) 30ms\n\n Test Files  1 passed (1)\n      Tests  15 passed (15)\n   Start at  23:55:41\n   Duration  4.00s (transform 506ms, setup 186ms, collect 2.73s, tests 30ms, environment 654ms, prepare 112ms)\n\nnpm warn Unknown env config \"devdir\". This will stop working in the next major version of npm.\n"
+  },
+  "mutations": [
+    {
+      "id": "T13-M01-css-class-as-slot",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M02-fallback-steals",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M03-location-missing",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M04-dirty-follows-latest",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M05-mixed-dimensions",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M06-collision-takes-first",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M07-old-dict-formula-type",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M08-audit-warning-commit",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M09-assist-borrows-review",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M10-legacy-thread-forge-cell",
+      "result": "RED"
+    },
+    {
+      "id": "T13-M11-invisible-occupies-slot",
+      "result": "RED"
+    }
+  ],
+  "requiredCount": 11,
+  "redOk": 11,
+  "bad": 0
+}

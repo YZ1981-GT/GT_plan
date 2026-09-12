@@ -437,3 +437,16 @@ backend/app/services/workpaper_sync/phase5_d7_contract_liabilities.py  965
 #     局部可审计性；当前 950 行为真实门禁基线，后续应在独立任务中抽取伴生模块。
 #     spec: d4-revenue-matrix-bidirectional Task 5
 backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  950
+
+#   FormulaManagerDialog.vue —— workpaper route **唯一** FormulaManagerDialog 宿主
+#     （R5.1 禁止业务组件挂第二份 dialog）。**改动前即 2875 行已超 1500 上限**；
+#     本次 F-SHELL 交付增至 3985：项目级/模板级层级标签、公式看板域/层级/分类健康度
+#     分组筛选、全局 7 域总览与空态引导、项目级↔主模板差异面板（复用既有
+#     report_config_baseline 三端点）、模板引用撤销、以及 dialogSession + 请求序号的
+#     会话隔离（防切换底稿后旧响应覆盖新结果）。
+#     拆分方向见 spec design.md §19：抽 ① 看板 ② 全局总览+主模板差异 ③ 用户公式 v2
+#     ④ 变更历史 四个伴生模块；拆分须保持唯一 owner 与 dialogSession 语义，完成后移除本条。
+#     🔴 依赖 monkeypatch 符号或共享 dialogSession 闭包的 handler 不能搬走（同
+#     custom_query.py 登记时记录的约束），故不为凑行数扭曲接线。
+#     spec: workpaper-page-formula-toolbar-closure（F-SHELL 交付）
+audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue  3985

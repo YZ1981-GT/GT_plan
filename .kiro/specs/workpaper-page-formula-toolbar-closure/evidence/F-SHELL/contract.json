@@ -1,0 +1,20 @@
+{
+  "contractId": "F-SHELL",
+  "contractVersion": "1.0",
+  "producerSpec": "workpaper-page-formula-toolbar-closure",
+  "producerTask": 13,
+  "consumers": [
+    "workpaper-guidance-content-closure:G20",
+    "custom-workpaper-template-ingestion-and-sync-closure:X12",
+    "custom-workpaper-template-ingestion-and-sync-closure:X18"
+  ],
+  "dependsOn": {
+    "G-C0": "1.0",
+    "G-ID": "1.0",
+    "G-RAIL": "1.0"
+  },
+  "module": "audit-platform/frontend/src/shell/formula/fShellContract.ts",
+  "mutationReportDigest": "eaca1848373aec2c498d8bf428fc55fbea01caa77f46938b80113a999a1e0321",
+  "recordedAt": "2026-09-08T15:55:40.135184Z",
+  "verdict": "PASS"
+}
