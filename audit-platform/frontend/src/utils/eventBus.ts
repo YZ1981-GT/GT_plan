@@ -34,6 +34,25 @@ export interface FourColSwitchPayload {
 /** 打开公式管理器 */
 export interface OpenFormulaManagerPayload {
   nodeKey?: string
+  wpId?: string
+  projectId?: string
+  year?: number
+  wpCode?: string
+  sheetName?: string
+  /**
+   * 宿主工作簿实际拥有的 sheet 编码（来自 render-config，运行时权威）。
+   *
+   * 🔴 跨循环共享 sheet（D2 页里的 D0-1~D0-8 函证表、E1 里的 E26A 等）在 ACNR
+   * 目录中的 `parent_wp_code` 是它的原生工作簿（D0），不等于宿主 wp_code（D2）。
+   * 只靠 wp_code 前缀推断归属会把这些页判成「不属于本底稿」⇒ 定位失败后静默退成
+   * 全册视图。故由入口下发真实 sheet 集，公式中心不再猜。
+   */
+  sheetCodes?: string[]
+  /**
+   * 公式中心作用域。合并工作底稿等无 wpId 的入口必须显式声明，
+   * 否则全局挂载层会把它误判为报表域。
+   */
+  scope?: 'note' | 'consol_note' | 'consol_worksheet' | 'consol_report' | 'report' | 'tb' | 'workpaper'
 }
 
 /** 合并树节点选择 */

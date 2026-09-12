@@ -131,6 +131,11 @@
         @toggle-fullscreen="isWpFullscreen = !isWpFullscreen"
         @open-attachments="attachmentsDrawerVisible = true"
       >
+        <template #page-capabilities-compatibility>
+          <el-button size="small" :disabled="!runtimeProjectId || !runtimeWpCode || loading" @click="openPageFormulaManager">
+            <el-icon><Setting /></el-icon> 公式管理
+          </el-button>
+        </template>
         <template v-if="activeSheetName" #center>
           <GtWpAiReviewToolbar
             :wp-id="wpId"
@@ -181,7 +186,7 @@
         @step-advance="onStepAdvance"
         @open-attachment="onOpenAttachment"
         @formula-saved="reload"
-        @open-formula="onOpenFormula"
+        @open-formula="openPageFormulaManager"
         @restore="reload"
         @navigate-sheet="onChildNavigateSheet"
       />
@@ -293,7 +298,7 @@
 import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Switch } from '@element-plus/icons-vue'
+import { Switch, Setting } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import {
   resolveRenderSheet,
@@ -373,8 +378,6 @@ const emit = defineEmits<{
   'sync-to-disclosure-notes': [payload: Record<string, any>]
   'jump-to-reference': [refCode: string]
   'open-attachment': [payload: { wpId: string; sheetName: string; rowRef: string }]
-  /** 审定表（audit-sheet）公式按钮 → 转发给上层（后续接 FormulaEditDialog） */
-  'open-formula': [payload: { wpId: string; sheetName: string }]
 }>()
 
 // ─── Refs ───
@@ -643,17 +646,31 @@ const activeSheetHtmlData = computed<any>(() => activeSheet.value?.html_data ?? 
  * 「审定表D1-1」→ D1-1），与后端 _generate_b_index_data 的 sheet 级提取口径一致；
  * 提取不到时回退 workpaper 级 wp_code（renderConfig.wp_code）。
  */
+/** 从 sheet 名尾部抽索引号（如「核实被函证单位信息D0-2」→ D0-2）；本文件唯一实现。 */
+function extractSheetIndexNo(sheetName: string): string {
+  const m = String(sheetName || '').match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)
+  return m ? m[1] : ''
+}
 const activeSheetIndexNo = computed<string>(() => {
-  const name = activeSheetName.value || ''
-  const m = name.match(/([A-Z]\d+[A-Z]?(?:-\d+)*)\s*$/)
-  if (m) return m[1]
-  return renderConfig.value?.wp_code ?? ''
+  return extractSheetIndexNo(activeSheetName.value) || (renderConfig.value?.wp_code ?? '')
 })
 /** univer 类底稿：html_data 是否含可渲染网格 cells（决定走只读网格还是占位） */
 const hasGridCells = computed<boolean>(() => {
   const hd = activeSheetHtmlData.value
   return !!hd && typeof hd === 'object' && hd.cells && Object.keys(hd.cells).length > 0
 })
+/**
+ * 本工作簿拥有的全部 sheet 索引号（含跨循环共享页，如 D2 册内的 D0-1~D0-8）。
+ * 供公式管理中心判定「某页是否属于当前实例」——该判据的真源是 render-config，
+ * 不是 ACNR 的 parent_wp_code（后者指向 sheet 的原生工作簿）。
+ */
+const hostSheetCodes = computed<string[]>(() => {
+  const codes = (renderConfig.value?.sheets ?? [])
+    .map((s: any) => extractSheetIndexNo(s?.sheet_name || ''))
+    .filter(Boolean)
+  return [...new Set(codes)]
+})
+
 /** 当前 sheet 的 componentType（每个 sheet 独立路由） */
 const componentType = computed<WpComponentType>(() => {
   if (isWholeExcelTab.value) return 'onlyoffice-sheet' as WpComponentType
@@ -1113,11 +1130,30 @@ function onOpenAttachment(payload: { wpId: string; sheetName: string; rowRef: st
 }
 
 /**
- * 审定表公式按钮：子组件 emit('open-formula', { sheetName }) → 补全 wpId 转发上层。
- * 后续由 WorkpaperEditor 监听打开 FormulaEditDialog（当前仅冒泡，不在本任务范围）。
+ * 打开平台公式管理中心并定位到当前 sheet。
+ *
+ * 工具栏「公式管理」按钮与子组件 `open-formula` 事件共用本入口：位置身份一律取
+ * 渲染器的 canonical 状态（activeSheetName + render-config 的 wp_code），
+ * 不用子组件自带的 sheet，也不再冒泡给外层 —— 否则子页（如 D0-2）会被外层
+ * 按初始页上下文打开，左树定位不到、右侧列出的是别页（如 D2-1）的公式。
+ *
+ * 「完整Excel」合成页签不是真实 sheet，传空表示工作簿级视图。
  */
-function onOpenFormula(payload: { sheetName: string }) {
-  emit('open-formula', { wpId: props.wpId, sheetName: payload?.sheetName ?? activeSheetName.value })
+function openPageFormulaManager() {
+  if (!props.wpId || !runtimeProjectId.value || !runtimeWpCode.value) {
+    ElMessage.warning('当前底稿缺少完整上下文，暂时无法打开公式管理')
+    return
+  }
+  eventBus.emit('open-formula-manager', {
+    wpId: props.wpId,
+    projectId: runtimeProjectId.value,
+    year: preparationYear.value,
+    wpCode: runtimeWpCode.value,
+    sheetName: isWholeExcelTab.value ? '' : activeSheetName.value,
+    // 本工作簿真实拥有的 sheet 集（render-config 是运行时权威）。跨循环共享页
+    // （D2 里的 D0-*、E1 里的 E26A）靠它才能被认成「本册内页」而非外册。
+    sheetCodes: hostSheetCodes.value,
+  })
 }
 </script>
 

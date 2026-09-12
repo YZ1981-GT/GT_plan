@@ -22,6 +22,14 @@
       <slot name="center" />
     </div>
     <div class="gt-wp-toolbar__right">
+      <!-- Task 5: real named compatibility outlet (CSS class remains styling only) -->
+      <span
+        class="gt-wp-toolbar__compat-outlet"
+        data-toolbar-outlet="page-capabilities-compatibility"
+        data-testid="page-capabilities-compatibility"
+      >
+        <slot name="page-capabilities-compatibility" />
+      </span>
       <el-button size="small" @click="$emit('open-attachments')">
         <el-icon><Paperclip /></el-icon> 关联附件
       </el-button>
@@ -73,5 +81,10 @@ defineEmits<{
   display: flex;
   gap: 6px;
   align-items: center;
+}
+.gt-wp-toolbar__compat-outlet {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 </style>

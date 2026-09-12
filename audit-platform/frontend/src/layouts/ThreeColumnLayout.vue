@@ -144,6 +144,23 @@
           </el-badge>
         </el-tooltip>
 
+        <!-- formula-toolbar Task 5: primary outlet — AI 后、金额单位快捷前 -->
+        <WorkpaperPrimaryCapabilitiesHost
+          host-instance-id="three-column-primary"
+          :owner-epoch="pageCapabilitiesOwnerEpoch"
+        >
+          <template #page-capabilities-primary>
+            <slot name="page-capabilities-primary" />
+          </template>
+        </WorkpaperPrimaryCapabilitiesHost>
+
+        <!-- 金额单位快捷（保证 AI → ƒx outlet → 金额单位 顺序） -->
+        <el-tooltip content="金额单位" placement="bottom">
+          <div class="gt-topbar-btn" title="金额单位" aria-label="金额单位">
+            <span class="gt-topbar-text-icon">{{ amountUnitShortLabel }}</span>
+          </div>
+        </el-tooltip>
+
         <!-- Phase 3 F4: 暗色模式切换按钮 -->
         <el-tooltip :content="isDark ? '切换到浅色模式' : '切换到暗色模式'" placement="bottom">
           <div class="gt-topbar-btn gt-theme-toggle" @click="toggleTheme">
@@ -197,7 +214,7 @@
             </transition>
           </div>
           <!-- 公式管理（弹窗触发，非路由） -->
-          <div class="gt-nav-item" @click="showFormulaManager = true" title="公式管理">
+          <div class="gt-nav-item" @click="onOpenFormulaEvent()" title="公式管理">
             <span class="gt-tool-text-icon" style="font-style:italic;font-weight:700;width:20px;text-align:center;display:inline-block">ƒx</span>
             <transition name="gt-fade">
               <span v-if="!sidebarCollapsed" class="gt-nav-label">公式管理</span>
@@ -300,8 +317,13 @@
     <FormulaManagerDialog
       v-model="showFormulaManager"
       :rows="[]"
-      :project-id="currentProjectId"
-      :year="currentYear"
+      :project-id="formulaContext?.projectId ?? currentProjectId"
+      :year="formulaContext?.year ?? currentYear"
+      :scope="formulaContext?.scope ?? (formulaContext?.wpId ? 'workpaper' : 'report')"
+      :wp-id="formulaContext?.wpId"
+      :wp-code="formulaContext?.wpCode"
+      :sheet-name="formulaContext?.sheetName"
+      :host-sheet-codes="formulaContext?.sheetCodes"
       @saved="onFormulaSaved"
       @applied="onFormulaApplied"
     />
@@ -328,7 +350,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useDisplayPrefsStore } from '@/stores/displayPrefs'
@@ -348,7 +370,10 @@ import GtRefreshScopeDialog from '@/components/formula/GtRefreshScopeDialog.vue'
 import CustomQueryDialog from '@/components/query/CustomQueryDialog.vue'
 import ShortcutHelpDialog from '@/components/common/ShortcutHelpDialog.vue'
 import DshPanel from '@/components/ai/DshPanel.vue'
-import { eventBus, type SyncEventPayload } from '@/utils/eventBus'
+import WorkpaperPrimaryCapabilitiesHost from '@/shell/formula/WorkpaperPrimaryCapabilitiesHost.vue'
+import { legacyPayloadToPartialCommand } from '@/shell/formula/openFormulaManagerCommand'
+import { DSH_ASSIST_BRIDGE_KEY, type DshAssistBridge } from '@/shell/formula/dshAssistBridge'
+import { eventBus, type SyncEventPayload, type OpenFormulaManagerPayload } from '@/utils/eventBus'
 import { operationHistory } from '@/utils/operationHistory'
 import { subscribeProjectEvent, WILDCARD_EVENT, type ProjectEventSubscription } from '@/services/sse/projectEventStream'
 import DegradedBanner from '@/components/DegradedBanner.vue'
@@ -358,6 +383,24 @@ const router = useRouter()
 const authStore = useAuthStore()
 const displayPrefs = useDisplayPrefsStore()
 const { isDark, toggle: toggleTheme } = useTheme()
+
+/** formula-toolbar Task 5 — primary outlet owner epoch (bumped on workpaper route change). */
+const pageCapabilitiesOwnerEpoch = ref(1)
+const amountUnitShortLabel = computed(() => {
+  const unit = displayPrefs.amountUnit
+  if (unit === 'wan') return '万'
+  if (unit === 'qian') return '千'
+  return '元'
+})
+
+watch(
+  () => route.path,
+  (path) => {
+    if (path.includes('/workpapers') || path.includes('/workpaper')) {
+      pageCapabilitiesOwnerEpoch.value += 1
+    }
+  },
+)
 
 // ── Props ──
 const props = defineProps<{
@@ -486,6 +529,17 @@ const middleCollapsed = ref(false)
 const showDshPanel = ref(false)
 const dshUnreadCount = ref(0)
 
+const dshAssistBridge: DshAssistBridge = {
+  isOpen: showDshPanel,
+  open: () => {
+    showDshPanel.value = true
+  },
+  close: (_options: { preserveDraft: boolean }) => {
+    showDshPanel.value = false
+  },
+}
+provide(DSH_ASSIST_BRIDGE_KEY, dshAssistBridge)
+
 function onDshMessageCount(count: number) {
   dshUnreadCount.value = count
 }
@@ -494,6 +548,7 @@ const catalogCollapsed = ref(false)
 const fourColumnMode = ref(false)
 const fullscreen = ref(false)
 const showFormulaManager = ref(false)
+const formulaContext = ref<OpenFormulaManagerPayload>()
 const showCustomQuery = ref(false)
 const customQueryInitialTab = ref<'basic' | 'advanced'>('basic')
 const customQueryInitialSource = ref<string | undefined>(undefined)
@@ -841,12 +896,16 @@ watch(() => route.params.projectId, (newId) => {
 }, { immediate: true })
 
 // 监听子组件打开公式管理的自定义事件
-function onOpenFormulaEvent(payload: { nodeKey?: string }) {
-  showFormulaManager.value = true
-  if (payload?.nodeKey) {
-    // 存储到 sessionStorage 供 FormulaManagerDialog 读取
-    sessionStorage.setItem('gt-formula-target-node', payload.nodeKey)
+function onOpenFormulaEvent(payload?: OpenFormulaManagerPayload) {
+  formulaContext.value = payload?.wpId ? { ...payload } : undefined
+  sessionStorage.removeItem('gt-formula-target-node')
+  // Task 6: EventBus remains a thin adapter; nodeKey is migration metadata only.
+  // Page entry must open FormulaManagerDialog (never FormulaEditDialog).
+  const meta = legacyPayloadToPartialCommand(payload ?? {})
+  if (meta.legacyNodeKey) {
+    sessionStorage.setItem('gt-formula-target-node', meta.legacyNodeKey)
   }
+  showFormulaManager.value = true
 }
 
 /** 监听全局打开自定义查询事件（如 Dashboard 快捷操作 / 模板页触发） */
