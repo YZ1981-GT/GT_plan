@@ -1,0 +1,340 @@
+{
+  "contract_id": "d4.revenue_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "fd888b06387556553777b8b7bd52edfef5afa0937e8b36fe549b45bec15f9ba5",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "html_store": {
+      "item_id": "D4-2-rows",
+      "note": "整张主营业务收入明细表存成这一条 item 的 remark（JSON 数组字符串，useD4RevenueDetail 的 JSON.stringify(rows)）。本契约按 stable field + row rowId 拆开；B~M 十二列走 months 数组下标（months/0..months/11），禁止把整 JSON 或整 months 当一个字段比较。periodTotal 由模板内部公式计算（store 可不持久化），projection 不得覆盖 N/P/S/T/U。",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "mapping_digest": "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8",
+    "pilot_class": "phase5_revenue_detail",
+    "reviewed_basis": "openpyxl 直读净化后权威模板 D/D4 收入底稿.xlsx（Task 4 sha256 b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f），只取受管 sheet 主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 （A product + B-M months/0..11 + N formula periodTotal + O auditAdjustment + Q/R prior + V remark）；P/S/T/U 仅 formula_mask。mapping_digest=6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8（T01）。wp_code 模块侧 D4O（manifest 幻影码）；裁决落点 D4（真载荷 2 行，Task 6）。"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "主营业务收入明细表D4-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d42-managed",
+      "tables": [
+        {
+          "anchor": "A11",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "product",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!A11",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/product",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!A12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/product",
+              "store_item_id": "D4-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_01",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!B11",
+              "header_text": "1月",
+              "json_pointer": "/rows/{row_uuid}/months/0",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!B12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_01",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_02",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!C11",
+              "header_text": "2月",
+              "json_pointer": "/rows/{row_uuid}/months/1",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!C12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_02",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_03",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!D11",
+              "header_text": "3月",
+              "json_pointer": "/rows/{row_uuid}/months/2",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!D12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_03",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_04",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!E11",
+              "header_text": "4月",
+              "json_pointer": "/rows/{row_uuid}/months/3",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!E12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_04",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_05",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!F11",
+              "header_text": "5月",
+              "json_pointer": "/rows/{row_uuid}/months/4",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!F12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_05",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_06",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!G11",
+              "header_text": "6月",
+              "json_pointer": "/rows/{row_uuid}/months/5",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!G12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_06",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_07",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!H11",
+              "header_text": "7月",
+              "json_pointer": "/rows/{row_uuid}/months/6",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!H12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_07",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_08",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!I11",
+              "header_text": "8月",
+              "json_pointer": "/rows/{row_uuid}/months/7",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!I12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_08",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_09",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!J11",
+              "header_text": "9月",
+              "json_pointer": "/rows/{row_uuid}/months/8",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!J12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_09",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_10",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!K11",
+              "header_text": "10月",
+              "json_pointer": "/rows/{row_uuid}/months/9",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!K12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_10",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_11",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!L11",
+              "header_text": "11月",
+              "json_pointer": "/rows/{row_uuid}/months/10",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!L12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_11",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "month_12",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!M11",
+              "header_text": "12月",
+              "json_pointer": "/rows/{row_uuid}/months/11",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!M12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/month_12",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_total",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!N11",
+              "header_text": "本期未审数合计",
+              "json_pointer": "/rows/{row_uuid}/periodTotal",
+              "mode": "formula",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!N12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/period_total",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "audit_adjustment",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!O11",
+              "header_text": "本期审计调整",
+              "json_pointer": "/rows/{row_uuid}/auditAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!O12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/audit_adjustment",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!Q11",
+              "header_text": "上期未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!Q12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "R",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_adjustment",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!R11",
+              "header_text": "上期审计调整",
+              "json_pointer": "/rows/{row_uuid}/priorAdjustment",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!R12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/prior_adjustment",
+              "store_item_id": "D4-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "V",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!主营业务收入明细表D4-2!V11",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!主营业务收入明细表D4-2!V12",
+              "stable_field_key": "revenue_detail_rows/{row_uuid}/remark",
+              "store_item_id": "D4-2-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 行 A24「合计」（纯两字无空格，T01）。声明为真使结构性插行有权按声明位移量扩张合计公式区间；N 列 =SUM(B:M) 为内部公式须保留。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "N12:N23",
+            "P12:P23",
+            "S12:S23",
+            "T12:T23",
+            "U12:U23"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "revenue_detail_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "e65fb12c1f5bf965053e8a957a879f98a11e3fd43d594b9bcf4e6f9b0ad88017",
+    "relative_path": "D/D4 收入底稿.xlsx",
+    "template_sha256": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+  },
+  "template_definition_sha256": "7b1c91f81e62daa1b002b0c6b3ef14784a87f6817a7eaf93f2c03b54bcf4d3c6"
+}

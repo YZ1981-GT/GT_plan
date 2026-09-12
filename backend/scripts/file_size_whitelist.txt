@@ -431,3 +431,9 @@ backend/app/services/workpaper_sync/phase5_d3_prepaid_receipts.py  967
 backend/app/services/workpaper_sync/phase5_d5_receivables_financing.py  888
 backend/app/services/workpaper_sync/phase5_d6_contract_assets.py  964
 backend/app/services/workpaper_sync/phase5_d7_contract_liabilities.py  965
+
+#   phase5_d4_revenue_detail.py —— D4 第六个 Phase 5 canary：18 字段含 months[12]
+#     位置数组、公式 mask、发布与 OO→HTML 合并必须保持同一入口以维持 provider/契约
+#     局部可审计性；当前 950 行为真实门禁基线，后续应在独立任务中抽取伴生模块。
+#     spec: d4-revenue-matrix-bidirectional Task 5
+backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  950

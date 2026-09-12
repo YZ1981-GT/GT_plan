@@ -1,0 +1,661 @@
+{
+  "measured_at": "2026-09-12",
+  "tool": "openpyxl data_only=False",
+  "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+  "template_sha256_preclean": "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f",
+  "n_sheets": 46,
+  "managed_sheet": "主营业务收入明细表D4-2",
+  "dimensions": "A1:V32",
+  "header_row": 11,
+  "first_data_row": 12,
+  "last_data_row": 23,
+  "footer_row": 24,
+  "footer_marker_exact": "合计",
+  "footer_marker_codepoints": [
+    "0x5408",
+    "0x8ba1"
+  ],
+  "headers_A_to_V": {
+    "A": "项目",
+    "B": "1月",
+    "C": "2月",
+    "D": "3月",
+    "E": "4月",
+    "F": "5月",
+    "G": "6月",
+    "H": "7月",
+    "I": "8月",
+    "J": "9月",
+    "K": "10月",
+    "L": "11月",
+    "M": "12月",
+    "N": "本期未审数合计",
+    "O": "本期审计调整",
+    "P": "本期审定数",
+    "Q": "上期未审数",
+    "R": "上期审计调整",
+    "S": "上期审定数",
+    "T": "未审变动比例",
+    "U": "审定变动比例",
+    "V": "备注"
+  },
+  "sample_formulas_first_data_row": {
+    "N": "=SUM(B12:M12)",
+    "P": "=N12+O12",
+    "S": "=Q12+R12",
+    "T": "=IF(AND(Q12=0,N12=0),0,IF(AND(Q12=0,N12>0),1,(N12-Q12)/Q12))",
+    "U": "=IF(AND(S12=0,P12=0),0,IF(AND(S12=0,P12>0),1,(P12-S12)/S12))"
+  },
+  "merged_ranges": [
+    "A2:V2",
+    "A1:V1"
+  ],
+  "field_map_all_22": [
+    {
+      "col": "A",
+      "header": "项目",
+      "column_key": "product",
+      "mode": "editable",
+      "value_type": "text",
+      "json_path": "product",
+      "store": true,
+      "frontend": "product",
+      "contract_candidate": true
+    },
+    {
+      "col": "B",
+      "header": "1月",
+      "column_key": "month_01",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/0",
+      "store": true,
+      "frontend": "months[0]",
+      "contract_candidate": true
+    },
+    {
+      "col": "C",
+      "header": "2月",
+      "column_key": "month_02",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/1",
+      "store": true,
+      "frontend": "months[1]",
+      "contract_candidate": true
+    },
+    {
+      "col": "D",
+      "header": "3月",
+      "column_key": "month_03",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/2",
+      "store": true,
+      "frontend": "months[2]",
+      "contract_candidate": true
+    },
+    {
+      "col": "E",
+      "header": "4月",
+      "column_key": "month_04",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/3",
+      "store": true,
+      "frontend": "months[3]",
+      "contract_candidate": true
+    },
+    {
+      "col": "F",
+      "header": "5月",
+      "column_key": "month_05",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/4",
+      "store": true,
+      "frontend": "months[4]",
+      "contract_candidate": true
+    },
+    {
+      "col": "G",
+      "header": "6月",
+      "column_key": "month_06",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/5",
+      "store": true,
+      "frontend": "months[5]",
+      "contract_candidate": true
+    },
+    {
+      "col": "H",
+      "header": "7月",
+      "column_key": "month_07",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/6",
+      "store": true,
+      "frontend": "months[6]",
+      "contract_candidate": true
+    },
+    {
+      "col": "I",
+      "header": "8月",
+      "column_key": "month_08",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/7",
+      "store": true,
+      "frontend": "months[7]",
+      "contract_candidate": true
+    },
+    {
+      "col": "J",
+      "header": "9月",
+      "column_key": "month_09",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/8",
+      "store": true,
+      "frontend": "months[8]",
+      "contract_candidate": true
+    },
+    {
+      "col": "K",
+      "header": "10月",
+      "column_key": "month_10",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/9",
+      "store": true,
+      "frontend": "months[9]",
+      "contract_candidate": true
+    },
+    {
+      "col": "L",
+      "header": "11月",
+      "column_key": "month_11",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/10",
+      "store": true,
+      "frontend": "months[10]",
+      "contract_candidate": true
+    },
+    {
+      "col": "M",
+      "header": "12月",
+      "column_key": "month_12",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/11",
+      "store": true,
+      "frontend": "months[11]",
+      "contract_candidate": true
+    },
+    {
+      "col": "N",
+      "header": "本期未审数合计",
+      "column_key": "period_total",
+      "mode": "formula",
+      "value_type": "amount",
+      "json_path": "periodTotal",
+      "store": false,
+      "frontend": "periodTotal (computed)",
+      "formula_sample": "=SUM(B12:M12)",
+      "contract_candidate": true
+    },
+    {
+      "col": "O",
+      "header": "本期审计调整",
+      "column_key": "audit_adjustment",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "auditAdjustment",
+      "store": true,
+      "frontend": "auditAdjustment",
+      "contract_candidate": true
+    },
+    {
+      "col": "P",
+      "header": "本期审定数",
+      "column_key": "audited",
+      "mode": "formula",
+      "value_type": "amount",
+      "json_path": "audited",
+      "store": false,
+      "frontend": "audited (computed)",
+      "formula_sample": "=N12+O12",
+      "contract_candidate": false
+    },
+    {
+      "col": "Q",
+      "header": "上期未审数",
+      "column_key": "prior_unadjusted",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "priorUnadjusted",
+      "store": true,
+      "frontend": "priorUnadjusted",
+      "contract_candidate": true
+    },
+    {
+      "col": "R",
+      "header": "上期审计调整",
+      "column_key": "prior_adjustment",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "priorAdjustment",
+      "store": true,
+      "frontend": "priorAdjustment",
+      "contract_candidate": true
+    },
+    {
+      "col": "S",
+      "header": "上期审定数",
+      "column_key": "prior_audited",
+      "mode": "formula",
+      "value_type": "amount",
+      "json_path": "priorAudited",
+      "store": false,
+      "frontend": "priorAudited (computed)",
+      "formula_sample": "=Q12+R12",
+      "contract_candidate": false
+    },
+    {
+      "col": "T",
+      "header": "未审变动比例",
+      "column_key": "unadjusted_change_rate",
+      "mode": "formula",
+      "value_type": "amount",
+      "json_path": "unadjustedChangeRate",
+      "store": false,
+      "frontend": "unadjustedChangeRate (computed)",
+      "formula_sample": "=IF(AND(Q12=0,N12=0),0,IF(AND(Q12=0,N12>0),1,(N12-Q12)/Q12))",
+      "contract_candidate": false
+    },
+    {
+      "col": "U",
+      "header": "审定变动比例",
+      "column_key": "audited_change_rate",
+      "mode": "formula",
+      "value_type": "amount",
+      "json_path": "auditedChangeRate",
+      "store": false,
+      "frontend": "auditedChangeRate (computed)",
+      "formula_sample": "=IF(AND(S12=0,P12=0),0,IF(AND(S12=0,P12>0),1,(P12-S12)/S12))",
+      "contract_candidate": false
+    },
+    {
+      "col": "V",
+      "header": "备注",
+      "column_key": "remark",
+      "mode": "editable",
+      "value_type": "text",
+      "json_path": "remark",
+      "store": true,
+      "frontend": "remark",
+      "contract_candidate": true
+    }
+  ],
+  "contract_field_count": 18,
+  "contract_fields": [
+    {
+      "col": "A",
+      "header": "项目",
+      "column_key": "product",
+      "mode": "editable",
+      "value_type": "text",
+      "json_path": "product",
+      "store": true,
+      "frontend": "product",
+      "contract_candidate": true
+    },
+    {
+      "col": "B",
+      "header": "1月",
+      "column_key": "month_01",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/0",
+      "store": true,
+      "frontend": "months[0]",
+      "contract_candidate": true
+    },
+    {
+      "col": "C",
+      "header": "2月",
+      "column_key": "month_02",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/1",
+      "store": true,
+      "frontend": "months[1]",
+      "contract_candidate": true
+    },
+    {
+      "col": "D",
+      "header": "3月",
+      "column_key": "month_03",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/2",
+      "store": true,
+      "frontend": "months[2]",
+      "contract_candidate": true
+    },
+    {
+      "col": "E",
+      "header": "4月",
+      "column_key": "month_04",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/3",
+      "store": true,
+      "frontend": "months[3]",
+      "contract_candidate": true
+    },
+    {
+      "col": "F",
+      "header": "5月",
+      "column_key": "month_05",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/4",
+      "store": true,
+      "frontend": "months[4]",
+      "contract_candidate": true
+    },
+    {
+      "col": "G",
+      "header": "6月",
+      "column_key": "month_06",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/5",
+      "store": true,
+      "frontend": "months[5]",
+      "contract_candidate": true
+    },
+    {
+      "col": "H",
+      "header": "7月",
+      "column_key": "month_07",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/6",
+      "store": true,
+      "frontend": "months[6]",
+      "contract_candidate": true
+    },
+    {
+      "col": "I",
+      "header": "8月",
+      "column_key": "month_08",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/7",
+      "store": true,
+      "frontend": "months[7]",
+      "contract_candidate": true
+    },
+    {
+      "col": "J",
+      "header": "9月",
+      "column_key": "month_09",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/8",
+      "store": true,
+      "frontend": "months[8]",
+      "contract_candidate": true
+    },
+    {
+      "col": "K",
+      "header": "10月",
+      "column_key": "month_10",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/9",
+      "store": true,
+      "frontend": "months[9]",
+      "contract_candidate": true
+    },
+    {
+      "col": "L",
+      "header": "11月",
+      "column_key": "month_11",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/10",
+      "store": true,
+      "frontend": "months[10]",
+      "contract_candidate": true
+    },
+    {
+      "col": "M",
+      "header": "12月",
+      "column_key": "month_12",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "months/11",
+      "store": true,
+      "frontend": "months[11]",
+      "contract_candidate": true
+    },
+    {
+      "col": "N",
+      "header": "本期未审数合计",
+      "column_key": "period_total",
+      "mode": "formula",
+      "value_type": "amount",
+      "json_path": "periodTotal",
+      "store": false,
+      "frontend": "periodTotal (computed)",
+      "formula_sample": "=SUM(B12:M12)",
+      "contract_candidate": true
+    },
+    {
+      "col": "O",
+      "header": "本期审计调整",
+      "column_key": "audit_adjustment",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "auditAdjustment",
+      "store": true,
+      "frontend": "auditAdjustment",
+      "contract_candidate": true
+    },
+    {
+      "col": "Q",
+      "header": "上期未审数",
+      "column_key": "prior_unadjusted",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "priorUnadjusted",
+      "store": true,
+      "frontend": "priorUnadjusted",
+      "contract_candidate": true
+    },
+    {
+      "col": "R",
+      "header": "上期审计调整",
+      "column_key": "prior_adjustment",
+      "mode": "editable",
+      "value_type": "amount",
+      "json_path": "priorAdjustment",
+      "store": true,
+      "frontend": "priorAdjustment",
+      "contract_candidate": true
+    },
+    {
+      "col": "V",
+      "header": "备注",
+      "column_key": "remark",
+      "mode": "editable",
+      "value_type": "text",
+      "json_path": "remark",
+      "store": true,
+      "frontend": "remark",
+      "contract_candidate": true
+    }
+  ],
+  "formula_mask_cols": [
+    "N",
+    "P",
+    "S",
+    "T",
+    "U"
+  ],
+  "formula_mask_note": "契约 18 条不含 P/S/T/U；它们仍是模板内部公式列，projection 不得覆盖（需 formula mask / skip）。",
+  "store_item_id": "D4-2-rows",
+  "frontend_source": "audit-platform/frontend/src/components/workpaper/composables/useD4RevenueDetail.ts",
+  "persisted_store_keys": [
+    "rowId",
+    "product",
+    "months",
+    "auditAdjustment",
+    "priorUnadjusted",
+    "priorAdjustment",
+    "remark"
+  ],
+  "mapping_digest": "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8",
+  "digest_payload": {
+    "contract_fields": [
+      {
+        "col": "A",
+        "column_key": "product",
+        "header": "项目",
+        "json_path": "product",
+        "mode": "editable"
+      },
+      {
+        "col": "B",
+        "column_key": "month_01",
+        "header": "1月",
+        "json_path": "months/0",
+        "mode": "editable"
+      },
+      {
+        "col": "C",
+        "column_key": "month_02",
+        "header": "2月",
+        "json_path": "months/1",
+        "mode": "editable"
+      },
+      {
+        "col": "D",
+        "column_key": "month_03",
+        "header": "3月",
+        "json_path": "months/2",
+        "mode": "editable"
+      },
+      {
+        "col": "E",
+        "column_key": "month_04",
+        "header": "4月",
+        "json_path": "months/3",
+        "mode": "editable"
+      },
+      {
+        "col": "F",
+        "column_key": "month_05",
+        "header": "5月",
+        "json_path": "months/4",
+        "mode": "editable"
+      },
+      {
+        "col": "G",
+        "column_key": "month_06",
+        "header": "6月",
+        "json_path": "months/5",
+        "mode": "editable"
+      },
+      {
+        "col": "H",
+        "column_key": "month_07",
+        "header": "7月",
+        "json_path": "months/6",
+        "mode": "editable"
+      },
+      {
+        "col": "I",
+        "column_key": "month_08",
+        "header": "8月",
+        "json_path": "months/7",
+        "mode": "editable"
+      },
+      {
+        "col": "J",
+        "column_key": "month_09",
+        "header": "9月",
+        "json_path": "months/8",
+        "mode": "editable"
+      },
+      {
+        "col": "K",
+        "column_key": "month_10",
+        "header": "10月",
+        "json_path": "months/9",
+        "mode": "editable"
+      },
+      {
+        "col": "L",
+        "column_key": "month_11",
+        "header": "11月",
+        "json_path": "months/10",
+        "mode": "editable"
+      },
+      {
+        "col": "M",
+        "column_key": "month_12",
+        "header": "12月",
+        "json_path": "months/11",
+        "mode": "editable"
+      },
+      {
+        "col": "N",
+        "column_key": "period_total",
+        "header": "本期未审数合计",
+        "json_path": "periodTotal",
+        "mode": "formula"
+      },
+      {
+        "col": "O",
+        "column_key": "audit_adjustment",
+        "header": "本期审计调整",
+        "json_path": "auditAdjustment",
+        "mode": "editable"
+      },
+      {
+        "col": "Q",
+        "column_key": "prior_unadjusted",
+        "header": "上期未审数",
+        "json_path": "priorUnadjusted",
+        "mode": "editable"
+      },
+      {
+        "col": "R",
+        "column_key": "prior_adjustment",
+        "header": "上期审计调整",
+        "json_path": "priorAdjustment",
+        "mode": "editable"
+      },
+      {
+        "col": "V",
+        "column_key": "remark",
+        "header": "备注",
+        "json_path": "remark",
+        "mode": "editable"
+      }
+    ],
+    "first_data_row": 12,
+    "footer_marker_exact": "合计",
+    "footer_row": 24,
+    "header_row": 11,
+    "last_data_row": 23,
+    "managed_sheet": "主营业务收入明细表D4-2",
+    "template_relative_path": "D/D4 收入底稿.xlsx"
+  }
+}
