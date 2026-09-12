@@ -16,7 +16,7 @@
 
       <div v-if="showModeToolbar" class="d1-mode-toolbar">
 
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD1DetailSheet && syncBusy" />
 
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d1-notes-receivable" />
 
@@ -26,9 +26,18 @@
 
 
 
+      <!-- G5-1 D1-3 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD1DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+      />
+
+      <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
 
-        v-if="renderMode === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
 
         :key="ooSheetName"
 
@@ -508,6 +517,16 @@ import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
+// G5-1 Phase 5 D1 canary：D1-3「按客户明细」走统一双向路径（descriptor → WorkpaperSyncEditorHost），
+// 与 GtD2AccountsReceivable 同构；其余 sheet 仍走 useD1EntryDualMode 的 legacy GtOnlyOfficeSheet。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+
+import { readStoreProjection } from './sync/workpaperSyncApi'
+
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
+
 
 
 const D1TabProcedure = defineAsyncComponent(() => import('./d1/D1TabProcedure.vue'))
@@ -750,11 +769,79 @@ const ooSheetName = computed(() =>
 
 
 
+// ─── G5-1 D1-3 canary：useWorkpaperSyncBridge + store-projection flush ───────
+//
+// 🔴 只覆盖 D1-3「按客户明细」（manifest entry 的 managed sheet = d13-managed）。
+// flushHtml 必须先 flushPendingSave，再 readStoreProjection：HTML debounce 未落库时
+// 服务端投影仍是旧 store（与 D2 缺陷 A 同型）。不在前端重造 15 列→stable-key 映射
+// （Requirement 6.1）；overlay 脚手架由服务端 store-projection 叠加。
+
+const D1_SYNC_ENTRY_ID = 'xlsx/gt-d1-notes-receivable'
+
+const D1_MANAGED_SHEET_KEY = 'd13-managed'
+
+const isD1DetailSheet = computed(() => currentSheet.value === 'D1-3')
+
+const isReadonly = computed(() => props.readonly ?? false)
+
+const syncSwitching = ref(false)
+
+/** 统一宿主实例 —— 切回结构化视图前用它 forceSave()（内部走 room forcesave）。 */
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+
+const syncEntryId = ref(D1_SYNC_ENTRY_ID)
+
+const syncSheetKey = ref(D1_MANAGED_SHEET_KEY)
+
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  // 谓词：capability 从 source-backed manifest 现算，禁止宿主内联字面量
+  capability: capabilityForEntry(D1_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D1_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D1_MANAGED_SHEET_KEY,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await loadAll()
+  },
+})
+
+/** 避免 `:descriptor="syncBridge.descriptor.value"` 丢失对 ref 的追踪 */
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
+/** 切换中或桥处于在途状态时禁用工具栏（供模板 disabled 门控）。 */
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+
+
+// renderMode / 切换：D1-3 走 syncBridge，其余 sheet 沿用 useD1EntryDualMode。
 const renderMode = computed({
 
-  get: () => dualMode.mode.value,
+  get: (): D1RenderMode =>
+    isD1DetailSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.mode.value,
 
-  set: (v: D1RenderMode) => { void dualMode.switchMode(v) },
+  set: (v: D1RenderMode) => {
+    if (isD1DetailSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
 
 })
 
@@ -770,11 +857,49 @@ const renderModeOptions = computed(() => [
 
     value: 'onlyoffice' as const,
 
-    disabled: !dualMode.ooAvailable.value,
+    disabled: isD1DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
 
   },
 
 ])
+
+
+
+async function switchRenderMode(target: D1RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD1DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      // 回写已完成但自动 reload 未跑完时，点结构化视图应主动 reload（§9.6）
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
 
 
 

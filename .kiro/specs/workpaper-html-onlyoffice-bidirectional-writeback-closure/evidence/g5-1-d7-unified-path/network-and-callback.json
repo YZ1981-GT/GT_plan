@@ -1,0 +1,128 @@
+{
+  "script": "e2e/g5-1-d7-unified-path.spec.ts",
+  "captured_at": "2026-09-12T09:52:19.073Z",
+  "scope": {
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "wp_id": "6f23dcce-6bb2-4456-9f18-b20b04043a55",
+    "entry_id": "xlsx/gt-d7-contract-liabilities"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/6f23dcce-6bb2-4456-9f18-b20b04043a55/sync/entries/xlsx/gt-d7-contract-liabilities/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/6f23dcce-6bb2-4456-9f18-b20b04043a55/sync/entries/xlsx/gt-d7-contract-liabilities/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/6f23dcce-6bb2-4456-9f18-b20b04043a55/sync/entries/xlsx/gt-d7-contract-liabilities/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49/workpapers/6f23dcce-6bb2-4456-9f18-b20b04043a55/sync/entries/xlsx/gt-d7-contract-liabilities/rooms/a91d8c1c-87e6-46c5-9662-3ef6f37e67fd/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/a91d8c1c-87e6-46c5-9662-3ef6f37e67fd/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_http_status": 202,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "a91d8c1c-87e6-46c5-9662-3ef6f37e67fd",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g5d7644908",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 0,
+        "input_prop_hits": 1,
+        "search_value": "g5d7644908",
+        "tracked_operation_id": "48339f7e-42d3-4740-84bc-e245293003d6"
+      }
+    },
+    "oo_write_target": "A10",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "A10",
+      "attempt": 1,
+      "sheetNames": [
+        "底稿目录",
+        "合同负债实质性程序表 D7A",
+        "合同负债实质性程序表 D8A（原）",
+        "审定表D7-1",
+        "附注披露信息(上市公司)",
+        "附注披露信息(国企)",
+        "明细表D7-2",
+        "调整分录汇总表D7-3",
+        "合同负债分析表D7-4",
+        "账龄1年以上合同负债检查表D7-5",
+        "关联方关系及交易检查表D7-6",
+        "合同负债检查表D7-7",
+        "GT_Custom",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "明细表D7-2",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g5d7644908",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g5d7644908"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 A10(contract_name)；权威判据是 forcesave cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐（venv 查库）",
+    "§9.6 条件 6：切回结构化视图后 D7TabDetail(.d7-detail) DOM 应出现 marker（getByText / input.value，排除搜索框）",
+    "Phase 5 第二个非 pilot canary（两级表头+账龄组）：权威模板经外链净化过 OOXML 门"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}

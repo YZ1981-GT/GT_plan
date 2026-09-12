@@ -303,6 +303,9 @@ export function useD7FormData(options: UseD7FormDataOptions) {
     saveBatch,
     debouncedSave,
     writebackTrialBalance,
+    // G5-1 D7 canary：统一同步桥 flushHtml 需在 readStoreProjection 前 flush 掉 2s
+    // debounce 未落库的行（否则服务端投影仍是旧 store，与 D1/D2 同型缺陷）。
+    flushPendingSave: _flushPending,
   }
 }
 

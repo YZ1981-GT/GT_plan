@@ -272,6 +272,8 @@ export function useD6FormData(options: UseD6FormDataOptions) {
     saveBatch,
     debouncedSave,
     writebackTrialBalance,
+    // G5-1 D6-2 canary：sync bridge flushHtml 前需 flush 掉 debounce 未落库的行
+    flushPendingSave: _flushPending,
   }
 }
 

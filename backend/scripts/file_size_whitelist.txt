@@ -161,7 +161,7 @@ backend/app/routers/wp_onlyoffice_router.py  1749
 backend/app/routers/wp_sync_router.py  2341
 backend/app/services/excel_structure_fingerprint.py  918
 backend/app/services/word_sdt_fingerprint.py  874
-backend/app/services/workpaper_sync/adapters/registry.py  1326
+backend/app/services/workpaper_sync/adapters/registry.py  1494
 backend/app/services/workpaper_sync/artifacts.py  1493
 backend/app/services/workpaper_sync/callback_delivery.py  1837
 backend/app/services/workpaper_sync/close_intent.py  1008
@@ -412,3 +412,22 @@ backend/tests/workpaper_sync/test_workbook_row_change_delete.py  888
 backend/app/core/startup_registry.py  889
 backend/app/routers/wp_render_pipeline.py  1219
 backend/scripts/gen/generate_component_capability_manifest.py  852
+
+# G5-1 Phase 5 —— D 循环 5 个 canary 的 per-entry provider 模块（2026-09-12 登记）
+#   登记理由：这 5 个文件与既在册的 4 个 pilot provider（pilot_simple_checklist 980 /
+#   pilot_d2_large_json 1513 / pilot_h1_grouped_dynamic 1868 / pilot_g7_two_level_dynamic
+#   2450）是**同一类文件**，且都比后三者更小。行数来自框架强制的 9 段固定外表面：
+#   冻结身份常量 + 权威模板哨兵 + 选型零回退守卫 + instrumentation/definition payload +
+#   per-entry 契约（与磁盘双向锁死）+ store 拆分/合并 + 发布 + adapter 注册/attach + 别名。
+#   这些段不是可选装饰：provisioner（Task 76）、first_publication、registry 白名单、
+#   oo_to_html 镜像四个消费方各自要求其中一段，删任一段即该 entry 不可发布。
+#   🔴 已评估过抽公共基类：9 段里有 7 段可参数化，但会把「每 entry 一份可独立审阅的
+#   冻结身份 + 逐格实测基线」打散成 spec 数据 + 共享逻辑两处，而 canary 的价值正是
+#   **单文件可逐条复核**（契约 digest 冻结在库里的 published definition 上，重构风险高
+#   于收益）。若后续 canary 数量继续增长（>8 个），再统一抽 `phase5_canary_base`。
+#   完整交付事实见 evidence/g5-1-canary-feasibility-and-wave-census.md §6–§11。
+backend/app/services/workpaper_sync/phase5_d1_notes_receivable.py  1040
+backend/app/services/workpaper_sync/phase5_d3_prepaid_receipts.py  967
+backend/app/services/workpaper_sync/phase5_d5_receivables_financing.py  888
+backend/app/services/workpaper_sync/phase5_d6_contract_assets.py  964
+backend/app/services/workpaper_sync/phase5_d7_contract_liabilities.py  965

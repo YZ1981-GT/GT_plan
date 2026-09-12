@@ -1,0 +1,337 @@
+{
+  "contract_id": "d5.receivables_financing_detail",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "b829ed8f648524a575f11620c8e53c69b46213453227fad1870d5abc8e05a672",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d5-receivables-financing",
+    "html_store": {
+      "item_id": "D5-2-rows",
+      "note": "整张应收款项融资明细表存成这一条 item 的 remark（JSON 数组字符串，useD5Detail 的 JSON.stringify(rows)）。本契约按 stable field + row rowId 拆开。🔴 无账龄组，两级表头的组（期初数/本期变动/期末数）下每个子列是不同语义字段。postRealized/eclStage 是 store-only 不入。",
+      "row_identity_key": "rowId",
+      "shape": "json_array_of_row_objects",
+      "table": "checklist_responses"
+    },
+    "pilot_class": "phase5_receivables_financing",
+    "reviewed_basis": "openpyxl 逐 sheet 直读净化后权威模板 D/D5 应收款项融资.xlsx（外链净化后 sha256 92c5f7f2），只取受管 sheet 应收款项融资明细表D5-2：两级表头 行 10（组标题 期初数 C:G / 本期变动 H:I / 期末数 J:P）/ 行 11（子标题），17 列 A-Q，数据区 12-16，F/J/L/O 四列逐行公式 =C+E+D / =C+H-I / =J+K / =J+N+M，A17「合计」footer（纯两字）；FVOCI 无账龄组；字段键与前端 useD5Detail.DetailRow 逐字段锁死（postRealized/eclStage store-only 不入）。wp_code=D5（载荷落点：D5-2-rows 全库 0 行同 H1/D3/D6 空表单，D5 wp 未删除有 file_path；非 D5R 幻影码）"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "应收款项融资明细表D5-2",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d52-managed",
+      "tables": [
+        {
+          "anchor": "A10",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "category",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!A10",
+              "header_text": "类别",
+              "json_pointer": "/rows/{row_uuid}/category",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!A12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/category",
+              "store_item_id": "D5-2-rows",
+              "value_type": "enum"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "item_name",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!B10",
+              "header_text": "明细项目",
+              "json_pointer": "/rows/{row_uuid}/itemName",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!B12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/item_name",
+              "store_item_id": "D5-2-rows",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!C10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!C11",
+              "header_text": "未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!C12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!C10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!D11",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!D12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!C10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!E11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!E12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!C10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!F11",
+              "header_text": "审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!F12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "oci_impairment",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!C10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!G11",
+              "header_text": "其他综合收益-应收款项融资减值准备余额",
+              "json_pointer": "/rows/{row_uuid}/ociImpairment",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!G12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/oci_impairment",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_increase",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!H10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!H11",
+              "header_text": "本期增加",
+              "json_pointer": "/rows/{row_uuid}/periodIncrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!H12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/period_increase",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "period_decrease",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!H10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!I11",
+              "header_text": "本期减少",
+              "json_pointer": "/rows/{row_uuid}/periodDecrease",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!I12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/period_decrease",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "J",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_balance",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!J11",
+              "header_text": "期末余额",
+              "json_pointer": "/rows/{row_uuid}/endBalance",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!J12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/end_balance",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "K",
+                "row_from": "row_identity"
+              },
+              "column_key": "entity_reclass",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!K11",
+              "header_text": "被审计单位重分类调整",
+              "json_pointer": "/rows/{row_uuid}/entityReclass",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!K12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/entity_reclass",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "L",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_unadjusted",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!L11",
+              "header_text": "期末未审余额",
+              "json_pointer": "/rows/{row_uuid}/endUnadjusted",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!L12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/end_unadjusted",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "M",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_aje",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!M11",
+              "header_text": "账项调整",
+              "json_pointer": "/rows/{row_uuid}/endAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!M12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/end_aje",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "N",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_rje",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!N11",
+              "header_text": "重分类调整",
+              "json_pointer": "/rows/{row_uuid}/endRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!N12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/end_rje",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "O",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_audited",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!O11",
+              "header_text": "审定数",
+              "json_pointer": "/rows/{row_uuid}/endAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!O12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/end_audited",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "P",
+                "row_from": "row_identity"
+              },
+              "column_key": "end_oci_impairment",
+              "group_source_ref": "源xlsx!应收款项融资明细表D5-2!J10",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!P11",
+              "header_text": "其他综合收益-应收款项融资减值准备余额",
+              "json_pointer": "/rows/{row_uuid}/endOciImpairment",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!P12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/end_oci_impairment",
+              "store_item_id": "D5-2-rows",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "Q",
+                "row_from": "row_identity"
+              },
+              "column_key": "remark",
+              "header_source_ref": "源xlsx!应收款项融资明细表D5-2!Q10",
+              "header_text": "备注",
+              "json_pointer": "/rows/{row_uuid}/remark",
+              "mode": "editable",
+              "source_ref": "源xlsx!应收款项融资明细表D5-2!Q12",
+              "stable_field_key": "receivables_financing_detail_rows/{row_uuid}/remark",
+              "store_item_id": "D5-2-rows",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 行 A17「合计」（纯两字无空格，同 D3）。声明为真使结构性插行按声明位移量扩张。",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "F12:F16",
+            "J12:J16",
+            "L12:L16",
+            "O12:O16"
+          ],
+          "header_rows": 2,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "receivables_financing_detail_rows"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "e16bc93b2f3df03aecce4f59902911c4c9e21ca907723d1b0662f128301d39a5",
+    "relative_path": "D/D5 应收款项融资.xlsx",
+    "template_sha256": "92c5f7f2d2d54340c29bef6094b24a9360edcfa730fcfd406aeb071d4d138ac4"
+  },
+  "template_definition_sha256": "32e809c091afc65ec0b5ab8ee2c1a61efe35c5552f4a25e9b7a34381d8dc9733"
+}

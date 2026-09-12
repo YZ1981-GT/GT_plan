@@ -6,13 +6,22 @@
 
     <template v-else>
       <div v-if="showModeToolbar" class="d3-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD3DetailSheet && syncBusy" />
+        <el-tag v-if="!isD3DetailSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d3-prepaid-accounts" />
       </div>
 
+      <!-- G5-1 D3-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD3DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+      />
+
+      <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -178,6 +187,12 @@ import D3TabIndex from './d3/D3TabIndex.vue'
 import D3TabProcedure from './d3/D3TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// G5-1 Phase 5 D3 canary：D3-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost），
+// 与 GtD1NotesReceivable / GtD7ContractLiabilities 同构；其余 sheet 仍走 useD3EntryDualMode。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const D3TabAdjudication = defineAsyncComponent(() => import('./d3/D3TabAdjudication.vue'))
 const D3TabDetail = defineAsyncComponent(() => import('./d3/D3TabDetail.vue'))
@@ -219,6 +234,7 @@ const {
   saveImmediate,
   saveBatch,
   debouncedSave,
+  flushPendingSave,
 } = useD3FormData({
   wpId: wpIdRef,
   projectId: projectIdRef,
@@ -280,9 +296,60 @@ const ooSheetName = computed(() =>
   dualMode.resolveOoSheetName() || props.sheetName || 'D3-1',
 )
 
+// ─── G5-1 D3-2 canary：useWorkpaperSyncBridge + store-projection flush ────────
+//
+// 🔴 只覆盖 D3-2「预收账款明细」（manifest entry 的 managed sheet = d32-managed）。
+// flushHtml 先 flushPendingSave（flush 掉 2s debounce 未落库的行）再 readStoreProjection。
+// 不在前端重造 27 列→stable-key 映射；账龄 nested（agingPrior/agingAudited）由服务端
+// store-projection + phase5_d3 的 _resolve_json_path/_set_json_path 处理。
+const D3_SYNC_ENTRY_ID = 'xlsx/gt-d3-prepaid-accounts'
+const D3_MANAGED_SHEET_KEY = 'd32-managed'
+const isD3DetailSheet = computed(() => currentSheet.value === 'D3-2')
+const syncSwitching = ref(false)
+/** 统一宿主实例 —— 切回结构化视图前用它 forceSave()（内部走 room forcesave）。 */
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(D3_SYNC_ENTRY_ID)
+const syncSheetKey = ref(D3_MANAGED_SHEET_KEY)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(D3_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D3_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D3_MANAGED_SHEET_KEY,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// renderMode / 切换：D3-2 走 syncBridge，其余 sheet 沿用 useD3EntryDualMode。
 const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: D3RenderMode) => { void dualMode.switchMode(v) },
+  get: (): D3RenderMode =>
+    isD3DetailSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.mode.value,
+  set: (v: D3RenderMode) => {
+    if (isD3DetailSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
 })
 
 const renderModeOptions = computed(() => [
@@ -290,9 +357,44 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
+    disabled: isD3DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
   },
 ])
+
+async function switchRenderMode(target: D3RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD3DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
 
 function onOoFallback(): void {
   void dualMode.switchMode('html')

@@ -257,6 +257,8 @@ export function useD3FormData(options: UseD3FormDataOptions) {
     saveBatch,
     debouncedSave,
     writebackTrialBalance,
+    // G5-1 D3-2 canary：sync bridge flushHtml 前需 flush 掉 2s debounce 未落库的行
+    flushPendingSave: _flushPending,
   }
 }
 

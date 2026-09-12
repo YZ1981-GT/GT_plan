@@ -1,5 +1,5 @@
 {
-  "adjudication_digest": "9207ccd7e1ddb8dd08c64ee136ae9cebe4b56461f51f285ec5750e376175620d",
+  "adjudication_digest": "c777062b3657df7013d37582f363660f763e636d30aba3422b1fde40178670c4",
   "adjudication_digest_algorithm": "sha256(json.dumps(adjudications, sort_keys=True, ensure_ascii=False, separators=(',',':')).encode('utf-8')).hexdigest()",
   "adjudication_digest_note": "🔴 2026-09-04：原 digest 的算法全仓无处记载（只有它自己出现一次），无法复算 ⇒ 改文件后留着它就是把错值当基线锁死。已换成算法自带的形态，见 `adjudication_digest_algorithm`。原值 c8b2bc2031e4041b143e6df973ee3d87ef641a23c28a5289b0da799ab3606125",
   "adjudications": [
@@ -20,9 +20,9 @@
       "resolvable_for_provisioning": true,
       "store_payload_evidence": {
         "max_payload_bytes": 0,
-        "measured_at": "2026-09-04",
-        "store_item_id": "",
-        "why_null": "该 provider 未声明 `STORE_ITEM_ID`（B60 工时预算是元数据表，不走 HTML 行集 store）⇒ 载荷落点判据对本条不适用，仍以 file_path 证据定码",
+        "measured_at": "2026-09-11",
+        "store_item_id": "B60-1-hour-budget-rows",
+        "why_null": "G4-1 DEC-11：声明 STORE_ITEM_ID=B60-1-hour-budget-rows；当前库仍 0B 载荷，空表单合法（EMPTY_STORE_PAYLOAD=[]）。码族仍按 file_path 证据定 B60-1",
         "wp_code_with_payload": null,
         "wp_count_with_payload": 0
       },
@@ -116,6 +116,136 @@
       },
       "wp_codes": [
         "H1"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 D1N 在 wp_index 里 0 命中（GtD1NotesReceivable → D1N 是幻影码）",
+        "heuristic_would_say": [
+          "D1N"
+        ],
+        "managed_excel_name": "原值明细表（按客户）D1-3",
+        "template_relative_path": "D/D1 应收票据.xlsx",
+        "wp_index_evidence": "wp_code=D1「应收票据」4 行未删除、4 行有 file_path；D1-3「原值明细(按客户)」2 行未删除、2 行有 file_path 但 0 行有 store 载荷。store item D1-cust-rows 的载荷全部落在 wp_code=D1 上（1 行，267 B）—— 与 D2 同理：名字相符不是判据，载荷落点才是（D1-3 名字最像却零载荷，选它会得空 projection + representation 永久失联）"
+      },
+      "contract_id": "d1.notes_receivable_detail",
+      "entry_id": "xlsx/gt-d1-notes-receivable",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 267,
+        "measured_at": "2026-09-12",
+        "store_item_id": "D1-cust-rows",
+        "wp_code_with_payload": "D1",
+        "wp_count_with_payload": 1
+      },
+      "wp_codes": [
+        "D1"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 D7C 在 wp_index 里 0 命中（GtD7ContractLiabilities → D7C 是幻影码）",
+        "heuristic_would_say": [
+          "D7C"
+        ],
+        "managed_excel_name": "明细表D7-2",
+        "template_relative_path": "D/D7 合同负债.xlsx",
+        "wp_index_evidence": "store item D7-2-rows 的载荷落在 wp_code=D7 上（project 0ec33ac9 / wp 6f23dcce / 669B）。D7-2 名义码无 store 载荷，D7C 是 CamelCase 幻影码 finder 零命中；载荷落点才是判据（与 D1/D2 同理）"
+      },
+      "contract_id": "d7.contract_liabilities_detail",
+      "entry_id": "xlsx/gt-d7-contract-liabilities",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 669,
+        "measured_at": "2026-09-12",
+        "store_item_id": "D7-2-rows",
+        "wp_code_with_payload": "D7",
+        "wp_count_with_payload": 1
+      },
+      "wp_codes": [
+        "D7"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 D3P 在 wp_index 里 0 命中（GtD3PrepaidAccounts → D3P 是幻影码；组件名 PrepaidAccounts 是历史命名错，内容是预收账款）",
+        "heuristic_would_say": [
+          "D3P"
+        ],
+        "managed_excel_name": "预收账款明细表D3-2",
+        "template_relative_path": "D/D3 预收账款.xlsx",
+        "wp_index_evidence": "wp_code=D3「预收账款」1 行未删除、有 file_path。store item D3-det-rows 全库 0 行（明细表从未录入，同 H1-8-rows 空表单是合法业务事实）；但 sibling store item D3-vc-current-rows（抽凭）的载荷落在 wp_code=D3 上（1 行 3601B）—— 已证 D3 store 落点=D3。D3-2 名义码无载荷，D3P 是 CamelCase 幻影码 finder 零命中；载荷落点才是判据（与 D1/D7 同理）"
+      },
+      "contract_id": "d3.prepaid_receipts_detail",
+      "entry_id": "xlsx/gt-d3-prepaid-accounts",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-12",
+        "store_item_id": "D3-det-rows",
+        "why_null": "`D3-det-rows` 全库 0 行有载荷（明细表从未录入，合法业务事实）⇒ 目标 item 无法定码，本条以 file_path 证据 + sibling D3-vc-current-rows 载荷落点定 `D3`（D3 wp 未删除有 file_path；同 subject 的抽凭 store 已证落 D3）",
+        "sibling_store_item_id": "D3-vc-current-rows",
+        "sibling_wp_code_with_payload": "D3",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "D3"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 D6C 在 wp_index 里 0 命中（GtD6ContractAssets → D6C 是幻影码）",
+        "heuristic_would_say": [
+          "D6C"
+        ],
+        "managed_excel_name": "明细表D6-2",
+        "template_relative_path": "D/D6 合同资产.xlsx",
+        "wp_index_evidence": "wp_code=D6「合同资产」5 项目各 1 行未删除、全有 file_path。store item D6-2-rows 全库 0 行（明细表从未录入，同 H1-8-rows / D3-det-rows 空表单是合法业务事实）；D6-1..D6-9 子码在 wp_index 有行但**无 file_path**（索引行非真底稿文件）。全库唯一非空 D6 载荷是 D6-note-listed-section4-groups（28B 披露配置，非 rows）。以 file_path 证据定 `D6`（D6 wp 未删除有 file_path）。D6-2 名义码无载荷，D6C 是 CamelCase 幻影码 finder 零命中；载荷落点才是判据（与 D1/D3/D7 同理）"
+      },
+      "contract_id": "d6.contract_assets_detail",
+      "entry_id": "xlsx/gt-d6-contract-assets",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-12",
+        "store_item_id": "D6-2-rows",
+        "why_null": "`D6-2-rows` 全库 0 行有载荷（明细表从未录入，合法业务事实）⇒ 目标 item 无法定码，本条以 file_path 证据定 `D6`（D6 wp 未删除有 file_path，同 H1/D3 空表单情形）",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "D6"
+      ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 D5R 在 wp_index 里 0 命中（GtD5ReceivablesFinancing → D5R 是幻影码）",
+        "heuristic_would_say": [
+          "D5R"
+        ],
+        "managed_excel_name": "应收款项融资明细表D5-2",
+        "template_relative_path": "D/D5 应收款项融资.xlsx",
+        "wp_index_evidence": "wp_code=D5「应收款项融资」4 项目各 1 行未删除、全有 file_path。store item D5-2-rows 全库 0 行（明细表从未录入，同 H1-8-rows / D3-det-rows / D6-2-rows 空表单是合法业务事实）。以 file_path 证据定 `D5`（D5 wp 未删除有 file_path）。D5-2 名义码无载荷，D5R 是 CamelCase 幻影码 finder 零命中；载荷落点才是判据（与 D1/D3/D6/D7 同理）"
+      },
+      "contract_id": "d5.receivables_financing_detail",
+      "entry_id": "xlsx/gt-d5-receivables-financing",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 0,
+        "measured_at": "2026-09-12",
+        "store_item_id": "D5-2-rows",
+        "why_null": "`D5-2-rows` 全库 0 行有载荷（明细表从未录入，合法业务事实）⇒ 目标 item 无法定码，本条以 file_path 证据定 `D5`（D5 wp 未删除有 file_path，同 H1/D3/D6 空表单情形）",
+        "wp_code_with_payload": null,
+        "wp_count_with_payload": 0
+      },
+      "wp_codes": [
+        "D5"
       ]
     }
   ],

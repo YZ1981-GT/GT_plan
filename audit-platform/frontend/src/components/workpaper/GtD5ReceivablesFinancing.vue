@@ -6,13 +6,22 @@
 
     <template v-else>
       <div v-if="showModeToolbar" class="d5-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD5DetailSheet && syncBusy" />
+        <el-tag v-if="!isD5DetailSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d5-receivables-financing" />
       </div>
 
+      <!-- G5-1 D5-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD5DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+      />
+
+      <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -144,6 +153,12 @@ import D5TabIndex from './d5/D5TabIndex.vue'
 import D5TabProcedure from './d5/D5TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// G5-1 Phase 5 D5 canary：D5-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost），
+// 与 GtD1/GtD3/GtD6/GtD7 同构；其余 sheet 仍走 useD5EntryDualMode。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 const D5TabAdjudication = defineAsyncComponent(() => import('./d5/D5TabAdjudication.vue'))
 const D5TabDetail = defineAsyncComponent(() => import('./d5/D5TabDetail.vue'))
@@ -176,6 +191,7 @@ const {
   saveImmediate,
   debouncedSave,
   saveBatch,
+  flushPendingSave,
 } = useD5FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -228,9 +244,56 @@ const ooSheetName = computed(() =>
   dualMode.resolveOoSheetName() || props.sheetName || '底稿目录',
 )
 
+// ─── G5-1 D5-2 canary：useWorkpaperSyncBridge + store-projection flush ────────
+//
+// 🔴 只覆盖 D5-2「应收款项融资明细」（manifest entry 的 managed sheet = d52-managed）。
+const D5_SYNC_ENTRY_ID = 'xlsx/gt-d5-receivables-financing'
+const D5_MANAGED_SHEET_KEY = 'd52-managed'
+const isD5DetailSheet = computed(() => currentSheet.value === 'D5-2')
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(D5_SYNC_ENTRY_ID)
+const syncSheetKey = ref(D5_MANAGED_SHEET_KEY)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(D5_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D5_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D5_MANAGED_SHEET_KEY,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// renderMode / 切换：D5-2 走 syncBridge，其余 sheet 沿用 useD5EntryDualMode。
 const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: D5RenderMode) => { void dualMode.switchMode(v) },
+  get: (): D5RenderMode =>
+    isD5DetailSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.mode.value,
+  set: (v: D5RenderMode) => {
+    if (isD5DetailSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
 })
 
 const renderModeOptions = computed(() => [
@@ -238,9 +301,44 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
+    disabled: isD5DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
   },
 ])
+
+async function switchRenderMode(target: D5RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD5DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
 
 function onOoFallback(): void {
   void dualMode.switchMode('html')

@@ -6,13 +6,22 @@
 
     <template v-else>
       <div v-if="showModeToolbar" class="d6-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD6DetailSheet && syncBusy" />
+        <el-tag v-if="!isD6DetailSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d6-contract-assets" />
       </div>
 
+      <!-- G5-1 D6-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD6DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+      />
+
+      <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet -->
       <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice'"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -206,6 +215,12 @@ import { useD6ReviewThreads } from './composables/useD6ReviewThreads'
 import D6TabIndex from './d6/D6TabIndex.vue'
 import D6TabProcedure from './d6/D6TabProcedure.vue'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
+// G5-1 Phase 5 D6 canary：D6-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost），
+// 与 GtD1/GtD3/GtD7 同构；其余 sheet 仍走 useD6EntryDualMode。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
 
 const D6TabAdjudication = defineAsyncComponent(() => import('./d6/D6TabAdjudication.vue'))
@@ -244,6 +259,7 @@ const {
   saveImmediate,
   debouncedSave,
   saveBatch,
+  flushPendingSave,
 } = useD6FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
@@ -336,9 +352,58 @@ const ooSheetName = computed(() =>
   dualMode.resolveOoSheetName() || props.sheetName || '底稿目录',
 )
 
+// ─── G5-1 D6-2 canary：useWorkpaperSyncBridge + store-projection flush ────────
+//
+// 🔴 只覆盖 D6-2「合同资产明细」（manifest entry 的 managed sheet = d62-managed）。
+// flushHtml 先 flushPendingSave（flush 掉 debounce 未落库的行）再 readStoreProjection。
+// 账龄 FLAT（agePrior1y/ageEnd1y）由服务端 store-projection + phase5_d6 处理。
+const D6_SYNC_ENTRY_ID = 'xlsx/gt-d6-contract-assets'
+const D6_MANAGED_SHEET_KEY = 'd62-managed'
+const isD6DetailSheet = computed(() => currentSheet.value === 'D6-2')
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(D6_SYNC_ENTRY_ID)
+const syncSheetKey = ref(D6_MANAGED_SHEET_KEY)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(D6_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D6_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D6_MANAGED_SHEET_KEY,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// renderMode / 切换：D6-2 走 syncBridge，其余 sheet 沿用 useD6EntryDualMode。
 const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: D6RenderMode) => { void dualMode.switchMode(v) },
+  get: (): D6RenderMode =>
+    isD6DetailSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.mode.value,
+  set: (v: D6RenderMode) => {
+    if (isD6DetailSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
 })
 
 const renderModeOptions = computed(() => [
@@ -346,9 +411,44 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
+    disabled: isD6DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
   },
 ])
+
+async function switchRenderMode(target: D6RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD6DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
 
 function onOoFallback(): void {
   void dualMode.switchMode('html')
