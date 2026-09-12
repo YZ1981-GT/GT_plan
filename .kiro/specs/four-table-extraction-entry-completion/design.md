@@ -81,49 +81,54 @@ AuxAggregationResult
 
 不新增表。写入落既有 `checklist_responses(wp_id, item_id, remark)` JSON 数组，字段与各循环前端 `serializeRows` 的持久化子集逐字一致（派生列不写）。
 
-来源可追溯（Requirement 5.4）：行上带既有的来源标记字段（各循环命名不一，Task 1 清册中统一登记）；无该字段的循环以"取数行 `companyCode`/`relationType` 留空 + message 计数"作为弱证据，并在清册中标注为待增强项，不在本 spec 强行加字段。
+来源可追溯（Requirement 5.4）：所有本 spec 交付的取数行必须带统一来源元数据 `source_kind`（`aux_balance`）和 `source_dataset_id`，必要时带 `source_account_prefix` / `source_aux_type`；该元数据必须进入各循环持久化子集并在 merge/reload 后保留。已有异名字段只能作为兼容投影，不能替代统一来源字段。无法承载来源元数据的循环不得标记为已交付 G-A/G-B，必须列为 blocked/deferred 并从最终完成数中排除。
+
+## Error Handling
+
+所有面向用户的取数端点必须消费 `aggregate_aux_by_name_ex` 的结构化结果，不得用旧三元组兼容函数决定用户提示。`AuxAggregationResult` 的 `reason` 枚举固定为 `ok`、`no_prefixes`、`no_aux_type`、`no_rows`、`no_active_dataset`、`error`；HTTP 响应必须同时返回 `reason`、`imported_count`、`message` 和可选的 `selected_aux_type`。异常路径必须先 rollback 当前事务，再以 ERROR 级别记录 `project_id`、`year`、`account_prefixes` 与异常类型；`no_rows` 等正常空结果不得记录 ERROR。响应经过 `ResponseWrapperMiddleware` 后，前端统一从 `response.data` 读取业务载荷，禁止各循环自行猜测包装层级。
+
+科目来源采用严格优先级：`ReportLineAccountSpec` 成功解析的前缀才可自动取数；显式 fallback 必须在声明式 registry 中登记 `source_ref`、适用 wp_code 和有效期，并由守卫验证 source_ref 仍指向真实模板/报表行。无法证明来源时返回 `no_prefixes`，不得静默使用字面量。
 
 ## Correctness Properties
 
-### Property 1
-
+### Property 1: active dataset 过滤不变式
 对任意 project/year/科目前缀，`aggregate_aux_by_name_ex` 的 SQL 必须包含 active dataset 谓词；移除该谓词时，存在至少一个真库样本使归集金额变为原值的整数倍（≥2×）。
 
-**Validates: Requirements 2.6**
+**Validates: Requirements 2.3, 3.5**
 
-### Property 2
+### Property 2: 单一 aux_type 归集不变式
 
 对任意挂了 ≥2 个 `aux_type` 的科目，归集结果必须只来自单一 `aux_type`；`sum(entries.closing)` 不得等于跨全部 `aux_type` 的合计。
 
 **Validates: Requirements 3.5**
 
-### Property 3
+### Property 3: merge 持久化不覆盖不变式
 
 对任意 merge 写入，已存在的业务键（客户名/合同名/单位名）行的所有字段逐字节不变，新增行只追加。
 
 **Validates: Requirements 3.4**
 
-### Property 4
+### Property 4: 取数只写录入列不变式
 
 端点返回的行 dict 的键集合必须是前端持久化子集的**子集**（不含任何派生列）。
 
 **Validates: Requirements 3.3**
 
-### Property 5
+### Property 5: 无账龄来源不伪造不变式
 
 当四表侧无账龄来源时，账龄字段必须缺键或为空，且 `sum(账龄段) != 期末余额`（不得被伪造成相等）。
 
 **Validates: Requirements 2.5, 5.3**
 
-### Property 6
+### Property 6: reason 与异常日志分离不变式
 
 对任意抛异常的内部调用，`aggregate_aux_by_name_ex` 返回 `reason='error'` 且日志含一条 ERROR；`reason='no_rows'` 时日志无 ERROR。二者不可混淆。
 
 **Validates: Requirements 5.1, 5.2**
 
-### Property 7
+### Property 7: 入口真实连通不变式
 
-缺口清单中每条 G-A/G-B 条目，在交付后都必须能 grep 到「按钮 → handler → 端点」三段的真实连接（按钮有唯一消费方、handler 真发请求、端点已注册路由）。
+缺口清单中每条 G-A/G-B 条目，在交付后必须同时满足：组件由真实 renderer registry 挂载；按钮在非只读 DOM 中可见；点击后网络请求命中该循环的已注册路由；响应被该宿主唯一 handler 消费并触发 reload。静态 AST/import/route registry 检查只能作为辅助，不能替代 Vitest 与 Playwright 行为证据。
 
 **Validates: Requirements 1.3, 6.3**
 

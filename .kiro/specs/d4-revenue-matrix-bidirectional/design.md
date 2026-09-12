@@ -81,37 +81,37 @@ elif adapter_id == "d4.revenue_detail":
 
 ## Correctness Properties
 
-### Property 1
+### Property 1: 真实生产链位置数组往返不变式
 
-对任意长度 12 的数值数组 `months`，`_set_json_path(row, "months/{i}", v)` 后 `row["months"]` 仍是 `list` 且 `len == 12`，且仅第 `i` 位被改写。
+对任意长度 12 的数值数组 `months`，必须经 `parse_contract → build_excel_adapter → materialize → extract → merge_projection_into_store_rows` 真实链路后，`row["months"]` 仍是 `list` 且长度为 12，12 个位置逐个等值；仅测试 provider 私有 helper 不构成通过。
 
-**Validates: Requirements 1.2**
+**Validates: Requirements 1.2, 1.6**
 
-### Property 2
+### Property 2: 数组边界 fail-closed 不变式
 
 对任意 `i` ∉ [0,11]，`_resolve_json_path(row, f"months/{i}")` 与 `_set_json_path` 必须抛错（fail closed），不得返回 None 或静默追加。
 
 **Validates: Requirements 1.4**
 
-### Property 3
+### Property 3: 净化坐标与内部公式不变式
 
-净化前后，受管 sheet 内**不含 `[n]`** 的 `<f>` 文本集合逐元素相等（内部公式零损伤）。
+净化前后，受管 sheet 内不含 `[n]` 的公式必须按坐标逐格比较完整 `<f>` 文本、缓存 `<v>`、单元格类型与 merge 范围；不能使用无坐标公式集合比较。外链部件、rels、defined names 和 XML Override/Relationship 必须按定向清单逐项核对删除。
 
-**Validates: Requirements 2.2**
+**Validates: Requirements 2.1, 2.2, 2.3**
 
-### Property 4
+### Property 4: OOXML 外链净化门不变式
 
 净化后模板过真 OOXML 门，且 `.preclean.bak` 不过门（门负例非空）。
 
 **Validates: Requirements 2.4**
 
-### Property 5
+### Property 5: 非空 projection 发布不变式
 
-first_publication 现算 projection 的 `row_keys[rows_table]` 长度等于 store 真实行数；每行贡献的 field 数 = 18。
+first_publication 现算 projection 的 `row_keys[rows_table]` 长度等于 store 真实行数；每行贡献的 field 数等于 Task 1 冻结的字段数量，未生成 mapping_digest 前不得假定为 18。
 
 **Validates: Requirements 3.2**
 
-### Property 6
+### Property 6: OO 回写数组形态不变式
 
 OO 回写经 `merge_projection_into_store_rows` 后，store 中 `months` 的 JSON 序列化形态是数组 `[...]` 而非对象 `{"0":...}`。
 
@@ -124,6 +124,10 @@ OO 回写经 `merge_projection_into_store_rows` 后，store 中 `months` 的 JSO
 3. **发布链**：Task 76 `--check` → `--apply`；`fix_projection_first_publication --check`（10 stage 全过）→ `--apply`。
 4. **§9.6 真栈 e2e**：`e2e/g5-1-d4-unified-path.spec.ts`，OO 写 A 列 `product`（文本列）。
 5. **DB 三谓词**：venv 只读查 applied / checklist marker / `source=onlyoffice` + op 逐字一致。
+
+## Error Handling
+
+数组路径统一使用 RFC 6901 JSON Pointer 的 token 规则，契约文件只允许一种规范形式 `/rows/{row_uuid}/months/{index}`；数组 index 必须是十进制非负整数，越界、长度不为 12、游标类型不匹配和缺失数组段分别返回稳定错误码并 fail closed。Task 2 的阻塞门必须调用共享 `parse_contract` 与真实 adapter/materialize/extract 链路，不得由 provider 私有 resolver 绕过共享解析器。Task 1 产出的列↔字段映射 digest 是 Task 5、6、7 的前置输入；digest 未生成或发生漂移时禁止生成契约和发布。
 
 ## Open Decisions
 

@@ -1,5 +1,11 @@
 # Implementation Plan
 
+## Overview
+
+本任务集按四表候选、稳定映射、F-SHELL 入口和底稿级刷新四条链路收口；标记为 BLOCKED 的任务不得用临时按钮或本地缓存绕过。
+
+## Tasks
+
 - [ ] 1. DEC-2 存储形态书面评估（阻塞门）
   - 实读 `backend/app/models/workpaper_field_override_models.py` + 迁移 V076，落「字段形态 / 作用域键 / 索引 / 唯一约束」实况
   - 逐条判 N:M 映射（`target_names` 数组 + `dataset_fingerprint` + `superseded_from` 留痕）能否不退化成 JSON 字符串塞入既有列
@@ -24,6 +30,7 @@
   - 输入已定位叶子（复用 `select_leaves`），输出账套明细名候选（`tb_aux_balance.aux_name` / `tb_balance.account_name`），带金额与来源坐标
   - 走 `get_active_filter`（只取 active dataset）；aux 侧必须先锁定单一 `aux_type` 再归集，防维度冗余双算
   - 🔴 不得复制或分叉 `ReportLineAccountSpec` 的定位逻辑（红基线 3）
+  - 候选按稳定目标 identity 传输，不得仅返回名称；名称归一规则、相似度算法、阈值和候选上限必须版本化并写入 evidence
   - _Requirements: 2.2_
 
 - [ ] 5. `classify` 四态纯函数 + PBT
@@ -39,17 +46,22 @@
   - _Requirements: 2.4, 5.1_
 
 - [ ] 7. 映射存储层（依赖 Task 1 结论）
+  - 目标身份必须保存 `account_code` / `aux_type` / `aux_name` / 维度键 / `dataset_id`；`row_key` 必须来自稳定模板/契约业务键，禁止使用可变行号或渲染数组下标
   - 按 Task 1 结论落存储：新建则 `backend/migrations/V*.sql` 全 DDL 幂等（`IF NOT EXISTS`）+ ORM + 读写服务
   - 作用域键至少 project + year + wp_code + sheet_code + row_key，唯一约束覆盖该键
   - 留痕字段 `confirmed_by` / `confirmed_at` / `superseded_from`；覆盖历史确认必须写新行或写留痕，不得原地静默改
-  - `dataset_fingerprint` 用于判 stale：目标名在当前 active dataset 消失 ⇒ 该行回落 `unmatched`（Property 2）
+  - `dataset_fingerprint` 用于判 stale：目标 identity 在当前 active dataset 中消失或身份字段变化 ⇒ 该行回落 `unmatched`（Property 2）
+  - 设计并测试批量确认的全回滚、重复请求幂等、版本冲突，以及目标 identity 变化导致 stale 的行为
   - _Requirements: 3.2, 3.4, 3.5, 1.4_
 
-- [ ] 8. 刷新链返回 match_state（扩展既有链，不新建平行端点）
+- [ ] 8. 映射批量确认事务与刷新链返回 match_state（扩展既有链，不新建平行端点）
+  - 批量确认单次事务提交，失败全回滚；请求携带 `base_mapping_version` + `idempotency_key`，重复请求幂等，版本冲突显式返回 conflict
+  - 覆盖历史映射写新版本并保留 before/after 快照；取消路径不得发逐行写入请求
+  - wire 字段固定为 row_key / match_state / candidates[] / target_identity / amount / similarity / source_kind / confirmed_by / confirmed_at / mapping_version / stale_reason
   - 底稿级取数/刷新响应逐行带 `match_state` + 候选 + 映射来源（自动/人工确认+确认人时间）
   - 已确认且未失效映射自动生效且不再触发弹窗（Property 5）
   - 🔴 additive 反模式自查：新字段必须有唯一前端消费方，否则即死代码
-  - _Requirements: 1.1, 1.3, 3.3_
+  - _Requirements: 1.1, 1.3, 3.3, 3.6_
 
 - [ ] 9. `GtRowNameAlignmentDialog.vue` 对齐确认弹窗
   - 两栏：左底稿行名（状态 tag）/ 右候选账套明细名（金额 + 相似度提示 + 排序）
@@ -57,7 +69,7 @@
   - 确认后关闭并立即重算受影响行；未确认行保持 `unmatched` 不伪造
   - 取消路径**零写入**（Property 4）
   - 不合并、不复制 `GtRefreshScopeDialog` 的 scope 树（红基线 2）
-  - _Requirements: 2.1, 2.3, 2.5, 2.6_
+  - _Requirements: 2.1, 2.3, 2.5, 2.6, 3.6_
 
 - [ ] 10. 行内可见标识与直达入口
   - `unmatched` / `ambiguous` 行给可见 tag（中文文案）+ 点击直达弹窗对应行，禁止静默显示 0
@@ -85,7 +97,8 @@
 - [ ] 14. 真栈实测（浏览器）
   - Playwright 跑 DEC-1 选定的样板底稿（待确认；建议 D3-1 审定表或 F1 附注）
   - 判据链：该行确认前无值 → 弹窗建立映射 → 确认后该行金额 = 账套真实值（与只读 SQL 快照逐字对齐）
-  - 二次刷新不再弹窗且出数一致（Property 5）；证据 JSON 落 spec evidence
+  - 二次刷新必须重新从服务端读取映射（不得依赖前端缓存），不再弹窗且出数一致（Property 5）；证据 JSON 落 spec evidence
+  - 同时证明 row_key 与目标 identity 未错位，且多对一告警能在下游审定表/附注显示
   - _Requirements: 5.4, 3.3_
 
 - [ ] 15. 收口
@@ -93,6 +106,10 @@
   - `.kiro/specs/INDEX.md` 登记本 spec 状态
   - 清理本轮 `tmp_*` / `_wip_*` 诊断产物
   - _Requirements: 5.3_
+
+## Notes
+
+DEC-1、DEC-2 在对应阻塞任务完成前不视为默认批准；所有实现任务必须把 producer digest、mapping version 和 evidence 路径写入交付记录。
 
 ## Task Dependency Graph
 
@@ -107,7 +124,8 @@
   ],
   "blocking": {
     "1": "DEC-2 书面结论未出 ⇒ Task 7 阻塞（Requirement 3.1）",
-    "2": "F-SHELL outlet 不可用 ⇒ Task 11 标 BLOCKED，禁止临时加按钮绕过（Requirement 4.2）"
+    "2": "F-SHELL outlet 不可用 ⇒ Task 11 标 BLOCKED，禁止临时加按钮绕过（Requirement 4.2）",
+    "external": "必须取得 F-SHELL producer 的版本、digest 与 conformance evidence；仅 producer tasks 标绿不能解除 Task 11 外部依赖"
   },
   "pending_decisions": {
     "DEC-1": "样板底稿待用户确认（红框图未获取到），影响 Task 14 的实测目标",

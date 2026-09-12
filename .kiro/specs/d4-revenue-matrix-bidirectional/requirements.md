@@ -26,6 +26,7 @@ D 循环已有 5 个 canary（D1/D3/D5/D6/D7）全部 `bidirectional_verified`�
 3. WHEN `months` 数组长度 ≠ 12 THEN 必须 fail closed 并给出显式错误，不得截断或补零静默通过
 4. WHEN 数组下标越界（如 `/months/12`）THEN 必须打红，不得回落到最后一个元素或 None
 5. WHEN 该往返验证未通过 THEN 本 spec 后续任务全部阻塞，不允许对 D4 执行 provisioner/first_publication
+6. WHEN 生产链路校验位置数组 THEN 必须通过 `parse_contract → build_excel_adapter → materialize → extract → merge_projection_into_store_rows` 的真实调用链；仅测试 provider 私有 helper 不得解除本阻塞门
 
 ### Requirement 2: 270 个公式格的精确净化（区分外链 vs 内部公式）
 

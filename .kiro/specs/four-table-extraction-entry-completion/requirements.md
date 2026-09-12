@@ -41,6 +41,7 @@
 3. WHEN 产出清单 THEN 每条必须给 wp_code → 宿主组件 → store item_id → 现有入口（后端端点有/无、前端按钮有/无、AutoSeed 有/无）五列，并标注 gap 类型
 4. WHEN 某底稿评估为"不适合取数" THEN 必须写明理由（如源模板无对应列、数据在序时账而非余额表），宁缺勿造，不得为凑数补入口
 5. WHEN 清单落地 THEN 必须是可复核产物（JSON 或 md 表）并作为后续任务的唯一真源
+6. WHEN 后续任务读取缺口清单 THEN 必须校验清单的 source digest 与当前 renderer registry / render-config 快照一致；不一致时必须阻塞实现，不得沿用过期清单
 
 ### Requirement 2: 红基线纠偏与历史实现迁移
 

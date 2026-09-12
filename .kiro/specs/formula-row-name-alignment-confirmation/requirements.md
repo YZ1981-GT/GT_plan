@@ -46,10 +46,11 @@
 #### Acceptance Criteria
 
 1. WHEN 评估存储方案 THEN 必须先给出「复用 `workpaper_field_overrides` 是否可承载 N:M 映射」的书面结论；若新建表则必须写明为何既有机制不足
-2. WHEN 映射落库 THEN 作用域必须至少含 project + year + 底稿（wp_code/sheet）+ 行标识，保证跨项目/跨年度不串
+2. WHEN 映射落库 THEN 作用域必须至少含 project + year + 底稿（wp_code/sheet）+ 稳定行标识，保证跨项目/跨年度不串；每个目标必须保存稳定身份（account_code、aux_type、aux_name 及适用的维度键/dataset_id），不得只保存名称字符串
 3. WHEN 同一作用域再次刷新 THEN 已确认映射必须自动生效且不再弹窗（除非映射已失效）
 4. WHEN 需要新迁移 THEN 必须是 `backend/migrations/V*.sql` 且全部 DDL 幂等（`IF NOT EXISTS`）
 5. WHEN 用户要修正历史确认 THEN 必须有入口可重新打开弹窗并覆盖既有映射，覆盖必须留痕（谁改的、改前是什么）
+6. WHEN 批量确认映射 THEN 必须以单次事务原子提交，支持幂等重试与版本冲突检测；任一目标校验失败时全部映射和审计记录不得写入
 
 ### Requirement 4: 刷新入口补齐（消费 F-SHELL，不自建按钮 owner）
 
