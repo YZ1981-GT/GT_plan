@@ -10,8 +10,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ref } from 'vue'
 
-const posts: Array<{ url: string; body: unknown }> = []
+const posts: Array<{ url: string; body: unknown; config?: Record<string, unknown> }> = []
 const gets: string[] = []
+let pullFailure: Error | null = null
 
 /** 每个 case 自己设置：forcesave 端点返回什么 */
 let forceSaveReply: { accepted: boolean; durable: boolean; detail: string } = {
@@ -33,12 +34,13 @@ vi.mock('@/utils/http', () => ({
       gets.push(url)
       return { data: { data: statusReply } }
     }),
-    post: vi.fn(async (url: string, body: unknown) => {
-      posts.push({ url, body })
+    post: vi.fn(async (url: string, body: unknown, config?: Record<string, unknown>) => {
+      posts.push({ url, body, config })
       if (url.includes('push-to-excel')) {
         return { data: { data: { rows: 1260, fields: 49140 } } }
       }
       if (url.includes('pull-from-excel')) {
+        if (pullFailure) throw pullFailure
         return { data: { data: { rows: 3, fields: 12, rows_changed: 3 } } }
       }
       return { data: { data: {} } }
@@ -47,11 +49,18 @@ vi.mock('@/utils/http', () => ({
 }))
 
 const messages: Array<{ kind: string; text: string }> = []
+let confirmAction: 'confirm' | 'cancel' = 'confirm'
 vi.mock('element-plus', () => ({
   ElMessage: {
     success: (m: unknown) => messages.push({ kind: 'success', text: readMsg(m) }),
     warning: (m: unknown) => messages.push({ kind: 'warning', text: readMsg(m) }),
     error: (m: unknown) => messages.push({ kind: 'error', text: readMsg(m) }),
+  },
+  ElMessageBox: {
+    confirm: vi.fn(async () => {
+      if (confirmAction === 'cancel') throw 'cancel'
+      return 'confirm'
+    }),
   },
 }))
 
@@ -85,6 +94,8 @@ beforeEach(() => {
   posts.length = 0
   gets.length = 0
   messages.length = 0
+  confirmAction = 'confirm'
+  pullFailure = null
   localStorage.clear()
   forceSaveReply = { accepted: true, durable: true, detail: '已落盘' }
   statusReply = {
@@ -125,6 +136,18 @@ describe('缺陷 A：HTML→Excel 必须先 flush 再 push', () => {
 })
 
 describe('缺陷 B：Excel→HTML 必须先拿到耐久确认', () => {
+  it('取消“保存并切换”时留在在线编辑，且不发 forcesave/pull、不显示失败', async () => {
+    confirmAction = 'cancel'
+    const { bridge, calls } = makeBridge()
+    bridge.currentMode.value = 'onlyoffice'
+    await bridge.switchMode('html')
+
+    expect(bridge.currentMode.value).toBe('onlyoffice')
+    expect(calls).not.toContain('forceSave')
+    expect(posts.some(p => p.url.includes('pull-from-excel'))).toBe(false)
+    expect(messages.some(m => m.kind === 'warning' || m.kind === 'error')).toBe(false)
+  })
+
   it('durable=true 时才发 pull，且 forceSave 早于 pull', async () => {
     const { bridge, calls } = makeBridge()
     bridge.currentMode.value = 'onlyoffice'
@@ -149,6 +172,7 @@ describe('缺陷 B：Excel→HTML 必须先拿到耐久确认', () => {
     const warn = messages.find(m => m.kind === 'warning')
     expect(warn).toBeTruthy()
     expect(warn!.text).toContain('尚未落盘')
+    expect(bridge.lastSync.value).toBe('')
     expect(messages.some(m => m.kind === 'success')).toBe(false)
   })
 
@@ -161,13 +185,32 @@ describe('缺陷 B：Excel→HTML 必须先拿到耐久确认', () => {
     expect(bridge.currentMode.value).toBe('onlyoffice')
   })
 
+  it('pull 失败由 bridge 单点提示，保持 OO 且不保留绿色同步摘要', async () => {
+    pullFailure = new Error('服务端拒绝陈旧文件')
+    const { bridge } = makeBridge()
+    bridge.currentMode.value = 'onlyoffice'
+    bridge.lastSync.value = '旧的绿色成功摘要'
+    await bridge.switchMode('html')
+
+    const pull = posts.find(p => p.url.includes('pull-from-excel'))
+    expect(pull?.config?._silent).toBe(true)
+    expect(bridge.currentMode.value).toBe('onlyoffice')
+    expect(bridge.lastSync.value).toBe('')
+    expect(messages.filter(m => m.kind === 'error')).toHaveLength(1)
+    expect(messages.some(m => m.kind === 'success')).toBe(false)
+  })
+
   it('pull 请求把耐久指纹带给后端，供服务端二次陈旧校验', async () => {
     forceSaveReply = {
       accepted: true,
       durable: true,
       detail: '已落盘',
-      // @ts-expect-error 测试构造：真实回执带 artifact 指纹
-      artifact: { before: { sha256: 'aaa' }, after: { sha256: 'bbb' } },
+      // @ts-expect-error 测试构造：真实回执带 artifact 指纹与服务端三态 outcome
+      artifact: {
+        before: { sha256: 'aaa' },
+        after: { sha256: 'bbb' },
+        outcome: 'accepted',
+      },
     }
     const { bridge } = makeBridge()
     bridge.currentMode.value = 'onlyoffice'
@@ -175,9 +218,11 @@ describe('缺陷 B：Excel→HTML 必须先拿到耐久确认', () => {
 
     const pull = posts.find(p => p.url.includes('pull-from-excel'))
     expect(pull).toBeTruthy()
+    expect(pull!.config?._silent).toBe(true)
     expect((pull!.body as Record<string, unknown>).durable_fingerprint).toEqual({
       before: { sha256: 'aaa' },
       after: { sha256: 'bbb' },
+      outcome: 'accepted',
     })
   })
 })

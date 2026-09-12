@@ -427,6 +427,16 @@ async def d2_forcesave(
     else:
         durable = False
 
+    artifact_receipt = {
+        "before": before,
+        "after": after,
+        # 与指纹放在同一份服务端回执中，pull 的陈旧门才能区分：
+        # * accepted + 相同指纹：callback 尚未落盘，必须拒绝；
+        # * nothing_to_save + 相同指纹：OO 明确确认无待保存内容，可以读取当前文件。
+        # 只在响应顶层返回 outcome 会被前端透传 artifact 时丢失，正是 2026-09-09
+        # “已点 OO 保存但仍报尚未落盘”的直接根因。
+        "outcome": outcome,
+    }
     return {
         "ok": True,
         "outcome": outcome,
@@ -434,27 +444,25 @@ async def d2_forcesave(
         "durable": durable,
         "doc_key": doc_key,
         "detail": detail,
-        "artifact": {"before": before, "after": after},
+        "artifact": artifact_receipt,
         "project_id": str(project_id),
     }
 
 
 def _assert_not_stale(artifact: Path, fingerprint: Mapping) -> None:
-    """磁盘文件必须是「forcesave 确认落盘后的那一份」，否则 409。
+    """磁盘文件必须与 forcesave 的耐久回执一致，否则 409。
 
-    `fingerprint` 是 `/d2-sync/forcesave` 回执里的 `artifact`，形如
-    ``{"before": {...}, "after": {...}}``。判据：
+    ``fingerprint`` 除 before/after 外还携带服务端判定的 ``outcome``：
 
-    * 若 forcesave 期间 **没**观察到变化（before.sha256 == after.sha256），
-      而磁盘现在仍是那个 sha256 ⇒ OO 的编辑从未落盘，读它必然拿到旧值 ⇒ 拒绝。
-    * 若磁盘当前 sha256 既不等于 `after` 也不等于 `before` ⇒ 文件被第三方并发换掉，
-      本次 pull 的前置确认已失效 ⇒ 拒绝，让调用方重新走 forcesave。
+    * ``accepted`` 必须观察到指纹变化，未变化表示 callback 尚未落盘；
+    * ``nothing_to_save`` 表示 OO 明确确认无待保存内容，此时相同指纹是正常结果；
+    * 当前文件既非 before 也非 after 时，说明确认后又被并发替换，必须拒绝。
 
-    只在 `fingerprint` 存在时生效；不带指纹的调用（如运维手动触发）不阻断，
-    但那种调用本身就不该用于「切回视图」路径。
+    不能只看 ``before == after``：它在上述前两种状态中外形相同、业务结论相反。
     """
     before = dict(fingerprint.get("before") or {})
     after = dict(fingerprint.get("after") or {})
+    outcome = str(fingerprint.get("outcome") or "")
     before_sha = str(before.get("sha256") or "")
     after_sha = str(after.get("sha256") or "")
     if not before_sha and not after_sha:
@@ -464,12 +472,14 @@ def _assert_not_stale(artifact: Path, fingerprint: Mapping) -> None:
 
     if before_sha and after_sha and before_sha == after_sha:
         if current_sha == before_sha:
+            if outcome == _FORCESAVE_NOTHING_TO_SAVE:
+                return
             raise HTTPException(
                 status_code=409,
                 detail=(
                     "在线编辑的内容尚未落盘 —— 磁盘上仍是切换前的那一份文件。"
                     "为避免用旧数据覆盖你在结构化视图的录入，本次回写已取消。"
-                    "请回到在线编辑，等状态显示已保存后再切换。"
+                    "请留在在线编辑，使用“保存并切换”并等待系统完成落盘。"
                 ),
             )
         return  # 磁盘已变新（forcesave 之后又落了一次），可读

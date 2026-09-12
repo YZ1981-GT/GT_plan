@@ -40,5 +40,7 @@ export interface ForceSaveResult {
   artifact?: {
     before?: { mtime_ns?: number; size?: number; sha256?: string }
     after?: { mtime_ns?: number; size?: number; sha256?: string }
+    /** 服务端三态判定；与 before/after 一起透传给 pull，禁止在 bridge 中丢失。 */
+    outcome?: string
   }
 }

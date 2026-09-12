@@ -22,7 +22,7 @@
  * 🔴 失败**不静默**：同步失败时不切换模式并显示真实原因。若失败还照切，
  * 审计师会在另一侧看到旧数据却以为是最新的 —— 那比报错危险得多。
  */
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
 
 import http from '@/utils/http'
@@ -106,6 +106,37 @@ function reasonOf(err: unknown): string {
     e?.message ||
     '未知错误'
   )
+}
+
+function isPromptCancel(error: unknown): boolean {
+  if (error === 'cancel' || error === 'close') return true
+  const action = String((error as { action?: unknown } | null)?.action ?? '')
+  return action === 'cancel' || action === 'close'
+}
+
+/**
+ * OO 工具栏的“保存”只表示文档服务已接收改动，不能替代平台的落盘回执。
+ * 模式切换因此由一个显式确认动作持有：确认后平台发 forcesave、等待 callback，
+ * 成功才切换；取消时不发任何请求，也不制造“同步失败”提示。
+ */
+async function confirmSaveAndSwitch(): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm(
+      '系统将保存在线编辑内容，并在服务器确认文件已落盘后自动切换到结构化视图。',
+      '保存并切换',
+      {
+        confirmButtonText: '保存并切换',
+        cancelButtonText: '取消',
+        type: 'warning',
+        closeOnClickModal: false,
+        closeOnPressEscape: true,
+      },
+    )
+    return true
+  } catch (error) {
+    if (isPromptCancel(error)) return false
+    throw error
+  }
 }
 
 export function useD2SyncBridge(options: D2SyncBridgeOptions): D2SyncBridge {
@@ -225,6 +256,8 @@ export function useD2SyncBridge(options: D2SyncBridgeOptions): D2SyncBridge {
     const { data } = await http.post(
       `/api/workpapers/${wpId.value}/d2-sync/pull-from-excel`,
       durableFingerprint ? { durable_fingerprint: durableFingerprint } : {},
+      // 业务提示由本 bridge 唯一持有；全局拦截器再弹一次会形成双横幅。
+      { _silent: true } as any,
     )
     const r = (data?.data ?? data) as {
       rows?: number
@@ -250,6 +283,9 @@ export function useD2SyncBridge(options: D2SyncBridgeOptions): D2SyncBridge {
         persist('onlyoffice')
         ElMessage.success(lastSync.value)
       } else {
+        // 由平台持有“保存并切换”动作：OO 工具栏保存不是后端落盘回执。
+        // 用户取消时留在当前视图，不发 forcesave/pull，也不显示失败。
+        if (!(await confirmSaveAndSwitch())) return
         // 🔴 先回写再切：切了再回写的话，reloadHtml 会先跑、拿到的还是旧库数据。
         await pullFromExcel()
         currentMode.value = 'html'
@@ -260,12 +296,12 @@ export function useD2SyncBridge(options: D2SyncBridgeOptions): D2SyncBridge {
       void refreshStatus()
     } catch (err) {
       const reason = reasonOf(err)
+      // 失败结果绝不能继续被宿主投影成绿色“已同步”。具体原因由本次唯一 toast 持有。
+      lastSync.value = ''
       if (err instanceof NotDurableError) {
         // 「没落盘所以主动不做」——不是失败，是保护。文案要说清为什么没切。
-        lastSync.value = err.message
         ElMessage.warning({ message: err.message, duration: 8000 })
       } else {
-        lastSync.value = `同步失败：${reason}`
         // 不切模式 —— 让用户留在数据确定是最新的那一侧
         ElMessage.error({
           message: `同步失败，已留在当前视图：${reason}`,

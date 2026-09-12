@@ -99,13 +99,48 @@ def test_stale_artifact_rejected(artifact: Path) -> None:
     old = _sha(b"OLD-CONTENT")
     with pytest.raises(HTTPException) as ei:
         R._assert_not_stale(
-            artifact, {"before": {"sha256": old}, "after": {"sha256": old}}
+            artifact,
+            {
+                "before": {"sha256": old},
+                "after": {"sha256": old},
+                "outcome": R._FORCESAVE_ACCEPTED,
+            },
         )
     assert ei.value.status_code == 409
     # 文案必须让审计师知道「为什么没回写」以及「该怎么做」
     detail = str(ei.value.detail)
     assert "尚未落盘" in detail
     assert "取消" in detail
+
+
+def test_nothing_to_save_same_artifact_allowed(artifact: Path) -> None:
+    """OO 明确回报无待保存改动时，相同指纹就是最新文件，不得误报 409。"""
+    old = _sha(b"OLD-CONTENT")
+    R._assert_not_stale(
+        artifact,
+        {
+            "before": {"sha256": old},
+            "after": {"sha256": old},
+            "outcome": R._FORCESAVE_NOTHING_TO_SAVE,
+        },
+    )
+
+
+@pytest.mark.parametrize("outcome", [None, "", "unknown"])
+def test_missing_or_unknown_outcome_cannot_bypass_stale_gate(
+    artifact: Path, outcome: str | None
+) -> None:
+    """只有服务端声明的 nothing_to_save 能放行；缺失/未知值仍按陈旧文件拒绝。"""
+    old = _sha(b"OLD-CONTENT")
+    fingerprint: dict[str, object] = {
+        "before": {"sha256": old},
+        "after": {"sha256": old},
+    }
+    if outcome is not None:
+        fingerprint["outcome"] = outcome
+    with pytest.raises(HTTPException) as exc_info:
+        R._assert_not_stale(artifact, fingerprint)
+    assert exc_info.value.status_code == 409
 
 
 def test_freshly_saved_artifact_allowed(artifact: Path) -> None:
@@ -195,6 +230,41 @@ def test_forcesave_endpoint_treats_nothing_to_save_as_durable() -> None:
     assert "durable = True" in branch, (
         "「无待保存内容」必须判为可回写 —— 磁盘已是权威版本，等也等不到变化"
     )
+
+    # AST 锁定 outcome 必须位于 artifact_receipt 字典本身；只搜字符串会被顶层同名键骗绿。
+    import ast
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(src))
+    receipt_assign = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(isinstance(target, ast.Name) and target.id == "artifact_receipt" for target in node.targets)
+    )
+    assert isinstance(receipt_assign.value, ast.Dict)
+    receipt_items = {
+        key.value: value.id
+        for key, value in zip(receipt_assign.value.keys, receipt_assign.value.values)
+        if isinstance(key, ast.Constant)
+        and isinstance(key.value, str)
+        and isinstance(value, ast.Name)
+    }
+    assert receipt_items.get("outcome") == "outcome", (
+        "forcesave 三态必须嵌入 artifact 回执，否则前端回传指纹时会丢失 nothing_to_save"
+    )
+    assert any(
+        isinstance(node, ast.Return)
+        and isinstance(node.value, ast.Dict)
+        and any(
+            isinstance(key, ast.Constant)
+            and key.value == "artifact"
+            and isinstance(value, ast.Name)
+            and value.id == "artifact_receipt"
+            for key, value in zip(node.value.keys, node.value.values)
+        )
+        for node in ast.walk(tree)
+    ), "forcesave 响应 artifact 必须返回携带 outcome 的 artifact_receipt"
 
 
 def test_pull_endpoint_accepts_durable_fingerprint() -> None:
