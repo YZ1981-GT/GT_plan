@@ -1,0 +1,82 @@
+{
+  "script": "verify_d2_materialize_http_live.py",
+  "spec": "workpaper-sync-materialize-large-table-performance",
+  "task": "Wave 4 Task 8",
+  "entry_id": "xlsx/gt-d2-accounts-receivable",
+  "sheet_key": "d22-managed",
+  "base": "http://127.0.0.1:9980",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88",
+    "user_id": "b6f8e8d0-8b64-47ab-bbc3-bfaed2b51e98",
+    "remark_bytes": "550278",
+    "substrate_rel": "storage/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/.versions/ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88/representations/xlsx/gt-d2-accounts-receivable/000000001-fea06682beae.xlsx",
+    "substrate_sha256": "fea06682beaea9c9b5c60df62354113863b544e556b9935a3d497a803c0974ba"
+  },
+  "soft_limit_seconds": 120.0,
+  "steps": {
+    "health": {
+      "status": 200,
+      "seconds": 0.032,
+      "body_keys": [
+        "migration",
+        "redis",
+        "schema_drift",
+        "services",
+        "startup",
+        "status"
+      ]
+    },
+    "store_projection": {
+      "status": 200,
+      "seconds": 17.305,
+      "field_count": 28491,
+      "row_count": 741,
+      "store_field_count": 28431,
+      "overlay_applied": true,
+      "expected_revision": 4
+    },
+    "pending_mutation": {
+      "status": 200,
+      "seconds": 10.197,
+      "has_token": true,
+      "error_code": null,
+      "idempotency_key": "d2-mat-live-1a83ee99-7da2-4116-b5bd-88db14ca2a08"
+    },
+    "materialize": {
+      "status": 200,
+      "seconds": 13.421,
+      "within_soft_limit": true,
+      "descriptor_present": true,
+      "response_keys": [
+        "artifact_sha256",
+        "authority_model",
+        "authority_model_definition_sha256",
+        "client_confirmed_base_revision",
+        "content_version_id",
+        "definition_bundle_id",
+        "definition_bundle_sha256",
+        "definition_bundle_slots",
+        "doc_key",
+        "document_type",
+        "generation",
+        "mode",
+        "onlyoffice_config",
+        "operation_id",
+        "participant_id",
+        "replayed",
+        "representation_generation",
+        "representation_id",
+        "room_id",
+        "server_applied_revision",
+        "write_fence_epoch"
+      ],
+      "error_code": null,
+      "message": null,
+      "room_id": "cfaf372a-1769-489e-97e4-349b147578c8",
+      "idempotency_key": "d2-mat-live-1a83ee99-7da2-4116-b5bd-88db14ca2a08"
+    }
+  },
+  "passed": true,
+  "linearity_offline_note": "see evidence/baseline-post-wave3.json for offline linearity PASS"
+}

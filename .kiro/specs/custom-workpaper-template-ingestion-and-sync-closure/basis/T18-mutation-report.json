@@ -1,0 +1,46 @@
+{
+  "task": 18,
+  "spec": "custom-workpaper-template-ingestion-and-sync-closure",
+  "recordedAt": "2026-09-09T07:03:22.217793+00:00",
+  "baselinePassed": true,
+  "postRestorePassed": true,
+  "mutations": [
+    {
+      "id": "M_PWI_NO_SHEET_COPY",
+      "target": "backend/app/services/custom_template_ingestion/workbook_instance.py",
+      "verdict": "RED",
+      "returncode": 1
+    },
+    {
+      "id": "M_NS_GATE",
+      "target": "backend/app/services/custom_template_ingestion/namespace_migration.py",
+      "verdict": "RED",
+      "returncode": 1
+    },
+    {
+      "id": "M_SAGA_ACTIVE",
+      "target": "backend/app/services/custom_template_ingestion/finalize_saga.py",
+      "verdict": "RED",
+      "returncode": 1
+    },
+    {
+      "id": "M_CAS_BASE",
+      "target": "backend/app/services/custom_template_ingestion/staging_cas.py",
+      "verdict": "RED",
+      "returncode": 1
+    },
+    {
+      "id": "M_NO_LWW",
+      "target": "backend/app/services/custom_template_ingestion/merge_remap.py",
+      "verdict": "RED",
+      "returncode": 1
+    }
+  ],
+  "allRed": true,
+  "redCount": 5,
+  "total": 5,
+  "scopeNotes": [
+    "Non-OO / non-Playwright module mutations only",
+    "SYNC gates and true OO dual-user Playwright remain BLOCKED for Task 18 closure"
+  ]
+}
