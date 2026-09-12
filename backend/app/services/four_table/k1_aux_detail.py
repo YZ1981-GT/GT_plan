@@ -75,8 +75,18 @@ def _num(v: Any) -> float:
         return 0.0
 
 
+def _empty_aging(seg_keys: Sequence[str]) -> dict[str, float]:
+    """空账龄骨架：每段值=0。
+
+    🔴 四表库无账龄维度 ⇒ 账龄由审计师人工填列，取数**只生成空骨架、绝不写入
+    任何账龄金额**（红基线④ / Property 5「不伪造账龄分布」）。严禁把余额整笔
+    落首段（`bucket[first_key]=amount` 即活体伪造）。
+    """
+    return {k: 0.0 for k in seg_keys}
+
+
 def _segment_keys(segments: Sequence[Any]) -> list[str]:
-    """从账龄段对象/字典/字符串里抽 key 序列（缺省回退 K1 默认首档 `within1`）。"""
+    """从账龄段对象/字典/字符串里抽 key 序列（去重、保序）。"""
     keys: list[str] = []
     for s in segments or []:
         if isinstance(s, str):
@@ -112,22 +122,21 @@ def build_k1_detail_rows_from_aux(
         row_id_factory: 行 id 工厂（默认 uuid4；单测注入确定性工厂）。
         source_hint: 写进 `remark` 的来源说明（如 ``1221·客户``）。
 
-    账龄**不臆造**：辅助余额表无账龄维度 → 金额整笔落**首段**，端点在 message 里
-    提示审计师按实际账龄调整（前端账龄区段可一键改档）。
+    账龄**不臆造**：辅助余额表无账龄维度 → 每行 aging 字段一律生成**空骨架**
+    （每段值=0，`agingPrior`/`agingCurrent`/`agingAudited` 三组皆然），端点在
+    message 里提示审计师按实际账龄人工填列（前端账龄区段可一键改档）。
+
+    段键集必须由调用方（端点）经 `get_effective_segments(project_id, "K1", db)`
+    取得后传入；本构建器**不臆造单段兜底**（不再有 `["within1"]` 硬编码），
+    segments 为空则骨架为空，交由端点保证传入有效配置。
 
     Returns:
         行 dict 列表；字段名逐字对齐前端 `K1DetailRow`。
     """
     make_row_id = row_id_factory or (lambda: f"K1-2-r-{uuid4().hex[:12]}")
-    seg_keys = _segment_keys(segments) or ["within1"]
-    first_key = seg_keys[0]
+    seg_keys = _segment_keys(segments)
     rp = {str(n).strip() for n in (related_party_names or []) if str(n or "").strip()}
     remark = f"由辅助余额表({source_hint})导入" if source_hint else "由辅助余额表导入"
-
-    def _aging(amount: float) -> dict[str, float]:
-        bucket = {k: 0.0 for k in seg_keys}
-        bucket[first_key] = amount
-        return bucket
 
     rows: list[dict] = []
     seq = 0
@@ -151,9 +160,9 @@ def build_k1_detail_rows_from_aux(
             "relatedParty": "是" if name in rp else "否",
             "beginBalance": round(opening, 2),
             "endBalance": round(end_balance, 2),
-            "agingPrior": _aging(round(opening, 2)),
-            "agingCurrent": _aging(round(end_balance, 2)),
-            "agingAudited": _aging(round(end_balance, 2)),
+            "agingPrior": _empty_aging(seg_keys),
+            "agingCurrent": _empty_aging(seg_keys),
+            "agingAudited": _empty_aging(seg_keys),
             "stage": 1,
             "badDebtProvision": 0.0,
             "netValue": round(end_balance, 2),

@@ -574,6 +574,8 @@ async def d7_import_aux_balance(
     from app.services.d_cycle_extraction.d_aux_import import (
         aggregate_d_cycle_aux,
         aux_reason_message,
+        build_two_period_aging_skeleton,
+        resolve_d_cycle_segments,
     )
 
     wp_result = await db.execute(
@@ -602,8 +604,15 @@ async def d7_import_aux_balance(
             "message": aux_reason_message(agg.reason, agg.prefixes),
         }
 
-    # 构建 D7-2 行数据 —— 只写录入列（Property 4）：合同/单位名 + 期初未审 + 录入默认。
-    # 账龄字段（agingPrior/agingAudited）**留空**（治理红基线 ④）；派生列交前端 recalc。
+    # 账龄空骨架段键由项目账龄配置驱动（Task 12 / Requirement 7.1~7.3）：段键 =
+    # `get_effective_segments(project_id, "D7", db)`（D7 默认 THREE_YEAR，2-period）。
+    # D7 明细行账龄为 nested keyed（agingPrior/agingAudited，见 useD7Detail），故骨架
+    # 也用 nested keyed；每段值=0，**永不塞余额**（治理红基线 ④，Property 5）。
+    segments = await resolve_d_cycle_segments(db, project_id, "D7")
+    aging_skeleton = build_two_period_aging_skeleton(segments)
+
+    # 构建 D7-2 行数据 —— 只写录入列（Property 4）：合同/单位名 + 期初未审 + 录入默认 + 空账龄骨架。
+    # 账龄字段（agingPrior/agingAudited）值全 0（治理红基线 ④）；派生列交前端 recalc。
     rows_data: list[dict] = []
     for idx, entry in enumerate(agg.entries[:_ROW_LIMIT], 1):
         rows_data.append({
@@ -614,6 +623,8 @@ async def d7_import_aux_balance(
             "relatedPartyType": "非关联方",
             "natureType": "预收货款",
             "priorUnadjusted": entry.opening,
+            "agingPrior": dict(aging_skeleton["agingPrior"]),
+            "agingAudited": dict(aging_skeleton["agingAudited"]),
         })
 
     # Merge模式：保留已有行，追加新客户
@@ -654,7 +665,8 @@ async def d7_import_aux_balance(
         "total_rows": len(merged),
         "message": (
             f"从辅助余额表({agg.prefixes[0]}·{agg.aux_type})归集 {len(agg.entries)} 个往来单位，"
-            f"新增 {len(new_rows)} 行；账龄字段留空，请按实际账龄人工填列。"
+            f"新增 {len(new_rows)} 行；账龄骨架已按项目账龄配置生成 {len(segments)} 段（值全为空），"
+            f"请按实际账龄人工填列。"
         ),
     }
 

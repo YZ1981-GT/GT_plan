@@ -187,6 +187,86 @@
         "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
         "timestamp": 1789229436625
       }
+    ],
+    "11. 修复 K1 账龄伪造 + 骨架改配置驱动（后端）": [
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254860491
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254871478
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789255536533
+      }
+    ],
+    "12. D 循环账龄骨架审计与对齐（后端）": [
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254860544
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254872290
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789255537163
+      }
+    ],
+    "13. 前端骨架同键 + 枚举切换重映射": [
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254860596
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789255550532
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789256063906
+      }
+    ],
+    "14. 守卫 + 变异（后端 Property 5/8 + 前端）": [
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254860640
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789255551202
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789256064597
+      }
+    ],
+    "15. 真栈实测 + 收口": [
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789254860703
+      },
+      {
+        "executionId": "5f16c4fa-fb06-4ec6-a272-f3371c517f19",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789256078319
+      }
     ]
   }
 }

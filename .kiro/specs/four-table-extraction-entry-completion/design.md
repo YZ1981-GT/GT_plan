@@ -32,7 +32,7 @@ checklist_responses[item_id].remark（merge 语义）
 | 维度锁定 | `pick_aux_type` 先定 `aux_type` | 直接 `GROUP BY aux_name` ❌ |
 | 科目来源 | 报表映射解析（如 K1 走 BS-009，兜底注明） | 字面量 `'2203%'` 等 ❌ |
 | 归集实现 | 共享件 `aux_aggregation` | 各自裸 SQL（D6 抽到 `detail_aggregation.py` 但仍裸 SQL）❌ |
-| 账龄 | 无来源则留空 | 全额塞 `within1` ❌ 伪造 |
+| 账龄 | 应为**配置驱动空骨架**（键取 `get_effective_segments`，值留空）；🔴 **K1 现状仍全额塞首段** `_aging()`→`bucket[first_key]=amount`，属活体伪造待修 | 全额塞 `within1` ❌ 伪造（D3/D5/D6/D7 迁移已改留空） |
 
 `aggregate_aux_by_name` 已是共享件且签名足够（`db, project_id, year, account_prefixes`），迁移主要是**替换调用 + 补 year 参数 + 科目码改解析**。
 
@@ -42,6 +42,18 @@ checklist_responses[item_id].remark（merge 语义）
 - **G-B**：后端端点无 + 具备取数能力 → 端点 + 按钮都补，端点直接用共享件（不会产生历史债）
 - **G-C**：两侧都有但实现违铁律（D3/D5/D6/D7）→ 迁移
 - **G-D**：评估为不适合（源模板无列 / 数据只在序时账 / 无维度挂账）→ 只登记理由，不动代码
+
+### 账龄骨架与账龄枚举联动（Requirement 7）
+
+四表库**无账龄源**（`tb_aux_balance` 无 aging 列，`tb_ledger` 只有 `voucher_date` 但取数不做逐笔账龄核销）⇒ 账龄是审计师在明细表**手动录入**的判断。取数的职责只有两条：
+
+1. **生成空账龄骨架**：账龄段键集来自 `aging_config_service.get_effective_segments(project_id, subject, db)`（与前端 `useAgingConfig` 同一真源 `wizard_state.aging_config`，subject-scoped）。3-period 科目（K1/D2/K3/G5/F1）生成 `agingPrior`/`agingCurrent`/`agingAudited` 三组，2-period 科目（D3/D5/D6/D7）生成 `agingPrior`/`agingAudited` 两组，每段值 = 0。**永不塞余额**。
+2. **随枚举联动**：项目切三年段（4 段）↔五年段（6 段）↔自定义（2-10 段）时，骨架段键自动跟着 `effective_segments` 变；已录明细行经前端 `useAgingMigration.remapRowAgingData` 重映射到新段（不丢已录数据）。
+
+实现要点：
+- `build_k1_detail_rows_from_aux` 与各 D 循环行构建器接收的 `segments` 必须由**端点在后端** `await get_effective_segments(project_id, subject, db)` 取得后传入，删除 `["within1"]` 硬编码兜底（改为 subject 默认 preset 兜底）。
+- K1 端点当前把余额喂给 `_aging()` 落首段 —— 改为 `_empty_aging(seg_keys)`（全 0），移除 `bucket[first_key]=amount`。
+- 骨架键 ↔ UI 列（`useAgingConfig` bands）↔ 审定表/附注账龄汇总三处必须同键（同一 `effective_segments`），不得各写一套。
 
 ### fail-open 治理（Requirement 5.1）
 
@@ -116,15 +128,21 @@ AuxAggregationResult
 
 ### Property 5: 无账龄来源不伪造不变式
 
-当四表侧无账龄来源时，账龄字段必须缺键或为空，且 `sum(账龄段) != 期末余额`（不得被伪造成相等）。
+四表侧无账龄来源 ⇒ 取数生成的账龄骨架每段值必须为 0/空，且**不存在**「某单段 == 期初/期末余额」（即不得整额落首段）；对任意非零余额行，`sum(agingAudited 各段) == 0`。含 K1 端点（现状 `_aging()` 落首段属违规，修复后此不变式成立）。
 
-**Validates: Requirements 2.5, 5.3**
+**Validates: Requirements 2.5, 5.3, 7.3**
 
 ### Property 6: reason 与异常日志分离不变式
 
 对任意抛异常的内部调用，`aggregate_aux_by_name_ex` 返回 `reason='error'` 且日志含一条 ERROR；`reason='no_rows'` 时日志无 ERROR。二者不可混淆。
 
 **Validates: Requirements 5.1, 5.2**
+
+### Property 8: 账龄骨架与枚举联动不变式
+
+对任意 project/subject，取数生成行的账龄段键集必须逐项等于 `get_effective_segments(project_id, subject, db)` 返回的 `[seg.key ...]`（顺序一致）；切换项目账龄枚举（三年/五年/自定义）后重取，骨架键集必须随之变化且与新枚举一致；已录明细行经 `useAgingMigration` 重映射后不丢已录账龄值。骨架键不得来自硬编码常量（改一处枚举不变则必红）。
+
+**Validates: Requirements 7.1, 7.2, 7.4, 7.5**
 
 ### Property 7: 入口真实连通不变式
 

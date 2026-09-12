@@ -1353,11 +1353,28 @@ router = create_cycle_import_export_router(tag="k1-import-export", api_prefix="k
 _K1_2_DETAIL_ITEM_ID = "K1-2-detail-rows"
 
 
-async def _resolve_k1_segments(db: AsyncSession, wp_id: str) -> list[Any]:
-    """K1 有效账龄段：项目级配置（K1 无表级覆盖，异常兜底 THREE_YEAR）。"""
-    from ._cycle_import_export_common import resolve_aging_segments
+async def _resolve_k1_segments(db: AsyncSession, project_id: str) -> list[Any]:
+    """K1 有效账龄段：项目级配置 `get_effective_segments(project_id, "K1", db)`。
 
-    return await resolve_aging_segments(db, wp_id, "K1")
+    🔴 段键集是账龄空骨架的唯一真源（Requirement 7.1）——必须来自项目账龄配置，
+    禁止硬编码段键或写死 `["within1"]` 兜底。读取失败时按 K1 科目默认 preset
+    （FIVE_YEAR）兜底，绝不回退单段（Requirement 7.6）。
+    """
+    from uuid import UUID
+
+    from app.services.aging_config_service import (
+        DEFAULT_SUBJECT_PRESETS,
+        AgingPreset,
+        get_effective_segments,
+        resolve_segments,
+    )
+
+    try:
+        return await get_effective_segments(UUID(str(project_id)), "K1", db)
+    except Exception:  # noqa: BLE001 — 配置读取失败按 subject 默认 preset 兜底，不回退单段
+        return resolve_segments(
+            DEFAULT_SUBJECT_PRESETS.get("K1", AgingPreset.FIVE_YEAR), None
+        )
 
 
 class _MiniCtx:
@@ -1407,7 +1424,7 @@ async def k1_import_aux_balance(
     year = int(wp_row.audit_year or 0)
 
     gross_prefixes = await _resolve_k1_gross_prefixes(db, project_id)
-    segments = await _resolve_k1_segments(db, wp_id)
+    segments = await _resolve_k1_segments(db, project_id)
 
     agg = await aggregate_aux_by_name_ex(db, project_id, year, gross_prefixes)
     entries, aux_type, total_units = agg.entries, agg.aux_type, agg.total_units
@@ -1457,13 +1474,10 @@ async def k1_import_aux_balance(
 
     await upsert_json_rows(db, wp_id, _K1_2_DETAIL_ITEM_ID, merged, field="remark")
 
-    first_label = ""
-    if segments:
-        first_label = str(getattr(segments[0], "label", "") or "")
     truncated = total_units > len(rows_data)
     msg = (
         f"从辅助余额表({source_hint})归集 {total_units} 个往来单位，"
-        f"新增 {len(added)} 行；账龄已整笔落「{first_label}」，请按实际账龄调整。"
+        f"新增 {len(added)} 行；账龄留空，请按实际账龄人工填列。"
     )
     out: dict[str, Any] = {
         "ok": True,

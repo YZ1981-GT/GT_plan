@@ -20,7 +20,8 @@ WHERE ... is_deleted=false GROUP BY aux_name`），带四个铁律违规（红�
 from __future__ import annotations
 
 import logging
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Sequence
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,6 +36,85 @@ from app.services.four_table.aux_aggregation import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ─── 账龄空骨架（Phase 2 / Task 12：配置驱动，不塞首段，Requirement 7.1~7.3/7.6） ──
+#
+# 🔴 四表库无账龄源 ⇒ 账龄由审计师人工填列，取数**只生成空骨架、绝不写入任何账龄金额**
+#   （红基线④ / Property 5「不伪造账龄分布」；严禁 `bucket[first_key]=amount` 整额落首段）。
+#   段键集必须来自项目级账龄配置 `get_effective_segments(project_id, subject, db)`，与前端
+#   `useAgingConfig` 同一真源（Requirement 7.1）。D3/D5/D6/D7 均为 **2-period** 科目
+#   （对齐 `useAgingConfig` 的 `THREE_PERIOD_SUBJECTS = {D2,K1,K3,G5,F1}`）⇒ 只生成
+#   `agingPrior`/`agingAudited` 两组，**不含** `agingCurrent`（Requirement 7.2）。
+
+
+def _segment_keys(segments: Sequence[Any]) -> list[str]:
+    """从账龄段对象/字典/字符串里抽 key 序列（去重、保序）。
+
+    与 `four_table.k1_aux_detail._segment_keys` 同款范式（K1 是 3-period 参照实现）。
+    """
+    keys: list[str] = []
+    for s in segments or []:
+        if isinstance(s, str):
+            key = s
+        elif isinstance(s, dict):
+            key = str(s.get("key") or "")
+        else:
+            key = str(getattr(s, "key", "") or "")
+        key = key.strip()
+        if key and key not in keys:
+            keys.append(key)
+    return keys
+
+
+def _empty_aging(seg_keys: Sequence[str]) -> dict[str, float]:
+    """空账龄骨架：每段值=0（Property 5「不伪造账龄分布」）。
+
+    绝不把余额整笔落首段（`bucket[first_key]=amount` 即活体伪造）。
+    """
+    return {k: 0.0 for k in seg_keys}
+
+
+def build_two_period_aging_skeleton(segments: Sequence[Any]) -> dict[str, dict[str, float]]:
+    """D3/D5/D6/D7（2-period）账龄空骨架：`agingPrior` + `agingAudited`，每段值=0。
+
+    段键来自 `resolve_d_cycle_segments`（项目账龄配置真源）。**不含** `agingCurrent`
+    （2-period 科目，Requirement 7.2）。骨架嵌套键式（nested keyed），与前端
+    `useAgingConfig` / `createEmptyAgingData` 及 D3/D7 明细行 `agingPrior.{key}` 对齐。
+    """
+    seg_keys = _segment_keys(segments)
+    return {
+        "agingPrior": _empty_aging(seg_keys),
+        "agingAudited": _empty_aging(seg_keys),
+    }
+
+
+async def resolve_d_cycle_segments(
+    db: AsyncSession, project_id: str, subject: str
+) -> list[Any]:
+    """某 D 循环的有效账龄段：项目级配置 `get_effective_segments(project_id, subject, db)`。
+
+    🔴 段键集是账龄空骨架的唯一真源（Requirement 7.1）——必须来自项目账龄配置，
+    禁止硬编码段键或写死 `["within1"]` 兜底。读取失败时按 subject 默认 preset
+    （`DEFAULT_SUBJECT_PRESETS`：D3/D7→THREE_YEAR，其余缺省 FIVE_YEAR）兜底，
+    绝不回退单段（Requirement 7.6）。与 `_k1_import_export._resolve_k1_segments` 同款范式。
+    """
+    from app.services.aging_config_service import (
+        DEFAULT_SUBJECT_PRESETS,
+        AgingPreset,
+        get_effective_segments,
+        resolve_segments,
+    )
+
+    try:
+        return await get_effective_segments(UUID(str(project_id)), subject, db)
+    except Exception:  # noqa: BLE001 — 配置读取失败按 subject 默认 preset 兜底，不回退单段
+        logger.exception(
+            "resolve_d_cycle_segments fallback: project=%s subject=%s", project_id, subject
+        )
+        return resolve_segments(
+            DEFAULT_SUBJECT_PRESETS.get(subject, AgingPreset.FIVE_YEAR), None
+        )
 
 
 class _MiniCtx:
@@ -119,6 +199,8 @@ __all__ = [
     "DAuxImportResult",
     "aggregate_d_cycle_aux",
     "aux_reason_message",
+    "build_two_period_aging_skeleton",
     "resolve_d_cycle_gross_prefixes",
+    "resolve_d_cycle_segments",
     "spec_of",
 ]

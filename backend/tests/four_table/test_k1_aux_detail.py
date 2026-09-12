@@ -133,7 +133,9 @@ def test_nature_not_all_other():
     assert [r["nature"] for r in rows] == ["保证金", "押金", "备用金", "往来款"]
 
 
-def test_aging_buckets_follow_segments_and_land_first():
+def test_aging_buckets_follow_segments_and_stay_empty():
+    """🔴 Property 5「不伪造账龄」：桶键随 segments 变，但每段值恒 0——
+    绝不把余额整笔落首段（红基线④ `bucket[first_key]=amount` 已删）。"""
     for segs in (FIVE, THREE):
         rows = build_k1_detail_rows_from_aux(
             [AuxEntry("甲", 70.0, 0, 0, 100.0)], segs, row_id_factory=_ids()
@@ -142,16 +144,21 @@ def test_aging_buckets_follow_segments_and_land_first():
         keys = [s.key for s in segs]
         for field in ("agingPrior", "agingCurrent", "agingAudited"):
             assert list(r[field].keys()) == keys, field
-        assert r["agingCurrent"]["within1"] == 100.0
-        assert r["agingPrior"]["within1"] == 70.0
-        assert sum(r["agingCurrent"].values()) == 100.0
+            assert sum(r[field].values()) == 0, field  # 空骨架，无金额落任何段
+        # 非零余额行的账龄合计仍为 0（不整额落首段）
+        assert r["agingCurrent"]["within1"] == 0.0
+        assert r["agingPrior"]["within1"] == 0.0
 
 
-def test_empty_segments_fallback_within1():
+def test_empty_segments_produce_empty_skeleton_no_hardcoded_within1():
+    """段列表为空时**不臆造单段兜底**（不再有 `["within1"]` 硬编码）——
+    骨架为空 dict，段键由端点经 get_effective_segments 保证。"""
     rows = build_k1_detail_rows_from_aux(
         [AuxEntry("甲", 0, 0, 0, 5.0)], [], row_id_factory=_ids()
     )
-    assert list(rows[0]["agingCurrent"].keys()) == ["within1"]
+    assert rows[0]["agingCurrent"] == {}
+    assert rows[0]["agingPrior"] == {}
+    assert rows[0]["agingAudited"] == {}
 
 
 def test_blank_names_skipped_and_row_limit():
@@ -202,9 +209,10 @@ def test_property_aggregation_conserves_totals(items):
     assert abs(got_end - exp_end) < 0.05
     exp_begin = sum(round(e.opening, 2) for e in entries)
     assert abs(sum(r["beginBalance"] for r in rows) - exp_begin) < 0.05
-    # 账龄桶之和 == 期末（整笔落首档）
+    # 🔴 账龄空骨架：三组账龄各段之和恒 0（不伪造，Property 5）
     for r in rows:
-        assert abs(sum(r["agingCurrent"].values()) - r["endBalance"]) < 0.005
+        for field in ("agingPrior", "agingCurrent", "agingAudited"):
+            assert sum(r[field].values()) == 0, field
 
 
 # ─────────────────── Property 2：手工优先幂等 ───────────────────

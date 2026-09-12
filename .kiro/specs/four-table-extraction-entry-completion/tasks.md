@@ -81,6 +81,38 @@
   - 清理 `tmp_*` / `_wip_*`
   - _Requirements: 1.5, 6.2_
 
+## Tasks (Phase 2 — 账龄骨架与账龄枚举联动)
+
+> 起因：用户复核指出账龄不能为空、须与账龄枚举（三年/五年/自定义）联动。核查确认四表库无账龄源、账龄由审计师手动录入；且 **K1 现状仍把余额整额塞首段（活体伪造，违红基线④/Property 5）**。本阶段修复伪造 + 让账龄骨架配置驱动、随枚举联动、切换时重映射不丢数据。Requirement 7 + 强化 2.5/Property 5。
+
+- [x] 11. 修复 K1 账龄伪造 + 骨架改配置驱动（后端）
+  - 删 `build_k1_detail_rows_from_aux` 的 `_aging()` 整额落首段（`bucket[first_key]=amount`）与 `["within1"]` 硬编码兜底
+  - 改为 `_empty_aging(seg_keys)`（每段值=0）；`segments` 由 K1 端点 `await get_effective_segments(project_id, "K1", db)` 取得后传入，读取失败按 subject 默认 preset（FIVE_YEAR）兜底、不回退单段
+  - message 仍提示「账龄留空，请按实际账龄人工填列」
+  - _Requirements: 2.5, 7.1, 7.3, 7.6_
+
+- [x] 12. D 循环账龄骨架审计与对齐（后端）
+  - 核 D3/D5/D6/D7 迁移端点的行构建器：确认账龄字段已留空（非塞首段），并同样由端点读 `get_effective_segments(project_id, subject, db)` 生成骨架段键（subject 默认：D3/D5/D6/D7→THREE_YEAR），删任何硬编码段
+  - 2-period 科目只生成 `agingPrior`/`agingAudited` 两组；3-period 科目三组（对齐 `useAgingConfig` 的 THREE_PERIOD_SUBJECTS）
+  - _Requirements: 2.5, 7.1, 7.2, 7.3_
+
+- [x] 13. 前端骨架同键 + 枚举切换重映射
+  - 明细行 merge 后账龄段键与 `useAgingConfig` bands 同键；取数骨架经宿主 reload 后由 `useAgingConfig` 渲染当前枚举列
+  - 项目切换账龄枚举（三年↔五年↔自定义）时调 `useAgingMigration.remapRowAgingData` 重映射已录账龄到新段，不丢/不错位；监听既有 `aging-config:changed` 事件
+  - 审定表账龄汇总 / 附注账龄披露与骨架同一 `effective_segments` 真源，三处不各写一套
+  - _Requirements: 7.2, 7.4, 7.5_
+
+- [x] 14. 守卫 + 变异（后端 Property 5/8 + 前端）
+  - 后端守卫：断言取数骨架 `sum(agingAudited)==0`（不塞首段，Property 5）、骨架键集逐项等于 `get_effective_segments` 返回（Property 8）；变异：把 `_empty_aging` 改回塞首段必红、把段键改成硬编码常量（改枚举不变）必红
+  - 前端 vitest：三年/五年/自定义三种配置下骨架键集与 `useAgingConfig` bands 一致；`useAgingMigration` 重映射不丢已录值
+  - _Requirements: 6.1, 6.2, 7.2, 7.4_
+
+- [x] 15. 真栈实测 + 收口
+  - Playwright：K1（或一张 3-period 底稿）取数 → 账龄各段值全空（非首段带数）；切项目账龄枚举三年↔五年 → 明细列与行骨架同步变、已录账龄段重映射保留；证据 JSON 记录段键集前后对照 + 某行手动录账龄后重取不被覆盖
+  - `get_diagnostics` 校验三件套；`git status --porcelain` 核无 `??` 漏登记；清理 `tmp_*`/`_wip_*`
+  - _Requirements: 6.4, 7.2, 7.4, 7.5_
+  - ✅ 交付（Task 15 evidence `evidence/task15-aging-skeleton-realstack.json`）：真栈 K1 wp `6e6348d0`（重庆和平药房_2024，1221 有 3305 aux 行/1098 户）新取 400 行 —— **全 400 行 × 3 组 × 6 段 aging 值恒 0**（`max_abs_aging_value=0`、`any_segment_equals_balance=false`、`sum(agingAudited)==0`），message「账龄留空，请按实际账龄人工填列」，键集 = FIVE_YEAR（Property 5/8 实证）；某行手动录 `agingAudited.y2to3=4800` 后重取 `imported_count=0`、值不被覆盖、无重复（Requirement 3.4/7.4）；项目账龄枚举 FIVE_YEAR→THREE_YEAR（`PUT /api/projects/{id}/aging/config` 广播 `aging-config:changed`）后 `effective_segments` 6→4、K1-2 明细「账龄区段」列同步渲染为「1年以内/1-2年/2-3年/3年以上」、共享段 y2to3=4800 经 `useAgingMigration` 重映射保留（Requirement 7.2/7.4/7.5），测后已还原 FIVE_YEAR。三件套 `get_diagnostics` 全 clean；本 spec Phase 2 产物（5 守卫/测试 + 改动端点/服务 + 2 证据 + 三件套）已 `git add` 无 `??` 漏登记（未 commit）。**已知遗留（不在本 spec 修）**：THREE_YEAR 末段 `over3` 与 FIVE_YEAR `over5` 键不同 ⇒ 末段值在三↔五切换时会掉（PRESET_SEGMENTS 固有，非本 spec 缺陷）。
+
 ## Task Dependency Graph
 
 ```json
@@ -91,7 +123,10 @@
     { "wave": 3, "tasks": ["4.1"], "rationale": "先冻结四家历史实现的迁移前真库基线与输入 digest；没有基线不得开始迁移" },
     { "wave": 4, "tasks": ["4", "5"], "rationale": "历史端点迁移与 G-B 新端点都消费增强后的共享件；Task 4 必须消费 Task 4.1 的 frozen baseline，G-B 仍受 Task 1 清册 digest 约束" },
     { "wave": 5, "tasks": ["6", "7"], "rationale": "后端守卫与前端入口并行：守卫针对 Wave 4 的后端行为，前端入口依赖端点已可用" },
-    { "wave": 6, "tasks": ["8", "9", "10"], "rationale": "前端守卫与真栈实测需要按钮已挂载；收口最后" }
+    { "wave": 6, "tasks": ["8", "9", "10"], "rationale": "前端守卫与真栈实测需要按钮已挂载；收口最后" },
+    { "wave": 7, "tasks": ["11", "12"], "rationale": "Phase 2 后端：K1 修伪造 + D 循环账龄骨架改配置驱动（读 get_effective_segments），二者独立可并行" },
+    { "wave": 8, "tasks": ["13", "14"], "rationale": "前端骨架同键+枚举切换重映射，与后端 Property 5/8 守卫+变异并行（守卫针对 wave 7 的后端行为）" },
+    { "wave": 9, "tasks": ["15"], "rationale": "Phase 2 真栈实测（枚举切换联动）+ 收口，需前后端骨架已落地" }
   ],
   "blocking": {
     "1": "缺口清册未出或 source digest 与 registry/render-config 漂移 ⇒ Task 5 / Task 7 无输入，全部阻塞（Requirement 1.5/1.6）",

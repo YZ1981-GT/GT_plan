@@ -1,0 +1,137 @@
+{
+  "artifact": "task15-aging-skeleton-realstack.json",
+  "spec": "four-table-extraction-entry-completion",
+  "task": "Task 15 (Phase 2) — 真栈实测 + 收口 · 账龄空骨架 + 账龄枚举联动重映射",
+  "purpose": "Playwright real-stack proof that Phase 2 fixed the K1 aging fabrication: (a) 从余额表导入 extracts rows whose aging segments are ALL EMPTY (every agingPrior/agingCurrent/agingAudited segment == 0, none equals the balance — the anti-fabrication guarantee, Property 5); (b) a manually-entered aging value survives a re-import (merge preserves it, no overwrite, no duplicate — Requirement 3.4/7.4); (c) switching the project aging enum (five↔three year) drives the detail-table columns AND row skeleton keys in lockstep, and an already-entered aging on a shared segment is preserved through the remap (Requirement 7.2/7.4/7.5, Property 8).",
+  "generated_by": "spec task subagent — Playwright MCP (authenticated browser, real endpoints via fetch with Bearer token from sessionStorage) + postgres MCP (READ-ONLY verification). No production code modified. No DB writes via MCP (all writes went through the app's own authenticated endpoints).",
+  "requirements_covered": ["6.4", "7.2", "7.4", "7.5"],
+  "properties_covered": ["5 (无账龄来源不伪造)", "8 (账龄骨架与枚举联动)"],
+
+  "environment": {
+    "servers_up": { "backend_9980": true, "frontend_3030": true, "started_by_this_task": false, "note": "Both ports already listening (start-dev.bat session); no duplicate servers started (workspace rule)." },
+    "app_url": "http://localhost:3030",
+    "auth": "admin / admin123 (prefilled). Token is JWT in sessionStorage.token; real endpoints called with Authorization: Bearer <token>. Auth is token-based, not cookie — credentials:'include' returns 401.",
+    "tooling": "Playwright MCP for user-visible behavior; postgres MCP restricted/read-only for DB verification."
+  },
+
+  "phase2_code_state_confirmed": {
+    "k1_aux_detail": "backend/app/services/four_table/k1_aux_detail.py — _empty_aging(seg_keys) returns {k:0.0 for k in seg_keys}; _aging()/bucket[first_key]=amount removed; no ['within1'] hardcode; segments passed by caller.",
+    "k1_endpoint": "backend/app/routers/wp_render_strategies/_k1_import_export.py — _resolve_k1_segments → get_effective_segments(project_id,'K1',db) with subject-preset fallback (resolve_segments), passed into build_k1_detail_rows_from_aux; message now '账龄留空，请按实际账龄人工填列' (was '账龄已整笔落「1年以内」' in Task 9).",
+    "frontend": "audit-platform/frontend/src/components/workpaper/composables/useK1Detail.ts — useAgingConfig(projectId,'K1') for segments/bands; onMounted addEventListener('aging-config:changed', _handleConfigEvent) → rows.map(remapRowAgingData(row, segments.value, true))."
+  },
+
+  "aging_presets_reference": {
+    "FIVE_YEAR_6seg": ["within1", "y1to2", "y2to3", "y3to4", "y4to5", "over5"],
+    "THREE_YEAR_4seg": ["within1", "y1to2", "y2to3", "over3"],
+    "shared_segments": ["within1", "y1to2", "y2to3"],
+    "terminal_bucket_differs": "over5 (5yr) vs over3 (3yr) — see known_followup",
+    "K1_subject_default_preset": "FIVE_YEAR",
+    "source": "backend/app/services/aging_config_service.py PRESET_SEGMENTS + DEFAULT_SUBJECT_PRESETS"
+  },
+
+  "proof_a_all_empty_aging_skeleton": {
+    "verdict": "PASS",
+    "target": {
+      "why": "Needed a K1 wp with an EMPTY K1-2 so a fresh import returns rows built by the current Phase-2 code (the canonical Task-9 K1 wp e53abb5b already holds 500 STALE rows from Task 9's pre-fix fabrication and re-import merges to 0 added).",
+      "wp_code": "K1",
+      "wp_id": "6e6348d0-a21d-4c57-826f-bd8a1f947892",
+      "project_id": "f064f5e4-69f2-4c7e-9c6d-c899c18d650b",
+      "被审计单位": "重庆和平药房连锁有限责任公司_2024",
+      "aux_availability_readonly_sql": "tb_aux_balance JOIN ledger_datasets(status='active') WHERE account_code LIKE '1221%' AND is_deleted=false → 3305 rows / 1098 distinct units (project f064f5e4).",
+      "project_aging_preset_at_extraction": "FIVE_YEAR (project default, subject_overrides {})"
+    },
+    "endpoint": "POST /api/workpapers/6e6348d0-a21d-4c57-826f-bd8a1f947892/k1/import-aux-balance",
+    "response": {
+      "status": 200,
+      "imported_count": 400,
+      "total_units": 400,
+      "total_rows": 400,
+      "aux_type": "客户",
+      "reason": "ok",
+      "message": "从辅助余额表(1221·客户)归集 400 个往来单位，新增 400 行；账龄留空，请按实际账龄人工填列。"
+    },
+    "aging_assertions_over_all_400_rows": {
+      "rows_checked": 400,
+      "max_abs_aging_value_across_all_rows_x3groups_x6segments": 0,
+      "any_segment_equals_balance": false,
+      "rows_with_nonzero_agingAudited_sum": 0,
+      "skeleton_keys_agingPrior": ["within1", "y1to2", "y2to3", "y3to4", "y4to5", "over5"],
+      "skeleton_keys_agingCurrent": ["within1", "y1to2", "y2to3", "y3to4", "y4to5", "over5"],
+      "skeleton_keys_agingAudited": ["within1", "y1to2", "y2to3", "y3to4", "y4to5", "over5"],
+      "note": "Segment keys == FIVE_YEAR effective_segments (Property 8). Every value 0; no segment equals the row balance (Property 5). Fabrication (整额落首段) is fixed."
+    },
+    "sample_rows": [
+      { "counterparty": "丁桃英", "beginBalance": 4800, "endBalance": 4800, "agingAudited": { "within1": 0, "y1to2": 0, "y2to3": 0, "y3to4": 0, "y4to5": 0, "over5": 0 } },
+      { "counterparty": "万泽绪", "beginBalance": 1600, "endBalance": 1600, "agingAudited": { "within1": 0, "y1to2": 0, "y2to3": 0, "y3to4": 0, "y4to5": 0, "over5": 0 } },
+      { "counterparty": "万里", "beginBalance": 11800, "endBalance": 11800, "agingAudited": { "within1": 0, "y1to2": 0, "y2to3": 0, "y3to4": 0, "y4to5": 0, "over5": 0 } }
+    ],
+    "ui_corroboration": "On the K1-2 明细表 UI, an alert reads '账龄合计与期末余额不一致 (203笔)' listing e.g. '万泽绪: 账龄合计0 ≠ 期末1600', '万里: 账龄合计0 ≠ 期末11800' — directly confirming the extracted rows carry 0 aging and the app prompts the auditor to fill it manually."
+  },
+
+  "proof_b_manual_entry_preserved_on_reimport": {
+    "verdict": "PASS",
+    "wp_id": "6e6348d0-a21d-4c57-826f-bd8a1f947892",
+    "steps": [
+      "GET /api/workpapers/{wp}/checklist-responses → item K1-2-detail-rows; row 丁桃英 (endBalance 4800) agingAudited all 0.",
+      "Manually set 丁桃英 agingAudited.y2to3 = 4800 (a SHARED segment across 5yr/3yr).",
+      "PUT /api/workpapers/{wp}/checklist-responses (items:[{item_id:'K1-2-detail-rows', remark:JSON}]) → 200; read-back confirms y2to3=4800 persisted.",
+      "Re-import: POST /k1/import-aux-balance → imported_count 0, total_rows 400 (merge no-op, all 400 counterparties already present).",
+      "Read-back after re-import: 丁桃英 agingAudited.y2to3 still 4800; duplicate_count(丁桃英)=1; total_rows still 400."
+    ],
+    "assertions": {
+      "put_status": 200,
+      "y2to3_after_manual_save": 4800,
+      "reimport_imported_count": 0,
+      "reimport_total_rows": 400,
+      "final_y2to3": 4800,
+      "manual_preserved": true,
+      "duplicate_count_丁桃英": 1
+    },
+    "note": "merge_k1_detail_rows keys on counterparty (business key), manual-priority: existing rows are neither duplicated nor rewritten (Property 3 / Requirement 3.4)."
+  },
+
+  "proof_c_enum_switch_lockstep_and_remap_preserved": {
+    "verdict": "PASS",
+    "project_id": "f064f5e4-69f2-4c7e-9c6d-c899c18d650b",
+    "config_endpoint": "PUT /api/projects/{project_id}/aging/config (backend/app/routers/aging_config.py — validates, persists to wizard_state.aging_config, broadcasts SSE 'aging-config:changed').",
+    "original_config": { "preset": "FIVE_YEAR", "effective_segments_keys": ["within1", "y1to2", "y2to3", "y3to4", "y4to5", "over5"], "subject_overrides": {} },
+    "switch_to_three_year": {
+      "put_status": 200,
+      "after_switch_preset": "THREE_YEAR",
+      "after_switch_effective_segments_keys": ["within1", "y1to2", "y2to3", "over3"],
+      "backend_lockstep": "PASS — effective_segments went 6→4 keys; terminal over5 replaced by over3; shared within1/y1to2/y2to3 unchanged (Property 8 backend side)."
+    },
+    "ui_lockstep_observed": {
+      "route": "/projects/f064f5e4-.../workpapers/6e6348d0-.../edit → tab 明细表K1-2 → 账龄区段",
+      "aging_column_headers_rendered": ["1年以内", "1-2年", "2-3年", "3年以上"],
+      "note": "4 THREE_YEAR bands (was 6 FIVE_YEAR bands). Columns changed in lockstep with the enum, driven by useAgingConfig bands (Requirement 7.5)."
+    },
+    "remap_preserved_observed": {
+      "row": "丁桃英",
+      "ui_账龄合计": "4,800.00",
+      "note": "The manually-entered agingAudited.y2to3=4800 survived the remap because 2-3年(y2to3) is a shared segment between FIVE_YEAR and THREE_YEAR. useAgingMigration.remapRowAgingData preserved it (Requirement 7.4). A plain extracted row (万泽绪) stayed 0 across all bands.",
+      "band_cells_blank_reason": "Individual 0-value band cells render blank because platform displayPrefs.showZero=false; the 4,800.00 in 账龄合计 confirms y2to3 carries the value."
+    },
+    "segment_key_set_before_after": {
+      "before_five_year": ["within1", "y1to2", "y2to3", "y3to4", "y4to5", "over5"],
+      "after_three_year": ["within1", "y1to2", "y2to3", "over3"],
+      "dropped_on_5to3": ["y3to4", "y4to5", "over5"],
+      "added_on_5to3": ["over3"],
+      "preserved_shared": ["within1", "y1to2", "y2to3"]
+    },
+    "persistence_note": "The frontend remap is applied to the live reactive rows on the 'aging-config:changed' event and rendered immediately (UI showed 4 bands + preserved 4,800); it persists back to checklist_responses on the next save. At read-back time the DB rows still carried FIVE_YEAR keys with y2to3=4800 preserved — expected, since no save was triggered in this read-only observation.",
+    "cleanup": "Project aging config RESTORED to original FIVE_YEAR after the test (PUT 200, effective_segments back to 6 keys). Verified."
+  },
+
+  "store_item_id": "K1-2-detail-rows",
+
+  "known_followup_not_fixed_here": {
+    "id": "aging-terminal-bucket-over3-vs-over5",
+    "observation": "THREE_YEAR terminal bucket key is 'over3' while FIVE_YEAR terminal bucket key is 'over5'. They are NOT a shared key, so a value entered in the terminal bucket (e.g. FIVE_YEAR over5) has no exact-key counterpart when switching to THREE_YEAR (over3) — the terminal-bucket value drops on a three↔five switch unless useAgingMigration's fallback merges it. Shared segments within1/y1to2/y2to3 are unaffected.",
+    "root_cause": "Inherent to PRESET_SEGMENTS in backend/app/services/aging_config_service.py (and the mirrored frontend useAgingConfig); NOT a defect introduced by this spec.",
+    "recommendation": "If terminal-bucket continuity across enum switches is desired, either (1) unify the terminal key (e.g. always 'overN' → a stable 'terminal' key) or (2) extend useAgingMigration to map old-terminal→new-terminal by position when keys differ. Track as a separate spec; do NOT fix in this spec."
+  },
+
+  "overall_verdict": "PASS — Phase 2 aging skeleton is config-driven and enum-linked with no fabrication. (a) fresh extraction produces all-empty aging skeletons (max aging value 0 across 400 rows, no segment == balance, Property 5); (b) manual aging entry preserved on re-import (merge no-op, no overwrite, no duplicate); (c) switching the project aging enum five↔three drives both effective_segments (backend) and the detail-table columns (frontend UI) in lockstep, with shared-segment entries preserved through the remap (Property 8, Requirement 7.2/7.4/7.5). Verified via authenticated Playwright browser (real endpoints + rendered UI) and postgres read-only.",
+  "cleanup_note": "Project aging config restored to FIVE_YEAR. The 400 rows imported into K1 wp 6e6348d0 during proof (a) were written via the app's own real endpoint (legitimate feature exercise) and left in place (empty-aging skeleton + one manually-filled 丁桃英 row) as durable evidence of the fixed behavior."
+}

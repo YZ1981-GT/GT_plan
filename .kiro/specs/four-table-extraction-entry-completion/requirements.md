@@ -53,7 +53,7 @@
 2. WHEN 确认「`period_type`/`balance` 必 500」理由已过期 THEN 必须修正 `aux_aggregation.py` docstring 与 G7/K1/D1 注释里的该表述，改为真实缺陷（①②③④），不得留错误理由继续繁殖
 3. WHEN 迁移历史端点 THEN D3/D5/D6/D7 必须改为复用 `four_table.aux_aggregation.aggregate_aux_by_name`（含 `get_active_filter` + `pick_aux_type`），删除各自的裸 SQL
 4. WHEN 迁移后 THEN 科目码必须从报表映射解析（保留硬编码仅作显式兜底且必须注明来源），不得继续裸硬编码
-5. WHEN 迁移触及账龄字段 THEN 不得把余额全额塞进账龄首段；无账龄来源时该字段留空并在返回 message 中提示需人工填账龄
+5. WHEN 取数触及账龄字段（含 D3/D5/D6/D7 迁移端点**与 K1 端点**）THEN 不得把余额全额塞进账龄首段（含 `bucket[first_key]=amount` 这类整额落首档）；四表库无账龄源 ⇒ 账龄由审计师手动录入，取数只生成**空账龄骨架**（每段值=0/缺省）并在返回 message 提示需人工填账龄。🔴 K1 现状 `build_k1_detail_rows_from_aux` 的 `_aging()` 把余额整笔落首段，属本条要修的活体违规
 6. WHEN 迁移完成 THEN `get_active_filter` / `pick_aux_type` 在这四个文件中必须可 grep 到真实调用（不是注释），且旧裸 SQL 零残留
 
 ### Requirement 3: 统一取数范式（禁止第 5 套）
@@ -91,6 +91,19 @@
 2. WHEN 端点返回 0 行 THEN 响应必须携带可区分的原因码（无候选 `aux_type` / 无匹配科目 / 无 active dataset / 异常），前端按原因码给不同提示
 3. WHEN 某字段无四表来源 THEN 必须留空，不得用 0、上期值或把总额塞进首段账龄伪装成已取数
 4. WHEN 取数结果写库 THEN 必须可追溯来源（至少能判断某行是取数产生还是手工录入）。来源标记的承载形式由 DEC-4 定夺：**本 spec 不新增统一 `source_kind`/`source_dataset_id` 列**（会动 5+ 循环的 store 形态与契约 digest），而是用各循环行已有的 `remark` 字段携带中文来源标记（如 K1 写 “由辅助余额表(1221·客户)导入”）以区分取数行与手工录入；`source_dataset_id` 在端点响应与证据中记录（Task 9 证据 JSON），不落入行。统一列是 **deferred 增强**（已在缺口清册 blocked/deferred 登记），不阻塞取数本身。若某循环连取数行本身都无法承载（行结构缺失），该循环必须标 blocked/deferred 并从最终完成数中排除
+
+### Requirement 7: 账龄骨架与账龄枚举联动（不伪造前提下同步）
+
+**User Story:** 作为审计师，取数进来的往来单位行必须带着与项目账龄枚举（三年段/五年段/自定义）一致的账龄段骨架，让我能立刻在正确段位手动录账龄；项目切换枚举时已录的账龄不能丢。
+
+#### Acceptance Criteria
+
+1. WHEN 取数端点构建账龄骨架 THEN 账龄段键集必须来自项目级账龄配置 `aging_config_service.get_effective_segments(project_id, subject, db)`（subject-scoped：K1/D2→FIVE_YEAR、D3/F1→THREE_YEAR 等默认，subject_overrides 优先），**禁止**硬编码段键或写死 `["within1"]` 兜底
+2. WHEN 项目账龄枚举为三年段/五年段/自定义 THEN 取数生成的骨架段键必须逐项与该枚举 `effective_segments[].key` 一致（3-period 科目含 agingPrior/agingCurrent/agingAudited 三组，2-period 科目含 agingPrior/agingAudited 两组）
+3. WHEN 生成账龄骨架 THEN 每段值必须为 0/缺省（空骨架），**永不**由取数写入任何账龄金额（Property 5 不伪造）
+4. WHEN 项目切换账龄枚举（三年↔五年↔自定义）THEN 已存在明细行的账龄数据必须经 `useAgingMigration` 重映射到新段键，不得丢弃或错位已录数据；无对应新段的旧段数据按既有迁移规则归并
+5. WHEN 取数骨架落库后 THEN 明细表 UI 列（`useAgingConfig` 派生的 bands）、审定表账龄汇总、附注账龄披露必须与骨架同键（同一 `effective_segments` 真源），不得三处各写一套段
+6. WHEN 账龄配置读取失败 THEN 按 subject 默认 preset 兜底（K1/D2→FIVE_YEAR、D3→THREE_YEAR），并在 message/日志提示，**不得**回退到写死单段 `["within1"]`
 
 ### Requirement 6: 守卫、变异检验与真栈实测
 
