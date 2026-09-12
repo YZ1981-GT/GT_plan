@@ -56,6 +56,13 @@ export const wpUserFormula = {
     `/api/workpapers/${wpId}/user-formulas/${encodedCellKey}`,
   /** POST `/api/workpapers/{wp_id}/validate-formula` — 语法校验 + 预览 */
   validate: (wpId: string) => `/api/workpapers/${wpId}/validate-formula`,
+  /** formula-toolbar Task 8 — v2 contract (new capability path; legacy dict stays migration-only) */
+  v2: {
+    list: (wpId: string) => `/api/workpapers/${wpId}/user-formulas/v2`,
+    batchMutate: (wpId: string) => `/api/workpapers/${wpId}/user-formulas/v2:batchMutate`,
+    history: (wpId: string, formulaId: string) =>
+      `/api/workpapers/${wpId}/user-formulas/v2/${formulaId}/history`,
+  },
 } as const
 
 // ─── 项目级公式（勾稽 / 自动生成） ────────────────────────────────────────────
@@ -70,17 +77,9 @@ export const projectFormula = {
    */
   reportCrossCheck: (projectId: string) =>
     `/api/projects/${projectId}/formula/report-cross-check`,
-  /**
-   * POST `/api/projects/{project_id}/formula/auto-generate`
-   *
-   * 🔴 **后端未实现**（`auto_generate` 全后端只命中合并/CFS/科目映射三处）——
-   * 这是**有意的前瞻占位**：`FormulaManagerDialog.vue` 的 catch 里显式判
-   * `status === 404` → 提示「自动生成公式功能尚未启用…」。
-   * 平台守卫 `formulaEndpointExistence.spec.ts` 已把它登记为唯一豁免条目
-   * （含「后端未实现 + 前端有 404 降级」两个判据）。**删掉这条降级提示前先读那份守卫**。
-   */
-  autoGenerate: (projectId: string) =>
-    `/api/projects/${projectId}/formula/auto-generate`,
+  // 注：曾登记过 `auto-generate` 前瞻占位（后端零实现 + 前端 404 降级）。
+  // 现已由既有的 `POST /api/report-config/clone`（`reportConfig.clone`，mode=sync）
+  // 落地「把报表预设落入项目级 project:{id}」，故该占位与其豁免登记一并删除。
 } as const
 
 // ─── 公式作用域目录（ACNR 地址目录） ──────────────────────────────────────────

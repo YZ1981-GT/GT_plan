@@ -270,7 +270,9 @@ describe('Property 20: 登记表每条 URL 都命中后端真实路由（交叉�
    * （`auto-generate`）。**两处不得各写一份判据** —— 这里只做「数量封顶 + 归一值一致」，
    * 理由与降级路径的实证归那份守卫。
    */
-  const EXEMPT_NORM = Object.freeze(['/api/projects/{}/formula/auto-generate'])
+  // 2026-09-11 清空：`auto-generate` 占位已删（改走 `POST /api/report-config/clone`
+  // 的 mode=sync 落项目级预设）。两处登记同步归零 ⇒ 登记表必须全部命中后端。
+  const EXEMPT_NORM: ReadonlyArray<string> = Object.freeze([])
 
   it('后端路由抽取非空（提取器自检）', () => {
     expect(backendNorm.size).toBeGreaterThan(500)

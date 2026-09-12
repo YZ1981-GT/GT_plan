@@ -190,15 +190,9 @@ const ENDPOINT_EXEMPTIONS: ReadonlyArray<{
   reason: string
   fallback: string
 }> = Object.freeze([
-  {
-    normalized: '/api/projects/{}/formula/auto-generate',
-    reason:
-      '后端确无等价实现（`auto_generate` 全后端只命中合并/CFS/科目映射三处），' +
-      '属有意的前瞻占位',
-    fallback:
-      'FormulaManagerDialog.vue 的 catch 里显式判 `status === 404` → ' +
-      '提示「自动生成公式功能尚未启用，请先使用…」，用户可感知且有替代路径',
-  },
+  // 2026-09-11 清空：唯一条目 `/api/projects/{}/formula/auto-generate` 已删除。
+  // 「把报表预设落入项目」改走既有 `POST /api/report-config/clone`（mode=sync），
+  // 前端 apiPaths 的 autoGenerate 占位与调用点一并移除 ⇒ 无需豁免（判据更严）。
 ])
 
 // ---------------------------------------------------------------------------
@@ -356,28 +350,20 @@ describe('Property 3: 前端公式端点 ⊆ 后端真实注册路由', () => {
   })
 
   /**
-   * 豁免的 auto-generate 前端确实有 404 降级分支（判据②可验证）。
+   * 前瞻占位已清零：`auto-generate` 访问器与调用点都不得复活。
    *
-   * 🔴 **Task 14 后判据必须两形态都认**：端点已收敛进 `apiPaths/formula.ts`，
-   * 调用点写的是 `projectFormula.autoGenerate(...)` 而不再是字面量 `auto-generate`。
-   * 只按字面量断言会把**正确写法打红**（memory 已登记该同族坑）。
-   * 故这里按「字面量 或 访问器」判定，并**交叉锁死**访问器真指向该 URL
-   * （否则出现「访问器名字对、URL 指到别处」的静默错误）。
+   * 「把报表预设落入项目」现走既有 `POST /api/report-config/clone`（mode=sync），
+   * 该端点真实存在 ⇒ 不需要豁免，也不该再留 404 降级分支冒充可用功能。
    */
-  it('豁免的 auto-generate 前端确实有 404 降级分支（判据②可验证）', () => {
+  it('auto-generate 占位不复活（访问器与调用点均已删除）', () => {
     const dlg = path.join(FE_SRC, 'components', 'formula', 'FormulaManagerDialog.vue')
     const src = stripComments(fs.readFileSync(dlg, 'utf-8'))
-    const literal = src.includes('auto-generate')
-    const viaPaths = /\bprojectFormula\s*\.\s*autoGenerate\s*\(/.test(src)
-    expect(literal || viaPaths).toBe(true)
-    expect(/status\s*===\s*404/.test(src)).toBe(true)
+    expect(/\bprojectFormula\s*\.\s*autoGenerate\s*\(/.test(src)).toBe(false)
+    expect(apiPathsAccessorUrl('autoGenerate')).toBeNull()
 
-    // 交叉锁死：走 apiPaths 时，该访问器必须真的产出 `auto-generate` 端点
-    if (!literal) {
-      const url = apiPathsAccessorUrl('autoGenerate')
-      expect(url).not.toBe('')
-      expect(url.endsWith('/formula/auto-generate')).toBe(true)
-    }
+    // 替代路径必须真的接上（否则等于把功能删了没补）
+    expect(src).toMatch(/P_rc\s*\.\s*clone/)
+    expect(src).toContain("mode: 'sync'")
   })
 })
 

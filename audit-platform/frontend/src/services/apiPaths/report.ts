@@ -38,6 +38,13 @@ export const reportConfig = {
   applyMasterUpdate: '/api/report-config/apply-master-update',
   candidates: '/api/report-config/candidates',
   staleStatus: (projectId: string) => `/api/report-config/stale-status/${projectId}`,
+  /**
+   * POST `/api/report-config/clone` — 把标准模板配置落成项目级（`project:{id}`）。
+   *
+   * `mode: 'sync'` 为幂等模式：只落有公式的行、已存在则跳过（`overwrite` 可覆盖）。
+   * 项目级行由取数层优先消费（report_account_mapping / four_table 三处）。
+   */
+  clone: '/api/report-config/clone',
 } as const
 
 // ─── 报表映射 ───────────────────────────────────────────────────────────────
