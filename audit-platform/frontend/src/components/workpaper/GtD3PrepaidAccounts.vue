@@ -62,6 +62,7 @@
         />
         <D3TabDetail
           v-else-if="currentSheet === 'D3-2'"
+          ref="detailRef"
           :all-responses="allResponses"
           :wp-id="wpIdRef"
           :project-id="projectIdRef"
@@ -443,6 +444,19 @@ async function selfLoad(): Promise<void> {
 }
 
 onMounted(() => { void selfLoad() })
+
+// ─── 行名对齐（formula-row-name-alignment-confirmation 复盘 #4）───────────────
+// GtWpRenderer 的 activeComponentRef 指向本顶层 bundle，故对齐行契约在此暴露，
+// 内部转发给当前 sheet 的子组件（D3-2 明细 → D3TabDetail）。仅明细表有按客户名取数的行。
+const detailRef = ref<{ getRowNameAlignmentRows?: () => unknown[] } | null>(null)
+function getRowNameAlignmentRows(): unknown[] {
+  if (currentSheet.value === 'D3-2' && detailRef.value?.getRowNameAlignmentRows) {
+    return detailRef.value.getRowNameAlignmentRows()
+  }
+  return []
+}
+
+defineExpose({ getRowNameAlignmentRows })
 </script>
 
 <style scoped>

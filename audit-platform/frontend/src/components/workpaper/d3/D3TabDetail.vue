@@ -584,6 +584,21 @@ async function genDetailContract() {
 }
 
 const { onExportTemplate, onExportData, onImportFile, onImportFromAuxBalance } = useD3TabImportExport(wpIdRef, 'D3-2')
+
+// ─── 行名对齐（formula-row-name-alignment-confirmation 复盘 #4：真实入口接线）───
+// 返回本表按客户名取数的行（row_key 用稳定 rowId，row_label 用客户名）。
+// account_prefixes 留空 —— 由后端按 wp_code/sheet_code 从 wp_account_mapping 解析（科目定位是后端职责，红基线 3）。
+function getRowNameAlignmentRows() {
+  return rows.value
+    .filter((r: any) => r && r.rowId && !String(r.rowId).startsWith('__') && (r.customerName || '').trim())
+    .map((r: any) => ({
+      row_key: String(r.rowId),
+      row_label: String(r.customerName).trim(),
+      account_prefixes: [] as string[],
+    }))
+}
+
+defineExpose({ getRowNameAlignmentRows })
 </script>
 
 <style scoped>

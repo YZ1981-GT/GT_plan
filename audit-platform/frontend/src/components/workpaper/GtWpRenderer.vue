@@ -135,6 +135,16 @@
           <el-button size="small" :disabled="!runtimeProjectId || !runtimeWpCode || loading" @click="openPageFormulaManager">
             <el-icon><Setting /></el-icon> 公式管理
           </el-button>
+          <!-- 行名对齐刷新（formula-row-name-alignment-confirmation Task 11）：
+               走 F-SHELL compatibility outlet slot，位于「导入」右侧；只读态禁用。 -->
+          <el-button
+            size="small"
+            :disabled="!runtimeProjectId || !runtimeWpCode || loading || readonly"
+            :loading="alignmentRefreshing"
+            @click="onRowNameAlignmentRefresh"
+          >
+            <el-icon><Refresh /></el-icon> 刷新取数
+          </el-button>
         </template>
         <template v-if="activeSheetName" #center>
           <GtWpAiReviewToolbar
@@ -283,6 +293,10 @@
       @rollback-completed="reload"
     />
 
+    <!-- 行名对齐确认弹窗（formula-row-name-alignment-confirmation Task 9）：
+         由「刷新取数」检测到 unmatched/ambiguous 行时经 eventBus 打开。 -->
+    <GtRowNameAlignmentDialog />
+
     <!-- 本底稿关联附件抽屉（工具栏「关联附件」打开；可编辑时支持解除关联）。 -->
     <WorkpaperAttachmentsDrawer
       v-model="attachmentsDrawerVisible"
@@ -298,7 +312,7 @@
 import { ref, computed, toRef, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Switch, Setting } from '@element-plus/icons-vue'
+import { Switch, Setting, Refresh } from '@element-plus/icons-vue'
 import http from '@/utils/http'
 import {
   resolveRenderSheet,
@@ -334,6 +348,7 @@ import GtWpDisclosureSyncBar from './GtWpDisclosureSyncBar.vue'
 import { isDisclosureSheetName } from './composables/disclosureSyncBar'
 import GtWpPreparationHeader from '@/components/workpaper/GtWpPreparationHeader.vue'
 import GtWorkpaperRuntimeHosts from '@/components/workpaper/GtWorkpaperRuntimeHosts.vue'
+import GtRowNameAlignmentDialog from '@/components/formula/GtRowNameAlignmentDialog.vue'
 import GtBArchitectureTree from '@/components/workpaper/GtBArchitectureTree.vue'
 import { useProjectStore } from '@/stores/project'
 import { subscribeInvalidation } from '@/services/acnr'
@@ -900,8 +915,15 @@ function onLocateCell(payload: WorkpaperLocateCellPayload) {
   })
 }
 
+/** 行名映射确认后重刷本底稿（用新映射重算受影响行）。 */
+function onRowNameAlignmentConfirmed(payload: { wpId: string; sheetCode: string }) {
+  if (payload.wpId !== props.wpId) return
+  reload()
+}
+
 onMounted(() => {
   eventBus.on('workpaper:locate-cell', onLocateCell)
+  eventBus.on('row-name-alignment:confirmed', onRowNameAlignmentConfirmed)
 })
 
 // ACNR 项目级 SSE 实时失效订阅（acnr-invalidation-overlay-hardening R1）：
@@ -933,6 +955,7 @@ watch(
 
 onUnmounted(() => {
   eventBus.off('workpaper:locate-cell', onLocateCell)
+  eventBus.off('row-name-alignment:confirmed', onRowNameAlignmentConfirmed)
   if (_acnrUnsub) {
     _acnrUnsub()
     _acnrUnsub = null
@@ -1154,6 +1177,73 @@ function openPageFormulaManager() {
     // （D2 里的 D0-*、E1 里的 E26A）靠它才能被认成「本册内页」而非外册。
     sheetCodes: hostSheetCodes.value,
   })
+}
+
+// ─── 行名对齐刷新（formula-row-name-alignment-confirmation Task 11）───────────
+const alignmentRefreshing = ref(false)
+
+/**
+ * 「刷新取数」：收集当前 sheet 的对齐行（行名 + 科目前缀）→ 调 /row-name-alignment →
+ * 若存在 unmatched/ambiguous 行则 emit 打开对齐弹窗；否则提示已全部匹配后重刷。
+ *
+ * 行来源：子组件通过 defineExpose 暴露 `getRowNameAlignmentRows()`
+ *   → [{ row_key, row_label, account_prefixes }]。未暴露则提示该底稿暂不支持。
+ */
+async function onRowNameAlignmentRefresh() {
+  if (!props.wpId || !runtimeProjectId.value || !runtimeWpCode.value) {
+    ElMessage.warning('当前底稿缺少完整上下文，暂时无法刷新取数')
+    return
+  }
+  const child = activeComponentRef.value
+  const collector = child && typeof child.getRowNameAlignmentRows === 'function'
+    ? child.getRowNameAlignmentRows
+    : null
+  if (!collector) {
+    ElMessage.info('当前底稿暂不支持按行名对齐刷新')
+    return
+  }
+  const rows = collector() || []
+  if (!Array.isArray(rows) || rows.length === 0) {
+    ElMessage.info('当前 sheet 无可对齐的取数行')
+    return
+  }
+
+  alignmentRefreshing.value = true
+  try {
+    const resp = await http.post(`/api/workpapers/${props.wpId}/row-name-alignment`, {
+      sheet_code: extractSheetIndexNo(activeSheetName.value) || (renderConfig.value?.wp_code ?? ''),
+      rows: rows.map((r: any) => ({
+        row_key: String(r.row_key),
+        row_label: String(r.row_label ?? r.row_key),
+        account_prefixes: Array.isArray(r.account_prefixes) ? r.account_prefixes : [],
+      })),
+      dataset_id: renderConfig.value?.dataset_id ?? null,
+    })
+    const data = resp.data?.data ?? resp.data ?? {}
+    const wireRows = Array.isArray(data.rows) ? data.rows : []
+    // 把行标签带回 wire（后端不含 row_label）供弹窗显示
+    const labelByKey = new Map(rows.map((r: any) => [String(r.row_key), String(r.row_label ?? r.row_key)]))
+    for (const w of wireRows) w.row_label = labelByKey.get(String(w.row_key)) ?? w.row_key
+
+    if (data.has_pending) {
+      eventBus.emit('open-row-name-alignment', {
+        wpId: props.wpId,
+        projectId: runtimeProjectId.value,
+        year: preparationYear.value,
+        wpCode: runtimeWpCode.value,
+        sheetCode: extractSheetIndexNo(activeSheetName.value) || (renderConfig.value?.wp_code ?? ''),
+        datasetId: renderConfig.value?.dataset_id ?? null,
+        rows: wireRows,
+      })
+    } else {
+      ElMessage.success('全部行名已匹配，正在刷新取数')
+      reload()
+    }
+  } catch (e: any) {
+    ElMessage.error('刷新取数失败：' + (e?.response?.data?.detail?.message || e?.message || '请稍后重试'))
+  } finally {
+    alignmentRefreshing.value = false
+  }
 }
 </script>
 

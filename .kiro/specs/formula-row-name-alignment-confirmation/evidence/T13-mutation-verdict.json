@@ -1,0 +1,32 @@
+{
+  "spec": "formula-row-name-alignment-confirmation",
+  "task": 13,
+  "baseline": "PASS",
+  "verdicts": [
+    {
+      "id": "M1_ignore_saved_mapping",
+      "expect_k": "saved_mapping_valid or saved_mapping_stale",
+      "actual": "RED",
+      "detail": "\nbackend\\tests\\four_table\\test_row_name_alignment.py:179: AssertionError\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_classify_saved_mapping_valid_is_user_confirmed\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_classify_saved_mapping_stale_falls_back_unmatched\n2 failed, 1 passed, 18 deselected in 1.68s"
+    },
+    {
+      "id": "M2_scope_missing_wp_code",
+      "expect_k": "scope_isolation_wp_code",
+      "actual": "RED",
+      "detail": "E         Use -v to get more diff\n\nbackend\\tests\\four_table\\test_row_name_mapping_service.py:259: AssertionError\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_mapping_service.py::test_scope_isolation_wp_code\n1 failed, 10 deselected in 2.99s"
+    },
+    {
+      "id": "M3_scope_missing_year",
+      "expect_k": "confirm_baseline_isolated_by_year",
+      "actual": "RED",
+      "detail": "E               app.services.row_name_mapping_service.MappingConflictError: version conflict on row_key=r1: base=None != current active=1\n\nbackend\\app\\services\\row_name_mapping_service.py:188: MappingConflictError\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_mapping_service.py::test_confirm_baseline_isolated_by_year\n1 failed, 10 deselected in 2.56s"
+    },
+    {
+      "id": "M4_ambiguous_as_auto",
+      "expect_k": "normalized_multi_hit",
+      "actual": "RED",
+      "detail": "\nbackend\\tests\\four_table\\test_row_name_alignment.py:157: AssertionError\n=========================== short test summary info ===========================\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_classify_normalized_multi_hit_is_ambiguous_not_auto\nFAILED backend\\tests\\four_table\\test_row_name_alignment.py::test_property_normalized_multi_hit_never_auto\n2 failed, 19 deselected in 2.10s"
+    }
+  ],
+  "pass": true
+}

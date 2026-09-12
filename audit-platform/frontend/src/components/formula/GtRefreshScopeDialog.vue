@@ -149,11 +149,33 @@
           </template>
         </el-alert>
 
+        <!-- 行名待确认汇总告警（formula-row-name-alignment-confirmation DEC-4）：
+             合伙人全局刷新遇 unmatched **不弹行级确认弹窗**，改产汇总告警并导向底稿级处理。 -->
+        <el-alert
+          v-if="rowNamePendingWarnings.length > 0"
+          type="warning"
+          show-icon
+          :closable="false"
+          class="gt-rsd-status-banner"
+        >
+          <template #title>
+            有 {{ rowNamePendingWarnings.length }} 项底稿存在行名未匹配，需到对应底稿逐行确认
+          </template>
+          <template #default>
+            <ul class="gt-rsd-failure-list">
+              <li v-for="(w, i) in rowNamePendingWarnings" :key="i">{{ w }}</li>
+            </ul>
+            <p class="gt-rsd-rowname-hint">
+              全局刷新不逐行确认名称对齐；请打开对应底稿点「刷新取数」完成确认。
+            </p>
+          </template>
+        </el-alert>
+
         <!-- warnings -->
-        <div v-if="parsedResult.warnings.length" class="gt-rsd-warns">
+        <div v-if="otherWarnings.length" class="gt-rsd-warns">
           <p class="gt-rsd-warns-title">告警信息：</p>
           <ul>
-            <li v-for="(w, i) in parsedResult.warnings" :key="i">{{ w }}</li>
+            <li v-for="(w, i) in otherWarnings" :key="i">{{ w }}</li>
           </ul>
         </div>
 
@@ -244,6 +266,22 @@ const treeData = ref<ScopeTreeNode[]>([])
 const checkedScopes = ref<string[]>([])
 
 const WORKPAPER_GROUP_KEY = '__workpaper_group__'
+
+// 行名对齐待确认告警识别（DEC-4）：从 warnings 中分离出「行名未匹配」类，
+// 单独用告警条展示 + 导向底稿级处理；其余照旧列在通用告警区。
+const _ROW_NAME_PENDING_MARKERS = ['行名未匹配', 'row_name_pending', '名称未对齐', '待确认行名']
+const rowNamePendingWarnings = computed<string[]>(() => {
+  if (!parsedResult.value) return []
+  return parsedResult.value.warnings.filter((w) =>
+    _ROW_NAME_PENDING_MARKERS.some((m) => String(w).includes(m)),
+  )
+})
+const otherWarnings = computed<string[]>(() => {
+  if (!parsedResult.value) return []
+  return parsedResult.value.warnings.filter(
+    (w) => !_ROW_NAME_PENDING_MARKERS.some((m) => String(w).includes(m)),
+  )
+})
 
 const presetSummary = computed<string>(() => {
   if (!parsedResult.value) return ''
@@ -450,5 +488,10 @@ defineExpose({ openDialog, isPartner, checkedScopes, parsedResult })
 }
 .gt-rsd-rollback-btn {
   margin-top: 10px;
+}
+.gt-rsd-rowname-hint {
+  margin: 6px 0 0 0;
+  font-size: 12px;
+  color: var(--gt-color-text-secondary, #909399);
 }
 </style>

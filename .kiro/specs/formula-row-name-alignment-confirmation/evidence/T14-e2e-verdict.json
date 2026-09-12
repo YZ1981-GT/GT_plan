@@ -1,0 +1,40 @@
+{
+  "steps": [
+    {
+      "step": 1,
+      "match_state": "unmatched",
+      "amount": null,
+      "candidate_count": 20,
+      "has_pending": true
+    },
+    {
+      "step": 2,
+      "confirmed": true
+    },
+    {
+      "step": 3,
+      "match_state": "user_confirmed",
+      "amount": "238921879.36",
+      "has_pending": false
+    },
+    {
+      "step": 4,
+      "reloaded_from_server": true,
+      "match_state": "user_confirmed",
+      "amount": "238921879.36",
+      "has_pending": false
+    }
+  ],
+  "chosen_target": {
+    "source_kind": "aux_name",
+    "account_code": "1221",
+    "aux_type": "客户",
+    "aux_name": "重庆医药（集团）股份有限公司",
+    "dimension_key": "1221|客户|重庆医药(集团)股份",
+    "dataset_id": null
+  },
+  "chosen_amount": "238921879.36",
+  "sql_snapshot_for_chosen": "238921879.36",
+  "verdict": "PASS",
+  "cleanup": "deleted 1 mapping rows"
+}

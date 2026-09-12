@@ -55,6 +55,55 @@ export interface OpenFormulaManagerPayload {
   scope?: 'note' | 'consol_note' | 'consol_worksheet' | 'consol_report' | 'report' | 'tb' | 'workpaper'
 }
 
+/**
+ * 打开行名对齐确认弹窗（formula-row-name-alignment-confirmation Task 9/11）。
+ * 由底稿级刷新入口在检测到 unmatched/ambiguous 行时 emit，携带定位上下文与逐行 wire。
+ */
+export interface OpenRowNameAlignmentPayload {
+  wpId: string
+  projectId: string
+  year: number
+  wpCode: string
+  sheetCode: string
+  datasetId?: string | null
+  /** 后端 /row-name-alignment 返回的逐行 wire（含 match_state / candidates）。 */
+  rows: RowNameAlignmentRowWire[]
+}
+
+/** 单行名称对齐 wire（与后端 build_alignment_wire 固定字段一致）。 */
+export interface RowNameAlignmentRowWire {
+  row_key: string
+  match_state: 'auto_matched' | 'ambiguous' | 'unmatched' | 'user_confirmed'
+  candidates: RowNameAlignmentCandidateWire[]
+  target_identity: RowNameAlignmentTargetWire[]
+  amount: string | null
+  similarity: number | null
+  source_kind: string | null
+  confirmed_by: string | null
+  confirmed_at: string | null
+  mapping_version: number | null
+  stale_reason: string | null
+  /** 前端补充：行的展示标签（后端 wire 不含，入口收集时带上供弹窗显示）。 */
+  row_label?: string
+}
+
+export interface RowNameAlignmentTargetWire {
+  source_kind: string
+  account_code: string
+  aux_type: string | null
+  aux_name: string
+  dimension_key: string
+  dataset_id: string | null
+}
+
+export interface RowNameAlignmentCandidateWire {
+  target_identity: RowNameAlignmentTargetWire
+  display_name: string
+  amount: string
+  similarity: number
+  source_kind: string
+}
+
 /** 合并树节点选择 */
 export interface ConsolTreeSelectPayload {
   companyCode?: string
@@ -324,6 +373,8 @@ export type Events = {
   'standard-change': StandardChangePayload
   'four-col-switch': FourColSwitchPayload
   'open-formula-manager': OpenFormulaManagerPayload
+  'open-row-name-alignment': OpenRowNameAlignmentPayload
+  'row-name-alignment:confirmed': { wpId: string; sheetCode: string }
 
   // 合并模块通信
   'consol-tree-select': ConsolTreeSelectPayload
