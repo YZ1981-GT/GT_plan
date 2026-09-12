@@ -90,7 +90,7 @@
 1. WHEN 共享件 `aggregate_aux_by_name` 捕获异常 THEN 不得只 fail-open 返回空：必须以 ERROR 级别记录异常（含科目前缀 / project / year），使"接线错误"与"真无数据"在日志上可分辨
 2. WHEN 端点返回 0 行 THEN 响应必须携带可区分的原因码（无候选 `aux_type` / 无匹配科目 / 无 active dataset / 异常），前端按原因码给不同提示
 3. WHEN 某字段无四表来源 THEN 必须留空，不得用 0、上期值或把总额塞进首段账龄伪装成已取数
-4. WHEN 取数结果写库 THEN 必须可追溯来源（至少能判断某行是取数产生还是手工录入）
+4. WHEN 取数结果写库 THEN 必须可追溯来源（至少能判断某行是取数产生还是手工录入）。来源标记的承载形式由 DEC-4 定夺：**本 spec 不新增统一 `source_kind`/`source_dataset_id` 列**（会动 5+ 循环的 store 形态与契约 digest），而是用各循环行已有的 `remark` 字段携带中文来源标记（如 K1 写 “由辅助余额表(1221·客户)导入”）以区分取数行与手工录入；`source_dataset_id` 在端点响应与证据中记录（Task 9 证据 JSON），不落入行。统一列是 **deferred 增强**（已在缺口清册 blocked/deferred 登记），不阻塞取数本身。若某循环连取数行本身都无法承载（行结构缺失），该循环必须标 blocked/deferred 并从最终完成数中排除
 
 ### Requirement 6: 守卫、变异检验与真栈实测
 
@@ -103,3 +103,16 @@
 3. WHEN 补前端入口 THEN 必须有 vitest 断言按钮存在且 disabled 受 `isReadonly` 控制、点击真调对应端点（不是只 mock 通过）
 4. WHEN 全部交付 THEN 必须至少一次浏览器真栈实测：某张此前无入口的明细表，点新按钮后行数从 0 变为账套真实户数，且金额与只读 SQL 快照逐字对齐
 5. WHEN 迁移历史端点 THEN 必须实测迁移前后金额差异并解释（若原来双算，迁移后金额下降是**预期**修正，须在证据里写明倍数）
+
+## Glossary
+
+| 术语 | 含义 |
+|------|------|
+| aux 取数 | 从 `tb_aux_balance`（辅助余额表）按往来单位/维度归集取数，四表库取数的一种 |
+| 共享件 | `backend/app/services/four_table/aux_aggregation.py`，平台唯一正确 aux 归集实现 |
+| `aggregate_aux_by_name` | 旧三元组返回函数（现为薄壳）；`_ex` 版返回 `AuxAggregationResult` 带 reason 码 |
+| reason 码 | `ok`/`no_prefixes`/`no_aux_type`/`no_rows`/`no_active_dataset`/`error`，区分“接线错误”与“真无数据” |
+| 三条铁律 | ① `get_active_filter` 只取 active dataset；② `pick_aux_type` 锁单一维度；③ 科目前缀 LIKE 区配（非精确等值） |
+| G-A/G-B/G-C/G-D | 缺口分类：后端有/前端无・两侧都无・两侧有但违铁律・不适合取数 |
+| merge 语义 | 已有业务键（往来单位名）不覆盖，只追加新行；overwrite 需显式参数驱动 |
+| 录入列 | 端点只写的非派生列（合计/审定/账龄合计等派生列留前端 recalc） |

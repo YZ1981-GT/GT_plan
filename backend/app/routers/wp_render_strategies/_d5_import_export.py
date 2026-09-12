@@ -322,12 +322,28 @@ async def d5_import_aux_balance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """从 tb_aux_balance（科目1124，按客户维度）批量导入到D5-2"""
+    """从 `tb_aux_balance`（科目由 BS-007 报表映射解析，兜底 1124）按明细维度归集导入 D5-2.
+
+    🔴 G-C 迁移（spec four-table-extraction-entry-completion / Task 4）：删除裸 SQL，
+    统一走共享件 `d_cycle_extraction.d_aux_import.aggregate_d_cycle_aux`
+    （`get_active_filter` + `pick_aux_type` + 报表映射前缀）。只写录入列（Property 4），
+    派生列（priorAudited/endBalance/endUnadjusted/endAudited）交前端 recalc，不双写。
+    merge 语义：已存在明细项目名不重复导入。
+    """
     import sqlalchemy as sa
 
-    # 获取 project_id
+    from app.services.d_cycle_extraction.d_aux_import import (
+        aggregate_d_cycle_aux,
+        aux_reason_message,
+    )
+
+    # 获取 project_id + audit_year
     wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+        sa.text(
+            "SELECT wp.project_id, p.audit_year "
+            "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+            "WHERE wp.id = :wp_id"
+        ),
         {"wp_id": wp_id},
     )
     wp_row = wp_result.fetchone()
@@ -335,49 +351,27 @@ async def d5_import_aux_balance(
         raise HTTPException(404, "底稿不存在")
 
     project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
 
-    # 从 tb_aux_balance 查询科目1124按客户维度聚合
-    aux_result = await db.execute(
-        sa.text("""
-            SELECT aux_name,
-                   COALESCE(SUM(opening_balance), 0) AS prior_balance,
-                   COALESCE(SUM(closing_balance), 0) AS current_balance
-            FROM tb_aux_balance
-            WHERE project_id = :pid
-              AND account_code LIKE '1124%'
-              AND is_deleted = false
-            GROUP BY aux_name
-            ORDER BY aux_name
-        """),
-        {"pid": project_id},
-    )
-    aux_rows = aux_result.fetchall()
+    agg = await aggregate_d_cycle_aux(db, project_id, year, "D5")
 
-    if not aux_rows:
-        return {"ok": True, "imported_count": 0, "message": "未找到科目1124的辅助余额数据"}
+    if not agg.entries:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "reason": agg.reason,
+            "selected_aux_type": agg.aux_type,
+            "message": aux_reason_message(agg.reason, agg.prefixes),
+        }
 
-    # 构建 D5-2 行数据
+    # 构建 D5-2 行数据 —— 只写录入列（Property 4）：明细项目名 + 期初未审。
     rows_data: list[dict] = []
-    for aux_row in aux_rows[:_ROW_LIMIT]:
+    for entry in agg.entries[:_ROW_LIMIT]:
         rows_data.append({
             "rowId": str(uuid4()),
-            "category": "应收票据",
-            "itemName": aux_row.aux_name or "",
-            "priorUnadjusted": float(aux_row.prior_balance),
-            "priorAje": 0,
-            "priorRje": 0,
-            "priorAudited": float(aux_row.prior_balance),
-            "ociImpairment": 0,
-            "periodIncrease": 0,
-            "periodDecrease": 0,
-            "endBalance": float(aux_row.current_balance),
-            "entityReclass": 0,
-            "endUnadjusted": float(aux_row.current_balance),
-            "endAje": 0,
-            "endRje": 0,
-            "endAudited": float(aux_row.current_balance),
-            "endOciImpairment": 0,
-            "remark": "",
+            "category": "应收账款",
+            "itemName": entry.aux_name,
+            "priorUnadjusted": entry.opening,
         })
 
     # 写入（merge模式：保留已有行、追加新客户）
@@ -414,8 +408,13 @@ async def d5_import_aux_balance(
     return {
         "ok": True,
         "imported_count": len(new_rows),
-        "message": f"成功导入{len(new_rows)}行数据",
+        "reason": agg.reason,
+        "selected_aux_type": agg.aux_type,
         "total_rows": len(merged),
+        "message": (
+            f"从辅助余额表({agg.prefixes[0]}·{agg.aux_type})归集 {len(agg.entries)} 个明细项目，"
+            f"新增 {len(new_rows)} 行；如涉账龄请人工填列。"
+        ),
     }
 
 

@@ -244,7 +244,7 @@
         </template>
       </el-table-column>
 
-      <template v-if="showAgingCols && isColVisible('aging1y')">
+      <template v-if="showAgingCols && isColVisible('agePrior1y')">
         <el-table-column label="期初≤1年" width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal">
@@ -387,7 +387,7 @@
         </template>
       </el-table-column>
 
-      <template v-if="showAgingCols && isColVisible('aging1y')">
+      <template v-if="showAgingCols && isColVisible('ageEnd1y')">
         <el-table-column label="期末≤1年" width="100" align="right">
           <template #default="{ row }">
             <template v-if="row._isSubtotal || row._isTotal">
@@ -454,7 +454,7 @@
         </el-table-column>
       </template>
 
-      <el-table-column label="1年以内收款权" width="120" align="right">
+      <el-table-column v-if="isColVisible('receivableWithin1y')" label="1年以内收款权" width="120" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.receivableWithin1y) }}</span>
@@ -471,7 +471,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="1年以上收款权" width="120" align="right">
+      <el-table-column v-if="isColVisible('receivableAbove1y')" label="1年以上收款权" width="120" align="right">
         <template #default="{ row }">
           <template v-if="row._isSubtotal || row._isTotal">
             <span class="subtotal-amount">{{ fmtAmount(row.receivableAbove1y) }}</span>
@@ -488,7 +488,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="建设期/质保期" width="110" align="center">
+      <el-table-column v-if="isColVisible('isInConstructionPeriod')" label="建设期/质保期" width="110" align="center">
         <template #default="{ row }">
           <el-select
             v-if="!row._isSubtotal && !row._isTotal && !isReadonly"
@@ -502,7 +502,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="信用风险组合" width="120">
+      <el-table-column v-if="isColVisible('creditRiskGroup')" label="信用风险组合" width="120">
         <template #default="{ row }">
           <el-select
             v-if="!row._isSubtotal && !row._isTotal && !isReadonly"
@@ -516,7 +516,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="是否函证" width="80" align="center">
+      <el-table-column v-if="isColVisible('isConfirmed')" label="是否函证" width="80" align="center">
         <template #default="{ row }">
           <el-input
             v-if="!row._isSubtotal && !row._isTotal && !isReadonly"
@@ -640,7 +640,14 @@ const allResponsesRef = toRef(props, 'allResponses') as unknown as Ref<Map<strin
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 // ─── Column Preferences ──────────────────────────────────────────────────────
-const { columnGroups, isColVisible, toggleCol, resetDefaults } = useD6DetailColumnPrefs()
+const d6ColumnPrefs = useD6DetailColumnPrefs()
+const columnGroups = computed(() => d6ColumnPrefs.D6_COLUMN_GROUPS.map((group) => ({
+  label: group.label,
+  keys: group.columns,
+})))
+const isColVisible = d6ColumnPrefs.isVisible
+const toggleCol = d6ColumnPrefs.toggleColumn
+const resetDefaults = d6ColumnPrefs.resetToAll
 
 const COL_LABELS: Record<string, string> = {
   seqNo: '序号', contractType: '合同类型', customerName: '客户名称',
@@ -648,8 +655,11 @@ const COL_LABELS: Record<string, string> = {
   priorUnadjusted: '期初未审', priorAje: '期初AJE', priorRje: '期初RJE',
   priorAudited: '期初审定', debitAmount: '借方发生', creditAmount: '贷方发生',
   endUnadjusted: '期末未审', endAje: '期末AJE', endRje: '期末RJE',
-  aging1y: '≤1年', aging1to2: '1~2年', aging2to3: '2~3年', aging3plus: '3年以上',
-  postPeriodSettlement: '期后结转', postPeriodDate: '期后日期',
+  agePrior1y: '期初≤1年', agePrior1to2y: '期初1~2年', agePrior2to3y: '期初2~3年', agePrior3yAbove: '期初3年+',
+  ageEnd1y: '期末≤1年', ageEnd1to2y: '期末1~2年', ageEnd2to3y: '期末2~3年', ageEnd3yAbove: '期末3年+',
+  receivableWithin1y: '1年以内收款权', receivableAbove1y: '1年以上收款权',
+  isInConstructionPeriod: '建设期/质保期', creditRiskGroup: '信用风险组合', isConfirmed: '是否函证',
+  postPeriodSettlement: '期后结转',
 }
 function getColLabel(key: string): string { return COL_LABELS[key] || key }
 
@@ -687,6 +697,7 @@ const {
   projectId: computed(() => props.projectId) as unknown as Ref<string>,
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
 })
 
 // ─── Row Dialog (弹窗新增/编辑) ──────────────────────────────────────────────

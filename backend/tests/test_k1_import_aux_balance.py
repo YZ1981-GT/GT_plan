@@ -156,38 +156,38 @@ def test_wp_not_found_raises_404():
 
 
 def test_no_aux_data_returns_zero_without_writing(_stub_active_filter_and_json_helpers, monkeypatch):
-    import app.services.four_table.aux_aggregation as agg_mod
+    from app.services.four_table.aux_aggregation import AuxAggregationResult
 
     async def _empty(db, project_id, year, prefixes):
-        return [], None, 0
+        return AuxAggregationResult([], None, 0, "no_rows")
 
-    monkeypatch.setattr(agg_mod, "aggregate_aux_by_name", _empty)
     import app.routers.wp_render_strategies._k1_import_export as mod
-    monkeypatch.setattr(mod, "aggregate_aux_by_name", _empty)
+    monkeypatch.setattr(mod, "aggregate_aux_by_name_ex", _empty)
 
     session = _FakeSession(wp_row=SimpleNamespace(project_id=uuid4(), audit_year=2025))
     out = _run(k1_import_aux_balance(wp_id=str(uuid4()), db=session, current_user=None))
     assert out["ok"] is True
     assert out["imported_count"] == 0
     assert out["rows"] == []
+    assert out["reason"] == "no_rows"
     assert "1221" in out["message"]
     assert _stub_active_filter_and_json_helpers == {}  # 未写库
 
 
 def test_import_writes_rows_with_correct_field_names(monkeypatch, _stub_active_filter_and_json_helpers):
-    import app.services.four_table.aux_aggregation as agg_mod
-    from app.services.four_table.aux_aggregation import AuxEntry
+    from app.services.four_table.aux_aggregation import AuxAggregationResult, AuxEntry
     import app.routers.wp_render_strategies._k1_import_export as mod
 
     async def _fake_aggregate(db, project_id, year, prefixes):
         assert prefixes == ["1221"]
-        return (
+        return AuxAggregationResult(
             [AuxEntry("甲公司", 100.0, 20.0, 0.0, 120.0), AuxEntry("乙公司", 0.0, 0.0, 0.0, 50.0)],
             "客户",
             2,
+            "ok",
         )
 
-    monkeypatch.setattr(mod, "aggregate_aux_by_name", _fake_aggregate)
+    monkeypatch.setattr(mod, "aggregate_aux_by_name_ex", _fake_aggregate)
 
     session = _FakeSession(
         wp_row=SimpleNamespace(project_id=uuid4(), audit_year=2025),
@@ -210,14 +210,13 @@ def test_import_writes_rows_with_correct_field_names(monkeypatch, _stub_active_f
 
 
 def test_manual_rows_not_duplicated_on_reimport(monkeypatch, _stub_active_filter_and_json_helpers):
-    import app.services.four_table.aux_aggregation as agg_mod
-    from app.services.four_table.aux_aggregation import AuxEntry
+    from app.services.four_table.aux_aggregation import AuxAggregationResult, AuxEntry
     import app.routers.wp_render_strategies._k1_import_export as mod
 
     async def _fake_aggregate(db, project_id, year, prefixes):
-        return [AuxEntry("甲公司", 0.0, 0.0, 0.0, 1.0)], "客户", 1
+        return AuxAggregationResult([AuxEntry("甲公司", 0.0, 0.0, 0.0, 1.0)], "客户", 1, "ok")
 
-    monkeypatch.setattr(mod, "aggregate_aux_by_name", _fake_aggregate)
+    monkeypatch.setattr(mod, "aggregate_aux_by_name_ex", _fake_aggregate)
 
     wp_id = str(uuid4())
     _stub_active_filter_and_json_helpers[_K1_2_DETAIL_ITEM_ID] = [
@@ -233,17 +232,16 @@ def test_manual_rows_not_duplicated_on_reimport(monkeypatch, _stub_active_filter
 
 
 def test_truncation_flagged_in_message(monkeypatch, _stub_active_filter_and_json_helpers):
-    import app.services.four_table.aux_aggregation as agg_mod
-    from app.services.four_table.aux_aggregation import AuxEntry
+    from app.services.four_table.aux_aggregation import AuxAggregationResult, AuxEntry
     from app.services.four_table.k1_aux_detail import K1_DETAIL_ROW_LIMIT
     import app.routers.wp_render_strategies._k1_import_export as mod
 
     entries = [AuxEntry(f"单位{i}", 0.0, 0.0, 0.0, float(i)) for i in range(K1_DETAIL_ROW_LIMIT + 5)]
 
     async def _fake_aggregate(db, project_id, year, prefixes):
-        return entries, "客户", len(entries)
+        return AuxAggregationResult(entries, "客户", len(entries), "ok")
 
-    monkeypatch.setattr(mod, "aggregate_aux_by_name", _fake_aggregate)
+    monkeypatch.setattr(mod, "aggregate_aux_by_name_ex", _fake_aggregate)
 
     session = _FakeSession(wp_row=SimpleNamespace(project_id=uuid4(), audit_year=2025))
     out = _run(k1_import_aux_balance(wp_id=str(uuid4()), db=session, current_user=None))

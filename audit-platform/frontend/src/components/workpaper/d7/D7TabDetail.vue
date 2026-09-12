@@ -408,6 +408,7 @@ const {
   debouncedSave: props.debouncedSave,
   relatedParties,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
 })
 
 // ─── Column Preferences（账龄组按当前 segments 动态生成）──────────────────────

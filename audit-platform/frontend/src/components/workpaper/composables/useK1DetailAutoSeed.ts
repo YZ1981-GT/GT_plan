@@ -14,8 +14,17 @@
  * Requirements 1.7 / Property 2
  */
 import http from '@/utils/http'
+import {
+  parseAuxImportResponse,
+  auxImportPrompt,
+  AUX_IMPORT_NETWORK_ERROR_PROMPT,
+  type AuxImportPrompt,
+} from './fourTableAuxImportFeedback'
 
 export const K1_DETAIL_ITEM_ID = 'K1-2-detail-rows'
+
+/** K1 aux 取数端点（AutoSeed 与手动入口共用同一后端 merge 端点）。 */
+export const K1_IMPORT_AUX_URL = (wpId: string) => `/api/workpapers/${wpId}/k1/import-aux-balance`
 
 /** 空表判定：缺失 / 空数组 / 解析失败 → true（可以自动 seed）。 */
 export function shouldAutoSeedK1Detail(allResponses: Map<string, any>): boolean {
@@ -49,15 +58,53 @@ export async function autoSeedK1DetailFromAux(opts: {
     return { imported: 0, skipped: true }
   }
   try {
-    const res = await http.post(`/api/workpapers/${wpId}/k1/import-aux-balance`, null, {
+    const res = await http.post(K1_IMPORT_AUX_URL(wpId), null, {
       _silent: true,
     } as any)
-    const data = res?.data?.data ?? res?.data ?? {}
-    const imported = Number(data?.imported_count ?? 0)
-    if (imported > 0) await reload()
-    return { imported, skipped: false, message: data?.message }
+    const outcome = parseAuxImportResponse(res)
+    if (outcome.importedCount > 0) await reload()
+    return { imported: outcome.importedCount, skipped: false, message: outcome.message }
   } catch (err) {
     console.warn('[useK1DetailAutoSeed] 自动归集失败:', err)
     return { imported: 0, skipped: false }
+  }
+}
+
+export interface ManualImportK1DetailResult {
+  /** 本次新增行数（merge 后追加）。 */
+  imported: number
+  /** 是否请求成功（false = 网络/服务器异常，非"0 行"）。 */
+  ok: boolean
+  /** 给用户看的规范化提示（reason 码可辨别，见 fourTableAuxImportFeedback）。 */
+  prompt: AuxImportPrompt
+}
+
+/**
+ * K1-2 明细表**手动**「从余额表导入」——与 AutoSeed 语义严格区分：
+ *   - AutoSeed（`autoSeedK1DetailFromAux`）：仅**空表**触发一次、静默、失败不打断页面；
+ *   - 手动入口（本函数）：可在**非空表**上触发，走后端 merge 语义（已有往来单位名不覆盖、
+ *     只追加新单位），并把 reason 码提示回传给宿主展示（Requirement 4.4 / 4.5）。
+ *
+ * 二者共用同一后端 merge 端点（`K1_IMPORT_AUX_URL`），后端保证幂等 merge，
+ * 故手动入口无需前端判空、无需客户端拼行——成功后直接 reload 让明细/审定表/披露级联刷新
+ * （Requirement 4.6）。
+ */
+export async function manualImportK1DetailFromAux(opts: {
+  wpId: string
+  reload: () => Promise<void>
+}): Promise<ManualImportK1DetailResult> {
+  const { wpId, reload } = opts
+  if (!wpId) {
+    return { imported: 0, ok: false, prompt: AUX_IMPORT_NETWORK_ERROR_PROMPT }
+  }
+  try {
+    const res = await http.post(K1_IMPORT_AUX_URL(wpId), null)
+    const outcome = parseAuxImportResponse(res)
+    // 无论新增几行都 reload：后端已 merge 落库，reload 才能让下游（K1-1/披露）读到最新持久化行
+    await reload()
+    return { imported: outcome.importedCount, ok: true, prompt: auxImportPrompt(outcome) }
+  } catch (err) {
+    console.warn('[useK1DetailAutoSeed] 手动归集失败:', err)
+    return { imported: 0, ok: false, prompt: AUX_IMPORT_NETWORK_ERROR_PROMPT }
   }
 }

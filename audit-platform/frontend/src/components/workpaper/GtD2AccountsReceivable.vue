@@ -14,37 +14,23 @@
         />
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d2-accounts-receivable" />
         <!-- 运行时同步状态：区分「正在同步 / 不可用原因 / 上次结果」，不合并成一句「成功」 -->
-        <el-tag v-if="dualMode.switching.value" type="warning" size="small">
+        <el-tag v-if="syncBusy" type="warning" size="small">
           同步中…
         </el-tag>
         <el-tooltip
-          v-else-if="dualMode.unavailableReason.value"
-          :content="dualMode.unavailableReason.value"
+          v-else-if="syncUnavailableReason"
+          :content="syncUnavailableReason"
           placement="bottom"
         >
           <el-tag type="danger" size="small">在线编辑不可用</el-tag>
         </el-tooltip>
         <el-tooltip
-          v-else-if="dualMode.lastSync.value"
-          :content="dualMode.lastSync.value"
+          v-else-if="syncFeedbackOk"
+          :content="syncFeedbackOk"
           placement="bottom"
         >
           <el-tag type="success" size="small">已同步</el-tag>
         </el-tooltip>
-        <el-button
-          v-if="canStartAiReview && props.sheetName"
-          size="small"
-          @click="onCurrentSheetAiReview"
-        >
-          本页AI复核
-        </el-button>
-        <el-button
-          v-if="canStartAiReview"
-          size="small"
-          @click="reviewDialogVisible = true"
-        >
-          批量AI复核
-        </el-button>
         <el-tag v-if="saving" type="info" size="small">保存中…</el-tag>
       </div>
 
@@ -91,17 +77,13 @@
         </template>
       </el-alert>
 
-      <!-- OnlyOffice 在线编辑 -->
-      <!-- ref 用于切回结构化视图前 `await forceSave()` 拿耐久确认，缺了它 pull 只能读旧文件 -->
-      <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
-        ref="ooSheetRef"
-        :key="ooSheetName"
-        :wp-id="props.wpId"
-        :sheet-name="ooSheetName"
-        :project-id="props.projectId"
-        :readonly="isReadonly"
-        @fallback="onOoFallback"
+      <!-- OnlyOffice 在线编辑（统一路径：descriptor → WorkpaperSyncEditorHost） -->
+      <!-- D2-2 canary：只在明细表走 USER_SYNC_PREFIX；其它 sheet 不挂 legacy GtOnlyOfficeSheet -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD2DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
       />
 
       <!-- HTML 结构化视图 -->
@@ -282,17 +264,6 @@
       :section-id="d2ReviewSection.id"
       :section-label="d2ReviewSection.label"
     />
-
-    <!-- AI 批量复核面板 -->
-    <el-dialog v-model="reviewDialogVisible" title="D2 应收账款 AI 批量复核" width="900px" :destroy-on-close="false">
-      <ReviewPanel
-        ref="reviewPanelRef"
-        :project-id="props.projectId"
-        wp-code-prefix="D2"
-        :year="props.year || new Date().getFullYear()"
-        @navigate-sheet="onReviewNavigateSheet"
-      />
-    </el-dialog>
   </div>
 </template>
 
@@ -300,15 +271,16 @@
 /**
  * GtD2AccountsReceivable.vue — D2 应收账款底稿主入口
  */
-import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, nextTick, type Ref } from 'vue'
-import { usePermissionMatrix } from '@/composables/usePermissionMatrix'
+import { ref, computed, onMounted, onBeforeUnmount, provide, inject, toRef, defineAsyncComponent, type Ref } from 'vue'
 import { useAgingConfig } from '@/composables/useAgingConfig'
 import { useD2FormData, type ChecklistResponse } from './composables/useD2FormData'
 import { useD2CrossSheet } from './composables/useD2CrossSheet'
-// 2026-09-06: 换成真同步 bridge。`usePilotBridgeAdapter` 只翻 ref + 写 localStorage，
-// 零 API 调用 ⇒ OO 侧永远是空表、HTML 侧永远看不到 OO 的编辑（实测业务行 0/756）。
-// `useD2SyncBridge` 在模式切换的两个边界上真调 push-to-excel / pull-from-excel。
-import { useD2SyncBridge } from './sync/useD2SyncBridge'
+// 2026-09-10: DEC-10 解除后迁统一路径。`useD2SyncBridge` + `/d2-sync/*` 仍保留
+// 至 ONLYOFFICE_VERIFIED（DEC-08），但本宿主不再调用它们。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 // Re-export getSheetNameFromD2Code which was also in the deleted module.
 // The sheet name resolution function is kept inline since it's pure data.
 const D2_SHEET_MAP: Record<string, string> = {
@@ -326,6 +298,9 @@ function getSheetNameFromD2Code(code: string): string {
   return code
 }
 type D2RenderMode = 'html' | 'onlyoffice'
+const D2_SYNC_ENTRY_ID = 'xlsx/gt-d2-accounts-receivable'
+/** 与后端 D2 managed sheet_key / materialize 取证脚本一致。 */
+const D2_MANAGED_SHEET_KEY = 'd22-managed'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { WorkpaperRuntimeContextKey } from './composables/useWorkpaperScaffold'
@@ -351,7 +326,6 @@ const D2TabWriteoffCheck = defineAsyncComponent(() => import('./d2/D2TabWriteoff
 const D2TabPledgeCheck = defineAsyncComponent(() => import('./d2/D2TabPledgeCheck.vue'))
 const D2TabBizModel = defineAsyncComponent(() => import('./d2/D2TabBizModel.vue'))
 const D2TabCutoff = defineAsyncComponent(() => import('./d2/D2TabCutoff.vue'))
-const ReviewPanel = defineAsyncComponent(() => import('./review/AiReviewPanel.vue'))
 
 const props = defineProps<{
   wpId: string
@@ -371,14 +345,6 @@ const emit = defineEmits<{
 
 const isReadonly = computed(() => !!props.readonly)
 const runtime = inject(WorkpaperRuntimeContextKey, null)
-
-const { currentRole } = usePermissionMatrix()
-const reviewDialogVisible = ref(false)
-const reviewPanelRef = ref<{ reviewCurrentSheet: (wpId: string, sheetName: string) => Promise<unknown> } | null>(null)
-const canStartAiReview = computed(() => {
-  const allowedRoles = ['manager', 'partner', 'qc', 'admin']
-  return allowedRoles.includes(currentRole.value)
-})
 
 const formData = useD2FormData(toRef(props, 'wpId'), toRef(props, 'projectId'), toRef(props, 'htmlData'))
 const allResponses = computed(() => formData.allResponses.value)
@@ -418,36 +384,75 @@ const relatedParties = computed<string[]>(() => {
 
 const isLoading = ref(true)
 const onlyOfficeFallback = ref(false)
+const syncSwitching = ref(false)
 
-/** OnlyOffice 编辑器实例引用 —— 切回结构化视图前用它 `await forceSave()`。 */
-const ooSheetRef = ref<InstanceType<typeof GtOnlyOfficeSheet> | null>(null)
+/** 统一宿主实例 —— 切回结构化视图前用它 `forceSave()`（内部走 room forcesave）。 */
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 
 const currentSheet = computed(() => normalizeD2SheetName(props.sheetName))
+/** 统一路径 canary 仅覆盖 D2-2 明细表（manifest entry 的 managed sheet）。 */
+const isD2DetailSheet = computed(() => currentSheet.value === 'D2-2')
 
 const d2ReviewSection = computed(() => resolveCycleReviewSection('D2', currentSheet.value))
 
-// ─── Task 45: bridge adapter replaces legacy useD2EntryDualMode ─────────────
+// ─── G4 host canary：useWorkpaperSyncBridge + store-projection flush ─────────
 //
-// 🔴 `flushBeforeOo` 必须传：HTML 侧录入走 debounce 落库，不 flush 就切到 OO 的话
-// push 推的是**上一次** debounce 落库的旧数据。2026-09-06 浏览器实测的时序：
-// Excel 写于 19:41:12.077、HTML store 落库于 19:41:14.771 —— push 早 2.7 秒，
-// 审计师刚录的「期后回款 13571.99」在 OO 里显示成 0。
-// bridge 早就定义并 await 了这个可选钩子，宿主漏传即静默失效
-// （Volar / vitest / get_diagnostics 三层全绿，只有浏览器暴露）。
-const dualMode = useD2SyncBridge({
+// 🔴 flushHtml 必须先 flushPendingSave，再 readStoreProjection：HTML debounce 未落库
+// 时服务端投影仍是旧 store（与 2026-09-06 缺陷 A 同型）。
+// 🔴 不得在前端重造 39 列→stable-key 映射（Requirement 6.1）；overlay 脚手架由服务端
+// store-projection 叠加（DEC-10 解除后的 materialize-ready 语义）。
+const syncEntryId = ref(D2_SYNC_ENTRY_ID)
+const syncSheetKey = ref(D2_MANAGED_SHEET_KEY)
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
   wpId: toRef(props, 'wpId'),
-  reloadHtml: () => formData.loadAll(),
-  flushBeforeOo: () => formData.flushPendingSave(),
-  requestForceSave: () => ooSheetRef.value?.forceSave() ?? Promise.resolve(null),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  // 谓词 8：capability 从 source-backed manifest 现算，禁止宿主内联字面量
+  capability: capabilityForEntry(D2_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    await formData.flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D2_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D2_MANAGED_SHEET_KEY,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
 })
 
-const ooSheetName = computed(() =>
-  getSheetNameFromD2Code(currentSheet.value) || props.sheetName || 'D2-1',
+/** 避免 `:descriptor="syncBridge.descriptor.value"` 丢失对 ref 的追踪 */
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
 )
+const syncUnavailableReason = computed(() => {
+  if (!isD2DetailSheet.value) {
+    return '统一路径 canary 仅开放 D2-2 明细表在线编辑'
+  }
+  const err = syncBridge.lastError.value
+  return err ? `${err.errorCode}: ${err.message}` : ''
+})
+const syncFeedbackOk = computed(() => {
+  const fb = syncBridge.feedback.value
+  return fb.kind === 'success' ? fb.message : ''
+})
 
 const renderMode = computed({
-  get: () => dualMode.currentMode.value,
-  set: (v: D2RenderMode) => { void dualMode.switchMode(v) },
+  get: (): D2RenderMode => (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html'),
+  set: (v: D2RenderMode) => {
+    void switchRenderMode(v)
+  },
 })
 
 const renderModeOptions = computed(() => [
@@ -455,28 +460,44 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    // 🔴 真源是 usePilotBridgeAdapter 的 `isOoAvailable`（legacy useD2EntryDualMode 叫 ooAvailable）。
-    // 写成 `ooAvailable` 会让 computed 求值时炸
-    // 「页面渲染出错：Cannot read properties of undefined (reading 'value')」整页白屏，
-    // 而 get_diagnostics / vitest / Vite transform 三层全绿。
-    disabled: !dualMode.isOoAvailable.value,
+    disabled: !isD2DetailSheet.value || isReadonly.value,
   },
 ])
 
-function onOoFallback(): void {
-  void dualMode.switchMode('html')
-}
-
-async function onCurrentSheetAiReview(): Promise<void> {
-  if (!props.sheetName) return
-  reviewDialogVisible.value = true
-  await nextTick()
-  await reviewPanelRef.value?.reviewCurrentSheet(props.wpId, props.sheetName)
-}
-
-function onReviewNavigateSheet(sheetName: string): void {
-  reviewDialogVisible.value = false
-  emit('jump-to-section', sheetName)
+async function switchRenderMode(target: D2RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD2DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  // → html
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      // 回写已完成但自动 reload 未跑完时，点结构化视图应主动 reload（§9.6）
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
 }
 
 const KNOWN_HTML_SHEETS = new Set([

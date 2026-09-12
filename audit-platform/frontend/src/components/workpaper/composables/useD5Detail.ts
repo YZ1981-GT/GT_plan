@@ -28,6 +28,12 @@ import {
   calcSubtotal,
 } from './useD5FormulaEngine'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
+import {
+  parseAuxImportResponse,
+  auxImportPrompt,
+  AUX_IMPORT_NETWORK_ERROR_PROMPT,
+} from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD5FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -65,6 +71,8 @@ export interface UseD5DetailOptions {
   saveImmediate: SaveFn
   debouncedSave: DebouncedSaveFn
   isReadonly: Ref<boolean>
+  /** 从余额表导入成功后由宿主重载 allResponses（级联审定表/披露刷新，Requirement 4.6）。 */
+  onImported?: () => Promise<void> | void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -196,8 +204,7 @@ function sumRows(rows: DetailRow[], label: string): DetailRow {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD5Detail(options: UseD5DetailOptions) {
-  const { allResponses, wpId: _wpId, projectId, debouncedSave, isReadonly } = options
-  void _wpId // reserved for future use (e.g., import endpoints)
+  const { allResponses, wpId, projectId, debouncedSave, isReadonly, onImported } = options
 
   const eventListeners: Array<{ event: string; handler: (e: Event) => void }> = []
 
@@ -413,61 +420,29 @@ export function useD5Detail(options: UseD5DetailOptions) {
   // ─── importFromAuxBalance（从余额表导入）──────────────────────────────
 
   /**
-   * 调后端API从tb_aux_balance科目1124按明细维度导入
+   * 从辅助余额表导入 D5-2.
+   *
+   * 🔴 迁移后端（spec four-table-extraction-entry-completion / Task 4）：改调统一端点
+   * `POST /api/workpapers/{wpId}/d5/import-aux-balance`（共享件 `aggregate_aux_by_name_ex`：
+   * active dataset 过滤 + 单一 aux_type 锁定 + 报表映射前缀），**服务端 merge 落库**并返回
+   * reason 码。旧实现走 `GET /tb-aux-balance` 客户端 GROUP BY + 硬编码 1124 + 客户端拼行，
+   * 违四表库铁律，已删除。前端不再客户端拼行：成功后由 `onImported` 重载 allResponses，
+   * D5-2-rows watch 自动重派生行（Requirement 4.6）；0 行按 reason 码给可辨别提示（4.4）。
    */
   async function importFromAuxBalance(): Promise<void> {
-    if (isReadonly.value || !projectId.value) return
-
+    if (isReadonly.value || !wpId.value) return
     try {
-      const res = await api.get(
-        `/api/projects/${projectId.value}/tb-aux-balance`,
-        { params: { account_code: '1124' } },
+      const res = await http.post(
+        `/api/workpapers/${wpId.value}/d5/import-aux-balance`,
+        { project_id: projectId.value },
       )
-      const importedData: any[] = Array.isArray(res) ? res : (res?.data ?? res?.rows ?? [])
-
-      if (importedData.length === 0) {
-        ElMessage.info('未找到科目1124的辅助余额数据')
-        return
-      }
-
-      // Merge imported rows into existing (add new items, update existing)
-      const existingMap = new Map(rows.value.map(r => [r.itemName, r]))
-      let newCount = 0
-
-      for (const imported of importedData) {
-        const name = imported.itemName || imported.item_name || imported.aux_name || ''
-        if (!name) continue
-
-        if (existingMap.has(name)) {
-          // Update existing row with imported data
-          const existing = { ...existingMap.get(name)! }
-          existing.priorUnadjusted = parseNum(imported.priorUnadjusted ?? imported.prior_unadjusted ?? imported.begin_balance)
-          // Recalculate formula chain
-          const recalculated = recalcRow(existing)
-          existingMap.set(name, recalculated)
-        } else {
-          // New item row
-          const category = imported.category || imported.aux_category || ''
-          const newRow = normalizeRow({
-            rowId: generateRowId(),
-            category: category || '应收票据',
-            itemName: name,
-            priorUnadjusted: imported.priorUnadjusted ?? imported.prior_unadjusted ?? imported.begin_balance ?? 0,
-            periodIncrease: imported.periodIncrease ?? imported.period_increase ?? imported.debit ?? 0,
-            periodDecrease: imported.periodDecrease ?? imported.period_decrease ?? imported.credit ?? 0,
-          })
-          const recalculated = recalcRow(newRow)
-          existingMap.set(name, recalculated)
-          newCount++
-        }
-      }
-
-      rows.value = Array.from(existingMap.values())
-      persistRows()
-
-      ElMessage.success(`成功导入${importedData.length}行数据，${newCount}个新明细项目`)
+      const outcome = parseAuxImportResponse(res)
+      await (onImported?.() ?? Promise.resolve())
+      const { level, text } = auxImportPrompt(outcome)
+      ElMessage[level]({ message: text })
     } catch {
-      ElMessage.error('从辅助余额表导入失败，请稍后重试')
+      const { level, text } = AUX_IMPORT_NETWORK_ERROR_PROMPT
+      ElMessage[level]({ message: text })
     }
   }
 

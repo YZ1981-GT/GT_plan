@@ -4,6 +4,11 @@
 import { ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import http from '@/utils/http'
+import {
+  parseAuxImportResponse,
+  auxImportPrompt,
+  AUX_IMPORT_NETWORK_ERROR_PROMPT,
+} from './fourTableAuxImportFeedback'
 
 export type D3ImportableSheet =
   | 'D3-1'
@@ -110,15 +115,24 @@ export function useD3ImportExport(options: UseD3ImportExportOptions) {
     }
   }
 
-  /** D3-2 专用：从辅助余额表导入 */
+  /**
+   * D3-2 专用：从辅助余额表导入.
+   *
+   * 🔴 迁移后端（spec four-table-extraction-entry-completion / Task 4）已改为**服务端
+   * merge 落库**并返回 reason 码（imported_count / reason / message），不再返回 rows[]。
+   * 故前端不再客户端拼行，成功后返回 true 让宿主 reloadWorkpaperData 级联刷新；
+   * 0 行按 reason 码给可辨别中文提示（Requirement 4.4），不再一律「成功导入 0 行」。
+   */
   async function importFromAuxBalance(): Promise<boolean> {
     try {
       const res = await http.post(`/api/workpapers/${wpId.value}/d3/import-aux-balance`, null)
-      const data = res.data?.data ?? res.data
-      ElMessage.success(`成功导入 ${data?.imported_count ?? 0} 行`)
+      const outcome = parseAuxImportResponse(res)
+      const { level, text } = auxImportPrompt(outcome)
+      ElMessage[level]({ message: text })
       return true
     } catch {
-      ElMessage.error('从余额表导入失败')
+      const { level, text } = AUX_IMPORT_NETWORK_ERROR_PROMPT
+      ElMessage[level]({ message: text })
       return false
     }
   }

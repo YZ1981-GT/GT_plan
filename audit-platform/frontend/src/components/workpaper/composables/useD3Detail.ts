@@ -30,6 +30,11 @@ import {
   calcSubtotal,
 } from './useD3FormulaEngine'
 import { api } from '@/services/apiProxy'
+import {
+  parseAuxImportResponse,
+  auxImportPrompt,
+  AUX_IMPORT_NETWORK_ERROR_PROMPT,
+} from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD3FormData'
 import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
 import { migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
@@ -398,6 +403,16 @@ export function useD3Detail(options: UseD3DetailOptions) {
 
   // ─── importFromAuxBalance ────────────────────────────────────────────
 
+  /**
+   * 从辅助余额表导入 D3-2（预收账款科目由 BS-046 报表映射解析，兜底 2203）.
+   *
+   * 🔴 D3-2 明细表的**实际入口**是 `useD3ImportExport.importFromAuxBalance`（经
+   * `useD3TabImportExport.onImportFromAuxBalance` → 宿主 reloadWorkpaperData 级联刷新）。
+   * 迁移后端（spec four-table-extraction-entry-completion / Task 4）已改服务端 merge 落库 +
+   * reason 码，不再返回 rows[]，故此处不再客户端拼行/客户端 merge（旧实现读
+   * `res?.data ?? res?.rows` 会与服务端 merge 双写且恒空）。仅消费端点、按 reason 码给
+   * 可辨别提示（Requirement 4.4）；行刷新由宿主 reload 后 D3-2-rows watch 驱动。
+   */
   async function importFromAuxBalance(): Promise<void> {
     if (!wpId.value) return
     try {
@@ -405,52 +420,12 @@ export function useD3Detail(options: UseD3DetailOptions) {
         `/api/workpapers/${wpId.value}/d3/import-aux-balance`,
         { project_id: projectId.value },
       )
-      const importedRows: any[] = Array.isArray(res) ? res : (res?.data ?? res?.rows ?? [])
-
-      if (importedRows.length === 0) {
-        ElMessage.info('未找到科目2203的辅助余额数据')
-        return
-      }
-
-      // Merge imported rows into existing (add new customers, update existing)
-      const existingMap = new Map(rows.value.map(r => [r.customerName, r]))
-      let newCount = 0
-
-      for (const imported of importedRows) {
-        const name = imported.customerName || imported.customer_name || ''
-        if (!name) continue
-
-        if (existingMap.has(name)) {
-          // Update existing row with imported data
-          const existing = existingMap.get(name)!
-          existing.priorUnadjusted = parseNum(imported.priorUnadjusted ?? imported.prior_unadjusted)
-          existing.credit = parseNum(imported.credit)
-          existing.debit = parseNum(imported.debit)
-          // Recalculate formula chain
-          const recalculated = recalcRowFormulas(existing)
-          existingMap.set(name, recalculated)
-        } else {
-          // New customer row
-          const newRow = normalizeRow({
-            rowId: generateRowId(),
-            customerName: name,
-            companyCode: imported.companyCode || imported.company_code || '',
-            priorUnadjusted: imported.priorUnadjusted ?? imported.prior_unadjusted ?? 0,
-            credit: imported.credit ?? 0,
-            debit: imported.debit ?? 0,
-          }, segments.value)
-          const recalculated = recalcRowFormulas(newRow)
-          existingMap.set(name, recalculated)
-          newCount++
-        }
-      }
-
-      rows.value = Array.from(existingMap.values())
-      persistRows()
-
-      ElMessage.success(`成功导入${importedRows.length}行数据，${newCount}个新客户`)
+      const outcome = parseAuxImportResponse(res)
+      const { level, text } = auxImportPrompt(outcome)
+      ElMessage[level]({ message: text })
     } catch {
-      ElMessage.error('从辅助余额表导入失败，请稍后重试')
+      const { level, text } = AUX_IMPORT_NETWORK_ERROR_PROMPT
+      ElMessage[level]({ message: text })
     }
   }
 

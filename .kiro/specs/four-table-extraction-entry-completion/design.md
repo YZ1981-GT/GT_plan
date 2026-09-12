@@ -52,7 +52,7 @@ AuxAggregationResult
   entries: list[AuxEntry]
   aux_type: str | None
   total_units: int
-  reason: 'ok' | 'no_prefixes' | 'no_aux_type' | 'no_rows' | 'error'
+  reason: 'ok' | 'no_prefixes' | 'no_aux_type' | 'no_rows' | 'no_active_dataset' | 'error'
 ```
 
 端点按 `reason` 产出不同中文提示（Requirement 4.4 / 5.2）。为不破坏既有 4 个消费者，新增 `aggregate_aux_by_name_ex()` 返回上述结构，旧函数改为其薄壳（保持返回三元组）。
@@ -81,11 +81,11 @@ AuxAggregationResult
 
 不新增表。写入落既有 `checklist_responses(wp_id, item_id, remark)` JSON 数组，字段与各循环前端 `serializeRows` 的持久化子集逐字一致（派生列不写）。
 
-来源可追溯（Requirement 5.4）：所有本 spec 交付的取数行必须带统一来源元数据 `source_kind`（`aux_balance`）和 `source_dataset_id`，必要时带 `source_account_prefix` / `source_aux_type`；该元数据必须进入各循环持久化子集并在 merge/reload 后保留。已有异名字段只能作为兼容投影，不能替代统一来源字段。无法承载来源元数据的循环不得标记为已交付 G-A/G-B，必须列为 blocked/deferred 并从最终完成数中排除。
+来源可追溯（Requirement 5.4）：**实际交付采 DEC-4 的轻量方案** —— 不新增统一 `source_kind`/`source_dataset_id` 列（会动 5+ 循环的 store 形态与契约 digest，风险 > 收益），而是用行已有的 `remark` 字段携带中文来源标记（如 K1 写「由辅助余额表(1221·客户)导入」）区分取数行与手工录入；`source_dataset_id` 在端点响应上下文与 Task 9 证据中记录（不落入行）。统一来源列登记为 **deferred 增强**（不阻塞取数本身）。仅当某循环连取数行本身（store item 行结构）都无法承载时，该循环才标 blocked/deferred 并从最终完成数中排除（本 spec 所列宿主均满足行结构，无一因此阻塞）。
 
 ## Error Handling
 
-所有面向用户的取数端点必须消费 `aggregate_aux_by_name_ex` 的结构化结果，不得用旧三元组兼容函数决定用户提示。`AuxAggregationResult` 的 `reason` 枚举固定为 `ok`、`no_prefixes`、`no_aux_type`、`no_rows`、`no_active_dataset`、`error`；HTTP 响应必须同时返回 `reason`、`imported_count`、`message` 和可选的 `selected_aux_type`。异常路径必须先 rollback 当前事务，再以 ERROR 级别记录 `project_id`、`year`、`account_prefixes` 与异常类型；`no_rows` 等正常空结果不得记录 ERROR。响应经过 `ResponseWrapperMiddleware` 后，前端统一从 `response.data` 读取业务载荷，禁止各循环自行猜测包装层级。
+所有面向用户的取数端点必须消费 `aggregate_aux_by_name_ex` 的结构化结果，不得用旧三元组兼容函数决定用户提示。（交付后实态：K1 / D2 / D3 / D5 / D6 / D7 **六个端点均已消费 `_ex` 并回传 `reason`**；D6 经 `aggregate_d_cycle_aux` 中转，K1 于收口阶段从旧薄壳迁至 `_ex`。）`AuxAggregationResult` 的 `reason` 枚举固定为 `ok`、`no_prefixes`、`no_aux_type`、`no_rows`、`no_active_dataset`、`error`；HTTP 响应必须同时返回 `reason`、`imported_count`、`message` 和可选的 `selected_aux_type`。异常路径必须先 rollback 当前事务，再以 ERROR 级别记录 `project_id`、`year`、`account_prefixes` 与异常类型；`no_rows` 等正常空结果不得记录 ERROR。响应经过 `ResponseWrapperMiddleware` 后，前端统一从 `response.data` 读取业务载荷，禁止各循环自行猜测包装层级。
 
 科目来源采用严格优先级：`ReportLineAccountSpec` 成功解析的前缀才可自动取数；显式 fallback 必须在声明式 registry 中登记 `source_ref`、适用 wp_code 和有效期，并由守卫验证 source_ref 仍指向真实模板/报表行。无法证明来源时返回 `no_prefixes`，不得静默使用字面量。
 

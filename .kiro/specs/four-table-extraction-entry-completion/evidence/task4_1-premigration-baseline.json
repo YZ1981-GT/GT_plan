@@ -1,0 +1,205 @@
+{
+  "artifact": "task4_1-premigration-baseline.json",
+  "spec": "four-table-extraction-entry-completion",
+  "task": "Task 4.1 — 迁移前后金额对照（真库）· PRE-MIGRATION baseline freeze",
+  "purpose": "Freeze the OLD (unmigrated) endpoint results + an input-snapshot digest so Task 4 can recompute POST-migration with IDENTICAL inputs and explain the difference (Requirement 6.5). Read-only capture; NO production code modified.",
+  "generated_by": "spec task subagent (read-only via postgres MCP + source reads)",
+  "generated_at_note": "All numbers below were computed by executing the OLD SQL shape (verbatim, differing only by account prefix) and the POST filter shape against the live audit_platform DB in READ-ONLY mode.",
+  "requirements_covered": ["6.5"],
+  "dependency_note": "Per tasks.md Task Dependency Graph: Task 4.1 (wave 3) MUST complete and freeze this baseline BEFORE Task 4 (wave 4). Task 4 MUST NOT run in parallel with 4.1 and MUST read this artifact.",
+
+  "freshness_gate": {
+    "requirement": "1.6 — recompute gap-inventory.json source_snapshot digests; BLOCK on drift of the host/endpoint derivation inputs.",
+    "frozen_aggregate_digest": "sha256:da5aeae67f2edbb333d6449061f18c09e13de59d813bcda8c52f3a176c0b3651",
+    "recomputed_aggregate_digest": "sha256:6185c4dba430172fcf90e1bd0a614136464fe4c273bbd7f3cbe05df16d0505b1",
+    "per_file": [
+      { "path": "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts", "expected_sha256": "961be1df1836c2dc48de3f3eb36eef0c2a79a6308ffe7538fc698c2c51d05c34", "actual_sha256": "961be1df1836c2dc48de3f3eb36eef0c2a79a6308ffe7538fc698c2c51d05c34", "match": true },
+      { "path": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts", "expected_sha256": "b27cd92661f5fe804d85f7c29d62a3584ebcc8714af8e32c68e7252b80b4ab2b", "actual_sha256": "b27cd92661f5fe804d85f7c29d62a3584ebcc8714af8e32c68e7252b80b4ab2b", "match": true },
+      { "path": "backend/app/data/wp_code_overrides.json", "expected_sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394", "actual_sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394", "match": true },
+      { "path": "backend/app/security/wp_bound_entry_coverage.json", "expected_sha256": "1392d1a5175b05f55fee0f4257e12d963ee9598b5eb45191896ff7b8c2a15bdc", "actual_sha256": "1392d1a5175b05f55fee0f4257e12d963ee9598b5eb45191896ff7b8c2a15bdc", "match": true },
+      { "path": "backend/app/services/four_table/aux_aggregation.py", "expected_sha256": "e03009840c952f7bf7319d9567eed3f8c022806f1bf4bdc13add657f942198c1", "actual_sha256": "d1326ce938d93eed8a658254f0092ae549c27a91a111b0b4a5bf362954f32463", "match": false }
+    ],
+    "gate_decision": "PROCEED (not blocked).",
+    "gate_rationale": "4 of 5 snapshot files are byte-identical. The 4 that DRIVE host/endpoint enumeration (forms.ts, specialized.ts, wp_code_overrides.json, wp_bound_entry_coverage.json) are unchanged, so the inventory's structural conclusions (G-A/G-B/G-C classification, the 8 endpoints, D2's DEC-2 resolution) are intact. The single drifted file is aux_aggregation.py, whose change is the wave-2 Task 3 enhancement (adds aggregate_aux_by_name_ex + AuxAggregationResult + reason codes + logger.exception; old aggregate_aux_by_name became a thin shell returning the identical 3-tuple). Confirmed by grep of the current file and `git status` showing it as an uncommitted ' M' modification. Per the dependency graph Task 3 is wave 2 and legitimately precedes Task 4.1 (wave 3); aux_aggregation.py is NOT an input to this baseline (the OLD/unmigrated endpoint SQL lives in _d3/_d5/_d7_import_export.py and d_cycle_extraction/detail_aggregation.py — none in the snapshot set). Therefore this drift is expected dependency-ordered evolution, not a stale-inventory hazard. Task 4 MUST re-run the gate and confirm the ONLY drifted file remains aux_aggregation.py (plus its own migration edits); any NEW drift in the 4 enumeration files must BLOCK."
+  },
+
+  "old_implementation_sql_shape": {
+    "note": "The 4 EXISTING G-C endpoints (D3/D5/D7 in routers/wp_render_strategies/_dN_import_export.py, D6 in services/d_cycle_extraction/detail_aggregation.py::_AUX_QUERY) run byte-identical SQL differing only in the account prefix. Verbatim shape:",
+    "sql_template": "SELECT aux_name, COALESCE(SUM(opening_balance),0) AS prior_balance, COALESCE(SUM(closing_balance),0) AS current_balance FROM tb_aux_balance WHERE project_id = :pid AND account_code LIKE '<PREFIX>%' AND is_deleted = false GROUP BY aux_name ORDER BY aux_name",
+    "flaws_baked_in": {
+      "flaw_1_no_active_filter": "No get_active_filter → NO year filter and NO dataset_id filter. Sums across ALL years and ALL dataset versions ⇒ dataset double-count.",
+      "flaw_2_no_aux_type_lock": "GROUP BY aux_name WITHOUT first locking a single aux_type ⇒ when one account carries multiple aux dimensions, each aux_name's amount is summed across dimensions (aux_type double-count).",
+      "flaw_3_hardcoded_prefix": "Prefix hardcoded ('2203%'/'1124%'/'2205%'/'1141%'; D2 frontend hardcodes 1122 + dim_type=客户).",
+      "flaw_4_aging_stuffing": "Full balance stuffed into the first aging bucket (fabricated aging)."
+    }
+  },
+
+  "input_snapshot": {
+    "note": "Task 4 MUST recompute with EXACTLY these inputs. project_id/year/active_dataset_id/account_prefixes/selected_aux_type are the frozen tuple.",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "year": 2025,
+    "active_dataset_id": "c050bfbe-45cf-46d6-95bc-54a464403dd3",
+    "active_dataset_selection_rule": "ledger_datasets WHERE status='active' ORDER BY activated_at DESC NULLS LAST, created_at DESC → first (per DatasetService.get_active_dataset_id).",
+    "project_dataset_inventory_year_2025": [
+      { "id": "53602855-2244-42e8-acfb-7758fadae8d4", "status": "failed" },
+      { "id": "70b883d7-9525-41f7-8b35-7ba957c92acb", "status": "superseded" },
+      { "id": "210aacc3-fcc7-4aa6-9a6c-8be8a5868195", "status": "superseded" },
+      { "id": "b949639e-2254-45f3-9fb7-2d09af1b3809", "status": "superseded" },
+      { "id": "ab168cfb-9585-43a7-b68a-acd372aeae88", "status": "superseded" },
+      { "id": "c050bfbe-45cf-46d6-95bc-54a464403dd3", "status": "active" }
+    ],
+    "account_prefixes_frozen": {
+      "D3": "2203",
+      "D5": "1124",
+      "D7": "2205",
+      "D6": "1141",
+      "D2": "1122"
+    },
+    "prefix_resolution_note": "These are the OLD hardcoded prefixes (flaw ③). Task 4 will resolve prefixes from report mapping (D3=BS-046, D5=BS-007, D6=BS-011, D7=BS-047, D2=BS-006, per gap-inventory.json). If the report-mapping-resolved prefix differs from the frozen prefix above, the resulting amount difference is attributable to PREFIX RESOLUTION, not to double-count correction, and Task 4 must state so explicitly. The report-line code varies by report variant (soe vs listed); Task 4 resolves the actual variant for this project.",
+    "selected_aux_type_post": {
+      "D3": "客户",
+      "D2": "客户",
+      "D5": "(n/a — no data)",
+      "D6": "(n/a — no data)",
+      "D7": "(n/a — no data)"
+    },
+    "input_digest_sha256_note": "Digest over the canonical input tuple string so Task 4 can prove identical inputs. canonical_string = 'project_id=0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49|year=2025|active_dataset_id=c050bfbe-45cf-46d6-95bc-54a464403dd3|prefixes=D2:1122,D3:2203,D5:1124,D6:1141,D7:2205|aux_type=D2:客户,D3:客户' (UTF-8, sha256).",
+    "input_digest": "sha256:b7f154c8fd96bd060f4cd0de28ea6545eb9e3e77b2082c0b953e3aba7339f12c"
+  },
+
+  "baselines": [
+    {
+      "wp_code": "D3",
+      "endpoint": "POST /api/workpapers/{wp_id}/d3/import-aux-balance",
+      "prefix": "2203",
+      "old": {
+        "filter": "project_id + account_code LIKE '2203%' + is_deleted=false (NO year, NO dataset)",
+        "row_count": 654,
+        "sum_prior_balance": "48407612.24",
+        "sum_current_balance": "42366490.28",
+        "raw_row_count_before_group_by": 1308,
+        "distinct_datasets_in_scope": 2,
+        "distinct_aux_types_in_scope": 1
+      },
+      "post_expected": {
+        "filter": "get_active_filter (year=2025 + dataset_id=c050bfbe...) + single aux_type lock '客户' + prefix",
+        "row_count": 654,
+        "sum_prior_balance": "24203806.12",
+        "sum_current_balance": "21183245.14",
+        "aux_type_locked": "客户"
+      },
+      "expected_difference": {
+        "current_balance_ratio_old_over_post": 2.0,
+        "attribution": "① dataset double-count. The OLD SQL summed 2 dataset versions (2×654=1308 raw rows) which GROUP BY aux_name collapsed into 654 aux_names with DOUBLED amounts. get_active_filter keeps only the active dataset ⇒ exactly ½. No aux_type double-count for D3 (only 1 aux_type '客户' in scope).",
+        "integer_multiple_drop": "2x (predicted, expected correction — NOT a regression)"
+      },
+      "sample_rows_2x_proof": [
+        { "aux_name": "上海市军天湖监狱卫生所", "old_current": "20.00", "post_current": "10.00" },
+        { "aux_name": "上海焜然医疗器械有限公司", "old_current": "0.04", "post_current": "0.02" }
+      ]
+    },
+    {
+      "wp_code": "D2",
+      "endpoint_old_actual": "GET /api/projects/{project_id}/ledger/aux-balance-detail?account_code=1122&dim_type=客户&year=2025 (ledger_penetration.get_aux_balance_detail), then GROUP BY aux_name CLIENT-SIDE (useD2Detail.importFromAuxBalance)",
+      "endpoint_post_target": "POST /api/workpapers/{wp_id}/d2/import-aux-balance (to be CREATED in Task 4 on the shared component)",
+      "prefix": "1122",
+      "d2_special_note": "D2 has NO prior双算 backend baseline to freeze (it aggregated client-side). The generic read endpoint it uses is ALREADY 铁律-compliant (get_active_filter + year + aux_type==dim_type '客户' + prefix LIKE), so the D2 CLIENT path did NOT double-count — its violation is the HARDCODED 1122/客户 (flaw ③) and bypassing the shared pipeline. Its baseline is recorded separately here.",
+      "old_client_path": {
+        "filter": "active dataset + year=2025 + aux_type='客户' + account_code LIKE '1122%' (read endpoint), client GROUP BY aux_name",
+        "row_count": 1260,
+        "sum_current_balance_客户": "624025343.06"
+      },
+      "post_expected": {
+        "filter": "shared aggregate_aux_by_name via new POST endpoint: get_active_filter + single aux_type lock + prefix from BS-006 mapping",
+        "row_count": 1260,
+        "sum_current_balance": "624025343.06",
+        "aux_type_locked": "客户",
+        "expected_difference": "0 (no change in amount when prefix resolves to 1122 and aux_type locks to 客户 — D2 client path was already correct). Difference materializes only if BS-006 resolves a different prefix."
+      },
+      "aux_type_double_count_illustration": {
+        "note": "Demonstrates flaw ② risk on 1122 (does NOT apply to the correctly-scoped 客户 path, shown for守卫 reference). Under active filter, account 1122 carries 3 aux_types: 业态, 客户, 集团内外. 业态 and 客户 each redundantly store the SAME closing balance; 集团内外 is null.",
+        "group_by_aux_name_WITHOUT_aux_type_lock_sum_current": "1248050686.12",
+        "aux_type_locked_客户_sum_current": "624025343.06",
+        "ratio": 2.0,
+        "attribution_if_triggered": "② aux_type double-count — a shared pipeline that fails to lock a single aux_type would double 1122. The migrated endpoint MUST lock aux_type (pick_aux_type) to avoid this."
+      },
+      "sample_rows_post_客户": [
+        { "aux_name": "万春街道新苑社区卫生服务一站", "post_prior": "3000.00", "post_current": "3000.00" },
+        { "aux_name": "万顺中西医结合门诊部", "post_prior": "5667.00", "post_current": "11334.00" }
+      ]
+    },
+    {
+      "wp_code": "D5",
+      "endpoint": "POST /api/workpapers/{wp_id}/d5/import-aux-balance",
+      "prefix": "1124",
+      "old": {
+        "filter": "project_id + account_code LIKE '1124%' + is_deleted=false",
+        "row_count": 0,
+        "sum_current_balance": "0.00"
+      },
+      "post_expected": {
+        "row_count": 0,
+        "sum_current_balance": "0.00"
+      },
+      "expected_difference": {
+        "attribution": "NONE. Whole-DB scan confirms tb_aux_balance has ZERO rows for prefix 1124 across ALL projects/years/datasets (any is_deleted). OLD endpoint returns 0 rows ('未找到科目1124的辅助余额数据') for any real project; migration changes the MECHANISM (shared component + active filter + aux_type lock) but the data set is empty, so amounts stay 0→0. No integer-multiple drop possible.",
+        "integer_multiple_drop": "n/a (0 rows)"
+      },
+      "db_scan_evidence": "SELECT ... WHERE account_code LIKE '1124%' across entire tb_aux_balance → [] (0 rows, any is_deleted)."
+    },
+    {
+      "wp_code": "D6",
+      "endpoint": "POST /api/workpapers/{wp_id}/d6/import-aux-balance (SQL in d_cycle_extraction/detail_aggregation.py::_AUX_QUERY)",
+      "prefix": "1141",
+      "old": {
+        "filter": "project_id + account_code LIKE '1141%' + is_deleted=false",
+        "row_count": 0,
+        "sum_current_balance": "0.00"
+      },
+      "post_expected": {
+        "row_count": 0,
+        "sum_current_balance": "0.00"
+      },
+      "expected_difference": {
+        "attribution": "NONE. Whole-DB scan confirms ZERO rows for prefix 1141. Migration deletes _AUX_QUERY / _D6_AUX_SQL and routes through the shared component; empty data ⇒ 0→0.",
+        "integer_multiple_drop": "n/a (0 rows)"
+      },
+      "db_scan_evidence": "SELECT ... WHERE account_code LIKE '1141%' across entire tb_aux_balance → [] (0 rows)."
+    },
+    {
+      "wp_code": "D7",
+      "endpoint": "POST /api/workpapers/{wp_id}/d7/import-aux-balance",
+      "prefix": "2205",
+      "old": {
+        "filter": "project_id + account_code LIKE '2205%' + is_deleted=false",
+        "row_count": 0,
+        "sum_current_balance": "0.00"
+      },
+      "post_expected": {
+        "row_count": 0,
+        "sum_current_balance": "0.00"
+      },
+      "expected_difference": {
+        "attribution": "NONE. Whole-DB scan confirms ZERO rows for prefix 2205. Migration changes mechanism only; empty data ⇒ 0→0. (Aging fields, previously stuffed into first bucket per flaw ④, must be left EMPTY post-migration per Requirement 2.5.)",
+        "integer_multiple_drop": "n/a (0 rows)"
+      },
+      "db_scan_evidence": "SELECT ... WHERE account_code LIKE '2205%' across entire tb_aux_balance → [] (0 rows)."
+    }
+  ],
+
+  "double_count_summary_for_req_6_5": {
+    "D3": "OLD 42,366,490.28 → POST 21,183,245.14 = 2× drop, attributed to ① dataset double-count (2 active- + superseded datasets summed).",
+    "D2": "No drop expected (already correctly aux_type-scoped in client path). But 1122 exhibits the ② aux_type double-count hazard (业态+客户 both 624M ⇒ 2× if aux_type not locked); migrated endpoint must lock aux_type.",
+    "D5_D6_D7": "0 → 0, no drop, no double-count (empty data for 1124/2205/1141 across the whole DB).",
+    "rule": "Every integer-multiple amount drop MUST be attributed to ① dataset double-count OR ② aux_type double-count correction. D3 = ①. D2's illustrated 2× = ②. D5/D6/D7 = n/a."
+  },
+
+  "how_task4_verifies": [
+    "1. Re-run the freshness gate; confirm the ONLY drifted snapshot file is still aux_aggregation.py (plus Task 4's own migration edits). Any NEW drift in the 4 enumeration files ⇒ BLOCK.",
+    "2. Recompute with the frozen input_snapshot (same project_id/year/active_dataset_id).",
+    "3. For D3: assert POST current-balance sum = 21,183,245.14 (½ of OLD), row_count 654, aux_type '客户'. Confirm the 2× drop is attributed to ① dataset double-count.",
+    "4. For D2: assert new POST endpoint yields 1260 rows, 客户, sum 624,025,343.06; assert it does NOT sum across the 3 aux_types (would give 1,248,050,686.12 = ②).",
+    "5. For D5/D6/D7: assert 0 rows, aging fields left EMPTY (not stuffed), message指出需人工填账龄.",
+    "6. Write the POST-migration numbers + difference explanation into a companion evidence artifact (task4-postmigration-comparison)."
+  ]
+}

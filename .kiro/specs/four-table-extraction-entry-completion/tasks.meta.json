@@ -1,0 +1,192 @@
+{
+  "pbtResults": {},
+  "executionHistory": {
+    "1. 缺口清册（结构性推导，禁 grep 按钮文字）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225566321
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225577240
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789226092829
+      }
+    ],
+    "2. 红基线核实与注释纠偏": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225566529
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225578088
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789226093806
+      }
+    ],
+    "3. 共享件增强：reason 码 + ERROR 日志（fail-open 治理）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225566625
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789226098867
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789226489247
+      }
+    ],
+    "4.1 迁移前后金额对照（真库）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225566755
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789226496453
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789227018083
+      }
+    ],
+    "5. G-B 类新端点（照 K1 范式）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225566809
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789227039344
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789228519949
+      }
+    ],
+    "6. 后端守卫 + 变异检验": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225566941
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789229444018
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789230715521
+      }
+    ],
+    "7. 前端入口补齐（G-A + G-B）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225567006
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789229444780
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789230716640
+      }
+    ],
+    "8. 前端守卫（vitest）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225567070
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789230724016
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789231831808
+      }
+    ],
+    "9. 真栈实测（浏览器）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225567122
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789230724777
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789231832949
+      }
+    ],
+    "10. 收口": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789225567194
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789231839958
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789232067516
+      }
+    ],
+    "4. 历史端点迁移（G-C：D3/D5/D6/D7）": [
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789227018167
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789227031524
+      },
+      {
+        "executionId": "dae80aa5-8e59-4f4b-ba85-bada92a1af08",
+        "chatSessionId": "sess_a565af6f-f95d-4801-a081-dde3c4d5d8b3",
+        "timestamp": 1789229436625
+      }
+    ]
+  }
+}

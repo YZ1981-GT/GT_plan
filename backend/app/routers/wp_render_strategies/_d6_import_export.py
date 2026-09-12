@@ -27,7 +27,7 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
 from app.services.d_cycle_extraction.detail_aggregation import (
-    aggregate_d6_detail_rows,
+    build_d6_detail_rows_from_aux,
 )
 
 logger = logging.getLogger(__name__)
@@ -364,15 +364,24 @@ async def d6_import_aux_balance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """从 tb_aux_balance（科目1141，按客户/合同维度）批量导入到D6-2
+    """从 `tb_aux_balance`（科目由 BS-011 报表映射解析，兜底 1141）按客户/合同维度归集导入 D6-2.
 
-    合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。原 `1402` 是在途物资
-    （存货类），属误用。
+    🔴 G-C 迁移（spec four-table-extraction-entry-completion / Task 4）：归集经共享件
+    `aggregate_d_cycle_aux` → `aggregate_aux_by_name_ex`（`get_active_filter`
+    + `pick_aux_type` + 报表映射前缀），删除 `_AUX_QUERY` 裸 SQL 并**回传结构化 reason 码**
+    （与 D3/D5/D7/D2 五端点统一，Requirement 3.1/5.2）。行构建复用纯函数
+    `build_d6_detail_rows_from_aux`（与 P0-2 render 自动 seed 共用，不新造第 3 套读取）。
+    账龄字段留空（治理红基线 ④），只写录入列（Property 4）。
+    合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。
     """
     import sqlalchemy as sa
 
     wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+        sa.text(
+            "SELECT wp.project_id, p.audit_year "
+            "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+            "WHERE wp.id = :wp_id"
+        ),
         {"wp_id": wp_id},
     )
     wp_row = wp_result.fetchone()
@@ -380,16 +389,28 @@ async def d6_import_aux_balance(
         raise HTTPException(404, "底稿不存在")
 
     project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
 
-    # 🔴 归集抽取为可复用纯函数（Wave 0 / Task 1.3 块 C-2 / 决策4）：
-    #   端点委托 `aggregate_d6_detail_rows`（查询 + 纯行构建），行为逐字节不变；
-    #   同一入口供 P0-2 render 自动 seed（Wave 5）按名调用，不新造第 3 套四表库读取。
-    rows_data: list[dict] = await aggregate_d6_detail_rows(
-        db, project_id, row_limit=_ROW_LIMIT
+    # 归集经共享件（active dataset + 单一 aux_type + 报表映射前缀），并拿回结构化 reason 码
+    # （Requirement 3.1 / 5.2：五端点统一消费 `aggregate_aux_by_name_ex` 的 reason，
+    # 不吞成"未找到数据"）；行构建复用与 P0-2 render seed 同一纯函数（不新造第 3 套读取）。
+    from app.services.d_cycle_extraction.d_aux_import import (
+        aggregate_d_cycle_aux,
+        aux_reason_message,
     )
 
-    if not rows_data:
-        return {"ok": True, "imported_count": 0, "message": "未找到科目1141的辅助余额数据"}
+    agg = await aggregate_d_cycle_aux(db, project_id, year, "D6")
+
+    if not agg.entries:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "reason": agg.reason,
+            "selected_aux_type": agg.aux_type,
+            "message": aux_reason_message(agg.reason, agg.prefixes),
+        }
+
+    rows_data: list[dict] = build_d6_detail_rows_from_aux(agg.entries, row_limit=_ROW_LIMIT)
 
     # Merge模式：保留已有行，追加新客户
     item_id = "D6-2-rows"
@@ -424,8 +445,13 @@ async def d6_import_aux_balance(
     return {
         "ok": True,
         "imported_count": len(new_rows),
-        "message": f"成功导入{len(new_rows)}行数据",
+        "reason": agg.reason,
+        "selected_aux_type": agg.aux_type,
         "total_rows": len(merged),
+        "message": (
+            f"从辅助余额表({agg.prefixes[0]}·{agg.aux_type})归集 {len(agg.entries)} 个合同/客户，"
+            f"新增 {len(new_rows)} 行；账龄字段留空，请按实际账龄人工填列。"
+        ),
     }
 
 

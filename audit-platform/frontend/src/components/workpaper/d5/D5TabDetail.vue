@@ -557,6 +557,7 @@ const {
   saveImmediate: props.saveImmediate,
   debouncedSave: props.debouncedSave,
   isReadonly: computed(() => props.isReadonly) as unknown as Ref<boolean>,
+  onImported: () => reloadWorkpaperData?.() ?? Promise.resolve(),
 })
 
 // ─── 抽凭引擎 ───────────────────────────────────────────────────────────────

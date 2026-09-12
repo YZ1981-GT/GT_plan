@@ -19,13 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
-from app.services.four_table.aux_aggregation import aggregate_aux_by_name
+from app.services.four_table.aux_aggregation import aggregate_aux_by_name_ex
 from app.services.four_table.k1_aux_detail import (
     K1_DETAIL_ROW_LIMIT,
     build_k1_detail_rows_from_aux,
     merge_k1_detail_rows,
 )
 from app.services.four_table.report_line_accounts import resolve_report_line_accounts
+from app.services.d_cycle_extraction.d_aux_import import aux_reason_message
 
 from ._cycle_import_export_common import (
     build_workbook_template,
@@ -1408,15 +1409,19 @@ async def k1_import_aux_balance(
     gross_prefixes = await _resolve_k1_gross_prefixes(db, project_id)
     segments = await _resolve_k1_segments(db, wp_id)
 
-    entries, aux_type, total_units = await aggregate_aux_by_name(
-        db, project_id, year, gross_prefixes
-    )
+    agg = await aggregate_aux_by_name_ex(db, project_id, year, gross_prefixes)
+    entries, aux_type, total_units = agg.entries, agg.aux_type, agg.total_units
     if not entries:
+        # 0 行按 reason 码给可辨别提示（Requirement 4.4 / 5.2）：
+        # 与 D2~D7 五端点统一消费 aggregate_aux_by_name_ex 的 reason，
+        # 不再把“接线错误”吞成“未找到数据”。
         return {
             "ok": True,
             "imported_count": 0,
             "rows": [],
-            "message": f"未找到科目{gross_prefixes[0]}的辅助余额数据",
+            "reason": agg.reason,
+            "selected_aux_type": agg.aux_type,
+            "message": aux_reason_message(agg.reason, list(gross_prefixes)),
         }
 
     related_names: set[str] = set()
@@ -1466,6 +1471,8 @@ async def k1_import_aux_balance(
         "total_rows": len(merged),
         "total_units": total_units,
         "aux_type": aux_type,
+        "reason": agg.reason,
+        "selected_aux_type": aux_type,
         "rows": added,
     }
     if truncated:

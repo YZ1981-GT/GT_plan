@@ -24,6 +24,11 @@ import {
 } from './useD7FormulaEngine'
 import { eventBus } from '@/utils/eventBus'
 import { matchRelatedPartyPure } from './useD3Detail'
+import {
+  parseAuxImportResponse,
+  auxImportPrompt,
+  AUX_IMPORT_NETWORK_ERROR_PROMPT,
+} from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD7FormData'
 import { useAgingConfig, type AgingSegment } from '@/composables/useAgingConfig'
 import { migrateD7FlatToNested, migrateD3F1Keys, remapRowAgingData, type AgingData } from '@/composables/useAgingMigration'
@@ -63,6 +68,8 @@ export interface UseD7DetailOptions {
   projectId: Ref<string>
   relatedParties?: Ref<string[]>
   isReadonly?: Ref<boolean>
+  /** 从余额表导入成功后由宿主重载 allResponses（级联审定表/披露刷新，Requirement 4.6）。 */
+  onImported?: () => Promise<void> | void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -195,7 +202,7 @@ function sumRows(rows: DetailRow[], label: string, segments: AgingSegment[]): De
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD7Detail(options: UseD7DetailOptions) {
-  const { allResponses, debouncedSave, wpId, projectId } = options
+  const { allResponses, debouncedSave, wpId, projectId, onImported } = options
   const relatedParties = options.relatedParties ?? ref<string[]>([])
   const isReadonly = options.isReadonly ?? ref(false)
 
@@ -316,6 +323,16 @@ export function useD7Detail(options: UseD7DetailOptions) {
 
   // ─── importFromAuxBalance ────────────────────────────────────────────
 
+  /**
+   * 从辅助余额表导入 D7-2（预收款项科目由 BS-047 报表映射解析，兜底 2205）.
+   *
+   * 🔴 迁移后端（spec four-table-extraction-entry-completion / Task 4）：统一走共享件
+   * `aggregate_aux_by_name_ex`（active dataset 过滤 + 单一 aux_type 锁定 + 报表映射前缀 +
+   * 账龄留空），**服务端 merge 落库**并返回 reason 码，不再返回 rows[]。前端不再客户端拼行/
+   * 客户端 merge（旧实现读 `res.data?.data ?? []`，迁移后恒空 → 静默 0 行 + 与服务端 merge
+   * 双写）：成功后由 `onImported` 重载 allResponses，D7-2-rows watch 自动重派生行
+   * （Requirement 4.6）；0 行按 reason 码给可辨别提示（Requirement 4.4）。
+   */
   async function importFromAuxBalance(): Promise<void> {
     if (!wpId.value) return
     try {
@@ -324,44 +341,13 @@ export function useD7Detail(options: UseD7DetailOptions) {
         `/api/workpapers/${wpId.value}/d7/import-aux-balance`,
         { project_id: projectId.value },
       )
-      const importedData: any[] = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
-
-      if (importedData.length === 0) {
-        ElMessage.info('未找到科目2205的辅助余额数据')
-        return
-      }
-
-      const existingMap = new Map(rows.value.map(r => [`${r.contractName}||${r.companyName}`, r]))
-      let newCount = 0
-
-      for (const item of importedData) {
-        const contractName = item.contractName || item.contract_name || item.aux_name || ''
-        const companyName = item.companyName || item.company_name || ''
-        const key = `${contractName}||${companyName}`
-
-        if (!existingMap.has(key)) {
-          const newRow = recalcRow(normalizeRow({
-            rowId: generateRowId(),
-            contractName,
-            companyName,
-            companyCode: item.companyCode || item.company_code || '',
-            priorUnadjusted: item.priorUnadjusted ?? item.prior_unadjusted ?? item.begin_balance ?? 0,
-            debitAmount: item.debitAmount ?? item.debit_amount ?? 0,
-            creditAmount: item.creditAmount ?? item.credit_amount ?? 0,
-            agingPrior: item.agingPrior,
-            agingAudited: item.agingAudited,
-            relatedPartyType: resolveRelatedPartyType(companyName),
-          }, segments.value))
-          existingMap.set(key, newRow)
-          newCount++
-        }
-      }
-
-      rows.value = Array.from(existingMap.values())
-      persistRows()
-      ElMessage.success(`成功导入${importedData.length}行数据，新增${newCount}个客户`)
+      const outcome = parseAuxImportResponse(res)
+      await (onImported?.() ?? Promise.resolve())
+      const { level, text } = auxImportPrompt(outcome)
+      ElMessage[level]({ message: text })
     } catch {
-      ElMessage.error('从辅助余额表导入失败，请稍后重试')
+      const { level, text } = AUX_IMPORT_NETWORK_ERROR_PROMPT
+      ElMessage[level]({ message: text })
     }
   }
 

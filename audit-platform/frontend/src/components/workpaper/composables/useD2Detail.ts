@@ -162,7 +162,7 @@ function sumAgingData(dataList: AgingData[]): AgingData {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<string[]> }) {
-  const { allResponses, isReadonly, relatedParties, projectId, bsDate } = options
+  const { wpId, allResponses, isReadonly, relatedParties, projectId, bsDate } = options
   const injectedSave = inject<D2SaveItemsFn | undefined>(D2_SAVE_ITEMS_KEY, undefined)
 
   // ─── 引入 useAgingConfig（subject='D2'） ───────────────────────────────
@@ -241,12 +241,19 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
     }
   }
 
-  // Watch allResponses for D2-detail-rows changes (initial load)
+  // Watch allResponses for D2-detail-rows changes
   watch(
     () => allResponses.value.get('D2-detail-rows')?.remark,
-    () => {
-      // Only reload if rows is empty (initial load) to avoid overwriting user edits
-      if (rows.value.length === 0) {
+    (newVal, oldVal) => {
+      if (newVal == null || newVal === '') {
+        if (rows.value.length === 0) return
+        // 外部清空 store 时同步清空
+        if (oldVal != null && oldVal !== '') loadRows()
+        return
+      }
+      // 初始加载，或 OO→HTML / reloadHtml 换了 remark 真源时必须重载。
+      // 🔴 旧逻辑「rows 非空就跳过」会让 applied 后 loadAll 的新 marker 永远进不了 DOM（G4-0d）。
+      if (rows.value.length === 0 || newVal !== oldVal) {
         loadRows()
       }
     },
@@ -495,83 +502,60 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
   // ─── Import from Aux Balance (Task 45.1) ────────────────────────────
 
   /**
-   * 从辅助余额表导入客户明细数据
-   * GET /api/projects/{pid}/ledger/aux-balance-detail?account_code=1122&aux_type=customer
+   * 从辅助余额表导入客户明细数据。
    *
-   * merge模式：按客户名去重，仅更新 priorUnadjusted/endBalance，不覆盖 AJE/RJE/账龄
+   * 🔴 G-C 迁移（spec four-table-extraction-entry-completion / Task 4）：
+   * 原实现 GET 通用读端点 `/ledger/aux-balance-detail?account_code=1122&dim_type=客户`
+   * 并**客户端 GROUP BY aux_name**（平台第 5 套归集）+ 硬编码 1122/客户 + 写派生列
+   * `endBalance`（违 Property 4）。现改调后端新端点
+   * `POST /api/workpapers/{wpId}/d2/import-aux-balance`，由共享件
+   * `aggregate_aux_by_name_ex` 统一归集（`get_active_filter` 治理数据集双算 ①；
+   * `pick_aux_type` 锁单一维度治理 ② —— 1122 同时挂「业态/客户/集团内外」，不锁会 2×；
+   * 报表映射 BS-006 解析前缀治理 ③）。前端只按后端返回的**录入列** merge，
+   * 不再客户端聚合、不写派生列（派生列交 recalc）。
+   *
+   * merge模式：按客户名去重，只填后端返回的录入列，不覆盖已有 AJE/RJE/账龄。
    * @returns { imported, updated, added } 摘要
    */
-  async function importFromAuxBalance(projectId: string): Promise<{ imported: number; updated: number; added: number }> {
+  async function importFromAuxBalance(_projectId?: string): Promise<{ imported: number; updated: number; added: number }> {
+    const empty = { imported: 0, updated: 0, added: 0 }
+    const wid = wpId?.value
+    if (!wid) return empty
     try {
-      // 获取当前审计年度——从项目 API 获取（最可靠）
-      const token = sessionStorage.getItem('token') || ''
-      const authHeaders = { 'Authorization': `Bearer ${token}` }
-      let year = String(new Date().getFullYear() - 1) // fallback: 上一年
+      const http = (await import('@/utils/http')).default
+      const res: any = await http.post(`/api/workpapers/${wid}/d2/import-aux-balance`, {})
+      // ResponseWrapperMiddleware 后统一从 response.data 读业务载荷
+      const data = res?.data ?? res ?? {}
+      const importedRows: any[] = Array.isArray(data.rows) ? data.rows : []
 
-      try {
-        const projResp = await fetch(`/api/projects/${projectId}`, { headers: authHeaders })
-        if (projResp.ok) {
-          const projData = await projResp.json()
-          const proj = projData.data || projData
-          if (proj.audit_year || proj.auditYear) {
-            year = String(proj.audit_year || proj.auditYear)
-          }
-        }
-      } catch { /* fallback to current year - 1 */ }
-
-      const response = await fetch(
-        `/api/projects/${projectId}/ledger/aux-balance-detail?account_code=1122&dim_type=${encodeURIComponent('客户')}&year=${year}`,
-        { headers: authHeaders }
-      )
-      if (!response.ok) {
-        ElMessage.info('辅助余额表无数据或请求失败')
-        return { imported: 0, updated: 0, added: 0 }
+      // 0 行：按后端 reason 码给可辨别中文提示（Requirement 4.4 / 5.2）
+      if (importedRows.length === 0) {
+        ElMessage.info(String(data.message || '未从辅助余额表取到数据'))
+        return empty
       }
 
-      const result = await response.json()
-      const rawData = result.data || result || []
-      // 后端返回字段: aux_name, opening_balance, debit_amount, credit_amount, closing_balance
-      // 同一客户可能有多条子科目记录(1122.01/02/...)，按 aux_name 聚合
-      const aggregated = new Map<string, { opening: number; debit: number; credit: number; closing: number }>()
-      for (const item of rawData) {
-        const name = (item.aux_name || '').trim()
-        if (!name) continue
-        const prev = aggregated.get(name) || { opening: 0, debit: 0, credit: 0, closing: 0 }
-        prev.opening += Number(item.opening_balance) || 0
-        prev.debit += Number(item.debit_amount) || 0
-        prev.credit += Number(item.credit_amount) || 0
-        prev.closing += Number(item.closing_balance) || 0
-        aggregated.set(name, prev)
-      }
-
-      if (aggregated.size === 0) {
-        ElMessage.info('辅助余额表中无1122科目客户维度数据')
-        return { imported: 0, updated: 0, added: 0 }
-      }
-
+      // 按客户名去重 merge（只填后端返回的录入列，不写派生列 / Property 4）
       let updated = 0
       let added = 0
-
-      for (const [customerName, amounts] of aggregated) {
-        // 按客户名去重查找已有行
+      for (const item of importedRows) {
+        const customerName = String(item.customerName || item.aux_name || '').trim()
+        if (!customerName) continue
         const existing = rows.value.find(
           r => r.customerName.trim().toLowerCase() === customerName.toLowerCase()
         )
-
         if (existing) {
-          existing.priorUnadjusted = amounts.opening
-          existing.debitOccurrence = amounts.debit
-          existing.creditOccurrence = amounts.credit
-          existing.endBalance = amounts.closing
+          // 手工优先：只在字段缺失/为 0 时填录入列，不覆盖已录数据
+          if (!existing.priorUnadjusted) existing.priorUnadjusted = Number(item.priorUnadjusted) || 0
+          if (!existing.debitOccurrence) existing.debitOccurrence = Number(item.debitOccurrence) || 0
+          if (!existing.creditOccurrence) existing.creditOccurrence = Number(item.creditOccurrence) || 0
           recalcRow(existing)
           updated++
         } else {
           const newRow = createEmptyRow(rows.value.length + 1, segments.value)
           newRow.customerName = customerName
-          newRow.priorUnadjusted = amounts.opening
-          newRow.debitOccurrence = amounts.debit
-          newRow.creditOccurrence = amounts.credit
-          newRow.endBalance = amounts.closing
+          newRow.priorUnadjusted = Number(item.priorUnadjusted) || 0
+          newRow.debitOccurrence = Number(item.debitOccurrence) || 0
+          newRow.creditOccurrence = Number(item.creditOccurrence) || 0
           recalcRow(newRow)
           rows.value.push(newRow)
           added++
@@ -579,15 +563,12 @@ export function useD2Detail(options: UseD2BaseOptions & { relatedParties: Ref<st
       }
 
       const imported = updated + added
-      if (imported > 0) {
-        debounceSave()
-      }
-
-      ElMessage.success(`从余额表导入完成：更新${updated}行，新增${added}行`)
+      if (imported > 0) debounceSave()
+      ElMessage.success(String(data.message || `从余额表导入完成：更新${updated}行，新增${added}行`))
       return { imported, updated, added }
     } catch {
       ElMessage.error('从余额表导入失败')
-      return { imported: 0, updated: 0, added: 0 }
+      return empty
     }
   }
 

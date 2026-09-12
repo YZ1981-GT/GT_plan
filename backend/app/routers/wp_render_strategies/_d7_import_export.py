@@ -561,11 +561,27 @@ async def d7_import_aux_balance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """从 tb_aux_balance（科目2205，按客户维度）批量导入到D7-2"""
+    """从 `tb_aux_balance`（科目由 BS-047 报表映射解析，兜底 2205）按往来单位维度归集导入 D7-2.
+
+    🔴 G-C 迁移（spec four-table-extraction-entry-completion / Task 4）：删除裸 SQL，
+    统一走共享件 `d_cycle_extraction.d_aux_import.aggregate_d_cycle_aux`
+    （`get_active_filter` + `pick_aux_type` + 报表映射前缀）。账龄字段**留空**
+    （不再把全额塞进账龄首段，治理红基线 ④，Requirement 2.5/5.3）；只写录入列
+    （Property 4），派生列交前端 recalc。merge 语义：已存在单位名不重复导入。
+    """
     import sqlalchemy as sa
 
+    from app.services.d_cycle_extraction.d_aux_import import (
+        aggregate_d_cycle_aux,
+        aux_reason_message,
+    )
+
     wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+        sa.text(
+            "SELECT wp.project_id, p.audit_year "
+            "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+            "WHERE wp.id = :wp_id"
+        ),
         {"wp_id": wp_id},
     )
     wp_row = wp_result.fetchone()
@@ -573,61 +589,31 @@ async def d7_import_aux_balance(
         raise HTTPException(404, "底稿不存在")
 
     project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
 
-    aux_result = await db.execute(
-        sa.text("""
-            SELECT aux_name,
-                   COALESCE(SUM(opening_balance), 0) AS prior_balance,
-                   COALESCE(SUM(closing_balance), 0) AS current_balance
-            FROM tb_aux_balance
-            WHERE project_id = :pid
-              AND account_code LIKE '2205%'
-              AND is_deleted = false
-            GROUP BY aux_name
-            ORDER BY aux_name
-        """),
-        {"pid": project_id},
-    )
-    aux_rows = aux_result.fetchall()
+    agg = await aggregate_d_cycle_aux(db, project_id, year, "D7")
 
-    if not aux_rows:
-        return {"ok": True, "imported_count": 0, "message": "未找到科目2205的辅助余额数据"}
+    if not agg.entries:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "reason": agg.reason,
+            "selected_aux_type": agg.aux_type,
+            "message": aux_reason_message(agg.reason, agg.prefixes),
+        }
 
-    # 解析当前项目账龄段（nested keyed 账龄，仅首段填余额，其余 0）
-    segments = await resolve_aging_segments(db, wp_id, "D7")
-    seg_keys = [s.key for s in segments] or ["within1"]
-
-    def _aging_first_seg(balance: float) -> dict[str, float]:
-        aging = {k: 0.0 for k in seg_keys}
-        aging[seg_keys[0]] = balance
-        return aging
-
-    # 构建 D7-2 行数据（贷方科目）
+    # 构建 D7-2 行数据 —— 只写录入列（Property 4）：合同/单位名 + 期初未审 + 录入默认。
+    # 账龄字段（agingPrior/agingAudited）**留空**（治理红基线 ④）；派生列交前端 recalc。
     rows_data: list[dict] = []
-    for idx, aux_row in enumerate(aux_rows[:_ROW_LIMIT], 1):
-        prior_bal = float(aux_row.prior_balance)
-        current_bal = float(aux_row.current_balance)
+    for idx, entry in enumerate(agg.entries[:_ROW_LIMIT], 1):
         rows_data.append({
             "rowId": str(uuid4()),
             "seqNo": idx,
-            "contractName": aux_row.aux_name or "",
-            "companyName": aux_row.aux_name or "",
-            "companyCode": "",
+            "contractName": entry.aux_name,
+            "companyName": entry.aux_name,
             "relatedPartyType": "非关联方",
             "natureType": "预收货款",
-            "priorUnadjusted": prior_bal,
-            "priorAje": 0, "priorRje": 0,
-            "priorAudited": prior_bal,
-            "agingPrior": _aging_first_seg(prior_bal),
-            "debitAmount": 0, "creditAmount": 0,
-            "endBalance": current_bal,
-            "entityReclass": 0,
-            "endUnadjusted": current_bal,
-            "endAje": 0, "endRje": 0,
-            "endAudited": current_bal,
-            "agingAudited": _aging_first_seg(current_bal),
-            "isConfirmed": "否",
-            "postTransfer": 0,
+            "priorUnadjusted": entry.opening,
         })
 
     # Merge模式：保留已有行，追加新客户
@@ -663,8 +649,13 @@ async def d7_import_aux_balance(
     return {
         "ok": True,
         "imported_count": len(new_rows),
-        "message": f"成功导入{len(new_rows)}行数据",
+        "reason": agg.reason,
+        "selected_aux_type": agg.aux_type,
         "total_rows": len(merged),
+        "message": (
+            f"从辅助余额表({agg.prefixes[0]}·{agg.aux_type})归集 {len(agg.entries)} 个往来单位，"
+            f"新增 {len(new_rows)} 行；账龄字段留空，请按实际账龄人工填列。"
+        ),
     }
 
 

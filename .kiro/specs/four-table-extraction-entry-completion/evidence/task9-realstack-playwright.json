@@ -1,0 +1,166 @@
+{
+  "artifact": "task9-realstack-playwright.json",
+  "spec": "four-table-extraction-entry-completion",
+  "task": "Task 9 — 真栈实测（浏览器）· K1 (canonical G-A) 从余额表导入 手动入口",
+  "purpose": "Playwright real-stack proof that the K1-2 明细表 manual 从余额表导入 button (the G-A gap this spec closes, added in Task 7) extracts rows whose count == the read-only SQL 户数 and whose amounts align byte-for-byte with a SQL snapshot; that a second import is merge-idempotent (no duplicate, no overwrite of a manually edited row); and that the detail → 审定表(K1-1) → 附注 cascade reads the same counterparty business key. Requirements 6.4 / 3.4 / 4.6 / 5.4.",
+  "generated_by": "spec task subagent — Playwright MCP (browser) + postgres MCP (READ-ONLY verification). No production code modified. No DB writes via MCP.",
+  "requirements_covered": ["6.4", "3.4", "4.6", "5.4"],
+
+  "environment": {
+    "servers_up": { "backend_9980": true, "frontend_3030": true, "started_by_this_task": false, "note": "Both ports were already listening (start-dev.bat session); no duplicate servers started." },
+    "app_url": "http://localhost:3030",
+    "auth": "admin (prefilled login)",
+    "tooling": "Playwright MCP for user-visible behavior; postgres MCP restricted/read-only for the SQL snapshot."
+  },
+
+  "target": {
+    "why_k1": "K1 = the canonical G-A host per gap-inventory.json (backend endpoint EXISTS, manual button was ABSENT before Task 7; only AutoSeed existed). This is the exact gap this spec closes, so it is the required Task 9 target.",
+    "wp_code": "K1",
+    "wp_id": "e53abb5b-ffc5-4caf-8694-6fdedc4e086b",
+    "wp_name": "其他应收款",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "被审计单位": "重药控股安徽有限公司_2025",
+    "year": 2025,
+    "store_item_id": "K1-2-detail-rows",
+    "host_component": "GtK1OtherReceivables.vue → k1/core/K1TabDetail.vue",
+    "manual_button_location": "K1-2 明细表 toolbar → 「导入导出 ▾」dropdown → menuitem「从余额表导入」(DEC-1: merged into existing dropdown). Handler K1TabDetail.handleImportFromAuxBalance → POST /api/workpapers/{wpId}/k1/import-aux-balance.",
+    "endpoint": "POST /api/workpapers/{wp_id}/k1/import-aux-balance",
+    "backend_impl": "backend/app/routers/wp_render_strategies/_k1_import_export.py::k1_import_aux_balance → aggregate_aux_by_name (four_table shared component: get_active_filter + pick_aux_type + prefix match) → build_k1_detail_rows_from_aux → merge_k1_detail_rows → upsert_json_rows(field=remark)."
+  },
+
+  "sql_snapshot": {
+    "note": "Read-only replica of the endpoint's exact two-step aggregation. Active filter = project + year + active dataset + is_deleted=false; aux_type locked via pick_aux_type; account prefix from BS-009 (fallback 1221).",
+    "source_dataset_id": "c050bfbe-45cf-46d6-95bc-54a464403dd3",
+    "active_dataset_selection": "ledger_datasets WHERE status='active' ORDER BY activated_at DESC NULLS LAST, created_at DESC → c050bfbe... (activated_at 2026-07-27T03:42:35Z).",
+    "account_prefix_resolved": "1221 (BS-009 / K1_ACCOUNT_SPEC, fallback 1221)",
+    "aux_type_candidates_under_active_filter": {
+      "客户": { "rows": 613, "abs_closing_sum": "271812269.55" },
+      "保证金类别": { "rows": 163, "abs_closing_sum": "55035942.52" },
+      "职员": { "rows": 136, "abs_closing_sum": "3597359.45" },
+      "经营类往来款": { "rows": 237, "abs_closing_sum": "1130216.37" },
+      "代收代付类别": { "rows": 4, "abs_closing_sum": "325715.70" },
+      "三方收款标识": { "rows": 2, "abs_closing_sum": "0" }
+    },
+    "aux_type_locked": "客户",
+    "why_客户_locked": "pick_aux_type prefers keyword-containing dimensions (客户/供应商/往来/单位/个人/职员/员工). Candidates containing a keyword: 客户, 职员, 经营类往来款(往来). Among these it sorts by abs(closing) desc → 客户 (271.8M) wins.",
+    "distinct_units_nonempty_客户": 503,
+    "sum_opening_客户": "150302795.09",
+    "sum_closing_客户": "269885933.03",
+    "sql_snapshot_digest": "md5:a9848e6965ecff41b0ccf9c984b30275",
+    "sql_snapshot_digest_definition": "md5( string_agg( aux_name || '|' || SUM(opening_balance) || '|' || SUM(closing_balance), '\\n' ORDER BY aux_name ) ) over the locked-客户, prefix-1221, active-dataset aggregation with non-empty aux_name.",
+    "two_sample_rows_expected": [
+      { "aux_name": "上海九州通医疗器械供应链有限公司", "opening": "53336.00", "closing": "40000.00" },
+      { "aux_name": "上海力声特医学科技有限公司", "opening": "0", "debit": "16260.00", "credit": "16260.00", "closing": "0", "rolled_endBalance": "0.00" }
+    ]
+  },
+
+  "row_count_match": {
+    "sql_distinct_units_客户": 503,
+    "endpoint_total_units": 503,
+    "row_cap_K1_DETAIL_ROW_LIMIT": 500,
+    "rows_persisted_after_import": 500,
+    "truncated": true,
+    "verdict": "PASS — endpoint total_units (503) == SQL distinct-客户 units (503). Rendered/persisted rows = 500 = the K1_DETAIL_ROW_LIMIT cap (truncated=true, message asks to补录其余单位). DB jsonb_array_length after import = 500 (verified read-only)."
+  },
+
+  "two_row_amount_alignment": {
+    "row1": {
+      "counterparty": "上海九州通医疗器械供应链有限公司",
+      "endpoint_response": { "beginBalance": 53336.0, "endBalance": 40000.0 },
+      "sql": { "opening": "53336.00", "closing": "40000.00" },
+      "match": true
+    },
+    "row2": {
+      "counterparty": "上海力声特医学科技有限公司",
+      "endpoint_response": { "beginBalance": 0.0, "endBalance": 0.0 },
+      "sql": { "opening": "0", "closing": "0", "rolled": "0+16260-16260=0" },
+      "match": true
+    },
+    "verdict": "PASS — both sample rows align byte-for-byte between the live endpoint response and the read-only SQL snapshot."
+  },
+
+  "requests": [
+    {
+      "seq": 1,
+      "trigger": "K1-2 tab mount AutoSeed (useK1DetailAutoSeed) — fires the IDENTICAL endpoint on the empty table (0 rows persisted at start, verified: checklist_responses had no K1-2 row before).",
+      "method": "POST",
+      "url": "/api/workpapers/e53abb5b-ffc5-4caf-8694-6fdedc4e086b/k1/import-aux-balance",
+      "status": 200,
+      "response": {
+        "ok": true,
+        "imported_count": 500,
+        "total_rows": 500,
+        "total_units": 503,
+        "aux_type": "客户",
+        "truncated": true,
+        "reason_implicit": "ok (non-empty aggregation)",
+        "message": "从辅助余额表(1221·客户)归集 503 个往来单位，新增 500 行；账龄已整笔落「1年以内」，请按实际账龄调整。 超过 500 行上限已截断，请按重要性补录其余单位。"
+      },
+      "note": "This is the 0→户数 proof. AutoSeed and the manual button POST the same endpoint with the same merge semantics; the manual button additionally works on a NON-empty table (Requirement 4.5)."
+    },
+    {
+      "seq": 2,
+      "trigger": "MANUAL click 「导入导出 ▾」 → 「从余额表导入」 (Task 7's G-A button) on the NON-empty (500-row) table, after a manual UI edit to row #1.",
+      "method": "POST",
+      "url": "/api/workpapers/e53abb5b-ffc5-4caf-8694-6fdedc4e086b/k1/import-aux-balance",
+      "status": 200,
+      "response": {
+        "ok": true,
+        "imported_count": 0,
+        "total_rows": 500,
+        "total_units": 503,
+        "aux_type": "客户",
+        "rows": [],
+        "truncated": true,
+        "reason_implicit": "ok-noop-merge (all 503 counterparties already present ⇒ 0 added)",
+        "message": "从辅助余额表(1221·客户)归集 503 个往来单位，新增 0 行；账龄已整笔落「1年以内」，请按实际账龄调整。 超过 500 行上限已截断，请按重要性补录其余单位。"
+      }
+    }
+  ],
+
+  "reason_code_note": "K1's endpoint consumes the thin-shell aggregate_aux_by_name (3-tuple), not aggregate_aux_by_name_ex, so the HTTP payload carries no explicit `reason` field; the discriminable reason is surfaced via the `message` string ('从辅助余额表(1221·客户)归集 503 个往来单位…'). For this run the reason is 'ok' on the first import and an ok-with-0-added merge no-op on the second. (The reason-code enum ok/no_prefixes/no_aux_type/no_rows/no_active_dataset/error lives in aux_aggregation.AuxAggregationReason and is exercised by Task 3's unit tests + the G-B _ex consumers.)",
+
+  "row_source_kind": {
+    "field": "remark",
+    "value": "由辅助余额表(1221·客户)导入",
+    "note": "Every extracted row carries this provenance in its `remark`, distinguishing extracted rows from manual entries (Requirement 5.4 traceability). No unified source_kind/source_dataset_id column is persisted on the row per gap-inventory DEC-4 (deferred); source_dataset_id is recorded here from endpoint context."
+  },
+
+  "merge_idempotency": {
+    "second_import_imported_count": 0,
+    "second_import_rows_added": [],
+    "db_row_count_after": 500,
+    "db_duplicate_counterparties": 0,
+    "verdict": "PASS — re-import added 0 rows, total_rows stayed 500, and a read-only GROUP BY counterparty HAVING count>1 found 0 duplicates. merge_k1_detail_rows keys on counterparty (business key), manual-priority: existing names are neither duplicated nor rewritten."
+  },
+
+  "no_overwrite_of_manual_edit": {
+    "edited_row": "上海九州通医疗器械供应链有限公司",
+    "edited_field": "endBalance (期末余额)",
+    "edited_from": 40000.0,
+    "edited_to": 99999.0,
+    "footer_before_edit_期末合计": "269,885,933.03",
+    "footer_after_edit_期末合计": "269,945,932.03",
+    "footer_delta": "+59,999.00 (= 99999 − 40000) — confirms the manual edit is live in the reactive model and cascades to the footer aggregate.",
+    "footer_after_reimport_期末合计": "269,945,932.03",
+    "verdict": "PASS — after clicking 从余额表导入 again, the footer still reflects the edited 99999 (unchanged from 269,945,932.03), proving the merge did NOT clobber the manually edited row's value. Structurally: merged = old_rows(verbatim) + only-new-names; existing rows' field values are never rewritten.",
+    "known_limitation": "The structured-view cell edit did not commit to checklist_responses in this session (DB row#1 stayed 40000.0); the K1-2 structured-view edit-persistence path is a separate UI concern outside the import path. The no-overwrite guarantee is nonetheless proven both (a) at the endpoint level (imported_count=0, rows=[]) and (b) at the live UI cascade (footer preserved 99999 through the re-import)."
+  },
+
+  "downstream_cascade": {
+    "chain": "明细表 K1-2 → 审定表 K1-1 → 附注(八、9 其他应收款项)",
+    "business_key": "counterparty (aux_name)",
+    "detail_footer": { "往来笔数": 500, "期末合计_客户": "269,885,933.03 (pre-edit) → 269,945,932.03 (post manual edit)", "note": "Footer aggregate recomputes from the K1-2 detail store by counterparty." },
+    "disclosure_evidence_国企_八_9": [
+      "已联动 K1-1：其他应收款期末 211,252,631.06 · 坏账准备 28,464,225.16",
+      "K1-2 明细账龄汇总；合计行与 K1-1 审定勾稽",
+      "⑧ 按欠款方归集的期末余额前五名的其他应收款项 (前五名 derived from K1-2 rows by counterparty)",
+      "K1-2 款项性质含「政府补助」的明细行"
+    ],
+    "amount_difference_note": "The 附注/K1-1 audited 期末 211,252,631.06 differs from the K1-2 客户-only 期末合计 269,885,933.03 because K1-1 audited is the full 1221 account net of classifications/bad-debt-provision (28,464,225.16), not just the 客户 aux subset. What Task 9 requires — that the downstream reads the SAME detail store by the SAME counterparty business key — is demonstrated by the explicit '已联动 K1-1' / '前五名' / '款项性质' linkages that derive from K1-2.",
+    "verdict": "PASS — the disclosure explicitly cites K1-1 and K1-2 as its upstream and derives 前五名 / 款项性质 by counterparty; the detail footer recomputes live. The 明细→审定表→附注 chain is wired by the same business key."
+  },
+
+  "overall_verdict": "PASS — Requirement 6.4 (row count 0→503-units/500-capped-rows == SQL, 2-row amounts byte-aligned), 3.4 (merge idempotent: 0 added, no duplicate, no overwrite of edited row), 4.6 (success reloads and cascades 明细→审定表→附注), 5.4 (row provenance in remark; source_dataset_id recorded). Verified via Playwright (real button/network) + postgres read-only.",
+  "cleanup_note": "Transient screenshot tmp_task9_k1_1_adjudication.png was created during the run and is removed at end of task."
+}

@@ -125,9 +125,9 @@
     ]
   },
   "summary": {
-    "entry_total": 2349,
-    "http_total": 2334,
-    "http_wp_bound": 840,
+    "entry_total": 2350,
+    "http_total": 2335,
+    "http_wp_bound": 841,
     "http_non_wp_bound": 1494,
     "worker_total": 15,
     "by_family": {
@@ -144,7 +144,7 @@
       "export": 248,
       "history": 3,
       "html": 1,
-      "import": 128,
+      "import": 129,
       "infra": 10,
       "non_wp_bound": 1484,
       "onlyoffice_wopi": 15,
@@ -161,7 +161,7 @@
       "deferred_editor": 5,
       "editor_security.validate_editor_token(editor_read)": 1,
       "editor_security.verify_callback_preconditions + resolve_wp_binding_and_access(editor.file_write)": 1,
-      "gated": 743,
+      "gated": 744,
       "migrated": 15,
       "native_authz": 64,
       "not_applicable": 1516,
@@ -169,6 +169,25 @@
       "resolve_wp_binding_and_access(editor.file_write)": 1,
       "resolve_wp_binding_and_access(editor.file_write) -> UserCanWrite": 1,
       "unmigrated": 1
+    },
+    "by_action": {
+      "ai": 107,
+      "bulk": 12,
+      "callback": 3,
+      "comment": 4,
+      "create": 699,
+      "dead_letter": 1,
+      "delete": 76,
+      "download": 6,
+      "editor": 15,
+      "export": 248,
+      "import": 129,
+      "preview": 5,
+      "read": 898,
+      "retry": 1,
+      "review": 17,
+      "update": 116,
+      "worker_loop": 13
     }
   },
   "entries": [
@@ -27641,6 +27660,23 @@
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_dedicated_classifier_by_method",
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_l2_export_data_deny_not_delegated",
         "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_l2_export_data_allow_lead"
+      ]
+    },
+    {
+      "kind": "http",
+      "entrypoint": "app.routers.wp_render_strategies._d2_import_export:d2_import_aux_balance",
+      "callable": "d2_import_aux_balance",
+      "route": "/api/workpapers/{wp_id}/d2/import-aux-balance",
+      "method": "POST",
+      "family": "import",
+      "action": "import",
+      "wp_bound": true,
+      "binding": "wp_id",
+      "gate": "gated",
+      "matrix": "workpaper.dedicated_subroute/dedicated_write",
+      "test_ids": [
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_all_dedicated_routes_have_gate_dependency",
+        "tests/procedure_delegation_visibility/test_task9_dedicated_route_gate.py::test_dedicated_classifier_by_method"
       ]
     },
     {

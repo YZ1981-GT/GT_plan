@@ -365,6 +365,10 @@ const projectIdRef = computed<string | undefined>(() => props.projectId || undef
 const persistence = useChecklistPersistence({ wpId: wpIdRef, projectId: projectIdRef })
 const allResponses = persistence.responses
 const runtime = inject<WorkpaperRuntimeContext | null>(WorkpaperRuntimeContextKey, null)
+
+// K1-2「从余额表导入」手动入口成功后由此重载 allResponses，级联刷新明细 → 审定表 → 披露
+// （Requirement 4.6）。与既有 D/F/G/N 宿主的 reloadWorkpaperData 契约一致。
+provide('reloadWorkpaperData', () => persistence.load())
 const tbData = ref({
   unadjusted1221: 0,
   audited1221: 0,

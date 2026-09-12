@@ -1,0 +1,145 @@
+{
+  "artifact": "task4-postmigration-comparison.json",
+  "spec": "four-table-extraction-entry-completion",
+  "task": "Task 4 — 历史端点迁移（G-C：D3/D5/D6/D7）+ D2 端点新建 · POST-migration 金额对照",
+  "purpose": "用 Task 4.1 冻结的完全相同输入重算迁移后归集，与迁移前基线对照并解释差异（Requirement 6.5）。所有金额经 postgres MCP 只读查询验证，未经 MCP 写库。",
+  "generated_by": "spec task subagent (read-only postgres MCP verification of the migrated shared-component SQL shape)",
+  "requirements_covered": ["2.3", "2.4", "2.5", "2.6", "3.1", "3.5", "5.3", "6.5"],
+
+  "freshness_gate": {
+    "requirement": "1.6 — recompute gap-inventory.json source_snapshot digests BEFORE any edit; block on drift of the 4 enumeration-driving files.",
+    "run_timing": "Executed BEFORE any file edit (including the D2 route registration into wp_bound_entry_coverage.json).",
+    "per_file": [
+      { "path": "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts", "expected_sha256": "961be1df1836c2dc48de3f3eb36eef0c2a79a6308ffe7538fc698c2c51d05c34", "actual_sha256": "961be1df1836c2dc48de3f3eb36eef0c2a79a6308ffe7538fc698c2c51d05c34", "match": true },
+      { "path": "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts", "expected_sha256": "b27cd92661f5fe804d85f7c29d62a3584ebcc8714af8e32c68e7252b80b4ab2b", "actual_sha256": "b27cd92661f5fe804d85f7c29d62a3584ebcc8714af8e32c68e7252b80b4ab2b", "match": true },
+      { "path": "backend/app/data/wp_code_overrides.json", "expected_sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394", "actual_sha256": "ecb63b62f82c7d1eb563a6c0f8f1a3a031e5f53bd6601f4dfa476fc51d3c9394", "match": true },
+      { "path": "backend/app/security/wp_bound_entry_coverage.json", "expected_sha256": "1392d1a5175b05f55fee0f4257e12d963ee9598b5eb45191896ff7b8c2a15bdc", "actual_sha256_pre_edit": "1392d1a5175b05f55fee0f4257e12d963ee9598b5eb45191896ff7b8c2a15bdc", "match_pre_edit": true },
+      { "path": "backend/app/services/four_table/aux_aggregation.py", "expected_sha256": "e03009840c952f7bf7319d9567eed3f8c022806f1bf4bdc13add657f942198c1", "actual_sha256": "d1326ce938d93eed8a658254f0092ae549c27a91a111b0b4a5bf362954f32463", "match": false }
+    ],
+    "gate_decision": "PROCEED (not blocked).",
+    "gate_rationale": "The 4 enumeration-driving files (forms.ts, specialized.ts, wp_code_overrides.json, wp_bound_entry_coverage.json) were byte-identical to the frozen digests at gate time (BEFORE any edit). The single drifted file aux_aggregation.py (actual d1326ce9...) is exactly Task 3's wave-2 enhancement (aggregate_aux_by_name_ex + AuxAggregationResult + reason codes + logger.exception), the ONLY allowed drift per Task 4.1. wp_bound_entry_coverage.json was subsequently modified BY THIS TASK to register the new D2 route (legitimate own change, see d2_route_registration below); its pre-edit digest is recorded above and matched frozen."
+  },
+
+  "input_snapshot_used": {
+    "note": "Recomputed with EXACTLY the Task 4.1 frozen tuple.",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "year": 2025,
+    "active_dataset_id": "c050bfbe-45cf-46d6-95bc-54a464403dd3",
+    "input_digest": "sha256:b7f154c8fd96bd060f4cd0de28ea6545eb9e3e77b2082c0b953e3aba7339f12c",
+    "prefix_resolution_post": "科目前缀现由报表映射解析（d_account_resolver: D2=BS-006/1122, D3=BS-046/2203, D5=BS-007/1124, D6=BS-011/1141, D7=BS-047/2205；兜底常量注明 source_ref）。对本项目本报表变体，解析出的前缀与 Task 4.1 冻结的旧硬编码前缀一致，故金额差异全部归因于双算修正，不含前缀解析差异。"
+  },
+
+  "migration_state_finding": {
+    "summary": "Task 4 的后端迁移在工作树中已落地（mtime 2026-09-12 23:37–23:50，非当前活跃编辑）：D3/D5/D7 端点 + detail_aggregation.py(D6) + 新建 D2 端点均已改调共享件 aggregate_d_cycle_aux → aggregate_aux_by_name_ex；裸 SQL（_AUX_QUERY/_D6_AUX_SQL/`is_deleted=false`/`GROUP BY aux_name`）在五端点中零残留（仅存于说明性注释）。本次执行补齐了三处剩余缺口，见 remaining_work_completed。",
+    "remaining_work_completed": [
+      "① D2 前端 useD2Detail.importFromAuxBalance 此前仍 GET 通用读端点 /ledger/aux-balance-detail?account_code=1122&dim_type=客户 并客户端 GROUP BY（平台第 5 套归集）+ 写派生列 endBalance（违 Property 4）。已改调 POST /api/workpapers/{wpId}/d2/import-aux-balance，只按后端返回的录入列 merge（customerName/priorUnadjusted/debitOccurrence/creditOccurrence），不再客户端聚合、不写派生列。",
+      "② D2 端点响应新增 rows 字段（仅录入列，Property 4），供前端 merge 到编辑态并本地 recalc 派生列。",
+      "③ D6 端点此前经 aggregate_d6_detail_rows 返回 list[dict]，丢弃了 reason 码（design 要求 5 端点统一消费 aggregate_aux_by_name_ex 的 reason）。已改为 aggregate_d_cycle_aux 取回结构化 reason + aux_type，行构建复用纯函数 build_d6_detail_rows_from_aux（与 P0-2 render seed 共用，不新造第 3 套读取），响应回传 reason/selected_aux_type/message。"
+    ]
+  },
+
+  "d2_route_registration": {
+    "route": "/api/workpapers/{wp_id}/d2/import-aux-balance",
+    "method": "POST",
+    "already_wired_in_app": "router_registry/workpaper.py:127 (d2_import_export router included) + dedicated_component_routers.py:81 (_d2_import_export in dedicated allowlist, same tier as _d3_import_export).",
+    "coverage_ledger_change": "Added one entry to wp_bound_entry_coverage.json.entries mirroring d3_import_aux_balance exactly (D2 shares the same dedicated-router classification): gate=gated, matrix=workpaper.dedicated_subroute/dedicated_write, same generic dedicated-route test_ids. Summary counters bumped: entry_total 2349→2350, http_wp_bound 840→841. Surgical + idempotent (did NOT regenerate the whole ledger to avoid generated_at churn + concurrent-session route drift). Applied via tmp_task4_register_d2_route.py (--apply), which is idempotent (re-run reports 'already present').",
+    "this_is_the_expected_own_drift": "The freshness gate was run BEFORE this edit; wp_bound_entry_coverage.json's pre-edit digest matched frozen. Post-edit drift of this file is this task's legitimate own change."
+  },
+
+  "results": [
+    {
+      "wp_code": "D3",
+      "endpoint": "POST /api/workpapers/{wp_id}/d3/import-aux-balance",
+      "prefix_resolved": "2203 (BS-046)",
+      "aux_type_locked": "客户",
+      "post": { "row_count": 654, "sum_current_balance": "21183245.14", "sum_prior_balance": "24203806.12" },
+      "old_baseline": { "row_count": 654, "sum_current_balance": "42366490.28", "sum_prior_balance": "48407612.24" },
+      "verified_by_readonly_sql": true,
+      "assertion": "PASS — POST current-balance = 21,183,245.14 = ½ of OLD 42,366,490.28 (654 rows, aux_type 客户).",
+      "difference_attribution": "① dataset double-count. Read-only scope check: prefix 2203 under project (is_deleted=false, no year/dataset) spans 2 distinct dataset_ids and 1 aux_type. get_active_filter keeps only the active dataset ⇒ exactly ½. No aux_type double-count (single aux_type in scope). This is the EXPECTED correction, not a regression.",
+      "integer_multiple_drop": "2x (attributed to ①)"
+    },
+    {
+      "wp_code": "D2",
+      "endpoint": "POST /api/workpapers/{wp_id}/d2/import-aux-balance (NEWLY CREATED on shared component)",
+      "prefix_resolved": "1122 (BS-006)",
+      "aux_type_locked": "客户",
+      "post": { "row_count": 1260, "sum_current_balance": "624025343.06" },
+      "old_client_path_baseline": { "row_count": 1260, "sum_current_balance": "624025343.06" },
+      "verified_by_readonly_sql": true,
+      "assertion": "PASS — new POST endpoint yields 1260 rows, aux_type 客户, sum 624,025,343.06 (== old client-path, no amount change: D2 client path was already correctly aux_type-scoped; its violation was hardcoded 1122/客户 + client-side GROUP BY + writing derived endBalance).",
+      "aux_type_lock_hazard_proof": {
+        "no_lock_sum_across_all_aux_types": "1248050686.12",
+        "locked_客户_sum": "624025343.06",
+        "ratio": 2.0,
+        "aux_types_on_1122_under_active_dataset": ["业态", "客户", "集团内外"],
+        "candidate_amounts": { "业态": "628512332.80", "客户": "628512332.80", "集团内外": "0" },
+        "why_客户_is_selected": "pick_aux_type prefers candidates containing 往来单位关键词 ('客户','供应商','往来','单位','个人','职员','员工'). Among {业态,客户,集团内外} only '客户' contains a keyword ⇒ deterministic选择 '客户' even though 业态 ties on amount. This proves the aux_type lock avoids the ② double-count (summing all 3 aux_types would give 1,248,050,686.12).",
+        "attribution_if_lock_removed": "② aux_type double-count — a shared pipeline that fails to lock a single aux_type would double 1122 (业态+客户 each carry the same 628.5M). The migrated endpoint MUST NOT sum across the 3 aux_types."
+      }
+    },
+    {
+      "wp_code": "D5",
+      "endpoint": "POST /api/workpapers/{wp_id}/d5/import-aux-balance",
+      "prefix_resolved": "1124 (BS-007)",
+      "post": { "row_count": 0, "sum_current_balance": "0.00" },
+      "old_baseline": { "row_count": 0, "sum_current_balance": "0.00" },
+      "verified_by_readonly_sql": true,
+      "db_scan_evidence": "SELECT count(*) FROM tb_aux_balance WHERE account_code LIKE '1124%' (whole DB, any is_deleted) = 0.",
+      "assertion": "PASS — 0 rows. Aging fields left EMPTY (not stuffed into first bucket). Endpoint returns reason + message '未找到科目1124的辅助余额数据' (message指出需人工填账龄 for non-empty cases).",
+      "difference_attribution": "NONE (empty data ⇒ 0→0). Migration changes mechanism only.",
+      "integer_multiple_drop": "n/a (0 rows)"
+    },
+    {
+      "wp_code": "D6",
+      "endpoint": "POST /api/workpapers/{wp_id}/d6/import-aux-balance",
+      "prefix_resolved": "1141 (BS-011)",
+      "post": { "row_count": 0, "sum_current_balance": "0.00" },
+      "old_baseline": { "row_count": 0, "sum_current_balance": "0.00" },
+      "verified_by_readonly_sql": true,
+      "db_scan_evidence": "SELECT count(*) FROM tb_aux_balance WHERE account_code LIKE '1141%' (whole DB) = 0.",
+      "assertion": "PASS — 0 rows. _AUX_QUERY/_D6_AUX_SQL raw SQL deleted; endpoint now routes through aggregate_d_cycle_aux and surfaces reason code (fixed the prior reason-drop). Aging left empty.",
+      "difference_attribution": "NONE (empty data ⇒ 0→0).",
+      "integer_multiple_drop": "n/a (0 rows)"
+    },
+    {
+      "wp_code": "D7",
+      "endpoint": "POST /api/workpapers/{wp_id}/d7/import-aux-balance",
+      "prefix_resolved": "2205 (BS-047)",
+      "post": { "row_count": 0, "sum_current_balance": "0.00" },
+      "old_baseline": { "row_count": 0, "sum_current_balance": "0.00" },
+      "verified_by_readonly_sql": true,
+      "db_scan_evidence": "SELECT count(*) FROM tb_aux_balance WHERE account_code LIKE '2205%' (whole DB) = 0.",
+      "assertion": "PASS — 0 rows. Aging fields (previously stuffed into first bucket per flaw ④) left EMPTY post-migration (Requirement 2.5). Endpoint surfaces reason + message指出需人工填账龄.",
+      "difference_attribution": "NONE (empty data ⇒ 0→0). Mechanism-only change.",
+      "integer_multiple_drop": "n/a (0 rows)"
+    }
+  ],
+
+  "double_count_summary_for_req_6_5": {
+    "D3": "OLD 42,366,490.28 → POST 21,183,245.14 = 2× drop, attributed to ① dataset double-count (2 dataset versions summed by the old bare is_deleted=false SQL). CONFIRMED by read-only SQL.",
+    "D2": "No amount change (624,025,343.06 both sides) — old D2 client path already aux_type-scoped to 客户. The migrated endpoint's aux_type lock is nonetheless essential: without it 1122 would double to 1,248,050,686.12 (② hazard). CONFIRMED by read-only SQL.",
+    "D5_D6_D7": "0 → 0, no drop, empty data for 1124/1141/2205 across the whole DB. CONFIRMED.",
+    "rule_satisfied": "Every integer-multiple amount drop is attributed to ① dataset double-count OR ② aux_type double-count. D3 = ①. D2 hazard = ②. D5/D6/D7 = n/a."
+  },
+
+  "grep_self_check": {
+    "raw_sql_zero_residue": "PASS — grep for `GROUP BY aux_name` / `_AUX_QUERY =` / `_D6_AUX_SQL =` / `is_deleted = false` across _d2/_d3/_d5/_d6/_d7_import_export.py + detail_aggregation.py = NO matches (only explanatory comments remain, which do not match the anchored patterns).",
+    "shared_chain_present": "PASS — all 5 endpoints call aggregate_d_cycle_aux → aggregate_aux_by_name_ex, which internally uses get_active_filter + pick_aux_type (verified in aux_aggregation.py). D2 frontend no longer performs client-side GROUP BY / hardcoded 1122 for the aux-balance import path."
+  },
+
+  "files_changed": [
+    "backend/app/routers/wp_render_strategies/_d2_import_export.py (add rows[] to D2 endpoint response — 录入列 only)",
+    "backend/app/routers/wp_render_strategies/_d6_import_export.py (D6 endpoint now surfaces reason via aggregate_d_cycle_aux + build_d6_detail_rows_from_aux; top import switched to build_d6_detail_rows_from_aux)",
+    "audit-platform/frontend/src/components/workpaper/composables/useD2Detail.ts (importFromAuxBalance migrated: POST new endpoint, remove client-side GROUP BY + hardcoded 1122/客户 + derived-column writes; wpId destructured)",
+    "backend/app/security/wp_bound_entry_coverage.json (register D2 route entry — this task's own expected drift, run AFTER the freshness gate)"
+  ],
+  "files_already_migrated_in_working_tree_before_this_run": [
+    "backend/app/routers/wp_render_strategies/_d3_import_export.py",
+    "backend/app/routers/wp_render_strategies/_d5_import_export.py",
+    "backend/app/routers/wp_render_strategies/_d7_import_export.py",
+    "backend/app/routers/wp_render_strategies/_d2_import_export.py (endpoint body)",
+    "backend/app/services/d_cycle_extraction/detail_aggregation.py",
+    "backend/app/services/d_cycle_extraction/d_aux_import.py (shared helper, untracked ??)"
+  ]
+}

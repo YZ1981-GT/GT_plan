@@ -450,3 +450,23 @@ backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py  950
 #     custom_query.py 登记时记录的约束），故不为凑行数扭曲接线。
 #     spec: workpaper-page-formula-toolbar-closure（F-SHELL 交付）
 audit-platform/frontend/src/components/formula/FormulaManagerDialog.vue  3985
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: four-table-extraction-entry-completion（2026-09-12 入库）
+#
+# 五个 import_export 端点模块的行数登记（debt registration, 非豁免赦免）。
+# 三个改动前即已超限（HEAD 计：_d2 1457 / _d7 892 / _k1 1274）；_d3(793) / _d6(716)
+# 因本 spec 的 G-C 迁移跨过 800：每个端点新增「改调共享件 aggregate_aux_by_name_ex
+# + 回传 reason/selected_aux_type + 报表映射前缀解析 + 说明性注释」，是迁移的必要产物。
+#   - _k1：收口阶段从旧三元组薄壳迁至 _ex（+reason 分支），六端点统一契约的一部分。
+#   - _d2：新建 /d2/import-aux-balance 端点体（G-C with endpoint creation）叠加在既有大文件上。
+# baseline 取当前真实行数（splitlines 口径），门禁继续拦膨胀 >5%。
+# 🔴 拆分方向（独立任务）：这些 *_import_export.py 均为「render 策略 + 多个 import/export
+#   端点 + aux 取数」挤在一个模块，应按 render-strategy / import-export / aux-import 三段
+#   抽伴生模块；但依赖可 monkeypatch 符号的 helper 不能搬走（沿用 custom_query.py 登记先例），
+#   不为凑行数扭曲接线。拆分完成后逐条从本表移除。
+backend/app/routers/wp_render_strategies/_d2_import_export.py  1778
+backend/app/routers/wp_render_strategies/_d3_import_export.py  940
+backend/app/routers/wp_render_strategies/_d6_import_export.py  832
+backend/app/routers/wp_render_strategies/_d7_import_export.py  1005
+backend/app/routers/wp_render_strategies/_k1_import_export.py  1482

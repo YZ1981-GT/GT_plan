@@ -57,10 +57,13 @@
           批量匹配 B19 清单
         </el-button>
         <el-dropdown trigger="click" size="small">
-          <el-button size="small">导入导出 ▾</el-button>
+          <el-button size="small" :loading="auxImporting">导入导出 ▾</el-button>
           <template #dropdown>
             <el-dropdown-menu>
-              <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+              <el-dropdown-item :disabled="isReadonly || auxImporting" @click="handleImportFromAuxBalance">
+                从余额表导入
+              </el-dropdown-item>
+              <el-dropdown-item divided @click="handleExportTemplate">导出模板</el-dropdown-item>
               <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
               <el-dropdown-item @click="handleImportData">导入数据</el-dropdown-item>
             </el-dropdown-menu>
@@ -369,6 +372,7 @@ import {
   buildK1DeeplinkHint,
   type K1NavSheet,
 } from '../../composables/useK1RowNavigation'
+import { manualImportK1DetailFromAux } from '../../composables/useK1DetailAutoSeed'
 
 // ─── Props / Emits ───────────────────────────────────────────────────────────
 
@@ -390,6 +394,9 @@ const emit = defineEmits<{
 
 const openReviewDialog = inject<(id: string) => void>('openReviewDialog', () => {})
 const k1Nav = inject(K1RowNavigationKey, null)
+// 宿主（GtK1OtherReceivables）provide 的 reload：手动「从余额表导入」成功后重载 allResponses，
+// 让 K1-1/披露级联读到最新持久化行（Requirement 4.6）。
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
 // ─── Composables ─────────────────────────────────────────────────────────────
 
@@ -571,6 +578,31 @@ function handleBatchMatchB19() {
 
 function handleExportTemplate() { exportTemplate('K1-2') }
 function handleExportData() { exportData('K1-2') }
+
+// ─── 从余额表导入（手动入口，区别于宿主 onMounted 的 AutoSeed） ─────────────────
+// AutoSeed 仅空表触发一次；本手动入口可在非空表上按 merge 语义追加（Requirement 4.5）。
+// loading 期间禁止重复提交（Requirement 4.3）；0 行按 reason 码给可辨别提示（Requirement 4.4）。
+const auxImporting = ref(false)
+
+async function handleImportFromAuxBalance() {
+  if (props.isReadonly || auxImporting.value || !props.wpId) return
+  auxImporting.value = true
+  try {
+    const result = await manualImportK1DetailFromAux({
+      wpId: props.wpId,
+      // 宿主 reload 重填 allResponses（级联 K1-1/披露）；本 Tab 的 rows 是手动 loadRows() 派生、
+      // 无 allResponses watcher，故 reload 后必须再 loadRows() 一次本 Tab 才刷新。
+      reload: async () => {
+        await (reloadWorkpaperData?.() ?? Promise.resolve())
+        loadRows()
+      },
+    })
+    const { level, text } = result.prompt
+    ElMessage[level]({ message: text })
+  } finally {
+    auxImporting.value = false
+  }
+}
 
 function handleImportData() {
   const input = document.createElement('input')

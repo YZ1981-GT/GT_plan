@@ -1672,3 +1672,107 @@ async def import_data(
         ]
 
     return {"data": result}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D2-2 明细表「从余额表导入」—— G-C 迁移 + 端点新建
+# spec: .kiro/specs/four-table-extraction-entry-completion/  (Task 4, DEC-2)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# 🔴 D2 是 G-C（两侧都有但实现违铁律）但**后端此前无端点**（DEC-2 已核实）：前端
+#   `useD2Detail.importFromAuxBalance(projectId)` GET 通用读端点
+#   `/ledger/aux-balance-detail?account_code=1122&dim_type=客户` 并**客户端 GROUP BY
+#   aux_name**（第 5 套归集），且硬编码 1122/客户（红基线 ③）。本任务新建 POST 端点
+#   落在共享件上（科目走 BS-006 报表映射解析），前端改调本端点、删客户端聚合。
+#
+# 与 D3/D5/D6/D7 同款：经 `aggregate_d_cycle_aux` → `aggregate_aux_by_name_ex`
+# （`get_active_filter` + `pick_aux_type` + 报表映射前缀），只写录入列（Property 4）。
+
+_D2_2_DETAIL_ITEM_ID = "D2-detail-rows"
+
+
+@router.post("/{wp_id}/d2/import-aux-balance")
+async def d2_import_aux_balance(
+    wp_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """从 `tb_aux_balance`（科目由 BS-006 报表映射解析，兜底 1122）按客户维度归集导入 D2-2.
+
+    🔴 G-C 迁移 + 端点新建（DEC-2）：替代前端客户端 GROUP BY（第 5 套归集）+ 硬编码
+    1122/客户。经共享件 `aggregate_d_cycle_aux` → `aggregate_aux_by_name_ex`
+    （`get_active_filter` 治理数据集双算 ①；`pick_aux_type` 治理 aux 维度双算 ②——
+    1122 同时挂「业态/客户/集团内外」，不锁维度会 2× 双算；报表映射前缀治理 ③）。
+    只写录入列（Property 4）：客户名 + 期初未审 + 借/贷发生；派生列（期末余额/期末未审/
+    期末审定）交前端 recalc。merge 语义：已存在客户名不重复导入（手工优先）。
+    """
+    import sqlalchemy as sa
+
+    from app.services.d_cycle_extraction.d_aux_import import (
+        aggregate_d_cycle_aux,
+        aux_reason_message,
+    )
+
+    wp_row = (
+        await db.execute(
+            sa.text(
+                "SELECT wp.project_id, p.audit_year "
+                "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+                "WHERE wp.id = :wp_id"
+            ),
+            {"wp_id": wp_id},
+        )
+    ).fetchone()
+    if not wp_row:
+        raise HTTPException(404, "底稿不存在")
+
+    project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
+
+    agg = await aggregate_d_cycle_aux(db, project_id, year, "D2")
+
+    if not agg.entries:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "reason": agg.reason,
+            "selected_aux_type": agg.aux_type,
+            "message": aux_reason_message(agg.reason, agg.prefixes),
+        }
+
+    # 构建 D2-2 行数据 —— 只写录入列（Property 4）：客户名 + 期初未审 + 借/贷发生。
+    # 期末余额/期末未审/期末审定/账龄等派生列交前端 recalc（不双写 / Requirement 3.3）。
+    rows_data: list[dict] = []
+    for entry in agg.entries[:MAX_IMPORT_ROWS]:
+        rows_data.append({
+            "rowId": str(uuid4()),
+            "customerName": entry.aux_name,
+            "priorUnadjusted": entry.opening,
+            "debitOccurrence": entry.debit,
+            "creditOccurrence": entry.credit,
+        })
+
+    # merge：已存在客户名不重复导入（手工优先，不覆盖）
+    existing_rows = await load_json_rows(db, wp_id, _D2_2_DETAIL_ITEM_ID, field="remark")
+    existing_names = {
+        str(r.get("customerName", "")).strip() for r in existing_rows
+    }
+    new_rows = [
+        r for r in rows_data if str(r["customerName"]).strip() not in existing_names
+    ]
+    merged = existing_rows + new_rows
+    await upsert_json_rows(db, wp_id, _D2_2_DETAIL_ITEM_ID, merged, field="remark")
+
+    return {
+        "ok": True,
+        "imported_count": len(new_rows),
+        "reason": agg.reason,
+        "selected_aux_type": agg.aux_type,
+        "total_rows": len(merged),
+        # 只回传本次归集的录入列（Property 4），供前端 merge 到编辑态并 recalc 派生列。
+        "rows": rows_data,
+        "message": (
+            f"从辅助余额表({agg.prefixes[0]}·{agg.aux_type})归集 {len(agg.entries)} 个客户，"
+            f"新增 {len(new_rows)} 行；如涉账龄请人工填列。"
+        ),
+    }

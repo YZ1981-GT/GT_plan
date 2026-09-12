@@ -27,6 +27,12 @@ import {
   calcSubtotal,
 } from './useD6FormulaEngine'
 import { api } from '@/services/apiProxy'
+import http from '@/utils/http'
+import {
+  parseAuxImportResponse,
+  auxImportPrompt,
+  AUX_IMPORT_NETWORK_ERROR_PROMPT,
+} from './fourTableAuxImportFeedback'
 import type { ChecklistResponse } from './useD6FormData'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -71,6 +77,8 @@ export interface UseD6DetailOptions {
   debouncedSave: (itemId: string, data: any) => void
   wpId: Ref<string>
   projectId: Ref<string>
+  /** 从余额表导入成功后由宿主重载 allResponses（级联审定表/披露刷新，Requirement 4.6）。 */
+  onImported?: () => Promise<void> | void
 }
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -316,7 +324,7 @@ function buildClassificationRows(rows: DetailRow[]): ClassificationRow[] {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useD6Detail(options: UseD6DetailOptions) {
-  const { allResponses, debouncedSave, wpId, projectId } = options
+  const { allResponses, debouncedSave, wpId, projectId, onImported } = options
 
   // ─── Reactive rows ───────────────────────────────────────────────────
 
@@ -478,70 +486,29 @@ export function useD6Detail(options: UseD6DetailOptions) {
   // ─── importFromAuxBalance ────────────────────────────────────────────
 
   /**
-   * 调后端 POST /api/workpapers/{wpId}/d6/import-aux-balance
-   * 从 tb_aux_balance 科目1141 按客户/合同维度导入明细行
+   * 从辅助余额表导入 D6-2（合同资产科目 1141，报表行 BS-011）.
    *
-   * 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。
-   * 原 `1402` 是在途物资（存货类），属误用。
+   * 🔴 迁移后端（spec four-table-extraction-entry-completion / Task 4）：统一走共享件
+   * `aggregate_aux_by_name_ex`（active dataset 过滤 + 单一 aux_type 锁定 + 报表映射前缀），
+   * **服务端 merge 落库**并返回 reason 码，不再返回 rows[]。前端不再客户端拼行/客户端
+   * merge（旧实现读 `res?.data ?? res?.rows` 客户端 merge，迁移后恒空 → 静默 0 行 + 与
+   * 服务端 merge 双写）：成功后由 `onImported` 重载 allResponses，D6-2-rows watch 自动
+   * 重派生行（Requirement 4.6）；0 行按 reason 码给可辨别提示（Requirement 4.4）。
    */
   async function importFromAuxBalance(): Promise<void> {
     if (!wpId.value) return
-
     try {
-      const res = await api.post(
+      const res = await http.post(
         `/api/workpapers/${wpId.value}/d6/import-aux-balance`,
         { project_id: projectId.value },
       )
-      const importedData: any[] = Array.isArray(res) ? res : (res?.data ?? res?.rows ?? [])
-
-      if (importedData.length === 0) {
-        ElMessage.info('未找到科目1141的辅助余额数据')
-        return
-      }
-
-      // 转换为 DetailRow 并 merge
-      const existingMap = new Map(rows.value.map(r => [`${r.contractName}||${r.customerName}`, r]))
-      let newCount = 0
-      let nextSeqNo = rows.value.length > 0
-        ? Math.max(...rows.value.map(r => r.seqNo)) + 1
-        : 1
-
-      for (const item of importedData) {
-        const contractName = item.contractName || item.contract_name || item.aux_name || ''
-        const customerName = item.customerName || item.customer_name || ''
-        const key = `${contractName}||${customerName}`
-
-        if (existingMap.has(key)) {
-          // Update existing row
-          const existing = { ...existingMap.get(key)! }
-          existing.priorUnadjusted = parseNum(item.priorUnadjusted ?? item.prior_unadjusted ?? item.begin_balance)
-          existing.debitAmount = parseNum(item.debitAmount ?? item.debit_amount ?? item.debit ?? 0)
-          existing.creditAmount = parseNum(item.creditAmount ?? item.credit_amount ?? item.credit ?? 0)
-          existingMap.set(key, recalcRow(existing))
-        } else {
-          // New row
-          const newRow = normalizeRow({
-            rowId: generateRowId(),
-            seqNo: nextSeqNo++,
-            contractName,
-            customerName,
-            contractType: item.contractType || item.contract_type || '',
-            companyCode: item.companyCode || item.company_code || '',
-            relatedPartyType: item.relatedPartyType || item.related_party_type || '',
-            priorUnadjusted: item.priorUnadjusted ?? item.prior_unadjusted ?? item.begin_balance ?? 0,
-            debitAmount: item.debitAmount ?? item.debit_amount ?? item.debit ?? 0,
-            creditAmount: item.creditAmount ?? item.credit_amount ?? item.credit ?? 0,
-          })
-          existingMap.set(key, recalcRow(newRow))
-          newCount++
-        }
-      }
-
-      rows.value = Array.from(existingMap.values())
-      persistRows()
-      ElMessage.success(`成功导入${importedData.length}行数据，新增${newCount}个明细项目`)
+      const outcome = parseAuxImportResponse(res)
+      await (onImported?.() ?? Promise.resolve())
+      const { level, text } = auxImportPrompt(outcome)
+      ElMessage[level]({ message: text })
     } catch {
-      ElMessage.error('从辅助余额表导入失败，请稍后重试')
+      const { level, text } = AUX_IMPORT_NETWORK_ERROR_PROMPT
+      ElMessage[level]({ message: text })
     }
   }
 

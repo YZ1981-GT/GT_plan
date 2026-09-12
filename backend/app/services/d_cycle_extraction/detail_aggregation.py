@@ -1,52 +1,46 @@
-"""D-cycle 明细表四表库维度归集 —— 可复用聚合（Wave 0 / Task 1.3 块 C-2）.
+"""D-cycle 明细表四表库维度归集 —— 可复用聚合（D6-2）.
 
-spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/  (Requirements 4.3, 4.4 / 决策4)
+原 spec: .kiro/specs/d-cycle-tier-a-writeback-detail-seed/  (Requirements 4.3, 4.4 / 决策4)
+迁移 spec: .kiro/specs/four-table-extraction-entry-completion/  (Task 4, Requirements 2.3~2.6, 3.1, 3.5, 5.3)
 
-**背景（前置核实结论）**：D6-2 明细表的 `tb_aux_balance` 1141 客户/合同维度归集，
-原本**仅内联于 HTTP handler** `_d6_import_export.py::d6_import_aux_balance`（原始 SQL
-GROUP BY aux_name + 行构建循环），**无可复用后端函数**。按 R4.4 / 决策4（B）：
-若归集仅存在于 HTTP handler，则**先抽取为纯函数（不改原端点行为）** 再供 P0-2 render
-自动 seed（Wave 5 / Task 5.1）按名调用。
+🔴 G-C 迁移（2026 four-table-extraction-entry-completion / Task 4）
+------------------------------------------------------------------
+本模块**原本内联一份裸 SQL**（`_AUX_QUERY`：`SELECT aux_name ... FROM tb_aux_balance
+WHERE ... is_deleted=false GROUP BY aux_name`），带四表库四铁律违规（红基线 ①②③④）：
+① 不走 `get_active_filter`（跨数据集双算）；② `GROUP BY aux_name` 未先锁单一
+`aux_type`（同科目挂多维度双算）；③ 科目码硬编码 `'1141%'`；④ 把期初/期末余额全额
+塞进账龄首段（`agePrior1y=prior` / `ageEnd1y=current` / `receivableWithin1y=current`，
+伪造账龄分布）。
 
-本模块提供两层（收敛铁律：复用同一 SQL，不新造第 3 套四表库读取）：
+迁移后**删除裸 SQL**，统一走共享件：
 
-  * `build_d6_detail_rows_from_aux(...)` —— **纯函数**（无 I/O）：把 1141 归集结果
-    （aux_name / 期初余额 / 期末余额）构建为 D6-2 行 dict（30 列）。可无 DB 单测。
-  * `aggregate_d6_detail_rows(db, project_id, ...)` —— **可复用入口**（供 render 按名调用）：
-    执行与原端点**逐字节相同**的 tb_aux_balance 1141 GROUP BY aux_name 查询后调纯函数。
+  * 科目前缀经 `d_aux_import.resolve_d_cycle_gross_prefixes`（报表映射 BS-011 解析，
+    兜底 1141 注明 source_ref，治理 ③）。
+  * 归集经 `four_table.aux_aggregation.aggregate_aux_by_name_ex`
+    （`get_active_filter` 治理 ①；`pick_aux_type` 治理 ②；前缀匹配）。
+  * 账龄字段与派生列**留空/交前端 recalc**（治理 ④，Requirement 2.5/5.3；
+    Property 4 只写录入列）。
 
-原 HTTP 端点 `d6_import_aux_balance` 改为委托 `aggregate_d6_detail_rows` —— 端点行为
-（查询口径、行 schema、merge/persist、返回结构）逐字节不变。
+本模块保留两层，供**两个消费者**（HTTP 端点 `d6_import_aux_balance` + P0-2 render
+自动 seed `_seed_d6_detail_prefill`）复用同一归集，**不新造第 3/4 套四表库读取**：
 
-注意：**不 import 四表库 ORM**（TbAuxBalance 等），沿用原端点的原始 `sa.text` SQL，
-满足契约守卫 G7（明细归集复用既有函数、不新造第 3 套四表库读取 / Property 9）。
+  * `build_d6_detail_rows_from_aux(...)` —— **纯函数**（无 I/O）：把归集条目构建为
+    D6-2 明细行 dict（只写录入列）。可无 DB 单测。
+  * `aggregate_d6_detail_rows(db, project_id, year, ...)` —— **可复用入口**：
+    经共享件 `aggregate_aux_by_name_ex` 归集后调纯函数。
 """
 from __future__ import annotations
 
-from typing import Callable, Iterable, Sequence
+import logging
+from typing import Any, Callable, Iterable, Sequence
 from uuid import uuid4
 
-import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 # D6-2 明细行上限（与 `_d6_import_export._ROW_LIMIT` 一致；此处独立定义避免端点↔服务循环 import）
 DEFAULT_ROW_LIMIT = 500
-
-# tb_aux_balance 科目 1141 按客户/合同维度（aux_name）归集期初/期末余额。
-# 合同资产科目为 1141；`report_config` 报表行 BS-011 四准则一致。原 `1402` 是在途物资
-# （存货类），属误用。
-# 真实列: opening_balance / closing_balance（无 period_type / balance 列）。
-_AUX_QUERY = """
-    SELECT aux_name,
-           COALESCE(SUM(opening_balance), 0) AS prior_balance,
-           COALESCE(SUM(closing_balance), 0) AS current_balance
-    FROM tb_aux_balance
-    WHERE project_id = :pid
-      AND account_code LIKE '1141%'
-      AND is_deleted = false
-    GROUP BY aux_name
-    ORDER BY aux_name
-"""
 
 
 def build_d6_detail_rows_from_aux(
@@ -55,56 +49,36 @@ def build_d6_detail_rows_from_aux(
     row_limit: int = DEFAULT_ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
 ) -> list[dict]:
-    """纯函数：把 1141 归集结果构建为 D6-2 行 dict 列表（30 列，与原端点逐字节一致）.
+    """纯函数：把 1141 归集结果构建为 D6-2 明细行 dict 列表（**只写录入列**）.
+
+    🔴 迁移后只写录入列（Property 4，Requirement 3.3）：合同/客户名（业务键）+ 期初未审
+    `priorUnadjusted`。账龄字段（agePrior*/ageEnd*/receivableWithin1y）与派生列
+    （priorAudited/endUnadjusted/endAudited/debitAmount/creditAmount 等）**不再写**
+    （治理红基线 ④伪造账龄 + Requirement 3.3 禁双写派生列），交前端 recalc / 人工填账龄。
 
     Args:
-        aux_entries: 可迭代的归集条目，每项按位置解构为 `(aux_name, prior_balance, current_balance)`。
-        row_limit: 行数上限（超出截断，与原端点 `aux_rows[:_ROW_LIMIT]` 一致）。
-        row_id_factory: 生成 rowId 的工厂（默认 `uuid4`）；单测可注入确定性工厂以断言其余字段。
+        aux_entries: 可迭代的归集条目，每项按位置解构，至少取 ``entry[0]`` 作 aux_name、
+            ``entry[1]`` 作期初余额（兼容既有 `(aux_name, prior, current)` 三元组与
+            `AuxEntry(aux_name, opening, debit, credit, closing)` 具名元组）。
+        row_limit: 行数上限（超出截断）。
+        row_id_factory: 生成 rowId 的工厂（默认 `uuid4`）；单测可注入确定性工厂。
 
     Returns:
-        `list[dict]`，每行含 D6-2 明细 30 个字段（`seqNo` 从 1 起）。无 I/O、可单测。
+        `list[dict]`，每行含录入列（`seqNo` 从 1 起）。无 I/O、可单测。
     """
     make_row_id = row_id_factory or (lambda: str(uuid4()))
     rows_data: list[dict] = []
     for idx, entry in enumerate(list(aux_entries)[:row_limit], 1):
-        aux_name, prior_raw, current_raw = entry[0], entry[1], entry[2]
-        prior_bal = float(prior_raw)
-        current_bal = float(current_raw)
+        aux_name = entry[0]
+        prior_bal = float(entry[1]) if len(entry) > 1 and entry[1] is not None else 0.0
         name = aux_name or ""
         rows_data.append(
             {
                 "rowId": make_row_id(),
                 "seqNo": idx,
                 "contractName": name,
-                "contractType": "工程施工",
                 "customerName": name,
-                "companyCode": "",
-                "relatedPartyType": "非关联方",
                 "priorUnadjusted": prior_bal,
-                "priorAje": 0,
-                "priorRje": 0,
-                "priorAudited": prior_bal,
-                "agePrior1y": prior_bal,
-                "agePrior1to2y": 0,
-                "agePrior2to3y": 0,
-                "agePrior3yAbove": 0,
-                "debitAmount": 0,
-                "creditAmount": 0,
-                "endUnadjusted": current_bal,
-                "endAje": 0,
-                "endRje": 0,
-                "endAudited": current_bal,
-                "ageEnd1y": current_bal,
-                "ageEnd1to2y": 0,
-                "ageEnd2to3y": 0,
-                "ageEnd3yAbove": 0,
-                "receivableWithin1y": current_bal,
-                "receivableAbove1y": 0,
-                "isInConstructionPeriod": "否",
-                "creditRiskGroup": "业务类型组合",
-                "isConfirmed": "否",
-                "postPeriodSettlement": 0,
             }
         )
     return rows_data
@@ -113,28 +87,31 @@ def build_d6_detail_rows_from_aux(
 async def aggregate_d6_detail_rows(
     db: AsyncSession,
     project_id: str,
+    year: int | None = None,
     *,
     row_limit: int = DEFAULT_ROW_LIMIT,
     row_id_factory: Callable[[], str] | None = None,
 ) -> list[dict]:
-    """可复用入口（供 P0-2 render 自动 seed 按名调用 / Wave 5 Task 5.1）.
+    """可复用入口（HTTP 端点 + P0-2 render 自动 seed 共用 / 不新造第 3 套四表库读取）.
 
-    执行与原端点 `d6_import_aux_balance` 逐字节相同的 tb_aux_balance 1141 GROUP BY aux_name
-    查询，然后调 `build_d6_detail_rows_from_aux` 构建 D6-2 行。无归集数据 → 返回 `[]`。
+    🔴 G-C 迁移后：经共享件 `aggregate_aux_by_name_ex` 归集（`get_active_filter`
+    + `pick_aux_type` + 报表映射 BS-011 解析前缀，兜底 1141），再调纯函数构建 D6-2 行。
+    无归集数据 / 异常 → 返回 `[]`（fail-open，异常由共享件记 ERROR）。
 
     Args:
-        db: 传入的异步会话（不自建 engine/sessionmaker，收敛）。
+        db: 传入的异步会话（不自建 engine/sessionmaker）。
         project_id: 项目 ID（str）。
+        year: 审计年度（active dataset 过滤的必要维度）；None 时用 0（无 active dataset
+            则降级 is_deleted 过滤，仍不裸 GROUP BY）。
         row_limit: 行数上限。
         row_id_factory: rowId 工厂（默认 uuid4）。
     """
-    result = await db.execute(sa.text(_AUX_QUERY), {"pid": str(project_id)})
-    aux_rows = result.fetchall()
-    if not aux_rows:
+    from app.services.d_cycle_extraction.d_aux_import import aggregate_d_cycle_aux
+
+    agg = await aggregate_d_cycle_aux(db, str(project_id), int(year or 0), "D6")
+    if not agg.entries:
         return []
-    entries = [
-        (row.aux_name, row.prior_balance, row.current_balance) for row in aux_rows
-    ]
+    # AuxEntry(aux_name, opening, debit, credit, closing) —— 纯函数按位置取 name + opening
     return build_d6_detail_rows_from_aux(
-        entries, row_limit=row_limit, row_id_factory=row_id_factory
+        agg.entries, row_limit=row_limit, row_id_factory=row_id_factory
     )

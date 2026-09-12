@@ -439,12 +439,28 @@ async def d3_import_aux_balance(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """从 tb_aux_balance（科目2203，按客户维度）批量导入到D3-2"""
+    """从 `tb_aux_balance`（科目由 BS-046 报表映射解析，兜底 2203）按往来单位维度归集导入 D3-2.
+
+    🔴 G-C 迁移（spec four-table-extraction-entry-completion / Task 4）：删除各自裸 SQL，
+    统一走共享件 `d_cycle_extraction.d_aux_import.aggregate_d_cycle_aux`——
+    `get_active_filter`（active dataset，治理红基线 ①）+ `pick_aux_type`（单一维度，
+    治理 ②）+ 报表映射解析前缀（治理 ③）+ 账龄留空（治理 ④，Requirement 2.5/5.3）。
+    merge 语义：已存在的往来单位名称不重复导入。
+    """
     import sqlalchemy as sa
 
-    # 获取 project_id
+    from app.services.d_cycle_extraction.d_aux_import import (
+        aggregate_d_cycle_aux,
+        aux_reason_message,
+    )
+
+    # 获取 project_id + audit_year（year 是 active dataset 过滤的必要维度）
     wp_result = await db.execute(
-        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id"),
+        sa.text(
+            "SELECT wp.project_id, p.audit_year "
+            "FROM working_paper wp JOIN projects p ON p.id = wp.project_id "
+            "WHERE wp.id = :wp_id"
+        ),
         {"wp_id": wp_id},
     )
     wp_row = wp_result.fetchone()
@@ -452,49 +468,28 @@ async def d3_import_aux_balance(
         raise HTTPException(404, "底稿不存在")
 
     project_id = str(wp_row.project_id)
+    year = int(wp_row.audit_year or 0)
 
-    # 从 tb_aux_balance 查询科目2203按客户维度聚合
-    aux_result = await db.execute(
-        sa.text("""
-            SELECT aux_name,
-                   COALESCE(SUM(opening_balance), 0) AS prior_balance,
-                   COALESCE(SUM(closing_balance), 0) AS current_balance
-            FROM tb_aux_balance
-            WHERE project_id = :pid
-              AND account_code LIKE '2203%'
-              AND is_deleted = false
-            GROUP BY aux_name
-            ORDER BY aux_name
-        """),
-        {"pid": project_id},
-    )
-    aux_rows = aux_result.fetchall()
+    agg = await aggregate_d_cycle_aux(db, project_id, year, "D3")
 
-    if not aux_rows:
-        return {"ok": True, "imported_count": 0, "message": "未找到科目2203的辅助余额数据"}
+    if not agg.entries:
+        return {
+            "ok": True,
+            "imported_count": 0,
+            "reason": agg.reason,
+            "selected_aux_type": agg.aux_type,
+            "message": aux_reason_message(agg.reason, agg.prefixes),
+        }
 
-    # 构建 D3-2 行数据
+    # 构建 D3-2 行数据 —— **只写录入列**（Property 4）：往来单位名 + 期初未审。
+    # 账龄字段（agingPrior/agingAudited）留空，不再塞全额（治理红基线 ④）；
+    # 派生列（priorAudited/endBalance/...）交前端 recalc，不双写（Requirement 3.3）。
     rows_data: list[dict] = []
-    for aux_row in aux_rows[:_ROW_LIMIT]:
+    for entry in agg.entries[:_ROW_LIMIT]:
         rows_data.append({
             "rowId": str(uuid4()),
-            "customerName": aux_row.aux_name or "",
-            "companyCode": "",
-            "nature": "其他",
-            "relationType": "非关联方",
-            "priorUnadjusted": float(aux_row.prior_balance),
-            "priorAdjustment": 0,
-            "priorReclass": 0,
-            "agingPrior": {"within1": float(aux_row.prior_balance), "y1to2": 0, "y2to3": 0, "over3": 0},
-            "debit": 0,
-            "credit": 0,
-            "entityReclass": 0,
-            "endAje": 0,
-            "endRje": 0,
-            "agingAudited": {"within1": float(aux_row.current_balance), "y1to2": 0, "y2to3": 0, "over3": 0},
-            "isConfirmed": "",
-            "postPeriodSettlement": 0,
-            "remark": "",
+            "customerName": entry.aux_name,
+            "priorUnadjusted": entry.opening,
         })
 
     # 写入（merge模式：保留已有行、追加新客户）
@@ -531,8 +526,13 @@ async def d3_import_aux_balance(
     return {
         "ok": True,
         "imported_count": len(new_rows),
-        "message": f"成功导入{len(new_rows)}行数据，{len(new_rows)}个新客户",
+        "reason": agg.reason,
+        "selected_aux_type": agg.aux_type,
         "total_rows": len(merged),
+        "message": (
+            f"从辅助余额表({agg.prefixes[0]}·{agg.aux_type})归集 {len(agg.entries)} 个往来单位，"
+            f"新增 {len(new_rows)} 行；账龄字段留空，请按实际账龄人工填列。"
+        ),
     }
 
 
