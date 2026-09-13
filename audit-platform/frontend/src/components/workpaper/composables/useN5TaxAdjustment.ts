@@ -17,6 +17,7 @@
  * 科目：6801 所得税费用（损益类，纳税调整为税法vs会计差异）
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { calcNetAdjustment } from './useN5TaxAdjustmentEngine'
 import { calcSubtotal, parseNum } from './useN5FormulaEngine'
 import type { ChecklistResponse } from './useN5FormData'
@@ -246,6 +247,8 @@ export function useN5TaxAdjustment(options: UseN5TaxAdjustmentOptions) {
     // 自动同步调增/调减合计（跨会话不丢失）
     await saveField('5', 'add-back-total', addBackTotal.value)
     await saveField('5', 'deduct-total', deductTotal.value)
+    // EventBus 通知审定表/披露刷新（与其余循环对齐）
+    eventBus.emit('adjustment:created', { wpCode: 'N5', timestamp: Date.now() })
   }
 
   /**

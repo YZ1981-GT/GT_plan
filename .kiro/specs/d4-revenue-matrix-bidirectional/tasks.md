@@ -95,20 +95,13 @@
 Task 1 未冻结字段映射前不得假定字段数量；Task 2 必须通过共享解析器与真实 materialize/extract 链路。所有模板与 manifest digest 变化必须逐文件归因。
 
 ## Task Dependency Graph
-
 ```json
-{
-  "waves": [
-    { "wave": 1, "tasks": ["1", "2", "2.1", "3"], "rationale": "只读核定 + 形态先验证 + 公式分类，互不依赖，可并行；Task 2 是后续总闸" },
-    { "wave": 2, "tasks": ["4", "5"], "rationale": "净化与 provider 模块都依赖 Wave 1 的映射清单与形态结论；模板 sha256 由 Task 4 产出后喂给 Task 5 的哨兵" },
-    { "wave": 3, "tasks": ["6", "7"], "rationale": "登记与发布链依赖契约落盘（Task 5）与净化后模板（Task 4）" },
-    { "wave": 4, "tasks": ["8", "9"], "rationale": "overlay/manifest 与宿主接线依赖已有 published representation（Task 7）" },
-    { "wave": 5, "tasks": ["10", "11"], "rationale": "e2e 与 DB 三谓词是最终验证，依赖全链接通" }
-  ],
-  "blocking": {
-    "2": "位置数组真实生产链往返未通过 ⇒ Wave 2 起全部阻塞（Requirement 1.5/1.6）",
-    "1": "mapping_digest 未生成或与权威模板/DetailRow 漂移 ⇒ Task 5/6/7 阻塞",
-    "external": "F-SHELL/既有 Phase 5 shared infra 契约或 approved bundle 发生漂移 ⇒ 先校验 producer digest，再允许 D4 发布"
-  }
-}
+{"waves":[{"wave":1,"tasks":["1","2","2.1","3"],"rationale":"C0/C1形态核定并行"},{"wave":2,"tasks":["4","5"],"rationale":"净化与provider依赖Wave1"},{"wave":3,"tasks":["6","7"],"rationale":"registry和发布依赖契约"},{"wave":4,"tasks":["8","9"],"rationale":"接线依赖发布"},{"wave":5,"tasks":["10","11","12","13"],"rationale":"C4验收与alignment最后"}],"blocking":{"2":"数组往返未通过不得发布","1":"mapping_digest漂移阻塞契约和发布"}}
 ```
+
+
+## Common Contract Alignment Gate
+- [ ] 12. 对齐总纲 `d4-dual-mode-formula-governance`：ContentMutationService/useWorkpaperSyncBridge；不同字段自动合并、同字段冲突保留三方轨迹；durable ack不等于applied；公式key使用`wp_id`，禁止Excel优先、最后写胜出、eval和外链。
+  - _Requirements: 2.1, 2.2, 3.1, 3.2, 6.1_
+- [ ] 13. C4逐D4-2/3验收：source evidence、stable identity、formula mask、roundtrip、权限、Playwright及变异；公式同步不发布TB/A13，只门控本spec相关产物。
+  - _Requirements: 3.1, 3.2, 6.1_

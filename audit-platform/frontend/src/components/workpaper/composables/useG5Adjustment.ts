@@ -10,6 +10,7 @@
 import { ref, computed, watch, onMounted, type Ref } from 'vue'
 import { parseNum, isDebitCreditBalanced } from '@/composables/useG5FormulaEngine'
 import { ElMessage } from 'element-plus'
+import { eventBus } from '@/utils/eventBus'
 import { G5_ACCOUNT_CODE, G5_ACCOUNT_NAME } from './g5Constants'
 import { G5_ADJ_WRITEBACK_ROW_KEY } from './g5AdjudicationItems'
 import { G5_ITEM_IDS, buildCanonicalPayload, readCanonicalRaw } from './g5StorageContract'
@@ -376,6 +377,9 @@ export function useG5Adjustment(opts?: {
         },
       }))
     } catch { /* silent */ }
+
+    // EventBus 通知审定表/披露刷新（与其余循环对齐）
+    eventBus.emit('adjustment:created', { wpCode: 'G5', accountCode: G5_ACCOUNT_CODE, timestamp: Date.now() })
 
     const parts = [
       `原值 AJE ${nets.gross.aje.toFixed(2)}/RJE ${nets.gross.rje.toFixed(2)}`,
