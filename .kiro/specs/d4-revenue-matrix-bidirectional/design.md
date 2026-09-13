@@ -133,3 +133,7 @@ OO 回写经 `merge_projection_into_store_rows` 后，store 中 `months` 的 JSO
 
 - **DEC-D4-1**：契约里 12 个月是「12 条独立 field」还是「1 条 array field」。本设计选**12 条独立 field**（每列一个 stable key），理由：既有 merge/conflict/roundtrip 全部按 stable field 粒度工作，array 整体作为一个 field 会退回「把整 JSON 当一个字段比较」，那是 D2 AC 6.9/6.12 明令禁止的。
 - **DEC-D4-2**：若 Task 1 证明数组下标路径在共享 extract 侧不可行（而非仅 provider 侧），则升级为「先给 `contracts.py` 增加 array 段支持」的前置任务，并同步通知其余 canary 的 owner（形态扩展影响共享件）。
+
+
+## C0-C4 统一门
+C0核定权威模板与`wp_id`/stable identity；C1验证sync三方合并（不同字段自动合并、同字段冲突、durable ack与applied分离）；C2验证`wp_id`公式key、preset/custom、缺失/损坏/stale/blocked及schema白名单；C3验证表内表间DAG、单writer和真实联动，公式同步不发布TB/A13；C4只对D4-2/3相关contract、roundtrip、权限、Playwright和变异产物放行，不等待全平台77项。
