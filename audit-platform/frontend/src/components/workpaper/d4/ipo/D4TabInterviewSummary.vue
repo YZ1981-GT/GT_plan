@@ -1,14 +1,15 @@
 ﻿<script setup lang="ts">
 /**
- * D4TabInterviewSummary 鈥?D4-30 瀹㈡埛璁胯皥璁板綍姹囨€昏〃
+ * D4TabInterviewSummary — D4-30 客户访谈记录汇总表
  *
- * 杞疆琛細琛?17涓璋堢淮搴︼紝鍒?N涓鎴?
- * 涓夋ā寮忥細鍗＄墖瑙嗗浘(閫愬鎴峰～鍐? / 鐭╅樀瑙嗗浘(瀵规瘮) / 鍦ㄧ嚎缂栬緫
- * 搴曢儴10鏉＄孩瀛楄璋堟牳瀵规彁绀?
+ * 转置表：行=17个访谈维度，列=N个客户
+ * 三模式：卡片视图(逐客户填写) / 矩阵视图(对比) / 在线编辑
+ * 底部10条红字访谈核对提示
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -16,32 +17,32 @@ import { Plus } from '@element-plus/icons-vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
-// 瀵煎叆 xlsx 鎴愬姛鍚庨噸杞?allResponses锛堜富鍏ュ彛 provide锛夛紝鍚﹀垯鐣岄潰鍋滅暀鍦ㄦ棫鍊?
+// 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
-// 鈹€鈹€鈹€ 璁胯皥缁村害瀹氫箟 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+// ─── 访谈维度定义 ─────────────────────────────────────────────────────
 const INTERVIEW_FIELDS = [
-  { key: 'time', label: '璁胯皥鏃堕棿' },
-  { key: 'reason', label: '璁胯皥鍘熷洜', placeholder: '鍙戣浜虹X澶у鎴?鏈湡鏂板瀹㈡埛/閲囪喘浠锋牸寮傚父瀹㈡埛' },
-  { key: 'method', label: '璁胯皥鏂瑰紡', placeholder: '瀹炲湴璧拌/瑙嗛璁胯皥/鐢佃瘽璁胯皥' },
-  { key: 'regAddress', label: '琚璋堝叕鍙告敞鍐屽湴鍧€' },
-  { key: 'visitAddress', label: '瀹炲湴璧拌鍏徃鍦板潃' },
-  { key: 'interviewee', label: '鎺ュ彈璁胯皥浜哄憳鍙婅韩浠?, placeholder: '韬唤淇℃伅銆佽亴鍔′俊鎭€佸叿浣撹礋璐ｇ殑宸ヤ綔绛? },
-  { key: 'auditor', label: '鍙備笌璁胯皥鐨勫璁′汉鍛? },
-  { key: 'others', label: '鍙備笌璁胯皥鐨勫叾浠栦汉鍛? },
-  { key: 'travelInfo', label: '璁胯皥浜哄憳琛岀▼淇℃伅', placeholder: '杞︾エ/鏈虹エ/浣忓鍙戠エ澶嶅嵃浠舵垨鐓х墖' },
-  { key: 'onSiteConfirm', label: '鏄惁鐜板満鍑借瘉' },
-  { key: 'keyPoints', label: '璁胯皥鍏虫敞瑕佺偣' },
-  { key: 'contractCheck', label: '鍚堝悓鎵ц鏍稿鎯呭喌' },
-  { key: 'amountMatch', label: '浜ゆ槗閲戦鏍稿鏄惁涓€鑷? },
-  { key: 'balanceMatch', label: '寰€鏉ヤ綑棰濇牳瀵规槸鍚︿竴鑷? },
-  { key: 'conclusion', label: '璁胯皥缁撹' },
-  { key: 'indexRef', label: '璁胯皥琛ㄧ储寮? },
+  { key: 'time', label: '访谈时间' },
+  { key: 'reason', label: '访谈原因', placeholder: '发行人第X大客户/本期新增客户/采购价格异常客户' },
+  { key: 'method', label: '访谈方式', placeholder: '实地走访/视频访谈/电话访谈' },
+  { key: 'regAddress', label: '被访谈公司注册地址' },
+  { key: 'visitAddress', label: '实地走访公司地址' },
+  { key: 'interviewee', label: '接受访谈人员及身份', placeholder: '身份信息、职务信息、具体负责的工作等' },
+  { key: 'auditor', label: '参与访谈的审计人员' },
+  { key: 'others', label: '参与访谈的其他人员' },
+  { key: 'travelInfo', label: '访谈人员行程信息', placeholder: '车票/机票/住宿发票复印件或照片' },
+  { key: 'onSiteConfirm', label: '是否现场函证' },
+  { key: 'keyPoints', label: '访谈关注要点' },
+  { key: 'contractCheck', label: '合同执行核对情况' },
+  { key: 'amountMatch', label: '交易金额核对是否一致' },
+  { key: 'balanceMatch', label: '往来余额核对是否一致' },
+  { key: 'conclusion', label: '访谈结论' },
+  { key: 'indexRef', label: '访谈表索引' },
 ]
 
 interface InterviewCustomer { id: string; name: string; fields: Record<string, string> }
 
-// 鑷畾涔夌淮搴︼紙鐢ㄦ埛鍙坊鍔犻澶栨鏌ラ」锛屽搴旀簮妯℃澘涓?鈥︹€?琛岋級
+// 自定义维度（用户可添加额外检查项，对应源模板中"……"行）
 const customDimensions = ref<{ key: string; label: string }[]>([])
 
 const customers = ref<InterviewCustomer[]>([])
@@ -54,7 +55,7 @@ function loadData() {
     try {
       const p = JSON.parse(r.remark)
       if (p && typeof p === 'object' && !Array.isArray(p)) {
-        // 鏂版牸寮? { customers: [...], customDimensions: [...] }
+        // 新格式: { customers: [...], customDimensions: [...] }
         customers.value = p.customers || []
         customDimensions.value = p.customDimensions || []
         return
@@ -68,7 +69,7 @@ function loadNote() { auditNote.value = props.allResponses.get('D4-30-note')?.re
 watch(() => props.allResponses.get('D4-30-customers')?.remark, loadData, { immediate: true })
 watch(() => props.allResponses.get('D4-30-note')?.remark, loadNote, { immediate: true })
 
-async function handleAddCustomer() { if (props.isReadonly) return; try { const { value } = await ElMessageBox.prompt('璇疯緭鍏ュ鎴峰悕绉?, '娣诲姞璁胯皥瀹㈡埛', { confirmButtonText: '纭', cancelButtonText: '鍙栨秷', inputPattern: /\S+/, inputErrorMessage: '涓嶈兘涓虹┖' }); if (value?.trim()) { customers.value.push({ id: `iv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, name: value.trim(), fields: {} }); activeIdx.value = customers.value.length - 1; persistAll() } } catch {} }
+async function handleAddCustomer() { if (props.isReadonly) return; try { const { value } = await ElMessageBox.prompt('请输入客户名称', '添加访谈客户', { confirmButtonText: '确认', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '不能为空' }); if (value?.trim()) { customers.value.push({ id: `iv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,6)}`, name: value.trim(), fields: {} }); activeIdx.value = customers.value.length - 1; persistAll() } } catch {} }
 function removeCustomer(id: string) { if (props.isReadonly) return; customers.value = customers.value.filter(c => c.id !== id); persistAll() }
 function updateField(custId: string, fieldKey: string, value: string) { if (props.isReadonly) return; const c = customers.value.find(x => x.id === custId); if (c) { c.fields[fieldKey] = value; persistAll() } }
 function updateName(id: string, name: string) { if (props.isReadonly) return; const c = customers.value.find(x => x.id === id); if (c) { c.name = name; persistAll() } }
@@ -76,7 +77,7 @@ function updateName(id: string, name: string) { if (props.isReadonly) return; co
 async function addCustomDimension() {
   if (props.isReadonly) return
   try {
-    const { value } = await ElMessageBox.prompt('璇疯緭鍏ヨ嚜瀹氫箟妫€鏌ラ」鍚嶇О', '娣诲姞妫€鏌ョ淮搴?, { confirmButtonText: '纭', cancelButtonText: '鍙栨秷', inputPattern: /\S+/, inputErrorMessage: '涓嶈兘涓虹┖' })
+    const { value } = await ElMessageBox.prompt('请输入自定义检查项名称', '添加检查维度', { confirmButtonText: '确认', cancelButtonText: '取消', inputPattern: /\S+/, inputErrorMessage: '不能为空' })
     if (value?.trim()) {
       const key = `custom_${Date.now().toString(36)}`
       customDimensions.value.push({ key, label: value.trim() })
@@ -86,7 +87,7 @@ async function addCustomDimension() {
 }
 function removeCustomDimension(key: string) { if (props.isReadonly) return; customDimensions.value = customDimensions.value.filter(d => d.key !== key); persistAll() }
 
-// 鍚堝苟鍥哄畾缁村害 + 鑷畾涔夌淮搴?
+// 合并固定维度 + 自定义维度
 const allFields = computed(() => [...INTERVIEW_FIELDS, ...customDimensions.value.map(d => ({ key: d.key, label: d.label, placeholder: '' }))])
 
 function persistAll() {
@@ -99,41 +100,63 @@ function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.va
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-30-customers','D4-30-note','D4-30-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
 
-const editorMode = ref<string>('鍗＄墖瑙嗗浘'); const modeOptions = ['鍗＄墖瑙嗗浘', '鐭╅樀瑙嗗浘', '鍦ㄧ嚎缂栬緫']
+const editorMode = ref<string>('卡片视图'); const modeOptions = ['卡片视图', '矩阵视图', '在线编辑']
 const activeIdx = ref(0)
 const activeCustomer = computed(() => customers.value[activeIdx.value] || null)
 
 const aiAvailable = ref(false)
 async function checkAiHealth() { try { const r = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' || (r.data?.data?.status ?? r.data?.status) === 'degraded' } catch { aiAvailable.value = false } }
 checkAiHealth()
-const aiTip = computed(() => aiAvailable.value ? 'AI 杈呭姪鐢熸垚' : 'AI 鏈嶅姟鏆備笉鍙敤')
+const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务暂不可用')
 const aiNoteLoading = ref(false); const aiConclusionLoading = ref(false)
-async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '鍩轰簬瀹㈡埛璁胯皥姹囨€?D4-30)缁撴灉鐢熸垚瀹¤璇存槑', customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 鏈敓鎴愬唴瀹?); return }; await ElMessageBox.confirm(t, 'AI 鐢熸垚', { confirmButtonText: '濉叆', cancelButtonText: '鍙栨秷', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 鐢熸垚澶辫触') } finally { aiNoteLoading.value = false } }
-async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '鍩轰簬璁胯皥姹囨€荤粨鏋滅敓鎴愬璁＄粨璁?, noteText: auditNote.value, customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 鏈敓鎴愬唴瀹?); return }; await ElMessageBox.confirm(t, 'AI 鐢熸垚', { confirmButtonText: '濉叆', cancelButtonText: '鍙栨秷', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 鐢熸垚澶辫触') } finally { aiConclusionLoading.value = false } }
+async function genNote() { if (props.isReadonly || !aiAvailable.value) return; aiNoteLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'analysis-note', existingContent: auditNote.value, relatedContext: { task: '基于客户访谈汇总(D4-30)结果生成审计说明', customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditNote(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiNoteLoading.value = false } }
+async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于访谈汇总结果生成审计结论', noteText: auditNote.value, customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 async function handleImportFile(f: any) { const r = await importData('D4-30', f.raw || f); if (r) await reloadWorkpaperData?.() }
+
+// 访谈红旗发现：仅由「核对不一致/异常」明确标记生成（空/含「一致」/「是」不算，不由 reason 单独判）
+function _isMismatch(v: string): boolean {
+  const s = String(v || '').trim()
+  if (!s) return false
+  if (s.includes('一致') || s === '是') return false
+  return s.includes('否') || s.includes('不一致') || s.includes('异常') || s.includes('差异')
+}
+const riskFindings = computed<D4IpoFinding[]>(() => {
+  const out: D4IpoFinding[] = []
+  for (const c of customers.value) {
+    const f = c.fields || {}
+    const flags: string[] = []
+    if (_isMismatch(f.amountMatch)) flags.push('交易金额核对不一致')
+    if (_isMismatch(f.balanceMatch)) flags.push('往来余额核对不一致')
+    if (_isMismatch(f.contractCheck)) flags.push('合同执行核对异常')
+    if (flags.length) {
+      out.push({ key: `d4-30-${c.id}`, label: `${c.name || '客户'}：${flags.join('、')}`, indexRef: f.indexRef || 'D4-30' })
+    }
+  }
+  return out
+})
 </script>
 
 <template>
 <div class="d4-interview-summary">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">瀵煎叆瀵煎嚭 鈻?/el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-30')">瀵煎嚭妯℃澘</el-dropdown-item><el-dropdown-item @click="exportData('D4-30')">瀵煎嚭鏁版嵁</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>瀵煎叆鏁版嵁</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-30-interview')">馃挰 澶嶆牳</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-30')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-30')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-30" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-30-interview')">💬 复核</el-button></div></div>
 
-  <!-- 浠〃鏉?-->
+  <!-- 仪表板 -->
   <div class="stats-dashboard">
-    <div class="stat-card stat-primary"><div class="stat-value">{{ customers.length }}<span class="stat-unit">瀹?/span></div><div class="stat-label">宸茶璋堝鎴?/div></div>
+    <div class="stat-card stat-primary"><div class="stat-value">{{ customers.length }}<span class="stat-unit">家</span></div><div class="stat-label">已访谈客户</div></div>
   </div>
 
-  <!-- 鈺愨晲鈺?鍗＄墖瑙嗗浘 鈺愨晲鈺?-->
-  <template v-if="editorMode === '鍗＄墖瑙嗗浘'">
-    <!-- 浣跨敤璇存槑 -->
+  <!-- ═══ 卡片视图 ═══ -->
+  <template v-if="editorMode === '卡片视图'">
+    <!-- 使用说明 -->
     <div class="usage-guide">
-      <span class="usage-icon">馃挕</span>
-      <span class="usage-text">鐐瑰嚮涓嬫柟"娣诲姞瀹㈡埛"鍒涘缓璁胯皥璁板綍鍗＄墖锛岄€愰」濉啓璁胯皥鏃堕棿銆佹柟寮忋€佸叧娉ㄨ鐐圭瓑淇℃伅銆傚彲娣诲姞鑷畾涔夋鏌ラ」銆傚垏鎹?鐭╅樀瑙嗗浘"妯悜瀵规瘮澶氫釜瀹㈡埛鐨勮璋堟儏鍐点€?/span>
+      <span class="usage-icon">💡</span>
+      <span class="usage-text">点击下方"添加客户"创建访谈记录卡片，逐项填写访谈时间、方式、关注要点等信息。可添加自定义检查项。切换"矩阵视图"横向对比多个客户的访谈情况。</span>
     </div>
     <div class="customer-tabs">
       <el-tabs v-model="activeIdx" type="card" @tab-remove="(name:any) => removeCustomer(customers[Number(name)]?.id)">
-        <el-tab-pane v-for="(cust, idx) in customers" :key="cust.id" :label="cust.name||`瀹㈡埛${idx+1}`" :name="idx" :closable="!isReadonly" />
+        <el-tab-pane v-for="(cust, idx) in customers" :key="cust.id" :label="cust.name||`客户${idx+1}`" :name="idx" :closable="!isReadonly" />
       </el-tabs>
     </div>
     <div v-if="activeCustomer" class="card-content">
@@ -141,53 +164,53 @@ async function handleImportFile(f: any) { const r = await importData('D4-30', f.
       <div v-for="field in allFields" :key="field.key" class="field-row">
         <label>{{ field.label }}</label>
         <el-input :model-value="activeCustomer.fields[field.key]||''" size="small" :disabled="isReadonly" :placeholder="field.placeholder||''" @input="(v:string)=>updateField(activeCustomer.id, field.key, v)" />
-        <el-button v-if="customDimensions.some(d => d.key === field.key)" link type="danger" size="small" :disabled="isReadonly" @click="removeCustomDimension(field.key)" title="鍒犻櫎姝よ嚜瀹氫箟椤?>脳</el-button>
+        <el-button v-if="customDimensions.some(d => d.key === field.key)" link type="danger" size="small" :disabled="isReadonly" @click="removeCustomDimension(field.key)" title="删除此自定义项">×</el-button>
       </div>
       <div class="add-dimension-bar">
-        <el-button size="small" text :disabled="isReadonly" @click="addCustomDimension">+ 娣诲姞鑷畾涔夋鏌ラ」</el-button>
+        <el-button size="small" text :disabled="isReadonly" @click="addCustomDimension">+ 添加自定义检查项</el-button>
       </div>
     </div>
-    <el-empty v-else description="璇锋坊鍔犲鎴峰紑濮嬭褰曡璋? :image-size="80">
-      <el-button type="primary" :disabled="isReadonly" @click="handleAddCustomer"><el-icon :size="14"><Plus /></el-icon> 娣诲姞瀹㈡埛</el-button>
+    <el-empty v-else description="请添加客户开始记录访谈" :image-size="80">
+      <el-button type="primary" :disabled="isReadonly" @click="handleAddCustomer"><el-icon :size="14"><Plus /></el-icon> 添加客户</el-button>
     </el-empty>
   </template>
 
-  <!-- 鈺愨晲鈺?鐭╅樀瑙嗗浘 鈺愨晲鈺?-->
-  <template v-else-if="editorMode === '鐭╅樀瑙嗗浘'">
+  <!-- ═══ 矩阵视图 ═══ -->
+  <template v-else-if="editorMode === '矩阵视图'">
     <el-table :data="allFields" border class="matrix-table" max-height="550">
-      <el-table-column label="椤圭洰" min-width="140" fixed><template #default="{ row }">{{ row.label }}</template></el-table-column>
-      <el-table-column v-for="cust in customers" :key="cust.id" :label="cust.name" min-width="130" align="center"><template #default="{ row }"><span>{{ cust.fields[row.key] || '鈥? }}</span></template></el-table-column>
+      <el-table-column label="项目" min-width="140" fixed><template #default="{ row }">{{ row.label }}</template></el-table-column>
+      <el-table-column v-for="cust in customers" :key="cust.id" :label="cust.name" min-width="130" align="center"><template #default="{ row }"><span>{{ cust.fields[row.key] || '—' }}</span></template></el-table-column>
     </el-table>
-    <div v-if="!customers.length" style="padding:20px 0;text-align:center;"><el-empty description="鏆傛棤璁胯皥鏁版嵁" :image-size="60" /></div>
+    <div v-if="!customers.length" style="padding:20px 0;text-align:center;"><el-empty description="暂无访谈数据" :image-size="60" /></div>
   </template>
 
-  <!-- 鈺愨晲鈺?鍦ㄧ嚎缂栬緫 鈺愨晲鈺?-->
-  <template v-else-if="editorMode === '鍦ㄧ嚎缂栬緫'">
-    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="瀹㈡埛璁胯皥璁板綍姹囨€昏〃D4-30" :readonly="isReadonly" /></div>
+  <!-- ═══ 在线编辑 ═══ -->
+  <template v-else-if="editorMode === '在线编辑'">
+    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户访谈记录汇总表D4-30" :readonly="isReadonly" /></div>
   </template>
 
-  <!-- 闈濷O鍏变韩鍖?-->
-  <template v-if="editorMode !== '鍦ㄧ嚎缂栬緫'">
-    <!-- 瀹¤鎰忚鍖?-->
-    <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">瀹¤鎰忚鍖?/span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">馃 AI杈呭姪璇存槑</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">馃 AI杈呭姪缁撹</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>瀹¤璇存槑</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="璁板綍璁胯皥鍙戠幇" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>瀹¤缁撹</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="缁煎悎鍒ゆ柇" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
+  <!-- 非OO共享区 -->
+  <template v-if="editorMode !== '在线编辑'">
+    <!-- 审计意见区 -->
+    <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">🤖 AI辅助说明</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">🤖 AI辅助结论</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="记录访谈发现" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
 
-    <!-- 绾㈠瓧鎻愮ず锛堣璋堟牳瀵瑰拰娉ㄦ剰浜嬮」锛?-->
+    <!-- 红字提示（访谈核对和注意事项） -->
     <details class="tips-collapse">
-      <summary class="tips-summary">鈿狅笍 璁胯皥鏍稿鍜屾敞鎰忎簨椤癸紙鎻愮ず锛?/summary>
+      <summary class="tips-summary">⚠️ 访谈核对和注意事项（提示）</summary>
       <div class="tips-body">
-        <p class="tips-intro">鎻愮ず1锛氳蛋璁跨殑鑼冨洿鈥斺€斾富瑕佸鎴凤紙濡傚墠鍗佸悕瀹㈡埛锛夛紱鏂板鐨勪富瑕佸鎴凤紱瀛樺湪鐤戣檻鐨勯噸瑕佸鎴枫€?/p>
-        <p class="tips-intro">鎻愮ず2锛氳璋堥渶鏍稿鍜屾敞鎰忎簨椤癸細</p>
+        <p class="tips-intro">提示1：走访的范围——主要客户（如前十名客户）；新增的主要客户；存在疑虑的重要客户。</p>
+        <p class="tips-intro">提示2：访谈需核对和注意事项：</p>
         <ol class="tips-list">
-          <li>璧拌鍦板潃涓庢敞鍐屽湴鍧€鏄惁涓€鑷达紵涓嶄竴鑷寸殑鍘熷洜鏄惁鍚堢悊锛熷叕鍙稿熀鏈儏鍐垫槸鍚︿笌宸ュ晢淇℃伅鏌ヨ涓€鑷达紵璧拌鍏徃鍦板潃鏄惁涓庣櫨搴﹀湴鍥剧瓑鏌ヨ璧拌鍦板潃涓€鑷达紵</li>
-          <li>浜ゆ槗鍐呭鏄惁涓庤蛋璁垮叕鍙稿疄闄呬笟鍔¤寖鍥翠竴鑷达紵</li>
-          <li>浜ゆ槗閲戦鏄惁涓庤蛋璁垮叕鍙歌妯★紙娉ㄥ唽璧勬湰銆佷汉鏁般€佽澶囨暟閲忕瓑锛夊尮閰嶏紵</li>
-          <li>浜ゆ槗浠锋牸鏄惁涓庡悓琛屼笟绫讳技浜ゆ槗涓€鑷达紵</li>
-          <li>鏄惁鏍稿疄璧拌瀵硅薄韬唤锛?/li>
-          <li>鏄惁鏍规嵁璧拌鍏徃鍙婅璋堝璞″叿浣撴儏鍐典慨鏀硅璋堥棶鍗凤紵</li>
-          <li>鏄惁鐜板満鍙栧緱鐩栧叕绔犵殑鍑借瘉鍥炲嚱锛堜氦鏄撱€佸線鏉ャ€佸叧鑱旀柟鍏崇郴纭锛夛紵</li>
-          <li>鏄惁鍚屼负瀹㈡埛鍜屼緵搴斿晢锛熺悊鐢辨槸鍚﹀悎鐞嗭紵</li>
-          <li>鏄惁瀛樺湪寮傚父鎯呭喌锛堝鍦板潃涓庤瀹¤鍗曚綅鍏宠仈鏂圭浉鍚屾垨鐩歌繎銆佸凡澶勪簬鍋滀骇鐘舵€併€佷骇鑳藉埄鐢ㄧ巼寮傚父銆佹棤娉曡瘉鏄庣浉鍏充骇鍝佹潵鑷瀹¤鍗曚綅锛夛紵</li>
-          <li>淇濈暀璁胯皥瀵硅薄韬唤璇佸鍗颁欢銆佸悕鐗?宸ョ墝澶嶅嵃浠躲€佷笌璁胯皥瀵硅薄鍚堝奖锛堝巶鍖洪棬鍙ｃ€佷粨搴撱€佽溅闂寸瓑鍦帮級銆佽蛋璁垮叕鍙稿伐浣滅幇鍦虹収鐗囥€?/li>
+          <li>走访地址与注册地址是否一致？不一致的原因是否合理？公司基本情况是否与工商信息查询一致？走访公司地址是否与百度地图等查询走访地址一致？</li>
+          <li>交易内容是否与走访公司实际业务范围一致？</li>
+          <li>交易金额是否与走访公司规模（注册资本、人数、设备数量等）匹配？</li>
+          <li>交易价格是否与同行业类似交易一致？</li>
+          <li>是否核实走访对象身份？</li>
+          <li>是否根据走访公司及访谈对象具体情况修改访谈问卷？</li>
+          <li>是否现场取得盖公章的函证回函（交易、往来、关联方关系确认）？</li>
+          <li>是否同为客户和供应商？理由是否合理？</li>
+          <li>是否存在异常情况（如地址与被审计单位关联方相同或相近、已处于停产状态、产能利用率异常、无法证明相关产品来自被审计单位）？</li>
+          <li>保留访谈对象身份证复印件、名片/工牌复印件、与访谈对象合影（厂区门口、仓库、车间等地）、走访公司工作现场照片。</li>
         </ol>
       </div>
     </details>
