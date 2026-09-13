@@ -80,7 +80,7 @@ function fmtPercent(v: number): string {
 
 // ─── Row class: >10% yellow / >20% red ──────────────────────────────
 function getRowClass({ row }: { row: RelatedPriceRow }): string {
-  const color = getDiffRateColor(row.priceDiffRate)
+  const color = getDiffRateColor(row.priceDiffRate || 0)
   if (color === 'red') return 'row-red'
   if (color === 'yellow') return 'row-yellow'
   return ''
@@ -95,10 +95,10 @@ async function handleOcrUpload(rowId: string, file: File) {
     const fields = (res.data?.data ?? res.data)?.extracted_fields || {}
     if (!Object.keys(fields).length) { ElMessage.info('OCR完成，未识别到可填充字段'); return }
     // Auto-fill recognized fields
-    if (fields.customerName || fields.relatedCustomer) updateCell(rowId, 'relatedCustomer', String(fields.customerName || fields.relatedCustomer))
+    if (fields.customerName || fields.relatedCustomer) updateCell(rowId, 'partyName', String(fields.customerName || fields.relatedCustomer))
     if (fields.product || fields.productName) updateCell(rowId, 'product', String(fields.product || fields.productName))
-    if (fields.relatedPrice || fields.unitPrice) updateCell(rowId, 'relatedPrice', Number(fields.relatedPrice || fields.unitPrice) || 0)
-    if (fields.nonRelatedPrice) updateCell(rowId, 'nonRelatedPrice', Number(fields.nonRelatedPrice) || 0)
+    if (fields.relatedPrice || fields.unitPrice) updateCell(rowId, 'avgPrice', Number(fields.relatedPrice || fields.unitPrice) || 0)
+    if (fields.nonRelatedPrice) updateCell(rowId, 'nonrelatedAvgPrice', Number(fields.nonRelatedPrice) || 0)
     ElMessage.success('OCR结果已填入')
   } catch { ElMessage.warning('OCR识别失败') }
 }
@@ -256,12 +256,12 @@ async function handleImportFile(uploadFile: any) { await importData('D4-21', upl
         <el-table-column label="基本信息" align="center" class-name="col-basic">
           <el-table-column label="关联方客户名称" min-width="130">
             <template #default="{ row }">
-              <el-input v-model="row.relatedCustomer" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'relatedCustomer', row.relatedCustomer)" />
+              <el-input v-model="row.partyName" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'partyName', row.partyName)" />
             </template>
           </el-table-column>
           <el-table-column label="关联关系" min-width="100">
             <template #default="{ row }">
-              <el-input v-model="row.reason" size="small" :disabled="isReadonly" placeholder="如：母子公司" @change="updateCell(row.rowId, 'reason', row.reason)" />
+              <el-input v-model="row.relationship" size="small" :disabled="isReadonly" placeholder="如：母子公司" @change="updateCell(row.rowId, 'relationship', row.relationship)" />
             </template>
           </el-table-column>
           <el-table-column label="产品名称" min-width="120">
@@ -271,12 +271,12 @@ async function handleImportFile(uploadFile: any) { await importData('D4-21', upl
           </el-table-column>
           <el-table-column label="销售数量" min-width="90" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.relatedPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'relatedPrice', row.relatedPrice)" />
+              <el-input-number v-model="row.qty" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'qty', row.qty)" />
             </template>
           </el-table-column>
           <el-table-column label="销售额" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="row.nonRelatedPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'nonRelatedPrice', row.nonRelatedPrice)" />
+              <el-input-number v-model="row.salesAmount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'salesAmount', row.salesAmount)" />
             </template>
           </el-table-column>
         </el-table-column>
@@ -285,32 +285,32 @@ async function handleImportFile(uploadFile: any) { await importData('D4-21', upl
         <el-table-column label="本年度分析" align="center" class-name="col-analysis">
           <el-table-column label="销售额占比" min-width="90" align="right">
             <template #default="{ row }">
-              <span class="auto-calc" title="自动计算：该产品销售额÷同类产品销售额合计">{{ row.nonRelatedPrice && relatedSalesTotal ? ((row.nonRelatedPrice / relatedSalesTotal) * 100).toFixed(2) + '%' : '—' }}</span>
+              <el-input-number v-model="row.salesRatio" size="small" :controls="false" :disabled="isReadonly" style="width:100%" placeholder="%" @change="updateCell(row.rowId, 'salesRatio', row.salesRatio)" />
             </template>
           </el-table-column>
           <el-table-column label="平均单价" min-width="100" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="(row as any).avgUnitPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'avgUnitPrice', (row as any).avgUnitPrice)" />
+              <el-input-number v-model="row.avgPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'avgPrice', row.avgPrice)" />
             </template>
           </el-table-column>
           <el-table-column label="非关联方平均单价" min-width="120" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="(row as any).nonRelatedAvgPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'nonRelatedAvgPrice', (row as any).nonRelatedAvgPrice)" />
+              <el-input-number v-model="row.nonrelatedAvgPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'nonrelatedAvgPrice', row.nonrelatedAvgPrice)" />
             </template>
           </el-table-column>
           <el-table-column label="差异率" min-width="80" align="right">
             <template #default="{ row }">
-              <span :class="['auto-calc', getDiffRateColor(row.priceDiffRate)]" title="自动计算：(关联单价-非关联单价)÷非关联单价×100%">{{ fmtPercent(row.priceDiffRate) }}</span>
+              <span :class="['auto-calc', getDiffRateColor(row.priceDiffRate || 0)]" title="模板公式 I=(平均单价-非关联平均单价)÷非关联平均单价">{{ fmtPercent(row.priceDiffRate || 0) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="可比公允价格" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="(row as any).fairPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'fairPrice', (row as any).fairPrice)" />
+              <el-input-number v-model="row.fairPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'fairPrice', row.fairPrice)" />
             </template>
           </el-table-column>
           <el-table-column label="差异率(公允)" min-width="90" align="right">
             <template #default="{ row }">
-              <span class="auto-calc" :class="(row as any).fairPrice && (row as any).avgUnitPrice ? getDiffRateColor((((row as any).avgUnitPrice - (row as any).fairPrice) / (row as any).fairPrice) * 100) : ''" title="自动计算：(关联单价-公允价格)÷公允价格×100%">{{ (row as any).fairPrice && (row as any).avgUnitPrice ? (((( row as any).avgUnitPrice - (row as any).fairPrice) / (row as any).fairPrice) * 100).toFixed(2) + '%' : '—' }}</span>
+              <span class="auto-calc" :class="getDiffRateColor(row.fairDiffRate || 0)" title="模板公式 K=(平均单价-可比公允价格)÷可比公允价格">{{ fmtPercent(row.fairDiffRate || 0) }}</span>
             </template>
           </el-table-column>
         </el-table-column>
@@ -319,12 +319,12 @@ async function handleImportFile(uploadFile: any) { await importData('D4-21', upl
         <el-table-column label="上年度参考" align="center" class-name="col-prior">
           <el-table-column label="上年度占比" min-width="90" align="right">
             <template #default="{ row }">
-              <el-input v-model="(row as any).priorProportion" size="small" :disabled="isReadonly" placeholder="如 5.2%" @change="updateCell(row.rowId, 'priorProportion', (row as any).priorProportion)" />
+              <el-input-number v-model="row.priorSalesRatio" size="small" :controls="false" :disabled="isReadonly" style="width:100%" placeholder="%" @change="updateCell(row.rowId, 'priorSalesRatio', row.priorSalesRatio)" />
             </template>
           </el-table-column>
           <el-table-column label="上年度平均单价" min-width="110" align="right">
             <template #default="{ row }">
-              <el-input-number v-model="(row as any).priorAvgPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'priorAvgPrice', (row as any).priorAvgPrice)" />
+              <el-input-number v-model="row.priorAvgPrice" size="small" :controls="false" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'priorAvgPrice', row.priorAvgPrice)" />
             </template>
           </el-table-column>
         </el-table-column>

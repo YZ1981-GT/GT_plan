@@ -135,6 +135,7 @@ export function useD4FormData(options: UseD4FormDataOptions) {
       if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
         ElMessage.error('保存失败，请稍后重试')
       }
+      throw err
     }
   }
 
@@ -208,7 +209,7 @@ export function useD4FormData(options: UseD4FormDataOptions) {
     const timer = setTimeout(() => {
       _debounceTimers.delete(itemId)
       _pendingItems.delete(itemId)
-      _doSave([updated])
+      void _doSave([updated]).catch(() => {})
     }, 2000)
     _debounceTimers.set(itemId, timer)
   }
@@ -230,14 +231,14 @@ export function useD4FormData(options: UseD4FormDataOptions) {
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
-  function _flushPending(): void {
+  async function _flushPending(): Promise<void> {
     // 清除所有 debounce 定时器
     for (const timer of _debounceTimers.values()) {
       clearTimeout(timer)
     }
     _debounceTimers.clear()
 
-    // 保存所有 pending items
+    const saves: Promise<void>[] = []
     if (_pendingItems.size > 0) {
       const items: ChecklistResponse[] = []
       for (const itemId of _pendingItems) {
@@ -245,16 +246,21 @@ export function useD4FormData(options: UseD4FormDataOptions) {
         if (resp) items.push(resp)
       }
       _pendingItems.clear()
-      if (items.length > 0) {
-        _doSave(items)
-      }
+      if (items.length > 0) saves.push(_doSave(items))
     }
+    // 子 composable（D4-2-rows / D4-3-rows 等）走 window debounce —— 通知立刻落库
+    try {
+      window.dispatchEvent(new CustomEvent('d4:flush-pending'))
+    } catch {
+      /* silent */
+    }
+    await Promise.all(saves)
   }
 
   // ─── Lifecycle ───────────────────────────────────────────────────────────
 
   onScopeDispose(() => {
-    _flushPending()
+    void _flushPending().catch(() => {})
   })
 
   return {
@@ -266,6 +272,8 @@ export function useD4FormData(options: UseD4FormDataOptions) {
     saveBatch,
     debouncedSave,
     writebackTrialBalance,
+    /** G5-1 D4 canary：flushHtml 前先冲掉 debounce，避免投影读到旧 store */
+    flushPendingSave: _flushPending,
   }
 }
 

@@ -374,6 +374,23 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "按审定金额降序 Top 排名占比（calcProportion / customerStructureData）",
              "useD4CrossSheet"),
         ],
+        # D4-10 重要客户销售价格分析
+        "D4-10": [
+            ("本期销售总额", "WP('D4-2','本期未审合计') ≡ D4-2 主营明细本期合计", "取数",
+             "公式真源 + 手工覆盖（totalAmountFormulaRef / totalAmountManualOverride）",
+             "D4TabCustomerPrice / useD4CrossSheet.mainRevenueTotal"),
+            ("金额占比", "销售金额 ÷ 本期销售总额", "计算",
+             "客户行占比（amountRatio）", "D4TabCustomerPrice"),
+            ("与均价/市价差异", "(单价 − 均价或市价) ÷ 均价或市价；|差|>20% → 异常回标 D4-2", "logic_check",
+             "d4:price-abnormal → useD4PriceWriteback.priceAbnormal", "D4TabCustomerPrice"),
+        ],
+        # D4-11 产品销售价格分析
+        "D4-11": [
+            ("从 D4-2 导入产品", "按品种 merge productRevenueForMargin（金额维度）", "取数",
+             "上游导入不覆盖手工行", "D4TabProductPrice / d4PriceUpstreamMerge"),
+            ("与定价/市价差异", "(单价 − 定价或市价) ÷ 定价或市价；|差|>10% → 异常回标 D4-2", "logic_check",
+             "d4:price-abnormal → useD4PriceWriteback.priceAbnormal", "D4TabProductPrice"),
+        ],
         # D4-12 合同检查
         "D4-12": [
             ("覆盖率", "已检查金额 ÷ 收入合计 × 100%", "计算",
@@ -409,9 +426,32 @@ CATALOG: dict[str, dict[str, list[SheetFormula]]] = {
              "关联方交易价格公允性（calcPriceDiffRate）", "useD4FormulaEngine"),
         ],
         # D4-32 资金流水检查
+        # D4-29 客户信息检查表（转置矩阵：行=检查字段，列=客户；粒度=客户）
+        "D4-29": [
+            ("关联方客户数", "COUNT(是否为关联方 = '是')", "计算",
+             "关联方客户计数（relatedCount，逐客户 fields.isRelated 聚合）", "useD4CustomerDetail"),
+            ("字段完成度", "已填字段数 ÷ (客户数 × 检查字段数) × 100%", "计算",
+             "信息完整度（completionRate，占比语义 calcProportion）", "useD4CustomerDetail / useD4FormulaEngine"),
+            ("IPO/舞弊组可见性", "business_category 含 ipo/listed/neeq/restructuring/fraud_risk", "logic_check",
+             "IPO/舞弊组一级 Tab 可见性（isIpoGroupVisible）", "useD4FormulaEngine"),
+        ],
+        # D4-30 客户访谈记录汇总表（转置矩阵：行=访谈维度，列=客户，含自定义维度）
+        "D4-30": [
+            ("已访谈客户数", "COUNT(访谈记录卡片)", "计算",
+             "访谈客户计数（customers.length 聚合）", "useD4FormulaEngine"),
+        ],
+        # D4-31 客户访谈记录（单份结构化问卷，四章节 + 多选/条件展开）
+        "D4-31": [
+            ("红旗发现留痕", "关联关系/资金往来/退换货异常 → findings 记录（不自动判错报）", "logic_check",
+             "访谈红旗人工认定后方可推 A13（useD4InspectionWriteback）", "useD4InspectionWriteback"),
+        ],
         "D4-32": [
             ("资金回流可疑判定", "同一对手入/出金额差异<10% ∧ 间隔<30天 → 可疑", "logic_check",
-             "资金回流识别（isSuspiciousFundFlow）", "useD4FormulaEngine"),
+             "资金回流识别（isSuspiciousFundFlow），空/零金额→不可疑保持未知", "useD4FormulaEngine"),
+            ("异常交易笔数", "COUNT(是否发现异常交易 = '是')", "计算",
+             "异常流水计数（anomalyCount，逐行 hasAnomaly 聚合；'否'/空非异常）", "useD4FormulaEngine"),
+            ("异常率", "异常笔数 ÷ 已检查笔数 × 100%", "计算",
+             "资金流水异常率（calcAnomalyRate，已检查=0→0）", "useD4FormulaEngine"),
         ],
         # D4-33 其他业务毛利
         "D4-33": [

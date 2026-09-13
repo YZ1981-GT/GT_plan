@@ -24,7 +24,12 @@
      `operationId`（`operationId?: never`），运行时也只取 case 自身的字段。
 -->
 <template>
-  <div class="wp-sync-editor-host" data-testid="wp-sync-host">
+  <div
+    class="wp-sync-editor-host"
+    data-testid="wp-sync-host"
+    :data-bridge-state="bridge.state.value"
+    :data-dirty="bridge.dirty.value ? '1' : '0'"
+  >
     <!-- 状态条：文案唯一真源是桥的 feedback（error 优先，Property 48） -->
     <div
       class="wp-sync-editor-host__status"

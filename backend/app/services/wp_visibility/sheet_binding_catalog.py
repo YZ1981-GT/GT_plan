@@ -44,6 +44,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.procedure_models import ProcedureRowTask
 
+# 已物化项目工作簿的 sheet entry 是“先生成底稿后委派”场景的稳定页签来源；
+# 它只补充 catalog 成员，不授予任何 grant。名称不可用时以稳定 code 作为解析键。
+_WORKBOOK_ENTRY_SQL = sa.text(
+    """
+    SELECT DISTINCT e.sheet_code, NULL
+    FROM project_workbook_instance i
+    JOIN project_workbook_sheet_entry e
+      ON e.workbook_instance_id = i.workbook_instance_id
+    WHERE i.project_id = :project_id
+      AND i.wp_id = :wp_id
+      AND e.sheet_code IS NOT NULL
+    """
+)
+
 # 从 checklist item_id / 任意字符串头部提取 sheet 级编码 token（如 D2A / D2-7 / G1A / K10-6）。
 _CODE_TOKEN_RE = re.compile(r"^([A-Za-z]+\d+(?:-\d+)?[A-Za-z]?)")
 # sheet 级编码 → 底稿基码（D2A→D2 / D2-7A→D2-7），与 materialization 的 _base_wp_code 对齐。
@@ -120,6 +134,7 @@ class SheetBindingCatalog:
         project_id: UUID,
         wp_index_id: UUID,
         version: str | None = None,
+        wp_id: UUID | None = None,
     ) -> "SheetBindingCatalog":
         rows = (
             await db.execute(
@@ -133,6 +148,18 @@ class SheetBindingCatalog:
                 )
             )
         ).all()
+        # 先生成底稿后委派时没有 ProcedureRowTask；复用已物化 workbook entry
+        # 补充稳定 sheet_code。此查询只产生 catalog 成员，不改变 grant/scope。
+        if wp_id is not None:
+            entry_rows = (await db.execute(
+                _WORKBOOK_ENTRY_SQL,
+                {
+                    "project_id": str(project_id),
+                    "wp_id": str(wp_id),
+                    "wp_index_id": str(wp_index_id),
+                },
+            )).all()
+            rows = list(rows) + list(entry_rows)
 
         sheet_keys: set[str] = set()
         norm_key_to_canonical: dict[str, str] = {}

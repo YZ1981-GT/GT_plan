@@ -43,32 +43,32 @@
   - **完成**：clean sha256=`b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f`；bak=`ecac5d56…`；变异 4/4 RED（`evidence/T04-sanitize-mutation-verdict.json`）；zip 元数据保留保证 sha 可复现
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 5. provider 模块 + 契约 + 生成器
+- [x] 5. provider 模块 + 契约 + 生成器
   - 新增 `backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py`（9 段结构，18 字段，12 个月走数组下标 json_path）
   - 新增 `backend/scripts/gen/generate_phase5_d4_contract.py`，`--apply` 生成 `backend/data/workpaper_sync_contracts/d4.revenue_detail.json`
   - `assert_contract_file_matches_source()` 双向锁死；`parse_contract` 必须接受数组下标 pointer
   - 🔴 新模块行数若超 800 行门：优先按 spec 决策抽共生件，不得直接改 whitelist
   - _Requirements: 1.1, 4.1_
 
-- [ ] 6. registry 两白名单 + wp_code 裁决
+- [x] 6. registry 两白名单 + wp_code 裁决
   - `registry.py`：`_ALLOWED_PROVIDER_MODULES` + `DELIVERED_PER_ENTRY_CONTRACTS` 各加 D4 条
   - `workpaper_sync_entry_wp_code_adjudication.json` 加 D4 条，wp_codes 以**真载荷落点**为准（实测 D4），带 store_payload_evidence
   - _Requirements: 3.1, 4.1_
 
-- [ ] 7. 发布链（有真载荷的非空首版）
+- [x] 7. 发布链（有真载荷的非空首版）
   - Task 76 provisioner `--check` → `--apply`（记 bundle id）
   - `fix_projection_first_publication --check`：必须 10 stage 全过且 `row_keys` 非 0
   - `--apply` 产出 published representation（记 representation id / revision / projection_sha256）
   - 查库印证 representation 的 `definition_bundle_id` 与 Task 76 的 bundle 一致
   - _Requirements: 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 8. overlay + manifest 重生
+- [x] 8. overlay + manifest 重生
   - overlay 加 D4 宿主 override（cap=bidirectional / adapter_id=d4.revenue_detail）
   - `approved_source_digest` 若变动：必须逐 mount 归因（mount 总数不变 + 唯一变动是本 spec 的宿主接线），带精确 review_basis
   - 重生 manifest 两件产物，核 capability=bidirectional + adapter_id
   - _Requirements: 4.1, 4.2_
 
-- [ ] 9. 宿主接线 + oo_to_html 分支
+- [x] 9. 宿主接线 + oo_to_html 分支
   - D4 宿主：仅 D4-2 走 `WorkpaperSyncEditorHost`，其余 40+ sheet 保留既有 dualMode
   - `useD4*FormData` 导出 flush（flushHtml 前 flush debounce）
   - `oo_to_html.py` 加 `elif adapter_id == "d4.revenue_detail"` 分支，数组形态写回
@@ -77,14 +77,14 @@
   - Task 1 的 `mapping_digest` 未生成或漂移时阻塞本任务
   - _Requirements: 4.2, 4.3, 3.3_
 
-- [ ] 10. §9.6 真栈 e2e
+- [x] 10. §9.6 真栈 e2e
   - 新增 `audit-platform/frontend/e2e/g5-1-d4-unified-path.spec.ts`
   - 等待判据用可观测状态（`data-bridge-state` / confirm-descriptor 200），OO 写 A 列 product（文本列），证据记 `activeSheet`
   - 四硬断言：confirm-descriptor 200 / cs_error=0 / store_mirrored / marker_visible；另断言 OO→store 后 D4-2 下游审定表/附注值按同一 row key 更新，且内部 `periodTotal` 公式未被覆盖
   - evidence 必须同时记录 store row key、activeSheet、下游消费值和公式保护结果
   - _Requirements: 4.4, 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 11. DB 三谓词 + 收口
+- [x] 11. DB 三谓词 + 收口
   - venv 只读查：application applied / `D4-2-rows` 含 marker 且 `months` 仍是数组 / content_version `source=onlyoffice` 且 op 逐字一致
   - runbook 追加 D4 小节（照 §8–§10 格式）
   - 清 tmp_*；`git status --porcelain` 核产物无 `??` 漏登记
@@ -94,6 +94,10 @@
 
 Task 1 未冻结字段映射前不得假定字段数量；Task 2 必须通过共享解析器与真实 materialize/extract 链路。所有模板与 manifest digest 变化必须逐文件归因。
 
+### 交付实态
+- Task 1–4 / 5–11 ✅：provider+registry+发布+宿主+真栈证据见 `evidence/g5-1-d4-unified-path/`（application applied / adapter `d4.revenue_detail` / source=onlyoffice）。
+- Task 12–13（公式治理总纲 / 正式 C4）：本轮价格侧已落地局部 WP preset+覆盖+未审合计对齐；D4-2 `periodTotal` 仍由表内公式/`formula_mask` 保护；平台级 F-SHELL/CAS 归属 `d4-dual-mode-formula-governance`。
+
 ## Task Dependency Graph
 ```json
 {"waves":[{"wave":1,"tasks":["1","2","2.1","3"],"rationale":"C0/C1形态核定并行"},{"wave":2,"tasks":["4","5"],"rationale":"净化与provider依赖Wave1"},{"wave":3,"tasks":["6","7"],"rationale":"registry和发布依赖契约"},{"wave":4,"tasks":["8","9"],"rationale":"接线依赖发布"},{"wave":5,"tasks":["10","11","12","13"],"rationale":"C4验收与alignment最后"}],"blocking":{"2":"数组往返未通过不得发布","1":"mapping_digest漂移阻塞契约和发布"}}
@@ -101,7 +105,9 @@ Task 1 未冻结字段映射前不得假定字段数量；Task 2 必须通过共
 
 
 ## Common Contract Alignment Gate
-- [ ] 12. 对齐总纲 `d4-dual-mode-formula-governance`：ContentMutationService/useWorkpaperSyncBridge；不同字段自动合并、同字段冲突保留三方轨迹；durable ack不等于applied；公式key使用`wp_id`，禁止Excel优先、最后写胜出、eval和外链。
+- [x] 12. 对齐总纲 `d4-dual-mode-formula-governance`：ContentMutationService/useWorkpaperSyncBridge；不同字段自动合并、同字段冲突保留三方轨迹；durable ack不等于applied；公式key使用`wp_id`，禁止Excel优先、最后写胜出、eval和外链。
+  - **本轮**：D4-2 走统一 sync bridge；表内 N 列 formula_mask；跨表 WP 取数（D4-10←D4-2 未审合计）经公式引擎 preset/override。平台 F-SHELL/CAS 仍由总纲 owner。
   - _Requirements: 2.1, 2.2, 3.1, 3.2, 6.1_
-- [ ] 13. C4逐D4-2/3验收：source evidence、stable identity、formula mask、roundtrip、权限、Playwright及变异；公式同步不发布TB/A13，只门控本spec相关产物。
+- [~] 13. C4逐D4-2/3验收：source evidence、stable identity、formula mask、roundtrip、权限、Playwright及变异；公式同步不发布TB/A13，只门控本spec相关产物。
+  - **本轮**：D4-2 真栈证据已在 `evidence/g5-1-d4-unified-path/`；D4-3 为兄弟表，正式 C4 矩阵仍随总纲推进。
   - _Requirements: 3.1, 3.2, 6.1_

@@ -10,9 +10,12 @@
 import { ref, computed, inject, toRef, nextTick, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4PolicyCheck } from '../../composables/useD4PolicyCheck'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 
 const props = defineProps<{
   wpId: string
@@ -23,13 +26,8 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-// ─── 双模式 ──────────────────────────────────────────────────────────
-const editorMode = ref<'structured' | 'onlyoffice'>('structured')
+// ─── OO 健康（tab 内 dualMode 用）────────────────────────────────────
 const ooHealthy = ref(false)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
 async function checkOoHealth() {
   try {
     const res = await http.get('/api/workpapers/onlyoffice/health', { _silent: true } as any)
@@ -68,12 +66,87 @@ const {
   totalCount,
   progress,
   guidanceTips,
+  flushPendingSave,
 } = useD4PolicyCheck({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+// ─── D4-5 专用 sync bridge（不并入父级 isD4DetailSheet）────────────────
+const D45_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D45_SHEET_KEY = 'd45-managed'
+const d45SyncSwitching = ref(false)
+const d45SyncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const d45EntryId = ref(D45_ENTRY)
+const d45SheetKey = ref(D45_SHEET_KEY)
+const d45SyncBridge = useWorkpaperSyncBridge({
+  entryId: d45EntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: d45SheetKey,
+  capability: capabilityForEntry(D45_ENTRY),
+  flushHtml: async () => {
+    flushPendingSave()
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D45_ENTRY,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey: D45_SHEET_KEY,
+    }
+  },
+  reloadHtml: async () => {
+    // 父级 formData.loadAll 由 d4:save / 全局 reload 覆盖；此处触发 checklist 刷新事件
+    window.dispatchEvent(new CustomEvent('d4:reload-responses'))
+  },
+})
+const d45SyncOoDescriptor = computed(() => d45SyncBridge.descriptor.value)
+const d45SyncBusy = computed(
+  () =>
+    d45SyncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(d45SyncBridge.state.value)),
+)
+
+const editorMode = computed({
+  get: (): 'structured' | 'onlyoffice' =>
+    d45SyncBridge.mode.value === 'oo' ? 'onlyoffice' : 'structured',
+  set: (v: 'structured' | 'onlyoffice') => {
+    void switchD45Mode(v)
+  },
+})
+const modeOptions = computed(() => [
+  { label: '结构化视图', value: 'structured' },
+  {
+    label: '在线编辑',
+    value: 'onlyoffice',
+    disabled: props.isReadonly || !ooHealthy.value || d45SyncBusy.value,
+  },
+])
+
+async function switchD45Mode(target: 'structured' | 'onlyoffice'): Promise<void> {
+  if (target === editorMode.value) return
+  if (target === 'onlyoffice') {
+    if (props.isReadonly || !ooHealthy.value) return
+    d45SyncSwitching.value = true
+    try {
+      await d45SyncBridge.switchToOnlyOffice()
+    } finally {
+      d45SyncSwitching.value = false
+    }
+    return
+  }
+  d45SyncSwitching.value = true
+  try {
+    await d45SyncBridge.switchToHtml()
+  } finally {
+    d45SyncSwitching.value = false
+  }
+}
 
 // ─── 各章节完成状态（引导式流程用） ──────────────────────────────────
 const bizModelDone = computed(() => bizModelItems.value.filter(i => i.content.trim()).length)
@@ -389,15 +462,16 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
       </div>
     </template>
 
-    <!-- OnlyOffice 模式 -->
+    <!-- OnlyOffice：D4-5 专用 sync 路径（sheet_key=d45-managed），不进父级 isD4DetailSheet -->
     <template v-else>
       <div style="min-height: 600px; height: calc(100vh - 280px);">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="营业收入会计政策检查D4-5"
-          :readonly="isReadonly"
+        <WorkpaperSyncEditorHost
+          v-if="d45SyncOoDescriptor"
+          ref="d45SyncHostRef"
+          :descriptor="d45SyncOoDescriptor"
+          :bridge="d45SyncBridge"
         />
+        <div v-else class="d45-oo-loading">正在打开 D4-5 同步编辑器…</div>
       </div>
     </template>
   </div>

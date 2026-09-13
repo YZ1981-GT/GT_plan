@@ -89,6 +89,121 @@ AuxAggregationResult
 3. 有 AutoSeed 的底稿（F1/K1）保留 AutoSeed，手动入口按 merge 语义（Requirement 4.5）
 4. 成功后走宿主既有 reload（保证审定表/附注级联刷新，Requirement 4.6）
 
+### D4-6/D4-7 上下游数据联动（Phase 3）
+
+#### D4-6 指标自动预填
+
+后端 `_d4_operating_revenue.py` 的 render 函数在 `html_data` 中新增 `indicator_prefill` 字段：
+
+```python
+# 在 D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED 灰度下
+indicator_prefill: dict[str, dict] = {}
+# 从 trial_balance 取审定数 → 按公式计算每项指标
+# 科目映射：1122=应收账款, 6001=主营业务收入, 4103=净利润, 1231=坏账准备, 资产总计=BS合计行
+# 涉及非 TB 数据（员工总数等）的指标不预填
+html_data["indicator_prefill"] = indicator_prefill
+```
+
+指标 key → 计算公式映射（纯函数 `build_d4_indicator_prefill`）：
+
+| key | 公式 | 科目 / 来源 |
+|---|---|---|
+| `ar-to-assets` | 1122审定 / 资产总计审定 | `trial_balance` |
+| `ar-turnover-days` | (期初1122+期末1122)/2 / (6001审定/365) | `trial_balance` + `tb_balance` |
+| `ar-turnover-times` | 6001审定 / (期初1122+期末1122)/2 | 同上 |
+| `net-profit-margin` | 4103审定 / 6001审定 | `trial_balance` |
+| `bad-debt-ratio` | 1231审定 / 1122审定 | `trial_balance` |
+| `revenue-per-employee` | — | 需 `project_info` 员工数，**不预填** |
+| `profit-per-employee` | — | 同上，**不预填** |
+| 其余 4 项 | 需折扣/折让/退货/末季月度/原材料，细粒度 > `trial_balance` 一级科目 | 视数据可用性，有则填无则空 |
+
+前端 `D4TabIndicator.vue` 的 `loadIndicators()` 增加 prefill 消费：
+
+```ts
+// 注入 htmlData（或从 allResponses 获取 render-config 下发的 indicator_prefill）
+const prefill = props.htmlData?.indicator_prefill ?? {}
+indicators.value = DEFAULT_INDICATORS.map(d => {
+  const p = prefill[d.key]
+  return {
+    ...d, current: p?.current ?? 0, prior: p?.prior ?? 0,
+    diff1: null, analysis1: '', industryAvg: null, diff2: null, analysis2: '',
+  }
+})
+```
+
+只在 `D4-6-indicators-v2` 无持久化数据时预填；已有数据走正常加载路径。
+
+#### D4-7 月度联动（从 D4-2 汇总）
+
+前端 `D4TabMarginMonthly.vue` 的 `loadMonthly()` 增加 D4-2 种子逻辑：
+
+```ts
+function loadMonthly() {
+  const resp = props.allResponses.get('D4-7-monthly')
+  if (resp?.remark) { /* 已有持久化数据，照常加载 */ return }
+  // 无持久化 → 尝试从 D4-2 汇总
+  const d42Resp = props.allResponses.get('D4-2-rows')
+  if (d42Resp?.remark) {
+    const d42Rows = JSON.parse(d42Resp.remark) // StoredRevenueRow[]
+    const revenue = new Array(12).fill(0)
+    for (const row of d42Rows) {
+      if (Array.isArray(row.months)) {
+        row.months.forEach((v, i) => { revenue[i] += parseFloat(v) || 0 })
+      }
+    }
+    monthly.value = { revenue, cost: new Array(12).fill(0), priorRevenue: 0, priorCost: 0 }
+    // 成本需从 6401 侧取或手填；此处只种子收入
+  }
+}
+```
+
+注意：成本侧月度数据不在 D4-2（D4-2 只有收入明细），cost 留 0 由审计师手填或从成本明细表联动（超出本 phase 范围）。
+
+#### D4-7 产品预填（从 segment_prefill）
+
+前端 `D4TabMarginMonthly.vue` 的 `loadProducts()` 增加 segment_prefill 种子：
+
+```ts
+function loadProducts() {
+  const resp = props.allResponses.get('D4-7-products')
+  if (resp?.remark) { /* 已有持久化数据，照常加载 */ return }
+  // 无持久化 → 从 render-config 的 segment_prefill 预填
+  const segments = props.htmlData?.segment_prefill
+  if (Array.isArray(segments) && segments.length > 0) {
+    products.value = segments.map(s => ({
+      name: s.label || '', curQty: 0,
+      curRevenue: s.current_revenue ?? 0,
+      curCost: s.current_cost ?? 0,
+      priorQty: 0,
+      priorRevenue: s.prior_revenue ?? 0,
+      priorCost: s.prior_cost ?? 0,
+      remark: '',
+    }))
+  }
+}
+```
+
+需要在主入口向 D4-7 传递 `htmlData` prop（当前 D4-7 只收 4 个 prop，不收 htmlData）。
+
+#### D4-7 月度数据导入导出
+
+后端 `_d4_import_export.py` 新增 `D4-7-monthly` 子表支持：
+- `_SHEET_HEADERS` 增加 `"D4-7-monthly"` 键：`["1月收入", "2月收入", ..., "12月收入", "1月成本", ..., "12月成本", "上期收入合计", "上期成本合计"]`
+- `_SUPPORTED_SHEETS` 增加 `"D4-7-monthly"`
+- 导入解析 `_parse_d4_7_monthly_row` 返回 `MonthlyData` 结构
+- 导入写入 `D4-7-monthly` 的 remark
+- 导出从 `D4-7-monthly` 读取并按列展开
+
+#### D4-7 上期数量导入修复
+
+`_parse_d4_7_row` 增加 `上期数量` 列解析：
+
+```python
+"priorQty": _safe_float(_col_val("上期数量")),
+```
+
+`_SHEET_HEADERS["D4-7"]` 在 `上期主营业务成本` 后面增加 `上期数量`。
+
 ## Data Models
 
 不新增表。写入落既有 `checklist_responses(wp_id, item_id, remark)` JSON 数组，字段与各循环前端 `serializeRows` 的持久化子集逐字一致（派生列不写）。
@@ -149,6 +264,24 @@ AuxAggregationResult
 缺口清单中每条 G-A/G-B 条目，在交付后必须同时满足：组件由真实 renderer registry 挂载；按钮在非只读 DOM 中可见；点击后网络请求命中该循环的已注册路由；响应被该宿主唯一 handler 消费并触发 reload。静态 AST/import/route registry 检查只能作为辅助，不能替代 Vitest 与 Playwright 行为证据。
 
 **Validates: Requirements 1.3, 6.3**
+
+### Property 9: D4-6 指标预填与 TB 一致性不变式
+
+对任意 D4-6 指标 key，如果后端能从 `trial_balance` / `tb_balance` 解析出所需科目余额（两个科目都有值），则 `indicator_prefill[key].current` 必须等于按公式计算的结果（如 `ar-to-assets` = 1122审定数 / 资产总计审定数），误差 ≤ 0.01；如果任一科目无数据，则该 key 不出现在 prefill 中（不伪造 0）。
+
+**Validates: Requirements 8.1, 8.2, 8.3**
+
+### Property 10: D4-7 月度种子与 D4-2 数据一致性不变式
+
+当 D4-7 月度从 D4-2 种子时，`seed.revenue[m]` 必须等于 `D4-2-rows` 中所有产品行的 `months[m]` 之和（m=0..11），不得遗漏行或月份；当 D4-2 无数据时 seed 为全零（不阻塞手填）。种子只在 `D4-7-monthly` 未持久化时执行，已有数据不覆盖。
+
+**Validates: Requirements 8.4**
+
+### Property 11: D4-7 产品预填与 segment_prefill 一致性不变式
+
+当 D4-7 产品表从 `segment_prefill` 预填时，产品数 = `segment_prefill.length`，每行的 `name` / `curRevenue` / `curCost` / `priorRevenue` / `priorCost` 分别对应 `label` / `current_revenue` / `current_cost` / `prior_revenue` / `prior_cost`；`segment_prefill` 为空时产品表留空不伪造。预填只在 `D4-7-products` 未持久化时执行。
+
+**Validates: Requirements 8.5**
 
 ## Testing Strategy
 

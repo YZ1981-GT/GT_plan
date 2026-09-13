@@ -162,8 +162,10 @@ __all__ = [
     "assert_no_runtime_binding",
     "assert_candidate_is_non_current",
     "build_instrumentation_payload",
+    "build_instrumentation_payload_for_sheets",
     "build_template_payload",
     "instrument_workbook_bytes",
+    "instrument_workbook_bytes_multi",
     "verify_visible_equivalence",
     "read_back_identity",
     "normalized_structure_hash",
@@ -242,6 +244,23 @@ _GT_SYNC_REL_ID: Final[str] = "rIdGTSYNC"
 _GT_TABLE_REL_ID: Final[str] = "rIdGTTBL1"
 _GT_SYNC_SHEET_PART: Final[str] = "xl/worksheets/sheetGtSync.xml"
 _GT_TABLE_PART: Final[str] = "xl/tables/tableGtRowId.xml"
+
+
+def _gt_table_part_for(*, template_id: str, primary: bool) -> str:
+    """受管 sheet 的 Table 部件路径。
+
+    首张（primary）保持历史文件名 `tableGtRowId.xml` 以稳既有 digest；
+    后续 sheet 用 `tableGtRowId_{template_id}.xml` 避免同 workbook 内撞名。
+    """
+    if primary:
+        return _GT_TABLE_PART
+    return f"xl/tables/tableGtRowId_{template_id}.xml"
+
+
+def _gt_table_rel_id_for(*, template_id: str, primary: bool) -> str:
+    if primary:
+        return _GT_TABLE_REL_ID
+    return f"rIdGTTBL_{template_id}"
 
 #: `<worksheet>` 里必须排在 `<tableParts>` **之前**的尾部元素（OOXML 顺序敏感）。
 _SHEET_TAIL_ORDER: Final[tuple[str, ...]] = (
@@ -616,6 +635,11 @@ class ExcelInstrumentationSpec:
     uuid_col: str
     table_name: str
     semantic_version: str = "1.0.0"
+    #: 契约 ``sheet_key``。缺省 ``{template_id.lower()}-managed``；
+    #: D4-25~28 前端锁死 ``d4-25-managed``（带连字符），必须显式传入，否则
+    #: instrumentation/anchors 写成 ``d425-managed`` 与契约对不上，
+    #: ``observe_structure_inventory`` 按契约 key 查物理 sheet 会整表跳过。
+    sheet_key: str | None = None
 
     def __post_init__(self) -> None:
         if not self.entry_id.strip():
@@ -639,6 +663,13 @@ class ExcelInstrumentationSpec:
                 f"隐藏 UUID 列 {self.uuid_col} 必须在受管业务列 {self.managed_last_col} 右侧，"
                 "否则会覆盖可见业务单元格（Requirement 6.13：不得改变业务公式/标签）"
             )
+
+    @property
+    def resolved_sheet_key(self) -> str:
+        explicit = (self.sheet_key or "").strip()
+        if explicit:
+            return explicit
+        return f"{self.template_id.lower()}-managed"
 
     @property
     def managed_range(self) -> str:
@@ -688,39 +719,38 @@ def build_template_payload(*, spec: ExcelInstrumentationSpec, template_sha256: s
     return payload
 
 
-def build_instrumentation_payload(
-    *,
-    spec: ExcelInstrumentationSpec,
-    template_definition_sha256: str,
-    template_sha256: str,
-    gate: ExcelIdentityCarrierGate,
-    identity_anchors: Sequence[str] = ("defined_name_ref", "excel_table_sheet_association"),
-) -> dict[str, Any]:
-    """instrumentation definition 的 canonical semantic payload。
+def _managed_sheet_payload_entry(spec: ExcelInstrumentationSpec) -> dict[str, Any]:
+    """单张受管 sheet 在 instrumentation payload 里的声明。"""
+    return {
+        # 逻辑 sheet 身份（contract 的 sheet_key）。**不是**展示名、**不是** sheetId。
+        "sheet_key": spec.resolved_sheet_key,
+        "locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": f"GT_MANAGED_REGION_{spec.template_id}",
+        },
+        "region_boundary_locator": {
+            "anchor": "excel_table_sheet_association",
+            "table_key": spec.table_name,
+        },
+        "tables": [
+            {
+                "table_key": spec.table_name,
+                "row_identity": "row_uuid",
+                "row_uuid_column_letter": spec.uuid_col,
+                "row_uuid_literal_prefix": f"GTROW-{spec.template_id}-",
+                "header_row_count": 0,
+                "managed_row_count_at_instrumentation": spec.row_count,
+            }
+        ],
+        "footer_locator": {
+            "anchor": "defined_name_ref",
+            "defined_name": f"GT_FOOTER_ANCHOR_{spec.template_id}",
+        },
+    }
 
-    四条硬约束（Requirement 6.14），每条都由**别处的判据**兜住而不是靠这里写对：
 
-    1. 不含自身 UUID/hash → Task 12 `validate_instrumentation_payload` 的
-       `_assert_no_self_reference`（禁 `id` / `sha256` / `artifact_id` … 等键名）；
-    2. 不含 contract/bundle 反向引用 → 同一函数的 `_BACKWARD_REFERENCE_PREFIXES`；
-    3. 单向引用已发布 template digest → 同一函数强制 `template_definition_sha256`；
-    4. 不依赖被证伪的锚点 → 本函数逐个 `gate.assert_anchor_allowed(...)`。
-
-    **payload 里没有 sheetId、没有 sheet 展示名、没有中文 label、没有单元格坐标当
-    identity**：受管 sheet 由 defined name 定位、受管行区域边界由 Table 定位、行身份
-    由隐藏列里的字面量 UUID 表达。`cell_geometry` 只描述注入时刻的几何（用于
-    instrumentation 复现），它被显式标注 `anchor_role: "none"`。
-    """
-    for anchor in identity_anchors:
-        gate.assert_anchor_allowed(anchor)
-    for carrier in ("hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"):
-        gate.assert_carrier_allowed(carrier)
-    if not is_digest(template_definition_sha256):
-        raise InstrumentationError(
-            f"template_definition_sha256 非法: {template_definition_sha256!r}"
-        )
-
-    names = {
+def _defined_name_templates_for(spec: ExcelInstrumentationSpec) -> dict[str, str]:
+    return {
         name: ref_tpl.format(
             sheet="{managed_sheet}",
             first=spec.first_data_row,
@@ -731,10 +761,91 @@ def build_instrumentation_payload(
         )
         for name, ref_tpl, _ in spec.defined_names()
     }
+
+
+def build_instrumentation_payload_for_sheets(
+    *,
+    specs: Sequence[ExcelInstrumentationSpec],
+    template_definition_sha256: str,
+    template_sha256: str,
+    gate: ExcelIdentityCarrierGate,
+    identity_anchors: Sequence[str] = ("defined_name_ref", "excel_table_sheet_association"),
+) -> dict[str, Any]:
+    """多受管 sheet 的 instrumentation definition canonical payload。
+
+    每张 sheet 各自保留 `GT_MANAGED_REGION_{template_id}` / Table / UUID 列声明；
+    顶层 `template_id` 取第一张（发布 DAG 与既有单 sheet 调用兼容）。
+    """
+    if not specs:
+        raise InstrumentationError("build_instrumentation_payload_for_sheets: specs 不得为空")
+    entry_ids = {s.entry_id for s in specs}
+    if len(entry_ids) != 1:
+        raise InstrumentationError(
+            f"同一 instrumentation payload 的 specs 必须同属一个 entry_id，实得 {sorted(entry_ids)}"
+        )
+    template_ids = [s.template_id for s in specs]
+    if len(set(template_ids)) != len(template_ids):
+        raise InstrumentationError(
+            f"多 sheet instrumentation 的 template_id 必须唯一，实得 {template_ids}"
+        )
+    table_names = [s.table_name for s in specs]
+    if len(set(table_names)) != len(table_names):
+        raise InstrumentationError(
+            f"多 sheet instrumentation 的 table_name 必须唯一，实得 {table_names}"
+        )
+
+    for anchor in identity_anchors:
+        gate.assert_anchor_allowed(anchor)
+    for carrier in ("hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"):
+        gate.assert_carrier_allowed(carrier)
+    if not is_digest(template_definition_sha256):
+        raise InstrumentationError(
+            f"template_definition_sha256 非法: {template_definition_sha256!r}"
+        )
+
+    primary = specs[0]
+    names: dict[str, str] = {}
+    for spec in specs:
+        names.update(_defined_name_templates_for(spec))
+
+    hidden_meta: dict[str, Any] = {
+        "sheet_name": GT_SYNC_SHEET_NAME,
+        "keys": list(REQUIRED_GT_SYNC_KEYS),
+        "runtime_binding_keys_written_at_finalize_only": list(RUNTIME_BINDING_KEYS),
+    }
+    # 多 sheet 时显式列出全部 sheet_key / template_id；单 sheet 保持历史字段集以稳 digest。
+    if len(specs) > 1:
+        hidden_meta["managed_sheet_keys"] = [
+            s.resolved_sheet_key for s in specs
+        ]
+        hidden_meta["template_ids"] = list(template_ids)
+
+    cell_geometry: dict[str, Any] = {
+        "anchor_role": "none",
+        "note": (
+            "仅描述注入时刻的几何以便复现 instrumentation；运行时定位一律走 "
+            "identity_anchors，不得按坐标猜"
+            + ("。多 sheet 时 sheets[] 按 managed_sheets 顺序。" if len(specs) > 1 else "")
+        ),
+        "managed_range": primary.managed_range,
+        "table_ref": primary.table_ref,
+        "footer_row": primary.footer_row,
+    }
+    if len(specs) > 1:
+        cell_geometry["sheets"] = [
+            {
+                "sheet_key": spec.resolved_sheet_key,
+                "managed_range": spec.managed_range,
+                "table_ref": spec.table_ref,
+                "footer_row": spec.footer_row,
+            }
+            for spec in specs
+        ]
+
     payload: dict[str, Any] = {
         "schema_version": INSTRUMENTATION_SCHEMA_VERSION,
-        "entry_id": spec.entry_id,
-        "template_id": spec.template_id,
+        "entry_id": primary.entry_id,
+        "template_id": primary.template_id,
         # 单向引用：已发布 template definition 的 digest + 模板 blob 的内容身份
         "template_definition_sha256": template_definition_sha256,
         "template_sha256": template_sha256,
@@ -743,40 +854,9 @@ def build_instrumentation_payload(
         "identity_carriers": list(sorted(gate.allowed_carriers)),
         "identity_anchors": list(identity_anchors),
         "forbidden_anchors": list(sorted(gate.forbidden_anchors)),
-        "managed_sheets": [
-            {
-                # 逻辑 sheet 身份（contract 的 sheet_key）。**不是**展示名、**不是** sheetId。
-                "sheet_key": f"{spec.template_id.lower()}-managed",
-                "locator": {
-                    "anchor": "defined_name_ref",
-                    "defined_name": f"GT_MANAGED_REGION_{spec.template_id}",
-                },
-                "region_boundary_locator": {
-                    "anchor": "excel_table_sheet_association",
-                    "table_key": spec.table_name,
-                },
-                "tables": [
-                    {
-                        "table_key": spec.table_name,
-                        "row_identity": "row_uuid",
-                        "row_uuid_column_letter": spec.uuid_col,
-                        "row_uuid_literal_prefix": f"GTROW-{spec.template_id}-",
-                        "header_row_count": 0,
-                        "managed_row_count_at_instrumentation": spec.row_count,
-                    }
-                ],
-                "footer_locator": {
-                    "anchor": "defined_name_ref",
-                    "defined_name": f"GT_FOOTER_ANCHOR_{spec.template_id}",
-                },
-            }
-        ],
+        "managed_sheets": [_managed_sheet_payload_entry(spec) for spec in specs],
         "defined_names": names,
-        "hidden_metadata_sheet": {
-            "sheet_name": GT_SYNC_SHEET_NAME,
-            "keys": list(REQUIRED_GT_SYNC_KEYS),
-            "runtime_binding_keys_written_at_finalize_only": list(RUNTIME_BINDING_KEYS),
-        },
+        "hidden_metadata_sheet": hidden_meta,
         "row_uuid_disposition": {
             "empty_uuid_on_new_row": "allocate_new_id",
             "duplicate_uuid_from_copy": "structural_conflict",
@@ -785,20 +865,29 @@ def build_instrumentation_payload(
         },
         "visible_equivalence_policy": "strict",
         "ignored_by_business_sheet_enumerators": [GT_SYNC_SHEET_NAME],
-        "cell_geometry": {
-            "anchor_role": "none",
-            "note": (
-                "仅描述注入时刻的几何以便复现 instrumentation；运行时定位一律走 "
-                "identity_anchors，不得按坐标猜"
-            ),
-            "managed_range": spec.managed_range,
-            "table_ref": spec.table_ref,
-            "footer_row": spec.footer_row,
-        },
+        "cell_geometry": cell_geometry,
     }
     validate_instrumentation_payload(payload)
     _assert_no_forbidden_anchor_declared(payload, gate=gate)
     return payload
+
+
+def build_instrumentation_payload(
+    *,
+    spec: ExcelInstrumentationSpec,
+    template_definition_sha256: str,
+    template_sha256: str,
+    gate: ExcelIdentityCarrierGate,
+    identity_anchors: Sequence[str] = ("defined_name_ref", "excel_table_sheet_association"),
+) -> dict[str, Any]:
+    """单受管 sheet 的 instrumentation payload（委托多 sheet 构建器）。"""
+    return build_instrumentation_payload_for_sheets(
+        specs=(spec,),
+        template_definition_sha256=template_definition_sha256,
+        template_sha256=template_sha256,
+        gate=gate,
+        identity_anchors=identity_anchors,
+    )
 
 
 def _iter_anchor_declarations(node: Any) -> Iterable[str]:
@@ -1017,7 +1106,7 @@ def _hide_uuid_column(sheet_xml: str, *, uuid_col: str) -> str:
     return _insert_before(sheet_xml, "<sheetData", f"<cols>{col}</cols>", what="cols block")
 
 
-def _attach_table_part(sheet_xml: str) -> str:
+def _attach_table_part(sheet_xml: str, *, rel_id: str = _GT_TABLE_REL_ID) -> str:
     # 🔴 Task 42 修：`<tablePart>` 用 `r:id`，而**有些工作簿的 `<worksheet>` 根元素并不
     #    声明 `xmlns:r`**（实测 `H1 固定资产.xlsx` 的 26 张 sheet 全是这种：根元素只有
     #    默认命名空间，`r:` 声明写在需要它的子元素上）。原实现无条件不带声明，对这类
@@ -1030,7 +1119,7 @@ def _attach_table_part(sheet_xml: str) -> str:
     rel_ns_decl = "" if 'xmlns:r="' in root_tag else f' xmlns:r="{_REL_NS}"'
     block = (
         f'<tableParts{rel_ns_decl} count="1">'
-        f'<tablePart r:id="{_GT_TABLE_REL_ID}"/></tableParts>'
+        f'<tablePart r:id="{rel_id}"/></tableParts>'
     )
     for tail in _SHEET_TAIL_ORDER:
         idx = sheet_xml.find(f"<{tail}")
@@ -1039,61 +1128,40 @@ def _attach_table_part(sheet_xml: str) -> str:
     return _insert_before(sheet_xml, "</worksheet>", block, what="tableParts")
 
 
-def instrument_workbook_bytes(
-    source: bytes, spec: ExcelInstrumentationSpec, *, gate: ExcelIdentityCarrierGate
-) -> InstrumentedWorkbook:
-    """把四类探针通过的 identity 载体注入 workbook **副本字节**。
+def _quote_sheet_name(sheet_name: str) -> str:
+    return (
+        f"'{sheet_name}'"
+        if re.search(r"[\s\-()（）]", sheet_name)
+        else sheet_name
+    )
 
-    只吃 bytes、只吐 bytes：本函数结构上碰不到 `backend/wp_templates/` 里的文件
-    （Requirement 9.9「不得在运行时临时写回模板库」）。
+
+def _inject_managed_sheet(
+    entries: dict[str, bytes],
+    *,
+    workbook_xml: str,
+    content_types: str,
+    spec: ExcelInstrumentationSpec,
+    primary: bool,
+) -> tuple[str, str, dict[int, str], dict[str, str], str]:
+    """对一张受管 sheet 注入 Table + UUID 列 + defined names。
+
+    返回 `(workbook_xml, content_types, uuids, defined_name_refs, managed_sheet_id)`。
+    `_GT_SYNC` 由调用方一次性创建 —— 本函数不得再写 metadata sheet。
     """
-    for carrier in ("hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"):
-        gate.assert_carrier_allowed(carrier)
-
-    template_sha = _sha256_bytes(source)
-    try:
-        with zipfile.ZipFile(io.BytesIO(source)) as zf:
-            entries: dict[str, bytes] = {name: zf.read(name) for name in zf.namelist()}
-    except zipfile.BadZipFile as exc:
-        raise InstrumentationError(f"源 artifact 不是合法 xlsx zip: {exc}") from exc
-
-    for required in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
-        if required not in entries:
-            raise InstrumentationError(f"源 artifact 缺 OOXML 必需部件: {required}")
-    if _GT_SYNC_SHEET_PART in entries or _GT_TABLE_PART in entries:
+    table_part = _gt_table_part_for(template_id=spec.template_id, primary=primary)
+    table_rel_id = _gt_table_rel_id_for(template_id=spec.template_id, primary=primary)
+    if table_part in entries:
         raise InstrumentationError(
-            "源 artifact 已含 instrumentation 部件 —— 重复注入会产生第二套 identity；"
-            "存量 instrumented artifact 应走 definition 升级而不是再注入一次"
+            f"源 artifact 已含 instrumentation 部件 {table_part} —— 重复注入会产生第二套 identity"
         )
 
-    workbook_xml = entries["xl/workbook.xml"].decode("utf-8")
     wb_rels_xml = entries["xl/_rels/workbook.xml.rels"].decode("utf-8")
-    content_types = entries["[Content_Types].xml"].decode("utf-8")
-
     managed_sheet_id = _sheet_id_for(workbook_xml, spec.managed_sheet)
     target_part = _sheet_part_for(workbook_xml, wb_rels_xml, spec.managed_sheet)
     if target_part not in entries:
         raise InstrumentationError(f"目标 sheet 部件不存在: {target_part}")
 
-    # ── BP-21 门：声明的受管行区间末行不得落在「排版占位行」上 ──────────────
-    #
-    # 中文审计模板普遍在数据区末尾放一行续行省略号（整格 `……`），紧跟其后才是 `合计`。
-    # 受管区行范围是派生的，派生规则「表头与合计之间都是数据行」会把它一并吞进受管区 ⇒
-    # materialize 试图把 `……` 按 `integer` 写回业务字段（首版发布实测卡在 H1 的 `A27`）。
-    #
-    # 🔴 为什么排在**这里**：本函数是「provider 声明的行区间」第一次遇上「模板真实字节」的
-    #    地方。往后一步（`uuids = {...}`）就已经按声明的区间给占位行发了 row UUID，那个
-    #    UUID 会进冻结 identity inventory，此后无论读侧怎么收缩都会被
-    #    `assert_identity_inventory_retained` 判成「OO 往返后丢了一个 row identity」——
-    #    实测过：只在 `resolve_managed_region` 收缩会撞 `IdentityRetentionError`。
-    #    区间、UUID 集合、冻结清册三者必须**同源**收缩，而它们的共同上游只有本函数。
-    #
-    # 🔴 为什么 fail closed 而不是引擎自动收缩：自动收缩会让 `GT_ROW_UUID_LAST_ROW` 写 27
-    #    而 UUID 只到 26，「声明与实况不符」自己是一类缺陷；且下一个 provider 作者永远不会
-    #    知道这条规则存在。fail closed 让他撞一次、改一次，而声明可被 digest 冻结。
-    #
-    # 全库实测 170 处 / 37 份模板 / 35 个 wp_code ⇒ 逐契约写 `excluded_rows` 必然遗漏，
-    # 故落成平台级门。判据实现在 `excel_typography_rows`（单一真源，验收脚本也消费它）。
     _where = f"entry {spec.entry_id} / sheet {spec.managed_sheet!r}"
     try:
         _typography.assert_label_column_matches_spec(spec.table_ref, where=_where)
@@ -1110,26 +1178,179 @@ def instrument_workbook_bytes(
 
     uuids = {row: spec.row_uuid(row) for row in range(spec.first_data_row, spec.last_data_row + 1)}
 
-    # ── 载体 1：hidden `_GT_SYNC` metadata sheet ──────────────────────
+    quoted = _quote_sheet_name(spec.managed_sheet)
+    sheet_order = re.findall(r'<sheet [^>]*name="([^"]+)"', workbook_xml)
+    local_sheet_id = sheet_order.index(_xml_escape(spec.managed_sheet))
+    refs: dict[str, str] = {}
+    nodes: list[str] = []
+    for name, ref_tpl, sheet_local in spec.defined_names():
+        ref = ref_tpl.format(
+            sheet=quoted,
+            first=spec.first_data_row,
+            last=spec.last_data_row,
+            last_col=spec.managed_last_col,
+            footer=spec.footer_row,
+            uuid_col=spec.uuid_col,
+        )
+        refs[name] = ref
+        scope = f' localSheetId="{local_sheet_id}"' if sheet_local else ""
+        nodes.append(f'<definedName name="{name}"{scope}>{_xml_escape(ref)}</definedName>')
+    joined = "".join(nodes)
+    if "<definedNames>" in workbook_xml:
+        workbook_xml = _insert_before(workbook_xml, "</definedNames>", joined, what="defined names")
+    else:
+        workbook_xml = workbook_xml.replace(
+            "</sheets>", f"</sheets><definedNames>{joined}</definedNames>", 1
+        )
+
+    sheet_xml = entries[target_part].decode("utf-8")
+    sheet_xml = _add_uuid_cells(sheet_xml, uuid_col=spec.uuid_col, uuids=uuids)
+    sheet_xml = _hide_uuid_column(sheet_xml, uuid_col=spec.uuid_col)
+    dim = re.search(r'<dimension ref="([A-Z]+\d+):([A-Z]+)(\d+)"/>', sheet_xml)
+    if dim and _col_index(dim.group(2)) < _col_index(spec.uuid_col):
+        sheet_xml = sheet_xml.replace(
+            dim.group(0), f'<dimension ref="{dim.group(1)}:{spec.uuid_col}{dim.group(3)}"/>', 1
+        )
+    table_ids = [
+        int(m)
+        for name, blob in entries.items()
+        if name.startswith("xl/tables/")
+        for m in re.findall(r'<table [^>]*\bid="(\d+)"', blob.decode("utf-8", "replace"))
+    ]
+    entries[table_part] = _table_xml(
+        table_id=(max(table_ids) + 1) if table_ids else 1,
+        name=spec.table_name,
+        ref=spec.table_ref,
+        column_count=_col_index(spec.uuid_col),
+    )
+    sheet_xml = _attach_table_part(sheet_xml, rel_id=table_rel_id)
+    rels_part = f"{target_part.rsplit('/', 1)[0]}/_rels/{target_part.rsplit('/', 1)[1]}.rels"
+    # 相对路径：从 worksheets/ 看 tables/
+    table_target = f"../tables/{table_part.rsplit('/', 1)[-1]}"
+    rel_node = (
+        f'<Relationship Id="{table_rel_id}" Type="{_REL_NS}/table" '
+        f'Target="{table_target}"/>'
+    )
+    if rels_part in entries:
+        entries[rels_part] = _insert_before(
+            entries[rels_part].decode("utf-8"), "</Relationships>", rel_node, what="table 关系"
+        ).encode("utf-8")
+    else:
+        entries[rels_part] = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f"{rel_node}</Relationships>"
+        ).encode("utf-8")
+    content_types = _insert_before(
+        content_types,
+        "</Types>",
+        f'<Override PartName="/{table_part}" ContentType="application/'
+        'vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>',
+        what="table content type",
+    )
+    entries[target_part] = sheet_xml.encode("utf-8")
+    return workbook_xml, content_types, uuids, refs, managed_sheet_id
+
+
+def instrument_workbook_bytes_multi(
+    source: bytes,
+    specs: Sequence[ExcelInstrumentationSpec],
+    *,
+    gate: ExcelIdentityCarrierGate,
+) -> InstrumentedWorkbook:
+    """把多张受管 sheet 的 identity 载体注入**同一份**干净 workbook 副本。
+
+    关键一次 `_GT_SYNC`；每张 sheet 各自 Table / UUID 列 / defined names。
+    返回值以**第一张** spec 为主字段（兼容既有单 sheet 消费方）；
+    `defined_name_refs` / `gt_sync_pairs` 含全部 sheet。
+    """
+    if not specs:
+        raise InstrumentationError("instrument_workbook_bytes_multi: specs 不得为空")
+    entry_ids = {s.entry_id for s in specs}
+    if len(entry_ids) != 1:
+        raise InstrumentationError(
+            f"多 sheet 注入的 specs 必须同属一个 entry_id，实得 {sorted(entry_ids)}"
+        )
+    for carrier in ("hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"):
+        gate.assert_carrier_allowed(carrier)
+
+    template_sha = _sha256_bytes(source)
+    try:
+        with zipfile.ZipFile(io.BytesIO(source)) as zf:
+            entries: dict[str, bytes] = {name: zf.read(name) for name in zf.namelist()}
+    except zipfile.BadZipFile as exc:
+        raise InstrumentationError(f"源 artifact 不是合法 xlsx zip: {exc}") from exc
+
+    for required in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
+        if required not in entries:
+            raise InstrumentationError(f"源 artifact 缺 OOXML 必需部件: {required}")
+    already = [
+        name
+        for name in entries
+        if name == _GT_SYNC_SHEET_PART
+        or name == _GT_TABLE_PART
+        or name.startswith("xl/tables/tableGtRowId")
+    ]
+    if already:
+        raise InstrumentationError(
+            "源 artifact 已含 instrumentation 部件 —— 重复注入会产生第二套 identity；"
+            "存量 instrumented artifact 应走 definition 升级而不是再注入一次"
+            f"（命中: {already[:3]}）"
+        )
+
+    workbook_xml = entries["xl/workbook.xml"].decode("utf-8")
+    wb_rels_xml = entries["xl/_rels/workbook.xml.rels"].decode("utf-8")
+    content_types = entries["[Content_Types].xml"].decode("utf-8")
+
+    primary = specs[0]
+    primary_sheet_id = _sheet_id_for(workbook_xml, primary.managed_sheet)
+
+    # ── 载体 1：hidden `_GT_SYNC` metadata sheet（一次）────────────────
     pairs: list[tuple[str, str]] = [
         ("GT_SYNC_SCHEMA_VERSION", "1"),
         ("GT_IDENTITY_SCHEMA_VERSION", IDENTITY_SCHEMA_VERSION),
         ("GT_INSTRUMENTATION_VERSION", INSTRUMENTATION_VERSION),
-        ("GT_TEMPLATE_ID", spec.template_id),
+        ("GT_TEMPLATE_ID", primary.template_id),
         ("GT_TEMPLATE_SHA256", template_sha),
-        ("GT_ENTRY_ID", spec.entry_id),
+        ("GT_ENTRY_ID", primary.entry_id),
         # 🔴 保留但**降级**：Task 5 已证伪 sheetId 作为运行时锚点（OO 每次保存重编号）。
-        #    该键只是 instrumentation 时刻的审计线索，契约 usage_rules 写死了这一点。
-        ("GT_MANAGED_SHEET_ID", managed_sheet_id),
-        ("GT_MANAGED_SHEET_NAME_AT_INSTRUMENTATION", spec.managed_sheet),
-        ("GT_MANAGED_RANGE", spec.managed_range),
-        ("GT_FOOTER_ROW", str(spec.footer_row)),
-        ("GT_ROW_UUID_COLUMN", spec.uuid_col),
-        ("GT_ROW_UUID_FIRST_ROW", str(spec.first_data_row)),
-        ("GT_ROW_UUID_LAST_ROW", str(spec.last_data_row)),
-        ("GT_MANAGED_TABLE", spec.table_name),
-        ("GT_MANAGED_TABLE_REF", spec.table_ref),
+        ("GT_MANAGED_SHEET_ID", primary_sheet_id),
+        ("GT_MANAGED_SHEET_NAME_AT_INSTRUMENTATION", primary.managed_sheet),
+        ("GT_MANAGED_RANGE", primary.managed_range),
+        ("GT_FOOTER_ROW", str(primary.footer_row)),
+        # 主 sheet 带 template_id 的冻结 footer，供多 sheet binding 按表取用。
+        (f"GT_FOOTER_ROW_{primary.template_id}", str(primary.footer_row)),
+        ("GT_ROW_UUID_COLUMN", primary.uuid_col),
+        ("GT_ROW_UUID_FIRST_ROW", str(primary.first_data_row)),
+        ("GT_ROW_UUID_LAST_ROW", str(primary.last_data_row)),
+        ("GT_MANAGED_TABLE", primary.table_name),
+        ("GT_MANAGED_TABLE_REF", primary.table_ref),
     ]
+    if len(specs) > 1:
+        pairs.extend(
+            [
+                (
+                    "GT_TEMPLATE_IDS",
+                    ",".join(s.template_id for s in specs),
+                ),
+                (
+                    "GT_MANAGED_SHEET_KEYS",
+                    ",".join(s.resolved_sheet_key for s in specs),
+                ),
+                (
+                    "GT_MANAGED_SHEET_NAMES_AT_INSTRUMENTATION",
+                    "|".join(s.managed_sheet for s in specs),
+                ),
+                (
+                    "GT_MANAGED_TABLES",
+                    ",".join(s.table_name for s in specs),
+                ),
+            ]
+        )
+        for sibling in specs[1:]:
+            pairs.append(
+                (f"GT_FOOTER_ROW_{sibling.template_id}", str(sibling.footer_row))
+            )
     pair_map = dict(pairs)
     missing_required = [k for k in REQUIRED_GT_SYNC_KEYS if k not in pair_map]
     if missing_required:
@@ -1140,14 +1361,6 @@ def instrument_workbook_bytes(
     entries[_GT_SYNC_SHEET_PART] = _gt_sync_sheet_xml(pairs)
 
     existing_ids = [int(m) for m in re.findall(r'<sheet [^>]*sheetId="(\d+)"', workbook_xml)]
-    # 🔴 Task 42 修：注入的 `<sheet>` 用 `r:id`，而**有些工作簿的 `<workbook>` 根元素
-    #    并不声明 `xmlns:r`** —— 它们把声明写在每个 `<sheet>` 元素上（实测
-    #    `H1 固定资产.xlsx` 就是这种：根元素只有默认命名空间，26 个 `<sheet>` 各带一份
-    #    `xmlns:r=...`）。原实现无条件不带声明，对这类工作簿产出的 workbook.xml 里
-    #    `r:` 前缀**未绑定**，`ET.fromstring` 直接 `ParseError: unbound prefix`，
-    #    下游 `identity_inventory` / `structure_fingerprint` 全线不可用。
-    #    只在根元素**确实没有**声明时才补一份（同 URI 的重复声明虽合法，但无条件加会改动
-    #    另外 358 个工作簿的注入字节，从而改掉 Task 40/41 已冻结的 structure hash）。
     _root_end = workbook_xml.find(">", workbook_xml.find("<workbook"))
     _root_tag = workbook_xml[: _root_end + 1] if _root_end > 0 else workbook_xml
     _rel_ns_decl = "" if 'xmlns:r="' in _root_tag else f' xmlns:r="{_REL_NS}"'
@@ -1173,85 +1386,23 @@ def instrument_workbook_bytes(
         'vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
         what="_GT_SYNC content type",
     )
-
-    # ── 载体 2：defined names（sheet 改名后 OO 会自动改写 ref）───────────
-    quoted = (
-        f"'{spec.managed_sheet}'"
-        if re.search(r"[\s\-()（）]", spec.managed_sheet)
-        else spec.managed_sheet
-    )
-    sheet_order = re.findall(r'<sheet [^>]*name="([^"]+)"', workbook_xml)
-    local_sheet_id = sheet_order.index(_xml_escape(spec.managed_sheet))
-    refs: dict[str, str] = {}
-    nodes: list[str] = []
-    for name, ref_tpl, sheet_local in spec.defined_names():
-        ref = ref_tpl.format(
-            sheet=quoted,
-            first=spec.first_data_row,
-            last=spec.last_data_row,
-            last_col=spec.managed_last_col,
-            footer=spec.footer_row,
-            uuid_col=spec.uuid_col,
-        )
-        refs[name] = ref
-        scope = f' localSheetId="{local_sheet_id}"' if sheet_local else ""
-        nodes.append(f'<definedName name="{name}"{scope}>{_xml_escape(ref)}</definedName>')
-    joined = "".join(nodes)
-    if "<definedNames>" in workbook_xml:
-        workbook_xml = _insert_before(workbook_xml, "</definedNames>", joined, what="defined names")
-    else:
-        workbook_xml = workbook_xml.replace(
-            "</sheets>", f"</sheets><definedNames>{joined}</definedNames>", 1
-        )
-
-    # ── 载体 3/4：Excel Table + 隐藏 UUID 列 ──────────────────────────
-    sheet_xml = entries[target_part].decode("utf-8")
-    sheet_xml = _add_uuid_cells(sheet_xml, uuid_col=spec.uuid_col, uuids=uuids)
-    sheet_xml = _hide_uuid_column(sheet_xml, uuid_col=spec.uuid_col)
-    dim = re.search(r'<dimension ref="([A-Z]+\d+):([A-Z]+)(\d+)"/>', sheet_xml)
-    if dim and _col_index(dim.group(2)) < _col_index(spec.uuid_col):
-        sheet_xml = sheet_xml.replace(
-            dim.group(0), f'<dimension ref="{dim.group(1)}:{spec.uuid_col}{dim.group(3)}"/>', 1
-        )
-    table_ids = [
-        int(m)
-        for name, blob in entries.items()
-        if name.startswith("xl/tables/")
-        for m in re.findall(r'<table [^>]*\bid="(\d+)"', blob.decode("utf-8", "replace"))
-    ]
-    entries[_GT_TABLE_PART] = _table_xml(
-        table_id=(max(table_ids) + 1) if table_ids else 1,
-        name=spec.table_name,
-        ref=spec.table_ref,
-        column_count=_col_index(spec.uuid_col),
-    )
-    sheet_xml = _attach_table_part(sheet_xml)
-    rels_part = f"{target_part.rsplit('/', 1)[0]}/_rels/{target_part.rsplit('/', 1)[1]}.rels"
-    rel_node = (
-        f'<Relationship Id="{_GT_TABLE_REL_ID}" Type="{_REL_NS}/table" '
-        'Target="../tables/tableGtRowId.xml"/>'
-    )
-    if rels_part in entries:
-        entries[rels_part] = _insert_before(
-            entries[rels_part].decode("utf-8"), "</Relationships>", rel_node, what="table 关系"
-        ).encode("utf-8")
-    else:
-        entries[rels_part] = (
-            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            f"{rel_node}</Relationships>"
-        ).encode("utf-8")
-    content_types = _insert_before(
-        content_types,
-        "</Types>",
-        f'<Override PartName="/{_GT_TABLE_PART}" ContentType="application/'
-        'vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>',
-        what="table content type",
-    )
-
-    entries[target_part] = sheet_xml.encode("utf-8")
-    entries["xl/workbook.xml"] = workbook_xml.encode("utf-8")
     entries["xl/_rels/workbook.xml.rels"] = wb_rels_xml.encode("utf-8")
+
+    all_refs: dict[str, str] = {}
+    primary_uuids: dict[int, str] = {}
+    for index, spec in enumerate(specs):
+        workbook_xml, content_types, uuids, refs, _sid = _inject_managed_sheet(
+            entries,
+            workbook_xml=workbook_xml,
+            content_types=content_types,
+            spec=spec,
+            primary=index == 0,
+        )
+        all_refs.update(refs)
+        if index == 0:
+            primary_uuids = uuids
+
+    entries["xl/workbook.xml"] = workbook_xml.encode("utf-8")
     entries["[Content_Types].xml"] = content_types.encode("utf-8")
 
     buf = io.BytesIO()
@@ -1264,13 +1415,24 @@ def instrument_workbook_bytes(
         source_sha256=template_sha,
         instrumented_bytes=result,
         instrumented_sha256=_sha256_bytes(result),
-        managed_sheet_name_at_instrumentation=spec.managed_sheet,
-        managed_sheet_id_at_instrumentation=managed_sheet_id,
-        row_uuids=uuids,
+        managed_sheet_name_at_instrumentation=primary.managed_sheet,
+        managed_sheet_id_at_instrumentation=primary_sheet_id,
+        row_uuids=primary_uuids,
         gt_sync_pairs=pair_map,
-        defined_name_refs=refs,
-        table_ref=spec.table_ref,
+        defined_name_refs=all_refs,
+        table_ref=primary.table_ref,
     )
+
+
+def instrument_workbook_bytes(
+    source: bytes, spec: ExcelInstrumentationSpec, *, gate: ExcelIdentityCarrierGate
+) -> InstrumentedWorkbook:
+    """把四类探针通过的 identity 载体注入 workbook **副本字节**（单 sheet 包装）。
+
+    只吃 bytes、只吐 bytes：本函数结构上碰不到 `backend/wp_templates/` 里的文件
+    （Requirement 9.9「不得在运行时临时写回模板库」）。
+    """
+    return instrument_workbook_bytes_multi(source, (spec,), gate=gate)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

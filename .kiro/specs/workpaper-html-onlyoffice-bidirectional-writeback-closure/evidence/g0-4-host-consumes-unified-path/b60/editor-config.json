@@ -1,0 +1,39 @@
+{
+  "callback_url": "http://host.docker.internal:9980/api/workpaper-sync/rooms/e4c46326-ab6f-463a-836d-47288b0ab1ae/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+  "capture_kind": "playwright_runtime_editor_config_capture",
+  "complete_for_negative_assertion": false,
+  "complete_for_positive_assertion": true,
+  "entry_id": "xlsx/b60/gt-b60-bundle",
+  "execution_status": "COMPLETED",
+  "observed_query_keys": [
+    "doc_key",
+    "generation",
+    "room_id",
+    "route_credential_id",
+    "route_token"
+  ],
+  "positive_state_eligible": true,
+  "run_id": "g4-1-pilots-positive-runtime-v1",
+  "schema_version": "host-unified-path-editor-config-evidence/v1",
+  "source_bindings": [
+    {
+      "path": "backend/app/services/workpaper_sync/callback_route.py",
+      "required_literals": [
+        "URL_BOUND_PARAMS",
+        "\"room_id\"",
+        "\"generation\"",
+        "\"doc_key\"",
+        "\"route_credential_id\""
+      ],
+      "sha256": "092ed138bf8b2275736c4271296dc9480a192f7f07f6fbcf4100784a73dde9f4"
+    },
+    {
+      "path": "audit-platform/frontend/src/components/workpaper/sync/WorkpaperSyncEditorHost.vue",
+      "required_literals": [
+        "confirmDescriptor",
+        "forcesave"
+      ],
+      "sha256": "ace938949e97df1304cbf87f0111e30d778005e7708702f0c027a2ad0f3a7772"
+    }
+  ]
+}

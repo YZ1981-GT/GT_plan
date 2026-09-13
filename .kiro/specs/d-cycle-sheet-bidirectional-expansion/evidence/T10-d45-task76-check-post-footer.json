@@ -1,0 +1,494 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 66,
+    "working_paper_sync_definition_bundle": 25,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 106
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/b60/gt-b60-bundle",
+        "contract_id": "b60.hour_budget",
+        "provider_module": "app.services.workpaper_sync.pilot_simple_checklist",
+        "wp_codes": [
+          "B60-1"
+        ],
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9",
+        "wp_code": "B60-1",
+        "store_bytes": 0,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "de0a8376ff8c89cceb8b9e9fead6cb849a692cd9c9359bc44a558222721b460c",
+        "bundle": "98289fd059c8ccb76fe8e92bd85448597611ddd71972541091b69ab7fcf24eda",
+        "contract": "527e6e38ba3aaf6763867fd0b442821615940e3c5c7ab5fa2130bc000635cd0b",
+        "instrumentation": "8a1319384f807f35a868cb66647bf8c0d88f678684992e2017ead6669642df21",
+        "template": "3dc00385534a85211da311ce68579ddcd77f8a3ef55f3c312d96b8ec3cbdfb1f"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": "5d7808db-10af-4247-8e75-4aa01940a938",
+        "current_definition_bundle_id": "efb8874b-7094-4ffe-89c9-9541bbe9d060",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "98289fd059c8ccb76fe8e92bd85448597611ddd71972541091b69ab7fcf24eda"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d2-accounts-receivable",
+        "contract_id": "d2.receivable_detail",
+        "provider_module": "app.services.workpaper_sync.pilot_d2_large_json",
+        "wp_codes": [
+          "D2"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "ef7f88e3-09eb-42cc-9f1d-1469fb3e6c88",
+        "wp_code": "D2",
+        "store_bytes": 550531,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "2befb296c1db44e82994977d8a300abb9dc89a535d9e26f7c3d229563ccef661",
+        "bundle": "9b98b794cf1d7117ba6a648c61a3aab76c8e53103757baa9a5a7c1b2ecc9e04a",
+        "contract": "f341ea688ee32ad317aa3b1517f191ea8e89b300f451ae19a620bafdc496f3d7",
+        "instrumentation": "46f3c617175503757310f97e953a5c4d6e8e4c007e210949902500c5c452e694",
+        "template": "c7bbec6e010a1c3c768c3524cddb82864c89bb953b1daa4299a34f97ce799638"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "54db660f-e5b2-4892-ac67-33474bd495ba",
+        "current_definition_bundle_id": "0c8426e6-e2d7-469a-978c-5204ce275b3e",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "9b98b794cf1d7117ba6a648c61a3aab76c8e53103757baa9a5a7c1b2ecc9e04a"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-h1-fixed-assets",
+        "contract_id": "h1.disposal_check",
+        "provider_module": "app.services.workpaper_sync.pilot_h1_grouped_dynamic",
+        "wp_codes": [
+          "H1"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "c71b7c54-6868-4fb9-9e14-083034f57815",
+        "wp_code": "H1",
+        "store_bytes": 51,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "bad2e813869f46fcfe1bdebd337bccf52170e8fb37d976b3393cb8c9222f2f04",
+        "bundle": "b2284d1fd77d9670cbb2d472cf7fb32e8a7117bdd12b9a4bfeef0208608b816a",
+        "contract": "064b11a66d371e283f1c08fc10ad6693c7015024f12268cf14fec0c91474fcd2",
+        "instrumentation": "e4f226a082cbdd6504fd60be7d882afdc4c5643ef53bde106563cc83969b7cf6",
+        "template": "ef2e9042958aa94766b6d6d12fb9deee4ea909a64ee0944fce486ae570a916a1"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "905bd425-0a90-4df0-9cea-3d04e468a26d",
+        "current_definition_bundle_id": "1a247328-39cf-4003-beb1-2849c30141ad",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "b2284d1fd77d9670cbb2d472cf7fb32e8a7117bdd12b9a4bfeef0208608b816a"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-g7-long-term-equity-main",
+        "contract_id": "g7.soe_subsidiary_disclosure",
+        "provider_module": "app.services.workpaper_sync.pilot_g7_two_level_dynamic",
+        "wp_codes": [
+          "G7"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "354e060f-15fa-41f0-8632-320082a54ed6",
+        "wp_code": "G7",
+        "store_bytes": 31877,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "1824bd59cf106b44544d01d47a8da8fc12d6a7578a085f122475615e222dba4b",
+        "bundle": "889fcb95ddeda77d14150bf3c0a84d6271c05cddd0bd56512a4da784aabc1606",
+        "contract": "aa2caa887fd7c3d6413d5a2becce90f2189dbdaf66f9a0c64b2e338985a0567f",
+        "instrumentation": "3e05ff630b65790573e952715273f8edc7066db302693facc55b6af489cf1f50",
+        "template": "e3e7e96ab9350819dd1a0e444a3c2129099ba0a943741360340c60878241ac03"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "2703b6b1-9ceb-44fe-9a23-5e8c210bbb8c",
+        "current_definition_bundle_id": "e0340629-a3dc-4311-bd81-47ecf6450d0e",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "889fcb95ddeda77d14150bf3c0a84d6271c05cddd0bd56512a4da784aabc1606"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d1-notes-receivable",
+        "contract_id": "d1.notes_receivable_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d1_notes_receivable",
+        "wp_codes": [
+          "D1"
+        ],
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "68c7740e-dc48-4787-a788-2e77f8560673",
+        "wp_code": "D1",
+        "store_bytes": 352,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "526577af92a5458781ff1d9e50567339fd016fdc682a76e2ccab3895adffd40c",
+        "bundle": "1b29c35891fd2075dd0e542252bfcc42641ed1678330abe5a3ad5d373192fe43",
+        "contract": "b9b2849522542bc06951727d1c1c19f44a517f4bfed57ad1755be5a4472d77fa",
+        "instrumentation": "185ea17ecb3a052b24c300d111d3c577a68aa1a7df06f722d24d251e2ca7c74b",
+        "template": "418de2c2eab1cbcbbeb7480e9ecad25d78e72c07eb2c368fd5ed0cff7e0b0f26"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "f26fdee3-42e7-4793-8c22-4086877e5ab6",
+        "current_definition_bundle_id": "dc1f3ada-c6b0-4697-91a3-07adc41cb5f7",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "1b29c35891fd2075dd0e542252bfcc42641ed1678330abe5a3ad5d373192fe43"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d7-contract-liabilities",
+        "contract_id": "d7.contract_liabilities_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d7_contract_liabilities",
+        "wp_codes": [
+          "D7"
+        ],
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "6f23dcce-6bb2-4456-9f18-b20b04043a55",
+        "wp_code": "D7",
+        "store_bytes": 728,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "dc29aeb0dcd8c217123aa6db39c62023bb3882d2184a670a4b719f6af03e691f",
+        "bundle": "66be518171607384e61e035a6e05efa998dbba37aa36da8ab65833204541f7e6",
+        "contract": "40a2fb4cb75419bd96f1cda2bdbc764d79591168b9949f11e3731065aab57550",
+        "instrumentation": "0ddb7bc393070cfdf94cc49b3f22ca2cf42970fc4188dd1d93f0fe058511c76d",
+        "template": "10d584e74541cd2d7963f15a505b1285abbd84555dff8524fe2cb8faf0f84292"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "4b6fafa9-603f-448a-9683-b53af171a582",
+        "current_definition_bundle_id": "7baecdec-6b98-4f88-a029-86285aeaf492",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "66be518171607384e61e035a6e05efa998dbba37aa36da8ab65833204541f7e6"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d3-prepaid-accounts",
+        "contract_id": "d3.prepaid_receipts_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d3_prepaid_receipts",
+        "wp_codes": [
+          "D3"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "d35c715a-9d71-4f4f-80ee-efc846533a24",
+        "wp_code": "D3",
+        "store_bytes": 59,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "af46af0e05857274b39f21cfbea52b998850867465471d156d6c48b112e774ff",
+        "bundle": "15aadca6e43e236795d6bdb74ea8ec6fc02e1c0181a8b69b18892c79bcc47201",
+        "contract": "2cfdb8594e0e8a49a8a51cffc0cd74ac6acca46c5c327ac581e66751a06f430f",
+        "instrumentation": "15370ee891da981073d5d87b6cafbb8c9858ce366ed4753906cb4b419ae8b3e6",
+        "template": "8e3177b8669e7b73a1c1684b724a7882a03b9b5d9952e6144faf12c05ed5a1c4"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "fc45730c-d00f-4f2f-803d-3c6bc0b1f285",
+        "current_definition_bundle_id": "246ad0e4-9fee-4caa-a84f-a2c5ebd50d77",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "15aadca6e43e236795d6bdb74ea8ec6fc02e1c0181a8b69b18892c79bcc47201"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d6-contract-assets",
+        "contract_id": "d6.contract_assets_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d6_contract_assets",
+        "wp_codes": [
+          "D6"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "1ed2feaf-3c3c-4a6c-824b-3be8d6e5b377",
+        "wp_code": "D6",
+        "store_bytes": 525,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "7f69fbe782f75d766e609ef6927da49d739c72dbbc0f4dd4dfedb20e4ad7776b",
+        "bundle": "1a42b0916c42126823b179d04007f33ce5d1c2fa794e765f8864c4ceea66f333",
+        "contract": "2c8a2800e3b2149879d8666c30cc4aa6e19714c4f3e548e949fa92efdc25397e",
+        "instrumentation": "368cabf44ff329222f2547d067259a9d77619c34a81d068de864a0f0a3148ac4",
+        "template": "3bc883579a03bfa1c9f8cc8a26aca3da7e8e72364ac84e9adca703ba96a62ef5"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "a3be9231-7f97-43e6-acec-8b0472ccd8ee",
+        "current_definition_bundle_id": "201a4334-7550-4ef9-a524-ff2c890d3103",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "1a42b0916c42126823b179d04007f33ce5d1c2fa794e765f8864c4ceea66f333"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d5-receivables-financing",
+        "contract_id": "d5.receivables_financing_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d5_receivables_financing",
+        "wp_codes": [
+          "D5"
+        ],
+        "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+        "wp_id": "629d762a-d363-4195-b1bc-5c28e3c2bd72",
+        "wp_code": "D5",
+        "store_bytes": 55,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "reused",
+        "contract": "reused",
+        "instrumentation": "reused",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "14ff5a6953820903ea0653fefc266ba7e54200bbbf3b45baa71300d4fcecf7b7",
+        "bundle": "01efe9289d28d82150ac46023a442e853d69ecf99ccb4ae0686098c69827978c",
+        "contract": "e902a0ba7857cf9f3da85e5f9dac566af41a5e0b8a63e84118737e5a93c2a405",
+        "instrumentation": "b829ed8f648524a575f11620c8e53c69b46213453227fad1870d5abc8e05a672",
+        "template": "32e809c091afc65ec0b5ab8ee2c1a61efe35c5552f4a25e9b7a34381d8dc9733"
+      },
+      "would_create": [],
+      "reused": [
+        "authority_model",
+        "bundle",
+        "contract",
+        "instrumentation",
+        "template"
+      ],
+      "representation": {
+        "settlement": "reused_current",
+        "current_representation_id": "8fe67e23-bb36-4982-9d34-5485923152ba",
+        "current_definition_bundle_id": "fbf0a58a-2832-40a3-90bc-9a3508fa4c83",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "01efe9289d28d82150ac46023a442e853d69ecf99ccb4ae0686098c69827978c"
+    },
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "contract_id": "d4.revenue_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        "wp_codes": [
+          "D4"
+        ],
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+        "wp_code": "D4",
+        "store_bytes": 2051,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "134884caa91f67c946c546ede8495c58be68e4776e266acc2ebc1cea8cb02f64",
+        "bundle": "b42a44e22d12a74f48f5f335592d3164923ed301745c86595619b8c4d677722b",
+        "contract": "a1ce5695bbfe4da7b302baf24f450306968ea744d18161ac47c6a94d9a79f80e",
+        "instrumentation": "d0b2416026863f54843287bc402a9af5c089fd5d04d4670678b5832acd6e6c56",
+        "template": "7b1c91f81e62daa1b002b0c6b3ef14784a87f6817a7eaf93f2c03b54bcf4d3c6"
+      },
+      "would_create": [
+        "bundle",
+        "contract",
+        "instrumentation"
+      ],
+      "reused": [
+        "authority_model",
+        "template"
+      ],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": "9b2cd368-7870-4195-ab35-a248e0126463",
+        "current_definition_bundle_id": "5da52651-a209-4388-9bfe-5e995615172d",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "b42a44e22d12a74f48f5f335592d3164923ed301745c86595619b8c4d677722b"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 3
+}

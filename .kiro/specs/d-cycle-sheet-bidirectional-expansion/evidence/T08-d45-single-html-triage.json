@@ -5,6 +5,9 @@
   "adapter_id": "d4.revenue_detail",
   "decision": "single_html",
   "not_bidirectional": true,
+  "superseded_by": "T09-d45-block-field-mapping.json",
+  "superseded_decision": "paragraph_block_bidirectional",
+  "superseded_note": "2026-09-13：产品改判为固定区 static + 分组紧凑表全量双向；宿主独立于 D4-2/3 统一路径。本文件保留为历史 triage。",
   "rationale": [
     "Excel 为段落式程序/政策叙述（一、审计目标 / 二、审计过程 / 经营模式 / 会计政策分组 / 信用政策 / 结论），非固定 data-row 网格",
     "HTML 持久化为多 item_id：D4-5-biz-*、D4-5-policy-groups(JSON)、D4-5-credit-policy、D4-5-audit-note、D4-5-audit-conclusion —— 与契约 table_key 扁平行不对齐",
@@ -30,7 +33,7 @@
     "gtrow_or_uuid_column": false,
     "managed_data_band": null
   },
-  "host_implication": "Keep dualMode / GtOnlyOfficeSheet or HTML-only; do NOT add d45-managed to d4.revenue_detail sheets[]",
+  "host_implication": "SUPERSEDED by T09: D4TabPolicyCheck own sync host + d45-managed in d4.revenue_detail sheets[]; do NOT fold into parent isD4DetailSheet",
   "redirect": {
     "next_bidirectional_candidate": "D4-4 (Wave 2 kickoff; UUID col still unfrozen) or D1-2"
   }

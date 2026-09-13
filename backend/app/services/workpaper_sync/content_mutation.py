@@ -65,7 +65,9 @@ design §Filesystem Layout 的发布协议是**可恢复协议**：
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -99,9 +101,10 @@ from app.services.workpaper_sync.conflicts import (
     UnresolvedConflictError,
     assert_all_conflicts_resolved,
 )
-from app.services.workpaper_sync.contracts import FieldMode, SyncContract
+from app.services.workpaper_sync.contracts import FieldMode, PROTECTED_MODES, SyncContract
 from app.services.workpaper_sync.definitions import canonical_json_bytes, json_safe
 from app.services.workpaper_sync.entry_profile import Capability
+from app.services.workpaper_sync.limits import load_limits
 from app.services.workpaper_sync.merge import (
     MergeOutcome,
     apply_resolutions,
@@ -138,6 +141,7 @@ __all__ = [
     "RevisionTargetError",
     "RoundtripEquivalenceError",
     "AdjudicationNotFoldedError",
+    "MaterializeSoftTimeoutError",
     "AuthorityModelMismatchError",
     "ContractRequiredError",
     "PendingMutationScopeError",
@@ -260,6 +264,22 @@ class AdjudicationNotFoldedError(ContentMutationError):
     """
 
     error_code = "adjudication_projection_not_folded"
+
+
+class MaterializeSoftTimeoutError(ContentMutationError):
+    """materialize CPU 段已完成，但耗时超过配置的软上限（Requirement 2.4）。
+
+    🔴 抛在 CPU 段**之后**、publish **之前**：staged 产物已写完且正确，不中断写盘；
+    请求仍 fail visible，避免静默占满到 HTTP 层超时。
+    """
+
+    error_code = "materialize_soft_timeout"
+    http_status = 422
+
+    def __init__(self, message: str, *, elapsed_seconds: float, limit_seconds: float):
+        super().__init__(message)
+        self.elapsed_seconds = elapsed_seconds
+        self.limit_seconds = limit_seconds
 
 
 class AuthorityModelMismatchError(ContentMutationError):
@@ -638,9 +658,9 @@ class ContentCommitPlan:
     #: 为什么不让 plan 自己去读：plan 按设计**不持有任何 I/O 能力面**
     #: （`assert_no_mutation_surface` 逐字段实测），读文件/读库都不允许。
     #:
-    #: 留 `None` 时 `_stage_and_verify` 回落到旧的字节摘要口径并记 WARNING ——
-    #: 那是 BP-30 之前的语义，会让 observer 在请求时刻判「结构漂移」。
-    structure_anchors: Mapping[str, str] | None = None
+    #: Excel 缺 anchors/contract 时拒绝提交；Word 保留独立结构摘要。
+    #: 多受管 sheet 时可传锚点序列（与 instrumentation_specs / managed_sheets 对齐）。
+    structure_anchors: Mapping[str, str] | Sequence[Mapping[str, str]] | None = None
     room_id: uuid.UUID | None = None
     application_id: uuid.UUID | None = None
     pending_mutation_id: uuid.UUID | None = None
@@ -780,6 +800,21 @@ def html_only_entry_id(*, wp_code: str | None, wp_id: uuid.UUID) -> str:
     """
     stem = (wp_code or "").strip() or str(wp_id)
     return f"{HTML_ONLY_ENTRY_PREFIX}{stem}"[:200]
+
+
+def _is_roundtrip_empty(value: Any) -> bool:
+    """roundtrip 等值判据里「该单元格无值」的空表示。
+
+    仅用于 `_assert_roundtrip_equivalent`：提交空 enum/text（`""`）写进 OOXML 得到空
+    单元格，extract 反读空单元格得到 `None` —— 二者表示同一件事。`None` 与空白字符串
+    都算空；数值 `0` / `False` / `Decimal("0")` **不算**（它们是真实值，不得折叠成空）。
+    不改全局 `merge.normalize_value`（那里刻意区分 `""`/`None`/`MISSING`）。
+    """
+    if value is None:
+        return True
+    if isinstance(value, str) and value.strip() == "":
+        return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -1544,59 +1579,27 @@ class ContentMutationService:
         work_dir.mkdir(parents=True, exist_ok=True)
         output = work_dir / f"materialized.{plan.document_type}"
 
-        materialized = adapter.materialize(
-            substrate=plan.substrate_path,
+        # 纯 CPU 段卸载到工作线程：事件循环可继续服务其他请求（Requirement 2.1）。
+        # fence / artifact publish 仍留在事件循环侧（可能碰 DB / async IO）。
+        started = time.perf_counter()
+        materialized, extracted, unmanaged, structure_hash = await asyncio.to_thread(
+            self._stage_cpu_segment,
+            plan=plan,
             projection=projection,
+            adapter=adapter,
             output=output,
-            contract=plan.contract,
         )
-        if not isinstance(materialized, MaterializeResult):
-            raise ContentMutationError(
-                f"adapter.materialize 必须返回 MaterializeResult，实得 {type(materialized)!r}"
+        elapsed = time.perf_counter() - started
+        soft_limit = float(load_limits().materialize_soft_limit_seconds)
+        if elapsed > soft_limit:
+            raise MaterializeSoftTimeoutError(
+                f"materialize CPU 段耗时 {elapsed:.3f}s 超过软上限 "
+                f"{soft_limit:.3f}s —— staged 产物已写完但请求 fail visible，"
+                "避免静默占满到 HTTP 超时",
+                elapsed_seconds=elapsed,
+                limit_seconds=soft_limit,
             )
 
-        extracted = adapter.extract(artifact=output, contract=plan.contract)
-        self._assert_roundtrip_equivalent(
-            intended=projection, extracted=extracted, contract=plan.contract
-        )
-        # 🔴 BP-23：把 materialize **写盘前冻结的**三个结构性声明喂给未管理区域比对。
-        #
-        #    此前这里只传 `before/after/contract`，于是 verifier 的
-        #    `row_shift` / `total_formula_rows` / `propagation` 三个入参**生产零消费** ——
-        #    参数在、单测在、没有任何调用方喂它们（假绿第①源「additive 注入即死代码」）。
-        #    后果：任何需要结构性插行的 entry 必在未管理区域比对上打红。
-        #    D2 首版实测（插 729 行）：不传 `row_shift` ⇒ `managed_sheet_unmanaged_cells`
-        #    238 → 632；只传 `row_shift` ⇒ 引用侧三张 sheet 的跨 sheet 公式仍判漂移。
-        #
-        #    判据没有被放宽：三者都是**声明值**而非观测值，apply 与 verify 用同一份 ⇒
-        #    「与声明一致」判等价、「声明之外的任何改动」仍判漂移。
-        unmanaged = adapter.verify_unmanaged_regions(
-            before=plan.substrate_path,
-            after=output,
-            contract=plan.contract,
-            row_shift=materialized.row_shift,
-            total_formula_rows=materialized.total_formula_rows,
-            propagation=materialized.workbook_row_change,
-        )
-        unmanaged.assert_equivalent()
-
-        # 🔴 Task 26 的「publish 前最后一道 fence」就在这里：extract 等值与未管理区域
-        # 都已通过、artifact 尚未进入 `.versions` 命名空间。放到 publish 之后就只剩
-        # 「已发布再回滚」，而 publish 是内容寻址的不可变发布，回滚只能留 orphan。
-        # 🔴 BP-30：projection lane 的 `structure_hash` 必须与**请求时刻**观测器
-        #    （`published_identity_observer.recompute_structure_hash`，与
-        #    `ExcelEntryFinalizeGate` 同构）算的是同一个量。
-        #
-        #    在此之前这里写的是 `materialized.structure_hash` =
-        #    `normalized_structure_hash(整份 xlsx 字节)`，即**文件字节**摘要；而 adapter
-        #    接线时观测器按「契约 + 受管结构坐标」重算 ⇒ 两个不可比的量相比，刚发布的
-        #    entry 也照样判 `ObservedIdentityDriftError` ⇒ bidirectional 结构上永为 0。
-        #
-        #    fence 与 representation 必须收到**同一个**值：fence 校验的是「即将发布的
-        #    这份身份」，两处不同就等于校验了一份、落库了另一份。
-        structure_hash = self._projection_structure_hash(
-            plan=plan, output=output, materialized=materialized
-        )
         if fence is not None:
             await fence.before_publish(
                 artifact_sha256=materialized.artifact_sha256,
@@ -1639,25 +1642,58 @@ class ContentMutationService:
             extracted_key_count=len(extracted.values),
         )
 
+    def _stage_cpu_segment(
+        self,
+        *,
+        plan: ContentCommitPlan,
+        projection: Projection,
+        adapter: Any,
+        output: Path,
+    ) -> tuple[Any, Any, Any, str]:
+        """materialize + extract + roundtrip + unmanaged + structure_hash。
+
+        🔴 **不得**持有或操作 DB 会话（Property 4 / Requirement 2.2）：本方法跑在
+        ``asyncio.to_thread`` 工作线程里，任何会话绑定都是隔离破坏。
+        """
+        materialized = adapter.materialize(
+            substrate=plan.substrate_path,
+            projection=projection,
+            output=output,
+            contract=plan.contract,
+        )
+        if not isinstance(materialized, MaterializeResult):
+            raise ContentMutationError(
+                f"adapter.materialize 必须返回 MaterializeResult，实得 {type(materialized)!r}"
+            )
+
+        extracted = adapter.extract(artifact=output, contract=plan.contract)
+        self._assert_roundtrip_equivalent(
+            intended=projection, extracted=extracted, contract=plan.contract
+        )
+        unmanaged = adapter.verify_unmanaged_regions(
+            before=plan.substrate_path,
+            after=output,
+            contract=plan.contract,
+            row_shift=materialized.row_shift,
+            total_formula_rows=materialized.total_formula_rows,
+            propagation=materialized.workbook_row_change,
+        )
+        unmanaged.assert_equivalent()
+        structure_hash = self._projection_structure_hash(
+            plan=plan, output=output, materialized=materialized
+        )
+        return materialized, extracted, unmanaged, structure_hash
+
     def _projection_structure_hash(
         self, *, plan: ContentCommitPlan, output: Path, materialized: Any
     ) -> str:
-        """projection lane 的 `structure_hash`（BP-30）。
-
-        有冻结 instrumentation ⇒ 走观测器的同一条链（受管结构坐标摘要）；
-        没有 ⇒ 回落旧的字节摘要并记 WARNING。
-
-        🔴 回落**不是**兜底设计，而是过渡期的显式退化：它保留了 BP-30 之前的语义，
-        因此 observer 在请求时刻仍会判「结构漂移」。判据从两侧钉住 ——
-        发布宿主必须传（AST），且真实 entry 上「observer 重算 == 冻结值」必须成立。
-        """
-        if plan.structure_anchors is None or plan.contract is None:
-            logger.warning(
-                "entry %s: 构造 plan 时未提供 structure_anchors/contract ⇒ structure_hash "
-                "回落字节摘要口径（BP-30 之前的语义）；请求时刻观测器会判结构漂移",
-                plan.entry_id,
-            )
+        """Excel reads final artifact coordinates; Word keeps its independent hash."""
+        if plan.document_type == "docx":
             return str(materialized.structure_hash)
+        if plan.structure_anchors is None or plan.contract is None:
+            raise ContentMutationError(
+                "projection Excel commit requires frozen structure_anchors and contract"
+            )
         from app.services.workpaper_sync.publish_time_structure_hash import (
             compute_structure_hash_from_artifact,
         )
@@ -1711,13 +1747,41 @@ class ContentMutationService:
         )
 
     async def _next_generation_probe(self, plan: ContentCommitPlan) -> int:
-        """新 content version 的首个 generation 恒为 1。
+        """新 content version 的首个 generation。
 
-        文件名里带 generation，所以要在 stage 阶段确定。业务 commit 一定伴随**新**
-        content version（`uq_wpcr_generation` 按 content version 分组），故恒为 1；
-        写成方法而不是字面量是为了让「有人把它改成按 entry 全局递增」这类回归有落点。
+        默认恒为 1（`uq_wpcr_generation` 按 content version 分组）。G7/D4 canary 例外：
+        OnlyOffice 按 ``doc_key`` 缓存文档；``doc_key`` 只随 representation generation
+        轮转。若本 entry 上一代 room 曾以 ``-82`` 卡在 ``opening``，或已 ``superseded``
+        而 ``uq_wpoor_generation`` 禁止同代际重建，同 generation 复用会永远失败。
+        因此取 entry 全局 max(rep, room)+1，让下一次 commit 换 key / 开新 room。
         """
-        return 1
+        if str(plan.entry_id) not in {
+            "xlsx/gt-g7-long-term-equity-main",
+            "xlsx/gt-d4-operating-revenue",
+        }:
+            return 1
+        from app.models.workpaper_sync_models import (
+            WorkpaperContentRepresentation,
+            WorkpaperOoRoom,
+        )
+
+        max_rep = (
+            await self._session.execute(
+                sa.select(sa.func.max(WorkpaperContentRepresentation.generation)).where(
+                    WorkpaperContentRepresentation.wp_id == plan.wp_id,
+                    WorkpaperContentRepresentation.entry_id == str(plan.entry_id),
+                )
+            )
+        ).scalar_one_or_none()
+        max_room = (
+            await self._session.execute(
+                sa.select(sa.func.max(WorkpaperOoRoom.generation)).where(
+                    WorkpaperOoRoom.wp_id == plan.wp_id,
+                    WorkpaperOoRoom.entry_id == str(plan.entry_id),
+                )
+            )
+        ).scalar_one_or_none()
+        return int(max(max_rep or 0, max_room or 0)) + 1
 
     def _assert_roundtrip_equivalent(
         self, *, intended: Projection, extracted: Projection, contract: SyncContract
@@ -1733,17 +1797,29 @@ class ContentMutationService:
             for spec in contract.all_fields()
             if spec.mode is FieldMode.word_only
         }
+        # formula / auto_source 不由 materialize 写值；Excel 空公式格反读常为 0，
+        # store 侧多为 None —— 把它们拉进 Property 65 会在 OO 重算后假红（G4-0d）。
+        protected = {
+            spec.stable_field_key
+            for spec in contract.all_fields()
+            if spec.mode in PROTECTED_MODES
+        }
+
+        def _key_excluded(key: str, templates: set[str]) -> bool:
+            if key in templates:
+                return True
+            return any(
+                "{row_uuid}" in tpl
+                and key.startswith(tpl.split("{row_uuid}")[0])
+                and key.endswith(tpl.split("{row_uuid}")[-1])
+                for tpl in templates
+            )
 
         def _managed(proj: Projection) -> dict[str, Any]:
             return {
                 key: value
                 for key, value in proj.values.items()
-                if not any(
-                    key == tpl or key.startswith(tpl.split("{row_uuid}")[0])
-                    for tpl in word_only
-                    if "{row_uuid}" in tpl
-                )
-                and key not in word_only
+                if not _key_excluded(key, word_only) and not _key_excluded(key, protected)
             }
 
         left = _managed(intended)
@@ -1763,6 +1839,13 @@ class ContentMutationService:
             )
         for key in sorted(left):
             mine, theirs = left[key], right[key]
+            # roundtrip 空值等价：提交「空 enum/text」（`""`）写进 OOXML 得到空单元格，
+            # extract 反读空单元格得到 `None` —— 两者表示同一件事「该格无值」。全局
+            # `normalize_value` 刻意不折叠 `""`/`None`/`MISSING`（merge 场景「清空」与
+            # 「从未设置」有别），故这里**仅在 roundtrip 场景**、且**两侧都为空表示**时
+            # 视为等值；只要有一侧非空就仍走严格 `values_equal`（不会放过真实漂移）。
+            if _is_roundtrip_empty(mine.value) and _is_roundtrip_empty(theirs.value):
+                continue
             if not values_equal(mine.value, theirs.value, mine.value_type):
                 raise RoundtripEquivalenceError(
                     f"受管字段 {key} 反读不等值：提交 {mine.value!r} → 反读 {theirs.value!r}"
@@ -1867,12 +1950,23 @@ class ContentMutationService:
             await witness.stamp(self._session, "content_version")
 
             # ④ 兼容 representation（**同一次** commit，不是第二次）
-            generation = await next_representation_generation(
-                self._session,
-                wp_id=plan.wp_id,
-                entry_id=plan.entry_id,
-                content_version_id=version.id,
-            )
+            if str(plan.entry_id) in {
+                "xlsx/gt-g7-long-term-equity-main",
+                # D4 canary：superseded gen-1 room + uq_wpoor_generation 禁止同代际重建；
+                # 若 content_commit 仍从 1 起，materialize 会永久 room_not_writable。
+                "xlsx/gt-d4-operating-revenue",
+            }:
+                # G7：doc_key 随 generation 轮转；按 content version 从 1 起会与
+                # 仍卡在 opening 的同 entry room 撞 key，OO 继续吃 -82 缓存。
+                # D4：同理，entry 全局 max(rep, room)+1 才能在 supersede 后开新 room。
+                generation = await self._next_generation_probe(plan)
+            else:
+                generation = await next_representation_generation(
+                    self._session,
+                    wp_id=plan.wp_id,
+                    entry_id=plan.entry_id,
+                    content_version_id=version.id,
+                )
             representation = await self._repo.create_representation(
                 project_id=plan.project_id,
                 wp_id=plan.wp_id,

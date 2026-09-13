@@ -71,9 +71,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
@@ -184,9 +185,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
@@ -290,9 +292,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
@@ -403,9 +406,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
         "source_refs": [
@@ -488,9 +492,9 @@
           "sourceKind": "registry_ast",
           "sourceSpan": {
             "endColumn": 1,
-            "endLine": 161,
+            "endLine": 176,
             "startColumn": 1,
-            "startLine": 161
+            "startLine": 176
           },
           "templateNodeOrdinal": 0,
           "wpExpression": ":wp-id=\"wpId\""
@@ -650,7 +654,7 @@
       "parent_entry_id": "docx/gt-a16-bundle",
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 5,
+        "inbound_reference_count": 6,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA10Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/GtA12Bundle.vue"
@@ -901,14 +905,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtBIndex.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -1028,7 +1032,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/b60/GtB60DocxPane.vue#L91",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -1146,13 +1150,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/core.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -1244,17 +1249,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_e6ed5673594ddc4c7ddb",
+          "mountId": "mount_ede2497def1b8c433fa8",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"重要客户销售价格分析D4-10\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 353,
+            "endLine": 425,
             "startColumn": 9,
-            "startLine": 348
+            "startLine": 420
           },
-          "templateNodeOrdinal": 112,
+          "templateNodeOrdinal": 114,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -1267,8 +1272,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue#L348",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue#L420",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -1388,7 +1393,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerStructure.vue#L382",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -1509,7 +1514,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabIndicator.vue#L454",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -1630,7 +1635,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabMarginMonthly.vue#L675",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -1728,17 +1733,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_656d12993917c0613d3f",
+          "mountId": "mount_c68fa77bef93c3a0b4ef",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"产品销售价格分析D4-11\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 307,
+            "endLine": 376,
             "startColumn": 9,
-            "startLine": 302
+            "startLine": 371
           },
-          "templateNodeOrdinal": 98,
+          "templateNodeOrdinal": 100,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -1751,8 +1756,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductPrice.vue#L302",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabProductPrice.vue#L371",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -1849,17 +1854,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_7a5631ef53d210bd3175",
+          "mountId": "mount_907b9dfcb2b3387c9c1a",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"营业收入完整性检查表D4-15\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 65,
-            "endLine": 431,
+            "endLine": 457,
             "startColumn": 9,
-            "startLine": 430
+            "startLine": 456
           },
-          "templateNodeOrdinal": 158,
+          "templateNodeOrdinal": 164,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -1872,8 +1877,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCompleteness.vue#L430",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCompleteness.vue#L456",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -1993,7 +1998,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabContract.vue#L426",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -2114,7 +2119,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffBackward.vue#L440",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -2235,7 +2240,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabCutoffForward.vue#L440",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -2356,7 +2361,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabDiscount.vue#L374",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -2454,17 +2459,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_83d1ba1e4e8eb674213a",
+          "mountId": "mount_3a6a9f16534be5984ca8",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"营业收入账面金额与ERP系统核对记录D4-13\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 228,
+            "endLine": 286,
             "startColumn": 9,
-            "startLine": 223
+            "startLine": 281
           },
-          "templateNodeOrdinal": 27,
+          "templateNodeOrdinal": 38,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -2477,8 +2482,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabErpCheck.vue#L223",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabErpCheck.vue#L281",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -2575,17 +2580,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_b3250b26a9655e1a09be",
+          "mountId": "mount_2ad892b14026b29f2b6a",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"出口收入电子口岸系统核对D4-16\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 146,
-            "endLine": 371,
+            "endLine": 408,
             "startColumn": 33,
-            "startLine": 371
+            "startLine": 408
           },
-          "templateNodeOrdinal": 121,
+          "templateNodeOrdinal": 131,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -2598,8 +2603,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabExport.vue#L371",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabExport.vue#L408",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -2696,17 +2701,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_ebcd7b8584591c64c43a",
+          "mountId": "mount_768f39e9c7d6e1181b36",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"营业收入发生检查表D4-14\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 692,
+            "endLine": 715,
             "startColumn": 9,
-            "startLine": 687
+            "startLine": 710
           },
-          "templateNodeOrdinal": 169,
+          "templateNodeOrdinal": 171,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -2719,8 +2724,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue#L687",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabOccurrence.vue#L710",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -2840,7 +2845,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/inspection/D4TabReturn.vue#L692",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -2961,7 +2966,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue#L125",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3082,7 +3087,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue#L129",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3203,7 +3208,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue#L96",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3324,7 +3329,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue#L138",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3445,7 +3450,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue#L327",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3566,7 +3571,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue#L163",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3687,7 +3692,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInvoiceCompare.vue#L313",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3808,7 +3813,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabIpoIndicator.vue#L443",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -3929,7 +3934,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue#L106",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4050,7 +4055,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabThirdParty.vue#L243",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4171,7 +4176,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue#L176",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4292,7 +4297,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue#L173",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4413,7 +4418,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherContract.vue#L201",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4534,7 +4539,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCutoff.vue#L203",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4655,7 +4660,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherMargin.vue#L205",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -4687,127 +4692,6 @@
         "source_host": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherMargin.vue",
         "wp_code_patterns": [
           "D4-33",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/policy/d4-tab-policy-check",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "props.wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"props.wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "props.projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"props.projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "营业收入会计政策检查D4-5",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"营业收入会计政策检查D4-5\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_ca9ca2d3e2b7d2decf70",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"营业收入会计政策检查D4-5\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 11,
-            "endLine": 400,
-            "startColumn": 9,
-            "startLine": 395
-          },
-          "templateNodeOrdinal": 104,
-          "wpExpression": ":wp-id=\"props.wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue#L395",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"营业收入会计政策检查D4-5\""
-        ],
-        "sheet_literals": [
-          "营业收入会计政策检查D4-5"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/policy/D4TabPolicyCheck.vue",
-        "wp_code_patterns": [
-          "D4-5",
           "D4T"
         ]
       }
@@ -4897,7 +4781,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/d4/related/D4TabRelatedPrice.vue#L409",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -5011,13 +4895,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5130,13 +5015,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5263,7 +5149,7 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA1Dashboard.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
@@ -5271,7 +5157,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA112DualChecklist.vue#L276",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5398,7 +5284,7 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA1Dashboard.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
@@ -5406,7 +5292,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA115DisclosureChecklist.vue#L336",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5519,13 +5405,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5645,14 +5532,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5772,14 +5659,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -5906,14 +5793,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6040,14 +5927,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6174,14 +6061,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6308,14 +6195,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6428,14 +6315,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6545,13 +6432,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6664,13 +6552,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6783,13 +6672,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -6895,14 +6785,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/core.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue#L133",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7029,7 +6920,7 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
@@ -7037,7 +6928,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtA38GoodwillImpairment.vue#L223",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7150,14 +7041,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/CashFlowVerification.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7270,13 +7161,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7389,13 +7281,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7515,13 +7408,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7638,13 +7532,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7747,13 +7642,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -7870,13 +7766,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8014,14 +7911,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtB22AControlMatrix.vue#L855",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8159,14 +8057,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtB22BControlMatrix.vue#L202",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8304,14 +8203,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtB22BDeficiencyEvaluation.vue#L418",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8449,14 +8349,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtB22CDesignEffectiveness.vue#L245",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8573,14 +8474,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtB23ProcessControl.vue#L829",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8711,14 +8613,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtB50RiskAssessment.vue#L1060",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8835,14 +8738,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtCControlTest.vue#L95",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -8971,14 +8875,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtC22ItgcBundle.vue#L685",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9101,7 +9006,7 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 3,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/formula/FormulaEditDialog.vue",
           "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
@@ -9109,7 +9014,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtCustomWpEditor.vue#L54",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9167,8 +9072,8 @@
               "argument": null,
               "expression": "renderMode === 'onlyoffice'",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"renderMode === 'onlyoffice'\""
             },
             {
               "argument": "key",
@@ -9215,23 +9120,23 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue",
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_8c5aa94f6b99dd549162",
+          "mountId": "mount_d9030800268cbc710a79",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 45,
+            "endLine": 54,
             "startColumn": 7,
-            "startLine": 29
+            "startLine": 38
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         },
         {
@@ -9266,31 +9171,32 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_928ecfc41833b1184704",
+          "mountId": "mount_8e844582d8ff9a0c62a2",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 420,
+            "endLine": 429,
             "startColumn": 9,
-            "startLine": 412
+            "startLine": 421
           },
-          "templateNodeOrdinal": 34,
+          "templateNodeOrdinal": 35,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue#L29",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD1NotesReceivable.vue#L38",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9341,79 +9247,6 @@
       "independent_entry": true,
       "migration_state": "adapter_registered",
       "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": null,
-              "expression": "renderMode === 'onlyoffice'",
-              "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
-            },
-            {
-              "argument": "key",
-              "expression": "ooSheetName",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":key=\"ooSheetName\""
-            },
-            {
-              "argument": "wp-id",
-              "expression": "props.wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"props.wpId\""
-            },
-            {
-              "argument": "sheet-name",
-              "expression": "ooSheetName",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":sheet-name=\"ooSheetName\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "props.projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"props.projectId\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            },
-            {
-              "argument": "fallback",
-              "expression": "onOoFallback",
-              "kind": "directive",
-              "name": "on",
-              "raw": "@fallback=\"onOoFallback\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_2d3aa0c468cc11dd0228",
-          "runtimeCardinality": "single",
-          "sheetExpression": ":sheet-name=\"ooSheetName\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 9,
-            "endLine": 85,
-            "startColumn": 7,
-            "startLine": 77
-          },
-          "templateNodeOrdinal": 17,
-          "wpExpression": ":wp-id=\"props.wpId\""
-        },
         {
           "attributes": [
             {
@@ -9474,32 +9307,32 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_c0f9ec714f02c21f064b",
+          "mountId": "mount_0f5b15fcfc9e006adad6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"props.sheetName || ''\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 247,
+            "endLine": 249,
             "startColumn": 7,
-            "startLine": 239
+            "startLine": 241
           },
-          "templateNodeOrdinal": 37,
+          "templateNodeOrdinal": 40,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue#L239",
-          "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue#L77",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD2AccountsReceivable.vue#L241",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9512,7 +9345,7 @@
         "editability": "editable",
         "host_reachable": true,
         "mount_cardinality": "single",
-        "mount_count": 2,
+        "mount_count": 1,
         "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
         "readonly_binding": "runtime_expression",
         "room_model": "shared",
@@ -9522,7 +9355,6 @@
       "wp_match": {
         "component_types": [],
         "sheet_expressions": [
-          ":sheet-name=\"ooSheetName\"",
           ":sheet-name=\"props.sheetName || ''\""
         ],
         "sheet_literals": [],
@@ -9560,8 +9392,8 @@
               "argument": null,
               "expression": "renderMode === 'onlyoffice'",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"renderMode === 'onlyoffice'\""
             },
             {
               "argument": "key",
@@ -9608,37 +9440,38 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue",
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_a157c058d91b659a8e4d",
+          "mountId": "mount_5d97a207fc73858a3bd6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 22,
+            "endLine": 31,
             "startColumn": 7,
-            "startLine": 14
+            "startLine": 23
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue#L14",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD3PrepaidAccounts.vue#L23",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9671,35 +9504,31 @@
       }
     },
     {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
+      "adapter_id": "d4.revenue_detail",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "capability": "bidirectional",
       "document_type": "xlsx",
       "editability": "editable",
       "entry_id": "xlsx/gt-d4-operating-revenue",
       "evidence": {
         "browser_case": null,
         "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "review_status": "source_inventory_reviewed"
+        "legacy_reasons": [],
+        "review_status": "published_representation_verified"
       },
       "host_path": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
-      "html_store": "unresolved",
+      "html_store": "checklist_responses_d4_revenue_detail_rows",
       "independent_entry": true,
-      "migration_state": "legacy_fake_bidirectional",
+      "migration_state": "adapter_registered",
       "mounts": [
         {
           "attributes": [
             {
               "argument": null,
-              "expression": "renderMode === 'onlyoffice'",
+              "expression": "renderMode === 'onlyoffice' && currentSheet !== 'D4-5'",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"renderMode === 'onlyoffice' && currentSheet !== 'D4-5'\""
             },
             {
               "argument": "key",
@@ -9746,37 +9575,38 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice' && currentSheet !== 'D4-5'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_7b8f1655faf3397d1bd2",
+          "mountId": "mount_a17fab72b5357c17631c",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 24,
+            "endLine": 33,
             "startColumn": 7,
-            "startLine": 16
+            "startLine": 25
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue#L16",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue#L25",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9836,8 +9666,8 @@
               "argument": null,
               "expression": "renderMode === 'onlyoffice'",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"renderMode === 'onlyoffice'\""
             },
             {
               "argument": "key",
@@ -9884,37 +9714,38 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue",
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_0f8139b637103604b75d",
+          "mountId": "mount_11ac71cd38886622f426",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 22,
+            "endLine": 31,
             "startColumn": 7,
-            "startLine": 14
+            "startLine": 23
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue#L14",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD5ReceivablesFinancing.vue#L23",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -9974,8 +9805,8 @@
               "argument": null,
               "expression": "renderMode === 'onlyoffice'",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"renderMode === 'onlyoffice'\""
             },
             {
               "argument": "key",
@@ -10022,37 +9853,38 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue",
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_febac41e8c577a77da39",
+          "mountId": "mount_7944d49758e67fa6e5e4",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 22,
+            "endLine": 31,
             "startColumn": 7,
-            "startLine": 14
+            "startLine": 23
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue#L14",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD6ContractAssets.vue#L23",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -10112,8 +9944,8 @@
               "argument": null,
               "expression": "renderMode === 'onlyoffice'",
               "kind": "directive",
-              "name": "if",
-              "raw": "v-if=\"renderMode === 'onlyoffice'\""
+              "name": "else-if",
+              "raw": "v-else-if=\"renderMode === 'onlyoffice'\""
             },
             {
               "argument": "key",
@@ -10160,37 +9992,38 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-if=\"renderMode === 'onlyoffice'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue",
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_582a66345fb8d90fce43",
+          "mountId": "mount_f111acd7493593af32a6",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"ooSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 22,
+            "endLine": 31,
             "startColumn": 7,
-            "startLine": 14
+            "startLine": 23
           },
-          "templateNodeOrdinal": 9,
+          "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue#L14",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtD7ContractLiabilities.vue#L23",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -10387,15 +10220,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue#L134",
           "audit-platform/frontend/src/components/workpaper/GtE1MonetaryFund.vue#L49",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -10585,15 +10419,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue#L168",
           "audit-platform/frontend/src/components/workpaper/GtF1Prepayment.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -10783,15 +10618,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue#L17",
           "audit-platform/frontend/src/components/workpaper/GtF2InventoryMain.vue#L212",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -10981,15 +10817,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue#L197",
           "audit-platform/frontend/src/components/workpaper/GtF2InventorySpecial.vue#L27",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -11179,15 +11016,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue#L142",
           "audit-platform/frontend/src/components/workpaper/GtF2InventoryValuation.vue#L17",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -11318,14 +11156,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF2StocktakeBundle.vue#L24",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -11515,15 +11354,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue#L252",
           "audit-platform/frontend/src/components/workpaper/GtF3NotesPayable.vue#L40",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -11713,15 +11553,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue#L151",
           "audit-platform/frontend/src/components/workpaper/GtF4AccountsPayable.vue#L39",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -11911,15 +11752,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue#L133",
           "audit-platform/frontend/src/components/workpaper/GtF5CostOfSales.vue#L30",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -12123,15 +11965,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue#L247",
           "audit-platform/frontend/src/components/workpaper/GtG1TradingFinancialAssets.vue#L36",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -12322,15 +12165,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue#L162",
           "audit-platform/frontend/src/components/workpaper/GtG10TradingFinancialLiabilities.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -12520,15 +12364,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue#L159",
           "audit-platform/frontend/src/components/workpaper/GtG11InvestmentIncome.vue#L42",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -12718,15 +12563,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue#L135",
           "audit-platform/frontend/src/components/workpaper/GtG12NetHedgeGains.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -12916,15 +12762,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue#L107",
           "audit-platform/frontend/src/components/workpaper/GtG13FairValueChanges.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -13114,15 +12961,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue#L112",
           "audit-platform/frontend/src/components/workpaper/GtG14CreditImpairmentLoss.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -13326,15 +13174,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue#L185",
           "audit-platform/frontend/src/components/workpaper/GtG2InterestReceivable.vue#L22",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -13532,15 +13381,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue#L152",
           "audit-platform/frontend/src/components/workpaper/GtG3DividendReceivable.vue#L21",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -13730,15 +13580,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue#L107",
           "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentEcl.vue#L28",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -13928,15 +13779,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue#L124",
           "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentMain.vue#L27",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -14126,15 +13978,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue#L27",
           "audit-platform/frontend/src/components/workpaper/GtG4BondInvestmentSppi.vue#L71",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -14324,15 +14177,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue#L169",
           "audit-platform/frontend/src/components/workpaper/GtG5LongTermReceivable.vue#L30",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -14462,7 +14316,7 @@
         "room_model_fact": "unreachable_host_opens_no_room",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondEcl.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50"
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61"
         ]
       },
       "room_model": "none",
@@ -14651,15 +14505,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue#L33",
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondInvestmentEcl.vue#L91",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -14849,15 +14704,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue#L131",
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondMain.vue#L28",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -15047,15 +14903,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue#L28",
           "audit-platform/frontend/src/components/workpaper/GtG6OtherBondSppi.vue#L96",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -15245,15 +15102,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG7EquityMethod.vue#L40",
           "audit-platform/frontend/src/components/workpaper/GtG7EquityMethod.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -15443,15 +15301,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG7EquitySubsidiary.vue#L40",
           "audit-platform/frontend/src/components/workpaper/GtG7EquitySubsidiary.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -15637,15 +15496,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue#L125",
           "audit-platform/frontend/src/components/workpaper/GtG7LongTermEquityMain.vue#L41",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -15835,15 +15695,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue#L151",
           "audit-platform/frontend/src/components/workpaper/GtG8OtherEquityInstruments.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -16033,15 +15894,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue#L143",
           "audit-platform/frontend/src/components/workpaper/GtG9OtherNoncurrentFinancial.vue#L18",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -16227,15 +16089,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue#L21",
           "audit-platform/frontend/src/components/workpaper/GtH1FixedAssets.vue#L301",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -16432,15 +16295,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L130",
           "audit-platform/frontend/src/components/workpaper/GtH10AssetDisposalIncome.vue#L19",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -16637,15 +16501,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L23",
           "audit-platform/frontend/src/components/workpaper/GtH2ConstructionInProgress.vue#L282",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -16835,15 +16700,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue#L286",
           "audit-platform/frontend/src/components/workpaper/GtH3InvestmentProperty.vue#L30",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -17033,15 +16899,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue#L182",
           "audit-platform/frontend/src/components/workpaper/GtH4EngineeringMaterials.vue#L21",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -17238,15 +17105,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L276",
           "audit-platform/frontend/src/components/workpaper/GtH5OilGasAssets.vue#L29",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -17436,15 +17304,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L134",
           "audit-platform/frontend/src/components/workpaper/GtH6AssetDisposalClearing.vue#L34",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -17634,15 +17503,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L342",
           "audit-platform/frontend/src/components/workpaper/GtH7BiologicalAssets.vue#L35",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -17832,15 +17702,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L306",
           "audit-platform/frontend/src/components/workpaper/GtH8RightOfUseAssets.vue#L47",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -18030,15 +17901,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L165",
           "audit-platform/frontend/src/components/workpaper/GtH9LeaseLiabilities.vue#L36",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -18228,15 +18100,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue#L20",
           "audit-platform/frontend/src/components/workpaper/GtI1IntangibleAssets.vue#L243",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -18426,15 +18299,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue#L334",
           "audit-platform/frontend/src/components/workpaper/GtI2DevelopmentExpenditure.vue#L45",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -18756,9 +18630,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -18766,7 +18641,7 @@
           "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue#L186",
           "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue#L20",
           "audit-platform/frontend/src/components/workpaper/GtI3Goodwill.vue#L42",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -18956,15 +18831,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L168",
           "audit-platform/frontend/src/components/workpaper/GtI4LongTermPrepaid.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -19154,15 +19030,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtI5OtherNoncurrentAssets.vue#L133",
           "audit-platform/frontend/src/components/workpaper/GtI5OtherNoncurrentAssets.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -19352,15 +19229,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L159",
           "audit-platform/frontend/src/components/workpaper/GtI6ResearchDevelopmentExpense.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -19550,15 +19428,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L21",
           "audit-platform/frontend/src/components/workpaper/GtK1OtherReceivables.vue#L221",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -19748,15 +19627,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L138",
           "audit-platform/frontend/src/components/workpaper/GtK10OtherIncome.vue#L29",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -19946,15 +19826,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L106",
           "audit-platform/frontend/src/components/workpaper/GtK11AssetImpairmentLoss.vue#L29",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -20144,15 +20025,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L119",
           "audit-platform/frontend/src/components/workpaper/GtK12NonOperatingIncome.vue#L29",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -20342,15 +20224,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L118",
           "audit-platform/frontend/src/components/workpaper/GtK13NonOperatingExpense.vue#L29",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -20540,15 +20423,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L147",
           "audit-platform/frontend/src/components/workpaper/GtK2OtherCurrentAssets.vue#L21",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -20738,15 +20622,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L167",
           "audit-platform/frontend/src/components/workpaper/GtK3OtherPayables.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -20936,15 +20821,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L134",
           "audit-platform/frontend/src/components/workpaper/GtK4OtherCurrentLiabilities.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -21134,15 +21020,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L156",
           "audit-platform/frontend/src/components/workpaper/GtK5Provisions.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -21332,15 +21219,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L151",
           "audit-platform/frontend/src/components/workpaper/GtK6HeldForSale.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -21530,15 +21418,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L131",
           "audit-platform/frontend/src/components/workpaper/GtK7DeferredIncome.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -21735,15 +21624,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L187",
           "audit-platform/frontend/src/components/workpaper/GtK8SellingExpenses.vue#L46",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -21940,15 +21830,16 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L180",
           "audit-platform/frontend/src/components/workpaper/GtK9AdminExpenses.vue#L24",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22124,14 +22015,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtL1ShortTermLoans.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22308,14 +22200,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtL2InterestPayable.vue#L20",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22426,13 +22319,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22542,13 +22436,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22658,13 +22553,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22774,13 +22670,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -22890,13 +22787,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -23006,13 +22904,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -23174,13 +23073,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -23343,13 +23243,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -23512,13 +23413,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -23681,13 +23583,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -23850,13 +23753,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -24019,13 +23923,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -24188,13 +24093,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -24357,13 +24263,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -24526,13 +24433,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -24643,13 +24551,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -24832,14 +24741,15 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtN1DeferredTaxAssets.vue#L26",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -25110,16 +25020,17 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L15",
           "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L197",
           "audit-platform/frontend/src/components/workpaper/GtN2TaxesPayable.vue#L27",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -25375,16 +25286,17 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L20",
           "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L30",
           "audit-platform/frontend/src/components/workpaper/GtN3DeferredTaxLiabilities.vue#L97",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -25640,16 +25552,17 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L111",
           "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L16",
           "audit-platform/frontend/src/components/workpaper/GtN4TaxesAndSurcharges.vue#L35",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -25971,9 +25884,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -25981,7 +25895,7 @@
           "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L181",
           "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L26",
           "audit-platform/frontend/src/components/workpaper/GtN5IncomeTaxExpense.vue#L36",
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -26102,17 +26016,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_a91891dcf7e1885d0874",
+          "mountId": "mount_b71ec711fe09e068f84e",
           "runtimeCardinality": "single",
           "sheetExpression": ":sheet-name=\"isWholeExcelTab ? wholeWorkbookSheetName : activeSheetName\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 200,
+            "endLine": 215,
             "startColumn": 7,
-            "startLine": 191
+            "startLine": 206
           },
-          "templateNodeOrdinal": 40,
+          "templateNodeOrdinal": 47,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -26126,8 +26040,8 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
-          "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue#L191",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
+          "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue#L206",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -26251,7 +26165,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -26375,7 +26289,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -26499,7 +26413,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -26623,7 +26537,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/h8/measurement/H8TabMeasurementAnnual.vue#L133",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -26748,7 +26662,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/h8/measurement/H8TabMeasurementMonthly.vue#L136",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -26866,13 +26780,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/j1/GtJ1EmployeeCompensation.vue#L17",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -26983,7 +26898,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -27103,7 +27018,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -27223,7 +27138,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -27343,7 +27258,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -27463,7 +27378,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -27656,13 +27571,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s12-cpa-expert/GtS12CpaExpert.vue#L108",
           "audit-platform/frontend/src/components/workpaper/s12-cpa-expert/GtS12CpaExpert.vue#L22",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -27854,13 +27770,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s13-mgmt-expert/GtS13MgmtExpert.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s13-mgmt-expert/GtS13MgmtExpert.vue#L97",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -28052,13 +27969,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s14-accounting-estimate/GtS14AccountingEstimate.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s14-accounting-estimate/GtS14AccountingEstimate.vue#L79",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -28250,13 +28168,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s15-eps-roe/GtS15EpsRoe.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s15-eps-roe/GtS15EpsRoe.vue#L72",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -28382,13 +28301,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s20-revenue-deduction/GtS20RevenueDeduction.vue#L33",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -28579,13 +28499,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s21-data-asset/GtS21DataAsset.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s21-data-asset/GtS21DataAsset.vue#L72",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -28777,13 +28698,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s3-policy-change/GtS3PolicyChange.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s3-policy-change/GtS3PolicyChange.vue#L88",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -28975,13 +28897,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s4-nonmonetary-exchange/GtS4NonmonetaryExchange.vue#L59",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -29173,13 +29096,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s5-debt-restructuring/GtS5DebtRestructuring.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s5-debt-restructuring/GtS5DebtRestructuring.vue#L59",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -29371,13 +29295,14 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
+          "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/s6-fund-occupation/GtS6FundOccupation.vue#L22",
           "audit-platform/frontend/src/components/workpaper/s6-fund-occupation/GtS6FundOccupation.vue#L59",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
@@ -29509,7 +29434,7 @@
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L50",
+          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "audit-platform/frontend/src/components/workpaper/shared/CycleStandaloneProcedureShell.vue#L41",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -29541,48 +29466,48 @@
       }
     }
   ],
-  "manifest_digest": "51fd7a6a7c7eeb45f76de55a1446de97efd7eafc4d6d3f6d5839e79556e57291",
-  "overlay_digest": "1adc18d9e3b87a389eed38be9b26a5d32be67e87be64151ee5487d1e8c4f0e8e",
-  "profile_source_digest": "49dc7fb2bacc2fb3ad1eaf8496047eb18966a9aa16a9009ba18559cf52383f44",
+  "manifest_digest": "87602a8b5cbf7dca925bfa0af2e0fe8cf487d6b958b997df0643ed8238d48cf7",
+  "overlay_digest": "c03b475c578f4e8f8f55ba043ddce7ad818cdb7fcf6e1fa5a83d27983ddb3d23",
+  "profile_source_digest": "fed34d8e3a1a4af76afb17e0e89967dc88edf8f42789cbb4404849791d242aed",
   "schema_version": 1,
-  "source_digest": "d9fddb64a7b3d9881bb81e247b848c36b7e5668202b0d07e7b7900779cc88a32",
+  "source_digest": "65e7c37195915c541775d71362c85b0aad104359265814c6ebb52e36f295486a",
   "stats": {
     "by_component": {
-      "GtOnlyOfficeSheet": 270,
+      "GtOnlyOfficeSheet": 268,
       "OnlyOfficeWordDialog": 2,
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
-      "bidirectional": 3,
+      "bidirectional": 4,
       "single_html": 5,
-      "single_onlyoffice": 177,
+      "single_onlyoffice": 175,
       "unreachable": 1
     },
     "dispatcher_count": 1,
     "editability_counts": {
-      "editable": 185,
+      "editable": 184,
       "unreachable": 1
     },
-    "entry_count": 186,
-    "host_count": 185,
+    "entry_count": 185,
+    "host_count": 184,
     "independent_entry_count": 142,
-    "legacy_fake_bidirectional_count": 138,
-    "mount_count": 276,
-    "parent_duplicate_count": 43,
+    "legacy_fake_bidirectional_count": 137,
+    "mount_count": 274,
+    "parent_duplicate_count": 42,
     "room_model_counts": {
       "exclusive": 6,
       "none": 1,
-      "shared": 179
+      "shared": 178
     },
     "room_service_state": "room_service_wired",
     "scenario_profile_counts": {
       "docx.editable.exclusive.dynamic.room_service_wired.v1": 1,
       "docx.editable.exclusive.single.room_service_wired.v1": 5,
       "docx.editable.shared.single.room_service_wired.v1": 1,
-      "xlsx.editable.shared.single.room_service_wired.v1": 178,
+      "xlsx.editable.shared.single.room_service_wired.v1": 177,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
-    "unadjudicated_count": 133,
+    "unadjudicated_count": 132,
     "unreachable_count": 1
   }
 }

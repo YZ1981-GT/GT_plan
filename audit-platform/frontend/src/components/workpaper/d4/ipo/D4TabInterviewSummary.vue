@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * D4TabInterviewSummary — D4-30 客户访谈记录汇总表
  *
@@ -7,15 +7,31 @@
  * 底部10条红字访谈核对提示
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { useD4InterviewSave, useD4InterviewMode } from './useD4InterviewSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+// 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+const d4Save = useD4InterviewSave(() => ['D4-30-customers','D4-30-note','D4-30-conclusion'].map(k => props.allResponses.get(k)).filter(Boolean))
+const d4SyncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId),
+  sheetKey: ref('d4-30-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
+  flushHtml: async () => { await d4Save.flush(); const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID }); return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-30-managed' } },
+  reloadHtml: async () => { await reloadWorkpaperData?.() },
+})
+const syncHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 
 // ─── 访谈维度定义 ─────────────────────────────────────────────────────
 const INTERVIEW_FIELDS = [
@@ -91,13 +107,13 @@ function persistAll() {
   props.allResponses.set('D4-30-customers', { item_id: 'D4-30-customers', conclusion: null, remark: JSON.stringify({ customers: customers.value, customDimensions: customDimensions.value }) })
   props.allResponses.set('D4-30-note', { item_id: 'D4-30-note', conclusion: null, remark: auditNote.value })
   props.allResponses.set('D4-30-conclusion', { item_id: 'D4-30-conclusion', conclusion: null, remark: auditConclusion.value })
-  if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; const keys = ['D4-30-customers','D4-30-note','D4-30-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) }, 2000)
+  d4Save.schedule()
 }
 function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.value = v; persistAll() }
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-30-customers','D4-30-note','D4-30-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
+onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); d4Save.flush().catch(() => undefined) } })
 
-const editorMode = ref<string>('卡片视图'); const modeOptions = ['卡片视图', '矩阵视图', '在线编辑']
+const { editorMode, modeOptions, busy: syncBusy, feedback: syncFeedback } = useD4InterviewMode(d4SyncBridge, () => props.isReadonly, ['卡片视图', '矩阵视图'])
 const activeIdx = ref(0)
 const activeCustomer = computed(() => customers.value[activeIdx.value] || null)
 
@@ -110,11 +126,35 @@ async function genNote() { if (props.isReadonly || !aiAvailable.value) return; a
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于访谈汇总结果生成审计结论', noteText: auditNote.value, customerCount: customers.value.length } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info' }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+async function handleImportFile(f: any) { const r = await importData('D4-30', f.raw || f); if (r) await reloadWorkpaperData?.() }
+
+// 访谈红旗发现：仅由「核对不一致/异常」明确标记生成（空/含「一致」/「是」不算，不由 reason 单独判）
+function _isMismatch(v: string): boolean {
+  const s = String(v || '').trim()
+  if (!s) return false
+  if (s.includes('不一致')) return true
+  if (s.includes('一致') || s === '是') return false
+  return s.includes('否') || s.includes('异常') || s.includes('差异')
+}
+const riskFindings = computed<D4IpoFinding[]>(() => {
+  const out: D4IpoFinding[] = []
+  for (const c of customers.value) {
+    const f = c.fields || {}
+    const flags: string[] = []
+    if (_isMismatch(f.amountMatch)) flags.push('交易金额核对不一致')
+    if (_isMismatch(f.balanceMatch)) flags.push('往来余额核对不一致')
+    if (_isMismatch(f.contractCheck)) flags.push('合同执行核对异常')
+    if (flags.length) {
+      out.push({ key: `d4-30-${c.id}`, label: `${c.name || '客户'}：${flags.join('、')}`, indexRef: f.indexRef || 'D4-30' })
+    }
+  }
+  return out
+})
 </script>
 
 <template>
 <div class="d4-interview-summary">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-30')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-30')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-30',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:D4-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-30-interview')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-30')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-30')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-30" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-30-interview')">💬 复核</el-button></div></div>
 
   <!-- 仪表板 -->
   <div class="stats-dashboard">
@@ -160,7 +200,7 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 
   <!-- ═══ 在线编辑 ═══ -->
   <template v-else-if="editorMode === '在线编辑'">
-    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户访谈记录汇总表D4-30" :readonly="isReadonly" /></div>
+    <div class="oo-container"><WorkpaperSyncEditorHost v-if="d4SyncDescriptor" ref="syncHostRef" :descriptor="d4SyncDescriptor" :bridge="d4SyncBridge" /><div v-else class="oo-loading">正在打开 D4-30 同步编辑器…</div></div>
   </template>
 
   <!-- 非OO共享区 -->

@@ -646,7 +646,8 @@ async def read_store_projection(
     `{"values": {...}}` 与当前 `expected_revision`。
 
     只读：不写库、不推 revision、不建 room。失败一律 fail visible（不返回空 projection ——
-    空 projection = 清空整表）。
+    空 projection = 清空整表）。有 published substrate 时服务端叠加基线脚手架字段
+    （与首版 overlay 同语义），使返回值可直接喂 pending → materialize。
     """
     scope = await _guard(
         svc,
@@ -660,9 +661,11 @@ async def read_store_projection(
     try:
         return await compute_store_projection_response(
             session=svc.session,
+            project_id=project_id,
             wp_id=wp_id,
             entry_id=scope.entry_id,
             registration=registration,
+            resolution=svc.resolution,
         )
     except SyncDomainError as exc:
         raise _domain_error(exc, status=422) from exc
@@ -673,6 +676,7 @@ async def materialize(
     project_id: uuid.UUID,
     wp_id: uuid.UUID,
     entry_id: str,
+    request: Request,
     payload: Mapping[str, Any] = Body(...),
     idempotency_key: str = Header(..., alias="Idempotency-Key"),
     svc: _SyncServices = Depends(_services),
@@ -687,7 +691,7 @@ async def materialize(
         action="materialize",
     )
     coordinator = build_materialize_coordinator(svc.session, secret=_secret())
-    request = await _materialize_request(
+    mat_request = await _materialize_request(
         svc,
         scope=scope,
         payload=payload,
@@ -695,7 +699,7 @@ async def materialize(
         pending_mutation_token=token,
     )
     try:
-        authorized = await coordinator.authorize(request)
+        authorized = await coordinator.authorize(mat_request)
         outcome = await coordinator.materialize(authorized)
     except SyncDomainError as exc:
         raise _domain_error(exc, status=classify_materialize_rejection(exc)) from exc
@@ -709,7 +713,171 @@ async def materialize(
         )
     body = outcome.descriptor.as_dict()
     body["replayed"] = bool(outcome.replayed)
-    return body
+    return await _attach_launch_urls(body, http_request=request, svc=svc)
+
+
+async def _attach_launch_urls(
+    body: dict[str, Any],
+    *,
+    http_request: Request,
+    svc: _SyncServices,
+) -> dict[str, Any]:
+    """响应时补签 `document.url` + room-bound `callbackUrl`（Task 28 docstring）。
+
+    coordinator 产出的 `onlyoffice_config` **刻意不含**短 TTL URL（避免与 descriptor
+    生命周期绑死）。本函数在返回前原地补键 —— 不新建第二份完整 config 字面量
+    （`test_the_router_builds_no_second_onlyoffice_config` AST 门）。
+
+    🔴 JWT 必须对**最终**送进 DocEditor 的字段签名，且签名后**只**允许再加 `token`
+    本身。在签名后再改 `type`/`user` 会导致 DocsAPI 客户端校验失败并丢掉 token，
+    OO 侧表现为 `jwt must be provided token=undefined` / `editor_error_-20`。
+    """
+    from app.core.config import settings
+    from app.models.core import User
+    from app.services.workpaper_sync.callback_route import (
+        build_callback_url,
+        sign_callback_route_token,
+    )
+    from app.services.workpaper_sync.room_launch import (
+        LaunchUserIdentity,
+        build_contents_url,
+        build_signed_launch_config,
+        sign_room_contents_token,
+    )
+
+    room_id = uuid.UUID(str(body["room_id"]))
+    generation = int(body["generation"])
+    doc_key = str(body["doc_key"])
+    representation_id = uuid.UUID(str(body["representation_id"]))
+    artifact_sha256 = str(body["artifact_sha256"])
+
+    credential = await svc.rooms.route_credential(room_id)
+    base_url = str(
+        getattr(settings, "ONLYOFFICE_CALLBACK_BASE", "") or ""
+    ).rstrip("/") or str(http_request.base_url).rstrip("/")
+
+    callback_url = build_callback_url(
+        base_url=base_url,
+        path=f"/api/workpaper-sync/rooms/{room_id}/onlyoffice-callback",
+        room_id=room_id,
+        generation=generation,
+        doc_key=doc_key,
+        route_credential_id=credential.credential_id,
+    )
+    # OO 无法在 callback 上带平台自定义 Authorization（outbox JWT 覆盖 header）。
+    # 契约 oo94_facts：平台 claim 必须自签；实践上嵌入 callbackUrl query，OO 原样回呼。
+    secret_for_route = str(getattr(settings, "ONLYOFFICE_JWT_SECRET", "") or "")
+    if secret_for_route:
+        from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+        route_token = sign_callback_route_token(
+            secret=secret_for_route,
+            room_id=room_id,
+            generation=generation,
+            doc_key=doc_key,
+            route_credential_id=credential.credential_id,
+            action="callback_write",
+            # 覆盖整段编辑会话；短 TTL 会在用户仍打开编辑器时让 forcesave callback 一律 error=1
+            ttl_seconds=12 * 3600,
+            audit_participant_hint=svc.user_id if isinstance(svc.user_id, uuid.UUID) else None,
+        )
+        parts = urlsplit(callback_url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query["route_token"] = route_token
+        callback_url = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment)
+        )
+    secret = str(getattr(settings, "ONLYOFFICE_JWT_SECRET", "") or "")
+    document_url = build_contents_url(
+        base_url=base_url,
+        room_id=room_id,
+        token=sign_room_contents_token(
+            secret=secret,
+            room_id=room_id,
+            representation_id=representation_id,
+            artifact_sha256=artifact_sha256,
+        ),
+    )
+
+    user_row = (
+        await svc.session.execute(sa.select(User).where(User.id == svc.user_id))
+    ).scalar_one_or_none()
+
+    out = dict(body)
+    out["onlyoffice_config"] = build_signed_launch_config(
+        raw_config=body.get("onlyoffice_config") or {},
+        document_url=document_url,
+        callback_url=callback_url,
+        document_type=str(body.get("document_type") or ""),
+        user=LaunchUserIdentity(
+            id=str(svc.user_id),
+            name=str(
+                getattr(user_row, "username", None)
+                or getattr(user_row, "display_name", None)
+                or svc.user_id
+            ),
+        ),
+        secret=secret,
+    )
+    return out
+
+
+# G4-3：contents token 的签发/验签已迁 `workpaper_sync/room_launch.py`。
+# 理由：那是业务判定（代际冻结 + 跨 wp 归属），而 Task 28 要求 router 不自己 jwt.decode。
+
+
+@public_router.get("/api/workpaper-sync/rooms/{room_id}/contents")
+async def get_room_contents(
+    room_id: uuid.UUID,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> Any:
+    """OO `document.url` 消费方：短 TTL token → representation artifact 字节。
+
+    G4-3：解析全部在 `room_launch.resolve_room_contents()`，本 handler 只做状态码映射。
+    原实现在这里散着 4 个裸 404（`room not found` / `representation not found` /
+    `artifact not found` / `artifact file missing`）—— 四种措辞合起来就是一台存在性
+    预言机：能构造 token 的人据此可以区分「这个 representation 存在但文件没了」。
+    现在四者在 service 层合成同一类域异常，出口只有 `_not_found()` 一处。
+    """
+    from fastapi.responses import FileResponse
+
+    from app.core.config import settings
+    from app.services.workpaper_sync.room_launch import (
+        RoomContentsDigestMismatchError,
+        RoomContentsTokenInvalidError,
+        RoomContentsUnavailableError,
+        RoomLaunchSecretMissingError,
+        resolve_room_contents,
+    )
+
+    try:
+        resolved = await resolve_room_contents(
+            db,
+            room_id=room_id,
+            token=token,
+            secret=str(getattr(settings, "ONLYOFFICE_JWT_SECRET", "") or ""),
+            artifacts=CanonicalArtifactRepository(BACKEND_ROOT),
+        )
+    except RoomContentsTokenInvalidError as exc:
+        # 401 而不是 404：调用方是 DocServer（服务凭证），它需要知道「换一枚 token 重试」
+        # 与「这份内容不存在」的区别；而这条路径上不存在用户可见的存在性泄露面。
+        raise HTTPException(
+            status_code=401,
+            detail={"error_code": exc.error_code, "message": "contents token 不可用"},
+        ) from exc
+    except RoomLaunchSecretMissingError as exc:
+        raise _domain_error(exc, status=503) from exc
+    except RoomContentsDigestMismatchError as exc:
+        raise _conflict(exc, error_code=exc.error_code) from exc
+    except RoomContentsUnavailableError as exc:
+        raise _not_found() from exc
+
+    return FileResponse(
+        resolved.path,
+        media_type=resolved.media_type,
+        filename=resolved.filename,
+    )
 
 
 async def _materialize_request(
@@ -936,11 +1104,34 @@ async def request_forcesave(
         await svc.session.rollback()
         raise _sync_http(exc) from exc
     dispatch_error: str | None = None
+    cs_error: int | None = None
+    cs_outcome: str | None = None
+    callback_expected: bool | None = None
     try:
         room = await svc.requests.room_of(room_id)
-        await svc.command_client().forcesave(
+        dispatch = await svc.command_client().forcesave(
             accepted, target=_command_target(accepted, room=room)
         )
+        cs_error = int(dispatch.error_code)
+        cs_outcome = str(
+            dispatch.outcome.value if hasattr(dispatch.outcome, "value") else dispatch.outcome
+        )
+        callback_expected = bool(dispatch.callback_expected)
+        # 🔴 CS no_changes / doc_not_online / configuration_error / implementation_defect：
+        # 不会再有 callback —— request + shell 就地终结，避免前端无限等 status 6。
+        if dispatch.terminal_without_callback:
+            await svc.requests.terminate_without_callback(
+                accepted,
+                cs_outcome=str(cs_outcome or "unknown"),
+                cs_error=cs_error,
+            )
+            await svc.session.commit()
+            logger.info(
+                "forcesave CS terminal_without_callback room=%s cs_error=%s outcome=%s",
+                room_id,
+                cs_error,
+                cs_outcome,
+            )
     except SyncDomainError as exc:
         # 出站失败不回滚已落库的 frozen request/shell：AC 4.1 的顺序是「先落库再出站」，
         # 回滚会让重放拿到新的 request id，复合幂等键就白写了。失败原样透出。
@@ -964,6 +1155,9 @@ async def request_forcesave(
         "poll_after_ms": 500,
         "replayed": bool(accepted.cache_hit),
         "dispatch_error": dispatch_error,
+        "cs_error": cs_error,
+        "cs_outcome": cs_outcome,
+        "callback_expected": callback_expected,
     }
 
 
@@ -1962,6 +2156,11 @@ async def rollback_version(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
+# G4-3：OO outbox JWT 与平台 route token 的拆分已迁
+# `workpaper_sync/callback_route.resolve_platform_callback_authorization()`。
+# 理由：它自己要 `jwt.decode` 验 OO 签名，而 Task 28 明令 callback 的验签只在该模块。
+
+
 @public_router.post("/api/workpaper-sync/rooms/{room_id}/onlyoffice-callback")
 async def post_room_onlyoffice_callback(
     room_id: uuid.UUID,
@@ -1983,6 +2182,9 @@ async def post_room_onlyoffice_callback(
     repo = WorkpaperSyncRepository(db)
     artifacts = CanonicalArtifactRepository(BACKEND_ROOT)
     from app.core.config import settings
+    from app.services.workpaper_sync.callback_route import (
+        resolve_platform_callback_authorization,
+    )
 
     service = CallbackDeliveryService(
         repo,
@@ -1992,18 +2194,31 @@ async def post_room_onlyoffice_callback(
         ),
         transport=build_httpx_transport(),
     )
+    secret = _onlyoffice_secret()
     try:
-        outcome = await service.handle_callback(
+        authorization = resolve_platform_callback_authorization(
             authorization_header=request.headers.get("Authorization"),
+            route_token_query=request.query_params.get("route_token"),
+            secret=secret,
+        )
+        outcome = await service.handle_callback(
+            authorization_header=authorization,
+            # 绑定校验只认四项 URL_BOUND_PARAMS；route_token 可留在 URL 中
             callback_url=str(request.url),
             body=body,
             room_id=room_id,
-            secret=_onlyoffice_secret(),
+            secret=secret,
         )
     except SyncDomainError as exc:
         await db.rollback()
         logger.warning(
             "sync callback pre-durable 拒绝 room=%s error_code=%s", room_id, exc.error_code
+        )
+        return {"error": 1}
+    except Exception as exc:  # noqa: BLE001 — OO 重试撞唯一键等不得抬成 HTTP 500
+        await db.rollback()
+        logger.exception(
+            "sync callback 未预期失败 room=%s err=%s", room_id, type(exc).__name__
         )
         return {"error": 1}
     await db.commit()
@@ -2233,7 +2448,7 @@ class _ServiceScopeVisibilityProbe:
         self, *, project_id: uuid.UUID, wp_id: uuid.UUID, entry_id: str
     ) -> Mapping[str, Any]:
         from app.models.workpaper_models import WorkingPaper, WpFileStatus
-        from app.models.project import Project
+        from app.models.core import Project
 
         project_visible = bool(
             (

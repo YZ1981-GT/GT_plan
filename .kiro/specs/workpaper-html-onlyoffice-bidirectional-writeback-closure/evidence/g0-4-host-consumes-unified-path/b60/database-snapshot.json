@@ -1,0 +1,64 @@
+{
+  "applications": [
+    {
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "id": "baf86294-1604-4dbf-a20f-eb29430d68ce",
+      "result_revision": 5,
+      "room_id": "e4c46326-ab6f-463a-836d-47288b0ab1ae",
+      "state": "applied",
+      "wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9"
+    }
+  ],
+  "capture_kind": "runtime_database_snapshot",
+  "captured_at": "2026-09-11T05:49:59.966773+00:00",
+  "content_versions": [
+    {
+      "id": "27ac31dc-29bc-42ed-97f0-5ba65d384b1c",
+      "operation_id": "bf9c9599-190a-4733-b0ea-28b8c8bbe9cf",
+      "revision": 5,
+      "source": "onlyoffice",
+      "wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9"
+    }
+  ],
+  "entry_id": "xlsx/b60/gt-b60-bundle",
+  "evidence_source": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g4-1-b60-host-unified-path/",
+  "execution_status": "COMPLETED",
+  "oo_content_revision_delta": {
+    "after": null,
+    "before": null,
+    "note": "business correctness owned by content_version revision 5; oo_content_revision may exist for doc_key rotation only",
+    "observed": false,
+    "used_as_correctness_basis": false
+  },
+  "operations": [
+    {
+      "application_id": "baf86294-1604-4dbf-a20f-eb29430d68ce",
+      "direction": "oo_to_html",
+      "entry_id": "xlsx/b60/gt-b60-bundle",
+      "id": "bf9c9599-190a-4733-b0ea-28b8c8bbe9cf",
+      "state": "applied"
+    }
+  ],
+  "read_only_capture": true,
+  "run_id": "g4-1-pilots-positive-runtime-v1",
+  "scenario_executed": true,
+  "schema_version": "host-unified-path-database-evidence/v1",
+  "source_bindings": [
+    {
+      "path": "backend/app/models/workpaper_sync_models.py",
+      "required_literals": [
+        "class WorkpaperContentApplication",
+        "class WorkpaperSyncOperation",
+        "class WorkpaperContentVersion"
+      ],
+      "sha256": "720a20b2fa2100803b73b992907215590bfa1b3615b1817d5cc304a4c12b6e1f"
+    },
+    {
+      "path": "backend/app/services/workpaper_sync/models.py",
+      "required_literals": [
+        "class OperationState"
+      ],
+      "sha256": "d1265f9b306d2354317b2d17b90712c1e0dba30de8026addb4a893d091caf6f0"
+    }
+  ]
+}

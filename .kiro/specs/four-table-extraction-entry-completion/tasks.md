@@ -113,6 +113,64 @@
   - _Requirements: 6.4, 7.2, 7.4, 7.5_
   - ✅ 交付（Task 15 evidence `evidence/task15-aging-skeleton-realstack.json`）：真栈 K1 wp `6e6348d0`（重庆和平药房_2024，1221 有 3305 aux 行/1098 户）新取 400 行 —— **全 400 行 × 3 组 × 6 段 aging 值恒 0**（`max_abs_aging_value=0`、`any_segment_equals_balance=false`、`sum(agingAudited)==0`），message「账龄留空，请按实际账龄人工填列」，键集 = FIVE_YEAR（Property 5/8 实证）；某行手动录 `agingAudited.y2to3=4800` 后重取 `imported_count=0`、值不被覆盖、无重复（Requirement 3.4/7.4）；项目账龄枚举 FIVE_YEAR→THREE_YEAR（`PUT /api/projects/{id}/aging/config` 广播 `aging-config:changed`）后 `effective_segments` 6→4、K1-2 明细「账龄区段」列同步渲染为「1年以内/1-2年/2-3年/3年以上」、共享段 y2to3=4800 经 `useAgingMigration` 重映射保留（Requirement 7.2/7.4/7.5），测后已还原 FIVE_YEAR。三件套 `get_diagnostics` 全 clean；本 spec Phase 2 产物（5 守卫/测试 + 改动端点/服务 + 2 证据 + 三件套）已 `git add` 无 `??` 漏登记（未 commit）。**已知遗留（不在本 spec 修）**：THREE_YEAR 末段 `over3` 与 FIVE_YEAR `over5` 键不同 ⇒ 末段值在三↔五切换时会掉（PRESET_SEGMENTS 固有，非本 spec 缺陷）。
 
+## Tasks (Phase 3 — D4-6/D4-7 上下游数据联动与导入导出增强)
+
+> 起因：复盘发现 D4-6 重要指标分析表的 12 项指标全手填（`source` 标注了 TB 科目但无实际取数）、D4-7 月度毛利分析表与 D4-2 主营明细零联动（月度收入/成本手抄、产品毛利不消费已有 `segment_prefill`）、D4-7 月度数据不支持导入导出、`priorQty` 导入恒 0。Requirement 8 + 强化 Property 9/10/11。
+
+- [ ] 16. D4-6 后端指标预填（render 策略增强）
+  - 在 `_d4_operating_revenue.py` 的 render 函数中，灰度开关 `D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED` 下新增 `build_d4_indicator_prefill()` 纯函数
+  - 从 `trial_balance` 取审定数：1122（应收账款）/ 6001（主营业务收入）/ 4103（净利润）/ 1231（坏账准备）/ 资产总计（BS 合计行），复用 `four_table/` 的现有取数函数
+  - 上期数据从 `ctx.year - 1` 取（与 `segment_prefill` 上期取数同范式）
+  - 涉及非 TB 数据的指标（员工总数、原材料采购、折扣/折让/退货月度明细）留空不伪造
+  - 输出 `html_data["indicator_prefill"]` = `{key: {current, prior}}`
+  - _Requirements: 8.1, 8.2, 8.3_
+
+- [ ] 17. D4-6 前端消费 indicator_prefill + 传递 htmlData
+  - 主入口 `GtD4OperatingRevenue.vue` 向 `D4TabIndicator` 传递 `:html-data="props.htmlData"` prop
+  - `D4TabIndicator.vue` 增加 `htmlData` 可选 prop
+  - `loadIndicators()` 增加预填逻辑：`D4-6-indicators-v2` 无持久化时从 `htmlData.indicator_prefill` 按 key 填入 `current`/`prior`
+  - 已有持久化数据不覆盖
+  - _Requirements: 8.1, 8.3_
+
+- [ ] 18. D4-7 月度联动（从 D4-2 汇总种子）
+  - `D4TabMarginMonthly.vue` 的 `loadMonthly()` 增加种子逻辑：`D4-7-monthly` 无持久化时从 `allResponses.get('D4-2-rows')` 读取所有产品行的 `months[12]` 按月 SUM 汇总作为收入行 seed
+  - 成本侧留 0（D4-2 无成本数据），不伪造
+  - 已有持久化数据不覆盖；D4-2 无数据时留空
+  - _Requirements: 8.4_
+
+- [ ] 19. D4-7 产品预填（从 segment_prefill）
+  - 主入口向 `D4TabMarginMonthly` 传递 `:html-data="props.htmlData"` prop
+  - `D4TabMarginMonthly.vue` 增加 `htmlData` 可选 prop
+  - `loadProducts()` 增加种子逻辑：`D4-7-products` 无持久化时从 `htmlData.segment_prefill` 预填产品行（`label` → `name`、`current_revenue` → `curRevenue`、`current_cost` → `curCost`、`prior_revenue` → `priorRevenue`、`prior_cost` → `priorCost`）
+  - 已有持久化数据不覆盖；`segment_prefill` 为空时留空
+  - _Requirements: 8.5_
+
+- [ ] 20. D4-7 月度数据导入导出
+  - 后端 `_d4_import_export.py`：`_SUPPORTED_SHEETS` 增加 `D4-7-monthly`；`_SHEET_HEADERS` 增加 26 列（12 月收入 + 12 月成本 + 上期收入合计 + 上期成本合计）
+  - 新增 `_parse_d4_7_monthly_row` 解析函数，写入 `D4-7-monthly` remark JSON
+  - 导出模板/导出数据均支持 `D4-7-monthly` sheet code
+  - 前端：月度毛利分析区域的工具栏增加「导入导出 ▾」下拉（与产品毛利分析的导入导出并列），sheet code 传 `D4-7-monthly`
+  - 导入成功后调 `loadMonthly()` 刷新
+  - _Requirements: 8.6_
+
+- [ ] 21. D4-7 上期数量导入修复
+  - `_SHEET_HEADERS["D4-7"]` 在 `上期主营业务成本` 后增加 `上期数量` 列
+  - `_parse_d4_7_row` 的 `priorQty` 改为 `_safe_float(_col_val("上期数量"))` 而非硬编码 0
+  - 导出数据时补上 `priorQty` 列值
+  - _Requirements: 8.7_
+
+- [ ] 22. 守卫 + 变异（Phase 3）
+  - 后端守卫：断言 `build_d4_indicator_prefill` 对已知有 TB 数据的项目返回非空 dict，且 `ar-to-assets` 等 key 的 `current` 值 > 0（Property 9）
+  - 变异：删 `indicator_prefill` 赋值行 → 前端 indicators 全 0（打红）；改公式（除法变乘法）→ 值不一致（打红）
+  - 前端 vitest：D4-7 `loadMonthly` 无持久化 + 有 D4-2 数据时 seed 收入行 = D4-2 月度 SUM（Property 10）；D4-7 `loadProducts` 无持久化 + 有 segment_prefill 时产品数 = prefill 行数（Property 11）
+  - _Requirements: 6.1, 6.2, 6.3_
+
+- [ ] 23.(*) 真栈实测 + 收口（Phase 3）
+  - Playwright：打开 D4 底稿 → D4-6 指标表的"本期"列至少 3 项非零（TB 预填生效）→ D4-7 月度收入行非全零（D4-2 联动生效）→ D4-7 产品表行数 ≥ 1（segment_prefill 预填生效）
+  - D4-7 月度导入导出：导出模板 → 填数据 → 导入 → `loadMonthly()` 刷新验证
+  - `get_diagnostics` 校验三件套；清理 `tmp_*`/`_wip_*`
+  - _Requirements: 6.4, 8.4, 8.5, 8.6_
+
 ## Task Dependency Graph
 
 ```json
@@ -126,18 +184,23 @@
     { "wave": 6, "tasks": ["8", "9", "10"], "rationale": "前端守卫与真栈实测需要按钮已挂载；收口最后" },
     { "wave": 7, "tasks": ["11", "12"], "rationale": "Phase 2 后端：K1 修伪造 + D 循环账龄骨架改配置驱动（读 get_effective_segments），二者独立可并行" },
     { "wave": 8, "tasks": ["13", "14"], "rationale": "前端骨架同键+枚举切换重映射，与后端 Property 5/8 守卫+变异并行（守卫针对 wave 7 的后端行为）" },
-    { "wave": 9, "tasks": ["15"], "rationale": "Phase 2 真栈实测（枚举切换联动）+ 收口，需前后端骨架已落地" }
+    { "wave": 9, "tasks": ["15"], "rationale": "Phase 2 真栈实测（枚举切换联动）+ 收口，需前后端骨架已落地" },
+    { "wave": 10, "tasks": ["16", "20", "21"], "rationale": "Phase 3 后端：D4-6 指标预填 + D4-7 月度导入导出 + D4-7 上期数量修复，三者独立可并行" },
+    { "wave": 11, "tasks": ["17", "18", "19"], "rationale": "Phase 3 前端：D4-6 消费 prefill（依赖 Task 16）+ D4-7 月度联动 + D4-7 产品预填（依赖 segment_prefill 已在 render 中产出）" },
+    { "wave": 12, "tasks": ["22", "23"], "rationale": "Phase 3 守卫变异 + 真栈实测 + 收口，需前后端均已落地" }
   ],
   "blocking": {
     "1": "缺口清册未出或 source digest 与 registry/render-config 漂移 ⇒ Task 5 / Task 7 无输入，全部阻塞（Requirement 1.5/1.6）",
     "3": "共享件未带 reason 码 ⇒ Task 7 的可辨别提示（Requirement 4.4）无法实现",
-    "4.1": "迁移前基线未冻结 ⇒ Task 4 不得开始；G-B 超过 6 个时必须拆为独立批次 gate"
+    "4.1": "迁移前基线未冻结 ⇒ Task 4 不得开始；G-B 超过 6 个时必须拆为独立批次 gate",
+    "16": "D4-6 后端 indicator_prefill 未产出 ⇒ Task 17 前端消费无数据源"
   },
   "pending_decisions": {
     "DEC-1": "按钮摆法：倾向沿用平铺「从余额表导入」，仅在已有「导入导出 ▾」的宿主并入下拉",
     "DEC-2": "D2 实际端点归属，由 Task 1 核实后归入 G-C 或 G-B",
     "DEC-3": "无可证明报表映射时只能走有 source_ref 的声明式 fallback，否则 blocked",
-    "DEC-5": "G-B > 6 个时按每批 ≤3 个拆成独立 release gate，不得以部分批次标记本 spec 全部完成"
+    "DEC-5": "G-B > 6 个时按每批 ≤3 个拆成独立 release gate，不得以部分批次标记本 spec 全部完成",
+    "DEC-6": "D4-6 部分指标（折扣/折让/退货占比、末季占比）需要月度发生额明细，可能需从 tb_ledger 取数而非 trial_balance 一级科目——如果真库无该维度数据则留空不伪造"
   }
 }
 ```

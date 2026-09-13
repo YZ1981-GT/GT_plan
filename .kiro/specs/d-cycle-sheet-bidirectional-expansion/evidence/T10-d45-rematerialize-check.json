@@ -1,0 +1,28 @@
+{
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "mode": "check",
+  "force": false,
+  "current": {
+    "representation_id": "6c84fcb2-4ba8-4276-9669-f5b429e09880",
+    "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+    "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+    "bundle_sha256": "9c7d0848fcf1f4bdcfd041f80fd4ac122bb49d34c8924579a3eec3c3687ad53a",
+    "generation": 1
+  },
+  "desired_bundle": {
+    "id": "f2dc6413-7582-4575-8dba-53248060b718",
+    "sha256": "adddb51660ddcc684e89eb58b08369325636c42f81491d589c3cf2840173bdc7"
+  },
+  "store_bytes": {
+    "D4-2-rows": 2249,
+    "D4-3-rows": 1010,
+    "D4-5-policy-groups": 2,
+    "D4-5-biz-scene": 0,
+    "D4-5-biz-order": 0,
+    "D4-5-biz-produce": 0,
+    "D4-5-biz-sales": 0,
+    "D4-5-biz-pricing": 0,
+    "D4-5-biz-delivery": 0
+  },
+  "status": "would_rematerialize"
+}

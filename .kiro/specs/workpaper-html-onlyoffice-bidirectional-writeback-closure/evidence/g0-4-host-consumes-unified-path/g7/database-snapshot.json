@@ -1,0 +1,64 @@
+{
+  "applications": [
+    {
+      "entry_id": "xlsx/gt-g7-long-term-equity-main",
+      "id": "3967599d-88c7-49ed-80c5-f8bcbb3b8b0d",
+      "result_revision": 9,
+      "room_id": "cf7f7185-6e92-4052-9cc5-bdc68fd33e38",
+      "state": "applied",
+      "wp_id": "354e060f-15fa-41f0-8632-320082a54ed6"
+    }
+  ],
+  "capture_kind": "runtime_database_snapshot",
+  "captured_at": "2026-09-11T05:49:59.966773+00:00",
+  "content_versions": [
+    {
+      "id": "37ea2d0b-ed8a-494e-a1f4-e774be70732d",
+      "operation_id": "6efd5fa2-ae15-43da-885d-d8ab4d7c3aea",
+      "revision": 9,
+      "source": "onlyoffice",
+      "wp_id": "354e060f-15fa-41f0-8632-320082a54ed6"
+    }
+  ],
+  "entry_id": "xlsx/gt-g7-long-term-equity-main",
+  "evidence_source": ".kiro/specs/workpaper-html-onlyoffice-bidirectional-writeback-closure/evidence/g4-1-g7-host-unified-path/",
+  "execution_status": "COMPLETED",
+  "oo_content_revision_delta": {
+    "after": null,
+    "before": null,
+    "note": "business correctness owned by content_version revision 9; oo_content_revision may exist for doc_key rotation only",
+    "observed": false,
+    "used_as_correctness_basis": false
+  },
+  "operations": [
+    {
+      "application_id": "3967599d-88c7-49ed-80c5-f8bcbb3b8b0d",
+      "direction": "oo_to_html",
+      "entry_id": "xlsx/gt-g7-long-term-equity-main",
+      "id": "6efd5fa2-ae15-43da-885d-d8ab4d7c3aea",
+      "state": "applied"
+    }
+  ],
+  "read_only_capture": true,
+  "run_id": "g4-1-pilots-positive-runtime-v1",
+  "scenario_executed": true,
+  "schema_version": "host-unified-path-database-evidence/v1",
+  "source_bindings": [
+    {
+      "path": "backend/app/models/workpaper_sync_models.py",
+      "required_literals": [
+        "class WorkpaperContentApplication",
+        "class WorkpaperSyncOperation",
+        "class WorkpaperContentVersion"
+      ],
+      "sha256": "720a20b2fa2100803b73b992907215590bfa1b3615b1817d5cc304a4c12b6e1f"
+    },
+    {
+      "path": "backend/app/services/workpaper_sync/models.py",
+      "required_literals": [
+        "class OperationState"
+      ],
+      "sha256": "d1265f9b306d2354317b2d17b90712c1e0dba30de8026addb4a893d091caf6f0"
+    }
+  ]
+}

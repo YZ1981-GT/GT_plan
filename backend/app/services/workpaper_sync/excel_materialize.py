@@ -130,6 +130,7 @@ from dataclasses import dataclass, field as dataclass_field
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
+from types import MappingProxyType
 from typing import Any, Final, Mapping, Sequence
 
 from openpyxl.utils import column_index_from_string
@@ -215,6 +216,10 @@ __all__ = [
     "apply_plan_openpyxl",
     "assert_output_outside_template_library",
     "TEMPLATE_LIBRARY_MARKER",
+    # 坐标索引（大表性能）
+    "SheetCellIndex",
+    "build_sheet_cell_index",
+    "patch_sheet_xml_indexed",
     # 入口
     "ExcelMaterializeOutcome",
     "materialize_projection",
@@ -732,6 +737,10 @@ class MaterializePlan:
     #: ⚠ 类型写成 `Any` 而不是 `WorkbookRowChangePlan`：N1 反向 import 本模块的
     #: `_write_entries` 会成环。运行时类型由 `assert_workbook_plan_consistent` 校验。
     workbook_row_change: Any | None = None
+    #: 多 sheet：本次 materialize 的契约 ``sheet_key``（如 ``d42-managed``）。
+    #: ``_refresh_gt_sync_runtime_binding`` 只重冻结本 sheet 的 ``GT_FOOTER_ROW_{TID}``，
+    #: 避免 sibling 的 footer 键被主 sheet 插行误移位。
+    managed_sheet_key: str | None = None
 
     @property
     def field_writes(self) -> tuple[CellWrite, ...]:
@@ -842,6 +851,57 @@ def _cell_view(xml: str, coord: str) -> _CellView | None:
     )
 
 
+# ─────────────────────────────────────────────────────────────────────────
+# 坐标索引（spec: workpaper-sync-materialize-large-table-performance）
+# 把 O(N × 表体积) 的全表 re.search 换成「单次建索引 + O(1) 命中」。
+# SheetCellIndex 是同一份 xml 字节的纯投影，不是第二套结构真源。
+# ─────────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class SheetCellIndex:
+    """sheet XML 的坐标 → span 索引。``view(coord)`` 与 ``_cell_view`` 逐字段等价。"""
+
+    xml: str
+    _spans: Mapping[str, tuple[int, int]]
+
+    def span(self, coord: str) -> tuple[int, int] | None:
+        return self._spans.get(coord)
+
+    def view(self, coord: str) -> _CellView | None:
+        span = self._spans.get(coord)
+        if span is None:
+            return None
+        # 在切片上复用现有单格解析 —— 不再对整份 XML 全扫。
+        sliced = self.xml[span[0] : span[1]]
+        parsed = _cell_view(sliced, coord)
+        if parsed is None:
+            raise EditableCellWriteError(
+                f"坐标索引键 {coord!r} 的 span 切片无法解析为单元格 —— "
+                "索引与真实 XML 不一致，不得按索引静默返回错值"
+            )
+        # raw 必须指向**整份** xml 上的原文，供旧的 str.replace 路径与等价判据使用。
+        if parsed.raw != sliced:
+            raise EditableCellWriteError(
+                f"坐标索引键 {coord!r} 的 span 切片与解析出的 raw 不一致"
+            )
+        return parsed
+
+
+def build_sheet_cell_index(xml: str) -> SheetCellIndex:
+    """一遍 ``re.finditer(_ANY_CELL_RE)`` 建 ``{coord: (start, end)}``。O(表体积)。"""
+    spans: dict[str, tuple[int, int]] = {}
+    for match in _ANY_CELL_RE.finditer(xml):
+        letters = match.group(1) or match.group(3)
+        row = match.group(2) or match.group(4)
+        if not letters or not row:
+            continue
+        coord = f"{letters}{row}"
+        # 同一坐标若重复出现，保留首次命中（与 ``_cell_view`` 的 search 首命中一致）。
+        spans.setdefault(coord, match.span())
+    return SheetCellIndex(xml=xml, _spans=MappingProxyType(spans))
+
+
 def _cell_xml(*, coord: str, style: str, write: CellWrite) -> str:
     """按写入形态渲染一格。**恒带回原样式 `s=`**（AC 3.5：样式必须保留）。"""
     style_attr = f' s="{style}"' if style else ""
@@ -922,7 +982,11 @@ def _replace_cached_value(view: _CellView, value: Any, formula_text: str = "") -
 
 
 def _patch_sheet_xml(xml: str, writes: Sequence[CellWrite]) -> str:
-    """在 sheet XML 上定点写受管格。缺格按列序插入、缺行按行序插入。"""
+    """在 sheet XML 上定点写受管格。缺格按列序插入、缺行按行序插入。
+
+    生产路径请走 :func:`patch_sheet_xml_indexed`（O(N + 表体积)）。本函数保留为
+    逐字节等价的对照实现与变异靶心。
+    """
     for write in writes:
         column = re.match(r"[A-Z]+", write.coord)
         row_match = re.search(r"\d+$", write.coord)
@@ -942,6 +1006,68 @@ def _patch_sheet_xml(xml: str, writes: Sequence[CellWrite]) -> str:
                 f"受保护公式格 {write.coord} 在 substrate 里不存在 —— 不得凭空造一个公式格"
                 f"（stable key {write.stable_field_key!r}）"
             )
+        new = _cell_xml(coord=write.coord, style="", write=write)
+        xml = _insert_cell(xml, row=row, column=column.group(0), cell_xml=new)
+    return xml
+
+
+def patch_sheet_xml_indexed(xml: str, writes: Sequence[CellWrite]) -> str:
+    """与 :func:`_patch_sheet_xml` 逐字节等价，但用坐标索引 + 批量拼接。
+
+    * 已存在的格：按 span 排序后一次性拼接，不再对每个写入 ``str.replace`` 重建整串；
+    * 缺格/缺行：仍走 ``_insert_cell``（插入次数通常远小于已有格写入）。
+    * 同一坐标多次写入时**最后一次**生效（与旧逐个 replace 语义一致）。
+    """
+    if not writes:
+        return xml
+
+    index = build_sheet_cell_index(xml)
+    # coord → (span, new_fragment)；后写覆盖先写。
+    replacements: dict[str, tuple[tuple[int, int], str]] = {}
+    inserts: list[CellWrite] = []
+
+    for write in writes:
+        column = re.match(r"[A-Z]+", write.coord)
+        row_match = re.search(r"\d+$", write.coord)
+        if column is None or row_match is None:
+            raise EditableCellWriteError(f"非法坐标 {write.coord!r}")
+        span = index.span(write.coord)
+        if span is not None:
+            view = index.view(write.coord)
+            assert view is not None  # span 存在 ⇒ view 必成功或已 fail visible
+            if write.kind is CellWriteKind.cached_value_only:
+                new = _replace_cached_value(view, write.value, write.formula_text)
+            else:
+                new = _cell_xml(coord=write.coord, style=view.style, write=write)
+            replacements[write.coord] = (span, new)
+            continue
+        if write.kind is CellWriteKind.cached_value_only:
+            raise ProtectedRegionWriteError(
+                f"受保护公式格 {write.coord} 在 substrate 里不存在 —— 不得凭空造一个公式格"
+                f"（stable key {write.stable_field_key!r}）"
+            )
+        inserts.append(write)
+
+    if replacements:
+        ordered = sorted(replacements.values(), key=lambda item: item[0][0])
+        parts: list[str] = []
+        cursor = 0
+        for (start, end), fragment in ordered:
+            if start < cursor:
+                raise EditableCellWriteError(
+                    "坐标索引写出的 span 发生重叠 —— 索引与真实 XML 不一致"
+                )
+            parts.append(xml[cursor:start])
+            parts.append(fragment)
+            cursor = end
+        parts.append(xml[cursor:])
+        xml = "".join(parts)
+
+    for write in inserts:
+        column = re.match(r"[A-Z]+", write.coord)
+        row_match = re.search(r"\d+$", write.coord)
+        assert column is not None and row_match is not None
+        row = int(row_match.group(0))
         new = _cell_xml(coord=write.coord, style="", write=write)
         xml = _insert_cell(xml, row=row, column=column.group(0), cell_xml=new)
     return xml
@@ -1051,6 +1177,33 @@ def _identity_pattern(identity: str) -> re.Pattern[str]:
     return re.compile(escaped)
 
 
+def _template_ids_from_sheet_key(sheet_key: str) -> tuple[str, ...]:
+    """sheet_key → 候选 TEMPLATE_ID（与 ``GT_FOOTER_ROW_{TID}`` 对齐）。
+
+    常规 ``{tid.lower()}-managed``（如 ``d42-managed`` → ``D42``）。
+    D4-25~28 前端锁死连字符形态 ``d4-25-managed``，而 instrumentation 写的是
+    ``GT_FOOTER_ROW_D425``（无连字符）—— 去连字符紧凑形态必须一并尝试，否则会
+    回退到主键 ``GT_FOOTER_ROW``（主 sheet footer），把兄弟表误判成 footer 下移。
+    """
+    raw = str(sheet_key).removesuffix("-managed").upper()
+    compact = raw.replace("-", "")
+    if compact and compact != raw:
+        return (compact, raw)
+    return (raw,) if raw else ()
+
+
+def _resolve_frozen_footer_row(
+    runtime_binding: Mapping[str, str], *, sheet_key: str | None
+) -> str | None:
+    """多 sheet：优先 ``GT_FOOTER_ROW_{TEMPLATE_ID}``；否则回退 ``GT_FOOTER_ROW``。"""
+    if sheet_key:
+        for tid in _template_ids_from_sheet_key(str(sheet_key)):
+            keyed = runtime_binding.get(f"GT_FOOTER_ROW_{tid}")
+            if keyed is not None:
+                return keyed
+    return runtime_binding.get("GT_FOOTER_ROW")
+
+
 def assert_footer_anchor_stable(
     *,
     entries: Mapping[str, bytes],
@@ -1058,6 +1211,7 @@ def assert_footer_anchor_stable(
     contract: SyncContract,
     runtime_binding: Mapping[str, str],
     row_shift: RowShiftPlan | None = None,
+    table_key: str | None = None,
 ) -> int | None:
     """footer 标记行必须与 representation 冻结的 `GT_FOOTER_ROW` 一致（AC 6.9 / 6.3）。
 
@@ -1069,6 +1223,10 @@ def assert_footer_anchor_stable(
       读出后作为 `runtime_binding` 传进来（本模块不自己解析那张 sheet —— 首版抄了一份
       `r:id="(rId\\d+)"` 的 sheet 定位，而 Task 17 的关系 id 是 `rIdGTSYNC`，于是恒读空、
       把「sheet 定位失败」误报成「缺 GT_FOOTER_ROW」）。
+
+    多 sheet 契约：传 `table_key` 时只用该表的 footer_anchor，并优先读
+    ``GT_FOOTER_ROW_{TEMPLATE_ID}``（与 sheet_key ``{tid.lower()}-managed`` 对齐）；
+    缺省回退主键 ``GT_FOOTER_ROW``（单 sheet / 旧 artifact 兼容）。
 
     两者不一致即 footer 已下移（OO 在受管区域内插了行）。此时**fail closed**而不是跟着
     marker 写：Task 37 的 extract 仍按契约 `static_row` 反读，跟着写会让「写在 28 行、
@@ -1094,15 +1252,35 @@ def assert_footer_anchor_stable(
     `plan.shift(frozen)` 而不是 `frozen + plan.count`：前者自带这个边界，后者要在调用侧
     再写一遍 if（写两遍就会漂移）。
     """
-    anchors = [
-        table.footer_anchor
-        for sheet in contract.sheets
-        for table in sheet.tables
-        if table.footer_anchor is not None
-    ]
-    if not anchors:
-        return None
-    anchor = anchors[0]
+    sheet_for_table: Any = None
+    table_for_key: Any = None
+    if table_key is not None:
+        for sheet in contract.sheets:
+            for table in sheet.tables:
+                if table.table_key == table_key:
+                    sheet_for_table = sheet
+                    table_for_key = table
+                    break
+            if table_for_key is not None:
+                break
+        if table_for_key is None:
+            raise FooterAnchorDriftError(
+                f"契约 {contract.contract_id} 没有 table_key={table_key!r} —— "
+                "无法按 binding 取 footer_anchor"
+            )
+        if table_for_key.footer_anchor is None:
+            return None
+        anchor = table_for_key.footer_anchor
+    else:
+        anchors = [
+            table.footer_anchor
+            for sheet in contract.sheets
+            for table in sheet.tables
+            if table.footer_anchor is not None
+        ]
+        if not anchors:
+            return None
+        anchor = anchors[0]
     xml = entries[sheet_part].decode("utf-8")
     shared = _shared_strings(entries)
     observed = _find_marker_row(
@@ -1114,7 +1292,9 @@ def assert_footer_anchor_stable(
             "一处都找不到 —— footer anchor 是 AC 6.3 要求契约表达的结构之一，"
             "定位不到即结构漂移，不得按固定行号继续写"
         )
-    frozen = runtime_binding.get("GT_FOOTER_ROW")
+    frozen = _resolve_frozen_footer_row(
+        runtime_binding, sheet_key=getattr(sheet_for_table, "sheet_key", None)
+    )
     if frozen is None:
         raise FooterAnchorDriftError(
             "runtime binding 里没有 GT_FOOTER_ROW（实测键 "
@@ -1165,15 +1345,25 @@ def _shared_strings(entries: Mapping[str, bytes]) -> list[str]:
 def _find_marker_row(
     xml: str, *, column: str, marker: str, shared: Sequence[str]
 ) -> int | None:
-    """在指定列上找 marker 文本所在行（支持 sharedString / inlineStr / str 三种载体）。"""
+    """在指定列上找 marker 文本所在行（支持 sharedString / inlineStr / str 三种载体）。
+
+    🔴 OO 回写常把空格写成自闭合 ``<c r="A84" s="168"/>``。若 attrs 用 ``[^>]*``
+    会把结尾 ``/`` 吃进 attrs、再拿后面第一个 ``</c>``（往往是下一行有文本的格）当
+    本格闭合，footer marker 就被「吞掉」→ ``FooterAnchorDriftError``（G7 canary
+    真栈：A84 自闭合吞掉 A85 的 footer）。attrs 不得跨越 ``/``；自闭合格直接跳过。
+    """
     for match in re.finditer(
-        r'<c r="' + re.escape(column) + r'(\d+)"(?P<attrs>(?:\s[^>]*?)?)>(?P<body>.*?)</c>',
+        r'<c r="'
+        + re.escape(column)
+        + r'(\d+)"(?P<attrs>[^>/]*)(?:/>|>(?P<body>.*?)</c>)',
         xml,
         re.S,
     ):
         row = int(match.group(1))
         attrs = match.group("attrs") or ""
         body = match.group("body")
+        if body is None:
+            continue
         text: str | None = None
         if 't="s"' in attrs:
             index = re.search(r"<v>(\d+)</v>", body)
@@ -1423,16 +1613,9 @@ def plan_managed_writes(
         sheet_part=region.sheet_part,
         contract=contract,
         runtime_binding=runtime_binding,
+        table_key=dynamic_table.table_key,
     )
-    anchor = next(
-        (
-            table.footer_anchor
-            for sheet in contract.sheets
-            for table in sheet.tables
-            if table.footer_anchor is not None
-        ),
-        None,
-    )
+    anchor = dynamic_table.footer_anchor
     if footer_row is not None:
         assert_footer_formula_covers_managed_rows(
             entries=substrate_entries,
@@ -1490,6 +1673,7 @@ def plan_managed_writes(
         if shifted_xml is not None
         else substrate_entries[region.sheet_part].decode("utf-8")
     )
+    cell_index = build_sheet_cell_index(xml)
     intended_map: Mapping[str, str] = (
         substrate_formulas if intended_formulas is None else intended_formulas
     )
@@ -1503,7 +1687,7 @@ def plan_managed_writes(
         field = projection.get(key)
         if field is None:
             return
-        view = _cell_view(xml, coord)
+        view = cell_index.view(coord)
         restore = ""
         if spec.mode is FieldMode.formula:
             if view is None or not view.has_formula:
@@ -1629,7 +1813,16 @@ def plan_managed_writes(
         total_formula_rows=total_formula_rows,
         table_part=table_part,
         workbook_row_change=workbook_row_change,
+        managed_sheet_key=_sheet_key_for_table(contract, binding.table_key),
     )
+
+
+def _sheet_key_for_table(contract: SyncContract, table_key: str) -> str | None:
+    for sheet in contract.sheets:
+        for table in sheet.tables:
+            if table.table_key == table_key:
+                return str(sheet.sheet_key)
+    return None
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -1666,7 +1859,7 @@ def _managed_table_part(entries: Mapping[str, bytes], *, table_name: str) -> str
 
 
 def _static_rows_at_or_below(
-    *, contract: SyncContract, insert_at: int
+    *, contract: SyncContract, insert_at: int, sheet_key: str | None = None
 ) -> tuple[tuple[str, str], ...]:
     """契约声明的**静态行**里落在插入点及其之下的那些（第五类拒绝理由）。
 
@@ -1684,10 +1877,14 @@ def _static_rows_at_or_below(
     实测：K11 契约的 `k11_footer/tb_amount` 在 **B27**，而追加插行的插入点是 26
     ⇒ K11 在读侧跟随落地之前**不可安全插行**。这不是缺陷而是正确的 fail closed；
     解除条件 = extract 侧的静态行定位也变成位移感知（读写两侧一起改）。
+
+    多 sheet 合册：只检查**同一 sheet_key** 上的静态行。跨 sheet 的 static_row
+    （如 D4-5 B11）不得挡住另一张 sheet（如 D4-31）在其自身行号上的插行。
     """
     return tuple(
         (spec.stable_field_key, f"{spec.cell.column}{spec.cell.static_row}")
         for sheet in contract.sheets
+        if sheet_key is None or str(getattr(sheet, "sheet_key", "") or "") == sheet_key
         for table in sheet.tables
         for spec in table.fields
         if spec.cell is not None
@@ -1745,7 +1942,11 @@ def _plan_row_shift(
             "受管区域与物理行集已不自洽，不得据此算插入点",
         )
     insert_at = last_data_row + 1
-    offenders = _static_rows_at_or_below(contract=contract, insert_at=insert_at)
+    offenders = _static_rows_at_or_below(
+        contract=contract,
+        insert_at=insert_at,
+        sheet_key=_sheet_key_for_table(contract, region.table_key),
+    )
     if offenders:
         raise _reject("contract_static_row_below_insertion", _static_row_reason(offenders, insert_at))
 
@@ -1934,7 +2135,7 @@ def apply_plan_zip_with_report(
         )
 
     # 阶段 3：写格（坐标已是位移后行号）
-    entries[plan.sheet_part] = _patch_sheet_xml(xml, plan.writes).encode("utf-8")
+    entries[plan.sheet_part] = patch_sheet_xml_indexed(xml, plan.writes).encode("utf-8")
     return _write_entries(entries), report
 
 
@@ -2032,6 +2233,7 @@ def assert_shifted_footer_gates(
         contract=contract,
         runtime_binding=runtime_binding,
         row_shift=plan.row_shift,
+        table_key=region.table_key,
     )
     if footer_row is None:
         return None
@@ -2040,7 +2242,7 @@ def assert_shifted_footer_gates(
             table.footer_anchor
             for sheet in contract.sheets
             for table in sheet.tables
-            if table.footer_anchor is not None
+            if table.table_key == region.table_key and table.footer_anchor is not None
         ),
         None,
     )
@@ -2215,6 +2417,14 @@ def _refresh_gt_sync_runtime_binding(
     old_footer_row = _to_int(
         dict(pairs).get("GT_FOOTER_ROW"), what="GT_FOOTER_ROW", required=False
     )
+    managed_sheet_key = str(getattr(plan, "managed_sheet_key", None) or "").strip() or None
+    # 与 `_resolve_frozen_footer_row` 同口径：优先紧凑 TEMPLATE_ID（D425），
+    # 避免 `d4-25-managed` → `D4-25` 对不上 `GT_FOOTER_ROW_D425`。
+    managed_tid = (
+        _template_ids_from_sheet_key(managed_sheet_key)[0]
+        if managed_sheet_key
+        else None
+    )
 
     new_pairs: list[tuple[str, str]] = []
     seen: set[str] = set()
@@ -2225,8 +2435,26 @@ def _refresh_gt_sync_runtime_binding(
             # `_grow_managed_table_ref` 的同名算式），与 Table ref 增长保持同源。
             new_value = str(old_last_row + shift.count if old_last_row >= shift.insert_at - 1 else old_last_row)
         elif key == "GT_FOOTER_ROW" and old_footer_row is not None:
-            # `shift.shift()` 自带「footer 在插入点之上时不动」的边界 ⇒ 不在这里写 if。
-            new_value = str(shift.shift(old_footer_row))
+            # 主键跟 instrumentation 的 primary sheet；仅本趟是 primary 时才移位。
+            first_tid_key = next(
+                (k for k, _ in pairs if k.startswith("GT_FOOTER_ROW_")),
+                None,
+            )
+            if managed_tid is None or first_tid_key is None:
+                new_value = str(shift.shift(old_footer_row))
+            elif first_tid_key == f"GT_FOOTER_ROW_{managed_tid}":
+                new_value = str(shift.shift(old_footer_row))
+            else:
+                new_value = value
+        elif key.startswith("GT_FOOTER_ROW_") and managed_tid is not None:
+            # 只重冻结本趟 sheet 的 per-template footer 键（D42 插行不得动 D43）。
+            if key == f"GT_FOOTER_ROW_{managed_tid}":
+                old_keyed = _to_int(value, what=key, required=False)
+                new_value = (
+                    str(shift.shift(old_keyed)) if old_keyed is not None else value
+                )
+            else:
+                new_value = value
         elif key == "GT_MANAGED_RANGE":
             new_value = _grow_range_string(value, shift) if value else value
         elif key == "GT_MANAGED_TABLE_REF":
@@ -2448,6 +2676,7 @@ def materialize_projection(
     capability: ExcelWriteCapability | None = None,
     intended_formulas: Mapping[str, str] | None = None,
     limits: SyncLimits | None = None,
+    retain_identity_inventory: bool = True,
 ) -> ExcelMaterializeOutcome:
     """把 projection 写进 substrate 的**副本**，产出 staged 文件。
 
@@ -2482,14 +2711,17 @@ def materialize_projection(
         artifact_kind=substrate_kind,
         artifact_state=substrate_state,
         limits=lim,
+        retain_identity_inventory=retain_identity_inventory,
     )
-    strategy = select_write_strategy(artifact=substrate, capability=capability)
     source_bytes = substrate.read_bytes()
     entries = _read_entries(source_bytes)
-    with zipfile.ZipFile(substrate) as zf:
+    # 同一份 substrate 字节：entries + runtime binding 共用一次 zip 打开，不再
+    # `ZipFile(substrate)` 二次读盘（Wave 2 / Requirement 1.4）。
+    with zipfile.ZipFile(io.BytesIO(source_bytes)) as zf:
         runtime_binding = read_runtime_binding_pairs(
             zf, metadata_sheet=binding.metadata_sheet
         )
+    strategy = select_write_strategy(artifact=substrate, capability=capability)
     plan = plan_managed_writes(
         projection=projection,
         contract=definitions.contract,
@@ -2588,10 +2820,11 @@ def _staged_identity_inventory(
     with zipfile.ZipFile(output) as zf:
         region = resolve_managed_region(zf, contract=definitions.contract, binding=binding)
         xml = entries[region.sheet_part].decode("utf-8")
+        cell_index = build_sheet_cell_index(xml)
         raw: dict[int, str] = {}
         shared = _shared_strings(entries)
         for row in region.row_span:
-            view = _cell_view(xml, f"{region.uuid_column}{row}")
+            view = cell_index.view(f"{region.uuid_column}{row}")
             raw[row] = "" if view is None else _cell_text(view, shared)
         return read_runtime_identity_inventory(
             zf,

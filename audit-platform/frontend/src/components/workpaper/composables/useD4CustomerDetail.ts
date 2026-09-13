@@ -72,17 +72,20 @@ export interface UseD4CustomerDetailOptions {
   projectId: Ref<string>
   allResponses: Ref<Map<string, any>>
   isReadonly: Ref<boolean>
+  saveItems?: (items: any[]) => Promise<void>
 }
 
 // ─── Composable ──────────────────────────────────────────────────────
 
 export function useD4CustomerDetail(options: UseD4CustomerDetailOptions) {
-  const { wpId, projectId, allResponses, isReadonly } = options
+  const { wpId, projectId, allResponses, isReadonly, saveItems } = options
 
   const customers = ref<CustomerItem[]>([])
   const auditNote = ref('')
   const auditConclusion = ref('')
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let saveInFlight: Promise<void> = Promise.resolve()
+  const lastError = ref<string | null>(null)
 
   // Load
   function loadData() {
@@ -97,7 +100,7 @@ export function useD4CustomerDetail(options: UseD4CustomerDetailOptions) {
     auditConclusion.value = allResponses.value.get('D4-29-conclusion')?.remark || ''
   }
   watch(() => allResponses.value.get('D4-29-customers')?.remark, loadData, { immediate: true })
-  watch(() => allResponses.value.get('D4-29-note')?.remark, loadNote, { immediate: true })
+  watch(() => [allResponses.value.get('D4-29-note')?.remark, allResponses.value.get('D4-29-conclusion')?.remark], loadNote, { immediate: true })
 
   // CRUD
   function addCustomer(name: string): CustomerItem {
@@ -153,17 +156,25 @@ export function useD4CustomerDetail(options: UseD4CustomerDetailOptions) {
     allResponses.value.set('D4-29-conclusion', { item_id: 'D4-29-conclusion', conclusion: null, remark: auditConclusion.value })
     debounceSave()
   }
-  function debounceSave() { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000) }
-  function flushSave() { const keys = ['D4-29-customers', 'D4-29-note', 'D4-29-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => allResponses.value.get(k)).filter(Boolean) } })) }
+  function debounceSave() { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; flushSave().catch((error) => { lastError.value = error?.message || '保存失败，请重试' }) }, 2000) }
+  function flushSave(): Promise<void> {
+    if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null }
+    if (!saveItems) return Promise.reject(new Error('D4-29 未提供保存宿主'))
+    const keys = ['D4-29-customers', 'D4-29-note', 'D4-29-conclusion']
+    const items = keys.map(k => allResponses.value.get(k)).filter(Boolean)
+    const operation = saveInFlight.catch(() => {}).then(() => saveItems(items)).catch((error) => { lastError.value = error?.message || '保存失败，请重试'; throw error })
+    saveInFlight = operation.catch(() => {})
+    return operation
+  }
   function updateAuditNote(v: string) { if (isReadonly.value) return; auditNote.value = v; persistAll() }
   function updateAuditConclusion(v: string) { if (isReadonly.value) return; auditConclusion.value = v; persistAll() }
-  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushSave() } })
+  onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); debounceTimer = null; void flushSave().catch(() => {}) } })
 
   return {
-    customers, auditNote, auditConclusion,
+    customers, auditNote, auditConclusion, lastError,
     customerCount, relatedCount, completionRate,
     addCustomer, removeCustomer, updateField, updateCustomerName,
-    updateAuditNote, updateAuditConclusion, loadData,
+    updateAuditNote, updateAuditConclusion, loadData, flushPendingSave: flushSave,
   }
 }
 

@@ -1,11 +1,11 @@
 {
-  "scanned_files": 1862,
+  "scanned_files": 1872,
   "totals": {
-    "el_input_number": 3063,
+    "el_input_number": 3053,
     "el_input_number_with_formatter": 18,
-    "wp_amount_input": 1881
+    "wp_amount_input": 1878
   },
-  "column_classified_total": 3734,
+  "column_classified_total": 3721,
   "confirmed_violation": [
     {
       "file": "d4/core/D4TabAdjudication.vue",
@@ -2206,7 +2206,7 @@
     },
     {
       "file": "k1/core/K1TabDetail.vue",
-      "line": 170,
+      "line": 173,
       "label": "期初余额",
       "full_label": "期初余额",
       "control": "el-input-number",
@@ -2219,7 +2219,7 @@
     },
     {
       "file": "k1/core/K1TabDetail.vue",
-      "line": 178,
+      "line": 181,
       "label": "期末余额",
       "full_label": "期末余额",
       "control": "el-input-number",
@@ -2232,7 +2232,7 @@
     },
     {
       "file": "k1/core/K1TabDetail.vue",
-      "line": 245,
+      "line": 248,
       "label": "坏账准备",
       "full_label": "坏账准备",
       "control": "el-input-number",
@@ -11192,7 +11192,7 @@
     },
     {
       "file": "d2/D2TabDetail.vue",
-      "line": 364,
+      "line": 386,
       "label": "band.label",
       "full_label": "期末审定账龄 / band.label",
       "control": "el-input-number",
@@ -11221,6 +11221,58 @@
       "line": 638,
       "label": "obligationColumns.find((c: any) => c.key === yk)?.label || yk",
       "full_label": "obligationColumns.find((c: any) => c.key === yk)?.label || yk",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "d4/ipo/D4TabCustomerChecklist.vue",
+      "line": 200,
+      "label": "seg.cols[0].label",
+      "full_label": "seg.cols[0].label",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "d4/ipo/D4TabDealer.vue",
+      "line": 191,
+      "label": "col.label",
+      "full_label": "col.label",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "d4/ipo/D4TabOverseas.vue",
+      "line": 199,
+      "label": "seg.cols[0].label",
+      "full_label": "seg.cols[0].label",
+      "control": "WpAmountInput",
+      "has_formatter": false,
+      "semantic": "ambiguous",
+      "bucket": "ambiguous",
+      "reason": "dynamic_label",
+      "non_amount_category": null,
+      "batch": 3
+    },
+    {
+      "file": "d4/ipo/D4TabUndisclosedRp.vue",
+      "line": 191,
+      "label": "col.label",
+      "full_label": "col.label",
       "control": "WpAmountInput",
       "has_formatter": false,
       "semantic": "ambiguous",
@@ -12986,7 +13038,7 @@
     },
     {
       "file": "k1/core/K1TabDetail.vue",
-      "line": 191,
+      "line": 194,
       "label": "band.label",
       "full_label": "band.label",
       "control": "el-input-number",
@@ -13219,5 +13271,5 @@
       "batch": 3
     }
   ],
-  "ok_count": 2718
+  "ok_count": 2701
 }

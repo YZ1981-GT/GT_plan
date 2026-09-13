@@ -8,17 +8,32 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
  * 异常行红色高亮 + AI辅助 + 双模式OO + 导入导出
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { useD4InterviewSave, useD4InterviewMode } from './useD4InterviewSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+// 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 
-// ─── Types ───────────────────────────────────────────────────────────
+const d4Save = useD4InterviewSave(() => ['D4-32-groups','D4-32-note','D4-32-conclusion'].map(k => props.allResponses.get(k)).filter(Boolean))
+const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+const d4SyncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), sheetKey: ref('d4-32-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
+  flushHtml: async () => { await d4Save.flush(); const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID }); return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-32-managed' } },
+  reloadHtml: async () => { await reloadWorkpaperData?.() },
+})
+const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)
+
 const GROUPS = [
   { key: 'supplier', label: '主要供应商', color: '#f0faf0' },
   { key: 'customer', label: '主要客户', color: '#f0f5ff' },
@@ -32,7 +47,7 @@ interface FlowRow {
   id: string; name: string; amount: number | string; ratio: string
   bank: string; account: string; method: string; hasAnomaly: string; indexRef: string
 }
-interface GroupData { key: string; rows: FlowRow[] }
+interface GroupData { key: string; label?: string; rows: FlowRow[] }
 
 const groups = ref<GroupData[]>(GROUPS.map(g => ({ key: g.key, rows: [] })))
 const auditNote = ref(''); const auditConclusion = ref('')
@@ -44,13 +59,40 @@ function createRow(name?: string): FlowRow {
 
 function loadData() {
   const r = props.allResponses.get('D4-32-groups')
-  if (r?.remark) { try { const p = JSON.parse(r.remark); if (Array.isArray(p) && p.length === 6) { groups.value = p; return } } catch {} }
+  if (r?.remark) {
+    try {
+      const p = JSON.parse(r.remark)
+      if (Array.isArray(p)) {
+        const known = new Map(GROUPS.map(g => [g.key, { key: g.key, rows: [] as FlowRow[] }]))
+        const unknown: GroupData[] = []
+        for (const group of p) {
+          if (!group || typeof group !== 'object' || !Array.isArray(group.rows)) continue
+          if (known.has(group.key)) known.get(group.key)!.rows = group.rows
+          else unknown.push({ key: String(group.key || '__unknown__'), label: String(group.label || group.groupLabel || group.key || '待映射分组'), rows: group.rows })
+        }
+        groups.value = [...GROUPS.map(g => known.get(g.key)!), ...unknown]
+        return
+      }
+    } catch (error) {
+      ElMessage.error('D4-32 数据格式错误，已保留原数据未覆盖')
+      return
+    }
+  }
   groups.value = GROUPS.map(g => ({ key: g.key, rows: [] }))
 }
 function loadNote() { auditNote.value = props.allResponses.get('D4-32-note')?.remark || ''; auditConclusion.value = props.allResponses.get('D4-32-conclusion')?.remark || '' }
 watch(() => props.allResponses.get('D4-32-groups')?.remark, loadData, { immediate: true })
 watch(() => props.allResponses.get('D4-32-note')?.remark, loadNote, { immediate: true })
 
+function mapUnknownGroup(groupKey: string, targetKey: string) {
+  if (props.isReadonly || !GROUPS.some(g => g.key === targetKey)) return
+  const source = groups.value.find(g => g.key === groupKey)
+  const target = groups.value.find(g => g.key === targetKey)
+  if (!source || !target || source === target) return
+  target.rows.push(...source.rows)
+  groups.value = groups.value.filter(g => g !== source)
+  persistAll()
+}
 async function addRow(groupKey: string) {
   if (props.isReadonly) return
   try {
@@ -65,13 +107,13 @@ function persistAll() {
   props.allResponses.set('D4-32-groups', { item_id: 'D4-32-groups', conclusion: null, remark: JSON.stringify(groups.value) })
   props.allResponses.set('D4-32-note', { item_id: 'D4-32-note', conclusion: null, remark: auditNote.value })
   props.allResponses.set('D4-32-conclusion', { item_id: 'D4-32-conclusion', conclusion: null, remark: auditConclusion.value })
-  if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; const keys = ['D4-32-groups','D4-32-note','D4-32-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) }, 2000)
+  if (debounceTimer) clearTimeout(debounceTimer); d4Save.schedule()
 }
 function updateAuditNote(v: string) { if (props.isReadonly) return; auditNote.value = v; persistAll() }
 function updateAuditConclusion(v: string) { if (props.isReadonly) return; auditConclusion.value = v; persistAll() }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); const keys = ['D4-32-groups','D4-32-note','D4-32-conclusion']; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } })) } })
+onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); d4Save.flush().catch(() => undefined) } })
 
-const editorMode = ref<string>('表格视图'); const modeOptions = ['表格视图', '在线编辑']
+const { editorMode, modeOptions, busy: syncBusy, feedback: syncFeedback } = useD4InterviewMode(d4SyncBridge, () => props.isReadonly, ['表格视图'])
 const aiAvailable = ref(false)
 async function checkAiHealth() { try { const r = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = (r.data?.data?.status ?? r.data?.status) === 'healthy' || (r.data?.data?.status ?? r.data?.status) === 'degraded' } catch { aiAvailable.value = false } }
 checkAiHealth()
@@ -81,17 +123,32 @@ async function genNote() { if (props.isReadonly || !aiAvailable.value) return; a
 async function genConclusion() { if (props.isReadonly || !aiAvailable.value) return; aiConclusionLoading.value = true; try { const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, { section: 'adj-conclusion', existingContent: auditConclusion.value, relatedContext: { task: '基于资金流水检查结果生成审计结论', noteText: auditNote.value } }, { _silent: true } as any); const t = res.data?.data?.content ?? res.data?.content ?? ''; if (!t) { ElMessage.warning('AI 未生成内容'); return }; await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info', customStyle: { maxWidth: '600px' } }); updateAuditConclusion(t) } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') } finally { aiConclusionLoading.value = false } }
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+async function handleImportFile(f: any) { const r = await importData('D4-32', f.raw || f); if (r) await reloadWorkpaperData?.() }
 
 // Stats
 const totalRows = computed(() => groups.value.reduce((s, g) => s + g.rows.length, 0))
 const anomalyCount = computed(() => groups.value.reduce((s, g) => s + g.rows.filter(r => r.hasAnomaly === '是').length, 0))
 
 function rowClassName({ row }: { row: FlowRow }) { return row.hasAnomaly === '是' ? 'row-anomaly' : '' }
+
+// ─── 风险发现：仅「是否发现异常交易='是'」标记（'否'/空不判异常）───────────────
+const GROUP_LABEL: Record<string, string> = { supplier: '主要供应商', customer: '主要客户', shareholder: '控股股东', controller: '实际控制人', management: '关键管理人员', related: '其他关联方' }
+const riskFindings = computed<D4IpoFinding[]>(() => {
+  const out: D4IpoFinding[] = []
+  for (const g of groups.value) {
+    for (const r of g.rows) {
+      if (r.hasAnomaly === '是') {
+        out.push({ key: `d4-32-${r.id}`, label: `${GROUP_LABEL[g.key] || g.key} · ${r.name || '对象'}：异常资金往来`, indexRef: r.indexRef || 'D4-32' })
+      }
+    }
+  }
+  return out
+})
 </script>
 
 <template>
 <div class="d4-fund-flow">
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-32')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-32')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="(f:any)=>importData('D4-32',f.raw||f)"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><GtIndexChip value="wp:E1-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-32-fund')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-32')">导出模板</el-dropdown-item><el-dropdown-item @click="exportData('D4-32')">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-32" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:E1-31" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-32-fund')">💬 复核</el-button></div></div>
 
   <!-- 仪表板 -->
   <div class="stats-dashboard">
@@ -112,12 +169,13 @@ function rowClassName({ row }: { row: FlowRow }) { return row.hasAnomaly === '�
     </details>
 
     <!-- ═══ 6组表格 ═══ -->
-    <div v-for="(group, gIdx) in GROUPS" :key="group.key" class="group-section" :style="{ borderLeftColor: group.color }">
+    <div v-for="(group, gIdx) in groups" :key="group.key" class="group-section" :style="{ borderLeftColor: GROUPS.find(g => g.key === group.key)?.color || '#e6a23c' }">
       <div class="group-header">
-        <span class="group-title">{{ group.label }}</span>
+        <span class="group-title">{{ GROUPS.find(g => g.key === group.key)?.label || `待映射：${(group as any).label || group.key}` }}</span>
+        <el-select v-if="group.key === '__unknown__' || group.key.startsWith('__unknown__')" size="small" :disabled="isReadonly" placeholder="选择归属" @change="(v:string) => mapUnknownGroup(group.key, v)"><el-option v-for="known in GROUPS" :key="known.key" :label="known.label" :value="known.key" /></el-select>
         <el-button size="small" :disabled="isReadonly" @click="addRow(group.key)"><el-icon :size="12"><Plus /></el-icon> 添加</el-button>
       </div>
-      <el-table v-if="groups[gIdx].rows.length" :data="groups[gIdx].rows" border stripe size="small" class="flow-table" :row-class-name="rowClassName">
+      <el-table v-if="group.rows.length" :data="group.rows" border stripe size="small" class="flow-table" :row-class-name="rowClassName">
         <el-table-column label="#" width="40" align="center"><template #default="{ $index }">{{ $index+1 }}</template></el-table-column>
         <el-table-column label="单位名称/姓名" min-width="110"><template #default="{ row }"><el-input v-model="row.name" size="small" :disabled="isReadonly" @change="updateCell(group.key,row.id,'name',row.name)" /></template></el-table-column>
         <el-table-column label="本期交易金额" min-width="110" align="right"><template #default="{ row }"><WpAmountInput v-model="row.amount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(group.key,row.id,'amount',row.amount)" /></template></el-table-column>
@@ -135,7 +193,7 @@ function rowClassName({ row }: { row: FlowRow }) { return row.hasAnomaly === '�
     <!-- 审计意见区 -->
     <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">🤖 AI辅助说明</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">🤖 AI辅助结论</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>三、审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="记录资金流水检查中发现的异常情况" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>四、审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断是否存在资金配合虚构收入的情况" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
   </template>
-  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户、供应商等资金流水检查D4-32" :readonly="isReadonly" /></div></template>
+  <template v-if="editorMode==='在线编辑'"><div class="oo-container"><WorkpaperSyncEditorHost v-if="d4SyncDescriptor" :descriptor="d4SyncDescriptor" :bridge="d4SyncBridge" /><div v-else class="oo-loading">正在打开 D4-32 同步编辑器…</div></div></template>
 </div>
 </template>
 

@@ -1,0 +1,62 @@
+{
+  "mode": "check",
+  "supply_rows": {
+    "working_paper_sync_definition_artifact": 56,
+    "working_paper_sync_definition_bundle": 19,
+    "working_paper_representation_upgrade_candidate": 1,
+    "working_paper_content_representation": 98
+  },
+  "entries": [
+    {
+      "target": {
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "contract_id": "d4.revenue_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        "wp_codes": [
+          "D4"
+        ],
+        "project_id": "0ec33ac9-3de5-4e65-b3bf-f9dccd7b2a49",
+        "wp_id": "b3ab3c46-828f-4f48-950e-aee9bbdc923f",
+        "wp_code": "D4",
+        "store_bytes": 2051,
+        "resolved": true,
+        "unresolved_reason": null
+      },
+      "status": "ok",
+      "stages": {
+        "authority_model": "reused",
+        "bundle": "would_create",
+        "contract": "would_create",
+        "instrumentation": "would_create",
+        "template": "reused"
+      },
+      "digests": {
+        "authority_model": "134884caa91f67c946c546ede8495c58be68e4776e266acc2ebc1cea8cb02f64",
+        "bundle": "adddb51660ddcc684e89eb58b08369325636c42f81491d589c3cf2840173bdc7",
+        "contract": "0efeec0b4521a770c31221b80d21e76b694ef6d97f569db6f3b1b960581ea522",
+        "instrumentation": "e8841d40050ac76a24621ef4aca4a5f1e351c5f893707406e91bf96a2472bc55",
+        "template": "7b1c91f81e62daa1b002b0c6b3ef14784a87f6817a7eaf93f2c03b54bcf4d3c6"
+      },
+      "would_create": [
+        "bundle",
+        "contract",
+        "instrumentation"
+      ],
+      "reused": [
+        "authority_model",
+        "template"
+      ],
+      "representation": {
+        "settlement": "blocked",
+        "current_representation_id": "6c84fcb2-4ba8-4276-9669-f5b429e09880",
+        "current_definition_bundle_id": "0b7bb759-6364-4398-a97d-fffa402c3d62",
+        "candidates_awaiting_contract": 0,
+        "candidate_bound_to_target_bundle": null,
+        "candidate_bound_state": null
+      },
+      "definition_bundle_sha256": "adddb51660ddcc684e89eb58b08369325636c42f81491d589c3cf2840173bdc7"
+    }
+  ],
+  "errors": [],
+  "would_create_total": 3
+}

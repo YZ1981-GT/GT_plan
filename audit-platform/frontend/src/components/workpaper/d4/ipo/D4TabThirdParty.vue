@@ -26,20 +26,23 @@ const props = defineProps<{
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
 // ─── Types ───────────────────────────────────────────────────────────
+// 字段键与后端 phase5_d4_ipo_related_sheets descriptor 的 json_path 逐字对齐
+// （源模板 第三方回款检查D4-24 的 13 个受管列 A..M）；item_id=D4-24-rows。
+// 行身份 = rowId（稳定，稳定序号，禁下标）。无内部公式（FORMULA_MASK 空）。
 interface ThirdPartyRow {
-  id: string
-  customerName: string
-  salesAmount: number | string
-  arBalance: number | string
-  thirdPartyAmount: number | string
-  thirdPartyName: string
-  reason: string
-  relationToCustomer: string
-  relationToAuditee: string
-  hasAgreement: string  // 是/否
-  hasConfirmation: string  // 是/否
-  analysis: string
-  indexRef: string
+  rowId: string               // 稳定行身份（ROW_IDENTITY_STORE_KEY_D424）
+  customerName: string        // B 客户名称
+  annualSales: number | string   // C 本年度销售金额
+  endingAr: number | string      // D 期末应收账款余额
+  thirdPartyAmount: number | string // E 本年度第三方回款金额
+  payerName: string           // F 第三方回款方名称
+  reason: string              // G 第三方回款原因
+  payerCustomerRelation: string // H 第三方回款方与客户关系
+  payerEntityRelation: string   // I 第三方回款方与被审计单位关系
+  hasPaymentAgreement: string   // J 是否有代付协议（是/否）
+  isConfirmed: string         // K 是否函证（是/否）
+  rationality: string         // L 合理性分析
+  indexNo: string             // M 索引
 }
 
 // ─── State ───────────────────────────────────────────────────────────
@@ -50,10 +53,10 @@ let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
 function createRow(): ThirdPartyRow {
   return {
-    id: `tp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    customerName: '', salesAmount: '', arBalance: '', thirdPartyAmount: '',
-    thirdPartyName: '', reason: '', relationToCustomer: '', relationToAuditee: '',
-    hasAgreement: '', hasConfirmation: '', analysis: '', indexRef: '',
+    rowId: `tp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+    customerName: '', annualSales: '', endingAr: '', thirdPartyAmount: '',
+    payerName: '', reason: '', payerCustomerRelation: '', payerEntityRelation: '',
+    hasPaymentAgreement: '', isConfirmed: '', rationality: '', indexNo: '',
   }
 }
 
@@ -88,14 +91,14 @@ async function handleAddRow() {
     }
   } catch {}
 }
-function removeRow(id: string) {
+function removeRow(rowId: string) {
   if (props.isReadonly) return
-  rows.value = rows.value.filter(r => r.id !== id)
+  rows.value = rows.value.filter(r => r.rowId !== rowId)
   persistAll()
 }
-function updateCell(id: string, field: keyof ThirdPartyRow, value: any) {
+function updateCell(rowId: string, field: keyof ThirdPartyRow, value: any) {
   if (props.isReadonly) return
-  const row = rows.value.find(r => r.id === id)
+  const row = rows.value.find(r => r.rowId === rowId)
   if (row) { (row as any)[field] = value; persistAll() }
 }
 
@@ -159,7 +162,7 @@ async function handleImportFile(uploadFile: any) { await importData('D4-24', upl
 
 // ─── Stats ───────────────────────────────────────────────────────────
 const totalThirdPartyAmount = computed(() => rows.value.reduce((s, r) => s + (parseFloat(String(r.thirdPartyAmount)) || 0), 0))
-const noAgreementCount = computed(() => rows.value.filter(r => r.hasAgreement === '否').length)
+const noAgreementCount = computed(() => rows.value.filter(r => r.hasPaymentAgreement === '否').length)
 
 function fmtAmount(v: number): string { return v ? v.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—' }
 </script>
@@ -205,19 +208,19 @@ function fmtAmount(v: number): string { return v ? v.toLocaleString('zh-CN', { m
       <!-- 主表格 -->
       <el-table :data="rows" border stripe class="tp-table">
         <el-table-column label="序号" width="55" align="center" fixed><template #default="{ $index }">{{ $index + 1 }}</template></el-table-column>
-        <el-table-column label="客户名称" min-width="120"><template #default="{ row }"><el-input v-model="row.customerName" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'customerName', row.customerName)" /></template></el-table-column>
-        <el-table-column label="本年度销售金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.salesAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'salesAmount', row.salesAmount)" /></template></el-table-column>
-        <el-table-column label="期末应收余额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.arBalance" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'arBalance', row.arBalance)" /></template></el-table-column>
-        <el-table-column label="第三方回款金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.thirdPartyAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.id, 'thirdPartyAmount', row.thirdPartyAmount)" /></template></el-table-column>
-        <el-table-column label="回款方名称" min-width="120"><template #default="{ row }"><el-input v-model="row.thirdPartyName" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'thirdPartyName', row.thirdPartyName)" /></template></el-table-column>
-        <el-table-column label="回款原因" min-width="110"><template #default="{ row }"><el-input v-model="row.reason" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'reason', row.reason)" /></template></el-table-column>
-        <el-table-column label="与客户关系" min-width="100"><template #default="{ row }"><el-input v-model="row.relationToCustomer" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'relationToCustomer', row.relationToCustomer)" /></template></el-table-column>
-        <el-table-column label="与被审计单位关系" min-width="110"><template #default="{ row }"><el-input v-model="row.relationToAuditee" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'relationToAuditee', row.relationToAuditee)" /></template></el-table-column>
-        <el-table-column label="代付协议" width="80" align="center"><template #default="{ row }"><el-select v-model="row.hasAgreement" size="small" :disabled="isReadonly" placeholder="—" @change="updateCell(row.id, 'hasAgreement', row.hasAgreement)"><el-option label="是" value="是" /><el-option label="否" value="否" /></el-select></template></el-table-column>
-        <el-table-column label="函证" width="70" align="center"><template #default="{ row }"><el-select v-model="row.hasConfirmation" size="small" :disabled="isReadonly" placeholder="—" @change="updateCell(row.id, 'hasConfirmation', row.hasConfirmation)"><el-option label="是" value="是" /><el-option label="否" value="否" /></el-select></template></el-table-column>
-        <el-table-column label="合理性分析" min-width="140"><template #default="{ row }"><el-input v-model="row.analysis" size="small" :disabled="isReadonly" placeholder="分析回款合理性" @change="updateCell(row.id, 'analysis', row.analysis)" /></template></el-table-column>
-        <el-table-column label="索引" width="80"><template #default="{ row }"><el-input v-model="row.indexRef" size="small" :disabled="isReadonly" @change="updateCell(row.id, 'indexRef', row.indexRef)" /></template></el-table-column>
-        <el-table-column label="操作" width="60" fixed="right" align="center"><template #default="{ row }"><el-popconfirm title="确认删除？" @confirm="removeRow(row.id)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">删除</el-button></template></el-popconfirm></template></el-table-column>
+        <el-table-column label="客户名称" min-width="120"><template #default="{ row }"><el-input v-model="row.customerName" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'customerName', row.customerName)" /></template></el-table-column>
+        <el-table-column label="本年度销售金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.annualSales" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'annualSales', row.annualSales)" /></template></el-table-column>
+        <el-table-column label="期末应收余额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.endingAr" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'endingAr', row.endingAr)" /></template></el-table-column>
+        <el-table-column label="第三方回款金额" min-width="120" align="right"><template #default="{ row }"><WpAmountInput v-model="row.thirdPartyAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell(row.rowId, 'thirdPartyAmount', row.thirdPartyAmount)" /></template></el-table-column>
+        <el-table-column label="回款方名称" min-width="120"><template #default="{ row }"><el-input v-model="row.payerName" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'payerName', row.payerName)" /></template></el-table-column>
+        <el-table-column label="回款原因" min-width="110"><template #default="{ row }"><el-input v-model="row.reason" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'reason', row.reason)" /></template></el-table-column>
+        <el-table-column label="与客户关系" min-width="100"><template #default="{ row }"><el-input v-model="row.payerCustomerRelation" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'payerCustomerRelation', row.payerCustomerRelation)" /></template></el-table-column>
+        <el-table-column label="与被审计单位关系" min-width="110"><template #default="{ row }"><el-input v-model="row.payerEntityRelation" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'payerEntityRelation', row.payerEntityRelation)" /></template></el-table-column>
+        <el-table-column label="代付协议" width="80" align="center"><template #default="{ row }"><el-select v-model="row.hasPaymentAgreement" size="small" :disabled="isReadonly" placeholder="—" @change="updateCell(row.rowId, 'hasPaymentAgreement', row.hasPaymentAgreement)"><el-option label="是" value="是" /><el-option label="否" value="否" /></el-select></template></el-table-column>
+        <el-table-column label="函证" width="70" align="center"><template #default="{ row }"><el-select v-model="row.isConfirmed" size="small" :disabled="isReadonly" placeholder="—" @change="updateCell(row.rowId, 'isConfirmed', row.isConfirmed)"><el-option label="是" value="是" /><el-option label="否" value="否" /></el-select></template></el-table-column>
+        <el-table-column label="合理性分析" min-width="140"><template #default="{ row }"><el-input v-model="row.rationality" size="small" :disabled="isReadonly" placeholder="分析回款合理性" @change="updateCell(row.rowId, 'rationality', row.rationality)" /></template></el-table-column>
+        <el-table-column label="索引" width="80"><template #default="{ row }"><el-input v-model="row.indexNo" size="small" :disabled="isReadonly" @change="updateCell(row.rowId, 'indexNo', row.indexNo)" /></template></el-table-column>
+        <el-table-column label="操作" width="60" fixed="right" align="center"><template #default="{ row }"><el-popconfirm title="确认删除？" @confirm="removeRow(row.rowId)"><template #reference><el-button link type="danger" size="small" :disabled="isReadonly">删除</el-button></template></el-popconfirm></template></el-table-column>
       </el-table>
 
       <div class="add-row-bar"><el-button :disabled="isReadonly" @click="handleAddRow"><el-icon :size="14"><Plus /></el-icon> 添加记录</el-button></div>

@@ -964,6 +964,16 @@ async def _get_render_config_impl(
         _rep = {**_rep, "html_data": {}}
         sheets = [_rep]
 
+    # guidance inventory 要求每个 render sheet 明确记录身份来源；历史模板页签（如“底稿目录”）
+    # 没有标准 sheet_code，但仍是 render-config 的合法成员，必须标记来源而不能让 guidance
+    # 整体 503。该字段只描述身份裁决来源，不改变 sheet_code/name 匹配结果。
+    for _sheet in sheets:
+        if not str(_sheet.get("sheet_code_reason") or "").strip():
+            _sheet["sheet_code_reason"] = (
+                "explicit_code" if str(_sheet.get("sheet_code") or "").strip()
+                else "template_sheet_name"
+            )
+
     # Step 7: auto-fill + Step 8: response
     fill_results: dict = {}
     try:
