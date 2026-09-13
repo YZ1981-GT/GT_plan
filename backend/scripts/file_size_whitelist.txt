@@ -538,3 +538,8 @@ backend/app/services/custom_template_ingestion/quarantine.py  870
 #     （判据 + 反空转对照组 + 可复算 method 必须同文件可见）。
 #     spec: workpaper-guidance-content-closure Task 7 切片 A
 backend/scripts/diagnose/diagnose_guidance_source_ref_localization.py  860
+# _d4_import_export.py（3077 行）—— D4 全 36 张 sheet 的导入导出端点 + 逐 sheet
+#   parser/exporter 集中模块（历史大文件，本就远超上限）。spec d4-ipo-fraud-writeback-formula-io
+#   为 D4-29/30/31/32 补齐专用 parser/exporter/item_id 映射/reshape（+~1000 行，与既有
+#   _parse_d4_XX 同构、内聚在同一 IO 模块）。拆分需与并发 D4 会话协调，属独立瘦身 spec。
+backend/app/routers/wp_render_strategies/_d4_import_export.py  3077

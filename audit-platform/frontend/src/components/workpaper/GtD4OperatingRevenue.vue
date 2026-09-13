@@ -8,13 +8,22 @@
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
       <div v-if="showModeToolbar" class="d4-mode-toolbar">
-        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" />
-        <el-tag v-if="!dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD4DetailSheet && syncBusy" />
+        <el-tag v-if="!isD4DetailSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
         <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" />
       </div>
 
+      <!-- G5-1 D4-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
+      <WorkpaperSyncEditorHost
+        v-if="renderMode === 'onlyoffice' && isD4DetailSheet"
+        ref="syncEditorHostRef"
+        :descriptor="syncOoDescriptor"
+        :bridge="syncBridge"
+      />
+
+      <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet（D4-5 自管 dualMode，排除） -->
       <GtOnlyOfficeSheet
-        v-if="renderMode === 'onlyoffice'"
+        v-else-if="renderMode === 'onlyoffice' && currentSheet !== 'D4-5'"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -136,7 +145,9 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
+import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD } from './composables/d4AccountScope'
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
+import { useD4PriceWriteback } from './composables/useD4PriceWriteback'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
@@ -147,6 +158,12 @@ import { isSkipWorkpaperSheet } from './composables/workpaperSkipSheets'
 import { useHostApplicableStandards } from './composables/hostApplicableStandards'
 import GtOnlyOfficeSheet from './GtOnlyOfficeSheet.vue'
 import GtEntrySyncCapabilityNotice from './sync/GtEntrySyncCapabilityNotice.vue'
+// G5-1 Phase 5 D4 canary：D4-2 明细走统一双向路径（descriptor → WorkpaperSyncEditorHost）；
+// 其余 40+ sheet 仍走 useD4EntryDualMode。
+import { useWorkpaperSyncBridge, WP_BRIDGE_IN_FLIGHT_STATES } from './sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from './sync/workpaperSyncApi'
+import { capabilityForEntry } from './sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from './sync/WorkpaperSyncEditorHost.vue'
 
 // ─── Lazy-loaded child components ────────────────────────────────────────────
 
@@ -240,12 +257,26 @@ const formData = useD4FormData({
   wpId: toRef(props, 'wpId'),
   projectId: toRef(props, 'projectId'),
 })
+const { flushPendingSave } = formData
 
-const allResponses = computed(() => formData.allResponses.value)
+// 直接传 Ref<Map>，禁止 computed(() => map.value) —— 否则子表 watch remark 丢响应，
+// OO→HTML 镜像后的新行（如 GTROW）不会进 D4TabRevenueDetail DOM。
+const allResponses = formData.allResponses
 
 const crossSheet = useD4CrossSheet({
   allResponses: formData.allResponses,
   projectContext: formData.projectContext,
+})
+
+// 🔴 价格分析 / 审定表派生联动：子表 inject('d4CrossSheet')；无 provide 则导入按钮永久「上游未就绪」。
+provide('d4CrossSheet', crossSheet)
+
+// 🔴 方案 C 接收端必须挂在宿主生命周期内，否则 d4:price-abnormal 又成「发了无人听」。
+useD4PriceWriteback({
+  allResponses: formData.allResponses,
+  onPersist: (item) => {
+    window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: [item] } }))
+  },
 })
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───
@@ -302,6 +333,10 @@ const d4AuditYear = computed<number>(() => {
 })
 provide('d4AuditYear', d4AuditYear)
 
+// 子 Tab 导入 xlsx 成功后主动重载 allResponses（否则界面停留在旧值）。
+// selfLoad → formData.loadAll() 刷新 formData.allResponses（子表 watch 的同一 Map 引用）。
+provide('reloadWorkpaperData', selfLoad)
+
 useWorkpaperEntryInjections({
   onJumpToSection: (sheetLabel) => emit('jump-to-section', sheetLabel),
   reloadFn: () => formData.loadAll(),
@@ -315,7 +350,10 @@ const KNOWN_HTML_SHEETS = new Set([
 ])
 
 const showModeToolbar = computed(() =>
-  currentSheet.value !== 'skip' && currentSheet.value !== 'D4' && KNOWN_HTML_SHEETS.has(currentSheet.value),
+  currentSheet.value !== 'skip'
+  && currentSheet.value !== 'D4'
+  && currentSheet.value !== 'D4-5' // D4-5 政策检查：tab 内自管 dualMode / sync host
+  && KNOWN_HTML_SHEETS.has(currentSheet.value),
 )
 
 const dualMode = useD4EntryDualMode({
@@ -329,9 +367,60 @@ const ooSheetName = computed(() =>
   dualMode.resolveOoSheetName() || props.sheetName || 'D4-1',
 )
 
+// ─── G5-1 D4-2/D4-3 canary：useWorkpaperSyncBridge + store-projection flush ────────
+const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+const D4_SHEET_KEY_BY_CODE: Record<string, string> = {
+  'D4-2': 'd42-managed',
+  'D4-3': 'd43-managed',
+  'D4-6': 'd46-managed',
+  'D4-7': 'd47-managed',
+}
+const isD4DetailSheet = computed(() => currentSheet.value != null && currentSheet.value in D4_SHEET_KEY_BY_CODE)
+const syncSwitching = ref(false)
+const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
+const syncEntryId = ref(D4_SYNC_ENTRY_ID)
+const syncSheetKey = computed(() => D4_SHEET_KEY_BY_CODE[currentSheet.value] || 'd42-managed')
+const syncBridge = useWorkpaperSyncBridge({
+  entryId: syncEntryId,
+  wpId: toRef(props, 'wpId'),
+  projectId: toRef(props, 'projectId'),
+  sheetKey: syncSheetKey,
+  capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
+  flushHtml: async () => {
+    flushPendingSave()
+    const sheetKey = D4_SHEET_KEY_BY_CODE[currentSheet.value] || 'd42-managed'
+    const snap = await readStoreProjection({
+      projectId: props.projectId,
+      wpId: props.wpId,
+      entryId: D4_SYNC_ENTRY_ID,
+    })
+    return {
+      expectedRevision: snap.expectedRevision,
+      projection: snap.projection,
+      sheetKey,
+    }
+  },
+  reloadHtml: async (_minimumRevision: number) => {
+    await formData.loadAll()
+  },
+})
+const syncOoDescriptor = computed(() => syncBridge.descriptor.value)
+const syncBusy = computed(
+  () =>
+    syncSwitching.value
+    || (WP_BRIDGE_IN_FLIGHT_STATES as readonly string[]).includes(String(syncBridge.state.value)),
+)
+
+// renderMode / 切换：D4-2 走 syncBridge，其余 sheet 沿用 useD4EntryDualMode。
 const renderMode = computed({
-  get: () => dualMode.mode.value,
-  set: (v: D4RenderMode) => { void dualMode.switchMode(v) },
+  get: (): D4RenderMode =>
+    isD4DetailSheet.value
+      ? (syncBridge.mode.value === 'oo' ? 'onlyoffice' : 'html')
+      : dualMode.mode.value,
+  set: (v: D4RenderMode) => {
+    if (isD4DetailSheet.value) void switchRenderMode(v)
+    else void dualMode.switchMode(v)
+  },
 })
 
 const renderModeOptions = computed(() => [
@@ -339,9 +428,43 @@ const renderModeOptions = computed(() => [
   {
     label: '在线编辑',
     value: 'onlyoffice' as const,
-    disabled: !dualMode.ooAvailable.value,
+    disabled: isD4DetailSheet.value ? isReadonly.value : !dualMode.ooAvailable.value,
   },
 ])
+
+async function switchRenderMode(target: D4RenderMode): Promise<void> {
+  if (target === renderMode.value) return
+  if (target === 'onlyoffice') {
+    if (!isD4DetailSheet.value) return
+    syncSwitching.value = true
+    try {
+      await syncBridge.switchToOnlyOffice()
+    } catch {
+      // lastError / feedback 已由桥写入；保持 html
+    } finally {
+      syncSwitching.value = false
+    }
+    return
+  }
+  if (syncBridge.mode.value !== 'oo') {
+    syncBridge.persistMode('html')
+    return
+  }
+  syncSwitching.value = true
+  try {
+    if (String(syncBridge.state.value) === 'applied') {
+      await syncBridge.reloadAfterApplied()
+    } else if (syncBridge.canForcesave.value && syncEditorHostRef.value) {
+      await syncEditorHostRef.value.forceSave()
+    } else {
+      syncBridge.persistMode('html')
+    }
+  } catch {
+    // 保持 OO；错误在桥上
+  } finally {
+    syncSwitching.value = false
+  }
+}
 
 function onOoFallback(): void {
   void dualMode.switchMode('html')
@@ -362,16 +485,11 @@ async function saveImmediateBatch(
 // ─── selfLoad ────────────────────────────────────────────────────────────────
 
 async function selfLoad() {
-  if (props.htmlData) {
-    // 从 props 提供的数据初始化
-    if (props.htmlData.projectContext) {
-      formData.projectContext.value = props.htmlData.projectContext
-    }
-    isLoading.value = false
-    return
+  if (props.htmlData?.projectContext) {
+    formData.projectContext.value = props.htmlData.projectContext
   }
 
-  // 当 htmlData 为空时（bundle 内嵌场景），自行加载
+  // htmlData 有无都要拉 checklist：OO→HTML 镜像写在 D4-2-rows，跳过 load 会让明细表「共 0 行」
   try {
     await formData.loadAll()
   } catch (err) {
@@ -400,10 +518,23 @@ function handleD4SaveItems(e: Event): void {
 }
 
 // ─── 审定表 TB 回写：监听 d4:writeback-trial-balance → 落库 trial_balance ──────
-function handleD4Writeback(e: Event): void {
+async function handleD4Writeback(e: Event): Promise<void> {
   const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode != null && d.auditedAmount != null) {
-    void formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
+  if (d?.accountCode == null || d.auditedAmount == null) return
+
+  // TB 回写成功后同步 D4-1 的只读核对影子值，确保 D4-2/D4-1 下一次计算读到同一审定口径。
+  await formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
+  const itemId = d.accountCode === D4_MAIN_REVENUE_STANDARD
+    ? 'D4-1-adj-tb-6001'
+    : d.accountCode === D4_OTHER_REVENUE_STANDARD
+      ? 'D4-1-adj-tb-6051'
+      : null
+  if (itemId) {
+    await formData.saveBatch([{
+      itemId,
+      data: { remark: String(d.auditedAmount), conclusion: null },
+    }])
+    scheduleAutoSnapshot()
   }
 }
 

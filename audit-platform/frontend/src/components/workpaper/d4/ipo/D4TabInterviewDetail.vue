@@ -1,50 +1,56 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
- * D4TabInterviewDetail — D4-31 客户访谈记录
+ * D4TabInterviewDetail 鈥?D4-31 瀹㈡埛璁胯皥璁板綍
  *
- * 结构化访谈问卷：4大章节 + 多选/单选/条件展开
- * 元信息 → 受访人介绍 → 客户基本情况 → 业务情况(7问) → 关联关系(3问)
- * + 附件清单 + 签字区 + 承诺声明 + CAS18提示
- * AI辅助生成访谈问卷内容 + 双模式OO
+ * 缁撴瀯鍖栬璋堥棶鍗凤細4澶х珷鑺?+ 澶氶€?鍗曢€?鏉′欢灞曞紑
+ * 鍏冧俊鎭?鈫?鍙楄浜轰粙缁?鈫?瀹㈡埛鍩烘湰鎯呭喌 鈫?涓氬姟鎯呭喌(7闂? 鈫?鍏宠仈鍏崇郴(3闂?
+ * + 闄勪欢娓呭崟 + 绛惧瓧鍖?+ 鎵胯澹版槑 + CAS18鎻愮ず
+ * AI杈呭姪鐢熸垚璁胯皥闂嵎鍐呭 + 鍙屾ā寮廜O
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
 const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<string, any>; isReadonly: boolean }>()
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+// 瀵煎叆 xlsx 鎴愬姛鍚庨噸杞?allResponses锛堜富鍏ュ彛 provide锛夛紝鍚﹀垯鐣岄潰鍋滅暀鍦ㄦ棫鍊?
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+async function handleImportFile(f: any) { const r = await importData('D4-31', f.raw || f); if (r) await reloadWorkpaperData?.() }
 
-// ─── 问卷数据模型 ─────────────────────────────────────────────────────
+// 鈹€鈹€鈹€ 闂嵎鏁版嵁妯″瀷 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 interface InterviewData {
-  // 元信息
+  // 鍏冧俊鎭?
   target: string; timePlace: string; interviewee: string; interviewer: string
-  // 一、受访人介绍
+  // 涓€銆佸彈璁夸汉浠嬬粛
   introduction: string
-  // 二、客户基本情况
+  // 浜屻€佸鎴峰熀鏈儏鍐?
   companyName: string; regCapital: string; establishDate: string; bizNature: string
   legalRep: string; equityStructure: string
-  // 三、业务情况
-  q1_relation: string[]  // 多选
-  q2a_payment: string    // 客户采购结算
-  q2b_collection: string // 客户销售结算
-  q3a_hasContract: string // 是/否
+  // 涓夈€佷笟鍔℃儏鍐?
+  q1_relation: string[]  // 澶氶€?
+  q2a_payment: string    // 瀹㈡埛閲囪喘缁撶畻
+  q2b_collection: string // 瀹㈡埛閿€鍞粨绠?
+  q3a_hasContract: string // 鏄?鍚?
   q3b_quality: string
-  q3c_returnClause: string // 是/否
+  q3c_returnClause: string // 鏄?鍚?
   q3d_returnAmount: string
   q3e_acceptance: string
-  q3f_hasRebate: string  // 是/否
+  q3f_hasRebate: string  // 鏄?鍚?
   q3f_rebateMethod: string
   q3f_rebateAmount: string
-  q3g_finalSold: string  // 是/否
-  q4_otherFunds: string  // 是/否
+  q3g_finalSold: string  // 鏄?鍚?
+  q4_otherFunds: string  // 鏄?鍚?
   q5_otherMatters: string
-  // 四、关联关系
-  q6_hasShares: string   // 是/否
-  q6_hasPosition: string // 是/否
-  q6_hasTransaction: string // 是/否
-  // 签字
+  // 鍥涖€佸叧鑱斿叧绯?
+  q6_hasShares: string   // 鏄?鍚?
+  q6_hasPosition: string // 鏄?鍚?
+  q6_hasTransaction: string // 鏄?鍚?
+  // 绛惧瓧
   signInterviewee: string; signAuditor: string; signOther: string; signDate: string
 }
 
@@ -78,7 +84,23 @@ function persistAll() {
 function update(field: keyof InterviewData, value: any) { if (props.isReadonly) return; (formData.value as any)[field] = value; persistAll() }
 onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: [props.allResponses.get('D4-31-interview')].filter(Boolean) } })) } })
 
-const editorMode = ref<string>('问卷视图'); const modeOptions = ['问卷视图', '在线编辑']
+// 鈹€鈹€鈹€ 璁胯皥绾㈡棗鍙戠幇锛堜粎鏄惧紡'鏄?/鍏宠仈鍏崇郴鏍囪锛泀5 鍏朵粬浜嬮」闈炵┖浣滅暀鐥曞€欓€夛紝浜哄伐璁ゅ畾鍚庢墠鎺級鈹€鈹€鈹€
+const riskFindings = computed<D4IpoFinding[]>(() => {
+  const d = formData.value
+  const out: D4IpoFinding[] = []
+  const rel = Array.isArray(d.q1_relation) ? d.q1_relation : []
+  if (rel.some(r => r.includes('渚涘簲鍟?) || r.includes('鍏宠仈鏂?))) {
+    out.push({ key: 'd4-31-relation', label: `涓氬姟鍏崇郴绾㈡棗锛?{rel.filter(r => r.includes('渚涘簲鍟?) || r.includes('鍏宠仈鏂?)).join('銆?)}`, indexRef: 'D4-31' })
+  }
+  if (d.q4_otherFunds === '鏄?) out.push({ key: 'd4-31-otherfunds', label: '闄ら噰璐瀛樺湪鍏朵粬璧勯噾寰€鏉?, indexRef: 'D4-31' })
+  if (d.q6_hasShares === '鏄?) out.push({ key: 'd4-31-shares', label: '鍏宠仈鏂瑰湪瀹㈡埛鎸佹湁鑲′唤', indexRef: 'D4-31' })
+  if (d.q6_hasPosition === '鏄?) out.push({ key: 'd4-31-position', label: '鍏宠仈鏂瑰湪瀹㈡埛鎷呬换鑱屽姟', indexRef: 'D4-31' })
+  if (d.q6_hasTransaction === '鏄?) out.push({ key: 'd4-31-transaction', label: '鍏宠仈鏂逛笌瀹㈡埛瀛樺湪浜ゆ槗', indexRef: 'D4-31' })
+  if (d.q5_otherMatters && d.q5_otherMatters.trim()) out.push({ key: 'd4-31-other', label: `鍏朵粬閲嶈浜嬮」锛?{d.q5_otherMatters.trim().slice(0, 30)}`, indexRef: 'D4-31' })
+  return out
+})
+
+const editorMode = ref<string>('闂嵎瑙嗗浘'); const modeOptions = ['闂嵎瑙嗗浘', '鍦ㄧ嚎缂栬緫']
 const activeSection = ref('meta')
 const showExample = ref(false)
 
@@ -95,47 +117,47 @@ async function aiGenerateIntro() {
     const res = await http.post(`/api/workpapers/${props.wpId}/d4/ai-generate`, {
       section: 'interview-questions',
       existingContent: formData.value.introduction || '',
-      relatedContext: { task: '根据客户基本情况生成访谈人介绍模板文字', companyName: formData.value.companyName, target: formData.value.target },
+      relatedContext: { task: '鏍规嵁瀹㈡埛鍩烘湰鎯呭喌鐢熸垚璁胯皥浜轰粙缁嶆ā鏉挎枃瀛?, companyName: formData.value.companyName, target: formData.value.target },
     }, { _silent: true } as any)
     const t = res.data?.data?.content ?? res.data?.content ?? ''
-    if (t) { await ElMessageBox.confirm(t, 'AI 生成', { confirmButtonText: '填入', cancelButtonText: '取消', type: 'info', customStyle: { maxWidth: '600px' } }); update('introduction', t) }
-    else ElMessage.warning('AI 未生成内容')
-  } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 生成失败') }
+    if (t) { await ElMessageBox.confirm(t, 'AI 鐢熸垚', { confirmButtonText: '濉叆', cancelButtonText: '鍙栨秷', type: 'info', customStyle: { maxWidth: '600px' } }); update('introduction', t) }
+    else ElMessage.warning('AI 鏈敓鎴愬唴瀹?)
+  } catch (e: any) { if (e !== 'cancel') ElMessage.warning('AI 鐢熸垚澶辫触') }
   finally { aiLoading.value = false }
 }
 
-// 选项定义
-const RELATION_OPTIONS = ['客户是终端客户', '客户是经销商(客户)', '客户是供应商', '客户既是客户又是供应商', '客户是ABC的关联方']
-const PAYMENT_OPTIONS = ['预付款方式', '货到付款方式', '赊销方式', '预付款方式和赊销方式兼有']
-const COLLECTION_OPTIONS = ['预收款方式', '货到收款方式', '赊销方式', '预收款方式和赊销方式兼有']
-const QUALITY_OPTIONS = ['良好', '一般', '产品质量不稳定', '产品质量差']
-const RETURN_AMOUNT_OPTIONS = ['无', '20万元以下', '20-50万元', '50-100万元', '100万元以上']
-const ACCEPTANCE_OPTIONS = ['检验合格后计量入库签收确认收到货物', '直接计量入库签收确认收到货物', '其他方式请描述']
-const REBATE_METHOD_OPTIONS = ['现金', '其他方式']
-const REBATE_AMOUNT_OPTIONS = ['10万元以下', '10-50万元', '50-100万元', '100万元以上']
+// 閫夐」瀹氫箟
+const RELATION_OPTIONS = ['瀹㈡埛鏄粓绔鎴?, '瀹㈡埛鏄粡閿€鍟?瀹㈡埛)', '瀹㈡埛鏄緵搴斿晢', '瀹㈡埛鏃㈡槸瀹㈡埛鍙堟槸渚涘簲鍟?, '瀹㈡埛鏄疉BC鐨勫叧鑱旀柟']
+const PAYMENT_OPTIONS = ['棰勪粯娆炬柟寮?, '璐у埌浠樻鏂瑰紡', '璧婇攢鏂瑰紡', '棰勪粯娆炬柟寮忓拰璧婇攢鏂瑰紡鍏兼湁']
+const COLLECTION_OPTIONS = ['棰勬敹娆炬柟寮?, '璐у埌鏀舵鏂瑰紡', '璧婇攢鏂瑰紡', '棰勬敹娆炬柟寮忓拰璧婇攢鏂瑰紡鍏兼湁']
+const QUALITY_OPTIONS = ['鑹ソ', '涓€鑸?, '浜у搧璐ㄩ噺涓嶇ǔ瀹?, '浜у搧璐ㄩ噺宸?]
+const RETURN_AMOUNT_OPTIONS = ['鏃?, '20涓囧厓浠ヤ笅', '20-50涓囧厓', '50-100涓囧厓', '100涓囧厓浠ヤ笂']
+const ACCEPTANCE_OPTIONS = ['妫€楠屽悎鏍煎悗璁￠噺鍏ュ簱绛炬敹纭鏀跺埌璐х墿', '鐩存帴璁￠噺鍏ュ簱绛炬敹纭鏀跺埌璐х墿', '鍏朵粬鏂瑰紡璇锋弿杩?]
+const REBATE_METHOD_OPTIONS = ['鐜伴噾', '鍏朵粬鏂瑰紡']
+const REBATE_AMOUNT_OPTIONS = ['10涓囧厓浠ヤ笅', '10-50涓囧厓', '50-100涓囧厓', '100涓囧厓浠ヤ笂']
 
-// 案例中交易核对表数据
+// 妗堜緥涓氦鏄撴牳瀵硅〃鏁版嵁
 const exampleTradeItems = [
-  { seq: 1, item: '交易模式', info: '包销', source: '与合同条款一致' },
-  { seq: 2, item: '交易标的', info: 'AAA材料', source: '与合同条款一致' },
-  { seq: 3, item: '交易规模', info: '500-800吨（含税金额约5000-8000万）', source: '与合同条款一致' },
-  { seq: 4, item: '付款方式', info: '银行承兑汇票或银行转账', source: '与合同条款一致' },
-  { seq: 5, item: '账期时间', info: '与合同条款一致', source: '与合同条款一致' },
-  { seq: 6, item: '付款期限', info: '十个月以内，基本在月之内发货（一般每月发一次货）', source: '合同条款为十个工之内' },
-  { seq: 7, item: '账金返利', info: '结存差额高于若超过27000万，按全年期初差额余额当月，按年归还每年进行合同金额', source: '与合同条款一致' },
-  { seq: 8, item: '账金水平', info: '略高于同行业销售水平，行业平均为4.8-5%', source: '与合同条款一致' },
-  { seq: 9, item: '运输方式及费用承担', info: '火车运输为主，少量汽运/叉车运输；发运时自提，运费由买方XXX负担', source: '与合同条款一致' },
-  { seq: 10, item: '交付方式', info: 'XYZ收到货，签字确认即可/交付完毕', source: '与合同条款一致' },
-  { seq: 11, item: '质量保证', info: '收货验收后十个月', source: '与合同条款一致' },
-  { seq: 12, item: '验收或检验', info: '出具收据即可到账认收入次/月', source: '与凭证检查结论一致' },
-  { seq: 13, item: '退货、换货条件', info: '合同5年来，从未发生过一次重大质量问题损，换货/赔偿', source: '与关于/入境条款行信息一致' },
-  { seq: 14, item: '是否涉及委托加工', info: '否', source: '' },
-  { seq: 15, item: '是否存在来料加工', info: '否', source: '' },
-  { seq: 16, item: '资金交易情况', info: '无', source: '' },
-  { seq: 17, item: '第三方收款/付款', info: '无', source: '' },
-  { seq: 18, item: '代收款、代付款', info: '无', source: '' },
-  { seq: 19, item: '其他资金往来', info: '无', source: '' },
-  { seq: 20, item: '是否涉知', info: '否', source: '' },
+  { seq: 1, item: '浜ゆ槗妯″紡', info: '鍖呴攢', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 2, item: '浜ゆ槗鏍囩殑', info: 'AAA鏉愭枡', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 3, item: '浜ゆ槗瑙勬ā', info: '500-800鍚紙鍚◣閲戦绾?000-8000涓囷級', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 4, item: '浠樻鏂瑰紡', info: '閾惰鎵垮厬姹囩エ鎴栭摱琛岃浆璐?, source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 5, item: '璐︽湡鏃堕棿', info: '涓庡悎鍚屾潯娆句竴鑷?, source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 6, item: '浠樻鏈熼檺', info: '鍗佷釜鏈堜互鍐咃紝鍩烘湰鍦ㄦ湀涔嬪唴鍙戣揣锛堜竴鑸瘡鏈堝彂涓€娆¤揣锛?, source: '鍚堝悓鏉℃涓哄崄涓伐涔嬪唴' },
+  { seq: 7, item: '璐﹂噾杩斿埄', info: '缁撳瓨宸楂樹簬鑻ヨ秴杩?7000涓囷紝鎸夊叏骞存湡鍒濆樊棰濅綑棰濆綋鏈堬紝鎸夊勾褰掕繕姣忓勾杩涜鍚堝悓閲戦', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 8, item: '璐﹂噾姘村钩', info: '鐣ラ珮浜庡悓琛屼笟閿€鍞按骞筹紝琛屼笟骞冲潎涓?.8-5%', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 9, item: '杩愯緭鏂瑰紡鍙婅垂鐢ㄦ壙鎷?, info: '鐏溅杩愯緭涓轰富锛屽皯閲忔苯杩?鍙夎溅杩愯緭锛涘彂杩愭椂鑷彁锛岃繍璐圭敱涔版柟XXX璐熸媴', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 10, item: '浜や粯鏂瑰紡', info: 'XYZ鏀跺埌璐э紝绛惧瓧纭鍗冲彲/浜や粯瀹屾瘯', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 11, item: '璐ㄩ噺淇濊瘉', info: '鏀惰揣楠屾敹鍚庡崄涓湀', source: '涓庡悎鍚屾潯娆句竴鑷? },
+  { seq: 12, item: '楠屾敹鎴栨楠?, info: '鍑哄叿鏀舵嵁鍗冲彲鍒拌处璁ゆ敹鍏ユ/鏈?, source: '涓庡嚟璇佹鏌ョ粨璁轰竴鑷? },
+  { seq: 13, item: '閫€璐с€佹崲璐ф潯浠?, info: '鍚堝悓5骞存潵锛屼粠鏈彂鐢熻繃涓€娆￠噸澶ц川閲忛棶棰樻崯锛屾崲璐?璧斿伩', source: '涓庡叧浜?鍏ュ鏉℃琛屼俊鎭竴鑷? },
+  { seq: 14, item: '鏄惁娑夊強濮旀墭鍔犲伐', info: '鍚?, source: '' },
+  { seq: 15, item: '鏄惁瀛樺湪鏉ユ枡鍔犲伐', info: '鍚?, source: '' },
+  { seq: 16, item: '璧勯噾浜ゆ槗鎯呭喌', info: '鏃?, source: '' },
+  { seq: 17, item: '绗笁鏂规敹娆?浠樻', info: '鏃?, source: '' },
+  { seq: 18, item: '浠ｆ敹娆俱€佷唬浠樻', info: '鏃?, source: '' },
+  { seq: 19, item: '鍏朵粬璧勯噾寰€鏉?, info: '鏃?, source: '' },
+  { seq: 20, item: '鏄惁娑夌煡', info: '鍚?, source: '' },
 ]
 </script>
 
@@ -144,263 +166,265 @@ const exampleTradeItems = [
   <div class="toolbar">
     <div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div>
     <div class="toolbar-right">
-      <el-button size="small" type="warning" plain @click="showExample = true">📖 查看访谈案例</el-button>
+      <el-button size="small" type="warning" plain @click="showExample = true">馃摉 鏌ョ湅璁胯皥妗堜緥</el-button>
+      <el-dropdown trigger="click" size="small"><el-button size="small">瀵煎叆瀵煎嚭 鈻?/el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="exportTemplate('D4-31')">瀵煎嚭妯℃澘</el-dropdown-item><el-dropdown-item @click="exportData('D4-31')">瀵煎嚭鏁版嵁</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>瀵煎叆鏁版嵁</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown>
+      <D4IpoFindingWriteback wp-code="D4-31" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" />
       <GtIndexChip value="wp:D4-30" :context-project-id="projectId" />
-      <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-31-detail')">💬 复核</el-button>
+      <el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-31-detail')">馃挰 澶嶆牳</el-button>
     </div>
   </div>
 
-  <template v-if="editorMode === '问卷视图'">
-    <!-- 左侧导航 + 右侧内容 -->
+  <template v-if="editorMode === '闂嵎瑙嗗浘'">
+    <!-- 宸︿晶瀵艰埅 + 鍙充晶鍐呭 -->
     <div class="questionnaire-layout">
       <nav class="section-nav">
-        <div :class="['nav-item', { active: activeSection === 'meta' }]" @click="activeSection='meta'">元信息</div>
-        <div :class="['nav-item', { active: activeSection === 'ch1' }]" @click="activeSection='ch1'">一、受访人介绍</div>
-        <div :class="['nav-item', { active: activeSection === 'ch2' }]" @click="activeSection='ch2'">二、客户基本情况</div>
-        <div :class="['nav-item', { active: activeSection === 'ch3' }]" @click="activeSection='ch3'">三、业务情况</div>
-        <div :class="['nav-item', { active: activeSection === 'ch4' }]" @click="activeSection='ch4'">四、关联关系</div>
-        <div :class="['nav-item', { active: activeSection === 'sign' }]" @click="activeSection='sign'">签字与承诺</div>
+        <div :class="['nav-item', { active: activeSection === 'meta' }]" @click="activeSection='meta'">鍏冧俊鎭?/div>
+        <div :class="['nav-item', { active: activeSection === 'ch1' }]" @click="activeSection='ch1'">涓€銆佸彈璁夸汉浠嬬粛</div>
+        <div :class="['nav-item', { active: activeSection === 'ch2' }]" @click="activeSection='ch2'">浜屻€佸鎴峰熀鏈儏鍐?/div>
+        <div :class="['nav-item', { active: activeSection === 'ch3' }]" @click="activeSection='ch3'">涓夈€佷笟鍔℃儏鍐?/div>
+        <div :class="['nav-item', { active: activeSection === 'ch4' }]" @click="activeSection='ch4'">鍥涖€佸叧鑱斿叧绯?/div>
+        <div :class="['nav-item', { active: activeSection === 'sign' }]" @click="activeSection='sign'">绛惧瓧涓庢壙璇?/div>
       </nav>
 
       <div class="section-content">
-        <!-- 元信息 -->
+        <!-- 鍏冧俊鎭?-->
         <div v-show="activeSection==='meta'" class="form-section">
-          <h4>访谈基本信息</h4>
+          <h4>璁胯皥鍩烘湰淇℃伅</h4>
           <div class="form-grid">
-            <div class="form-item"><label>访谈对象</label><el-input :model-value="formData.target" :disabled="isReadonly" @input="(v:string)=>update('target',v)" /></div>
-            <div class="form-item"><label>访谈时间及地点</label><el-input :model-value="formData.timePlace" :disabled="isReadonly" @input="(v:string)=>update('timePlace',v)" /></div>
-            <div class="form-item"><label>接受访谈人员及职务</label><el-input :model-value="formData.interviewee" :disabled="isReadonly" @input="(v:string)=>update('interviewee',v)" /></div>
-            <div class="form-item"><label>访谈人</label><el-input :model-value="formData.interviewer" :disabled="isReadonly" @input="(v:string)=>update('interviewer',v)" /></div>
+            <div class="form-item"><label>璁胯皥瀵硅薄</label><el-input :model-value="formData.target" :disabled="isReadonly" @input="(v:string)=>update('target',v)" /></div>
+            <div class="form-item"><label>璁胯皥鏃堕棿鍙婂湴鐐?/label><el-input :model-value="formData.timePlace" :disabled="isReadonly" @input="(v:string)=>update('timePlace',v)" /></div>
+            <div class="form-item"><label>鎺ュ彈璁胯皥浜哄憳鍙婅亴鍔?/label><el-input :model-value="formData.interviewee" :disabled="isReadonly" @input="(v:string)=>update('interviewee',v)" /></div>
+            <div class="form-item"><label>璁胯皥浜?/label><el-input :model-value="formData.interviewer" :disabled="isReadonly" @input="(v:string)=>update('interviewer',v)" /></div>
           </div>
-          <div class="form-hint">💡 访谈内容应根据被审计单位实际情况、关注的客户主要风险情况修改。</div>
+          <div class="form-hint">馃挕 璁胯皥鍐呭搴旀牴鎹瀹¤鍗曚綅瀹為檯鎯呭喌銆佸叧娉ㄧ殑瀹㈡埛涓昏椋庨櫓鎯呭喌淇敼銆?/div>
         </div>
 
-        <!-- 一、受访人介绍 -->
+        <!-- 涓€銆佸彈璁夸汉浠嬬粛 -->
         <div v-show="activeSection==='ch1'" class="form-section">
-          <div class="section-title-row"><h4>一、接受访谈人介绍</h4><el-button v-if="aiAvailable" size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="aiGenerateIntro">🤖 AI生成模板</el-button></div>
-          <p class="field-hint">包括姓名、任职的公司、职务、具体负责的工作等</p>
-          <el-input type="textarea" :autosize="{minRows:3,maxRows:10}" :model-value="formData.introduction" :disabled="isReadonly" placeholder="请记录受访人基本介绍信息" @input="(v:string)=>update('introduction',v)" />
+          <div class="section-title-row"><h4>涓€銆佹帴鍙楄璋堜汉浠嬬粛</h4><el-button v-if="aiAvailable" size="small" type="primary" plain :loading="aiLoading" :disabled="isReadonly" @click="aiGenerateIntro">馃 AI鐢熸垚妯℃澘</el-button></div>
+          <p class="field-hint">鍖呮嫭濮撳悕銆佷换鑱岀殑鍏徃銆佽亴鍔°€佸叿浣撹礋璐ｇ殑宸ヤ綔绛?/p>
+          <el-input type="textarea" :autosize="{minRows:3,maxRows:10}" :model-value="formData.introduction" :disabled="isReadonly" placeholder="璇疯褰曞彈璁夸汉鍩烘湰浠嬬粛淇℃伅" @input="(v:string)=>update('introduction',v)" />
         </div>
 
-        <!-- 二、客户基本情况 -->
+        <!-- 浜屻€佸鎴峰熀鏈儏鍐?-->
         <div v-show="activeSection==='ch2'" class="form-section">
-          <h4>二、客户的基本情况</h4>
-          <p class="field-hint">附有关部门盖章确认的工商登记证明文件、主体纳税证明等</p>
+          <h4>浜屻€佸鎴风殑鍩烘湰鎯呭喌</h4>
+          <p class="field-hint">闄勬湁鍏抽儴闂ㄧ洊绔犵‘璁ょ殑宸ュ晢鐧昏璇佹槑鏂囦欢銆佷富浣撶撼绋庤瘉鏄庣瓑</p>
           <div class="form-grid">
-            <div class="form-item"><label>公司名称</label><el-input :model-value="formData.companyName" :disabled="isReadonly" @input="(v:string)=>update('companyName',v)" /></div>
-            <div class="form-item"><label>注册资本</label><el-input :model-value="formData.regCapital" :disabled="isReadonly" @input="(v:string)=>update('regCapital',v)" /></div>
-            <div class="form-item"><label>成立日期</label><el-input :model-value="formData.establishDate" :disabled="isReadonly" @input="(v:string)=>update('establishDate',v)" /></div>
-            <div class="form-item"><label>经济性质</label><el-input :model-value="formData.bizNature" :disabled="isReadonly" @input="(v:string)=>update('bizNature',v)" /></div>
-            <div class="form-item"><label>法定代表人</label><el-input :model-value="formData.legalRep" :disabled="isReadonly" @input="(v:string)=>update('legalRep',v)" /></div>
-            <div class="form-item"><label>股权结构</label><el-input :model-value="formData.equityStructure" :disabled="isReadonly" @input="(v:string)=>update('equityStructure',v)" /></div>
+            <div class="form-item"><label>鍏徃鍚嶇О</label><el-input :model-value="formData.companyName" :disabled="isReadonly" @input="(v:string)=>update('companyName',v)" /></div>
+            <div class="form-item"><label>娉ㄥ唽璧勬湰</label><el-input :model-value="formData.regCapital" :disabled="isReadonly" @input="(v:string)=>update('regCapital',v)" /></div>
+            <div class="form-item"><label>鎴愮珛鏃ユ湡</label><el-input :model-value="formData.establishDate" :disabled="isReadonly" @input="(v:string)=>update('establishDate',v)" /></div>
+            <div class="form-item"><label>缁忔祹鎬ц川</label><el-input :model-value="formData.bizNature" :disabled="isReadonly" @input="(v:string)=>update('bizNature',v)" /></div>
+            <div class="form-item"><label>娉曞畾浠ｈ〃浜?/label><el-input :model-value="formData.legalRep" :disabled="isReadonly" @input="(v:string)=>update('legalRep',v)" /></div>
+            <div class="form-item"><label>鑲℃潈缁撴瀯</label><el-input :model-value="formData.equityStructure" :disabled="isReadonly" @input="(v:string)=>update('equityStructure',v)" /></div>
           </div>
         </div>
 
-        <!-- 三、业务情况 -->
+        <!-- 涓夈€佷笟鍔℃儏鍐?-->
         <div v-show="activeSection==='ch3'" class="form-section">
-          <h4>三、与客户业务情况</h4>
-          <!-- Q1 业务关系 -->
+          <h4>涓夈€佷笌瀹㈡埛涓氬姟鎯呭喌</h4>
+          <!-- Q1 涓氬姟鍏崇郴 -->
           <div class="question-card">
-            <div class="q-label">1. 客户与发行人的业务关系为</div>
+            <div class="q-label">1. 瀹㈡埛涓庡彂琛屼汉鐨勪笟鍔″叧绯讳负</div>
             <el-checkbox-group :model-value="formData.q1_relation" :disabled="isReadonly" @change="(v:string[])=>update('q1_relation',v)">
               <el-checkbox v-for="opt in RELATION_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-checkbox>
             </el-checkbox-group>
           </div>
-          <!-- Q2 结算方式 -->
+          <!-- Q2 缁撶畻鏂瑰紡 -->
           <div class="question-card">
-            <div class="q-label">2. 客户与发行人的结算方式</div>
-            <div class="sub-question"><span class="sub-label">(1) 客户向发行人的采购</span>
+            <div class="q-label">2. 瀹㈡埛涓庡彂琛屼汉鐨勭粨绠楁柟寮?/div>
+            <div class="sub-question"><span class="sub-label">(1) 瀹㈡埛鍚戝彂琛屼汉鐨勯噰璐?/span>
               <el-radio-group :model-value="formData.q2a_payment" :disabled="isReadonly" @change="(v:string)=>update('q2a_payment',v)"><el-radio v-for="opt in PAYMENT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group>
             </div>
-            <div class="sub-question"><span class="sub-label">(2) 客户向发行人的销售</span>
+            <div class="sub-question"><span class="sub-label">(2) 瀹㈡埛鍚戝彂琛屼汉鐨勯攢鍞?/span>
               <el-radio-group :model-value="formData.q2b_collection" :disabled="isReadonly" @change="(v:string)=>update('q2b_collection',v)"><el-radio v-for="opt in COLLECTION_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group>
             </div>
           </div>
-          <!-- Q3 交易情况 -->
+          <!-- Q3 浜ゆ槗鎯呭喌 -->
           <div class="question-card">
-            <div class="q-label">3. 20XX年度至今客户与发行人交易情况</div>
-            <div class="sub-question"><span class="sub-label">(1) 所有交易行为是否签订合同</span><el-radio-group :model-value="formData.q3a_hasContract" :disabled="isReadonly" @change="(v:string)=>update('q3a_hasContract',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(2) 产品质量情况（适用客户）</span><el-radio-group :model-value="formData.q3b_quality" :disabled="isReadonly" @change="(v:string)=>update('q3b_quality',v)"><el-radio v-for="opt in QUALITY_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(3) 是否约定退换货条款</span><el-radio-group :model-value="formData.q3c_returnClause" :disabled="isReadonly" @change="(v:string)=>update('q3c_returnClause',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-            <div v-if="formData.q3c_returnClause==='是'" class="sub-question condition-expand"><span class="sub-label">(4) 退换货金额</span><el-radio-group :model-value="formData.q3d_returnAmount" :disabled="isReadonly" @change="(v:string)=>update('q3d_returnAmount',v)"><el-radio v-for="opt in RETURN_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(5) 产品验收入库情况</span><el-radio-group :model-value="formData.q3e_acceptance" :disabled="isReadonly" @change="(v:string)=>update('q3e_acceptance',v)"><el-radio v-for="opt in ACCEPTANCE_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-            <div class="sub-question"><span class="sub-label">(6) 是否存在返利约定</span><el-radio-group :model-value="formData.q3f_hasRebate" :disabled="isReadonly" @change="(v:string)=>update('q3f_hasRebate',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-            <template v-if="formData.q3f_hasRebate==='是'">
-              <div class="sub-question condition-expand"><span class="sub-label">A. 返利支付方式</span><el-radio-group :model-value="formData.q3f_rebateMethod" :disabled="isReadonly" @change="(v:string)=>update('q3f_rebateMethod',v)"><el-radio v-for="opt in REBATE_METHOD_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
-              <div class="sub-question condition-expand"><span class="sub-label">B. 返利金额</span><el-radio-group :model-value="formData.q3f_rebateAmount" :disabled="isReadonly" @change="(v:string)=>update('q3f_rebateAmount',v)"><el-radio v-for="opt in REBATE_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="q-label">3. 20XX骞村害鑷充粖瀹㈡埛涓庡彂琛屼汉浜ゆ槗鎯呭喌</div>
+            <div class="sub-question"><span class="sub-label">(1) 鎵€鏈変氦鏄撹涓烘槸鍚︾璁㈠悎鍚?/span><el-radio-group :model-value="formData.q3a_hasContract" :disabled="isReadonly" @change="(v:string)=>update('q3a_hasContract',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(2) 浜у搧璐ㄩ噺鎯呭喌锛堥€傜敤瀹㈡埛锛?/span><el-radio-group :model-value="formData.q3b_quality" :disabled="isReadonly" @change="(v:string)=>update('q3b_quality',v)"><el-radio v-for="opt in QUALITY_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(3) 鏄惁绾﹀畾閫€鎹㈣揣鏉℃</span><el-radio-group :model-value="formData.q3c_returnClause" :disabled="isReadonly" @change="(v:string)=>update('q3c_returnClause',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group></div>
+            <div v-if="formData.q3c_returnClause==='鏄?" class="sub-question condition-expand"><span class="sub-label">(4) 閫€鎹㈣揣閲戦</span><el-radio-group :model-value="formData.q3d_returnAmount" :disabled="isReadonly" @change="(v:string)=>update('q3d_returnAmount',v)"><el-radio v-for="opt in RETURN_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(5) 浜у搧楠屾敹鍏ュ簱鎯呭喌</span><el-radio-group :model-value="formData.q3e_acceptance" :disabled="isReadonly" @change="(v:string)=>update('q3e_acceptance',v)"><el-radio v-for="opt in ACCEPTANCE_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(6) 鏄惁瀛樺湪杩斿埄绾﹀畾</span><el-radio-group :model-value="formData.q3f_hasRebate" :disabled="isReadonly" @change="(v:string)=>update('q3f_hasRebate',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group></div>
+            <template v-if="formData.q3f_hasRebate==='鏄?">
+              <div class="sub-question condition-expand"><span class="sub-label">A. 杩斿埄鏀粯鏂瑰紡</span><el-radio-group :model-value="formData.q3f_rebateMethod" :disabled="isReadonly" @change="(v:string)=>update('q3f_rebateMethod',v)"><el-radio v-for="opt in REBATE_METHOD_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
+              <div class="sub-question condition-expand"><span class="sub-label">B. 杩斿埄閲戦</span><el-radio-group :model-value="formData.q3f_rebateAmount" :disabled="isReadonly" @change="(v:string)=>update('q3f_rebateAmount',v)"><el-radio v-for="opt in REBATE_AMOUNT_OPTIONS" :key="opt" :value="opt">{{ opt }}</el-radio></el-radio-group></div>
             </template>
-            <div class="sub-question"><span class="sub-label">(7) 经销商购买的货物是否已最终销售</span><el-radio-group :model-value="formData.q3g_finalSold" :disabled="isReadonly" @change="(v:string)=>update('q3g_finalSold',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio><el-radio value="不适用">不适用</el-radio></el-radio-group></div>
+            <div class="sub-question"><span class="sub-label">(7) 缁忛攢鍟嗚喘涔扮殑璐х墿鏄惁宸叉渶缁堥攢鍞?/span><el-radio-group :model-value="formData.q3g_finalSold" :disabled="isReadonly" @change="(v:string)=>update('q3g_finalSold',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio><el-radio value="涓嶉€傜敤">涓嶉€傜敤</el-radio></el-radio-group></div>
           </div>
-          <!-- Q4 其他资金 -->
+          <!-- Q4 鍏朵粬璧勯噾 -->
           <div class="question-card">
-            <div class="q-label">4. 除采购外是否还存在其他资金往来？</div>
-            <el-radio-group :model-value="formData.q4_otherFunds" :disabled="isReadonly" @change="(v:string)=>update('q4_otherFunds',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group>
+            <div class="q-label">4. 闄ら噰璐鏄惁杩樺瓨鍦ㄥ叾浠栬祫閲戝線鏉ワ紵</div>
+            <el-radio-group :model-value="formData.q4_otherFunds" :disabled="isReadonly" @change="(v:string)=>update('q4_otherFunds',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group>
           </div>
-          <!-- Q5 其他 -->
+          <!-- Q5 鍏朵粬 -->
           <div class="question-card">
-            <div class="q-label">5. 其他重要事项</div>
-            <el-input type="textarea" :autosize="{minRows:2,maxRows:6}" :model-value="formData.q5_otherMatters" :disabled="isReadonly" placeholder="记录其他需关注的重要事项" @input="(v:string)=>update('q5_otherMatters',v)" />
+            <div class="q-label">5. 鍏朵粬閲嶈浜嬮」</div>
+            <el-input type="textarea" :autosize="{minRows:2,maxRows:6}" :model-value="formData.q5_otherMatters" :disabled="isReadonly" placeholder="璁板綍鍏朵粬闇€鍏虫敞鐨勯噸瑕佷簨椤? @input="(v:string)=>update('q5_otherMatters',v)" />
           </div>
         </div>
 
-        <!-- 四、关联关系 -->
+        <!-- 鍥涖€佸叧鑱斿叧绯?-->
         <div v-show="activeSection==='ch4'" class="form-section">
-          <h4>四、关联关系情况</h4>
-          <p class="field-hint">发行人的实际控制人、自然人股东、董事、监事或高管人员及主要关联方是否在客户持有股份</p>
-          <div class="question-card"><div class="q-label">是否持有股份</div><el-radio-group :model-value="formData.q6_hasShares" :disabled="isReadonly" @change="(v:string)=>update('q6_hasShares',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-          <div class="question-card"><div class="q-label">是否担任职务</div><el-radio-group :model-value="formData.q6_hasPosition" :disabled="isReadonly" @change="(v:string)=>update('q6_hasPosition',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
-          <div class="question-card"><div class="q-label">是否和客户有交易</div><el-radio-group :model-value="formData.q6_hasTransaction" :disabled="isReadonly" @change="(v:string)=>update('q6_hasTransaction',v)"><el-radio value="是">是</el-radio><el-radio value="否">否</el-radio></el-radio-group></div>
+          <h4>鍥涖€佸叧鑱斿叧绯绘儏鍐?/h4>
+          <p class="field-hint">鍙戣浜虹殑瀹為檯鎺у埗浜恒€佽嚜鐒朵汉鑲′笢銆佽懀浜嬨€佺洃浜嬫垨楂樼浜哄憳鍙婁富瑕佸叧鑱旀柟鏄惁鍦ㄥ鎴锋寔鏈夎偂浠?/p>
+          <div class="question-card"><div class="q-label">鏄惁鎸佹湁鑲′唤</div><el-radio-group :model-value="formData.q6_hasShares" :disabled="isReadonly" @change="(v:string)=>update('q6_hasShares',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group></div>
+          <div class="question-card"><div class="q-label">鏄惁鎷呬换鑱屽姟</div><el-radio-group :model-value="formData.q6_hasPosition" :disabled="isReadonly" @change="(v:string)=>update('q6_hasPosition',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group></div>
+          <div class="question-card"><div class="q-label">鏄惁鍜屽鎴锋湁浜ゆ槗</div><el-radio-group :model-value="formData.q6_hasTransaction" :disabled="isReadonly" @change="(v:string)=>update('q6_hasTransaction',v)"><el-radio value="鏄?>鏄?/el-radio><el-radio value="鍚?>鍚?/el-radio></el-radio-group></div>
         </div>
 
-        <!-- 签字与承诺 -->
+        <!-- 绛惧瓧涓庢壙璇?-->
         <div v-show="activeSection==='sign'" class="form-section">
-          <h4>附件清单</h4>
+          <h4>闄勪欢娓呭崟</h4>
           <div class="attachment-list">
             <div class="attachment-item">
-              <span class="att-label">1. 供应商盖章确认的工商登记证明文件</span>
+              <span class="att-label">1. 渚涘簲鍟嗙洊绔犵‘璁ょ殑宸ュ晢鐧昏璇佹槑鏂囦欢</span>
               <el-dropdown trigger="click" size="small">
-                <el-button size="small" :disabled="isReadonly">📎 上传 ▾</el-button>
+                <el-button size="small" :disabled="isReadonly">馃搸 涓婁紶 鈻?/el-button>
                 <template #dropdown><el-dropdown-menu>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('附件上传功能开发中')"><span>上传文件</span></el-upload></el-dropdown-item>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('文件夹上传功能开发中')"><span>上传文件夹</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('闄勪欢涓婁紶鍔熻兘寮€鍙戜腑')"><span>涓婁紶鏂囦欢</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('鏂囦欢澶逛笂浼犲姛鑳藉紑鍙戜腑')"><span>涓婁紶鏂囦欢澶?/span></el-upload></el-dropdown-item>
                 </el-dropdown-menu></template>
               </el-dropdown>
             </div>
             <div class="attachment-item">
-              <span class="att-label">2. 跟函回函</span>
+              <span class="att-label">2. 璺熷嚱鍥炲嚱</span>
               <el-dropdown trigger="click" size="small">
-                <el-button size="small" :disabled="isReadonly">📎 上传 ▾</el-button>
+                <el-button size="small" :disabled="isReadonly">馃搸 涓婁紶 鈻?/el-button>
                 <template #dropdown><el-dropdown-menu>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('附件上传功能开发中')"><span>上传文件</span></el-upload></el-dropdown-item>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('文件夹上传功能开发中')"><span>上传文件夹</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('闄勪欢涓婁紶鍔熻兘寮€鍙戜腑')"><span>涓婁紶鏂囦欢</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('鏂囦欢澶逛笂浼犲姛鑳藉紑鍙戜腑')"><span>涓婁紶鏂囦欢澶?/span></el-upload></el-dropdown-item>
                 </el-dropdown-menu></template>
               </el-dropdown>
             </div>
             <div class="attachment-item">
-              <span class="att-label">3. XX产品销售明细账、XX产品库存商品明细账</span>
+              <span class="att-label">3. XX浜у搧閿€鍞槑缁嗚处銆乆X浜у搧搴撳瓨鍟嗗搧鏄庣粏璐?/span>
               <el-dropdown trigger="click" size="small">
-                <el-button size="small" :disabled="isReadonly">📎 上传 ▾</el-button>
+                <el-button size="small" :disabled="isReadonly">馃搸 涓婁紶 鈻?/el-button>
                 <template #dropdown><el-dropdown-menu>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('附件上传功能开发中')"><span>上传文件</span></el-upload></el-dropdown-item>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('文件夹上传功能开发中')"><span>上传文件夹</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('闄勪欢涓婁紶鍔熻兘寮€鍙戜腑')"><span>涓婁紶鏂囦欢</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('鏂囦欢澶逛笂浼犲姛鑳藉紑鍙戜腑')"><span>涓婁紶鏂囦欢澶?/span></el-upload></el-dropdown-item>
                 </el-dropdown-menu></template>
               </el-dropdown>
             </div>
             <div class="attachment-item">
-              <span class="att-label">4. XXX账户资金流水</span>
+              <span class="att-label">4. XXX璐︽埛璧勯噾娴佹按</span>
               <el-dropdown trigger="click" size="small">
-                <el-button size="small" :disabled="isReadonly">📎 上传 ▾</el-button>
+                <el-button size="small" :disabled="isReadonly">馃搸 涓婁紶 鈻?/el-button>
                 <template #dropdown><el-dropdown-menu>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('附件上传功能开发中')"><span>上传文件</span></el-upload></el-dropdown-item>
-                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('文件夹上传功能开发中')"><span>上传文件夹</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('闄勪欢涓婁紶鍔熻兘寮€鍙戜腑')"><span>涓婁紶鏂囦欢</span></el-upload></el-dropdown-item>
+                  <el-dropdown-item><el-upload :show-file-list="false" :auto-upload="false" multiple :disabled="isReadonly" @change="() => ElMessage.info('鏂囦欢澶逛笂浼犲姛鑳藉紑鍙戜腑')"><span>涓婁紶鏂囦欢澶?/span></el-upload></el-dropdown-item>
                 </el-dropdown-menu></template>
               </el-dropdown>
             </div>
           </div>
 
-          <h4 style="margin-top:20px;">参与访谈的各方人员签字</h4>
+          <h4 style="margin-top:20px;">鍙備笌璁胯皥鐨勫悇鏂逛汉鍛樼瀛?/h4>
           <div class="form-grid">
-            <div class="form-item"><label>接受访谈人员</label><el-input :model-value="formData.signInterviewee" :disabled="isReadonly" @input="(v:string)=>update('signInterviewee',v)" /></div>
-            <div class="form-item"><label>审计人员</label><el-input :model-value="formData.signAuditor" :disabled="isReadonly" @input="(v:string)=>update('signAuditor',v)" /></div>
-            <div class="form-item"><label>其他人员</label><el-input :model-value="formData.signOther" :disabled="isReadonly" @input="(v:string)=>update('signOther',v)" /></div>
-            <div class="form-item"><label>日期</label><el-input :model-value="formData.signDate" :disabled="isReadonly" placeholder="YYYY-MM-DD" @input="(v:string)=>update('signDate',v)" /></div>
+            <div class="form-item"><label>鎺ュ彈璁胯皥浜哄憳</label><el-input :model-value="formData.signInterviewee" :disabled="isReadonly" @input="(v:string)=>update('signInterviewee',v)" /></div>
+            <div class="form-item"><label>瀹¤浜哄憳</label><el-input :model-value="formData.signAuditor" :disabled="isReadonly" @input="(v:string)=>update('signAuditor',v)" /></div>
+            <div class="form-item"><label>鍏朵粬浜哄憳</label><el-input :model-value="formData.signOther" :disabled="isReadonly" @input="(v:string)=>update('signOther',v)" /></div>
+            <div class="form-item"><label>鏃ユ湡</label><el-input :model-value="formData.signDate" :disabled="isReadonly" placeholder="YYYY-MM-DD" @input="(v:string)=>update('signDate',v)" /></div>
           </div>
-          <!-- 承诺声明 -->
+          <!-- 鎵胯澹版槑 -->
           <div class="commitment-box">
-            <p class="commitment-text">"本公司向XX会计师事务所提供的信息和资料真实、完整，如存在虚假信息或重大遗漏，本公司愿意承担一切法律责任"。</p>
-            <p class="commitment-hint">如识别出客户存在第三方配合实施财务舞弊的风险，应要求客户就其提供的资料进行承诺并加盖公章。</p>
+            <p class="commitment-text">"鏈叕鍙稿悜XX浼氳甯堜簨鍔℃墍鎻愪緵鐨勪俊鎭拰璧勬枡鐪熷疄銆佸畬鏁达紝濡傚瓨鍦ㄨ櫄鍋囦俊鎭垨閲嶅ぇ閬楁紡锛屾湰鍏徃鎰挎剰鎵挎媴涓€鍒囨硶寰嬭矗浠?銆?/p>
+            <p class="commitment-hint">濡傝瘑鍒嚭瀹㈡埛瀛樺湪绗笁鏂归厤鍚堝疄鏂借储鍔¤垶寮婄殑椋庨櫓锛屽簲瑕佹眰瀹㈡埛灏卞叾鎻愪緵鐨勮祫鏂欒繘琛屾壙璇哄苟鍔犵洊鍏珷銆?/p>
           </div>
-          <!-- CAS18提示 -->
-          <details class="tips-collapse"><summary class="tips-summary">⚠️ CAS18号实地走访提示</summary><ol class="tips-list">
-            <li>选择多名或不同层级人员访谈相同问题，进行相互印证。</li>
-            <li>核实被询问人员是否与被审计单位存在特殊关系。</li>
-            <li>对客户的产品实施观察、检查等程序，关注存货的存放和领用是否为真实需要。</li>
-            <li>对经销商客户关注库存量是否明显不合理，考虑检查经销商进销存记录。</li>
-            <li>针对识别出的风险，考虑采用跟函方式进行函证，观察函证处理过程。</li>
+          <!-- CAS18鎻愮ず -->
+          <details class="tips-collapse"><summary class="tips-summary">鈿狅笍 CAS18鍙峰疄鍦拌蛋璁挎彁绀?/summary><ol class="tips-list">
+            <li>閫夋嫨澶氬悕鎴栦笉鍚屽眰绾т汉鍛樿璋堢浉鍚岄棶棰橈紝杩涜鐩镐簰鍗拌瘉銆?/li>
+            <li>鏍稿疄琚闂汉鍛樻槸鍚︿笌琚璁″崟浣嶅瓨鍦ㄧ壒娈婂叧绯汇€?/li>
+            <li>瀵瑰鎴风殑浜у搧瀹炴柦瑙傚療銆佹鏌ョ瓑绋嬪簭锛屽叧娉ㄥ瓨璐х殑瀛樻斁鍜岄鐢ㄦ槸鍚︿负鐪熷疄闇€瑕併€?/li>
+            <li>瀵圭粡閿€鍟嗗鎴峰叧娉ㄥ簱瀛橀噺鏄惁鏄庢樉涓嶅悎鐞嗭紝鑰冭檻妫€鏌ョ粡閿€鍟嗚繘閿€瀛樿褰曘€?/li>
+            <li>閽堝璇嗗埆鍑虹殑椋庨櫓锛岃€冭檻閲囩敤璺熷嚱鏂瑰紡杩涜鍑借瘉锛岃瀵熷嚱璇佸鐞嗚繃绋嬨€?/li>
           </ol></details>
         </div>
       </div>
     </div>
   </template>
 
-  <template v-if="editorMode === '在线编辑'">
-    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户访谈记录 D4-31" :readonly="isReadonly" /></div>
+  <template v-if="editorMode === '鍦ㄧ嚎缂栬緫'">
+    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="瀹㈡埛璁胯皥璁板綍 D4-31" :readonly="isReadonly" /></div>
   </template>
 
-  <!-- 访谈案例弹窗 -->
-  <el-dialog v-model="showExample" title="📖 访谈记录与核对示例" width="800px" destroy-on-close top="5vh">
+  <!-- 璁胯皥妗堜緥寮圭獥 -->
+  <el-dialog v-model="showExample" title="馃摉 璁胯皥璁板綍涓庢牳瀵圭ず渚? width="800px" destroy-on-close top="5vh">
     <div class="example-content">
       <div class="example-section">
-        <h4 class="example-title">一、走访的公司基本信息</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">涓€銆佽蛋璁跨殑鍏徃鍩烘湰淇℃伅</h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
         <div class="example-text">
-          <p>【XYZ公司的基本情况，包括：XYZ公司法定代表人、注册地、注册资本、设立及变更历史、经营范围、实缴资本情况及在册股东出资比例等。公司营业执照、企业信用信息公示报告等】</p>
-          <p>工商信息查询结果、天眼查等查询结果。</p>
-          <p>百度地图等查询走访地址的结果。</p>
+          <p>銆怷YZ鍏徃鐨勫熀鏈儏鍐碉紝鍖呮嫭锛歑YZ鍏徃娉曞畾浠ｈ〃浜恒€佹敞鍐屽湴銆佹敞鍐岃祫鏈€佽绔嬪強鍙樻洿鍘嗗彶銆佺粡钀ヨ寖鍥淬€佸疄缂磋祫鏈儏鍐靛強鍦ㄥ唽鑲′笢鍑鸿祫姣斾緥绛夈€傚叕鍙歌惀涓氭墽鐓с€佷紒涓氫俊鐢ㄤ俊鎭叕绀烘姤鍛婄瓑銆?/p>
+          <p>宸ュ晢淇℃伅鏌ヨ缁撴灉銆佸ぉ鐪兼煡绛夋煡璇㈢粨鏋溿€?/p>
+          <p>鐧惧害鍦板浘绛夋煡璇㈣蛋璁垮湴鍧€鐨勭粨鏋溿€?/p>
         </div>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">二、交易基本信息</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">浜屻€佷氦鏄撳熀鏈俊鎭?/h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
         <div class="example-text">
-          <p>【询问及XYZ公司与发行人的合作情况（交易模式、交易金额、交易方式、付款方式、退换条款、结算条件等），并关注实物流与合同条款及账面记录的一致性；需核对的问题如下，将核对情况记录在下表：】</p>
+          <p>銆愯闂強XYZ鍏徃涓庡彂琛屼汉鐨勫悎浣滄儏鍐碉紙浜ゆ槗妯″紡銆佷氦鏄撻噾棰濄€佷氦鏄撴柟寮忋€佷粯娆炬柟寮忋€侀€€鎹㈡潯娆俱€佺粨绠楁潯浠剁瓑锛夛紝骞跺叧娉ㄥ疄鐗╂祦涓庡悎鍚屾潯娆惧強璐﹂潰璁板綍鐨勪竴鑷存€э紱闇€鏍稿鐨勯棶棰樺涓嬶紝灏嗘牳瀵规儏鍐佃褰曞湪涓嬭〃锛氥€?/p>
         </div>
         <el-table :data="exampleTradeItems" border size="small" class="example-table">
           <el-table-column prop="seq" label="Q#" width="40" align="center" />
-          <el-table-column prop="item" label="项目" width="100" />
-          <el-table-column prop="info" label="询问所获信息" min-width="200" />
-          <el-table-column prop="source" label="来自发行人合同条款" min-width="150" />
+          <el-table-column prop="item" label="椤圭洰" width="100" />
+          <el-table-column prop="info" label="璇㈤棶鎵€鑾蜂俊鎭? min-width="200" />
+          <el-table-column prop="source" label="鏉ヨ嚜鍙戣浜哄悎鍚屾潯娆? min-width="150" />
         </el-table>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">三、与发行人的交易与合同条款核对</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">涓夈€佷笌鍙戣浜虹殑浜ゆ槗涓庡悎鍚屾潯娆炬牳瀵?/h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
         <div class="example-text">
-          <p>【询问及取得有关证明文件核对XYZ公司与发行人合作协议的情况。包括合同条款约定、销售金额比对、第三方收款/付款情况、资金交易情况等。】</p>
-          <p>与发行人合作始于2008年签订合作协议【与发行人XXX产品销售AAAHH材料】，报告三年合同金额分别为XXX。</p>
-          <p>期间交易金额、与前述发票及台账核对一致，无异议。交易金额比对正常。</p>
+          <p>銆愯闂強鍙栧緱鏈夊叧璇佹槑鏂囦欢鏍稿XYZ鍏徃涓庡彂琛屼汉鍚堜綔鍗忚鐨勬儏鍐点€傚寘鎷悎鍚屾潯娆剧害瀹氥€侀攢鍞噾棰濇瘮瀵广€佺涓夋柟鏀舵/浠樻鎯呭喌銆佽祫閲戜氦鏄撴儏鍐电瓑銆傘€?/p>
+          <p>涓庡彂琛屼汉鍚堜綔濮嬩簬2008骞寸璁㈠悎浣滃崗璁€愪笌鍙戣浜篨XX浜у搧閿€鍞瓵AAHH鏉愭枡銆戯紝鎶ュ憡涓夊勾鍚堝悓閲戦鍒嗗埆涓篨XX銆?/p>
+          <p>鏈熼棿浜ゆ槗閲戦銆佷笌鍓嶈堪鍙戠エ鍙婂彴璐︽牳瀵逛竴鑷达紝鏃犲紓璁€備氦鏄撻噾棰濇瘮瀵规甯搞€?/p>
         </div>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">四、走访经营情况</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">鍥涖€佽蛋璁跨粡钀ユ儏鍐?/h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
         <div class="example-text">
-          <p>【走访XYZ的生产经营情况（若适用），关注其生产经营现状与访谈内容和凭证扫描】</p>
-          <p>XYZ公司位于XXX工业园区，园区面积1300亩，主要生产XXXXX，主要原材料AAA，年产能XXXX吨。</p>
-          <p>XYZ公司目前拥有3个生产车间，整体成品存"生产许可证"，开工率约为90%。</p>
+          <p>銆愯蛋璁縓YZ鐨勭敓浜х粡钀ユ儏鍐碉紙鑻ラ€傜敤锛夛紝鍏虫敞鍏剁敓浜х粡钀ョ幇鐘朵笌璁胯皥鍐呭鍜屽嚟璇佹壂鎻忋€?/p>
+          <p>XYZ鍏徃浣嶄簬XXX宸ヤ笟鍥尯锛屽洯鍖洪潰绉?300浜╋紝涓昏鐢熶骇XXXXX锛屼富瑕佸師鏉愭枡AAA锛屽勾浜ц兘XXXX鍚ㄣ€?/p>
+          <p>XYZ鍏徃鐩墠鎷ユ湁3涓敓浜ц溅闂达紝鏁翠綋鎴愬搧瀛?鐢熶骇璁稿彲璇?锛屽紑宸ョ巼绾︿负90%銆?/p>
         </div>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">五、凭证核对</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">浜斻€佸嚟璇佹牳瀵?/h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
         <div class="example-text">
-          <p>【对XYZ公司进行现场函证（此部分内容包括但不限于：截至目的日的货权/服务合同、或是全期的全部交易及往来余额）；无联方关系确认函。】</p>
-          <p>现场收取的XYZ公司对函证信息进行一次（差异为XXXX元，250万），XYZ公司确认无任何第2月前实际的质检的原材料按照应收账款余额，并按要求对其进行盖章签字。</p>
+          <p>銆愬XYZ鍏徃杩涜鐜板満鍑借瘉锛堟閮ㄥ垎鍐呭鍖呮嫭浣嗕笉闄愪簬锛氭埅鑷崇洰鐨勬棩鐨勮揣鏉?鏈嶅姟鍚堝悓銆佹垨鏄叏鏈熺殑鍏ㄩ儴浜ゆ槗鍙婂線鏉ヤ綑棰濓級锛涙棤鑱旀柟鍏崇郴纭鍑姐€傘€?/p>
+          <p>鐜板満鏀跺彇鐨刋YZ鍏徃瀵瑰嚱璇佷俊鎭繘琛屼竴娆★紙宸紓涓篨XXX鍏冿紝250涓囷級锛孹YZ鍏徃纭鏃犱换浣曠2鏈堝墠瀹為檯鐨勮川妫€鐨勫師鏉愭枡鎸夌収搴旀敹璐︽浣欓锛屽苟鎸夎姹傚鍏惰繘琛岀洊绔犵瀛椼€?/p>
         </div>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">六、关联方关系</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">鍏€佸叧鑱旀柟鍏崇郴</h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
         <div class="example-text">
-          <p>走访公司的股权结构、实际控制人。</p>
-          <p>走访公司的董监高、关键经办人员（如正名、销售员/门店店人、出纳等）。</p>
+          <p>璧拌鍏徃鐨勮偂鏉冪粨鏋勩€佸疄闄呮帶鍒朵汉銆?/p>
+          <p>璧拌鍏徃鐨勮懀鐩戦珮銆佸叧閿粡鍔炰汉鍛橈紙濡傛鍚嶃€侀攢鍞憳/闂ㄥ簵搴椾汉銆佸嚭绾崇瓑锛夈€?/p>
         </div>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">七、其他</h4>
-        <p class="example-hint">【建议采写】</p>
+        <h4 class="example-title">涓冦€佸叾浠?/h4>
+        <p class="example-hint">銆愬缓璁噰鍐欍€?/p>
       </div>
 
       <div class="example-section">
-        <h4 class="example-title">走访结论</h4>
+        <h4 class="example-title">璧拌缁撹</h4>
         <div class="example-text">
-          <p>（由审计人员根据走访情况总结得出结论）</p>
+          <p>锛堢敱瀹¤浜哄憳鏍规嵁璧拌鎯呭喌鎬荤粨寰楀嚭缁撹锛?/p>
         </div>
       </div>
     </div>
@@ -452,7 +476,7 @@ const exampleTradeItems = [
 
 .oo-container { min-height: 600px; height: calc(100vh - 280px); border-radius: 8px; overflow: hidden; }
 
-/* 案例弹窗 */
+/* 妗堜緥寮圭獥 */
 .example-content { max-height: 70vh; overflow-y: auto; padding: 0 8px; }
 .example-section { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0; }
 .example-section:last-child { border-bottom: none; }

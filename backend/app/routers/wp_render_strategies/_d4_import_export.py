@@ -13,6 +13,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
@@ -37,14 +38,17 @@ _ROW_LIMIT = 500
 
 _SUPPORTED_SHEETS: set[str] = {
     "D4-1", "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
-    "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19", "D4-20",
+    "D4-13", "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19", "D4-20",
     "D4-20-provision", "D4-20-current", "D4-20-post",
     "D4-21", "D4-22", "D4-23", "D4-24", "D4-25", "D4-26", "D4-27",
     "D4-28", "D4-29", "D4-30", "D4-31", "D4-32",
-    "D4-33", "D4-34", "D4-34-rental", "D4-34-consult", "D4-35", "D4-36", "D4-36-forward", "D4-36-backward",
+    "D4-33", "D4-34-rental", "D4-34-consult", "D4-35", "D4-36-forward", "D4-36-backward",
 }
 
 _SHEET_HEADERS: dict[str, list[str]] = {
+    "D4-13": [
+        "区块", "内容",
+    ],
     "D4-1": [
         "区块", "行键", "项目",
         "本期未审", "本期AJE", "本期RJE",
@@ -193,7 +197,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     "D4-28": [
         "序号", "客户名称", "选取原因", "销售金额", "占总交易比重",
         "应收账款期末余额", "占期末余额比重", "合同负债期末余额", "占期末余额比重",
-        "工商资料查询", "互联网信息查询", "函证", "视频电话访谈", "实地走访", "索引号",
+        "工商资料查询", "互联网信息查询", "函证", "视频、电话访谈", "实地走访", "索引号",
     ],
     "D4-29": [
         "客户名称", "统一社会信用代码", "注册地址", "办公地址", "网站地址", "网站IP地址",
@@ -203,8 +207,21 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "是否为关联方", "是否同时为供应商", "开始合作时间",
         "是否长期拖欠款项", "经营状态", "是否列入失信人", "信息来源",
     ],
+    # D4-30 客户访谈记录汇总表：转置矩阵在导出侧投影为「一客户一行」(客户名称 + 16 访谈维度列)
+    # 自定义维度(customDimensions)作为尾部动态列追加(仿 D4-22 peers)，导入按表头恢复。
+    "D4-30": [
+        "客户名称", "访谈时间", "访谈原因", "访谈方式", "被访谈公司注册地址",
+        "实地走访公司地址", "接受访谈人员及身份", "参与访谈的审计人员", "参与访谈的其他人员",
+        "访谈人员行程信息", "是否现场函证", "访谈关注要点", "合同执行核对情况",
+        "交易金额核对是否一致", "往来余额核对是否一致", "访谈结论", "访谈表索引",
+    ],
+    # D4-31 客户访谈记录：单份问卷，导出为「字段/值」键值对(单对象非行集)
+    "D4-31": [
+        "字段", "值",
+    ],
+    # D4-32 资金流水检查：6 组扁平化时加显式「组别」列，导入按组别恢复分组(非按行号硬切)
     "D4-32": [
-        "序号", "单位名称/姓名", "本期交易金额", "占同类交易比例",
+        "组别", "序号", "单位名称/姓名", "本期交易金额", "占同类交易比例",
         "开户银行", "账号", "资金流水获取途径", "是否发现异常交易", "索引号",
     ],
     "D4-33": [
@@ -213,11 +230,6 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "出租固定资产-收入", "出租固定资产-成本", "出租固定资产-毛利率",
         "出租无形资产-收入", "出租无形资产-成本", "出租无形资产-毛利率",
         "销售材料-收入", "销售材料-成本", "销售材料-毛利率",
-    ],
-    "D4-34": [
-        "序号", "承租方/委托方", "租赁期间/咨询项目", "租赁面积/委托期限",
-        "合同单价/合同金额", "合同索引", "本期实际租赁月数",
-        "本期应计收入", "本期实计收入", "差异", "索引号",
     ],
     "D4-34-rental": [
         "序号", "承租方", "租赁期间", "租赁面积", "合同单价",
@@ -231,10 +243,6 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "日期", "凭证编号", "业务内容", "对方科目", "明细科目", "金额",
         "支持性文件", "核对1", "核对2", "核对3", "核对4", "核对5", "核对6",
         "索引号", "是否异常", "备注说明",
-    ],
-    "D4-36": [
-        "凭证日期", "凭证编号", "凭证品名", "凭证数量", "凭证金额",
-        "单据日期", "单据编号", "单据品名", "单据数量", "单据金额", "是否跨期",
     ],
     "D4-36-forward": [
         "凭证日期", "凭证编号", "凭证品名", "凭证数量", "凭证金额",
@@ -479,6 +487,11 @@ async def d4_export_template(
         for label in ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月", "合计", "上年数", "变动额", "变动比例"]:
             ws.append([label] + [None] * (len(headers) - 1))
 
+    # D4-13特殊处理：预填两行区块名（核对过程/核对结论），叙述式
+    if sheet == "D4-13":
+        ws.append(["核对过程", None])
+        ws.append(["核对结论", None])
+
     # 添加编制说明 sheet
     if include_guidance:
         guidance = _get_guidance_text(sheet)
@@ -514,6 +527,8 @@ async def d4_export_data(
 ) -> StreamingResponse:
     """导出当前数据xlsx"""
     _validate_sheet(sheet)
+    if sheet == "D4-13":
+        return await _handle_d4_13_export(wp_id, db)
     headers = _get_headers(sheet)
 
     # 加载 checklist_responses 中的行数据
@@ -538,10 +553,28 @@ async def d4_export_data(
         item_id = "D4-12-contracts-v2"
     elif sheet == "D4-14":
         item_id = "D4-14-transactions"
+    elif sheet == "D4-15":
+        item_id = "D4-15-items"
     elif sheet == "D4-22":
         item_id = "D4-22-data"
     elif sheet == "D4-23":
         item_id = "D4-23-data"
+    elif sheet == "D4-33":
+        item_id = "D4-33-data"
+    elif sheet in ("D4-34-rental", "D4-34-consult"):
+        item_id = "D4-34-data"
+    elif sheet == "D4-35":
+        item_id = "D4-35-data"
+    elif sheet in ("D4-36-forward", "D4-36-backward"):
+        item_id = "D4-36-data"
+    elif sheet == "D4-29":
+        item_id = "D4-29-customers"
+    elif sheet == "D4-30":
+        item_id = "D4-30-customers"
+    elif sheet == "D4-31":
+        item_id = "D4-31-interview"
+    elif sheet == "D4-32":
+        item_id = "D4-32-groups"
     result = await db.execute(
         sa.text(
             "SELECT remark FROM checklist_responses "
@@ -550,13 +583,72 @@ async def d4_export_data(
         {"wp_id": wp_id, "item_id": item_id},
     )
     row = result.fetchone()
+
+    # D4-31 单份问卷：键值对导出（单对象非行集），字段顺序固定
+    if sheet == "D4-31":
+        data: dict = {}
+        if row and row.remark:
+            try:
+                _p = json.loads(row.remark)
+                if isinstance(_p, dict):
+                    data = _p
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return _export_d4_31_questionnaire(sheet, data)
+
     rows_data: list[dict] = []
+    _d4_33_store: dict = {}  # D4-33 嵌套 store（bizTypes/months/priorYear），循环后展开
+    _d4_30_custom_dims: list[dict] = []  # D4-30 自定义维度（尾部动态列）
     if row and row.remark:
         try:
             parsed = json.loads(row.remark)
             # D4-22 stores {rows: [...], peers: [...], transportExpense: ...}
             if sheet == "D4-22" and isinstance(parsed, dict):
                 rows_data = parsed.get("rows", [])
+            # D4-29 stores [{id,name,fields}]（客户列表，一客户一行）
+            elif sheet == "D4-29" and isinstance(parsed, list):
+                rows_data = parsed
+            # D4-30 stores {customers:[...], customDimensions:[...]}（转置矩阵投影为一客户一行）
+            elif sheet == "D4-30" and isinstance(parsed, dict):
+                rows_data = parsed.get("customers", [])
+                _d4_30_custom_dims = parsed.get("customDimensions", []) or []
+            # D4-32 stores [{key,rows}]×6（+ 可能 __unknown__ 组）→ 扁平化加组别列
+            elif sheet == "D4-32" and isinstance(parsed, list):
+                _flat: list[dict] = []
+                for _g in parsed:
+                    if not isinstance(_g, dict):
+                        continue
+                    _gkey = _g.get("key", "")
+                    _glabel = _D4_32_GROUP_KEY_TO_LABEL.get(_gkey, _gkey)
+                    for _seq, _r in enumerate(_g.get("rows", []), start=1):
+                        _rr = dict(_r)
+                        _rr["_groupLabel"] = _glabel
+                        _rr["_seq"] = _seq
+                        _flat.append(_rr)
+                rows_data = _flat
+            # D4-9 stores {current:{rows…}, prior:{…}} → 导出本期行
+            elif sheet == "D4-9" and isinstance(parsed, dict):
+                rows_data = (parsed.get("current") or {}).get("rows", []) or []
+            # D4-10 stores {rows, totalAmount, formula…}
+            elif sheet == "D4-10" and isinstance(parsed, dict):
+                rows_data = parsed.get("rows", []) or []
+            # D4-34 stores {rentals: [...], consults: [...]}；按导出子区取对应区
+            elif sheet == "D4-34-rental" and isinstance(parsed, dict):
+                rows_data = parsed.get("rentals", [])
+            elif sheet == "D4-34-consult" and isinstance(parsed, dict):
+                rows_data = parsed.get("consults", [])
+            # D4-35 stores {rows: [...], sampling: {...}, periodAmount: ...}
+            elif sheet == "D4-35" and isinstance(parsed, dict):
+                rows_data = parsed.get("rows", [])
+            # D4-36 stores {forward: [...], backward: [...]}；按导出子区取对应区
+            elif sheet == "D4-36-forward" and isinstance(parsed, dict):
+                rows_data = parsed.get("forward", [])
+            elif sheet == "D4-36-backward" and isinstance(parsed, dict):
+                rows_data = parsed.get("backward", [])
+            # D4-33 stores {bizTypes: [...], months: {...}, priorYear: {...}}（嵌套，循环后特殊展开）
+            elif sheet == "D4-33" and isinstance(parsed, dict):
+                rows_data = []  # D4-33 由循环后专属分支从 parsed 展开
+                _d4_33_store = parsed
             elif isinstance(parsed, list):
                 rows_data = parsed
             else:
@@ -567,6 +659,9 @@ async def d4_export_data(
     wb = Workbook()
     ws = wb.active
     ws.title = sheet
+    # D4-30 自定义维度作尾部动态列追加到表头
+    if sheet == "D4-30" and _d4_30_custom_dims:
+        headers = list(headers) + [str(d.get("label", d.get("key", ""))) for d in _d4_30_custom_dims]
     ws.append(headers)
     ws.freeze_panes = "A2"
 
@@ -574,6 +669,37 @@ async def d4_export_data(
     for data_row in rows_data:
         if sheet == "D4-1":
             row_values = _export_d4_1_row(data_row)
+        elif sheet == "D4-29":
+            _fields = data_row.get("fields", {}) or {}
+            row_values = [data_row.get("name", "")] + [
+                _fields.get(_D4_29_HEADER_TO_KEY[h], "") for h in headers if h in _D4_29_HEADER_TO_KEY
+            ]
+        elif sheet == "D4-30":
+            _fields = data_row.get("fields", {}) or {}
+            _rv = [data_row.get("name", "")]
+            for h in headers:
+                if h == "客户名称":
+                    continue
+                if h in _D4_30_HEADER_TO_KEY:
+                    _rv.append(_fields.get(_D4_30_HEADER_TO_KEY[h], ""))
+                else:
+                    # 自定义维度列：key=label（与 parse 侧一致）
+                    _rv.append(_fields.get(h, ""))
+            row_values = _rv
+        elif sheet == "D4-32":
+            _amt = data_row.get("amount", "")
+            row_values = [
+                data_row.get("_groupLabel", ""),
+                data_row.get("_seq", "") or "",
+                data_row.get("name", ""),
+                _safe_float(_amt) if _amt not in (None, "") else "",
+                data_row.get("ratio", ""),
+                data_row.get("bank", ""),
+                data_row.get("account", ""),
+                data_row.get("method", ""),
+                data_row.get("hasAnomaly", ""),
+                data_row.get("indexRef", ""),
+            ]
         elif sheet == "D4-2":
             months = data_row.get("months", [0] * 12)
             period_total = sum(_safe_float(m) for m in months)
@@ -664,6 +790,38 @@ async def d4_export_data(
             # D4-8 special: data_row is a product with months[12]/priorMonths[12]
             # Output 12 rows per product (handled below after loop)
             continue
+        elif sheet == "D4-15":
+            # D4-15 完整性检查：嵌套 {delivery,invoice,voucher} → 18列平铺
+            d = data_row.get("delivery", {})
+            inv = data_row.get("invoice", {})
+            v = data_row.get("voucher", {})
+            _consistent = data_row.get("isConsistent")
+            _consistent_cell = "√" if _consistent is True else ("×" if _consistent is False else "")
+            row_values = [
+                data_row.get("indexNo", ""),
+                d.get("date", ""), d.get("number", ""), d.get("productName", ""), d.get("quantity", ""), _safe_float(d.get("amount")),
+                inv.get("date", ""), inv.get("number", ""), inv.get("productName", ""), inv.get("quantity", ""), _safe_float(inv.get("amount")),
+                v.get("date", ""), v.get("number", ""), v.get("productName", ""), v.get("quantity", ""), _safe_float(v.get("amount")),
+                _consistent_cell,
+                data_row.get("remark", ""),
+            ]
+        elif sheet == "D4-16":
+            # D4-16 出口核对：ExportCheckRow 英文 key → 中文列头，差异列重算
+            _book = _safe_float(data_row.get("bookAmount"))
+            _ports = _safe_float(data_row.get("portsAmount"))
+            _tax = _safe_float(data_row.get("taxReportAmount"))
+            row_values = [
+                data_row.get("indexNo", ""),
+                _book,
+                data_row.get("portsPeriod", ""),
+                _ports,
+                _book - _ports,
+                data_row.get("portsReason", ""),
+                _tax,
+                _book - _tax,
+                data_row.get("taxReason", ""),
+                data_row.get("taxIndex", ""),
+            ]
         elif sheet == "D4-14":
             # D4-14 穿行测试：TransactionItem → 32列平铺
             v = data_row.get("voucher", {})
@@ -717,6 +875,53 @@ async def d4_export_data(
                 _safe_float(data_row.get("diff")),
                 data_row.get("indexRef", ""),
             ]
+        elif sheet == "D4-33":
+            # D4-33 嵌套结构，由循环后专属分支展开（此处不应有行）
+            continue
+        elif sheet == "D4-9":
+            row_values = [
+                data_row.get("name", ""),
+                _safe_float(data_row.get("amount")),
+                _safe_float(data_row.get("quantity")),
+                data_row.get("priorRank", ""),
+            ]
+        elif sheet == "D4-10":
+            row_values = [
+                data_row.get("customer", ""),
+                data_row.get("product", ""),
+                _safe_float(data_row.get("amount")),
+                _safe_float(data_row.get("quantity")),
+                _safe_float(data_row.get("unitPrice")),
+                _safe_float(data_row.get("avgPrice")),
+                data_row.get("avgReason", ""),
+                _safe_float(data_row.get("marketPrice")),
+                data_row.get("marketReason", ""),
+            ]
+        elif sheet == "D4-11":
+            row_values = [
+                data_row.get("customer", ""),
+                data_row.get("product", ""),
+                _safe_float(data_row.get("unitPrice")),
+                _safe_float(data_row.get("quantity")),
+                data_row.get("invoiceDate", ""),
+                data_row.get("orderNo", ""),
+                data_row.get("orderDate", ""),
+                _safe_float(data_row.get("listPrice")),
+                _safe_float(data_row.get("marketPrice")),
+                data_row.get("reason", ""),
+                data_row.get("priceSource", ""),
+                data_row.get("remark", ""),
+            ]
+        elif sheet == "D4-34-rental":
+            row_values = _export_d4_34_rental_row(data_row)
+        elif sheet == "D4-34-consult":
+            row_values = _export_d4_34_consult_row(data_row)
+        elif sheet == "D4-35":
+            row_values = _export_d4_35_row(data_row)
+        elif sheet == "D4-36-forward":
+            row_values = _export_d4_36_forward_row(data_row)
+        elif sheet == "D4-36-backward":
+            row_values = _export_d4_36_backward_row(data_row)
         else:
             # 通用：按 headers 顺序提取值
             row_values = [data_row.get(h, "") for h in headers]
@@ -749,6 +954,19 @@ async def d4_export_data(
                     _safe_float(pri.get("costAmt")),
                 ])
 
+    # D4-33 special: 按实际 bizTypes 动态列头 + 展开 16 行（12月+合计+上年数+变动额+变动比例）
+    if sheet == "D4-33":
+        biz_types = _d4_33_store.get("bizTypes", []) if isinstance(_d4_33_store, dict) else []
+        months_map = _d4_33_store.get("months", {}) if isinstance(_d4_33_store, dict) else {}
+        prior_map = _d4_33_store.get("priorYear", {}) if isinstance(_d4_33_store, dict) else {}
+        # 用动态列头覆盖首行（合计3列 + 每业务类型3列）
+        dyn_headers = _d4_33_dynamic_headers(biz_types)
+        ws.delete_rows(1)  # 删掉先前 append 的静态 headers
+        ws.insert_rows(1)
+        for c_idx, h in enumerate(dyn_headers, start=1):
+            ws.cell(row=1, column=1 + (c_idx - 1), value=h)
+        _write_d4_33_rows(ws, biz_types, months_map, prior_map)
+
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -774,6 +992,9 @@ async def d4_import_data(
     """解析上传xlsx，校验格式，写入 checklist_responses"""
     _validate_sheet(sheet)
 
+    if sheet == "D4-13":
+        return await _handle_d4_13_import(wp_id, file, db)
+
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(400, "请上传 .xlsx 格式文件")
 
@@ -796,12 +1017,38 @@ async def d4_import_data(
     actual_headers = [str(h).strip() if h else "" for h in actual_headers]
 
     errors: list[str] = []
-    missing_cols = [h for h in expected_headers if h not in actual_headers]
+    if sheet == "D4-33":
+        # D4-33 业务类型列是动态的，只校验固定列（月份 + 合计三列）
+        _d4_33_fixed = ["月份", "合计-收入", "合计-成本", "合计-毛利率"]
+        missing_cols = [h for h in _d4_33_fixed if h not in actual_headers]
+    else:
+        missing_cols = [h for h in expected_headers if h not in actual_headers]
     if missing_cols:
         errors.append(f"缺少列: {', '.join(missing_cols)}")
 
     if errors:
         return {"ok": False, "errors": errors, "imported_count": 0}
+
+    # D4-31 单份问卷：键值对 → 单对象，item_id=D4-31-interview（非行集，独立落库）
+    if sheet == "D4-31":
+        import sqlalchemy as sa
+        from uuid import uuid4
+
+        data = _parse_d4_31_questionnaire(ws, actual_headers)
+        wb.close()
+        remark_json = json.dumps(data, ensure_ascii=False)
+        project_id = await _resolve_project_id(db, wp_id)
+        await db.execute(
+            sa.text("""
+                INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+                VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
+                ON CONFLICT (wp_id, item_id)
+                DO UPDATE SET remark = :remark, updated_at = NOW()
+            """),
+            {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": "D4-31-interview", "remark": remark_json},
+        )
+        await db.commit()
+        return {"ok": True, "imported_count": 1 if data else 0, "errors": []}
 
     # 解析数据行
     rows_data: list[dict] = []
@@ -830,12 +1077,40 @@ async def d4_import_data(
             row_dict = _parse_d4_7_row(row, actual_headers)
         elif sheet == "D4-8":
             row_dict = _parse_d4_8_row(row, actual_headers)
+        elif sheet == "D4-9":
+            row_dict = _parse_d4_9_row(row, actual_headers)
+        elif sheet == "D4-10":
+            row_dict = _parse_d4_10_row(row, actual_headers)
+        elif sheet == "D4-11":
+            row_dict = _parse_d4_11_row(row, actual_headers)
         elif sheet == "D4-14":
             row_dict = _parse_d4_14_row(row, actual_headers)
+        elif sheet == "D4-15":
+            row_dict = _parse_d4_15_row(row, actual_headers)
+        elif sheet == "D4-16":
+            row_dict = _parse_d4_16_row(row, actual_headers)
         elif sheet == "D4-22":
             row_dict = _parse_d4_22_row(row, actual_headers)
         elif sheet == "D4-23":
             row_dict = _parse_d4_23_row(row, actual_headers)
+        elif sheet == "D4-29":
+            row_dict = _parse_d4_29_row(row, actual_headers)
+        elif sheet == "D4-30":
+            row_dict = _parse_d4_30_row(row, actual_headers)
+        elif sheet == "D4-32":
+            row_dict = _parse_d4_32_row(row, actual_headers)
+        elif sheet == "D4-33":
+            row_dict = _parse_d4_33_row(row, actual_headers)
+        elif sheet == "D4-34-rental":
+            row_dict = _parse_d4_34_rental_row(row, actual_headers)
+        elif sheet == "D4-34-consult":
+            row_dict = _parse_d4_34_consult_row(row, actual_headers)
+        elif sheet == "D4-35":
+            row_dict = _parse_d4_35_row(row, actual_headers)
+        elif sheet == "D4-36-forward":
+            row_dict = _parse_d4_36_forward_row(row, actual_headers)
+        elif sheet == "D4-36-backward":
+            row_dict = _parse_d4_36_backward_row(row, actual_headers)
         else:
             row_dict = _parse_generic_row(row, actual_headers)
 
@@ -880,6 +1155,11 @@ async def d4_import_data(
             }
         rows_data = list(products_dict.values())
 
+    # D4-33 post-processing: 行(每月一行含各业务列) → {bizTypes, months, priorYear} 嵌套 store
+    d4_33_store: dict | None = None
+    if sheet == "D4-33":
+        d4_33_store = _rebuild_d4_33_store(rows_data, actual_headers)
+
     # 写入 checklist_responses
     import sqlalchemy as sa
     from uuid import uuid4
@@ -903,25 +1183,46 @@ async def d4_import_data(
         item_id = "D4-12-contracts-v2"
     elif sheet == "D4-14":
         item_id = "D4-14-transactions"
+    elif sheet == "D4-15":
+        item_id = "D4-15-items"
     elif sheet == "D4-22":
         item_id = "D4-22-data"
     elif sheet == "D4-23":
         item_id = "D4-23-data"
+    elif sheet == "D4-33":
+        item_id = "D4-33-data"
+    elif sheet in ("D4-34-rental", "D4-34-consult"):
+        item_id = "D4-34-data"
+    elif sheet == "D4-35":
+        item_id = "D4-35-data"
+    elif sheet in ("D4-36-forward", "D4-36-backward"):
+        item_id = "D4-36-data"
+    elif sheet == "D4-29":
+        item_id = "D4-29-customers"
+    elif sheet == "D4-30":
+        item_id = "D4-30-customers"
+    elif sheet == "D4-32":
+        item_id = "D4-32-groups"
+
+    async def _load_existing(iid: str) -> dict:
+        """读取既有 item_id 的 remark（dict），用于多子区合并写回；损坏/缺失返回空 dict。"""
+        _res = await db.execute(
+            sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"),
+            {"wp_id": wp_id, "item_id": iid},
+        )
+        _r = _res.fetchone()
+        if _r and _r.remark:
+            try:
+                _d = json.loads(_r.remark)
+                if isinstance(_d, dict):
+                    return _d
+            except (json.JSONDecodeError, TypeError):
+                pass
+        return {}
 
     # D4-22 特殊：保留已有peers和transportExpense，只替换rows
     if sheet == "D4-22":
-        # 读取已有数据
-        existing_result = await db.execute(
-            sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"),
-            {"wp_id": wp_id, "item_id": item_id},
-        )
-        existing_row = existing_result.fetchone()
-        existing_data = {}
-        if existing_row and existing_row.remark:
-            try:
-                existing_data = json.loads(existing_row.remark)
-            except (json.JSONDecodeError, TypeError):
-                pass
+        existing_data = await _load_existing(item_id)
         # 合并：导入的rows替换，peers/transportExpense保留
         merged = {
             "rows": rows_data,
@@ -929,18 +1230,91 @@ async def d4_import_data(
             "transportExpense": existing_data.get("transportExpense", ""),
         }
         remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-33":
+        # D4-33 一次导入即完整 store（含全部月份/业务），整体写回
+        remark_json = json.dumps(d4_33_store or {"bizTypes": [], "months": {}, "priorYear": {}}, ensure_ascii=False)
+    elif sheet == "D4-34-rental":
+        # 合并写回：替换 rentals，保留既有 consults
+        existing_data = await _load_existing(item_id)
+        merged = {"rentals": rows_data, "consults": existing_data.get("consults", [])}
+        remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-34-consult":
+        # 合并写回：替换 consults，保留既有 rentals
+        existing_data = await _load_existing(item_id)
+        merged = {"rentals": existing_data.get("rentals", []), "consults": rows_data}
+        remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-35":
+        # 合并写回：替换 rows，保留既有 sampling/periodAmount（抽样设计不被行导入冲掉）
+        existing_data = await _load_existing(item_id)
+        merged = {
+            "rows": rows_data,
+            "sampling": existing_data.get("sampling", {}),
+            "periodAmount": existing_data.get("periodAmount", ""),
+        }
+        remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-36-forward":
+        # 合并写回：替换 forward，保留既有 backward 及配置
+        existing_data = await _load_existing(item_id)
+        merged = dict(existing_data)
+        merged["forward"] = rows_data
+        merged.setdefault("backward", existing_data.get("backward", []))
+        remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-36-backward":
+        # 合并写回：替换 backward，保留既有 forward 及配置
+        existing_data = await _load_existing(item_id)
+        merged = dict(existing_data)
+        merged["backward"] = rows_data
+        merged.setdefault("forward", existing_data.get("forward", []))
+        remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-30":
+        # 一客户一行 → {customers, customDimensions}（自定义维度按尾部动态列并集恢复）
+        remark_json = json.dumps(_reshape_d4_30_rows(rows_data), ensure_ascii=False)
+    elif sheet == "D4-32":
+        # 扁平行 → 6 组 [{key,rows}]（显式组别列恢复，未知组别独立保留供人工映射）
+        remark_json = json.dumps(_reshape_d4_32_rows(rows_data), ensure_ascii=False)
+    elif sheet == "D4-10":
+        # 🔴 D4-10 HTML store 是 dict（{rows, totalAmount, formula…}），不得整表写成裸数组。
+        # 导入只替换 rows；总额/公式覆盖位保留既有值（公式真源不被 I/O 冲掉）。
+        existing_data = await _load_existing(item_id)
+        merged = {
+            "rows": rows_data,
+            "totalAmount": existing_data.get("totalAmount", 0),
+            "totalQuantity": existing_data.get("totalQuantity", 0),
+            "totalAmountManualOverride": existing_data.get(
+                "totalAmountManualOverride", False
+            ),
+            "totalAmountFormulaRef": existing_data.get("totalAmountFormulaRef")
+            or "WP('D4-2','本期未审合计')",
+        }
+        remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-9":
+        # D4-9 store = {current:{rows,total…}, prior:{…}}；xlsx 只投影 current 行，
+        # 导入替换 current.rows，保留总额与 prior 整段（避免冲掉对侧期间）。
+        existing_data = await _load_existing(item_id)
+        current = dict(existing_data.get("current") or {})
+        prior = dict(existing_data.get("prior") or {})
+        current["rows"] = rows_data
+        current.setdefault("totalAmount", current.get("totalAmount", 0) or 0)
+        current.setdefault("totalQuantity", current.get("totalQuantity", 0) or 0)
+        remark_json = json.dumps(
+            {"current": current, "prior": prior or {"rows": [], "totalAmount": 0, "totalQuantity": 0}},
+            ensure_ascii=False,
+        )
     else:
+        # D4-11 等：store 即为行数组
         remark_json = json.dumps(rows_data, ensure_ascii=False)
 
+    project_id = await _resolve_project_id(db, wp_id)
     await db.execute(
         sa.text("""
-            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
             ON CONFLICT (wp_id, item_id)
             DO UPDATE SET remark = :remark, updated_at = NOW()
         """),
         {
             "id": str(uuid4()),
+            "project_id": project_id,
             "wp_id": wp_id,
             "item_id": item_id,
             "remark": remark_json,
@@ -980,6 +1354,31 @@ def _safe_str(val: Any) -> str:
     if val is None:
         return ""
     return str(val).strip()
+
+
+# openpyxl 禁止写入的控制字符（除 \t \n \r 外的 C0 控制符及部分 C1）
+_ILLEGAL_XLSX_CHARS_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def _strip_illegal_xlsx_chars(val: str) -> str:
+    """去除 openpyxl 不允许写入 worksheet 的非法控制字符（防 IllegalCharacterError）。"""
+    if not val:
+        return val
+    return _ILLEGAL_XLSX_CHARS_RE.sub("", val)
+
+
+async def _resolve_project_id(db: AsyncSession, wp_id: str) -> str:
+    """从 working_paper 解析 project_id（checklist_responses.project_id NOT NULL 必填）。"""
+    import sqlalchemy as sa
+
+    res = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+        {"wp_id": wp_id},
+    )
+    row = res.fetchone()
+    if not row or row.project_id is None:
+        raise HTTPException(404, "底稿不存在或未关联项目")
+    return str(row.project_id)
 
 
 def _parse_d4_2_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
@@ -1273,6 +1672,81 @@ def _parse_d4_23_row(row: tuple, actual_headers: list[str]) -> dict:
     }
 
 
+def _parse_d4_15_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析D4-15完整性检查行 → CompletenessItem 嵌套结构（发货单×发票×记账凭证）"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "id": f"c-{uuid4().hex[:10]}",
+        "indexNo": "",
+        "delivery": {
+            "date": _safe_str(_col_val("发货单日期")),
+            "number": _safe_str(_col_val("发货单编号")),
+            "productName": _safe_str(_col_val("发货单品名")),
+            "quantity": _safe_str(_col_val("发货单数量")),
+            "amount": _safe_float(_col_val("发货单金额")),
+        },
+        "invoice": {
+            "date": _safe_str(_col_val("发票日期")),
+            "number": _safe_str(_col_val("发票编号")),
+            "productName": _safe_str(_col_val("发票品名")),
+            "quantity": _safe_str(_col_val("发票数量")),
+            "amount": _safe_float(_col_val("发票金额")),
+        },
+        "voucher": {
+            "date": _safe_str(_col_val("记账凭证日期")),
+            "number": _safe_str(_col_val("记账凭证编号")),
+            "productName": _safe_str(_col_val("记账凭证品名")),
+            "quantity": _safe_str(_col_val("记账凭证数量")),
+            "amount": _safe_float(_col_val("记账凭证金额")),
+        },
+        # isConsistent 留 None，由前端 checkConsistency 重算（不双写派生值）
+        "isConsistent": None,
+        "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_16_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析D4-16出口核对行 → ExportCheckRow 英文 key，差异列重算（防手改文件造假）"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    book = _safe_float(_col_val("账面出口收入金额"))
+    ports = _safe_float(_col_val("口岸结关金额"))
+    tax = _safe_float(_col_val("申报外营收入"))
+
+    return {
+        "id": f"r-{uuid4().hex[:10]}",
+        "bookAmount": book,
+        "portsAmount": ports,
+        "portsDiff": book - ports,          # 重算，不读文件差异列
+        "portsReason": _safe_str(_col_val("口岸差异原因")),
+        "portsAmount2": 0,
+        "portsPeriod": _safe_str(_col_val("口岸期间")),
+        "taxReportAmount": tax,
+        "taxDiff": book - tax,              # 重算
+        "taxReason": _safe_str(_col_val("申报差异原因")),
+        "taxIndex": _safe_str(_col_val("索引")),
+    }
+
+
 def _parse_generic_row(row: tuple, actual_headers: list[str]) -> dict:
     """通用行解析"""
     from uuid import uuid4
@@ -1284,6 +1758,77 @@ def _parse_generic_row(row: tuple, actual_headers: list[str]) -> dict:
             val = values[i]
             result[header] = val if val is not None else ""
     return result
+
+
+def _parse_d4_9_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-9 重要客户结构：中文列 → {name, amount, quantity, priorRank}。"""
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "name": _safe_str(_col_val("客户名称")),
+        "amount": _safe_float(_col_val("销售金额")),
+        "quantity": _safe_float(_col_val("销售数量")),
+        "priorRank": _safe_str(_col_val("上期排名")),
+    }
+
+
+def _parse_d4_10_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-10 客户价格：中文列 → PriceRow 英文字段（录入列；派生列前端重算）。"""
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "seq": None,
+        "customer": _safe_str(_col_val("客户名称")),
+        "product": _safe_str(_col_val("产品种类")),
+        "amount": _safe_float(_col_val("销售金额")),
+        "quantity": _safe_float(_col_val("销售数量")),
+        "unitPrice": _safe_float(_col_val("销售单价")),
+        "avgPrice": _safe_float(_col_val("年度均价")),
+        "avgReason": _safe_str(_col_val("与均价差异原因")),
+        "marketPrice": _safe_float(_col_val("市场价格")),
+        "marketReason": _safe_str(_col_val("与市场差异原因")),
+    }
+
+
+def _parse_d4_11_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-11 产品价格：中文列 → PriceRow 英文字段。"""
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "customer": _safe_str(_col_val("客户名称")),
+        "product": _safe_str(_col_val("品种规格")),
+        "unitPrice": _safe_float(_col_val("销售单价")),
+        "quantity": _safe_float(_col_val("销售数量")),
+        "invoiceDate": _safe_str(_col_val("开票日期")),
+        "orderNo": _safe_str(_col_val("销售订单")),
+        "orderDate": _safe_str(_col_val("订单日期")),
+        "listPrice": _safe_float(_col_val("定价表单价")),
+        "marketPrice": _safe_float(_col_val("同期市场价格")),
+        "reason": _safe_str(_col_val("差异原因分析")),
+        "priceSource": _safe_str(_col_val("市场价格来源")),
+        "remark": _safe_str(_col_val("备注")),
+    }
 
 
 def _parse_d4_6_row(row: tuple, actual_headers: list[str]) -> dict:
@@ -1687,3 +2232,846 @@ _GENERIC_GUIDANCE = [
 def _get_guidance_text(sheet_code: str) -> list[str]:
     """获取sheet对应的编制说明文本"""
     return _SHEET_GUIDANCE.get(sheet_code, _GENERIC_GUIDANCE)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-13 叙述式导入导出（双 item_id：核对过程 / 核对结论）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_D4_13_SECTIONS = [("核对过程", "D4-13-process"), ("核对结论", "D4-13-conclusion")]
+_D4_13_SECTION_BY_LABEL = {label: iid for label, iid in _D4_13_SECTIONS}
+
+
+async def _handle_d4_13_export(wp_id: str, db: AsyncSession) -> StreamingResponse:
+    """D4-13 导出：从 D4-13-process / D4-13-conclusion 读文本，各输出一行。"""
+    import sqlalchemy as sa
+
+    texts: dict[str, str] = {}
+    for _label, iid in _D4_13_SECTIONS:
+        res = await db.execute(
+            sa.text("SELECT remark FROM checklist_responses WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"),
+            {"wp_id": wp_id, "item_id": iid},
+        )
+        r = res.fetchone()
+        texts[iid] = (r.remark if r and r.remark else "") or ""
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "D4-13"
+    ws.append(_get_headers("D4-13"))
+    ws.freeze_panes = "A2"
+    for label, iid in _D4_13_SECTIONS:
+        ws.append([label, texts.get(iid, "")])
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["B"].width = 80
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    from urllib.parse import quote
+    encoded_filename = quote("D4-13_数据.xlsx")
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+    )
+
+
+async def _handle_d4_13_import(wp_id: str, file: UploadFile, db: AsyncSession) -> dict[str, Any]:
+    """D4-13 导入：按「区块」列把内容写回 D4-13-process / D4-13-conclusion 两个 item_id。"""
+    import sqlalchemy as sa
+    from uuid import uuid4
+
+    if not file.filename or not file.filename.endswith(".xlsx"):
+        raise HTTPException(400, "请上传 .xlsx 格式文件")
+    content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(400, "文件大小不能超过10MB")
+    try:
+        wb = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+    except Exception:
+        raise HTTPException(400, "无法解析xlsx文件，请确认文件格式正确")
+    ws = wb.active
+    if ws is None:
+        raise HTTPException(400, "xlsx文件中无活动工作表")
+
+    expected_headers = _get_headers("D4-13")
+    actual_headers = [str(c.value).strip() if c.value else "" for c in next(ws.iter_rows(min_row=1, max_row=1))]
+    missing = [h for h in expected_headers if h not in actual_headers]
+    if missing:
+        wb.close()
+        return {"ok": False, "errors": [f"缺少列: {', '.join(missing)}"], "imported_count": 0}
+
+    try:
+        block_idx = actual_headers.index("区块")
+        content_idx = actual_headers.index("内容")
+    except ValueError:
+        wb.close()
+        return {"ok": False, "errors": ["列头缺少 区块/内容"], "imported_count": 0}
+
+    project_id = await _resolve_project_id(db, wp_id)
+    written = 0
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or all(v is None for v in row):
+            continue
+        label = _safe_str(row[block_idx] if block_idx < len(row) else "")
+        text = _safe_str(row[content_idx] if content_idx < len(row) else "")
+        iid = _D4_13_SECTION_BY_LABEL.get(label)
+        if not iid:
+            continue
+        await db.execute(
+            sa.text(
+                """
+                INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+                VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
+                ON CONFLICT (wp_id, item_id)
+                DO UPDATE SET remark = :remark, updated_at = NOW()
+                """
+            ),
+            {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": iid, "remark": text},
+        )
+        written += 1
+    await db.commit()
+    wb.close()
+    return {"ok": True, "imported_count": written, "errors": []}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-29/30/31/32 IPO/舞弊组专用 parser（reshape 见 d4_import_data 后处理段）
+#
+# 设计要点（对齐源 xlsx 单一真源，见 spec d4-ipo-fraud-writeback-formula-io）：
+#   - D4-29 客户信息检查表：源为转置矩阵（行=检查字段，列=客户），IO 侧按「一客户一行」
+#     投影；表头中文 label ↔ CUSTOMER_FIELDS.key（与 useD4CustomerDetail 双侧一致）。
+#   - D4-30 客户访谈汇总：同为转置矩阵，一客户一行；自定义维度(customDimensions)作尾部
+#     动态列，导入按「非固定表头」恢复，不丢客户维度也不丢自定义维度。
+#   - D4-31 客户访谈记录：单份问卷键值对；q1_relation 始终是 string[]（导出以 ; 连接，
+#     导入按 ; / ； / 、 拆回数组），问卷单对象仅一份。
+#   - D4-32 资金流水：6 组由显式「组别」列恢复（非按行号/数量硬切）；未知组别进入人工
+#     映射(_removed/unknown)而非自动归「其他」。异常/占比为人工判断，原样保留不重算成 0。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# D4-29 中文表头 → CUSTOMER_FIELDS.key（与前端 useD4CustomerDetail.CUSTOMER_FIELDS 双向锁死）
+_D4_29_HEADER_TO_KEY: dict[str, str] = {
+    "统一社会信用代码": "creditCode",
+    "注册地址": "regAddress",
+    "办公地址": "officeAddress",
+    "网站地址": "website",
+    "网站IP地址": "websiteIp",
+    "企业邮箱": "email",
+    "成立时间": "establishDate",
+    "注册资本/实缴资本": "registeredCapital",
+    "经营范围": "bizScope",
+    "人员规模/社保缴纳人数": "headcount",
+    "法定代表人": "legalRep",
+    "股东1及持股比例": "shareholder1",
+    "股东2及持股比例": "shareholder2",
+    "股东3及持股比例": "shareholder3",
+    "股东4及持股比例": "shareholder4",
+    "股东5及持股比例": "shareholder5",
+    "董事长": "chairman",
+    "总经理": "gm",
+    "其他关键管理人员": "otherMgmt",
+    "关键经办人员": "keyHandler",
+    "实际控制人": "actualController",
+    "是否为关联方": "isRelated",
+    "是否同时为供应商": "isAlsoSupplier",
+    "开始合作时间": "cooperationStart",
+    "是否长期拖欠款项": "hasOverdue",
+    "经营状态": "bizStatus",
+    "是否列入失信人": "isBlacklisted",
+    "信息来源": "infoSource",
+}
+
+# D4-30 固定访谈维度中文表头 → INTERVIEW_FIELDS.key（与前端 D4TabInterviewSummary 双向锁死）
+_D4_30_HEADER_TO_KEY: dict[str, str] = {
+    "访谈时间": "time",
+    "访谈原因": "reason",
+    "访谈方式": "method",
+    "被访谈公司注册地址": "regAddress",
+    "实地走访公司地址": "visitAddress",
+    "接受访谈人员及身份": "interviewee",
+    "参与访谈的审计人员": "auditor",
+    "参与访谈的其他人员": "others",
+    "访谈人员行程信息": "travelInfo",
+    "是否现场函证": "onSiteConfirm",
+    "访谈关注要点": "keyPoints",
+    "合同执行核对情况": "contractCheck",
+    "交易金额核对是否一致": "amountMatch",
+    "往来余额核对是否一致": "balanceMatch",
+    "访谈结论": "conclusion",
+    "访谈表索引": "indexRef",
+}
+
+# D4-31 问卷字段中文标签 → InterviewData.key（与前端 D4TabInterviewDetail 双向锁死）
+_D4_31_FIELD_LABELS: list[tuple[str, str]] = [
+    ("访谈对象", "target"),
+    ("访谈时间及地点", "timePlace"),
+    ("接受访谈人员及职务", "interviewee"),
+    ("访谈人", "interviewer"),
+    ("一、接受访谈人介绍", "introduction"),
+    ("公司名称", "companyName"),
+    ("注册资本", "regCapital"),
+    ("成立日期", "establishDate"),
+    ("经济性质", "bizNature"),
+    ("法定代表人", "legalRep"),
+    ("股权结构", "equityStructure"),
+    ("业务关系(多选)", "q1_relation"),  # string[]：导出 ; 连接
+    ("客户向发行人采购结算方式", "q2a_payment"),
+    ("客户向发行人销售结算方式", "q2b_collection"),
+    ("是否签订合同", "q3a_hasContract"),
+    ("产品质量情况", "q3b_quality"),
+    ("是否约定退换货条款", "q3c_returnClause"),
+    ("退换货金额", "q3d_returnAmount"),
+    ("产品验收入库情况", "q3e_acceptance"),
+    ("是否存在返利约定", "q3f_hasRebate"),
+    ("返利支付方式", "q3f_rebateMethod"),
+    ("返利金额", "q3f_rebateAmount"),
+    ("经销商货物是否已最终销售", "q3g_finalSold"),
+    ("是否存在其他资金往来", "q4_otherFunds"),
+    ("其他重要事项", "q5_otherMatters"),
+    ("关联方是否持有股份", "q6_hasShares"),
+    ("关联方是否担任职务", "q6_hasPosition"),
+    ("关联方是否和客户有交易", "q6_hasTransaction"),
+    ("接受访谈人员签字", "signInterviewee"),
+    ("审计人员签字", "signAuditor"),
+    ("其他人员签字", "signOther"),
+    ("签字日期", "signDate"),
+]
+_D4_31_LABEL_TO_KEY: dict[str, str] = {label: key for label, key in _D4_31_FIELD_LABELS}
+_D4_31_MULTI_KEYS: set[str] = {"q1_relation"}
+
+# D4-32 组别中文 label → group key（与前端 D4TabFundFlow.GROUPS 双向锁死）
+_D4_32_GROUP_LABEL_TO_KEY: dict[str, str] = {
+    "主要供应商": "supplier",
+    "主要客户": "customer",
+    "控股股东": "shareholder",
+    "实际控制人": "controller",
+    "关键管理人员": "management",
+    "其他关联方": "related",
+}
+_D4_32_GROUP_KEY_TO_LABEL: dict[str, str] = {v: k for k, v in _D4_32_GROUP_LABEL_TO_KEY.items()}
+# 6 组的固定顺序（源 xlsx B 列组头顺序）
+_D4_32_GROUP_ORDER: list[str] = ["supplier", "customer", "shareholder", "controller", "management", "related"]
+
+
+def _parse_d4_29_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-29 客户信息行 → CustomerItem {id,name,fields}。表头 label→key，未知列忽略。"""
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    name = _safe_str(_col_val("客户名称"))
+    fields: dict[str, str] = {}
+    for header, key in _D4_29_HEADER_TO_KEY.items():
+        v = _col_val(header)
+        if v is not None:
+            fields[key] = _safe_str(v)
+    if not name and not any(fields.values()):
+        return {}
+    return {
+        "id": f"cust-{uuid4().hex[:10]}",
+        "name": name,
+        "fields": fields,
+    }
+
+
+def _parse_d4_30_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-30 访谈汇总行 → InterviewCustomer {id,name,fields}。
+
+    固定维度按 label→key；非固定表头（客户名称/固定16列之外）视为自定义维度，
+    key 用中文 label 本身（前端合并 customDimensions 时以 label 去重恢复）。
+    """
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    name = _safe_str(_col_val("客户名称"))
+    fields: dict[str, str] = {}
+    custom_labels: list[str] = []
+    for header in actual_headers:
+        if header == "客户名称" or not header:
+            continue
+        v = _col_val(header)
+        if header in _D4_30_HEADER_TO_KEY:
+            key = _D4_30_HEADER_TO_KEY[header]
+        else:
+            # 未知列 = 自定义维度：key 用 label（不猜测、不归并到固定维度）
+            key = header
+            custom_labels.append(header)
+        if v is not None:
+            fields[key] = _safe_str(v)
+    if not name and not any(fields.values()):
+        return {}
+    return {
+        "id": f"iv-{uuid4().hex[:10]}",
+        "name": name,
+        "fields": fields,
+        "_customLabels": custom_labels,  # 后处理据此恢复 customDimensions（reshape 后删除）
+    }
+
+
+def _parse_d4_32_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-32 资金流水行 → FlowRow + _groupKey（由显式「组别」列恢复分组）。
+
+    异常/占比为人工判断字段，原样保留字符串，不重算、不把 '否'/空当异常。
+    未知组别 label 落 _groupKey='__unknown__'，进入人工映射（不自动归「其他」）。
+    """
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    group_label = _safe_str(_col_val("组别"))
+    name = _safe_str(_col_val("单位名称/姓名"))
+    amount_raw = _col_val("本期交易金额")
+    if not name and not group_label and amount_raw in (None, ""):
+        return {}
+    group_key = _D4_32_GROUP_LABEL_TO_KEY.get(group_label, "__unknown__")
+    # 金额：可空（保持三态），有值才转 float，否则保留空串
+    amount: Any = ""
+    if amount_raw not in (None, ""):
+        amount = _safe_float(amount_raw)
+    return {
+        "_groupKey": group_key,
+        "_groupLabel": group_label,
+        "id": f"ff-{uuid4().hex[:10]}",
+        "name": name,
+        "amount": amount,
+        "ratio": _safe_str(_col_val("占同类交易比例")),
+        "bank": _safe_str(_col_val("开户银行")),
+        "account": _safe_str(_col_val("账号")),
+        "method": _safe_str(_col_val("资金流水获取途径")),
+        "hasAnomaly": _safe_str(_col_val("是否发现异常交易")),
+        "indexRef": _safe_str(_col_val("索引号")),
+    }
+
+
+def _reshape_d4_30_rows(rows_data: list[dict]) -> dict:
+    """D4-30 一客户一行 → {customers:[{id,name,fields}], customDimensions:[{key,label}]}。
+
+    customDimensions 由各行 _customLabels 并集恢复（保序去重），key=label。
+    """
+    seen_labels: list[str] = []
+    customers: list[dict] = []
+    for r in rows_data:
+        labels = r.pop("_customLabels", [])
+        for lb in labels:
+            if lb not in seen_labels:
+                seen_labels.append(lb)
+        customers.append(r)
+    custom_dims = [{"key": lb, "label": lb} for lb in seen_labels]
+    return {"customers": customers, "customDimensions": custom_dims}
+
+
+def _reshape_d4_32_rows(rows_data: list[dict]) -> list[dict]:
+    """D4-32 扁平行 → 6 组 [{key,rows}]（固定顺序）。未知组别行原样保留到 __unknown__ 组，
+    不自动归「其他」，供前端人工映射。"""
+    buckets: dict[str, list[dict]] = {k: [] for k in _D4_32_GROUP_ORDER}
+    unknown: list[dict] = []
+    for r in rows_data:
+        gkey = r.pop("_groupKey", "__unknown__")
+        r.pop("_groupLabel", None)
+        if gkey in buckets:
+            buckets[gkey].append(r)
+        else:
+            unknown.append(r)
+    groups = [{"key": k, "rows": buckets[k]} for k in _D4_32_GROUP_ORDER]
+    if unknown:
+        # 未知组别不并入六组，独立保留供人工认定（前端可提示待映射）
+        groups.append({"key": "__unknown__", "rows": unknown})
+    return groups
+
+
+def _parse_d4_31_questionnaire(ws: Any, actual_headers: list[str]) -> dict:
+    """解析 D4-31 键值对问卷 → 单份 InterviewData 对象。
+
+    label→key；q1_relation 按 ; / ； / 、 拆回 string[]；未知 label 忽略。
+    """
+    try:
+        field_idx = actual_headers.index("字段")
+        value_idx = actual_headers.index("值")
+    except ValueError:
+        return {}
+
+    data: dict[str, Any] = {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if row is None:
+            continue
+        label = _safe_str(row[field_idx]) if field_idx < len(row) else ""
+        raw = row[value_idx] if value_idx < len(row) else None
+        if not label:
+            continue
+        key = _D4_31_LABEL_TO_KEY.get(label)
+        if not key:
+            continue  # 未知字段忽略（不猜测）
+        if key in _D4_31_MULTI_KEYS:
+            s = _safe_str(raw)
+            parts = [p.strip() for p in re.split(r"[;；、]", s) if p.strip()] if s else []
+            data[key] = parts  # 始终 string[]
+        else:
+            data[key] = _safe_str(raw)
+    return data
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-33/34/35/36 其他业务收入组 —— 专用 parser / export 行构造
+#   spec: d4-33-36-writeback-formula-and-io-closure（Wave-1）
+#   范式照抄 D4-15/16/22/23：按列头名映射（非列序）、派生列重算/留空、item_id 落 -data 键
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _safe_amount_or_blank(val: Any) -> float | str:
+    """金额兜底：空/None → 空串（不写 0）；有值 → float。用于导入时保留「未填」语义。"""
+    if val is None:
+        return ""
+    if isinstance(val, str) and val.strip() == "":
+        return ""
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return ""
+
+
+def _make_col_val(row: tuple, actual_headers: list[str]):
+    """构造按列头名取值的闭包（复用范式，防列序错位）。"""
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return _col_val
+
+
+# ─── D4-33 其他业务毛利率分析（{bizTypes, months, priorYear} 嵌套 store）──────────
+
+_D4_33_FIXED_ROW_LABELS = ["合计", "上年数", "变动额", "变动比例"]
+_D4_33_MONTH_LABELS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+
+
+def _d4_33_dynamic_headers(biz_types: list[dict]) -> list[str]:
+    """按实际业务类型生成 D4-33 列头：月份 + 合计(收入/成本/毛利率) + 每业务(收入/成本/毛利率)。"""
+    headers = ["月份", "合计-收入", "合计-成本", "合计-毛利率"]
+    for b in biz_types:
+        name = b.get("name", "") if isinstance(b, dict) else str(b)
+        headers += [f"{name}-收入", f"{name}-成本", f"{name}-毛利率"]
+    return headers
+
+
+def _fmt_margin_pct(rev: float, cost: float) -> float:
+    """毛利率百分比口径（与前端 fmtMargin / 引擎 calcGrossMarginRate*100 一致）。"""
+    if not rev:
+        return 0.0
+    return round((rev - cost) / rev * 100, 2)
+
+
+def _write_d4_33_rows(ws, biz_types: list[dict], months_map: dict, prior_map: dict) -> None:
+    """导出 D4-33 的 16 行：12 月（录入）+ 合计/上年数/变动额/变动比例（派生）。"""
+    def _cell(biz_id: str, m_idx: int, field: str) -> float:
+        arr = months_map.get(biz_id, [])
+        if 0 <= m_idx < len(arr):
+            return _safe_float(arr[m_idx].get(field))
+        return 0.0
+
+    def _prior(biz_id: str, field: str) -> float:
+        return _safe_float(prior_map.get(biz_id, {}).get(field))
+
+    def _total(biz_id: str, field: str) -> float:
+        arr = months_map.get(biz_id, [])
+        return sum(_safe_float(m.get(field)) for m in arr)
+
+    # 12 月行（录入值）
+    for m_idx, m_label in enumerate(_D4_33_MONTH_LABELS):
+        tot_rev = sum(_cell(b.get("id", ""), m_idx, "revenue") for b in biz_types)
+        tot_cost = sum(_cell(b.get("id", ""), m_idx, "cost") for b in biz_types)
+        row = [m_label, tot_rev, tot_cost, _fmt_margin_pct(tot_rev, tot_cost)]
+        for b in biz_types:
+            bid = b.get("id", "")
+            rev = _cell(bid, m_idx, "revenue")
+            cost = _cell(bid, m_idx, "cost")
+            row += [rev, cost, _fmt_margin_pct(rev, cost)]
+        ws.append(row)
+
+    # 合计行（派生）
+    grand_rev = sum(_total(b.get("id", ""), "revenue") for b in biz_types)
+    grand_cost = sum(_total(b.get("id", ""), "cost") for b in biz_types)
+    row_total = ["合计", grand_rev, grand_cost, _fmt_margin_pct(grand_rev, grand_cost)]
+    for b in biz_types:
+        bid = b.get("id", "")
+        rev = _total(bid, "revenue")
+        cost = _total(bid, "cost")
+        row_total += [rev, cost, _fmt_margin_pct(rev, cost)]
+    ws.append(row_total)
+
+    # 上年数行（录入值）
+    prior_rev_all = sum(_prior(b.get("id", ""), "revenue") for b in biz_types)
+    prior_cost_all = sum(_prior(b.get("id", ""), "cost") for b in biz_types)
+    row_prior = ["上年数", prior_rev_all, prior_cost_all, _fmt_margin_pct(prior_rev_all, prior_cost_all)]
+    for b in biz_types:
+        bid = b.get("id", "")
+        rev = _prior(bid, "revenue")
+        cost = _prior(bid, "cost")
+        row_prior += [rev, cost, _fmt_margin_pct(rev, cost)]
+    ws.append(row_prior)
+
+    # 变动额行（派生：合计 - 上年数；毛利率列留空）
+    row_delta = ["变动额", grand_rev - prior_rev_all, grand_cost - prior_cost_all, ""]
+    for b in biz_types:
+        bid = b.get("id", "")
+        row_delta += [_total(bid, "revenue") - _prior(bid, "revenue"),
+                      _total(bid, "cost") - _prior(bid, "cost"), ""]
+    ws.append(row_delta)
+
+    # 变动比例行（派生：变动额 / 上年数 * 100；毛利率列留空）
+    def _rate(cur: float, prior: float) -> float | str:
+        return round((cur - prior) / prior * 100, 2) if prior else ""
+
+    row_rate = ["变动比例", _rate(grand_rev, prior_rev_all), _rate(grand_cost, prior_cost_all), ""]
+    for b in biz_types:
+        bid = b.get("id", "")
+        row_rate += [_rate(_total(bid, "revenue"), _prior(bid, "revenue")),
+                     _rate(_total(bid, "cost"), _prior(bid, "cost")), ""]
+    ws.append(row_rate)
+
+
+def _parse_d4_33_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-33 一行（一个月份/上年数含各业务列）→ 中间形态 {label, cells:{biz_name:{revenue,cost}}}。
+    合计/变动额/变动比例等派生行在 rebuild 时忽略（由前端重算）。"""
+    _col_val = _make_col_val(row, actual_headers)
+    label = _safe_str(_col_val("月份"))
+    if not label:
+        return {}
+    # 从动态列头提取业务类型名（形如 "{name}-收入"）
+    cells: dict[str, dict] = {}
+    for h in actual_headers:
+        if h.endswith("-收入") and not h.startswith("合计"):
+            biz_name = h[:-len("-收入")]
+            rev = _col_val(f"{biz_name}-收入")
+            cost = _col_val(f"{biz_name}-成本")
+            cells[biz_name] = {
+                "revenue": _safe_amount_or_blank(rev),
+                "cost": _safe_amount_or_blank(cost),
+            }
+    return {"label": label, "cells": cells}
+
+
+def _rebuild_d4_33_store(rows_data: list[dict], actual_headers: list[str]) -> dict:
+    """把 D4-33 行列表重组成 {bizTypes, months, priorYear} 嵌套 store。
+    仅取 12 月行填 months、上年数行填 priorYear；派生行（合计/变动额/变动比例）忽略。"""
+    # 从列头提取业务类型顺序（形如 "{name}-收入"，排除合计）
+    biz_names: list[str] = []
+    for h in actual_headers:
+        if h.endswith("-收入") and not h.startswith("合计"):
+            biz_names.append(h[:-len("-收入")])
+
+    biz_types = [{"id": f"biz-imp-{i}", "name": n} for i, n in enumerate(biz_names)]
+    name_to_id = {b["name"]: b["id"] for b in biz_types}
+    months: dict[str, list] = {b["id"]: [{"revenue": "", "cost": ""} for _ in range(12)] for b in biz_types}
+    prior_year: dict[str, dict] = {b["id"]: {"revenue": "", "cost": ""} for b in biz_types}
+
+    month_idx = {lbl: i for i, lbl in enumerate(_D4_33_MONTH_LABELS)}
+    for r in rows_data:
+        label = r.get("label", "")
+        cells = r.get("cells", {})
+        if label in month_idx:
+            m_idx = month_idx[label]
+            for biz_name, cell in cells.items():
+                bid = name_to_id.get(biz_name)
+                if bid:
+                    months[bid][m_idx] = {"revenue": cell.get("revenue", ""), "cost": cell.get("cost", "")}
+        elif label == "上年数":
+            for biz_name, cell in cells.items():
+                bid = name_to_id.get(biz_name)
+                if bid:
+                    prior_year[bid] = {"revenue": cell.get("revenue", ""), "cost": cell.get("cost", "")}
+        # 合计/变动额/变动比例：派生行，忽略（前端重算）
+
+    return {"bizTypes": biz_types, "months": months, "priorYear": prior_year}
+
+
+# ─── D4-34 合同测算（{rentals, consults} 两区）─────────────────────────────────
+
+
+def _export_d4_34_rental_row(data: dict) -> list:
+    """RentalRow → D4-34-rental 列头顺序（差异列重算，不读文件）。"""
+    expected = _safe_float(data.get("expectedRevenue"))
+    actual = _safe_float(data.get("actualRevenue"))
+    return [
+        "",  # 序号（占位，导入时忽略）
+        _safe_str(data.get("tenant")),
+        _safe_str(data.get("period")),
+        _safe_str(data.get("area")),
+        _safe_float(data.get("unitPrice")),
+        _safe_str(data.get("contractRef")),
+        _safe_str(data.get("actualMonths")),
+        expected,
+        actual,
+        actual - expected,  # 差异重算
+        _safe_str(data.get("indexRef")),
+    ]
+
+
+def _parse_d4_34_rental_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-34-rental 行 → RentalRow（差异列重算，不读文件）。"""
+    from uuid import uuid4
+    _col_val = _make_col_val(row, actual_headers)
+    tenant = _safe_str(_col_val("承租方"))
+    if not tenant:
+        return {}
+    expected = _safe_amount_or_blank(_col_val("本期应计收入"))
+    actual = _safe_amount_or_blank(_col_val("本期实计收入"))
+    diff = (_safe_float(actual) - _safe_float(expected))
+    return {
+        "id": f"rt-imp-{uuid4().hex[:8]}",
+        "tenant": tenant,
+        "period": _safe_str(_col_val("租赁期间")),
+        "area": _safe_str(_col_val("租赁面积")),
+        "unitPrice": _safe_amount_or_blank(_col_val("合同单价")),
+        "contractRef": _safe_str(_col_val("合同索引")),
+        "actualMonths": _safe_amount_or_blank(_col_val("本期实际租赁月数")),
+        "expectedRevenue": expected,
+        "actualRevenue": actual,
+        "diff": diff,  # 重算
+        "indexRef": _safe_str(_col_val("索引号")),
+    }
+
+
+def _export_d4_34_consult_row(data: dict) -> list:
+    """ConsultRow → D4-34-consult 列头顺序（差异列重算）。"""
+    expected = _safe_float(data.get("expectedRevenue"))
+    actual = _safe_float(data.get("actualRevenue"))
+    return [
+        "",  # 序号占位
+        _safe_str(data.get("client")),
+        _safe_str(data.get("project")),
+        _safe_str(data.get("duration")),
+        _safe_float(data.get("contractAmount")),
+        _safe_str(data.get("contractRef")),
+        expected,
+        actual,
+        actual - expected,  # 差异重算
+        _safe_str(data.get("indexRef")),
+    ]
+
+
+def _parse_d4_34_consult_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-34-consult 行 → ConsultRow（差异列重算）。"""
+    from uuid import uuid4
+    _col_val = _make_col_val(row, actual_headers)
+    client = _safe_str(_col_val("委托方"))
+    if not client:
+        return {}
+    expected = _safe_amount_or_blank(_col_val("本期应计收入"))
+    actual = _safe_amount_or_blank(_col_val("本期实计收入"))
+    diff = (_safe_float(actual) - _safe_float(expected))
+    return {
+        "id": f"cs-imp-{uuid4().hex[:8]}",
+        "client": client,
+        "project": _safe_str(_col_val("咨询项目")),
+        "duration": _safe_str(_col_val("委托期限")),
+        "contractAmount": _safe_amount_or_blank(_col_val("合同金额")),
+        "contractRef": _safe_str(_col_val("合同索引")),
+        "expectedRevenue": expected,
+        "actualRevenue": actual,
+        "diff": diff,  # 重算
+        "indexRef": _safe_str(_col_val("索引号")),
+    }
+
+
+# ─── D4-35 检查表（{rows, sampling, periodAmount}；isAnomalous 保持 string）───────
+
+
+def _export_d4_35_row(data: dict) -> list:
+    """CheckRow → D4-35 列头顺序（16 列，含 check1..6 √/空）。"""
+    return [
+        _safe_str(data.get("date")),
+        _safe_str(data.get("voucherNo")),
+        _safe_str(data.get("content")),
+        _safe_str(data.get("counterAccount")),
+        _safe_str(data.get("detailAccount")),
+        data.get("amount", "") if data.get("amount") not in (None,) else "",
+        _safe_str(data.get("supportDoc")),
+        _safe_str(data.get("check1")),
+        _safe_str(data.get("check2")),
+        _safe_str(data.get("check3")),
+        _safe_str(data.get("check4")),
+        _safe_str(data.get("check5")),
+        _safe_str(data.get("check6")),
+        _safe_str(data.get("indexRef")),
+        _safe_str(data.get("isAnomalous")),
+        _safe_str(data.get("remark")),
+    ]
+
+
+def _parse_d4_35_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-35 行 → CheckRow（16 字段；isAnomalous 保持 string；amount 空串保持空串）。"""
+    from uuid import uuid4
+    _col_val = _make_col_val(row, actual_headers)
+    voucher_no = _safe_str(_col_val("凭证编号"))
+    date = _safe_str(_col_val("日期"))
+    content = _safe_str(_col_val("业务内容"))
+    if not (voucher_no or date or content):
+        return {}
+    return {
+        "id": f"ck-imp-{uuid4().hex[:8]}",
+        "date": date,
+        "voucherNo": voucher_no,
+        "content": content,
+        "counterAccount": _safe_str(_col_val("对方科目")),
+        "detailAccount": _safe_str(_col_val("明细科目")),
+        "amount": _safe_amount_or_blank(_col_val("金额")),  # 空串保持空串，不写 0
+        "supportDoc": _safe_str(_col_val("支持性文件")),
+        "check1": _safe_str(_col_val("核对1")),
+        "check2": _safe_str(_col_val("核对2")),
+        "check3": _safe_str(_col_val("核对3")),
+        "check4": _safe_str(_col_val("核对4")),
+        "check5": _safe_str(_col_val("核对5")),
+        "check6": _safe_str(_col_val("核对6")),
+        "indexRef": _safe_str(_col_val("索引号")),
+        "isAnomalous": _safe_str(_col_val("是否异常")),  # 保持 string（是/否/空），不转 boolean
+        "remark": _safe_str(_col_val("备注说明")),
+    }
+
+
+# ─── D4-36 截止性测试（{forward, backward} 两区；按列头名映射防交叉错位）──────────
+
+
+def _export_d4_36_forward_row(data: dict) -> list:
+    """CutoffRow → D4-36-forward 列头顺序（凭证在前、单据在后；跨期判定重算，此处留空由前端判）。"""
+    return [
+        _safe_str(data.get("voucherDate")),
+        _safe_str(data.get("voucherNo")),
+        _safe_str(data.get("voucherProduct")),
+        _safe_str(data.get("voucherQty")),
+        _safe_amount_or_blank(data.get("voucherAmount")),
+        _safe_str(data.get("docDate")),
+        _safe_str(data.get("docNo")),
+        _safe_str(data.get("docProduct")),
+        _safe_str(data.get("docQty")),
+        _safe_amount_or_blank(data.get("docAmount")),
+        _safe_str(data.get("isCrossing")),
+    ]
+
+
+def _export_d4_36_backward_row(data: dict) -> list:
+    """CutoffRow → D4-36-backward 列头顺序（单据在前、凭证在后，与 forward 相反）。"""
+    return [
+        _safe_str(data.get("docDate")),
+        _safe_str(data.get("docNo")),
+        _safe_str(data.get("docProduct")),
+        _safe_str(data.get("docQty")),
+        _safe_amount_or_blank(data.get("docAmount")),
+        _safe_str(data.get("voucherDate")),
+        _safe_str(data.get("voucherNo")),
+        _safe_str(data.get("voucherProduct")),
+        _safe_str(data.get("voucherQty")),
+        _safe_amount_or_blank(data.get("voucherAmount")),
+        _safe_str(data.get("isCrossing")),
+    ]
+
+
+def _parse_d4_36_forward_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-36-forward 行 → CutoffRow（按列头名映射，跨期判定留空由前端 autoJudge 重算）。"""
+    from uuid import uuid4
+    _col_val = _make_col_val(row, actual_headers)
+    voucher_date = _safe_str(_col_val("凭证日期"))
+    doc_date = _safe_str(_col_val("单据日期"))
+    if not (voucher_date or doc_date):
+        return {}
+    return {
+        "id": f"ct-imp-{uuid4().hex[:8]}",
+        "voucherDate": voucher_date,
+        "voucherNo": _safe_str(_col_val("凭证编号")),
+        "voucherProduct": _safe_str(_col_val("凭证品名")),
+        "voucherQty": _safe_str(_col_val("凭证数量")),
+        "voucherAmount": _safe_amount_or_blank(_col_val("凭证金额")),
+        "docDate": doc_date,
+        "docNo": _safe_str(_col_val("单据编号")),
+        "docProduct": _safe_str(_col_val("单据品名")),
+        "docQty": _safe_str(_col_val("单据数量")),
+        "docAmount": _safe_amount_or_blank(_col_val("单据金额")),
+        "isCrossing": "",  # 派生：由前端 autoJudgeForward 重算
+    }
+
+
+def _parse_d4_36_backward_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-36-backward 行 → CutoffRow（按列头名映射，与 forward 同字段结构，防列序交叉错位）。"""
+    from uuid import uuid4
+    _col_val = _make_col_val(row, actual_headers)
+    voucher_date = _safe_str(_col_val("凭证日期"))
+    doc_date = _safe_str(_col_val("单据日期"))
+    if not (voucher_date or doc_date):
+        return {}
+    return {
+        "id": f"ct-imp-{uuid4().hex[:8]}",
+        "voucherDate": voucher_date,
+        "voucherNo": _safe_str(_col_val("凭证编号")),
+        "voucherProduct": _safe_str(_col_val("凭证品名")),
+        "voucherQty": _safe_str(_col_val("凭证数量")),
+        "voucherAmount": _safe_amount_or_blank(_col_val("凭证金额")),
+        "docDate": doc_date,
+        "docNo": _safe_str(_col_val("单据编号")),
+        "docProduct": _safe_str(_col_val("单据品名")),
+        "docQty": _safe_str(_col_val("单据数量")),
+        "docAmount": _safe_amount_or_blank(_col_val("单据金额")),
+        "isCrossing": "",  # 派生：由前端 autoJudgeBackward 重算
+    }
+
+
+def _export_d4_31_questionnaire(sheet: str, data: dict) -> StreamingResponse:
+    """D4-31 单份问卷导出为「字段/值」键值对 xlsx（单对象，非行集）。
+
+    q1_relation（string[]）以 ; 连接；字段顺序固定（_D4_31_FIELD_LABELS）。
+    """
+    from urllib.parse import quote
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = sheet
+    ws.append(["字段", "值"])
+    ws.freeze_panes = "A2"
+    for label, key in _D4_31_FIELD_LABELS:
+        val = data.get(key, "")
+        if key in _D4_31_MULTI_KEYS:
+            if isinstance(val, list):
+                val = "；".join(str(x) for x in val)
+            else:
+                val = _safe_str(val)
+        else:
+            val = _safe_str(val)
+        # 去除 xlsx 非法控制字符（否则 openpyxl 写入抛 IllegalCharacterError）
+        ws.append([label, _strip_illegal_xlsx_chars(val)])
+
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    filename = f"{sheet}_数据.xlsx"
+    encoded_filename = quote(filename)
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{encoded_filename}"},
+    )
