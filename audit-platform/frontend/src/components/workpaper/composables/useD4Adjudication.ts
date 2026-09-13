@@ -20,7 +20,7 @@
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, isMainRevenueCode, isOtherRevenueCode } from './d4AccountScope'
-import { D4_ADJ_ROWS_SPEC, D4_ADJ_PREFIX } from './d4AdjudicationRows'
+import { D4_ADJ_ROWS_SPEC, D4_ADJ_PREFIX, d4SectionKeyFromLabel } from './d4AdjudicationRows'
 import {
   parseNum,
   calcAuditedAmount,
@@ -164,6 +164,9 @@ function migrateLegacyD4Rows(
       label: normalizeLabel(lr.label),
       source: lr.isFromCrossSheet ? 'tb' : 'manual',
     }
+    // 🔴 保留旧 JSON 的 sectionKey（此前迁移到 DynamicAdjRow 时丢失）
+    const sectionKey = String(lr.sectionKey ?? '').trim()
+    if (sectionKey) row.sectionKey = sectionKey
     dynamicRows.push(row)
 
     // 迁移金额值到 per-field 键
@@ -291,7 +294,13 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
       dynamicRows.value,
       // D4 损益类：opening_balance = 上期发生额 → priorUnadjusted
       //           closing_balance = 本期发生额 → currentUnadjusted
-      { opening: 'priorUnadjusted', closing: 'currentUnadjusted' },
+      // sectionOf：把后端 section 文案（「主营业务收入」/「其他业务收入」）映射为
+      //            sectionKey（main-revenue / other-revenue），写入种子行的段归属。
+      {
+        opening: 'priorUnadjusted',
+        closing: 'currentUnadjusted',
+        sectionOf: (p) => d4SectionKeyFromLabel((p as { section?: string }).section),
+      },
     )
 
     // 更新行清单
@@ -426,11 +435,10 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     // 撞名检查
     if (findDuplicateLabel(dynamicRows.value, normalized)) return null
 
-    const { rows, row } = appendManualRow(dynamicRows.value)
-    // 设置行标签
-    const updatedRows = rows.map(r => r.rowId === row.rowId ? { ...r, label: normalized } : r)
-    dynamicRows.value = updatedRows
-    persistRowList(updatedRows)
+    // 手工行按当前所在区块（主营/其他）赋 sectionKey
+    const { rows, row } = appendManualRow(dynamicRows.value, normalized, Math.random, sectionKey)
+    dynamicRows.value = rows
+    persistRowList(rows)
     return row
   }
 
@@ -524,15 +532,70 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     return { mainAje, mainRje, otherAje, otherRje }
   })
 
+  // ─── CrossSheet → D4-1 行派生（Req 1.1~1.6: D4-2/D4-3 行自动成为 D4-1 审定行） ─
+
+  /**
+   * 归一化 label → 去重用稳定 key（全角→半角、trim、toLower）。
+   * 与 `normalizeLabel` 不同：这里不判空返 null，纯字符串映射。
+   */
+  function labelKey(raw: string): string {
+    return raw.replace(/[\s\u3000]+/g, '').toLowerCase()
+  }
+
+  /**
+   * D4-2 按产品派生 → D4-1 主营区块行。
+   * isFromCrossSheet=true、金额只读（AJE/RJE=0 走 D4-4 section 级汇总）。
+   */
+  const crossSheetMainRows = computed<AdjudicationRow[]>(() => {
+    const byProduct = mainRevenueByProduct.value
+    return Object.entries(byProduct).map(([product, vals]) => ({
+      rowKey: `xsheet-main-${labelKey(product)}`,
+      label: product,
+      isFixed: false,
+      currentUnadjusted: vals.current,
+      currentAje: 0,
+      currentRje: 0,
+      currentAudited: vals.current, // AJE/RJE 走 section 级汇总，行级恒 0
+      priorUnadjusted: vals.prior,
+      priorAje: 0,
+      priorRje: 0,
+      priorAudited: vals.prior,
+      isFromCrossSheet: true,
+      isEditable: false,
+    }))
+  })
+
+  /**
+   * D4-3 按项目派生 → D4-1 其他区块行。
+   */
+  const crossSheetOtherRows = computed<AdjudicationRow[]>(() => {
+    const byItem = otherRevenueByItem.value
+    return Object.entries(byItem).map(([item, vals]) => ({
+      rowKey: `xsheet-other-${labelKey(item)}`,
+      label: item,
+      isFixed: false,
+      currentUnadjusted: vals.current,
+      currentAje: 0,
+      currentRje: 0,
+      currentAudited: vals.current,
+      priorUnadjusted: vals.prior,
+      priorAje: 0,
+      priorRje: 0,
+      priorAudited: vals.prior,
+      isFromCrossSheet: true,
+      isEditable: false,
+    }))
+  })
+
   // ─── Sections computed (combining dynamic rows + crossSheet) ─────────
 
   const sections: ComputedRef<AdjudicationSection[]> = computed(() => {
     const rows = dynamicRows.value
     const adjTotals = adjustmentTotals.value
 
-    // 按科目码分组（主营 6001 / 其他 6051）
-    const mainRows: AdjudicationRow[] = []
-    const otherRows: AdjudicationRow[] = []
+    // 动态行 → AdjudicationRow（按科目码分组：主营 6001 / 其他 6051）
+    const dynamicMainRows: AdjudicationRow[] = []
+    const dynamicOtherRows: AdjudicationRow[] = []
 
     for (const r of rows) {
       const code = r.accountCode || ''
@@ -563,12 +626,15 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
       }
 
       if (isOther) {
-        otherRows.push(adjRow)
+        dynamicOtherRows.push(adjRow)
       } else {
-        // 默认归入主营（无科目码的手工行也归主营）
-        mainRows.push(adjRow)
+        dynamicMainRows.push(adjRow)
       }
     }
+
+    // 合并 crossSheet 派生行 + 手工行（Req 1.6: 按 labelKey 去重，派生优先）
+    const mainRows = mergeCrossSheetAndDynamic(crossSheetMainRows.value, dynamicMainRows)
+    const otherRows = mergeCrossSheetAndDynamic(crossSheetOtherRows.value, dynamicOtherRows)
 
     const mainSubtotal: AdjudicationRow = buildSubtotalRow('main-subtotal', '主营业务收入小计', mainRows, adjTotals.mainAje, adjTotals.mainRje)
     const otherSubtotal: AdjudicationRow = buildSubtotalRow('other-subtotal', '其他业务收入小计', otherRows, adjTotals.otherAje, adjTotals.otherRje)
@@ -588,6 +654,39 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
       },
     ]
   })
+
+  /**
+   * 合并 crossSheet 派生行与 dynamicRows 手工行。
+   * 同名去重（按 labelKey），派生行优先（金额来自上游，更权威）。
+   * 手工行的 AJE/RJE 不受影响（AJE/RJE 走 section 级汇总）。
+   */
+  function mergeCrossSheetAndDynamic(
+    crossSheetRows: AdjudicationRow[],
+    dynamicRowList: AdjudicationRow[],
+  ): AdjudicationRow[] {
+    const seen = new Set<string>()
+    const merged: AdjudicationRow[] = []
+
+    // 派生行优先
+    for (const r of crossSheetRows) {
+      const key = labelKey(r.label)
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push(r)
+      }
+    }
+
+    // 手工行：同名跳过（派生已覆盖），非同名保留
+    for (const r of dynamicRowList) {
+      const key = labelKey(r.label)
+      if (!seen.has(key)) {
+        seen.add(key)
+        merged.push(r)
+      }
+    }
+
+    return merged
+  }
 
   function buildSubtotalRow(
     rowKey: string,
@@ -719,41 +818,101 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
 
   // ─── EventBus: publishAdjudicated ────────────────────────────────────
 
-  function publishAdjudicated(): void {
+  /**
+   * 人工 TB 发布动作的结果（Req 4.2）。纯逻辑判定，UI 交互（二次确认对话框）由组件持有。
+   * - `published`：审定合计已回写 TB（分主营/其他两笔）+ 广播 substantive:adjudicated。
+   * - `needs_confirm`：审定合计与试算平衡表差异超阈值，须组件二次确认后再调 `{ confirmed: true }`。
+   * - `skipped_idempotent`：与上次发布快照逐字段一致，不重复回写（防重复点击写两次）。
+   * - `no_project`：无 projectId，无法回写。
+   */
+  type PublishVerdict = 'published' | 'needs_confirm' | 'skipped_idempotent' | 'no_project'
+  interface PublishResult {
+    verdict: PublishVerdict
+    /** 审定合计与试算平衡表数的差异（needs_confirm 时供组件展示）。 */
+    difference: number
+    mainAudited: number
+    otherAudited: number
+  }
+
+  /** 差异二次确认阈值（元）。超过则要求审计师显式确认后才回写。 */
+  const PUBLISH_DIFF_THRESHOLD = 1
+
+  /** 上次成功发布的快照签名 —— 幂等去重（同值重复点击不重复回写）。 */
+  let lastPublishedSignature: string | null = null
+
+  function publishSignature(main: number, other: number): string {
+    // 保留 2 位小数量级，避免浮点尾差把「同一次审定」判成不同快照。
+    return `${projectId.value}|${main.toFixed(2)}|${other.toFixed(2)}`
+  }
+
+  /**
+   * 人工确认审定 → 回写 TB。**只由「确认审定」按钮显式触发，切模式绝不调用**（Req 4.2 / 5.1）。
+   *
+   * @param opts.confirmed 组件在二次确认对话框「确定」后回调时传 true，跳过阈值门。
+   * @param opts.force 组件在极端情况下强制重发（跳过幂等），默认 false。
+   */
+  function publishAdjudicated(opts: { confirmed?: boolean; force?: boolean } = {}): PublishResult {
     const mainSub = sections.value[0]?.subtotalRow
     const otherSub = sections.value[1]?.subtotalRow
+    const mainAudited = mainSub?.currentAudited ?? 0
+    const otherAudited = otherSub?.currentAudited ?? 0
+    const difference = differenceRow.value
+
+    const result: PublishResult = {
+      verdict: 'published',
+      difference,
+      mainAudited,
+      otherAudited,
+    }
+
+    if (!projectId.value) {
+      result.verdict = 'no_project'
+      return result
+    }
+
+    // 差异超阈值 → 要求二次确认（Req 4.2）。confirmed=true 时放行。
+    if (!opts.confirmed && Math.abs(difference) > PUBLISH_DIFF_THRESHOLD) {
+      result.verdict = 'needs_confirm'
+      return result
+    }
+
+    // 幂等：同一发布快照不重复回写（防重复点击写两次；force 可跳过）。
+    const signature = publishSignature(mainAudited, otherAudited)
+    if (!opts.force && signature === lastPublishedSignature) {
+      result.verdict = 'skipped_idempotent'
+      return result
+    }
 
     const payload = {
       wpCode: 'D4',
       accountCode: '6001,6051',
-      auditedAmount: {
-        main: mainSub?.currentAudited ?? 0,
-        other: otherSub?.currentAudited ?? 0,
-      },
+      auditedAmount: { main: mainAudited, other: otherAudited },
     }
     try {
       window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
     } catch { /* silent */ }
 
-    // Writeback TB
-    if (projectId.value) {
-      try {
-        window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
-          detail: {
-            projectId: projectId.value,
-            accountCode: D4_MAIN_REVENUE_STANDARD,
-            auditedAmount: mainSub?.currentAudited ?? 0,
-          },
-        }))
-        window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
-          detail: {
-            projectId: projectId.value,
-            accountCode: D4_OTHER_REVENUE_STANDARD,
-            auditedAmount: otherSub?.currentAudited ?? 0,
-          },
-        }))
-      } catch { /* silent */ }
-    }
+    // Writeback TB（分主营/其他两笔）
+    try {
+      window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
+        detail: {
+          projectId: projectId.value,
+          accountCode: D4_MAIN_REVENUE_STANDARD,
+          auditedAmount: mainAudited,
+        },
+      }))
+      window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
+        detail: {
+          projectId: projectId.value,
+          accountCode: D4_OTHER_REVENUE_STANDARD,
+          auditedAmount: otherAudited,
+        },
+      }))
+    } catch { /* silent */ }
+
+    lastPublishedSignature = signature
+    result.verdict = 'published'
+    return result
   }
 
   // ─── EventBus: onAdjustmentCreated ───────────────────────────────────

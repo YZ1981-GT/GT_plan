@@ -137,6 +137,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
+import { useD4PriceWriteback } from './composables/useD4PriceWriteback'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
 import GtWpReviewRail from './GtWpReviewRail.vue'
 import { useWorkpaperEntryInjections } from './composables/useWorkpaperEntryInjections'
@@ -246,6 +247,20 @@ const allResponses = computed(() => formData.allResponses.value)
 const crossSheet = useD4CrossSheet({
   allResponses: formData.allResponses,
   projectContext: formData.projectContext,
+})
+
+// 供子表（D4-8/9/10/11）inject 消费上游取数数据（Req 6.1）
+provide('d4CrossSheet', crossSheet)
+
+// 异常回标接收端：D4-10/11 价格异常 → 写回 D4-2-rows 行标记（Task 5）
+useD4PriceWriteback({
+  allResponses: formData.allResponses,
+  debounceSave: () => {
+    // 复用 formData 的保存机制
+    window.dispatchEvent(new CustomEvent('d4:save-items', {
+      detail: { items: [formData.allResponses.value.get('D4-2-rows')].filter(Boolean) },
+    }))
+  },
 })
 
 // ─── Runtime Boundary：版本链/复核由 GtWpRenderer 统一提供，不再本地重复接线 ───

@@ -718,6 +718,13 @@ export type Events = {
     timestamp: number
   } | void
 
+  // D4 价格分析异常回标上游（D4-10/11 → D4-2/D4-9 行标记）
+  'd4:price-abnormal': {
+    wpCode: 'D4-10' | 'D4-11'
+    targetKey: 'customer' | 'product'
+    items: Array<{ name: string; diffPct: number }>
+  }
+
   // 快捷键（shortcuts.ts 发出）
   'shortcut:save': void
   'shortcut:undo': void

@@ -22,6 +22,7 @@ import http from '@/utils/http'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   wpId: string
@@ -31,6 +32,12 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+// 注入上游取数数据（Task 3: 从宿主 provide 的 d4CrossSheet 消费 D4-9/D4-2 聚合数据）
+const d4CrossSheet = inject<any>('d4CrossSheet', null)
+
+// 上游导入 loading 态
+const upstreamImporting = ref(false)
 
 // 双模式（结构化视图 / 在线编辑）
 const editorMode = ref<'structured' | 'onlyoffice'>('structured')
@@ -170,6 +177,82 @@ function handleExportTemplate() { exportTemplate('D4-10' as any) }
 function handleExportData() { exportData('D4-10' as any) }
 function handleImportUpload(file: File): boolean { importData('D4-10' as any, file).then(r => { if (r && r.rowCount > 0) loadData() }); return false }
 
+// ─── 从上游导入客户（Req 2.1~2.5: D4-9 客户结构 → D4-10 merge） ──────
+function importFromUpstream() {
+  if (props.isReadonly || upstreamImporting.value) return
+  if (!d4CrossSheet) {
+    ElMessage.warning('上游数据未就绪，请稍后重试')
+    return
+  }
+
+  const customers: Array<{ name: string; amount: number; proportion: number }> =
+    d4CrossSheet.customerStructureData?.value ?? []
+
+  if (customers.length === 0) {
+    ElMessage.warning('D4-9 客户结构为空，请先编制 D4-2 主营明细')
+    return
+  }
+
+  upstreamImporting.value = true
+  try {
+    // 已有客户名集合（不覆盖手工改过的值）
+    const existingNames = new Set(rows.value.map(r => r.customer))
+
+    for (const c of customers) {
+      if (existingNames.has(c.name)) continue  // Req 2.2: 不覆盖已有行
+      rows.value.push({
+        seq: null,
+        customer: c.name,
+        product: '',
+        amount: c.amount,
+        quantity: 0,
+        unitPrice: 0,
+        avgPrice: 0,
+        avgReason: '',
+        marketPrice: 0,
+        marketReason: '',
+      })
+    }
+
+    // Req 2.3: 本期销售总额 = 上游主营合计（手工已改过时保留手工值）
+    const mainTotal = d4CrossSheet.mainRevenueTotal?.value
+    if (mainTotal && totalAmount.value === 0) {
+      totalAmount.value = mainTotal.current ?? 0
+    }
+
+    persistData()
+    ElMessage.success(`已导入 ${customers.length} 个客户，新增 ${customers.length - existingNames.size >= 0 ? customers.filter(c => !existingNames.has(c.name)).length : 0} 行`)
+  } finally {
+    upstreamImporting.value = false
+  }
+}
+
+// ─── 异常回标（Req 4.1: 与均价/市价差异>20% 回标上游 D4-9/D4-2） ─────
+watch(computedRows, (rows) => {
+  const abnormals = rows
+    .filter(r => (r.avgDiff != null && Math.abs(r.avgDiff) > 0.2) || (r.marketDiff != null && Math.abs(r.marketDiff) > 0.2))
+    .map(r => ({
+      name: r.customer,
+      diffPct: Math.max(Math.abs(r.avgDiff ?? 0), Math.abs(r.marketDiff ?? 0)),
+    }))
+    .filter(a => a.name) // 跳过空名客户
+
+  eventBus.emit('d4:price-abnormal', {
+    wpCode: 'D4-10',
+    targetKey: 'customer',
+    items: abnormals,
+  })
+}, { deep: true })
+
+// ─── 结论供附注（Req 5.1: 审计说明/结论保存 → 发布联动事件） ──────────
+watch(auditConclusion, () => {
+  eventBus.emit('disclosure:note-text-updated', {
+    wpCode: 'D4-10',
+    section: 'conclusion',
+    timestamp: Date.now(),
+  })
+})
+
 // ─── 持久化 ──────────────────────────────────────────────────────────
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function persist(itemId: string, value: string) { props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: value }); debounceSave() }
@@ -216,7 +299,8 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
             <el-button size="small">导入导出 ▾</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+                <el-dropdown-item :disabled="upstreamImporting" @click="importFromUpstream">{{ upstreamImporting ? '导入中...' : '从 D4-9 导入客户' }}</el-dropdown-item>
+                <el-dropdown-item divided @click="handleExportTemplate">导出模板</el-dropdown-item>
                 <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
                 <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImportUpload" :disabled="importing"><span>{{ importing ? '导入中...' : '导入数据' }}</span></el-upload></el-dropdown-item>
               </el-dropdown-menu>

@@ -6,42 +6,42 @@
 
 ## Tasks
 
-- [ ] 1. 【打通死代码】D4-1 审定表行结构 computed 派生（参照 D2）
+- [x] 1. 【打通死代码】D4-1 审定表行结构 computed 派生（参照 D2）
   - `useD4Adjudication.ts`：新增 `crossSheetMainRows`/`crossSheetOtherRows` computed（从既有 `mainRevenueByProduct`/`otherRevenueByItem` 生成 `isFromCrossSheet=true` 行，稳定 rowKey=`xsheet-main-{normalizedProduct}`，金额只读）
   - `sections` computed 合并派生行 + 手工行，按 normalizedLabel 去重（派生优先）；手工行 AJE/RJE 不受影响
   - 删 `useD4CrossSheet.ts` 的 `syncProductRowToAdjudication`/`syncOtherItemRowToAdjudication` 及 return 导出（无接收端死代码）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
 
-- [ ] 2. 接线补齐：宿主 provide crossSheet
+- [x] 2. 接线补齐：宿主 provide crossSheet
   - `GtD4OperatingRevenue.vue`：`provide('d4CrossSheet', crossSheet)`，使子表可 inject 消费 `customerStructureData`/`productRevenueForMargin`/`mainRevenueTotal`
   - _Requirements: 6.1_
 
-- [ ] 3. D4-10 上游取数联动
+- [x] 3. D4-10 上游取数联动
   - `D4TabCustomerPrice.vue`：「导入导出 ▾」加「从 D4-9 导入客户」；inject `d4CrossSheet`，读 `customerStructureData` 按客户名 merge（不覆盖手工行）
   - 「本期销售总额」默认 = `crossSheet.mainRevenueTotal.current`（手工优先覆盖）；上游空给可辨别中文提示，不填 0
   - 只填录入列，派生列交 computed
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 6.3_
 
-- [ ] 4. D4-11 上游取数联动 + 修 chip bug
+- [x] 4. D4-11 上游取数联动 + 修 chip bug
   - `D4TabProductPrice.vue`：「导入导出 ▾」加「从 D4-2 导入产品」；读 `productRevenueForMargin` 按品种 merge
   - 修 `GtIndexChip value="wp:D4-10"` → `wp:D4-2`（指向真实上游）
   - 上游空给提示，不填 0；只填录入列
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 5. 回写联动方案 C：异常回标上游（事件 + 接收端）
+- [x] 5. 回写联动方案 C：异常回标上游（事件 + 接收端）
   - `eventBus.ts` 注册 `d4:price-abnormal` 类型；`crossWpEventBridge.ts` 的 `BRIDGED_EVENTS` 加该事件 + `normalizeBridgedPayload` 兜底
   - 新建 `useD4PriceWriteback.ts`（或宿主接线）：`eventBus.on('d4:price-abnormal')` → 写回 `D4-2-rows` 行 `priceAbnormal`（幂等：按 name 覆盖标记集，空数组清除）
   - D4-10 watch 异常客户（diff>20%）→ emit；D4-11 watch 异常产品（diff>10%）→ emit
   - 目标行缺失静默跳过；**必须真接线**（发送↔接收守卫锁死）
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 6.2_
 
-- [ ] 6. 回写联动方案 C：结论/异常供附注
+- [x] 6. 回写联动方案 C：结论/异常供附注
   - D4-10/11 审计说明/结论保存 → `eventBus.emit('disclosure:note-text-updated', {wpCode})`（复用现有事件族，经 bridge）
   - 价格异常清单可供 D4-1 审计说明/附注引用（暴露 computed 供消费）
   - fail-safe：无消费者不报错
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
-- [ ] 7. 守卫（前端 vitest）+ 变异检验
+- [x] 7. 守卫（前端 vitest）+ 变异检验
   - `d4AdjudicationRowLinkage.spec.ts`（Property 1）：塞 D4-2-rows → sections 派生行数；删产品 → 行数减
   - `d4PriceUpstreamImport.spec.ts`（Property 2）：D4-10/11 导入 merge 上游、空上游提示、手工行不被覆盖
   - `d4PriceWritebackLinkage.spec.ts`（Property 3）：emit d4:price-abnormal → 接收端写回、幂等、空集清除

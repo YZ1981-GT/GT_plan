@@ -42,6 +42,8 @@ export const BRIDGED_EVENTS: ReadonlySet<string> = new Set<string>([
   // 减值计提（F2/H1/H3/H8/I1 → K11 资产减值损失）——历史 producer/consumer 均走 window，
   // 纳入桥接后 eventBus 侧消费者亦可订阅，统一双通道。
   'impairment:calculated',
+  // D4 价格分析异常回标上游（D4-10/11 → D4-2/D4-9 行异常标记）
+  'd4:price-abnormal',
 ])
 
 /** 再入守卫标记：源自 eventBus 转发到 window 的事件带此标记，window 监听器见此不回灌。 */

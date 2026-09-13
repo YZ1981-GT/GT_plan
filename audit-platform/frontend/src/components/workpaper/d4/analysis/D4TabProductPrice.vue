@@ -16,6 +16,7 @@ import http from '@/utils/http'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { eventBus } from '@/utils/eventBus'
 
 const props = defineProps<{
   wpId: string
@@ -25,6 +26,12 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+// 注入上游取数数据（Task 4: 从宿主 provide 的 d4CrossSheet 消费 D4-2 产品数据）
+const d4CrossSheet = inject<any>('d4CrossSheet', null)
+
+// 上游导入 loading 态
+const upstreamImporting = ref(false)
 
 // 双模式（结构化视图 / 在线编辑）
 const editorMode = ref<'structured' | 'onlyoffice'>('structured')
@@ -149,6 +156,79 @@ function handleExportTemplate() { exportTemplate('D4-11' as any) }
 function handleExportData() { exportData('D4-11' as any) }
 function handleImportUpload(file: File): boolean { importData('D4-11' as any, file).then(r => { if (r && r.rowCount > 0) loadData() }); return false }
 
+// ─── 从上游导入产品（Req 3.1~3.5: D4-2 主营明细 → D4-11 merge） ──────
+function importFromUpstream() {
+  if (props.isReadonly || upstreamImporting.value) return
+  if (!d4CrossSheet) {
+    ElMessage.warning('上游数据未就绪，请稍后重试')
+    return
+  }
+
+  const products: Array<{ product: string; revenue: number; priorRevenue: number }> =
+    d4CrossSheet.productRevenueForMargin?.value ?? []
+
+  if (products.length === 0) {
+    ElMessage.warning('D4-2 主营明细为空，请先编制 D4-2')
+    return
+  }
+
+  upstreamImporting.value = true
+  try {
+    // 已有品种集合（不覆盖手工改过的值）
+    const existingProducts = new Set(rows.value.map(r => r.product))
+
+    for (const p of products) {
+      if (existingProducts.has(p.product)) continue  // Req 3.2: 不覆盖已有行
+      rows.value.push({
+        customer: '',
+        product: p.product,
+        unitPrice: 0,
+        quantity: 0,
+        invoiceDate: '',
+        orderNo: '',
+        orderDate: '',
+        listPrice: 0,
+        marketPrice: 0,
+        reason: '',
+        priceSource: '',
+        remark: '',
+      })
+    }
+
+    persistData()
+    const newCount = products.filter(p => !existingProducts.has(p.product)).length
+    ElMessage.success(`已导入 ${products.length} 个产品，新增 ${newCount} 行`)
+  } finally {
+    upstreamImporting.value = false
+  }
+}
+
+// ─── 异常回标（Req 4.2: 与定价/市价差异>10% 回标上游 D4-2） ──────────
+watch(computedRows, (rows) => {
+  const abnormals = rows
+    .filter(r => (r.policyDiff != null && Math.abs(r.policyDiff) > 0.1) || (r.marketDiff != null && Math.abs(r.marketDiff) > 0.1))
+    .map(r => ({
+      name: r.product,
+      diffPct: Math.max(Math.abs(r.policyDiff ?? 0), Math.abs(r.marketDiff ?? 0)),
+    }))
+    .filter(a => a.name)
+
+  eventBus.emit('d4:price-abnormal', {
+    wpCode: 'D4-11',
+    targetKey: 'product',
+    items: abnormals,
+  })
+}, { deep: true })
+
+// ─── 结论供附注（Req 5.1） ──────────────────────────────────────────
+watch(auditConclusion, () => {
+  eventBus.emit('disclosure:note-text-updated', {
+    wpCode: 'D4-11',
+    section: 'conclusion',
+    timestamp: Date.now(),
+  })
+})
+
 // ─── 持久化 ──────────────────────────────────────────────────────────
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function persist(itemId: string, value: string) { props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: value }); debounceSave() }
@@ -195,7 +275,8 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
             <el-button size="small">导入导出 ▾</el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item>
+                <el-dropdown-item :disabled="upstreamImporting" @click="importFromUpstream">{{ upstreamImporting ? '导入中...' : '从 D4-2 导入产品' }}</el-dropdown-item>
+                <el-dropdown-item divided @click="handleExportTemplate">导出模板</el-dropdown-item>
                 <el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item>
                 <el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx,.xls" :before-upload="handleImportUpload" :disabled="importing"><span>{{ importing ? '导入中...' : '导入数据' }}</span></el-upload></el-dropdown-item>
               </el-dropdown-menu>
@@ -204,7 +285,7 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
           <el-tooltip content="批量数据建议：先导出模板在Excel中填写后导入" placement="top" :show-after="300">
             <el-button size="small" :disabled="isReadonly" @click="addRow">+ 增行</el-button>
           </el-tooltip>
-          <GtIndexChip value="wp:D4-10" :context-project-id="projectId" />
+          <GtIndexChip value="wp:D4-2" :context-project-id="projectId" />
         </div>
       </div>
 

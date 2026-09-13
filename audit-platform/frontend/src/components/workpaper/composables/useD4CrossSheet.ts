@@ -260,33 +260,9 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     return isIpoGroupVisible(projectContext.value.business_category || '')
   })
 
-  // ─── D4-2/D4-3行结构→D4-1行同步（CustomEvent） ────────────────────
+  // ─── Return ────────────────────────────────────────────────────────────
 
-  /**
-   * 同步产品行到审定表
-   * D4-2 addRow 时→D4-1 主营区块新增对应行（isFromCrossSheet=true）
-   * D4-2 removeRow 时→D4-1 同步删除
-   */
-  function syncProductRowToAdjudication(action: 'add' | 'remove', product: string): void {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent('d4:sync-row', {
-      detail: { section: 'main-revenue', action, product },
-    }))
-  }
-
-  /**
-   * 同步其他项目行到审定表
-   * D4-3 addRow 时→D4-1 其他区块新增对应行
-   * D4-3 removeRow 时→D4-1 同步删除
-   */
-  function syncOtherItemRowToAdjudication(action: 'add' | 'remove', item: string): void {
-    if (typeof window === 'undefined') return
-    window.dispatchEvent(new CustomEvent('d4:sync-row', {
-      detail: { section: 'other-revenue', action, item },
-    }))
-  }
-
-  // ─── 附注成本跨循环取数（从TB科目6401+6402） ────────────────────────
+  return {
 
   /**
    * 从 allResponses 中读取成本数据
@@ -348,9 +324,6 @@ export function useD4CrossSheet(options: UseD4CrossSheetOptions) {
     adjudicationForDisclosure,
     // IPO组可见性
     ipoGroupVisible,
-    // D4-2/D4-3行结构→D4-1行同步
-    syncProductRowToAdjudication,
-    syncOtherItemRowToAdjudication,
     // 附注成本跨循环取数
     costFromTb,
     // 出口/境外适用性
