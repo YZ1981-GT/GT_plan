@@ -2609,6 +2609,32 @@ jobs:
       - name: Run D4 formula presets guard
         run: python -m pytest backend/tests/test_d4_formula_presets.py -v --tb=short
 
+  d4-dual-mode-formula-governance:
+    # D4 双模式公式治理总纲守卫（d4-dual-mode-formula-governance Task 1~7）
+    # 冻结 36 底稿 owner 矩阵 + C1 同步契约 + C2 公式契约 + C3 联动/平台契约 +
+    # C4 逐表验收登记。五个守卫均反 fiction（引用符号/测试/模块必须命中源码），
+    # 且带变异反向自检。UNVERIFIABLE 不假绿；playwright 禁标 GREEN。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check D4 owner matrix (--check)
+        run: python backend/scripts/check/check_d4_owner_matrix.py --check
+      - name: Check D4 C1 sync contract (--check)
+        run: python backend/scripts/check/check_d4_sync_contract.py --check
+      - name: Check D4 C2 formula contract (--check)
+        run: python backend/scripts/check/check_d4_formula_contract.py --check
+      - name: Check D4 C3 linkage + platform contract (--check)
+        run: python backend/scripts/check/check_d4_linkage_platform_contract.py --check
+      - name: Check D4 C4 acceptance registry (--check)
+        run: python backend/scripts/check/check_d4_c4_acceptance.py --check
+      - name: Install test dependency
+        run: python -m pip install pytest==8.4.2
+      - name: Run D4 governance contract + behavior guard tests
+        run: python -m pytest backend/tests/d4_governance/ -q --tb=short
+
   note-n-cycle-full-structure:
     # N 类（N1~N5）附注模板结构完整性守卫
     # （n-cycle-note-template-and-disclosure-completion R1/R4）
@@ -5889,3 +5915,29 @@ jobs:
         run: python backend/scripts/gen/generate_workpaper_sync_program_milestones.py --check
       - name: Program milestone guards (DAG, digests, evidence, live read-only DB)
         run: python -m pytest backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py -q --tb=short
+
+  d4-gap-formula-capability-backbone:
+    # d4-adjustment-and-analysis-gap-closure Task 3 / 4 / 5 产物守卫。
+    # 拦三类回归：
+    # 1. **能力快照 backbone**：前端 formula shell 挂载拉 `GET /capability-snapshot`，
+    #    后端缺该端点会 fail-closed 到 snapshot_uninitialized（公式管理器/右轨/双向回写
+    #    触发器全打不开）。守卫 9 键 role→capability 矩阵 + owner-epoch 竞态门 + wire 形状。
+    # 2. **公式单一真源治理**：有效公式 = 预设 + 用户二次编辑（custom 优先 / 删 custom
+    #    回落 preset / 预设升级不覆盖 custom）；schema 白名单禁 eval/外链。
+    # 3. **公式同步不发布 TB/A13**（否定式承诺）：源码禁词 + 行为 audit-kind 双判据，
+    #    变异注入 `substantive:adjudicated` 会打红。
+    # stdlib + 少量依赖即可跑（不连 DB），故独立成 job，避免被 ci.yml 全量前序失败掩盖。
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install backend deps
+        run: python -m pip install -r backend/requirements.txt
+      - name: Run capability matrix + snapshot endpoint guards
+        run: python -m pytest backend/tests/test_workpaper_capability_matrix.py backend/tests/test_wp_capability_snapshot_endpoint.py -q
+      - name: Run effective-formula single-source-of-truth guards
+        run: python -m pytest backend/tests/formula_management/test_effective_formula.py -q
+      - name: Run formula-sync no-TB/A13-publish guard
+        run: python -m pytest backend/tests/test_d4_gap_formula_no_tb_a13_publish.py -q
