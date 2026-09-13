@@ -8,6 +8,7 @@
  * 回写：1501* → G4-1 原值；1502* → G4-1 减值准备（贷−借）。
  */
 import { ref, computed, watch, onBeforeUnmount, getCurrentInstance, type Ref, type ComputedRef } from 'vue'
+import { eventBus } from '@/utils/eventBus'
 import { parseNum } from '@/composables/useG4MainFormulaEngine'
 import type { ChecklistResponse } from './useF1FormData'
 import {
@@ -456,6 +457,11 @@ export function useG4MainAdjustment(options: UseG4MainAdjustmentOptions) {
         },
       }),
     )
+
+    // EventBus 通知审定表/披露刷新（与其余循环对齐）；仅借贷平衡时发布
+    if (isBalanced.value) {
+      eventBus.emit('adjustment:created', { wpCode: 'G4', accountCode: G4_ACCOUNT_CODE, timestamp: Date.now() })
+    }
   }
 
   if (getCurrentInstance()) {
