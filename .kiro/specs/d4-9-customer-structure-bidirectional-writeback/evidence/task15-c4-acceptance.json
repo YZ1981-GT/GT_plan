@@ -1,0 +1,151 @@
+{
+  "schema": "d4-9-task15-c4-acceptance-evidence/v1",
+  "task": "15 C4 逐 D4-9 验收（final per-D4-9 acceptance gate，只门控 D4-9 相关产物）",
+  "requirements": ["3.1", "8.1", "8.5", "8.6", "9.1", "9.4"],
+  "verified_at_local_branch": "work/2026-05-30-wp-specs",
+  "scope_note": "本 gate 只门控 D4-9 相关产物（Req 9.4：不等待全平台 77 项）。sibling cycle 与平台级判据不在此 gate 内。",
+  "overall_verdict": "PARTIAL — 全部确定性（source/template evidence、三 table identity、formula mask、roundtrip、权限 fail-closed、变异）PASS 且带行为级基础；运行时依赖维度（Playwright 端到端、live 权限强制经真实 OO、applied 终态观测）记 UNVERIFIABLE（Req 8.6，环境不可用非实现失败，未改绿）。",
+
+  "environment_recheck": {
+    "note": "沿用并复核 Task 13/14 环境事实，本会话重测确认未变。",
+    "backend_9980": { "tcp": true, "note": "后端在线（Task 13 记 import app.main OK / /api/health 200）" },
+    "frontend_3030": { "tcp": false, "http": "connect_failed", "note": "前端 dev server 仍未运行 —— Playwright 端到端无法驱动" },
+    "onlyoffice_8080": { "tcp": true, "docker_container": "audit-onlyoffice", "docker_status": "Up 7 hours (healthy)", "note": "OO 容器健康，但无前端 + 无 DeepHorness SDK 无法完成 HTML↔OO 端到端往返" },
+    "deephorness_sdk": { "path": "D:\\DeepHorness", "exists": false, "note": "SDK 目录仍不存在 —— 双向 wiring runtime 尾部依赖它" }
+  },
+
+  "acceptance_dimensions": [
+    {
+      "dimension": "source/template evidence（真实模板 openpyxl facts）",
+      "verdict": "PASS",
+      "kind": "deterministic-structural-behavioral",
+      "behavioral_basis": [
+        "test_d4_9_task3_contract.py 真跑 assert_contract_file_matches_source() + parse_contract：D4-9 contract 与 phase5_d4_customer_structure 模块现算 payload 双向锁死，磁盘锁 d4.customer_structure.json（canonical_digest dc3337a3…）一致，任一漂移 fail closed（CS-1~CS-20）。",
+        "test_d4_9_task1_instrument_multi_region.py::test_openpyxl_recognizes_both_tables：真跑多区注入器 + openpyxl 复读真实模板 backend/wp_templates/D/D4收入底稿.xlsx（TEMPLATE_SHA256），同时认出 GT_D49C_ROWS(A13:W22) + GT_D49P_ROWS(A27:X36)。",
+        "全字段有 source_ref（test_all_fields_have_source_ref），禁止无来源自造字段（Req 2.6）。"
+      ],
+      "guard_run": "9 passed（task3）+ 10 passed（task1）"
+    },
+    {
+      "dimension": "三 table identity（contract 3-table 结构）",
+      "verdict": "PASS",
+      "kind": "deterministic-structural-behavioral",
+      "behavioral_basis": [
+        "单张 sheet（重要客户结构分析D4-9）恰含 3 张 table：customer_current_rows / customer_prior_rows / customer_totals（test_exactly_three_tables）。",
+        "两张动态行 table 有 row_identity（pointer 含 {row_uuid}）+ delete_policy（test_dynamic_row_tables_have_identity_and_delete_policy）；customer_totals 为静态标量 row_scoped=False + static_row 24/38，无 row_identity（test_totals_table_is_static_scalar / test_totals_static_rows_match_frozen_cells）。",
+        "字段数冻结 6+6+4（test_field_counts_frozen）。物理 sheet 双区不外溢成额外 wp_code（Req 9.1，Task 14 C0 已证 WP_CODES=frozenset({'D4O'}) 幻影码）。"
+      ],
+      "guard_run": "9 passed（task3）"
+    },
+    {
+      "dimension": "formula mask（D/F 占比列 + footer 合计）",
+      "verdict": "PASS",
+      "kind": "deterministic-structural-behavioral",
+      "behavioral_basis": [
+        "占比列 D/F 为 mode=formula 且落 formula_mask（test_ratio_columns_are_formula_and_masked，双区 D13:D22/F13:F22 + D27:D36/F27:F36）；customer_totals 无 formula_mask（test_totals_table_has_no_formula_mask）。",
+        "合计行由 footer_anchor.carries_total_formula=true 承载（test_footer_carries_total_formula）。",
+        "运行时保护集 runtime_protected_cells = contract formula_mask ∪ footer 合计 cell（C23/E23/C37/E37）∪ 运行时用户公式 cell；is_cell_protected 归一化 $/大小写（task9：mask 覆盖双区 · footer 受保护 · 用户公式 cell 入保护集 · 归一化 · 业务 cell 设公式后受保护 · 血缘链正确）。"
+      ],
+      "guard_run": "3 passed（task3 formula/footer）+ 8 passed（task9 保护集 + 血缘）"
+    },
+    {
+      "dimension": "roundtrip（materialize→extract→merge）",
+      "verdict": "PASS",
+      "kind": "deterministic-behavioral",
+      "behavioral_basis": [
+        "test_d4_9_task7_roundtrip.py::test_current_and_prior_regions_and_totals_roundtrip：真 materialize→extract 两趟（本期 + 4 总额、上期），逐字段往返对齐。",
+        "test_ratio_formula_columns_are_protected_not_overwritten：D/F 占比公式列受保护不被覆盖。",
+        "task4 投影/合并守卫：三区投影 · totals row_key=None · 占比 protected · build→merge roundtrip 保留可编辑值不跨区不覆盖公式 · 缺/重复 rowId fail-closed · 非对象 fail-closed · 同名 rowId 跨区允许（区域内唯一）。"
+      ],
+      "guard_run": "2 passed（task7）+ 9 passed（task4）"
+    },
+    {
+      "dimension": "权限 / capability fail-closed",
+      "verdict": "PASS",
+      "kind": "deterministic-behavioral",
+      "behavioral_basis": [
+        "test_d4_9_task6_manifest_capability_attach.py 真跑 build_manifest（真 overlay + pinned discovery fixture）：attach_adapters 在 manifest capability 未被 reviewed overlay 裁决为 bidirectional 时返回空（不注册 adapter）—— 行为判据非字符串存在。",
+        "覆盖降级 capability / single_html capability / 错 adapter_id / 缺 entry 四种 fail-closed 分支（test_downgraded_capability_fails_closed / test_single_html_capability_fails_closed / test_wrong_adapter_id_fails_closed / test_missing_entry_fails_closed）+ attach 空返回（test_attach_returns_empty_when_not_bidirectional / test_attach_returns_empty_when_entry_missing）。"
+      ],
+      "guard_run": "10 passed（task6）",
+      "runtime_note": "live 权限强制（真实 OO 会话下对 D4-9 的双向能力开关 / 未裁决时前端非双向）需前端 + 真实 OO 驱动，属下方 UNVERIFIABLE。此处 PASS 覆盖的是 fail-closed 装配门（静态/行为半部）。"
+    },
+    {
+      "dimension": "变异 mutation guard",
+      "verdict": "PASS",
+      "kind": "deterministic-behavioral",
+      "behavioral_basis": [
+        "mutate_d4_9_customer_structure_guards.py --check-anchors：5 锚点全 OK（各命中恰一行，M01 删 formula_mask / M02 静态标量改 row 域 / M03 合并两 table / M04 去 rowId 身份 / M05 总额来源改错）。",
+        "--run all：RED=5/5，问题项=[]，还原后回到全绿（四态判定，无 GREEN/ANCHOR-MISS/WRONG-TEST）。M01-M04 触发全 fixture ERROR（want 在其中）；M05 lineage-only 精确红 test_totals_source_is_d4_7。"
+      ],
+      "guard_run": "--check-anchors 5/5 命中；--run all RED 5/5 + 还原全绿"
+    },
+    {
+      "dimension": "Playwright（真实栈端到端）",
+      "verdict": "UNVERIFIABLE",
+      "kind": "runtime",
+      "reason": "Req 8.5 的 Playwright 逐 D4-9（HTML 编辑客户行 + 4 总额 → 在线编辑可见 → OO 改一行/改一总额 → 切回 HTML 值逐字对齐 → merge 幂等 → 用户公式 cell 不被 OO 覆盖）需前端 dev server（3030 DOWN）+ 真实 OnlyOffice 编辑会话 + DeepHorness SDK（D:\\DeepHorness 缺）。Req 8.6：环境不可用记 UNVERIFIABLE（非实现失败），未改绿。",
+      "unverifiable_sub_criteria": [
+        "request 路径命中 USER_SYNC_PREFIX、无 legacy 旁路（需前端在线发起 + network capture）",
+        "content version 推进恰好一个（需真实 commit 经 ContentMutationService）",
+        "application（callback→apply）终态（需真实 OO forcesave→callback→apply）",
+        "operation 终态（需端到端 operation 可观测）",
+        "artifact digest（需真实 materialize 产出 artifact）",
+        "OO 改一行 + 改一总额 → 切回 HTML 值逐字对齐（需前端 + 真实 OO）",
+        "merge 幂等（需真实 merge 链驱动）",
+        "用户公式 cell 不被 OO 覆盖（保护集注入 materialize/extract 入口依赖 adapter 路径 Task 5-7 阻塞链 + 真实 OO 编辑）"
+      ]
+    }
+  ],
+
+  "aggregate_d4_9_suite": {
+    "cmd": "python -m pytest backend/tests/workpaper_sync/test_d4_9_task1_instrument_multi_region.py backend/tests/workpaper_sync/test_d4_9_task3_contract.py backend/tests/workpaper_sync/test_d4_9_task4_projection.py backend/tests/workpaper_sync/test_d4_9_task6_manifest_capability_attach.py backend/tests/workpaper_sync/test_d4_9_task7_roundtrip.py backend/tests/workpaper_sync/test_d4_9_task9_formula_protection.py backend/tests/test_d4_9_task10_import_export.py -q -rAE",
+    "result": "59 passed, 1 warning",
+    "breakdown": "task1=10 · task3=9 · task4=9 · task6=10 · task7=2 · task9=8 · task10=11",
+    "frontend_guards": {
+      "cmd": "npx vitest run d4CustomerRowIdentity.spec.ts d4CustomerStructureLegacyEntry.spec.ts",
+      "result": "11 passed（rowId 身份 6 + legacy 入口移除 5）"
+    }
+  },
+
+  "deterministic_closure": {
+    "get_diagnostics_三件套": {
+      "requirements_md": "No diagnostics found",
+      "design_md": "No diagnostics found",
+      "tasks_md": "No diagnostics found",
+      "note": "Task 13/14 已完成格式对齐，本次复核无回归。"
+    },
+    "git_status_porcelain_产物清单": {
+      "untracked_??": [
+        "backend/app/services/workpaper_sync/phase5_d4_customer_structure.py",
+        "backend/data/workpaper_sync_contracts/d4.customer_structure.json",
+        "backend/scripts/gen/generate_phase5_d4_customer_structure_contract.py",
+        "backend/scripts/diagnose/mutate_d4_9_customer_structure_guards.py",
+        "backend/tests/workpaper_sync/test_d4_9_task1_instrument_multi_region.py",
+        "backend/tests/workpaper_sync/test_d4_9_task3_contract.py",
+        "backend/tests/workpaper_sync/test_d4_9_task4_projection.py",
+        "backend/tests/workpaper_sync/test_d4_9_task6_manifest_capability_attach.py",
+        "backend/tests/workpaper_sync/test_d4_9_task7_roundtrip.py",
+        "backend/tests/workpaper_sync/test_d4_9_task9_formula_protection.py",
+        "backend/tests/test_d4_9_task10_import_export.py",
+        "audit-platform/frontend/src/components/workpaper/d4/analysis/d4CustomerRowIdentity.ts",
+        "audit-platform/frontend/src/components/workpaper/d4/analysis/d4CustomerRowIdentity.spec.ts"
+      ],
+      "modified_tracked_M": [
+        "backend/app/routers/wp_render_strategies/_d4_import_export.py",
+        "backend/app/services/workpaper_sync/excel_instrumentation.py",
+        "backend/data/workpaper_sync_entry_overlay.json",
+        "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerStructure.vue"
+      ],
+      "resolved_now_tracked": ["backend/app/services/workpaper_capability.py"],
+      "note": "13 个 D4-9 产物 ?? 未跟踪（比 Task 13 记录的 12 多 1：task7 roundtrip 测试文件），4 个 M 修改，均未 commit。commit 需用户明确请求，且分支 work/2026-05-30-wp-specs 超前远端约 145 提交（多为并发会话在途），直接 push/commit 风险高。d4CustomerStructureLegacyEntry.spec.ts 亦为 ?? 未在产物清单登记（Task 8/12 守卫），建议一并入库。"
+    },
+    "tmp_wip_cleanup": "本 Task 未产生 tmp_*/_wip_* 诊断产物，无需清理。"
+  },
+
+  "unblock_requirements": [
+    "启动前端 dev server（3030）",
+    "部署 DeepHorness SDK 到 D:\\DeepHorness",
+    "mount-diff 复核并重批 approved_source_digest 让 workpaper sync manifest 干净 --apply 重生成（curated entry xlsx/gt-d4-customer-structure capability=bidirectional 已在 overlay 声明）"
+  ]
+}

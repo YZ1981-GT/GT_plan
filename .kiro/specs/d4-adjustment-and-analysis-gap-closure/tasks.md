@@ -37,7 +37,7 @@
   - 公式路径**不发布 TB/A13**（Req 2.4/3.2）以否定式承诺守卫：`backend/tests/test_d4_gap_formula_no_tb_a13_publish.py`
     双判据（源码禁词 + 行为 audit kind）+ **变异实证 RED**（注入 `substantive:adjudicated` 到 effective_formula 源码 → 守卫打红，已回退）。
   - _Requirements: 2.4, 3.2_
-- [-] 5. C4逐表验收与变异：roundtrip、权限、Playwright、owner 去重、公式/冲突和发布确认；只门控本 spec 相关产物。
+- [x] 5. C4逐表验收与变异：roundtrip、权限、Playwright、owner 去重、公式/冲突和发布确认；只门控本 spec 相关产物。
   - 导入导出：D4-4/8/12 已在 `_d4_import_export.py::_SUPPORTED_SHEETS` 且有专属列头/导出映射，功能可用（既有 `test_d4_import_export_pbt.py` 覆盖）。
   - 已完成：owner 去重（Task 1）、公式单一真源守卫（Task 3，13+22 例）、公式不发布 TB/A13（Task 4，4 例 + 变异 RED）、
     **端点集成守卫**（`test_wp_capability_snapshot_endpoint.py` 3 例，ASGITransport 打真实注册路由，验 200 + 9 键 wire 形状 + 角色分权，代替浏览器实测后端半）。
@@ -45,7 +45,9 @@
     `GET /api/workpapers/{wpId}/capability-snapshot?...&ownerEpoch=1` **200 OK ×2**；响应体经 ResponseWrapper 为
     `{code,message,data}`，data 含 `snapshotVersion:1.0`/64 位 subjectDigest/ownerEpoch/issuedAt/expiresAt(30min)/role:admin + 9 键 decision 全 allowed；
     公式壳层「公式管理/批量AI复核」按钮渲染启用（未 fail-closed）。4 个控制台报错均为无关 `guidance` 端点 422/503。
-  - **待做**：① CI job 挂载本 spec 产物；② 产物 `git add` 入库（当前 6 个 `??`：3 后端 + 3 测试）。
+  - ✅ CI job `d4-gap-formula-capability-backbone` 已挂 `governance-checks.yml`（跑 43 例，`work/**` 触发）。
+  - ✅ 产物已入库 commit `69f1ced3e`（11 文件 1384 insertions，含依赖的 `workpaper_capability.py`）。
+  - 注：并发会话另建了互补的 C4 契约层（`backend/data/d4_*.json` + `check_d4_*.py` + `tests/d4_governance/`，其 frozen 契约断言 `resolver_fn=="resolve_effective_formula"` 且 6 态与本实现逐字一致），未纳入本 commit（他人在途，勿代提）。
   - _Requirements: 3.1, 3.2_
 
 ## Task Dependency Graph

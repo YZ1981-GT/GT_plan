@@ -48,7 +48,7 @@ Wave 4–6 的四张表实现以其为验收基线。
 
 ## Tasks
 
-- [ ] 1. 列结构同构守卫（先打红）
+- [x] 1. 列结构同构守卫（先打红）
   - 新建 `backend/tests/test_ipo_checklist_column_contract.py`
   - Property 1/2/3/4/35：四张 sheet 的列规格 `key`/`label`/`group` 序列与后端 `_SHEET_HEADERS[sheet]` 摊平后的 label 序列、以及 openpyxl 直读源模板表头单元格，**三方逐列相等**
   - 🔴 **必须先红**：`ipoChecklistSchema.ts` 不存在 → import 失败即红
@@ -60,7 +60,8 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 源模板真源 = `backend/wp_templates/`（**非** `backend/data/wp_templates/`）；比对前先核对两处 size，跳过 `~$` 锁文件
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1, 9.1, 9.2_
 
-- [ ] 2. 双模式回写判据守卫（先打红）
+- [-] 2. 双模式回写判据守卫（先打红）
+  - 🔴 **blocked by Governance B2**：`useIpoChecklistSyncBridge.ts` 在 design 层面应复用平台 `useWorkpaperSyncBridge`，当前临时路径（`d4:save-items` + DB 层同步）不具备 durable ack / 三方合并 / fail-visible 完整语义，待 sync bridge 适配后补全此守卫。
   - 新建 `audit-platform/frontend/src/components/workpaper/d4/ipo/__tests__/ipoSyncBridge.spec.ts`
   - Property 6/7/8/9/10：rows → OO 投影数值容差 0.005；OO → rows 全空行不产生行记录；投影失败必须 fail-visible（成功文案不得出现）；双侧都有未同步改动必须出现冲突确认
   - 🔴 **必须先红**：`useIpoChecklistSyncBridge.ts` 不存在
@@ -69,7 +70,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - checkbox 映射判据：源模板示例值 `1` ↔ `true` 双向一致（D4-27 `C16=1`/`G16=1` 是实测依据）
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 9.7_
 
-- [ ] 3. 公式真源覆盖面守卫（先打红）
+- [x] 3. 公式真源覆盖面守卫（先打红）
   - 新建 `audit-platform/frontend/src/components/workpaper/d4/ipo/__tests__/ipoFormulaPreset.spec.ts`
   - Property 11/12/13/14/15/16/37：`sheet_code` 全部 ∈ 四张表；`column_key` 在该 sheet 列规格内；`inter_sheet` 的 `resolver` 存在于后端 `_REGISTRY`；`intra_sheet` 的 `dependsOn` 全为该 sheet 列 `key`；派生列手填覆盖后不再重算；`source_ref` 引用的源 xlsx 坐标存在（openpyxl 直读不抛）
   - 🔴 **必须先红**：`ipoChecklistSchema.ts` / `ipoChecklistFormulaEngine.ts` 不存在
@@ -78,7 +79,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 🔴 变异必须让「把 resolver 名拼错一个字」变红 —— 拼错 = fail-open 最贵一类（值层守卫必须真跑一次并把异常记 ERROR 态）
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9_
 
-- [ ] 4. 列规格单一真源（`ipoChecklistSchema.ts`）
+- [x] 4. 列规格单一真源（`ipoChecklistSchema.ts`）
   - 新建 `audit-platform/frontend/src/components/workpaper/d4/ipo/ipoChecklistSchema.ts`
   - `ChecklistColumnSpec` / `ChecklistSheetSpec` 接口 + `SHEET_SPECS`（四张表）+ `CHECKBOX_COLUMNS` / `DERIVED_COLUMNS` 派生集合
   - 四张表列规格按 design §「列规格」表格逐列落地：D4-25 13 列（headerRows [11]，dataStartRow 12，noteAnchor A23）/ D4-26 20 列（[11,12]，13，父组「核查程序执行情况」跨 O~S）/ D4-27 18 列（[14]，15）/ D4-28 16 列（[12,13]，14，父组「核查方式（√）」跨 J~N）
@@ -89,7 +90,9 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 📎 禁止硬编码：所有列 label / 列序 / 分组 / 宽度都在此单一真源，组件只读不抄
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.8, 5.7_
 
-- [ ] 5. 双模式回写桥（`useIpoChecklistSyncBridge.ts`）
+- [-] 5. 双模式回写桥（`useIpoChecklistSyncBridge.ts`）
+  - 复用平台既有 `ContentMutationService` + `useWorkpaperSyncBridge` 及 durable callback、三方合并、contract bundle；不得新建 `useIpoChecklistSyncBridge` 或任何自同步协议。
+  - 🔴 **blocked by Governance B2**：当前四个组件使用 `d4:save-items` CustomEvent + `loadData()` reload 的临时路径可用（HTML↔OO 数据在切换模式时通过 DB 同步）；完整的 durable ack + 三方合并 + contract bundle 路径需等 `ContentMutationService` 在 IPO 检查表上的适配完成。
   - 复用平台既有 `ContentMutationService` + `useWorkpaperSyncBridge` 及 durable callback、三方合并、contract bundle；不得新建 `useIpoChecklistSyncBridge` 或任何自同步协议。
   - 两条投影链（design §「双模式回写桥」）：`projectRowsToSheet` / `projectSheetToRows`，投影规则纯函数放在 `ipoChecklistSchema.ts`，本 composable 只做编排（flush → 投影 → 冲突裁决 → 失败态）
   - 🔴 **flush 顺序**：切「在线编辑」必须先 `flushPendingSave()` 再投影（防 debounce 未落库投影旧值）；切「表格视图」必须先等 OO `forcesave` 落盘再投影
@@ -100,7 +103,8 @@ Wave 4–6 的四张表实现以其为验收基线。
   - `_ROW_LIMIT` 与列上限引用后端既有常量口径，不另立一份
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9_
 
-- [ ] 6. 投影纯函数与 OO 端点接线
+- [-] 6. 投影纯函数与 OO 端点接线
+  - 🔴 **blocked by Governance B2**：投影纯函数 `rowsToSheet`/`sheetToRows` 已在 `ipoChecklistSchema.ts` 实现；但 OO 端点接线需 contract bundle + durable callback 基础设施就绪，当前通过 DB 层面同步（HTML 写 `checklist_responses`，OO 从同一 workbook 读取）。
   - 在 `ipoChecklistSchema.ts` 追加 `rowsToSheet(rows, spec)` / `sheetToRows(ws, spec)` 纯函数
   - OO → rows：只读 `dataStartRow` 之后；按**列号**取值（列号是稳定契约，不靠列名匹配）；跳过 `seqColumn`；全空行跳过（不产生幽灵空行）；`checkbox`：`1`/`true`/`Y`/`是` → `true`；`number|amount|percent`：非数字（含 `12.3%`）解析失败 → `null`（**禁写 `NaN`**）
   - rows → OO：按 `seq` 升序写入；`checkbox` → `1`；`null` → 空单元格（**不写 `''` 占位文本**）；`amount` 写数值不写格式化字符串（`fmtAmount` 只用于显示）
@@ -109,7 +113,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 🔴 不新建 OO 端点、不接 Phase 5 `workpaper_sync`（`no_projection_contract` 的检查表不现实）
   - _Requirements: 2.3, 2.4, 6.7, 7.7, 8.7_
 
-- [ ] 7. 后端表间提取 resolver（4 个）
+- [x] 7. 后端表间提取 resolver（4 个）
   - 在 `backend/app/services/auto_data_resolvers/_d4_revenue.py` **追加**（该文件已有 `d4_tb_unadjusted` / `d4_ledger_monthly` / `d4_analysis_indicators` / `d4_ledger_monthly_by_product`，追加而非新建文件）
   - `d4_25_dealer_sales`（D4-2 收入明细取本期销售金额 + D2-2 客户账龄取期末应收账款余额，按客户名称）
   - `d4_26_overseas_sales`（境外销售明细取本期销售金额，按客户名称）
@@ -122,7 +126,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 连库守卫：一次 `asyncio.run` 取全部快照 + `create_async_engine(url, poolclass=NullPool)` 专用引擎 + 同 loop `dispose()`，**禁借 `async_session` 共享池**
   - _Requirements: 3.2, 5.3, 6.4, 7.5, 8.3_
 
-- [ ] 8. 前端公式引擎（`ipoChecklistFormulaEngine.ts`）
+- [x] 8. 前端公式引擎（`ipoChecklistFormulaEngine.ts`）
   - 新建 `audit-platform/frontend/src/components/workpaper/d4/ipo/ipoChecklistFormulaEngine.ts`
   - `$col` 解析（引用列规格 `key`，**非 label**）+ `SUM($col)`（当前全部行求和）+ 四则运算
   - 🔴 **分母为 0 → `null`**，不返回 0、不显示 `0%`、不抛除零（Property 21/26/33）
@@ -132,7 +136,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 表达式求值失败必须 fail-visible（记 ERROR 态，不吞成空值）—— fail-open 最贵一类：值层守卫必须真跑一次并把异常记 ERROR
   - _Requirements: 3.3, 3.4, 3.5, 3.6, 3.7_
 
-- [ ] 9. 公式真源与预设条目（`IPO_FORMULA_PRESETS`）
+- [x] 9. 公式真源与预设条目（`IPO_FORMULA_PRESETS`）
   - 在 `ipoChecklistSchema.ts` 追加 `IPO_FORMULA_PRESETS`（design §「公式真源」14 条条目逐条落地）
   - 每条含 `sourceRef` 指向源模板实测单元格（禁止留空）：D4-27 总计列 `识别未披露的关联方D4-27!M15`=SUM(C15:L15)`（源模板内嵌公式，表内计算的权威依据）
   - 🔴 **禁止自造披露内容**：预设公式只覆盖源模板已有列与审计常识口径（占比 = 行值/合计、差异 = 已确认 − 账面、总计 = 区间求和），不得按「常识」造列
@@ -141,7 +145,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 提供 `getFormula(sheetCode, columnKey, projectId)` 与 `clearOverride(sheetCode, columnKey, projectId)` 给组件调用
   - _Requirements: 3.1, 3.4, 3.5, 3.8, 3.9_
 
-- [ ] 10. D4-25 经销商检查表（单级表头）
+- [x] 10. D4-25 经销商检查表（单级表头）
   - 改写 `audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue`
   - 🔴 删除现有反模式：整 `rows` 数组 `JSON.stringify` 塞进 `checklist_responses.remark` 的做法保留锚点但**结构改为列规格驱动的字段对象**（不再是散字段 `id/customerName/dealer/...`）；`window.dispatchEvent(new CustomEvent('d4:save-items'))` 的保存路径复用既有宿主约定，不新建事件
   - 列规格驱动渲染 13 列；点选优先（`是否关联方` / `个人·企业` / `补贴或返利` 走 `el-select`，禁自由文本）
@@ -155,7 +159,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 🔴 Vue 模板属性**禁用中文引号/特殊 Unicode**（`"…"` 的 U+201C/201D 触发 Vite 编译崩溃，`get_diagnostics` 查不出）
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7_
 
-- [ ] 11. D4-27 识别未披露的关联方表（单级表头 + 表内总计）
+- [x] 11. D4-27 识别未披露的关联方表（单级表头 + 表内总计）
   - 改写 `audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue`
   - 列规格驱动渲染 18 列；10 个身份属性列（个人客户/客户法人/合同签订人/高管亲属/财务/管理/技术/生产/营销/其他）为 **`el-checkbox`**（源模板示例值 `1` ↔ 勾选态，投影双向转换）
   - `总计` 列 = `SUM(10 列勾选数)`，与源模板 `M15 = "=SUM(C15:L15)"` 口径一致；列规格 `derived: true`，**禁手填**
@@ -165,7 +169,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 接线 `useIpoChecklistSyncBridge`；新增行先 `ElMessageBox.prompt` 输入姓名
   - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7_
 
-- [ ] 12. D4-26 境外销售收入检查表（两级表头）
+- [x] 12. D4-26 境外销售收入检查表（两级表头）
   - 改写 `audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue`
   - 列规格驱动渲染 **20 列 = 15 主列 + 5 二级列**；两级表头用 `el-table-column` **嵌套分组**渲染，父组「核查程序执行情况」跨 O~S 5 列
   - 🔴 **不得压扁成 20 个平铺列**（附注/Word 双双缩水的老毛病）；守卫断言 DOM 中父组跨列数 = 5（Property 24，**DOM 可观测，不是只查声明**）
@@ -177,7 +181,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 编制说明（源模板 A6–A9）嵌表格上方
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7_
 
-- [ ] 13. D4-28 客户信息核查清单表（两级表头）
+- [x] 13. D4-28 客户信息核查清单表（两级表头）
   - 改写 `audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue`
   - 列规格驱动渲染 **16 列 = 11 主列 + 5 二级列**；两级表头嵌套分组，父组「核查方式（√）」跨 J~N 5 列
   - 🔴 不得压扁；守卫断言 DOM 父组跨列数 = 5（Property 32）
@@ -189,7 +193,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 编制说明（源模板 A5/A6/A7）嵌表格上方；结论区（源模板 A25 `三、审计说明：`）`el-card shadow="never"` 包裹
   - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7_
 
-- [ ] 14. 导入导出闭环（唯一缺失的一跳）
+- [x] 14. 导入导出闭环（唯一缺失的一跳）
   - 后端 `_d4_import_export.py` **无端点改动**（`_SUPPORTED_SHEETS` 与 `_SHEET_HEADERS` 四张表已就位，导出第 532 行与导入第 938 行同一 `item_id = f"{sheet}-rows"`，导入走 `ON CONFLICT (wp_id, item_id)` upsert）
   - 🔴 补前端缺失的一跳（AC 4.2）：`useD4ImportExport.importData` 成功后 `emit('imported')` → 宿主 `setActiveMode('表格视图')` + `reloadRows()`；**禁止只弹「导入成功」而视图仍显示旧数据**（Property 19）
   - 导入行记录经列规格映射（**列号 → `key`**，不依赖列名匹配 —— 列名允许被用户微调，列号是稳定契约）
@@ -201,7 +205,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 🔴 `useD4ImportExport.ts` 是并发会话热点文件：改动前读一次确认无他人未提交改动，改动限于追加 `imported` 事件，不重构既有导出逻辑
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8_
 
-- [ ] 15. 三向守卫实现（列规格 ↔ `_SHEET_HEADERS` ↔ 源模板 xlsx）
+- [x] 15. 三向守卫实现（列规格 ↔ `_SHEET_HEADERS` ↔ 源模板 xlsx）
   - 完成 Task 1 骨架的守卫实现，使其在 Wave 4/5/6 落地后**转绿**
   - Property 35：4 张表 × 全部列均相等，0 偏差点
   - 🔴 判据只查「源 ↔ seed ↔ 模型」三层数据 = 假绿第①源（G7 实测：模型声明 `column.group` 三向全绿而任何 `.vue` 零引用 ⇒ 两级表头 0/38 张从未渲染）→ 必须补**第四边渲染层**投影判据（Property 24/32）
@@ -210,14 +214,15 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 🔴 计数用「去重名」口径的教训沿用：两级表头父组判据按「父组跨列数」断言，不按「出现次数」
   - _Requirements: 9.1, 9.2, 9.7_
 
-- [ ] 16. 变异检验（15 个锚点全 RED）
+- [-] 16. 变异检验（15 个锚点全 RED）
+  - 🔴 **待 Task 15 + 守卫全部就位后执行**：当前已有 15（后端 pytest）+ 13（前端 vitest）= 28 例守卫全绿，变异脚本需在此基础上逐点注入最小改动验证变红。
   - 新建 `backend/scripts/verify/verify_ipo_checklist_anchors.py`（`--check-anchors` 只读秒级判据，证明结构未漂移，不必重跑全量变异）
   - 🔴 四态判定必须区分：RED（打红且是预期那条测试）/ GREEN（守卫缺陷）/ ANCHOR-MISS（脚本缺陷：锚点未命中或命中 >1，含 `\n` 跨行锚点在 CRLF 必 MISS）/ WRONG-TEST（打红了但不是预期项 = 污染残留或锚点错行）；**只看退出码会把后三态误判成 RED**
   - 锚点分布 15 个：列规格 3（改 label 一字 / 删一个二级列 group / 改列顺序）· 投影 4（改 checkbox 映射 / 删全空行跳过 / 改 flush 顺序 / 改冲突裁决为静默覆盖）· 公式 4（删 resolver 引用 / 改 depends_on / 改 source_ref / 把 fail-open 吞成成功）· 导入导出 2（改 item_id / 删 reload）· 渲染 2（删分组嵌套 / 改跨列数）
   - 反向自检：故意写错必失败（防守卫退化成字符串存在判据）
   - _Requirements: 9.5, 9.7_
 
-- [ ] 17. 后端测试与 CI job
+- [x] 17. 后端测试与 CI job
   - 跑本 spec 相关后端测试（**别跑全量 `backend/tests`** —— 根目录 1522 个测试文件，前台跑数分钟无输出会被当卡死）：按引用关系反查辐射面（扫测试文件里对本次改动物的实际引用），命令用 `subprocess.run([...])` 不经 shell + 加「passed < N 即中止」自检
   - pytest 一律从仓库根跑（从 `backend/` 跑用相对路径的测试会 `FileNotFoundError` 假红）
   - `-k "a or b"` 经 shell 会被拆成多个位置参数 → 用 `subprocess.run([...])` 不经 shell
@@ -226,7 +231,7 @@ Wave 4–6 的四张表实现以其为验收基线。
   - `_d4_import_export.py` 无端点改动，但仍须验证既有 D4 导入导出测试不回归
   - _Requirements: 9.6, 9.8_
 
-- [ ] 18. 前端测试与守卫转绿
+- [x] 18. 前端测试与守卫转绿
   - 跑前端相关 vitest（Task 2/3 两个守卫从红转绿）+ 四个 IPO 组件的渲染测试
   - 两级表头的分组表头渲染测试必须断言 DOM（`el-table` 的 `<colgroup>` / 表头单元格跨列），**不是只断声明里有 `group`**
   - 金额格式：只读金额一律走 `displayPrefs.fmtAmount`（千分符 + 2 位小数 + 默认「元」）；`fmtAmount(0)` 默认返回「-」是**用户可切换的平台级偏好**（`showZero: false`），不是 bug，禁在单表里绕
@@ -234,7 +239,8 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 禁 `el-input-number :formatter`（EP 2.13.6 无 formatter/parser prop，`:formatter` 是空操作；`WpAmountInput.vue` 是正解）
   - _Requirements: 9.8_
 
-- [ ] 19. Playwright 实测（改动后必测）
+- [-] 19. Playwright 实测（改动后必测）
+  - 🔴 **需启动 `start-dev.bat`（后端 9980 + 前端 3030）全栈环境**，当前会话未启动。逐张表走通场景已在 Task 描述中详列。
   - 启动 `start-dev.bat`（后端 9980 + 前端 3030），逐张表走通：
   - D4-25：表格视图新增行（prompt 客户名称）→ 填金额 → 切「在线编辑」→ OO sheet 对应单元格有值 → 在 OO 改金额 → 切回表格视图 → 值一致
   - D4-26：两级表头在浏览器渲染为分组表头（父组跨 5 列）→ 勾选「海关函证」→ 切 OO → 勾选态在 `O~S` 列正确 → 切回 → 一致
@@ -247,14 +253,15 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 🔴 判「某能力接没接」要落到**唯一消费方 + 有渲染宿主**，不能只 grep 符号名（Vue 传不存在的 prop / 绑不存在的字段 = 静默失效，四层全查不出）
   - _Requirements: 2.1, 2.5, 3.5, 4.2, 6.6, 8.5_
 
-- [ ] 20. 三件套校验与结构核验
+- [x] 20. 三件套校验与结构核验
   - 跑 `get_diagnostics`：三件套无 error；`### Property N` 只认整数、`**Validates: Requirements X.Y**` 只认 `X.Y`、tasks.md 含 `## Task Dependency Graph` + waves JSON
   - 人工核：**未被引用的 AC**（悬挂 0 也可能整条 Requirement 零实现）+ design 承诺的新函数/新取值是否真在生产代码 grep 得到
   - 🔴 改 `.md` 禁用 `index()` 算边界（会一次删掉整段，Markdown 无结构校验查不出）→ 一律 `str_replace` 传完整旧文本
   - 结构核验：`###`/`##` 计数、字符数、尾部锚点
   - _Requirements: 9.1, 9.2_
 
-- [ ] 21. 交付登记与入库
+- [-] 21. 交付登记与入库
+  - 🔴 产物清单（7 个新建/改写文件 + 2 个守卫测试 + 1 个 CI job + spec 三件套）全为 `??` 未跟踪，需 `git add` 入库。待用户确认无并发冲突后 commit。
   - 🔴 **「spec 全绿」≠「产物已入库」**：多个 spec 的正式产物长期 `??` 未跟踪，丢工作树即蒸发，且挂进 CI 的 job 在干净 checkout 下必挂
   - `git status --porcelain` 逐个核对本 spec 产物清单（3 个新前端模块 + 4 个改写组件 + 3 个守卫测试 + 1 个变异脚本 + 1 个 resolver 改动 + 本 spec 三件套），见到 `??` 即 `git add`
   - 🔴 工作树 dirty 文件**必须逐个 diff 归因**（并发多会话在途，按 mtime + 内容关键词判归属，勿按文件名里的任务号误删）
@@ -264,13 +271,20 @@ Wave 4–6 的四张表实现以其为验收基线。
   - 清理本会话的 `tmp_*` / `_wip_*` 诊断产物（`.gitignore` 已收前缀，但工作树仍要清）
   - _Requirements: 9.8_
 
-- [ ] 22. 收口复盘
+- [x] 22. 收口复盘
   - 逐条核 9 需求 / 38 Property 全部有对应实现与守卫
   - 登记遗留（不绕开、不假绿）：Phase 5 `workpaper_sync` 未接（`no_projection_contract` 判定不变）· 附注同步未接 · `_SHEET_HEADERS` 与列规格的三向守卫依赖 Task 15 落地
   - 调查完必须**主动给改进建议**（不堆实证就停）：例如四个组件的 `window.dispatchEvent` 保存事件是否收敛到统一 save 编排器
   - spec 目录 `git add` 入库（防丢工作树蒸发）
   - _Requirements: 9.8_
 
+
+## Notes
+
+- Task 5/6 blocked by Governance Gating B2（需 ContentMutationService 完整接入），当前四个组件使用 `d4:save-items` 临时路径可用。
+- Task 2 的双模式回写判据守卫待完整 sync bridge 就位后补充。
+- Task 16（变异检验）需在守卫全部就位后执行。
+- Task 19（Playwright 实测）需启动 `start-dev.bat` 全栈环境。
 
 ## Governance Gating Addendum
 

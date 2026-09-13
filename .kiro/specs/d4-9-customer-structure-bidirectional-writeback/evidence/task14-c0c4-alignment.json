@@ -1,0 +1,126 @@
+{
+  "schema": "d4-9-task14-c0c4-alignment-evidence/v1",
+  "task": "14 C0-C4 alignment（按总纲验证 wp_id 身份、共享 sync、公式状态、真实 DAG/联动与逐表 gate）",
+  "verified_at_local_branch": "work/2026-05-30-wp-specs",
+  "master_control": [
+    "d4-dual-mode-formula-governance（总纲 spec）",
+    "docs/operations/workpaper-html-onlyoffice-bidirectional-writeback-master-control.md"
+  ],
+  "requirements": ["2.1", "2.2", "3.1", "8.1"],
+  "overall_verdict": "PARTIAL — C0/C2/C4 与 C1/C3 的确定性(静态/结构/行为)半部全 PASS；C1/C3 的运行时半部与 C4 的 Playwright 逐表 gate 记 UNVERIFIABLE（Req 8.6，环境不可用非实现失败，未改绿）",
+  "environment_note": "沿用 Task 13 环境实测：后端 9980 UP（import app.main OK）· OnlyOffice 8080 docker healthy · 前端 3030 DOWN（connect_failed）· D:\\DeepHorness 不存在。故凡需真实 OO callback / 前端在线编辑 / 已发布 bundle 的 runtime 判据一律 UNVERIFIABLE。",
+
+  "deterministic_evidence_commands": [
+    {
+      "cmd": "python -m pytest backend/tests/workpaper_sync/test_d4_9_task3_contract.py backend/tests/workpaper_sync/test_d4_9_task4_projection.py backend/tests/workpaper_sync/test_d4_9_task9_formula_protection.py backend/tests/test_d4_9_task10_import_export.py -q",
+      "result": "37 passed",
+      "covers": ["C0", "C2"]
+    },
+    {
+      "cmd": "python -m pytest backend/tests/workpaper_sync/test_d4_9_task3_contract.py backend/tests/test_d4_gap_formula_no_tb_a13_publish.py -q",
+      "result": "13 passed",
+      "covers": ["C0", "C3-platform"]
+    },
+    {
+      "cmd": "python -m pytest backend/tests/workpaper_sync/test_d4_9_task6_manifest_capability_attach.py -q",
+      "result": "10 passed",
+      "covers": ["C1-static-failclosed"]
+    },
+    {
+      "cmd": "python -c \"parse D4-9 contract + scan bridge source forbidden tokens + lineage\"",
+      "result": "SHEETS 1 | TABLES ['customer_current_rows','customer_prior_rows','customer_totals'] | C3_FORBIDDEN_HITS [] | TOTALS_SRC ['D4-7!D26','D4-7!B26','D4-7!L26','D4-7!J26']",
+      "covers": ["C0", "C2", "C3"]
+    }
+  ],
+
+  "checks": [
+    {
+      "id": "C0",
+      "title": "wp_id identity — 单 sheet 双区不是额外 wp_code",
+      "verdict": "PASS",
+      "kind": "deterministic-structural",
+      "requirements": ["2.1", "2.2"],
+      "behavioral_basis": [
+        "assert_contract_file_matches_source() 真跑 + parse_contract 通过：D4-9 contract 恰含 1 张 sheet（重要客户结构分析D4-9，sheet_key=d49-managed）+ 3 张 table（customer_current_rows / customer_prior_rows / customer_totals），本期/上期两个动态行区是同一 sheet 内的两张 table，不是两个 sheet、不是两个 wp_code。",
+        "身份常量单一：ENTRY_ID=xlsx/gt-d4-customer-structure、ADAPTER_ID=d4.customer_structure、WP_CODES=frozenset({'D4O'})（宿主 GtD4OperatingRevenue 幻影码，manifest 冻结，finder 零命中）—— 物理 sheet 双区共享同一 wp_id/entry/sheet_key，region 差异由 region_key（D49C/D49P）在双向引擎内部区分，不外溢成 wp_code。",
+        "test_d4_9_task3_contract.py 9 passed（3 table 顺序 / 动态行有 identity+delete_policy / totals 静态标量 row_scoped=False+static_row 24·38 / 全字段有 source_ref / 字段数 6+6+4）。"
+      ]
+    },
+    {
+      "id": "C1",
+      "title": "shared sync 接入 + durable ack != applied",
+      "verdict": "SPLIT",
+      "requirements": ["3.1"],
+      "static_half": {
+        "verdict": "PASS",
+        "kind": "deterministic-structural",
+        "behavioral_basis": [
+          "durable ack != applied 是平台级共享不变量，D4-9 经统一 sync 路径继承、不重复实现：CommandDispatch（command_service.py）刻意无 saved/applied/success 字段（AC 4.1『不得把 forcesave=true 或 Command Service HTTP 200 当保存完成』），只提供 accepted / awaits_callback；capacity_profile.py 把 incoming_durable_p95_seconds 与 applied_terminal_p95_seconds 建成两个不同的终态预算（AC 14.12）。",
+          "content_mutation.py _advance_room：server last_applied_version_id 每次成功应用都推进，client_confirmed_base_version_id 只在受管 projection 与 incoming 等值时才推进，否则 room 进 refresh_required —— durable 收到 ≠ applied 落地。",
+          "C1 fail-closed 接入门 PASS：test_d4_9_task6_manifest_capability_attach.py 10 passed —— attach_adapters 在 manifest capability 未被 reviewed overlay 裁决为 bidirectional 时返回空（不注册 adapter），是行为判据非字符串存在。"
+        ]
+      },
+      "runtime_half": {
+        "verdict": "UNVERIFIABLE",
+        "reason": "观测真实 applied 终态（OO forcesave→callback→apply 推进恰好一个 content version / last-applied）需真实 OnlyOffice 编辑会话 + 已发布 definition bundle + DeepHorness SDK；attach_adapters 的 runtime 尾部（resolve_visible_current_representation_id / load_bundle_snapshot / observe_published_frozen_definitions）需 DB + 已发布 bundle。前端 3030 DOWN、D:\\DeepHorness 缺 ⇒ 无法真实驱动。Req 8.6 记 UNVERIFIABLE，未改绿。"
+      }
+    },
+    {
+      "id": "C2",
+      "title": "formula 状态 — formula_mask / custom·preset / schema 白名单",
+      "verdict": "PASS",
+      "kind": "deterministic-structural-behavioral",
+      "requirements": ["8.1"],
+      "behavioral_basis": [
+        "formula_mask 覆盖 D/F 占比列双区（D13:D22/F13:F22 + D27:D36/F27:F36），mode=formula 字段的列必须落 formula_mask（CS-13，parse_contract 真跑通过）；customer_totals 4 个表级标量 row_scoped=False、无 formula 字段故无 formula_mask —— 状态区分正确（公式列 vs 可编辑标量）。",
+        "运行时保护集 runtime_protected_cells = contract formula_mask ∪ footer 合计 cell（C23/E23/C37/E37）∪ 运行时用户公式 cell（wp_formula.target_cell）；is_cell_protected 归一化 $ 与大小写。test_d4_9_task9_formula_protection.py 8 passed（mask 覆盖 D/F 双区 · footer 受保护 · 用户公式 cell 入保护集 · $/小写归一化 · 业务 cell 设公式后受保护 · 血缘链正确）。",
+        "公式定义 SSOT/白名单（禁 eval/外链）由平台级 formula_management.effective_formula + WpFormulaService 承担（D4-9 继承，不重复），custom/preset/preset_missing/corrupt/stale/blocked 六态与 wp_id key 语义在总纲 d4-dual-mode-formula-governance 冻结。"
+      ]
+    },
+    {
+      "id": "C3",
+      "title": "real DAG/linkage — 公式同步不触发 TB writeback / A13 misstatement",
+      "verdict": "SPLIT",
+      "requirements": ["8.1"],
+      "static_half": {
+        "verdict": "PASS",
+        "kind": "deterministic-structural-behavioral",
+        "behavioral_basis": [
+          "phase5_d4_customer_structure.py 全模块源码零 TB/A13 形态（grep + inspect.getsource 扫 ['audited_amount','aje_adjustment','adjustment:created','substantive:adjudicated','a13:push-misstatement','AdjustmentService','trial_balance','misstatement'] → C3_FORBIDDEN_HITS []）—— D4-9 公式/投影/合并/血缘路径结构性不可能发布 TB 或 A13。",
+          "formula_lineage() 的 totals_source 是对 D4-7 的只读取数血缘引用（D4-7!D26/B26/L26/J26 供审计追溯 Req 5.5），不是 trial_balance 写回；合计/占比血缘是表内 SUM 与占比引用（current/prior/totals 表内表间 DAG），不外发事件。",
+          "平台级公式路径同样保证：test_d4_gap_formula_no_tb_a13_publish.py 4 passed（user_formula_v2 / effective_formula 源码无禁词 + apply_batch_mutate 只记 user_formula_v2.batchMutate audit kind 不记审定/调整/错报 + resolve_effective_formula 无 session/db/trial/adjustment/a13 依赖）—— 变异注入 TB 写/publish 会立刻打红。"
+        ]
+      },
+      "runtime_half": {
+        "verdict": "UNVERIFIABLE",
+        "reason": "真实端到端 DAG/联动（current→prior→totals 表内表间在真实 OO 编辑下的重算传播、异常回标真实接收端）需真实 OnlyOffice + 前端在线编辑会话驱动，环境不可用记 UNVERIFIABLE（Req 8.6），未改绿。"
+      }
+    },
+    {
+      "id": "C4",
+      "title": "per-table gate — 只门控 D4-9 相关产物",
+      "verdict": "SPLIT",
+      "static_half": {
+        "verdict": "PASS",
+        "kind": "deterministic-structural",
+        "behavioral_basis": [
+          "D4-9 守卫套件只断言 D4-9 相关 contract/roundtrip/身份/保护集/IO/变异，不等待全平台 77 项（Req 9.4）：test_d4_9_task3/4/9/task10/task6 全绿（37+10 passed）；变异脚本 mutate_d4_9_customer_structure_guards.py 5 锚点仅打 D4-9 产物、四态判定 RED 5/5（Task 11 记录）。",
+          "sibling 平台 C3 守卫（test_d4_gap_formula_no_tb_a13_publish.py）覆盖平台公式路径，D4-9 特有的 no-TB/A13 由本模块源码零禁词 + lineage 只读引用直接锁死，两层互补且不越界门控他 cycle。"
+        ]
+      },
+      "runtime_half": {
+        "verdict": "UNVERIFIABLE",
+        "reason": "C4 的 Playwright 逐 D4-9 验收（source/template evidence 端到端 + roundtrip + 权限 + Playwright）属 Task 15/13 的真栈实测，需真实 OO + 前端 + DeepHorness，环境不可用记 UNVERIFIABLE（Req 8.6），未改绿。"
+      }
+    }
+  ],
+
+  "durable_ack_not_applied_summary": "确定性证明：CommandDispatch 无 saved/applied 字段（拒绝把 200/forcesave=true 当保存完成）；capacity_profile 双 p95 终态预算；content_mutation last_applied vs client_confirmed_base 分离推进。真实 applied 终态观测需 runtime，记 UNVERIFIABLE。",
+  "formula_sync_not_tb_a13_summary": "确定性证明：D4-9 bridge 源码零 TB/A13 禁词 + totals_source 是 D4-7 只读血缘非 TB 写回 + 平台公式路径行为守卫（audit kind 仅 user_formula_v2.batchMutate）。",
+
+  "unblock_requirements_for_runtime_halves": [
+    "启动前端 dev server（3030）",
+    "部署 DeepHorness SDK 到 D:\\DeepHorness",
+    "mount-diff 复核并重批 approved_source_digest 让 workpaper sync manifest 干净 --apply 重生成（curated entry xlsx/gt-d4-customer-structure capability=bidirectional 已在 overlay 声明）"
+  ]
+}

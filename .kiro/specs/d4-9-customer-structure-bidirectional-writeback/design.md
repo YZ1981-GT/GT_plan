@@ -1,6 +1,8 @@
 # Design — D4-9 重要客户结构分析双向回写
 
-## 1. 概述与范围
+## Overview
+
+（1. 概述与范围）
 
 把 D4-9 作为**独立 entry** 接入统一双向路径。复用已落地的内核（`ContentMutationService` / `RepresentationService` / `MaterializeCoordinator` / `CallbackDeliveryService` / `OoToHtmlCoordinator` / adapters registry / contracts 强校验器），**不改契约内核**——D4-9 的多区域 + 表级标量已被现有契约模型（`SheetSpec.tables: tuple` + `CellMapping.static_row` + `FooterAnchorSpec.carries_total_formula` + `formula_mask`）表达。
 
@@ -15,7 +17,9 @@ D4-9 新增：
 - 修 `_d4_import_export.py` 的 D4-9 分支。
 - 公式管理：D4-9 用户公式走 `wp_formula` + ACNR 血缘，用户公式 cell 纳入双向保护区。
 
-## 2. 契约设计（关键）
+## Architecture
+
+（2. 契约设计（关键））
 
 ### 2.1 契约模型能力（已核实 `contracts.py`）
 
@@ -79,7 +83,9 @@ sheet: `重要客户结构分析D4-9`，locator anchor 走 probe gate allowlist�
 - 前端 `D4TabCustomerStructure.vue`：`CustomerRow` 加 `rowId: string`；`defaultRows()` / `addRow()` 生成 `crypto.randomUUID()`（或既有 id 工具）；`loadData()` 对无 rowId 的历史行补齐并 `persistData()` 一次（Requirement 3.2）。
 - 投影 fail-closed：后端 `iter_store_rows` 复用 `phase5` 的 `store_row_identity`（缺/重复 rowId 抛 `StorePayloadError`）。current/prior 各自 seen 集合（区域内唯一，Requirement 3.4）。
 
-## 3. 后端 bridge 模块 `phase5_d4_customer_structure.py`
+## Components and Interfaces
+
+### 3. 后端 bridge 模块 `phase5_d4_customer_structure.py`
 
 镜像 `phase5_d4_revenue_detail.py` 的结构：
 
@@ -104,7 +110,9 @@ sheet: `重要客户结构分析D4-9`，locator anchor 走 probe gate allowlist�
 - manifest entry：document_type xlsx，independent_entry true，scenario_profile 复用 `xlsx.editable.shared.single.room_service_wired.v1`，wp_match wp_code_patterns（宿主幻影码），adapter_id `d4.customer_structure`，capability 由 reviewed overlay 裁决为 bidirectional，browser_case/contract_test 指向本 spec 证据。
 - `attach_adapters` 在 `build_production_registry` 请求期被调用；capability!=bidirectional 或 adapter_id 不符时 fail closed。
 
-## 6. 公式管理（用户自定义 + 血缘 + 保护区）
+## Data Models
+
+### 6. 公式管理（用户自定义 + 血缘 + 保护区）
 
 三套公式存储的边界（已核实）：
 - `wp_formula` 表（`WpFormula.target_cell`）：**用户自定义公式落这里**，`wp_template_init_service` 写 xlsx 时用户公式优先级最高（`_mark_user_formula_cell`）。各 D 循环 `resolve_effective` 读它。→ **本 spec 的用户公式主存储**。
@@ -134,7 +142,19 @@ sheet: `重要客户结构分析D4-9`，locator anchor 走 probe gate allowlist�
 - `D4TabCustomerStructure.vue`：行加 rowId + 迁移；**移除**内部 `editorMode` 双模式与 `GtOnlyOfficeSheet` 分支（legacy 单向），只保留结构化视图；在线编辑统一由宿主的 `WorkpaperSyncEditorHost` 承担（Requirement 7.1 / 7.5）。
 - 能力未裁决/OO 不健康 → `GtEntrySyncCapabilityNotice` + fail-closed 提示（Requirement 7.4）。
 
-## 9. Testing Strategy
+## Error Handling
+
+汇总本设计各节已声明的 fail-closed 规则（无新增语义）：
+
+- capability 未被 reviewed overlay 裁决为 `bidirectional` → 不注册 adapter，前端保持非双向（§5，Req 1.2）。
+- contract / instrumentation / template digest 与 `phase5` 现算 payload 漂移 → fail closed（§2，Req 1.4）。
+- store 行缺 rowId 或重复 rowId → 投影层抛 `StorePayloadError`，不退回下标、不静默合并（§2 投影，Req 3.3）。
+- 用户公式引用无法经 ACNR `full_resolve` 解析 → 返回可操作的中文错误，不静默吞（§6，Req 5.2）。
+- 三方合并同字段冲突 → 保留三值与解决轨迹，不静默选边（§4，Req 4.3）。
+- 导入列名不匹配 → 返回中文列名错误（§7，Req 6.5）。
+- 宿主实测不可达（产不出 descriptor 事实）→ 不注册 adapter（Req 1.5）。
+
+## Testing Strategy
 
 - 后端契约守卫：parse_contract 真跑，断言 3 table / 静态标量 / formula_mask 覆盖 / footer 承载（行为级）。
 - roundtrip：store（含 rowId + 4 总额）→ build_combined_store_projection → materialize → extract → merge → store，逐字段对齐；OO 改一行/改一总额 → 提取回正确区域。
@@ -144,45 +164,45 @@ sheet: `重要客户结构分析D4-9`，locator anchor 走 probe gate allowlist�
 - 导入导出：导出含本期/上期+总额；导入 `{current,prior}` 结构正确 + 补 rowId + 占比列不回导。
 - Playwright 真栈（真实 OO）：证据 JSON 记录 request 路径 / content version / application / operation 终态 / artifact digest。
 
-## Properties
+## Correctness Properties
 
-### Property 1
+### Property 1: 三 table 结构与静态标量
 D4-9 contract 经 parse_contract 后，sheet 恰含 3 张 table（`customer_current_rows`/`customer_prior_rows`/`customer_totals`）；前两张有 row_identity+delete_policy，第三张无 row_identity 且其 4 字段均 row_scoped=False 带 static_row。
 **Validates: Requirements 2.1, 2.2, 2.3**
 
-### Property 2
+### Property 2: 占比公式受 formula_mask 保护
 D/F 占比字段 mode=formula 且列落各自 table 的 formula_mask 内；合计行由 footer_anchor.carries_total_formula=true 承载。改任一为非保护/去 formula_mask 使 parse_contract 失败或 roundtrip 覆盖公式。
 **Validates: Requirements 2.4, 4.1**
 
-### Property 3
+### Property 3: 行身份稳定且区域隔离
 store 每行携带稳定 rowId；缺/重复 rowId 时投影 fail closed；current 与 prior 的 rowId 各自唯一、按 table_key 归属不串区域。
 **Validates: Requirements 3.1, 3.3, 3.4**
 
-### Property 4
+### Property 4: materialize→extract 逐字段往返
 materialize→extract roundtrip：current/prior 客户行与 4 个总额单元格逐字段还原；D/F 占比与合计公式不被投影覆盖。
 **Validates: Requirements 4.1, 4.2**
 
-### Property 5
+### Property 5: 单一 content version 推进
 业务提交只经 ContentMutationService.commit 推进恰好一个 content version/revision；不产生独立 file_version/oo_content_revision 自增。
 **Validates: Requirements 4.6, 1.3**
 
-### Property 6
+### Property 6: 用户公式 cell 纳入保护集
 存在用户公式的 cell 纳入运行时保护集合（contract formula_mask ∪ 用户公式 cell）；OO 侧改该 cell 产生受保护字段冲突而非覆盖。
 **Validates: Requirements 5.3, 5.6**
 
-### Property 7
+### Property 7: 用户公式落库并写入 xlsx
 用户自定义公式落 wp_formula 并在导出/实例化写进 xlsx（用户公式优先）；无法解析引用给中文错误不静默吞。
 **Validates: Requirements 5.1, 5.2**
 
-### Property 8
+### Property 8: 导入导出结构相符
 D4-9 导入导出区分本期/上期两表 + 总额；导入用专用 parser 写回 {current,prior} 嵌套结构并补 rowId；占比列不可回导覆盖公式。
 **Validates: Requirements 6.1, 6.2, 6.3, 6.4**
 
-### Property 9
+### Property 9: 前端走新 entry 且 legacy 移除
 前端 D4-9 在线编辑走新 entry 的 WorkpaperSyncEditorHost；能力未裁决时 fail-closed；legacy GtOnlyOfficeSheet 单向入口被移除/不可达。
 **Validates: Requirements 7.1, 7.4, 7.5**
 
-### Property 10
+### Property 10: 变异检验四锚点全 RED
 变异检验四锚点（删 formula_mask / 静态标量改 row 域 / 合并两 table / 去 rowId）全 RED；改错前端 entry_id 前缀打红。
 **Validates: Requirements 8.3, 8.4**
 

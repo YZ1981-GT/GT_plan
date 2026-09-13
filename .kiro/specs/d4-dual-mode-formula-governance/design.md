@@ -59,18 +59,18 @@ key=`wp_id + stable_sheet_key + row_key + field_key + custom`；`preset_version`
 风险发现不等于错报；四表取数复用 `app/services/four_table/`。导入保留sheet/table/region/stable row key/formula mask。按角色、scope、wp_id、content version做CAS。C0模板/identity、C1sync、C2formula、C3linkage、C4逐表验收只门控相关平台产物，不等待全平台77项；UNVERIFIABLE不计GREEN。
 
 ## Correctness Properties
-### Property 1
+### Property 1: 分母恒36且owner唯一
 36个且仅36个 `wp_code` 各有一条owner记录；物理sheet/变体/程序表不扩张分母。
 **Validates: Requirements 1.1, 1.2, 8.1**
-### Property 2
+### Property 2: 三方合并与durable-ack≠applied
 不同字段自动合并，同字段冲突保留三方轨迹；durable ack在applied前不会伪装为applied。
 **Validates: Requirements 2.1, 2.2**
-### Property 3
+### Property 3: 公式key用wp_id且分态
 公式key使用 `wp_id`，preset/custom/stale/损坏/缺失可区分，禁止eval和外链。
 **Validates: Requirements 3.1, 3.2, 3.3**
-### Property 4
+### Property 4: 真实DAG与发布边界
 表内表间真实DAG支持二次编辑，循环和单writer冲突失败；同步不触发TB/A13。
 **Validates: Requirements 4.1, 4.2, 5.1**
-### Property 5
+### Property 5: 只门控相关产物不假绿
 各owner的C0-C4只门控相关产物，UNVERIFIABLE不假绿。
 **Validates: Requirements 8.1**

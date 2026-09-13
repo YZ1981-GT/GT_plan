@@ -1,4 +1,6 @@
-# Requirements — D4-9 重要客户结构分析 HTML↔OnlyOffice 双向回写
+# Requirements Document
+
+D4-9 重要客户结构分析 HTML↔OnlyOffice 双向回写
 
 ## Introduction
 
@@ -19,7 +21,9 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 
 真源优先级遵循 `docs/operations/workpaper-html-onlyoffice-bidirectional-writeback-master-control.md`：数据库约束与运行态请求 > source-backed manifest/生成器/机器门禁 > 本 spec。
 
-## 术语与冻结事实（openpyxl 直读 `backend/wp_templates/D/D4 收入底稿.xlsx` 实测）
+## Glossary
+
+术语与冻结事实（openpyxl 直读 `backend/wp_templates/D/D4 收入底稿.xlsx` 实测）
 
 | 项 | 值 |
 |---|---|
@@ -35,7 +39,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 
 ## Requirements
 
-### Requirement 1 — D4-9 作为独立 entry 接入统一双向路径
+### Requirement 1: D4-9 作为独立 entry 接入统一双向路径
 
 **User Story:** 作为审计师，我希望在 D4-9 底稿上切换「结构化视图 / 在线编辑」并双向同步，使我在 Excel 里改的客户行与总额能回到结构化视图，反之亦然。
 
@@ -47,7 +51,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 4. WHEN adapter 注册成功 THEN 该 entry 的 contract/instrumentation/template digest 与 `phase5` 模块现算 payload SHALL 双向锁死；任一漂移 SHALL fail closed。
 5. WHERE 宿主实测不可达（产不出 descriptor 事实）THE 系统 SHALL NOT 注册 adapter。
 
-### Requirement 2 — 单 sheet 内两个动态行区域 + 表级标量的契约表达
+### Requirement 2: 单 sheet 内两个动态行区域 + 表级标量的契约表达
 
 **User Story:** 作为平台维护者，我希望 D4-9 的本期/上期两个客户区域与 4 个总额标量用现有契约模型正确表达，不引入契约内核改动。
 
@@ -60,7 +64,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 5. WHEN contract 经 `parse_contract` 校验 THEN 全部字段 SHALL 通过（无 CS-1~CS-20 违规），且序号列（A）等模板内部公式/自增列 SHALL NOT 冒充可编辑业务字段。
 6. IF 任一字段缺 `source_ref` THEN 校验 SHALL 失败（禁止无来源自造字段）。
 
-### Requirement 3 — HTML store 行补稳定行身份并迁移
+### Requirement 3: HTML store 行补稳定行身份并迁移
 
 **User Story:** 作为审计师，我希望删除/重排/新增客户行后数据不串行，因此每行需要稳定身份。
 
@@ -71,7 +75,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 3. WHEN 投影层遇到缺 rowId 或重复 rowId 的行 THEN 后端 SHALL fail closed（不得退回下标作身份，不得静默合并）。
 4. WHERE 同一 store 的本期与上期区域 THE rowId SHALL 在两个区域内各自唯一，且区域归属 SHALL 由 table_key 决定，不得跨区域串号。
 
-### Requirement 4 — HTML→OO materialize 与 OO→HTML extract/merge
+### Requirement 4: HTML→OO materialize 与 OO→HTML extract/merge
 
 **User Story:** 作为审计师，我希望 HTML 改动生成的 Excel 与 Excel 改动提取回的行都正确落到本期/上期对应区域与总额单元格。
 
@@ -84,7 +88,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 5. WHEN merge 结果与 incoming 不同 THEN 系统 SHALL canonical rematerialize 并要求 refresh/reopen；HTML 刷新 SHALL 读新 content version，SHALL NOT 直接读 callback 文件。
 6. WHEN 业务变更提交 THEN 系统 SHALL 只经 `ContentMutationService.commit` 推进恰好一个 content version/revision，SHALL NOT 自增独立 `file_version`/`oo_content_revision`。
 
-### Requirement 5 — 用户自定义公式与上下游血缘
+### Requirement 5: 用户自定义公式与上下游血缘
 
 **User Story:** 作为审计师，我希望能对 D4-9 的可编辑单元格自定义公式（如占比口径微调、销售总额从 D4-7 取数），并追溯公式引用的上下游，同时不被在线编辑覆盖。
 
@@ -97,7 +101,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 5. WHERE 表级标量总额来自上游 D4-7 THE 系统 SHALL 支持把该取数登记为可追溯来源，并在总额被手工覆盖时保留手工值（不被取数无条件覆盖）。
 6. IF 用户公式与契约声明的 formula 字段冲突（同 cell 既是模板公式又被声明用户公式）THEN 系统 SHALL 以明确规则裁决（用户公式优先并纳入保护区），SHALL NOT 两套公式同时写入产生歧义。
 
-### Requirement 6 — 修复 D4-9 导入导出与真实结构相符
+### Requirement 6: 修复 D4-9 导入导出与真实结构相符
 
 **User Story:** 作为审计师，我希望 D4-9 的导出模板/导出数据/导入数据与结构化视图看到的本期/上期两张表 + 总额一致。
 
@@ -109,7 +113,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 4. WHEN 导出的占比/合计为公式列 THEN 导出 SHALL 保留公式或导出计算值并标注，SHALL NOT 把公式列当可导入的手填列造成回导覆盖公式。
 5. WHEN 导入列名不匹配 THEN 系统 SHALL 返回可操作的中文列名错误。
 
-### Requirement 7 — 前端宿主接入与视图切换
+### Requirement 7: 前端宿主接入与视图切换
 
 **User Story:** 作为审计师，我希望 D4-9 的视图切换与 D4-2/3 一致、可靠，切换时不丢在途改动。
 
@@ -121,7 +125,7 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 4. WHEN 双向不可用（能力未裁决/OO 不健康）THEN 前端 SHALL 给出明确提示并保持结构化视图可编辑，SHALL NOT 呈现"看起来能切换实际会失败"的假入口。
 5. WHEN D4-9 legacy 单向入口被替换 THEN `D4TabCustomerStructure.vue` 内的 `editorMode` 双模式与其 `GtOnlyOfficeSheet` 分支 SHALL 按 source-backed deletion 移除或改为不可达，避免双入口。
 
-### Requirement 8 — 验证、守卫与防假绿
+### Requirement 8: 验证、守卫与防假绿
 
 **User Story:** 作为平台维护者，我希望每项能力都有行为级判据与变异检验，杜绝"类存在/字符串存在"式假绿。
 
@@ -135,8 +139,13 @@ D4-9 与 D4-2/3 的结构差异（本 spec 的核心难点）：
 6. WHERE 环境不可用 THE 相关判据 SHALL 记 `UNVERIFIABLE`（非实现失败），SHALL NOT 用人工说明改绿。
 
 
-### Requirement 9 — 统一治理边界与里程碑
-1. C0模板/identity、C1sync、C2formula、C3linkage、C4逐表验收必须有独立证据；物理sheet双区不是额外wp_code。
-2. 公式key使用wp_id，preset_version仅为定义版本；preset升级保留custom，删除custom恢复preset，缺失/损坏/stale/blocked分态，schema白名单禁eval和外链。
+### Requirement 9: 统一治理边界与里程碑
+
+**User Story:** 作为平台维护者，我希望 D4-9 的双向能力落在统一的 C0-C4 治理边界内，公式定义 key 与状态机语义一致，避免跨 spec 语义漂移。
+
+#### Acceptance Criteria
+
+1. WHEN 验收 D4-9 THEN C0模板/identity、C1sync、C2formula、C3linkage、C4逐表验收 SHALL 各有独立证据；物理sheet双区 SHALL NOT 被当作额外 wp_code。
+2. WHEN 处理公式定义 THEN 公式 key SHALL 使用 wp_id，preset_version 仅为定义版本；preset 升级 SHALL 保留 custom，删除 custom SHALL 恢复 preset，缺失/损坏/stale/blocked 分态，schema 白名单 SHALL 禁 eval 和外链。
 3. 不同字段自动合并，同字段保留三方冲突轨迹；durable ack不等于applied；同步不是TB/A13。
 4. 只门控D4-9相关平台产物，不等待全平台77项。

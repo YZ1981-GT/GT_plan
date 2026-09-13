@@ -43,11 +43,12 @@
   - **完成**：clean sha256=`b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f`；bak=`ecac5d56…`；变异 4/4 RED（`evidence/T04-sanitize-mutation-verdict.json`）；zip 元数据保留保证 sha 可复现
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
 
-- [ ] 5. provider 模块 + 契约 + 生成器
+- [x] 5. provider 模块 + 契约 + 生成器
   - 新增 `backend/app/services/workpaper_sync/phase5_d4_revenue_detail.py`（9 段结构，18 字段，12 个月走数组下标 json_path）
   - 新增 `backend/scripts/gen/generate_phase5_d4_contract.py`，`--apply` 生成 `backend/data/workpaper_sync_contracts/d4.revenue_detail.json`
   - `assert_contract_file_matches_source()` 双向锁死；`parse_contract` 必须接受数组下标 pointer
   - 🔴 新模块行数若超 800 行门：优先按 spec 决策抽共生件，不得直接改 whitelist
+  - **完成**：provider 986 行（数组路径已抽 `json_path.py` 共享模块，无冗余）；契约 `d4.revenue_detail.json` parse_contract 通过（1 sheet / 18 fields / 数组下标正确解析）；生成器脚本已创建；carrier gate digest 漂移兜底已加（镜像 D4-9 范式）
   - _Requirements: 1.1, 4.1_
 
 - [ ] 6. registry 两白名单 + wp_code 裁决

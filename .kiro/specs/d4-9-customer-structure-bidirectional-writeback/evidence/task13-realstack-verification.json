@@ -1,0 +1,87 @@
+{
+  "schema": "d4-9-task13-realstack-evidence/v1",
+  "task": "13 真栈实测（Playwright + 真实 OO）+ 收口",
+  "verdict": "UNVERIFIABLE",
+  "verdict_basis": "Requirement 8.6 — 环境不可用记 UNVERIFIABLE（非实现失败），SHALL NOT 用人工说明改绿。",
+  "verified_at_local_branch": "work/2026-05-30-wp-specs",
+  "environment_checks": {
+    "backend_9980": {
+      "tcp": true,
+      "import_app_main": "OK",
+      "http_api_health": 200,
+      "http_docs": 200,
+      "note": "后端在线且 import app.main 成功（workpaper_capability.py 缺失阻塞已解除，该模块现为 git TRACKED）"
+    },
+    "frontend_3030": {
+      "tcp": false,
+      "http": "connect_failed",
+      "note": "前端 dev server 未运行 —— 无法驱动 HTML 结构化视图编辑客户行 / 4 总额，无法做视图切换 Playwright 端到端"
+    },
+    "onlyoffice_8080": {
+      "tcp": true,
+      "docker_container": "audit-onlyoffice",
+      "docker_status": "Up (healthy)",
+      "note": "OO 容器健康，但无前端 + 无 DeepHorness SDK 无法完成 HTML↔OO 双向往返"
+    },
+    "deephorness_sdk": {
+      "path": "D:\\DeepHorness",
+      "exists": false,
+      "note": "DeepHorness SDK 目录不存在 —— 双向 wiring 链（Task 5/6 adapter runtime attach 的 DB/OO runtime 尾部：representation/bundle/observation）依赖它"
+    }
+  },
+  "behavioral_criteria_unverifiable": [
+    {
+      "criterion": "request 路径命中 USER_SYNC_PREFIX、无 legacy 旁路",
+      "status": "UNVERIFIABLE",
+      "reason": "需前端在线发起在线编辑请求 + adapter 经 registry 解析到；curated entry xlsx/gt-d4-customer-structure 已在 overlay 声明 capability=bidirectional，但 manifest --apply 重生成被既有 approved_source_digest 漂移堵死（并发会话在编辑 D4 宿主 .vue），且无前端无法观测真实 network capture"
+    },
+    { "criterion": "content version 推进恰好一个", "status": "UNVERIFIABLE", "reason": "需真实 commit 经 ContentMutationService，无前端/无 OO runtime 驱动" },
+    { "criterion": "application（callback→apply）终态", "status": "UNVERIFIABLE", "reason": "需真实 OO forcesave→callback→apply，无 DeepHorness SDK / 无前端" },
+    { "criterion": "operation 终态", "status": "UNVERIFIABLE", "reason": "同上，无端到端 operation 可观测" },
+    { "criterion": "artifact digest", "status": "UNVERIFIABLE", "reason": "需真实 materialize 产出 artifact，端到端不可跑" },
+    { "criterion": "OO 改一行 + 改一总额 → 切回 HTML 值逐字对齐", "status": "UNVERIFIABLE", "reason": "需前端 + 真实 OO 编辑会话" },
+    { "criterion": "merge 幂等", "status": "UNVERIFIABLE", "reason": "需真实 merge 链驱动" },
+    { "criterion": "用户公式 cell 不被 OO 覆盖", "status": "UNVERIFIABLE", "reason": "保护集注入 materialize/extract 入口依赖 adapter 路径（Task 5-7 阻塞链）+ 真实 OO 编辑" }
+  ],
+  "deterministic_closure_done": {
+    "get_diagnostics_三件套": {
+      "requirements_md": "0 diagnostics",
+      "design_md": "0 diagnostics",
+      "tasks_md": "0 diagnostics",
+      "note": "本次修复：requirements 标题格式（# Requirements Document / ### Requirement N: Title / ## Glossary / Req9 补 User Story+Acceptance Criteria）；design 补 ## Overview/## Architecture/## Components and Interfaces/## Data Models/## Correctness Properties/## Error Handling/## Testing Strategy + Property N: Title。纯机械格式对齐，未改内容实质。"
+    },
+    "git_status_porcelain_产物清单": {
+      "untracked_??": [
+        "backend/app/services/workpaper_sync/phase5_d4_customer_structure.py",
+        "backend/data/workpaper_sync_contracts/d4.customer_structure.json",
+        "backend/scripts/gen/generate_phase5_d4_customer_structure_contract.py",
+        "backend/scripts/diagnose/mutate_d4_9_customer_structure_guards.py",
+        "backend/tests/workpaper_sync/test_d4_9_task1_instrument_multi_region.py",
+        "backend/tests/workpaper_sync/test_d4_9_task3_contract.py",
+        "backend/tests/workpaper_sync/test_d4_9_task4_projection.py",
+        "backend/tests/workpaper_sync/test_d4_9_task7_roundtrip.py",
+        "backend/tests/workpaper_sync/test_d4_9_task9_formula_protection.py",
+        "backend/tests/test_d4_9_task10_import_export.py",
+        "audit-platform/frontend/src/components/workpaper/d4/analysis/d4CustomerRowIdentity.ts",
+        "audit-platform/frontend/src/components/workpaper/d4/analysis/d4CustomerRowIdentity.spec.ts"
+      ],
+      "modified_tracked_M": [
+        "backend/app/routers/wp_render_strategies/_d4_import_export.py",
+        "backend/app/services/workpaper_sync/excel_instrumentation.py",
+        "backend/data/workpaper_sync_entry_overlay.json",
+        "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerStructure.vue"
+      ],
+      "resolved_now_tracked": [
+        "backend/app/services/workpaper_capability.py"
+      ],
+      "note": "12 个 spec 产物仍 ?? 未跟踪（含 ts + spec.ts 共 2 个前端），未 commit。本会话不 commit：commit 需用户明确请求，且分支 work/2026-05-30-wp-specs 超前远端约 145 提交（多为并发会话在途），直接 push/commit 风险高。"
+    },
+    "index_md_registration": "已在 .kiro/specs/INDEX.md active 表 d4-revenue-matrix-bidirectional 行后新增 d4-9-customer-structure-bidirectional-writeback 行（10/15，Task 13 UNVERIFIABLE）",
+    "tmp_wip_cleanup": "本 spec 未产生 tmp_*/_wip_* 诊断产物（root + backend/scripts/diagnose 扫描无 D4-9 相关临时文件）"
+  },
+  "unblock_requirements": [
+    "部署 DeepHorness SDK 到 D:\\DeepHorness",
+    "启动前端 dev server（3030）",
+    "mount-diff 复核并重批 approved_source_digest 让 workpaper sync manifest 干净 --apply 重生成（当前被并发会话编辑 D4 宿主 .vue 导致源 digest 漂移堵死）"
+  ]
+}
