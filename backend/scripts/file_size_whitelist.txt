@@ -527,3 +527,14 @@ backend/tests/test_workpaper_route_task1_baseline.py  961
 # ═══════════════════════════════════════════════════════════════════════════
 backend/app/services/custom_template_ingestion/policy.py  806
 backend/app/services/custom_template_ingestion/quarantine.py  870
+
+#   diagnose_guidance_source_ref_localization.py（860 行）—— T7 切片 A 的**只读**事实
+#     核算器。单文件承载「分层匹配判据（skeleton 规范化 + 逐层求值）+ 校验器自检
+#     （1 正例 + 5 反例：sheet_not_found / range_empty / authority_root_not_allowed /
+#     kind_is_lifecycle_not_locator / digest_mismatch）+ evidence 序列化」三段。
+#     自检段是本脚本**防假绿的核心装置** —— 它把「attachable_valid=0」与「我的校验
+#     调用坏了」区分开，缺一条即整份报告判 harnessVerdict=BROKEN。拆分会让「判据 ↔
+#     它的反例对照组」跨文件，与 check_x3_deviation_registry.py 登记的是同一类结构
+#     （判据 + 反空转对照组 + 可复算 method 必须同文件可见）。
+#     spec: workpaper-guidance-content-closure Task 7 切片 A
+backend/scripts/diagnose/diagnose_guidance_source_ref_localization.py  860
