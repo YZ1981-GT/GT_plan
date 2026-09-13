@@ -495,3 +495,35 @@ backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
 # ═══════════════════════════════════════════════════════════════════════════
 audit-platform/frontend/src/components/workpaper/GtCControlTest.vue  1778
 backend/tests/test_workpaper_route_task1_baseline.py  961
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: custom-workpaper-template-ingestion-and-sync-closure（2026-09-13 首次入库）
+#
+# 🔴 这 2 条是**债务登记，不是豁免赦免**。入库时 pre-commit 报出这两个生产文件超限。
+#    生产代码按 whitelist 既定优先级属「唯一影响可维护性的一类」，应拆；此处登记的
+#    原因是**拆分方案本身有技术障碍或超出本次入库范围**，逐条说明如下，并给出方向。
+#
+#   policy.py（806 行，超上限 6 行）—— 已评估抽 `ScannerProvenance` 三件套
+#     （ScannerProvenanceError + ScannerProvenance + build_provenance，约 123 行）到
+#     伴生模块，**放弃**：它与 policy 是**双向**依赖 —— provenance 的 policy_fingerprint
+#     由 `CustomTemplateIngestionPolicy.fingerprint()` 派生、`is_stale_for()` 又收
+#     policy 实例做参数、`to_dict()` 还读模块私有 `_OBSERVATION_LIMITS`；而
+#     `test_policy.py` 从 `policy` 直接 import 这三个名字，兼容就得在 policy 末尾
+#     re-export ⇒ 形成循环 import（靠「末尾才 import、此时被依赖名已定义」的加载
+#     时序侥幸成立，脆弱）。为 6 行超限换一个循环 import 不值得。
+#     拆分方向：把 `ResourceObservation` + `_OBSERVATION_LIMITS` 下沉为
+#     `resource_observation.py`（无反向依赖），policy 与 scanner_provenance 各自
+#     依赖它，循环即解开 —— 属独立任务（动 3 个模块的 import 面）。
+#   quarantine.py（870 行，超上限 70 行）—— 主体 `PrivateQuarantine`（约 432 行）是
+#     内聚的私有隔离区存储实现（org 分区 / manifest / TTL 清理 / 状态标记），拆它
+#     等于拆一个类。可干净抽出的是「文件名与扩展名规范化」四件套
+#     （display_filename / _strip_surrounding / extension_of / is_allowed_extension，
+#     约 97 行纯字符串处理，抽出后 773 行即达标）与「ArtifactState + transition
+#     状态机」（约 88 行）。本次不做：这批代码非本会话所写、已静止 4 天，首次入库
+#     同批重构会把 diff 淹没在搬迁噪声里，且该拆分需回归 16 个 quarantine 用例。
+#     拆分方向：`filename_rules.py` + `artifact_state.py` 两个伴生模块。
+#
+# baseline 取门禁实测真实行数，登记后继续拦膨胀 >5%。
+# ═══════════════════════════════════════════════════════════════════════════
+backend/app/services/custom_template_ingestion/policy.py  806
+backend/app/services/custom_template_ingestion/quarantine.py  870
