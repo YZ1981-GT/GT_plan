@@ -476,3 +476,22 @@ backend/app/routers/wp_render_strategies/_k1_import_export.py  1482
 #   spec: workpaper-page-formula-toolbar-closure Task 13/15
 backend/scripts/gen/generate_workpaper_sync_program_milestones.py  2744
 backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
+
+# ═══════════════════════════════════════════════════════════════════════════
+# spec: workpaper-page-formula-toolbar-closure（2026-09-13 入库，gc0 dup 修复同批）
+#
+#   GtCControlTest.vue —— **改动前即 1778 行已超限**。本次仅 +7 行：把组件内本地
+#     `interface GuidanceSection` 改名 `RenderConfigGuidanceSection` 并加注释说明
+#     它是 render-config 琥珀块形状、不是 G-C0 wire 类型。改名前它让两条**已入库**
+#     守卫（test_gc0_reverse_dup_scan 的 covered_by_exemptions / zero_exemptions）
+#     在 HEAD 上就是红的。拆分该组件属 C 循环独立任务：与一次改名同批会把 diff
+#     淹没在搬迁噪声里。baseline 取当前真实行数。
+#   test_workpaper_route_task1_baseline.py —— F-SHELL Task 1「红基线冻结」宿主：
+#     7 类红基线清册（nodeKey payload / 唯一 dialog / FormulaEdit 链 / 旧 dict API /
+#     formula_type 双义 / audit warning commit / 重复 AI-review-rail）+ 域外清册
+#     + owner 冻结表 + 变异自检 M1，四段互为分母。清册条目本身是数据不是逻辑；
+#     拆分会让「某类清册 ↔ 它的变异自检」跨文件，分母核对不可见（沿用同域
+#     mutate_ie_lifecycle_guards.py / check_x3_deviation_registry.py 的在册先例）。
+# ═══════════════════════════════════════════════════════════════════════════
+audit-platform/frontend/src/components/workpaper/GtCControlTest.vue  1778
+backend/tests/test_workpaper_route_task1_baseline.py  961

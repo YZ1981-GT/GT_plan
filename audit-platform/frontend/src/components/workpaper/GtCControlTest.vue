@@ -580,14 +580,19 @@ const { state, loading, selfLoad, flushPendingSaves,
 
 // ─── Guidance (编制提示琥珀块) ────────────────────────────────────────────────
 
-interface GuidanceSection {
+/**
+ * render-config `html_data.guidance` 琥珀块的**本地** section 形状
+ * —— 不是 G-C0 wire 的 `GuidanceSection`（字段口径不同：这里是 heading/content，
+ * C0 wire 是 key/title/... ）。故显式命名，避免本地重复声明 C0 顶层符号。
+ */
+interface RenderConfigGuidanceSection {
   heading: string
   content: string
 }
 interface GuidanceData {
   wp_code: string
   title: string
-  sections: GuidanceSection[]
+  sections: RenderConfigGuidanceSection[]
   source: string
 }
 
