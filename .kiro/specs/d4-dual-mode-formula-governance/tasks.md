@@ -1,6 +1,6 @@
 # Tasks — D4双模式公式治理与36底稿覆盖
 
-- [~] 1. C0模板/identity：建立D4-1..36 owner矩阵，逐项读取finder索引及权威源模板；D4-4/8/12按已有能力只收口缺口，不重复已有owner。
+- [-] 1. C0模板/identity：建立D4-1..36 owner矩阵，逐项读取finder索引及权威源模板；D4-4/8/12按已有能力只收口缺口，不重复已有owner。
   - _Requirements: 1.1, 1.2, 1.3, 8.1_
 - [~] 2. C1sync：冻结共享协议、字段级自动合并、同字段冲突轨迹、durable ack/applied及canonical refresh。
   - _Requirements: 2.1, 2.2, 2.3_
