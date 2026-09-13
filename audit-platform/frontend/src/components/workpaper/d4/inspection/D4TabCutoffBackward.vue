@@ -16,6 +16,8 @@ import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
 import type { ExtractedVoucher, FillMode } from '../../composables/useCutoffAutoSampling'
 import { D4_MAIN_REVENUE_STANDARD } from '../../composables/d4AccountScope'
+import { isCutoffOk } from '../../composables/useD4FormulaEngine'
+import { useD4InspectionWriteback, type D4Discovery } from '../../composables/useD4InspectionWriteback'
 
 const GtCutoffAutoSampling = defineAsyncComponent(() => import('../../cutoff/GtCutoffAutoSampling.vue'))
 
@@ -65,9 +67,8 @@ const ocrResult = ref<Record<string, any>>({})
 
 // ─── Auto cutoff check ───────────────────────────────────────────────
 function checkCutoff(row: CutoffBackwardRow): boolean | null {
-  if (!row.deliveryDate || !row.voucherDate) return null
-  // D4-18: delivery in period, voucher after period → cutoff issue (×)
-  return !(row.deliveryDate <= cutoffDate.value && row.voucherDate > cutoffDate.value)
+  // D4-18（单据到账）：早侧=发货单，晚侧=凭证。单一真源 useD4FormulaEngine.isCutoffOk。
+  return isCutoffOk(row.deliveryDate, row.voucherDate, cutoffDate.value)
 }
 
 function recalcAll() {
@@ -85,6 +86,8 @@ function loadData() {
 function loadNoteConclusion() {
   auditNote.value = props.allResponses.get('D4-18-note')?.remark || ''
   auditConclusion.value = props.allResponses.get('D4-18-conclusion')?.remark || ''
+  const cd = props.allResponses.get('D4-18-cutoff-date')?.remark
+  if (cd && String(cd).trim()) { cutoffDate.value = String(cd).trim(); recalcAll() }
 }
 
 watch(() => props.allResponses.get('D4-18-rows')?.remark, () => loadData(), { immediate: true })
@@ -187,16 +190,53 @@ const totalRows = computed(() => rows.value.length)
 const cutoffIssues = computed(() => rows.value.filter(r => r.isCutoff === false).length)
 const totalAmount = computed(() => rows.value.reduce((s, r) => s + (r.deliveryAmount || 0), 0))
 
+// ─── 发现→人工确认门→A13（Task 4/5：跨期发现不自动造错报） ────────────────
+const { isPushed, canConfirm, pushConfirmed } = useD4InspectionWriteback({
+  wpCode: 'D4-18', projectId: computed(() => props.projectId),
+  defaultAccountCode: D4_MAIN_REVENUE_STANDARD, defaultAccountName: '主营业务收入',
+})
+const confirmDialogVisible = ref(false)
+interface ConfirmDraft extends D4Discovery { checked: boolean }
+const confirmDrafts = ref<ConfirmDraft[]>([])
+function openConfirmDialog() {
+  confirmDrafts.value = rows.value
+    .filter(r => r.isCutoff === false && !isPushed(r.id))
+    .map(r => ({
+      sourceId: r.id,
+      description: `截止跨期（发货${r.deliveryDate}/凭证${r.voucherDate}·${r.deliveryNo || '-'}）${r.deliveryProduct || ''}`.trim(),
+      // D4-18 单据到账：本期已发货而凭证在期后 → 本期少记收入（遗漏）→ 贷方（收入完整性）
+      direction: 'credit' as const,
+      amount: Number(r.deliveryAmount || 0),
+      evidence: r.remark || '',
+      accountCode: D4_MAIN_REVENUE_STANDARD,
+      accountName: '主营业务收入',
+      checked: true,
+    }))
+  if (!confirmDrafts.value.length) { ElMessage.info('无未推送的跨期发现'); return }
+  confirmDialogVisible.value = true
+}
+function confirmAndPush() {
+  const selected = confirmDrafts.value.filter(d => d.checked)
+  const blocked = selected.filter(d => !canConfirm(d))
+  if (blocked.length) {
+    ElMessage.warning(`${blocked.length} 笔缺方向/金额/证据，未通过确认门（请补齐证据索引与金额）`)
+  }
+  const n = pushConfirmed(selected)
+  if (n > 0) { ElMessage.success(`已确认并推送 ${n} 笔跨期错报至 A13`); confirmDialogVisible.value = false }
+  else if (!blocked.length) ElMessage.info('无可推送的已确认发现')
+}
+
 // ─── Persistence ─────────────────────────────────────────────────────
 function persistAll() {
   props.allResponses.set('D4-18-rows', { item_id: 'D4-18-rows', conclusion: null, remark: JSON.stringify(rows.value) })
   props.allResponses.set('D4-18-note', { item_id: 'D4-18-note', conclusion: null, remark: auditNote.value })
   props.allResponses.set('D4-18-conclusion', { item_id: 'D4-18-conclusion', conclusion: null, remark: auditConclusion.value })
+  props.allResponses.set('D4-18-cutoff-date', { item_id: 'D4-18-cutoff-date', conclusion: null, remark: cutoffDate.value })
   debounceSave()
 }
 function debounceSave() { if (debounceTimer) clearTimeout(debounceTimer); debounceTimer = setTimeout(() => { debounceTimer = null; flushSave() }, 2000) }
 function flushSave() {
-  const keys = ['D4-18-rows', 'D4-18-note', 'D4-18-conclusion']
+  const keys = ['D4-18-rows', 'D4-18-note', 'D4-18-conclusion', 'D4-18-cutoff-date']
   window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: keys.map(k => props.allResponses.get(k)).filter(Boolean) } }))
 }
 function updateAuditNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persistAll() }
@@ -210,10 +250,14 @@ const aiAvailable = ref(false)
 async function checkAiHealth() { try { const res = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = ['healthy', 'degraded'].includes(res.data?.data?.status ?? res.data?.status) } catch { aiAvailable.value = false } }
 checkAiHealth()
 
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function handleExportTemplate() { exportTemplate('D4-18') }
 function handleExportData() { exportData('D4-18') }
-async function handleImportFile(uploadFile: any) { await importData('D4-18', uploadFile.raw || uploadFile) }
+async function handleImportFile(uploadFile: any) {
+  const res = await importData('D4-18', uploadFile.raw || uploadFile)
+  if (res && reloadWorkpaperData) { await reloadWorkpaperData(); loadData() }
+}
 
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)
@@ -332,6 +376,14 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
         @applied="onCutoffReviewApplied"
       />
 
+      <!-- 发现→人工确认门（跨期发现不自动造错报） -->
+      <el-alert v-if="cutoffIssues > 0" type="warning" :closable="false" show-icon style="margin-bottom:12px">
+        <template #title>
+          <span>发现 {{ cutoffIssues }} 笔跨期问题（本期已发货而收入凭证在期后＝本期收入遗漏/少计）。风险发现≠错报，请人工确认方向/金额/证据后推送。</span>
+          <el-button v-if="!isReadonly" size="small" type="danger" plain style="margin-left:12px" @click="openConfirmDialog">确认并推送至 A13</el-button>
+        </template>
+      </el-alert>
+
       <!-- 主表格 -->
       <el-table :data="rows" border stripe class="cutoff-table" :row-class-name="rowClassName">
         <el-table-column label="序号" width="55" align="center" fixed>
@@ -439,6 +491,39 @@ function rowClassName({ row }: { row: any }) { return row.isCutoff === false ? '
     <template v-if="editorMode === '在线编辑'">
       <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="营业收入截止测试（单据到账）D4-18" :readonly="isReadonly" /></div>
     </template>
+
+    <!-- 发现→A13 人工确认弹窗（逐项确认方向/金额/证据） -->
+    <el-dialog v-model="confirmDialogVisible" title="确认跨期错报并推送至 A13" width="720px" destroy-on-close>
+      <el-alert type="info" :closable="false" show-icon style="margin-bottom:12px">
+        <template #title>只有勾选且方向/金额/证据齐全的行才会形成错报请求。金额为 0 或证据缺失的行无法确认。</template>
+      </el-alert>
+      <el-table :data="confirmDrafts" border size="small" max-height="360">
+        <el-table-column width="46" align="center">
+          <template #default="{ row }"><el-checkbox v-model="row.checked" /></template>
+        </el-table-column>
+        <el-table-column label="发现描述" min-width="220">
+          <template #default="{ row }">{{ row.description }}</template>
+        </el-table-column>
+        <el-table-column label="方向" width="110" align="center">
+          <template #default="{ row }">
+            <el-select v-model="row.direction" size="small" placeholder="选择">
+              <el-option label="借（多计资产/费用）" value="debit" />
+              <el-option label="贷（收入完整性）" value="credit" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="130" align="right">
+          <template #default="{ row }"><WpAmountInput v-model="row.amount" size="small" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="证据索引" min-width="140">
+          <template #default="{ row }"><el-input v-model="row.evidence" size="small" placeholder="填证据索引号" /></template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="confirmDialogVisible = false">取消</el-button>
+        <el-button type="danger" @click="confirmAndPush">确认并推送</el-button>
+      </template>
+    </el-dialog>
 
     <!-- OCR维度选择弹窗 -->
     <el-dialog v-model="ocrDialogVisible" title="OCR结果填入" width="400px" destroy-on-close>

@@ -1,0 +1,87 @@
+{
+  "note": "D4 C2 公式定义冻结契约（governance spec d4-dual-mode-formula-governance Task 3 / Property 3）。冻结公式作为单一真源的治理面：定义 key、preset/custom/effective、状态词汇、F-SHELL 白名单、CAS、审计门。不实现引擎；引用既有 user_formula_v2 / workpaper_capability / prefill_formula_mapping 与前端 F-SHELL 契约。改动本文件须跑 backend/scripts/check/check_d4_formula_contract.py --check。",
+  "contract_version": "1.0",
+  "spec": "d4-dual-mode-formula-governance",
+  "requirements": ["3.1", "3.2", "3.3", "3.4"],
+  "definition_identity": {
+    "key_fields": ["wp_id", "stable_sheet_key", "row_key", "field_key", "custom"],
+    "note": "有效定义 key 固定为 wp_id+stable_sheet_key+row_key+field_key+custom；preset_version 是定义版本，不进入业务 target identity；普通值 override 属另域。",
+    "preset_version_is_not_identity": true
+  },
+  "state_vocabulary": {
+    "preset": "预设公式（prefill_formula_mapping.json seed）",
+    "custom": "用户二次编辑的自定义公式（覆盖 preset，升级保留、删除后恢复 preset）",
+    "effective": "最终生效定义 = custom 存在则 custom 否则 preset",
+    "missing": "无任何定义（preset 与 custom 均缺）",
+    "corrupted": "定义存在但解析/校验失败（损坏，与 missing 分态）",
+    "stale": "依赖版本变化产生（输入 version stale 不得静默接受）",
+    "blocked": "Excel 用户改公式无法保留原字节时显式 blocked，不得静默仅存值"
+  },
+  "definition_ssot": {
+    "note": "D4 公式定义单一真源 = formula_management（预设持久化 + 用户二次编辑 override，五元键、6 态）。resolve_effective_formula 给出 custom 优先、回落 preset 的有效公式；preset 升级保留 custom、删除 custom 自动回落 preset。",
+    "resolver_module": "app.services.formula_management.effective_formula",
+    "resolver_fn": "resolve_effective_formula",
+    "key_fn": "make_formula_key",
+    "key_class": "FormulaKey",
+    "states": ["custom", "preset", "preset_missing", "corrupt", "stale", "blocked"],
+    "preset_persistence": {
+      "module": "app.services.formula_management.preset_library",
+      "seed_file": "backend/data/formula_presets/formula_presets_seed.json",
+      "custom_file": "backend/data/formula_presets/formula_custom_presets.json",
+      "keyed_by_identity_five_tuple": true,
+      "persisted": true
+    },
+    "whitelist": {
+      "validate_fn": "validate_expression",
+      "forbidden_tokens": ["eval", "exec", "__", "import", "lambda", "http://", "https://", "file://"],
+      "corrupt_is_fail_closed": true
+    }
+  },
+  "user_formula_toolbar_v2": {
+    "note": "这是与 definition_ssot **不同的、附加的** 用户公式工具栏批量改公式路径（非 D4-1 定义 SSOT）。有 CAS + 三方冲突 + audit 门 + history，但当前是进程内 in-memory store（DEFAULT_V2_STORE），重启即丢 —— 它服务的是工具栏临时编辑，不是 D4-1 审定表的公式定义真源，故 D4-1 的「公式作为单一真源」由 definition_ssot 满足，不受此 in-memory 限制影响。",
+    "backend_module": "app.services.user_formula_v2",
+    "store_class": "UserFormulaV2Store",
+    "apply_fn": "apply_batch_mutate",
+    "command_version_const": "COMMAND_VERSION",
+    "cas_field": "baseVersion",
+    "conflict_shape": ["base", "current", "incoming"],
+    "audit_gate": {
+      "class": "AuditGate",
+      "commit_gate": "audit 先写成功才 upsert store；audit 失败整批回滚且 committed=false，绝不 warn-then-commit"
+    },
+    "in_memory_only": true
+  },
+  "capability_gate": {
+    "backend_module": "app.services.workpaper_capability",
+    "action": "formulaEditUser",
+    "fail_closed": true,
+    "owner_epoch_race_guard": true
+  },
+  "fshell_whitelist": {
+    "frontend_contract": "audit-platform/frontend/src/shell/formula/fShellContract.ts",
+    "contract_id": "F-SHELL",
+    "non_capabilities_forbidden": ["legacy_dict_user_formula_api", "audit_warning_then_commit", "nodekey_as_identity"],
+    "no_eval_enforced_by": {
+      "backend_validator": "app.services.formula_engine",
+      "fn": "validate_formula",
+      "mechanism": "白名单 —— 仅注册函数（TB/TB_SUM/... 等）通过，eval(/new Function/外链等未注册即 validate_formula 报错，无需单独 eval 黑名单"
+    }
+  },
+  "preset_source": {
+    "file": "backend/data/prefill_formula_mapping.json",
+    "d4_functions_whitelist": ["TB", "TB_SUM", "TB_AUX", "WP", "PREV", "LEDGER", "LEDGER_DETAIL", "ADJ"],
+    "occurrence_basis": "损益类取本期发生额，禁期初/期末余额",
+    "no_cycle": "明细表 D4-2/D4-3 不得 WP() 引用审定表 D4-1"
+  },
+  "in_table_vs_cross_table": {
+    "note": "表内计算（审定=未审+AJE+RJE、小计、变动率）与表间提取（TB/TB_SUM/TB_AUX 取库、WP/PREV 取他底稿）均由同一公式定义体系覆盖，按真实 DAG 求值（Req 4）。",
+    "in_table_examples": ["calcAuditedAmount", "calcSubtotal", "calcChangeRate"],
+    "cross_table_functions": ["TB", "TB_SUM", "TB_AUX", "WP", "PREV"]
+  },
+  "ssot_status": {
+    "note": "更正（2026-09-13）：D4-1 的公式定义 SSOT = formula_management（effective_formula + preset_library），**已持久化且按五元键**（见 definition_ssot），Req 3.1「公式作为单一真源」由 D4-1 owner spec Task 3.1 交付（effective_formula 五元键/6态 + 12 条 D4-1 预设入 seed）。此前把 user_formula_v2 的 in-memory store 误当 D4-1 定义 SSOT 的登记已修正 —— 那是独立的工具栏路径（见 user_formula_toolbar_v2）。",
+    "d4_1_definition_ssot_persisted": true,
+    "d4_1_definition_ssot_keyed_by_five_tuple": true,
+    "owner_of_definition_ssot": "d4-1-adjudication-bidirectional-writeback-and-formula-io"
+  }
+}

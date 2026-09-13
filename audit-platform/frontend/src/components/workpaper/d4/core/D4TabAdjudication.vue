@@ -165,6 +165,38 @@ function getRowClassName({ row }: { row: AdjudicationRow }): string {
 // ─── 差异状态 ─────────────────────────────────────────────────────────
 const hasDifference = computed(() => Math.abs(differenceRow.value) > 0.005)
 
+// ─── 确认审定（人工 TB 发布 + 差异超阈值二次确认 + 幂等）Req 4.2 ──────────
+async function onPublishAdjudicated(): Promise<void> {
+  if (props.isReadonly) return
+  const r = publishAdjudicated()
+  if (r.verdict === 'no_project') {
+    ElMessage.warning('缺少项目上下文，无法回写试算表')
+    return
+  }
+  if (r.verdict === 'needs_confirm') {
+    // 差异超阈值：显式二次确认后才回写（不静默发布）
+    try {
+      await ElMessageBox.confirm(
+        `审定合计与试算平衡表数存在差异 ${fmtAmount(r.difference)} 元（超过阈值）。\n` +
+          '确认仍要按当前审定合计回写试算表吗？',
+        '确认审定 · 差异复核',
+        { confirmButtonText: '仍要回写', cancelButtonText: '返回核对', type: 'warning' },
+      )
+    } catch {
+      return // 取消 = 不回写
+    }
+    const confirmed = publishAdjudicated({ confirmed: true })
+    if (confirmed.verdict === 'published') ElMessage.success('审定数已回写试算表')
+    else if (confirmed.verdict === 'skipped_idempotent') ElMessage.info('审定数未变化，无需重复回写')
+    return
+  }
+  if (r.verdict === 'skipped_idempotent') {
+    ElMessage.info('审定数未变化，无需重复回写')
+    return
+  }
+  ElMessage.success('审定数已回写试算表')
+}
+
 // ─── 合并展示数据（按区块拼接） ────────────────────────────────────────
 const tableData = computed(() => {
   const result: (AdjudicationRow & { _sectionLabel?: string })[] = []
@@ -504,7 +536,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 
     <!-- 确认审定按钮 -->
     <div class="action-row">
-      <el-button type="primary" size="small" :disabled="isReadonly" @click="publishAdjudicated">
+      <el-button type="primary" size="small" :disabled="isReadonly" @click="onPublishAdjudicated">
         确认审定（回写TB）
       </el-button>
     </div>

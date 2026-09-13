@@ -274,6 +274,352 @@
       "description": "营业收入审定表：审定数 = 未审数 + AJE调整 + RJE调整"
     },
     {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-上期审定数",
+      "expression": "WP('D4','营业收入审定表D4-1','上期未审数') + WP('D4','营业收入审定表D4-1','上期AJE调整') + WP('D4','营业收入审定表D4-1','上期RJE调整')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','上期未审数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','上期AJE调整')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','上期RJE调整')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：上期审定数（I列）= 上期未审 + 上期AJE + 上期RJE（源模板 I{n}=SUM(F{n}:H{n})）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-主营业务收入小计-审定数",
+      "expression": "SUM(WP('D4','营业收入审定表D4-1','主营明细审定数'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','主营明细审定数')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：主营业务收入小计-审定数（R12 E列）= SUM(主营各明细行审定数)"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-其他业务收入小计-审定数",
+      "expression": "SUM(WP('D4','营业收入审定表D4-1','其他明细审定数'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','其他明细审定数')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：其他业务收入小计-审定数（R18 E列）= SUM(其他各明细行审定数)"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-营业收入合计-审定数",
+      "expression": "WP('D4','营业收入审定表D4-1','主营业务收入小计-审定数') + WP('D4','营业收入审定表D4-1','其他业务收入小计-审定数')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','主营业务收入小计-审定数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','其他业务收入小计-审定数')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：营业收入合计-审定数（R19 E列）= 主营小计 + 其他小计（源模板 B19=B18+B12）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-试算平衡表数-主营",
+      "expression": "TB('6001', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6001', '发生额')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：试算平衡表数-主营（R20）= 试算表科目 6001 主营业务收入发生额（损益类取发生额）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-试算平衡表数-其他",
+      "expression": "TB('6051', '发生额')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "TB('6051', '发生额')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：试算平衡表数-其他（R20）= 试算表科目 6051 其他业务收入发生额（损益类取发生额）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-试算平衡表数",
+      "expression": "WP('D4','营业收入审定表D4-1','试算平衡表数-主营') + WP('D4','营业收入审定表D4-1','试算平衡表数-其他')",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','试算平衡表数-主营')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','试算平衡表数-其他')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：试算平衡表数合计（R20 E列）= 主营 6001 + 其他 6051 发生额"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-差异数",
+      "expression": "WP('D4','营业收入审定表D4-1','营业收入合计-审定数') - WP('D4','营业收入审定表D4-1','试算平衡表数')",
+      "formula_type": "logic_check",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','营业收入合计-审定数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','试算平衡表数')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：差异数（R21 E列）= 审定合计 − 试算平衡表数（源模板 E21=E19-E20，应为 0）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-未审变动率",
+      "expression": "ROUND((WP('D4','营业收入审定表D4-1','营业收入合计-未审数') - WP('D4','营业收入审定表D4-1','上期营业收入合计-未审数')) / ABS(WP('D4','营业收入审定表D4-1','上期营业收入合计-未审数')), 4)",
+      "formula_type": "reasonability",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','营业收入合计-未审数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','上期营业收入合计-未审数')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：本期未审变动率 =（本期未审 − 上期未审）/ 上期未审（除零保护由前端 calc 处理，预设声明口径）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-审定变动率",
+      "expression": "ROUND((WP('D4','营业收入审定表D4-1','营业收入合计-审定数') - WP('D4','营业收入审定表D4-1','上期营业收入合计-审定数')) / ABS(WP('D4','营业收入审定表D4-1','上期营业收入合计-审定数')), 4)",
+      "formula_type": "reasonability",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','营业收入合计-审定数')",
+          "acnr_status": "migrated"
+        },
+        {
+          "formula_ref": "WP('D4','营业收入审定表D4-1','上期营业收入合计-审定数')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：审定变动率 =（本期审定 − 上期审定）/ 上期审定（除零保护由前端 calc 处理，预设声明口径）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-主营业务收入-未审数",
+      "expression": "SUM(WP('D4','主营业务收入明细表D4-2','本期审定'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','主营业务收入明细表D4-2','本期审定')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：主营业务收入明细取数 = 聚合 D4-2 主营业务收入明细表各产品本期审定额"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-1-其他业务收入-未审数",
+      "expression": "SUM(WP('D4','其他业务收入明细表D4-3','本期审定'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        {
+          "formula_ref": "WP('D4','其他业务收入明细表D4-3','本期审定')",
+          "acnr_status": "migrated"
+        }
+      ],
+      "source": "d_cycle_audited_structure",
+      "description": "营业收入审定表：其他业务收入明细取数 = 聚合 D4-3 其他业务收入明细表各项目本期审定额"
+    },
+
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-14-凭证金额合计",
+      "expression": "SUM(WP('D4','营业收入发生检查表D4-14','凭证金额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入发生检查表D4-14','凭证金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-14 发生检查：凭证金额合计（G列 SUM）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-14-出库金额合计",
+      "expression": "SUM(WP('D4','营业收入发生检查表D4-14','出库金额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入发生检查表D4-14','出库金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-14 发生检查：出库金额合计（X列 SUM）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-14-发票金额合计",
+      "expression": "SUM(WP('D4','营业收入发生检查表D4-14','发票金额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入发生检查表D4-14','发票金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-14 发生检查：发票金额合计（AF列 SUM）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-14-检查比例",
+      "expression": "SUM(WP('D4','营业收入发生检查表D4-14','凭证金额')) / WP('D4','营业收入审定表D4-1','营业收入合计-审定数')",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入发生检查表D4-14','凭证金额')" },
+        { "formula_ref": "WP('D4','营业收入审定表D4-1','营业收入合计-审定数')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-14 发生检查：检查比例 = 凭证金额合计 / D4-1 营业收入合计审定数"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-14-发生一致性判定",
+      "expression": "SUM(WP('D4','营业收入发生检查表D4-14','凭证金额')) - SUM(WP('D4','营业收入发生检查表D4-14','出库金额'))",
+      "formula_type": "logic_check",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入发生检查表D4-14','凭证金额')" },
+        { "formula_ref": "WP('D4','营业收入发生检查表D4-14','出库金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-14 发生检查：一致性判定 = 凭证金额合计 − 出库金额合计（应为 0，非零提示差异）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-15-isConsistent",
+      "expression": "WP('D4','营业收入完整性检查表D4-15','发货单金额') - WP('D4','营业收入完整性检查表D4-15','发票金额')",
+      "formula_type": "logic_check",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入完整性检查表D4-15','发货单金额')" },
+        { "formula_ref": "WP('D4','营业收入完整性检查表D4-15','发票金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-15 完整性检查：delivery/invoice 金额差 = 发货单金额 − 发票金额（0 为一致、非零为不一致，三维度实际由前端 checkConsistency 综合判定）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-15-发货单金额合计",
+      "expression": "SUM(WP('D4','营业收入完整性检查表D4-15','发货单金额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入完整性检查表D4-15','发货单金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-15 完整性检查：发货单金额合计"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-15-发票金额合计",
+      "expression": "SUM(WP('D4','营业收入完整性检查表D4-15','发票金额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入完整性检查表D4-15','发票金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-15 完整性检查：发票金额合计"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-15-记账凭证金额合计",
+      "expression": "SUM(WP('D4','营业收入完整性检查表D4-15','记账凭证金额'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','营业收入完整性检查表D4-15','记账凭证金额')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-15 完整性检查：记账凭证金额合计"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-16-portsDiff",
+      "expression": "WP('D4','出口收入电子口岸系统核对D4-16','bookAmount') - WP('D4','出口收入电子口岸系统核对D4-16','portsAmount')",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','出口收入电子口岸系统核对D4-16','bookAmount')" },
+        { "formula_ref": "WP('D4','出口收入电子口岸系统核对D4-16','portsAmount')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-16 出口核对：口岸差异 = 账面出口收入金额 − 电子口岸结关金额（与前端 row.portsDiff = row.bookAmount - row.portsAmount 同定义）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-16-taxDiff",
+      "expression": "WP('D4','出口收入电子口岸系统核对D4-16','bookAmount') - WP('D4','出口收入电子口岸系统核对D4-16','taxReportAmount')",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','出口收入电子口岸系统核对D4-16','bookAmount')" },
+        { "formula_ref": "WP('D4','出口收入电子口岸系统核对D4-16','taxReportAmount')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-16 出口核对：申报差异 = 账面出口收入金额 − 免抵退税申报外营收入（与前端 row.taxDiff = row.bookAmount - row.taxReportAmount 同定义）"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-16-portsDiff-total",
+      "expression": "SUM(WP('D4','出口收入电子口岸系统核对D4-16','portsDiff'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','出口收入电子口岸系统核对D4-16','portsDiff')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-16 出口核对：口岸差异合计"
+    },
+    {
+      "page_key": "workpaper:D4",
+      "target_cell": "D4-16-taxDiff-total",
+      "expression": "SUM(WP('D4','出口收入电子口岸系统核对D4-16','taxDiff'))",
+      "formula_type": "auto_calc",
+      "refs": [
+        { "formula_ref": "WP('D4','出口收入电子口岸系统核对D4-16','taxDiff')" }
+      ],
+      "source": "d4_inspection_formula",
+      "description": "D4-16 出口核对：申报差异合计"
+    },
+
+    {
       "page_key": "note:五、4",
       "target_cell": "报表应收票据期末勾稽",
       "expression": "ABS(ROUND(ROW('BS-004') - TB('1121','审定数'), 2)) <= 1",

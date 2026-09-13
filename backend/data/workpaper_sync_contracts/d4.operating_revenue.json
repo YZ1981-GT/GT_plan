@@ -1,0 +1,394 @@
+{
+  "contract_id": "d4.operating_revenue",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "2a053165d0cfb8d9a0b787d26d8e73371b638a154ae07e4501733d4d3bc8a1e9",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d4-operating-revenue",
+    "html_store": {
+      "item_id": "D4-1-adj-store",
+      "note": "整张 D4-1 存成一条 item 的 remark（JSON 对象字符串）：{main:{rows:[{rowId,label,currentUnadjusted,...}]}, other:{rows:[...]}, tbCheck:{tb6001,tb6051}}。本契约按 stable field + row rowId 拆开：main/other 各是动态行 table（json_pointer /rows/{uuid}/x），tb_check 是表级标量 table（静态 cell，json_pointer /tbCheck/tb6001 等，不含 {row_uuid}）。审定 E/I 派生列进 formula_mask 不回写。禁止把整 JSON 当一个字段比较。",
+      "row_identity_key": "rowId",
+      "shape": "json_object_with_main_other_tbcheck",
+      "table": "checklist_responses"
+    },
+    "mapping_digest": "bca4e6cea186dea27e794963a021937783495df0430ea254345df3ad93c53df5",
+    "pilot_class": "phase5_operating_revenue",
+    "reviewed_basis": "openpyxl 逐格直读权威模板 D/D4-1至D4-4…审定表明细表…xlsx 受管 sheet 营业收入审定表D4-1：主营段标题 R7 / 明细 R8:R11 / 小计 R12；其他段标题 R13 / 明细 R14:R17 / 小计 R18；合计 R19 / 试算平衡表数 R20 / 差异 R21。六输入列 B/C/D(本期未审/账项/重分类)+F/G/H(上期)，审定 E=SUM(B:D)/I=SUM(F:H) 派生公式列进 formula_mask。tb 标量 tb_6001(B20)/tb_6051(F20)。wp_code=D4O（宿主幻影码，载荷落点 D4）。真源 = app/services/d4_extraction/d4_1_descriptor.py。"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "营业收入审定表D4-1",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d41-managed",
+      "tables": [
+        {
+          "anchor": "A7",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "label",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!A7",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!A8",
+              "stable_field_key": "main_rows/{row_uuid}/label",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!B7",
+              "header_text": "本期未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!B8",
+              "stable_field_key": "main_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!C7",
+              "header_text": "本期账项调整",
+              "json_pointer": "/rows/{row_uuid}/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!C8",
+              "stable_field_key": "main_rows/{row_uuid}/current_aje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_rje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!D7",
+              "header_text": "本期重分类调整",
+              "json_pointer": "/rows/{row_uuid}/currentRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!D8",
+              "stable_field_key": "main_rows/{row_uuid}/current_rje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!E7",
+              "header_text": "本期审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!营业收入审定表D4-1!E8",
+              "stable_field_key": "main_rows/{row_uuid}/current_audited",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!F7",
+              "header_text": "上期未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!F8",
+              "stable_field_key": "main_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!G7",
+              "header_text": "上期账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!G8",
+              "stable_field_key": "main_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!H7",
+              "header_text": "上期重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!H8",
+              "stable_field_key": "main_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!I7",
+              "header_text": "上期审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!营业收入审定表D4-1!I8",
+              "stable_field_key": "main_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "小计",
+            "note": "footer 小计行承载合计公式（E/I=SUM），声明为真使结构性插行可扩张合计区间；审定 E/I 列进 formula_mask（=SUM(该期三输入列) 派生，不回写）",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E8:E11",
+            "I8:I11"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "main_rows"
+        },
+        {
+          "anchor": "A13",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "A",
+                "row_from": "row_identity"
+              },
+              "column_key": "label",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!A13",
+              "header_text": "项目",
+              "json_pointer": "/rows/{row_uuid}/label",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!A14",
+              "stable_field_key": "other_rows/{row_uuid}/label",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_unadjusted",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!B13",
+              "header_text": "本期未审数",
+              "json_pointer": "/rows/{row_uuid}/currentUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!B14",
+              "stable_field_key": "other_rows/{row_uuid}/current_unadjusted",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_aje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!C13",
+              "header_text": "本期账项调整",
+              "json_pointer": "/rows/{row_uuid}/currentAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!C14",
+              "stable_field_key": "other_rows/{row_uuid}/current_aje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_rje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!D13",
+              "header_text": "本期重分类调整",
+              "json_pointer": "/rows/{row_uuid}/currentRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!D14",
+              "stable_field_key": "other_rows/{row_uuid}/current_rje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "current_audited",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!E13",
+              "header_text": "本期审定数",
+              "json_pointer": "/rows/{row_uuid}/currentAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!营业收入审定表D4-1!E14",
+              "stable_field_key": "other_rows/{row_uuid}/current_audited",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_unadjusted",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!F13",
+              "header_text": "上期未审数",
+              "json_pointer": "/rows/{row_uuid}/priorUnadjusted",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!F14",
+              "stable_field_key": "other_rows/{row_uuid}/prior_unadjusted",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_aje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!G13",
+              "header_text": "上期账项调整",
+              "json_pointer": "/rows/{row_uuid}/priorAje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!G14",
+              "stable_field_key": "other_rows/{row_uuid}/prior_aje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "H",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rje",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!H13",
+              "header_text": "上期重分类调整",
+              "json_pointer": "/rows/{row_uuid}/priorRje",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!H14",
+              "stable_field_key": "other_rows/{row_uuid}/prior_rje",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "I",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_audited",
+              "header_source_ref": "源xlsx!营业收入审定表D4-1!I13",
+              "header_text": "上期审定数",
+              "json_pointer": "/rows/{row_uuid}/priorAudited",
+              "mode": "formula",
+              "source_ref": "源xlsx!营业收入审定表D4-1!I14",
+              "stable_field_key": "other_rows/{row_uuid}/prior_audited",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "小计",
+            "note": "footer 小计行承载合计公式（E/I=SUM），声明为真使结构性插行可扩张合计区间；审定 E/I 列进 formula_mask（=SUM(该期三输入列) 派生，不回写）",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "E14:E17",
+            "I14:I17"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "other_rows"
+        },
+        {
+          "anchor": "A20",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": 20
+              },
+              "column_key": "tb_6001",
+              "header_text": "主营业务收入试算平衡表数",
+              "json_pointer": "/tbCheck/tb6001",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!B20",
+              "stable_field_key": "tb_check/tb_6001",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": 20
+              },
+              "column_key": "tb_6051",
+              "header_text": "其他业务收入试算平衡表数",
+              "json_pointer": "/tbCheck/tb6051",
+              "mode": "editable",
+              "source_ref": "源xlsx!营业收入审定表D4-1!F20",
+              "stable_field_key": "tb_check/tb_6051",
+              "store_item_id": "D4-1-adj-store",
+              "value_type": "amount"
+            }
+          ],
+          "header_rows": 1,
+          "table_key": "tb_check"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "700313f7ebb417a9996df1ca47c8ef4659324525b1316ef81f0f48e88481b99b",
+    "relative_path": "D/D4-1至D4-4 营业收入 - 审定表明细表（Leap-常规程序）.xlsx",
+    "template_sha256": "fa69c92d1af6548974fb3fe1a0a45236ddf1c64037b4ac811d7e084de934340b"
+  },
+  "template_definition_sha256": "05a8530e31bfdc16ea3aadf708d5338761a044724f68b5d3e325caafa95d4e0a"
+}

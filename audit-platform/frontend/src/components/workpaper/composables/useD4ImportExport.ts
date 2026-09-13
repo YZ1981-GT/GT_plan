@@ -37,7 +37,7 @@ export type D4ImportableSheet =
   | 'D4-17'
   | 'D4-18'
   | 'D4-19'
-  | 'D4-20'
+  // 注：主 'D4-20' 为死配置（六区无单一存储），已移除；退货三张明细如下
   | 'D4-20-provision'
   | 'D4-20-current'
   | 'D4-20-post'

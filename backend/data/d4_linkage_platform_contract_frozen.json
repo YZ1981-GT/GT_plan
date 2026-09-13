@@ -1,0 +1,56 @@
+{
+  "note": "D4 C3 联动 + C0-C3 平台契约冻结（governance spec Task 4 + Task 5 / Property 4）。冻结真实 DAG / 单 writer / 联动接收端 / TB-A13 显式发布边界，以及导入 identity / 四表复用 / 权限CAS / 幂等迁移。只覆盖 D4 相关产物，不等待全平台 77 项。改动须跑 backend/scripts/check/check_d4_linkage_platform_contract.py --check。",
+  "contract_version": "1.0",
+  "spec": "d4-dual-mode-formula-governance",
+  "requirements": ["4.1", "4.2", "5.1", "5.2", "6.1", "7.1"],
+  "real_dag": {
+    "statement": "表内表间均可编辑，按真实引用建 DAG；循环/stale 显式失败。不按表号禁止合理引用。",
+    "no_cycle_guard": {
+      "test": "backend/tests/test_d4_formula_presets.py",
+      "class": "TestNoCyclicReferences",
+      "rule": "明细表 D4-2/D4-3 不得 WP() 引用审定表 D4-1（成环）；PREV 跨年度引用合法"
+    }
+  },
+  "single_writer": {
+    "statement": "同 scope 只有一个公式 writer。D4-1 审定表值 writer = D4 render 策略 prefill + 前端 useD4Adjudication；不与 D4-2/D4-3 明细争同一 scope。",
+    "d4_1_value_writer": "app.routers.wp_render_strategies._d4_operating_revenue.build_d4_adjudication_prefill"
+  },
+  "tb_a13_publish_boundary": {
+    "statement": "风险发现≠错报；TB/A13 发布必须显式确认、幂等、durable ack；模式切换不发布；公式同步不是 TB/A13。",
+    "d4_publish_is_explicit": {
+      "fn": "publishAdjudicated",
+      "trigger": "确认审定（回写TB）按钮，非模式切换、非公式保存",
+      "tb_writeback_channel": "d4:writeback-trial-balance CustomEvent → GtD4OperatingRevenue.handleD4Writeback 落库",
+      "threshold_second_confirm": {
+        "note": "差异超阈值（|审定合计−试算平衡表数|>PUBLISH_DIFF_THRESHOLD）返回 needs_confirm，组件二次确认后才回写（Req 4.2）。",
+        "verdicts": ["published", "needs_confirm", "skipped_idempotent", "no_project"],
+        "idempotent": "同一发布快照签名不重复回写（防重复点击写两次）。",
+        "test": "audit-platform/frontend/src/components/workpaper/__tests__/d4AdjudicationPublish.spec.ts"
+      }
+    }
+  },
+  "four_table_reuse": {
+    "statement": "四表取数复用 app/services/four_table/ 与 ReportLineAccountSpec，不复制科目 SQL。",
+    "module": "app.services.four_table.report_line_accounts",
+    "spec_dataclass": "ReportLineAccountSpec",
+    "d4_consumer": "app.routers.wp_render_strategies._d4_operating_revenue.build_d4_tb_values"
+  },
+  "import_identity": {
+    "statement": "导入保留 sheet/table/region/稳定 row key/公式 mask 身份；结构变更走 ContentMutationService mutation plan，拒绝位置猜测与静默扁平化。",
+    "d4_roundtrip_test": "backend/tests/workpaper_sync/test_d4_positional_array_roundtrip.py",
+    "frontend_io_composable": "useD4ImportExport",
+    "d4_1_stable_row_key": "D4-1-{rowId}-{field}（per-field 键，非整行 JSON）"
+  },
+  "permission_cas": {
+    "statement": "按角色/scope/wp_id/content version 做 CAS；拒绝过期 CAS 并记审计。",
+    "capability_module": "app.services.workpaper_capability",
+    "cas_field": "baseVersion",
+    "audit_on_reject": true
+  },
+  "idempotent_migration": {
+    "statement": "迁移幂等、可回滚，且不得把平台全局未完成作为 D4 全局阻塞。",
+    "runner": "MigrationRunner（backend/migrations/V*.sql，非 alembic）",
+    "rule": "新增迁移必须 IF NOT EXISTS 幂等",
+    "no_platform_wide_block": true
+  }
+}

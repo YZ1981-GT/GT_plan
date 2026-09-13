@@ -18,6 +18,7 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useD4InspectionWriteback, type D4Discovery } from '../../composables/useD4InspectionWriteback'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
@@ -214,6 +215,41 @@ function confirmOcrFill() {
 // ─── Stats ───────────────────────────────────────────────────────────
 const currentReturnTotal = computed(() => currentReturnRows.value.reduce((s, r) => s + (r.returnAmount || 0), 0))
 const postReturnTotal = computed(() => postReturnRows.value.reduce((s, r) => s + (r.returnAmount || 0), 0))
+
+// ─── 计提差异发现→人工确认门→A13（Task 4/5：差异发现不自动造错报） ───────────
+const { isPushed: isProvPushed, canConfirm: canProvConfirm, pushConfirmed: pushProvConfirmed } = useD4InspectionWriteback({
+  wpCode: 'D4-20', projectId: computed(() => props.projectId),
+  defaultAccountCode: '6001', defaultAccountName: '主营业务收入',
+})
+const provDiffCount = computed(() => provisionRows.value.filter(r => Math.abs(r.diff || 0) > 0.005 && !isProvPushed(r.id)).length)
+const provConfirmVisible = ref(false)
+interface ProvConfirmDraft extends D4Discovery { checked: boolean }
+const provConfirmDrafts = ref<ProvConfirmDraft[]>([])
+function openProvConfirm() {
+  provConfirmDrafts.value = provisionRows.value
+    .filter(r => Math.abs(r.diff || 0) > 0.005 && !isProvPushed(r.id))
+    .map(r => ({
+      sourceId: r.id,
+      description: `退货计提差异（产品${r.productName || '-'}·应计提${(r.shouldProvide || 0).toFixed(2)}/已计提${(r.alreadyProvided || 0).toFixed(2)}）`,
+      // 应计提>已计提 → 计提不足 → 需补提（负债/减收入方向由审计师定），预置借（费用/减收入）
+      direction: (r.diff || 0) > 0 ? ('debit' as const) : ('credit' as const),
+      amount: Math.abs(r.diff || 0),
+      evidence: r.diffReason || '',
+      accountCode: '6001',
+      accountName: '主营业务收入',
+      checked: true,
+    }))
+  if (!provConfirmDrafts.value.length) { ElMessage.info('无未推送的计提差异'); return }
+  provConfirmVisible.value = true
+}
+function confirmProvPush() {
+  const selected = provConfirmDrafts.value.filter(d => d.checked)
+  const blocked = selected.filter(d => !canProvConfirm(d))
+  if (blocked.length) ElMessage.warning(`${blocked.length} 笔缺方向/金额/证据（差异原因），未通过确认门`)
+  const n = pushProvConfirmed(selected)
+  if (n > 0) { ElMessage.success(`已确认并推送 ${n} 笔计提差异错报至 A13`); provConfirmVisible.value = false }
+  else if (!blocked.length) ElMessage.info('无可推送的已确认差异')
+}
 const returnRateDisplay = computed(() => {
   const total = summaryRows.value[2]
   return total.currentRate > 0 ? (total.currentRate * 100).toFixed(2) + '%' : '—'
@@ -247,10 +283,14 @@ const aiAvailable = ref(false)
 async function checkAiHealth() { try { const res = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = ['healthy', 'degraded'].includes(res.data?.data?.status ?? res.data?.status) } catch { aiAvailable.value = false } }
 checkAiHealth()
 
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function handleExportTemplate(sheet: string) { exportTemplate(sheet as any) }
 function handleExportData(sheet: string) { exportData(sheet as any) }
-async function handleImportFile(sheet: string, uploadFile: any) { await importData(sheet as any, uploadFile.raw || uploadFile) }
+async function handleImportFile(sheet: string, uploadFile: any) {
+  const res = await importData(sheet as any, uploadFile.raw || uploadFile)
+  if (res && reloadWorkpaperData) { await reloadWorkpaperData(); loadAll() }
+}
 
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)
@@ -501,6 +541,13 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
         <div class="add-row-bar">
           <el-button :disabled="isReadonly" size="small" @click="addProvisionRow"><el-icon :size="14" style="margin-right:4px;"><Plus /></el-icon>添加产品</el-button>
         </div>
+        <!-- 计提差异发现→人工确认门（差异≠错报，需人工确认方向/金额/证据） -->
+        <el-alert v-if="provDiffCount > 0" type="warning" :closable="false" show-icon style="margin-top:10px">
+          <template #title>
+            <span>发现 {{ provDiffCount }} 项退货计提差异（应计提≠账面已计提）。差异发现≠错报，请人工确认方向/金额/差异原因后推送。</span>
+            <el-button v-if="!isReadonly" size="small" type="danger" plain style="margin-left:12px" @click="openProvConfirm">确认并推送至 A13</el-button>
+          </template>
+        </el-alert>
       </div>
 
       <!-- ═══ Section 5: 检查本期产品退货情况 ═══ -->
@@ -691,6 +738,39 @@ function fmtRate(v: number): string { if (!v) return '—'; return (v * 100).toF
     <template v-if="editorMode === '在线编辑'">
       <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="销售退货检查表 D4-20" :readonly="isReadonly" /></div>
     </template>
+
+    <!-- 计提差异→A13 人工确认弹窗 -->
+    <el-dialog v-model="provConfirmVisible" title="确认退货计提差异错报并推送至 A13" width="720px" destroy-on-close>
+      <el-alert type="info" :closable="false" show-icon style="margin-bottom:12px">
+        <template #title>只有勾选且方向/金额/差异原因（证据）齐全的行才会形成错报请求。金额为 0 或差异原因缺失的行无法确认。</template>
+      </el-alert>
+      <el-table :data="provConfirmDrafts" border size="small" max-height="360">
+        <el-table-column width="46" align="center">
+          <template #default="{ row }"><el-checkbox v-model="row.checked" /></template>
+        </el-table-column>
+        <el-table-column label="发现描述" min-width="240">
+          <template #default="{ row }">{{ row.description }}</template>
+        </el-table-column>
+        <el-table-column label="方向" width="130" align="center">
+          <template #default="{ row }">
+            <el-select v-model="row.direction" size="small" placeholder="选择">
+              <el-option label="借（补提/减收入）" value="debit" />
+              <el-option label="贷（冲回）" value="credit" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="金额" width="130" align="right">
+          <template #default="{ row }"><WpAmountInput v-model="row.amount" size="small" style="width:100%" /></template>
+        </el-table-column>
+        <el-table-column label="差异原因(证据)" min-width="150">
+          <template #default="{ row }"><el-input v-model="row.evidence" size="small" placeholder="填差异原因/证据" /></template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="provConfirmVisible = false">取消</el-button>
+        <el-button type="danger" @click="confirmProvPush">确认并推送</el-button>
+      </template>
+    </el-dialog>
 
     <!-- OCR维度选择弹窗 -->
     <el-dialog v-model="ocrDialogVisible" title="OCR结果填入" width="400px" destroy-on-close>

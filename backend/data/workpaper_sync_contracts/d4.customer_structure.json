@@ -1,0 +1,332 @@
+{
+  "contract_id": "d4.customer_structure",
+  "document_type": "xlsx",
+  "identity_carriers": [
+    "hidden_sheet",
+    "defined_name",
+    "excel_table",
+    "hidden_uuid_column"
+  ],
+  "instrumentation_definition_sha256": "f20464e0448e5b91a08b2209213731235ae0c044f12655a0dcaaa409056f0765",
+  "review": {
+    "authority_root": "backend/wp_templates",
+    "entry_id": "xlsx/gt-d4-customer-structure",
+    "html_store": {
+      "item_id": "D4-9-data",
+      "note": "整张 D4-9 存成一条 item 的 remark（JSON 对象字符串）：{current:{rows,totalAmount,totalQuantity}, prior:{...}}。本契约按 stable field + row rowId 拆开：current/prior 各是动态行 table（json_pointer /rows/{uuid}/x），totals 是表级标量 table（静态 cell，json_pointer /current/totalAmount 等，不含 {row_uuid}）。禁止把整 JSON 当一个字段比较。",
+      "row_identity_key": "rowId",
+      "shape": "json_object_with_current_prior_totals",
+      "table": "checklist_responses"
+    },
+    "mapping_digest": "eeea4915ec9fa38b18e791591a73bdbbabfb3018270831885bf450bc55f2296e",
+    "pilot_class": "phase5_customer_structure",
+    "reviewed_basis": "openpyxl 逐格直读权威模板 D/D4收入底稿.xlsx 受管 sheet 重要客户结构分析D4-9：本期区表头 R12 / 数据 R13-22 / 合计 R23 / 本期销售总额 R24（C24=D4-7!D26 跨表公式、E24=D4-7!B26）；上期区表头 R26 / 数据 R27-36 / 合计 R37 / 上期销售总额 R38（C38=D4-7!L26、E38=D4-7!J26）；占比 D=IF(C=0,0,C/$C$24)、F=IF(E=0,0,E/$E$24)（上期引 $C$38/$E$38），合计 C/E=SUM。wp_code=D4-9（reviewed overlay curated 声明的 wp_code_pattern，载荷落点 D4）。"
+  },
+  "review_status": "reviewed",
+  "schema_version": "contract-definition:v1",
+  "semantic_version": "1.0.0",
+  "sheets": [
+    {
+      "excel_name": "重要客户结构分析D4-9",
+      "locator": {
+        "anchor": "excel_table_sheet_association"
+      },
+      "sheet_key": "d49-managed",
+      "tables": [
+        {
+          "anchor": "A12",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!B12",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/name",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!B13",
+              "stable_field_key": "customer_current_rows/{row_uuid}/customer_name",
+              "store_item_id": "D4-9-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "sales_amount",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!C12",
+              "header_text": "销售金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!C13",
+              "stable_field_key": "customer_current_rows/{row_uuid}/sales_amount",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount_ratio",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!D12",
+              "header_text": "销售金额占比",
+              "json_pointer": "/rows/{row_uuid}/amountRatio",
+              "mode": "formula",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!D13",
+              "stable_field_key": "customer_current_rows/{row_uuid}/amount_ratio",
+              "store_item_id": "D4-9-data",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "sales_quantity",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!E12",
+              "header_text": "销售数量",
+              "json_pointer": "/rows/{row_uuid}/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!E13",
+              "stable_field_key": "customer_current_rows/{row_uuid}/sales_quantity",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "quantity_ratio",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!F12",
+              "header_text": "销售数量占比",
+              "json_pointer": "/rows/{row_uuid}/quantityRatio",
+              "mode": "formula",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!F13",
+              "stable_field_key": "customer_current_rows/{row_uuid}/quantity_ratio",
+              "store_item_id": "D4-9-data",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rank",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!G12",
+              "header_text": "上期排名",
+              "json_pointer": "/rows/{row_uuid}/priorRank",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!G13",
+              "stable_field_key": "customer_current_rows/{row_uuid}/prior_rank",
+              "store_item_id": "D4-9-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 承载合计公式（C=SUM/E=SUM），声明为真使结构性插行可扩张合计区间；占比 D/F 列进 formula_mask",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D13:D22",
+            "F13:F22"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "customer_current_rows"
+        },
+        {
+          "anchor": "A26",
+          "delete_policy": "tombstone",
+          "fields": [
+            {
+              "cell": {
+                "column": "B",
+                "row_from": "row_identity"
+              },
+              "column_key": "customer_name",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!B26",
+              "header_text": "客户名称",
+              "json_pointer": "/rows/{row_uuid}/name",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!B27",
+              "stable_field_key": "customer_prior_rows/{row_uuid}/customer_name",
+              "store_item_id": "D4-9-data",
+              "value_type": "text"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": "row_identity"
+              },
+              "column_key": "sales_amount",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!C26",
+              "header_text": "销售金额",
+              "json_pointer": "/rows/{row_uuid}/amount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!C27",
+              "stable_field_key": "customer_prior_rows/{row_uuid}/sales_amount",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "D",
+                "row_from": "row_identity"
+              },
+              "column_key": "amount_ratio",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!D26",
+              "header_text": "销售金额占比",
+              "json_pointer": "/rows/{row_uuid}/amountRatio",
+              "mode": "formula",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!D27",
+              "stable_field_key": "customer_prior_rows/{row_uuid}/amount_ratio",
+              "store_item_id": "D4-9-data",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": "row_identity"
+              },
+              "column_key": "sales_quantity",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!E26",
+              "header_text": "销售数量",
+              "json_pointer": "/rows/{row_uuid}/quantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!E27",
+              "stable_field_key": "customer_prior_rows/{row_uuid}/sales_quantity",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "F",
+                "row_from": "row_identity"
+              },
+              "column_key": "quantity_ratio",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!F26",
+              "header_text": "销售数量占比",
+              "json_pointer": "/rows/{row_uuid}/quantityRatio",
+              "mode": "formula",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!F27",
+              "stable_field_key": "customer_prior_rows/{row_uuid}/quantity_ratio",
+              "store_item_id": "D4-9-data",
+              "value_type": "ratio"
+            },
+            {
+              "cell": {
+                "column": "G",
+                "row_from": "row_identity"
+              },
+              "column_key": "prior_rank",
+              "header_source_ref": "源xlsx!重要客户结构分析D4-9!G26",
+              "header_text": "上期排名",
+              "json_pointer": "/rows/{row_uuid}/priorRank",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!G27",
+              "stable_field_key": "customer_prior_rows/{row_uuid}/prior_rank",
+              "store_item_id": "D4-9-data",
+              "value_type": "text"
+            }
+          ],
+          "footer_anchor": {
+            "carries_total_formula": true,
+            "marker": "合计",
+            "note": "footer 承载合计公式（C=SUM/E=SUM），声明为真使结构性插行可扩张合计区间；占比 D/F 列进 formula_mask",
+            "search_column": "A"
+          },
+          "formula_mask": [
+            "D27:D36",
+            "F27:F36"
+          ],
+          "header_rows": 1,
+          "row_identity": {
+            "json_pointer": "/rows/*/rowId",
+            "kind": "field"
+          },
+          "table_key": "customer_prior_rows"
+        },
+        {
+          "anchor": "A24",
+          "fields": [
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 24
+              },
+              "column_key": "current_total_amount",
+              "header_text": "本期销售总额",
+              "json_pointer": "/current/totalAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!C24",
+              "stable_field_key": "customer_totals/current_total_amount",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 24
+              },
+              "column_key": "current_total_quantity",
+              "header_text": "本期销售总量",
+              "json_pointer": "/current/totalQuantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!E24",
+              "stable_field_key": "customer_totals/current_total_quantity",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "C",
+                "row_from": 38
+              },
+              "column_key": "prior_total_amount",
+              "header_text": "上期销售总额",
+              "json_pointer": "/prior/totalAmount",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!C38",
+              "stable_field_key": "customer_totals/prior_total_amount",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            },
+            {
+              "cell": {
+                "column": "E",
+                "row_from": 38
+              },
+              "column_key": "prior_total_quantity",
+              "header_text": "上期销售总量",
+              "json_pointer": "/prior/totalQuantity",
+              "mode": "editable",
+              "source_ref": "源xlsx!重要客户结构分析D4-9!E38",
+              "stable_field_key": "customer_totals/prior_total_quantity",
+              "store_item_id": "D4-9-data",
+              "value_type": "amount"
+            }
+          ],
+          "header_rows": 1,
+          "table_key": "customer_totals"
+        }
+      ]
+    }
+  ],
+  "template": {
+    "normalized_structure_hash": "ba72eee5996e0ee86d40d435b64ed79bbb9921bf3d142ea86fd6959e596120b7",
+    "relative_path": "D/D4收入底稿.xlsx",
+    "template_sha256": "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155"
+  },
+  "template_definition_sha256": "650cfa822067d7c5b02263341acfadd077938709bbdb29e11b44e385f9f5a635"
+}

@@ -183,6 +183,23 @@ export function isCrossPeriod(voucherDate: string, referenceDate: string, balanc
 }
 
 /**
+ * 截止测试 √/× 判定（D4-17/18 单一真源，后端 _cutoff_is_ok 同定义镜像）。
+ *
+ * 语义：早侧日期在截止日或之前、晚侧日期在截止日之后 → 跨期问题（返回 false = ×）；
+ * 否则非跨期（返回 true = √）。任一日期缺失/非法 → null（N/A，不强制取反）。
+ *
+ * D4-17（账到单据）: earlyDate=凭证日期, lateDate=发货单日期。
+ * D4-18（单据到账）: earlyDate=发货单日期, lateDate=凭证日期。
+ * 两表都对"早侧<=截止 且 晚侧>截止"判问题，非跨期同为 true（Req 2.3：非跨期不恒相反）。
+ *
+ * 注：字符串按 YYYY-MM-DD 字典序比较（与后端一致），仅在两端日期均非空时判定。
+ */
+export function isCutoffOk(earlyDate: string, lateDate: string, cutoffDate: string): boolean | null {
+  if (!earlyDate || !lateDate || !cutoffDate) return null
+  return !(earlyDate <= cutoffDate && lateDate > cutoffDate)
+}
+
+/**
  * 跨期天数 = |凭证日期 - 参考日期| (返回绝对值天数)
  *
  * 无效日期返回 0。D4-17/D4-18截止测试天数计算。

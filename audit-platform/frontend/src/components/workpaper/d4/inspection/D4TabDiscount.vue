@@ -157,10 +157,14 @@ const aiAvailable = ref(false)
 async function checkAiHealth() { try { const res = await http.get('/api/ai/health', { _silent: true } as any); aiAvailable.value = ['healthy', 'degraded'].includes(res.data?.data?.status ?? res.data?.status) } catch { aiAvailable.value = false } }
 checkAiHealth()
 
+const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
 function handleExportTemplate() { exportTemplate('D4-19') }
 function handleExportData() { exportData('D4-19') }
-async function handleImportFile(uploadFile: any) { await importData('D4-19', uploadFile.raw || uploadFile) }
+async function handleImportFile(uploadFile: any) {
+  const res = await importData('D4-19', uploadFile.raw || uploadFile)
+  if (res && reloadWorkpaperData) { await reloadWorkpaperData(); loadData() }
+}
 
 const aiNoteLoading = ref(false)
 const aiConclusionLoading = ref(false)

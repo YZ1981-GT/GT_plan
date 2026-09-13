@@ -1,0 +1,48 @@
+{
+  "note": "D4 C1 共享同步协议冻结契约（governance spec d4-dual-mode-formula-governance Task 2 / Property 2）。本文件不实现同步，只冻结既有实现的契约面并锁定四条不变式：①HTML 与 Excel 均经同一 commit boundary（ContentMutationService）与前端桥（useWorkpaperSyncBridge）；②不同字段自动合并、同字段冲突保留 base/current/incoming 三方轨迹；③durable ack ≠ applied；④模式切换不发布 TB/A13。改动本文件须跑 backend/scripts/check/check_d4_sync_contract.py --check。",
+  "contract_version": "1.0",
+  "spec": "d4-dual-mode-formula-governance",
+  "requirements": ["2.1", "2.2", "2.3"],
+  "shared_commit_boundary": {
+    "backend": {
+      "module": "app.services.workpaper_sync.content_mutation",
+      "class": "ContentMutationService",
+      "role": "唯一内容 commit boundary（DEC-01 架构常量）；HTML projection 与 OO/Excel materialize 都经此提交一个 business revision"
+    },
+    "frontend": {
+      "module": "audit-platform/frontend/src/components/workpaper/sync/useWorkpaperSyncBridge.ts",
+      "composable": "useWorkpaperSyncBridge",
+      "role": "唯一模式状态机；HTML→OO（flush→pending mutation→materialize→descriptor）与 OO→HTML（forcesave→shell→application→applied→reload）都经此"
+    }
+  },
+  "invariants": {
+    "durable_ack_not_applied": {
+      "statement": "durable ack 仅表示决策已持久化，不等于 applied；只有 canonical rematerialize 且目标 content revision 确认后才算 applied。",
+      "frontend_evidence": {
+        "in_flight_states_include_applied": true,
+        "reload_requires_applied_and_result_revision": "reloadAfterApplied() 在 state!=='applied' 或缺 result_revision 时 refuse",
+        "in_flight_states_symbol": "WP_BRIDGE_IN_FLIGHT_STATES"
+      }
+    },
+    "field_level_auto_merge": {
+      "statement": "不同字段自动合并，同字段异值必冲突并保留 base/current/incoming 三方轨迹。",
+      "backend_evidence": {
+        "conflict_module": "app.services.workpaper_sync.conflict_resolution",
+        "three_way_shape": ["base", "current", "incoming"]
+      }
+    },
+    "no_publish_on_mode_switch": {
+      "statement": "模式切换（html↔onlyoffice）不得触发 TB/A13 发布；发布必须是独立显式动作。",
+      "d4_evidence": {
+        "adjudication_publish_fn": "publishAdjudicated",
+        "publish_is_explicit_button": true,
+        "mode_toggle_composable": "useCycleHtmlOoDualMode"
+      }
+    }
+  },
+  "d4_host_consumption_status": {
+    "note": "D4-1 审定表当前的 TB 回写与保存走 CustomEvent（d4:writeback-trial-balance / d4:save-items），由 GtD4OperatingRevenue.vue 落库；尚未接入 useWorkpaperSyncBridge 的 durable-ack/applied 全链。此项登记为 D4-1 owner spec (d4-1-adjudication-bidirectional-writeback-and-formula-io Wave 2.1) 的收口范围，本治理 spec 只冻结契约不代实现。",
+    "wired_through_bridge": false,
+    "owner_of_wiring": "d4-1-adjudication-bidirectional-writeback-and-formula-io"
+  }
+}

@@ -19,6 +19,7 @@ import {
   calcAnomalyRate,
   calcCoverageRate,
   isCrossPeriod,
+  isCutoffOk,
   calcCrossPeriodDays,
   isSuspiciousFundFlow,
   isIpoGroupVisible,
@@ -279,6 +280,39 @@ describe('useD4FormulaEngine', () => {
 
     it('returns false for invalid dates', () => {
       expect(isCrossPeriod('invalid', '2024-12-25', bsDate)).toBe(false)
+    })
+  })
+
+  // ─── isCutoffOk (D4-17/18 单一真源，与后端 _cutoff_is_ok 同定义) ─────────────
+
+  describe('isCutoffOk', () => {
+    const cutoff = '2025-12-31'
+
+    it('returns false (×) when early<=cutoff and late>cutoff → cross-period issue', () => {
+      // D4-17: early=voucher(在期内), late=delivery(期后) → 问题
+      expect(isCutoffOk('2025-12-28', '2026-01-05', cutoff)).toBe(false)
+    })
+
+    it('returns true (√) when both on/before cutoff → not cross-period', () => {
+      expect(isCutoffOk('2025-12-20', '2025-12-25', cutoff)).toBe(true)
+    })
+
+    it('returns true (√) when both after cutoff → not cross-period', () => {
+      expect(isCutoffOk('2026-01-02', '2026-01-10', cutoff)).toBe(true)
+    })
+
+    it('non-cross-period is NOT inverted between D4-17 and D4-18 (Req 2.3)', () => {
+      // 相同日期对，D4-17(early=voucher) 与 D4-18(early=delivery) 都判非跨期 √，不恒相反
+      const d17 = isCutoffOk('2025-12-20', '2025-12-25', cutoff)
+      const d18 = isCutoffOk('2025-12-20', '2025-12-25', cutoff)
+      expect(d17).toBe(true)
+      expect(d18).toBe(true)
+    })
+
+    it('returns null (N/A) when a date is missing', () => {
+      expect(isCutoffOk('', '2025-12-25', cutoff)).toBeNull()
+      expect(isCutoffOk('2025-12-20', '', cutoff)).toBeNull()
+      expect(isCutoffOk('2025-12-20', '2025-12-25', '')).toBeNull()
     })
   })
 
