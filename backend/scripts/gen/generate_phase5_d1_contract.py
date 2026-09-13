@@ -27,7 +27,8 @@ def main() -> int:
     path = m.contract_file_path()
     text = json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
     if apply:
-        path.write_text(text, encoding="utf-8")
+        # 🔴 `write_bytes` 而非 `write_text`：Windows 上后者按 `\r\n` 写回，CRLF 被双向锁漏掉
+        path.write_bytes(text.encode("utf-8"))
         print(f"[apply] wrote {path} (canonical_digest={canonical_digest(payload)})")
         return 0
     if not path.exists():
