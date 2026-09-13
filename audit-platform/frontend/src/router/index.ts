@@ -280,6 +280,16 @@ const router = createRouter({
           component: () => import('@/views/extension/CustomTemplateEditor.vue'),
         },
         {
+          // 自定义模板摄取向导（三入口）。
+          // 与 ':id/edit' 的先后顺序无关紧要：vue-router 4 按路径**特异性打分**
+          // 匹配，静态段得分高于动态段（已用变异实测：两种顺序都解析到本路由）。
+          // 这里写在动态段之前只是可读性约定。
+          // spec: custom-workpaper-template-ingestion-and-sync-closure Task 12
+          path: 'extension/custom-templates/ingest',
+          name: 'CustomIngestionWizard',
+          component: () => import('@/views/extension/CustomIngestionWizard.vue'),
+        },
+        {
           path: 'extension/custom-templates/:id/edit',
           name: 'CustomTemplateEdit',
           component: () => import('@/views/extension/CustomTemplateEditor.vue'),
