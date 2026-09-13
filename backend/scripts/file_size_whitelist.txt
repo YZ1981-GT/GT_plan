@@ -470,3 +470,9 @@ backend/app/routers/wp_render_strategies/_d3_import_export.py  940
 backend/app/routers/wp_render_strategies/_d6_import_export.py  832
 backend/app/routers/wp_render_strategies/_d7_import_export.py  1005
 backend/app/routers/wp_render_strategies/_k1_import_export.py  1482
+
+#   F-SHELL program generator / guard —— 单文件承载完整跨 spec DAG 投影、输入摘要与行为守卫，
+#   其结构需与生成器的 AST/变异锚点保持同文件可见；拆分会破坏可复现投影和变异判据。
+#   spec: workpaper-page-formula-toolbar-closure Task 13/15
+backend/scripts/gen/generate_workpaper_sync_program_milestones.py  2744
+backend/tests/workpaper_sync/test_workpaper_sync_program_milestones.py  803
