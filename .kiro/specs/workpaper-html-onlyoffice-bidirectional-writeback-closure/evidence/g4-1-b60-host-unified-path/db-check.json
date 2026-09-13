@@ -1,0 +1,23 @@
+{
+  "application": {
+    "id": "baf86294-1604-4dbf-a20f-eb29430d68ce",
+    "result_revision": 5,
+    "state": "applied"
+  },
+  "captured_at": "2026-09-11T05:49:59.966773+00:00",
+  "content_version": {
+    "id": "27ac31dc-29bc-42ed-97f0-5ba65d384b1c",
+    "operation_id": "bf9c9599-190a-4733-b0ea-28b8c8bbe9cf",
+    "revision": 5,
+    "source": "onlyoffice"
+  },
+  "entry_id": "xlsx/b60/gt-b60-bundle",
+  "operation": {
+    "application_id": "baf86294-1604-4dbf-a20f-eb29430d68ce",
+    "id": "bf9c9599-190a-4733-b0ea-28b8c8bbe9cf",
+    "state": "applied"
+  },
+  "room_id": "e4c46326-ab6f-463a-836d-47288b0ab1ae",
+  "run_id": "g4-1-pilots-positive-runtime-v1",
+  "wp_id": "afb9201a-5989-4c3f-b79f-e1a950e53be9"
+}

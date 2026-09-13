@@ -1,0 +1,86 @@
+{
+  "captured_at": "2026-09-10T11:04:33.886Z",
+  "marker": "g4f66943",
+  "steps": [
+    {
+      "formula_count": 1,
+      "formula_visible": true
+    },
+    {
+      "after_formula": "0"
+    },
+    {
+      "after_eval": "0",
+      "evalRes": {
+        "topLineEditorName": "ce-cell-content",
+        "hasTopEl": true,
+        "hasEval": "boolean",
+        "topLineSet": true,
+        "composite": true,
+        "more": [
+          "mathInputType",
+          "evalCommand",
+          "formulasList",
+          "Begin_CompositeInput",
+          "Replace_CompositeText",
+          "End_CompositeInput",
+          "Set_CursorPosInCompositeText",
+          "Get_CursorPosInCompositeText",
+          "Get_MaxCursorPosInCompositeText",
+          "isCellEdited"
+        ]
+      }
+    },
+    {
+      "after_plugin": "1",
+      "pluginRes": {
+        "ok": true,
+        "methods": [
+          "ie_channel",
+          "ie_channel_check",
+          "tr_init",
+          "tr",
+          "_attachCustomMenuClickEvent",
+          "_onCustomMenuClick",
+          "attachContextMenuClickEvent",
+          "event_onContextMenuClick",
+          "attachToolbarMenuClickEvent",
+          "event_onToolbarMenuClick",
+          "attachEvent",
+          "detachEvent",
+          "onEvent",
+          "attachEditorEvent",
+          "detachEditorEvent",
+          "init",
+          "onTranslate",
+          "button",
+          "onThemeChanged",
+          "name",
+          "nameLocale",
+          "guid",
+          "version",
+          "minVersion",
+          "variations",
+          "onlyofficeScheme",
+          "_initInternal",
+          "info",
+          "theme",
+          "onThemeChangedBase",
+          "isStarted",
+          "_checkPluginOnWindow",
+          "_pushWindowMethodCommandCallback",
+          "executeCommand",
+          "executeMethod",
+          "resizeWindow",
+          "callCommand",
+          "callModule",
+          "loadModule",
+          "callCommandAsync"
+        ],
+        "errors": []
+      }
+    }
+  ],
+  "host_dirty": "1",
+  "host_status": "OnlyOffice 编辑中"
+}

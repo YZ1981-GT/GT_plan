@@ -1,0 +1,148 @@
+{
+  "script": "e2e/g4-1-h1-unified-path.spec.ts",
+  "captured_at": "2026-09-12T04:30:18.317Z",
+  "scope": {
+    "project_id": "2aa00f57-1df4-4fe8-9840-2d65d0fd8749",
+    "wp_id": "c71b7c54-6868-4fb9-9e14-083034f57815",
+    "entry_id": "xlsx/gt-h1-fixed-assets"
+  },
+  "predicates": {
+    "user_sync_requests": [
+      {
+        "method": "GET",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/c71b7c54-6868-4fb9-9e14-083034f57815/sync/entries/xlsx/gt-h1-fixed-assets/store-projection",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/c71b7c54-6868-4fb9-9e14-083034f57815/sync/entries/xlsx/gt-h1-fixed-assets/pending-mutations",
+        "status": 200
+      },
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/c71b7c54-6868-4fb9-9e14-083034f57815/sync/entries/xlsx/gt-h1-fixed-assets/materialize",
+        "status": 200
+      }
+    ],
+    "forcesave_hits": [
+      {
+        "method": "POST",
+        "path": "/api/projects/2aa00f57-1df4-4fe8-9840-2d65d0fd8749/workpapers/c71b7c54-6868-4fb9-9e14-083034f57815/sync/entries/xlsx/gt-h1-fixed-assets/rooms/de3df2bf-a25f-4bfc-bf36-b09f7f95d75f/forcesave",
+        "status": 202
+      }
+    ],
+    "d2_sync_hits": 0,
+    "callback_url_keys": [
+      "doc_key",
+      "generation",
+      "room_id",
+      "route_credential_id",
+      "route_token"
+    ],
+    "callback_url_redacted": "http://host.docker.internal:9980/api/workpaper-sync/rooms/de3df2bf-a25f-4bfc-bf36-b09f7f95d75f/onlyoffice-callback?room_id=%3Credacted%3E&generation=%3Credacted%3E&doc_key=%3Credacted%3E&route_credential_id=%3Credacted%3E&route_token=%3Credacted%3E",
+    "host_mounted": true,
+    "confirm_descriptor_200": true,
+    "forcesave_clicked": true,
+    "oo_cell_dirty_attempted": true,
+    "host_dirty_before_forcesave": false,
+    "forcesave_dispatch_error": null,
+    "forcesave_cs_error": 0,
+    "forcesave_cs_outcome": "accepted",
+    "forcesave_callback_expected": true,
+    "forcesave_http_status": 202,
+    "forcesave_error_code": null,
+    "forcesave_body_keys": [
+      "forcesave_request_id",
+      "operation_id",
+      "request_sequence",
+      "state",
+      "poll_after_ms",
+      "replayed",
+      "dispatch_error",
+      "cs_error",
+      "cs_outcome",
+      "callback_expected"
+    ],
+    "materialize_room_id": "de3df2bf-a25f-4bfc-bf36-b09f7f95d75f",
+    "materialize_has_jwt_token": true,
+    "doc_editor_called": false,
+    "doc_editor_has_root_token": false,
+    "doc_editor_document_mutable": false,
+    "host_status": "",
+    "host_error": "",
+    "confirm_forcesave_error": null,
+    "html_dom_roundtrip": {
+      "attempted": true,
+      "marker": "g4h1324785",
+      "switched_to_html": true,
+      "marker_visible": true,
+      "store_mirrored": true,
+      "dom_probe": {
+        "by_exact_text": 0,
+        "input_prop_hits": 1,
+        "table_text_has": false,
+        "tracked_operation_id": "61984dd2-1a72-4058-91d6-2e06ecf7a75b"
+      }
+    },
+    "oo_write_target": "D13",
+    "oo_cell_edit_probe": {
+      "ok": true,
+      "target": "D13",
+      "attempt": 1,
+      "hasInsert": "function",
+      "hasEnter": "function",
+      "hasPaste": "function",
+      "hasFind": "function",
+      "sheetNames": [
+        "底稿目录",
+        "固定资产审计程序表H1A",
+        "审定表H1-1",
+        "附注披露信息（上市公司）",
+        "附注披露信息（国有企业）",
+        "明细表H1-2",
+        "调整分录汇总H1-3",
+        "闲置检查表H1-4",
+        "会计政策估计检查表H1-5",
+        "分析表H1-6",
+        "增加检查表H1-7",
+        "减少检查表H1-8",
+        "监盘计划H1-9",
+        "盘点检查表H1-10",
+        "监盘小结H1-11",
+        "折旧测算表（不含减值）-直线法H1-12",
+        "折旧测算表（含减值）H1-12",
+        "折旧测算表（多次减值）H1-12",
+        "折旧分配分析表H1-13",
+        "减值测算表H1-14",
+        "可收回金额测试表H1-15",
+        "房屋建筑物权属检查表H1-16",
+        "运输设备权属检查表H1-17",
+        "关联交易检查表H1-18",
+        "经营租出固定资产检查表H1-19",
+        "融资租出固定资产检查表H1-20",
+        "_GT_SYNC"
+      ],
+      "activeSheet": "减少检查表H1-8",
+      "inserted": true,
+      "entered": true,
+      "pasted": true,
+      "closeRet": true,
+      "closed": true,
+      "cellText": "g4h1324785",
+      "modified": true,
+      "saveRet": true,
+      "saved": true,
+      "cellTextAfterSave": "g4h1324785"
+    }
+  },
+  "notes": [
+    "token/JWT/route_credential 值已脱敏",
+    "OO 写格：Asc.editor 写受管 D13(asset_name)；权威判据是 forcesave 响应 cs_error（0=有变更，4=no_changes）",
+    "application applied / revision+1 由同目录 DB 核查脚本补齐",
+    "§9.6 条件 6：切回结构化视图后 DOM 应出现 marker（getByDisplayValue / virtual text / input.value，排除搜索框）",
+    "DocEditor document 必须是可变纯对象（readonly Proxy 会导致 document.token 赋值被吞 → -20）"
+  ],
+  "auth_probe": {
+    "has_token": true
+  }
+}
