@@ -51,31 +51,35 @@
   - **完成**：provider 986 行（数组路径已抽 `json_path.py` 共享模块，无冗余）；契约 `d4.revenue_detail.json` parse_contract 通过（1 sheet / 18 fields / 数组下标正确解析）；生成器脚本已创建；carrier gate digest 漂移兜底已加（镜像 D4-9 范式）
   - _Requirements: 1.1, 4.1_
 
-- [ ] 6. registry 两白名单 + wp_code 裁决
+- [x] 6. registry 两白名单 + wp_code 裁决
   - `registry.py`：`_ALLOWED_PROVIDER_MODULES` + `DELIVERED_PER_ENTRY_CONTRACTS` 各加 D4 条
   - `workpaper_sync_entry_wp_code_adjudication.json` 加 D4 条，wp_codes 以**真载荷落点**为准（实测 D4），带 store_payload_evidence
+  - **完成**：白名单确认 `phase5_d4_revenue_detail` in `_ALLOWED_PROVIDER_MODULES`=True；DELIVERED 10 条（+1）；adjudication 10 条（+1），`wp_code=D4`（载荷 2 行 1739B）
   - _Requirements: 3.1, 4.1_
 
-- [ ] 7. 发布链（有真载荷的非空首版）
+- [-] 7. 发布链（有真载荷的非空首版）
   - Task 76 provisioner `--check` → `--apply`（记 bundle id）
   - `fix_projection_first_publication --check`：必须 10 stage 全过且 `row_keys` 非 0
   - `--apply` 产出 published representation（记 representation id / revision / projection_sha256）
   - 查库印证 representation 的 `definition_bundle_id` 与 Task 76 的 bundle 一致
+  - **阻塞**：provisioner `--check` 确认 D4 entry 已被识别（would_create 5 件 / contract digest=0bf1e12 与生成器一致），但全平台 carrier gate stale（carrier_contract digest 漂移 c88df6d7→350b7659）阻塞全部 10 entry 的 `--apply`（包括 D2/H1/G7/D1~D7 所有已做实的 canary）。需先重跑 carrier gate 探针重新裁决（属共享 infra），非本 spec scope。三表（bundle/representation/entry_state）当前均 0 行
   - _Requirements: 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 8. overlay + manifest 重生
+- [-] 8. overlay + manifest 重生
   - overlay 加 D4 宿主 override（cap=bidirectional / adapter_id=d4.revenue_detail）
   - `approved_source_digest` 若变动：必须逐 mount 归因（mount 总数不变 + 唯一变动是本 spec 的宿主接线），带精确 review_basis
   - 重生 manifest 两件产物，核 capability=bidirectional + adapter_id
+  - **部分完成**：overlay 已加 D4 reviewed_entries 条目（`overrides` 列表追加 GtD4OperatingRevenue.vue / adapter_id=d4.revenue_detail / capability=bidirectional）；manifest 重生需 Node discoverer + `approved_source_digest` 更新，属共享文件重量级操作待单独执行
   - _Requirements: 4.1, 4.2_
 
-- [ ] 9. 宿主接线 + oo_to_html 分支
+- [-] 9. 宿主接线 + oo_to_html 分支
   - D4 宿主：仅 D4-2 走 `WorkpaperSyncEditorHost`，其余 40+ sheet 保留既有 dualMode
   - `useD4*FormData` 导出 flush（flushHtml 前 flush debounce）
   - `oo_to_html.py` 加 `elif adapter_id == "d4.revenue_detail"` 分支，数组形态写回
   - 真库 `attach_adapters` 必须返回 `('d4.revenue_detail',)`
   - 必须验证 D4-2 更新后的 store 被审定表/附注下游消费，且 `periodTotal` 仍由内部公式计算而非 projection 覆盖
   - Task 1 的 `mapping_digest` 未生成或漂移时阻塞本任务
+  - **实测结论**：oo_to_html.py **不需要** per-adapter 分支——OoToHtmlCoordinator 走通用 adapter.extract/merge/commit 路径，adapter 由 `build_excel_adapter(contract)` 构建时已知数组下标 json_pointer；`merge_projection_into_store_rows` 用共享 `json_path.set_json_path` 处理数组写回。provider 的 `attach_adapters` 已实现完整注册链路（check manifest capability → 查库 representation → build_excel_adapter → register）。**剩余**：前端宿主 D4-2 走 `WorkpaperSyncEditorHost` 需改 GtD4OperatingRevenue.vue（并发在编辑需确认停手）+ Task 7 发布链产出 representation 后方可 attach
   - _Requirements: 4.2, 4.3, 3.3_
 
 - [ ] 10. §9.6 真栈 e2e

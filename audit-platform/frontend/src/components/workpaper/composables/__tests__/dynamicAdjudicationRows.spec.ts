@@ -496,3 +496,86 @@ describe('共享件与循环解耦（反向自检）', () => {
     expect(src).not.toMatch(/from ['"]element-plus['"]/)
   })
 })
+
+// ─── 多段审定表 sectionKey（D4-1 主营/其他分段；spec d4-1 Task 2.3 / Property 3）──
+//
+// sectionKey 是**可选**字段：多段审定表（如 D4-1）用它标行归属「主营业务收入」/
+// 「其他业务收入」；单段循环（K1/K2/F1…）不传，行为逐字节不变。
+// spec: .kiro/specs/d4-1-adjudication-bidirectional-writeback-and-formula-io/ Task 2.3
+
+describe('多段审定表 sectionKey（D4-1 Task 2.3 / Property 3）', () => {
+  it('序列化往返保留 sectionKey', () => {
+    const rows: DynamicAdjRow[] = [
+      { rowId: 'r-1', label: '批发', source: 'tb', accountCode: '6001.11', sectionKey: 'main-revenue' },
+      { rowId: 'r-2', label: '租金', source: 'manual', sectionKey: 'other-revenue' },
+      { rowId: 'r-3', label: '无段行', source: 'manual' },
+    ]
+    const back = deserializeRows(serializeRows(rows))
+    expect(back).toEqual(rows)
+    expect(back[0].sectionKey).toBe('main-revenue')
+    expect(back[1].sectionKey).toBe('other-revenue')
+    expect('sectionKey' in back[2]).toBe(false) // 无段行不产生空 sectionKey
+  })
+
+  it('sectionKey 仅在有值时落库（空串不写）', () => {
+    const rows: DynamicAdjRow[] = [
+      { rowId: 'r-1', label: '甲', source: 'manual', sectionKey: '' },
+    ]
+    const back = deserializeRows(serializeRows(rows))
+    expect('sectionKey' in back[0]).toBe(false)
+  })
+
+  it('seed 时 sectionOf 映射器把后端 section 文案翻成 sectionKey', () => {
+    const sectionOf = (p: { section?: string }) =>
+      p.section === '其他业务收入' ? 'other-revenue' : p.section === '主营业务收入' ? 'main-revenue' : undefined
+    const got = seedRowsFromPrefill(
+      SPEC,
+      [
+        { name: '批发', code: '6001.11', closing_balance: 100, section: '主营业务收入' },
+        { name: '租金', code: '6051.01', closing_balance: 50, section: '其他业务收入' },
+      ],
+      [],
+      { sectionOf },
+      seededRand(41),
+    )
+    const wholesale = got.rows.find((r) => r.label === '批发')
+    const rent = got.rows.find((r) => r.label === '租金')
+    expect(wholesale?.sectionKey).toBe('main-revenue')
+    expect(rent?.sectionKey).toBe('other-revenue')
+  })
+
+  it('seed 不传 sectionOf（单段循环）→ 行不带 sectionKey（零回归）', () => {
+    const got = seedRowsFromPrefill(
+      SPEC,
+      [{ name: '甲', code: '1901.01', closing_balance: 100 }],
+      [],
+      {},
+      seededRand(43),
+    )
+    expect('sectionKey' in got.rows[0]).toBe(false)
+  })
+
+  it('appendManualRow 带 section → 新手工行归属该段；不带则无段（反向自检）', () => {
+    const withSection = appendManualRow([], '手工主营行', seededRand(45), 'main-revenue')
+    expect(withSection.row.sectionKey).toBe('main-revenue')
+    const withoutSection = appendManualRow([], '普通手工行', seededRand(47))
+    expect('sectionKey' in withoutSection.row).toBe(false)
+  })
+
+  it('seed 已有行的 sectionKey 不被覆盖（手工归段优先）', () => {
+    const sectionOf = () => 'main-revenue'
+    const existing: DynamicAdjRow[] = [
+      { rowId: 'r-x', label: '批发', source: 'manual', accountCode: '6001.11', sectionKey: 'other-revenue' },
+    ]
+    const got = seedRowsFromPrefill(
+      SPEC,
+      [{ name: '批发', code: '6001.11', closing_balance: 100 }],
+      existing,
+      { sectionOf },
+      seededRand(49),
+    )
+    // 命中既有行 → 不新建，且已有 sectionKey 不被 seed 的映射结果覆盖
+    expect(got.rows).toHaveLength(1)
+    expect(got.rows[0].sectionKey).toBe('other-revenue')
+  })
+})

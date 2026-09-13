@@ -157,6 +157,7 @@ from app.services.workpaper_sync.excel_extract import (
     RowIdentityScan,
     RuntimeIdentityInventory,
     assert_engine_entry_definitions,
+    binding_key,
     extract_projection,
     managed_tables_of,
     read_runtime_binding_pairs,
@@ -1058,8 +1059,26 @@ def assert_footer_anchor_stable(
     contract: SyncContract,
     runtime_binding: Mapping[str, str],
     row_shift: RowShiftPlan | None = None,
+    region_key: str = "",
+    region_last_data_row: int | None = None,
 ) -> int | None:
     """footer 标记行必须与 representation 冻结的 `GT_FOOTER_ROW` 一致（AC 6.9 / 6.3）。
+
+    ═══ `region_key` / `region_last_data_row`：多受管区消歧（d4-9）═══
+
+    默认（`region_key=""`）逐字不变：取契约首个 footer_anchor、`_find_marker_row` 取列上
+    **首个** marker 行、读裸键 `GT_FOOTER_ROW`。
+
+    非空 `region_key` 时（同 sheet 双动态行区，两个 `合计` marker 落在 23 / 37 两行）：
+
+    * 冻结侧改经 :func:`~app.services.workpaper_sync.excel_extract.binding_key` 取
+      `GT_FOOTER_ROW__{region_key}`（缺失回退裸键）—— 各区各自的冻结 footer 行；
+    * 可见侧的 marker 搜索用 `region_last_data_row` 消歧：在列上找**紧跟在本区最后一个
+      数据行之后**的那个 marker 行（`_find_marker_row_after`），而不是全表第一个。没有
+      `region_last_data_row` 时退回首个 marker（单区语义）。
+
+    这样「本期区 footer=23」与「上期区 footer=37」各自独立校验，不会因为两个 marker 同名
+    而互相误判。
 
     判据用两个**互相独立**的载体交叉验证：
 
@@ -1105,19 +1124,40 @@ def assert_footer_anchor_stable(
     anchor = anchors[0]
     xml = entries[sheet_part].decode("utf-8")
     shared = _shared_strings(entries)
-    observed = _find_marker_row(
-        xml, column=anchor.search_column, marker=anchor.marker, shared=shared
-    )
+    if region_key and region_last_data_row is not None:
+        # 多受管区消歧：本区的 footer marker 是**紧跟在本区最后一个数据行之后**的那个
+        # `合计`，不是全表第一个（否则上期区会误判到本期区的 marker 上）。
+        observed = _find_marker_row_after(
+            xml,
+            column=anchor.search_column,
+            marker=anchor.marker,
+            shared=shared,
+            after_row=region_last_data_row,
+        )
+    else:
+        observed = _find_marker_row(
+            xml, column=anchor.search_column, marker=anchor.marker, shared=shared
+        )
     if observed is None:
         raise FooterAnchorDriftError(
             f"契约声明的 footer marker {anchor.marker!r} 在列 {anchor.search_column} 上"
-            "一处都找不到 —— footer anchor 是 AC 6.3 要求契约表达的结构之一，"
+            + (
+                f"第 {region_last_data_row} 行之后一处都找不到 —— 区域 {region_key!r} 的 "
+                if region_key and region_last_data_row is not None
+                else ""
+            )
+            + "footer anchor 是 AC 6.3 要求契约表达的结构之一，"
             "定位不到即结构漂移，不得按固定行号继续写"
         )
-    frozen = runtime_binding.get("GT_FOOTER_ROW")
+    frozen = binding_key(runtime_binding, "GT_FOOTER_ROW", region_key=region_key)
     if frozen is None:
+        _key_hint = (
+            f"GT_FOOTER_ROW__{region_key}（缺失时回退 GT_FOOTER_ROW）"
+            if region_key
+            else "GT_FOOTER_ROW"
+        )
         raise FooterAnchorDriftError(
-            "runtime binding 里没有 GT_FOOTER_ROW（实测键 "
+            f"runtime binding 里没有 {_key_hint}（实测键 "
             f"{sorted(runtime_binding)[:8]}）—— footer 位置缺冻结预期，"
             "无法判断它有没有下移"
         )
@@ -1188,6 +1228,46 @@ def _find_marker_row(
         if text is not None and text.strip() == marker:
             return row
     return None
+
+
+def _find_marker_row_after(
+    xml: str, *, column: str, marker: str, shared: Sequence[str], after_row: int
+) -> int | None:
+    """在指定列上找**行号 > `after_row`** 的第一个 marker 行（多受管区消歧用）。
+
+    与 :func:`_find_marker_row` 同解析（sharedString / inlineStr / str 三载体），只是
+    加了「跳过 `after_row` 及其之上的所有 marker」这一条：d4-9 两个区的 footer marker
+    同为 `合计`（落在 23 / 37 两行），上期区的 footer 是「本期区最后数据行 22 之后」的
+    第二个 `合计`——若不消歧会误判到本期区那行 23 上。
+
+    命中的 marker 行**必须**严格大于 `after_row`；候选按行号升序取第一个（最贴近本区末行
+    的那个），这样即使下方还有别的区的 marker 也不会取错。
+    """
+    candidates: list[int] = []
+    for match in re.finditer(
+        r'<c r="' + re.escape(column) + r'(\d+)"(?P<attrs>(?:\s[^>]*?)?)>(?P<body>.*?)</c>',
+        xml,
+        re.S,
+    ):
+        row = int(match.group(1))
+        if row <= after_row:
+            continue
+        attrs = match.group("attrs") or ""
+        body = match.group("body")
+        text: str | None = None
+        if 't="s"' in attrs:
+            index = re.search(r"<v>(\d+)</v>", body)
+            if index is not None and int(index.group(1)) < len(shared):
+                text = shared[int(index.group(1))]
+        elif 't="inlineStr"' in attrs:
+            inline = re.search(r"<t[^>]*>(.*?)</t>", body, re.S)
+            text = _xml_unescape(inline.group(1)) if inline else None
+        else:
+            value = re.search(r"<v>(.*?)</v>", body, re.S)
+            text = _xml_unescape(value.group(1)) if value else None
+        if text is not None and text.strip() == marker:
+            candidates.append(row)
+    return min(candidates) if candidates else None
 
 
 def assert_footer_formula_covers_managed_rows(
@@ -1389,6 +1469,7 @@ def plan_managed_writes(
             scan=scan,
             substrate_entries=substrate_entries,
             runtime_binding=runtime_binding,
+            region_key=binding.region_key,
         )
         # 插入行数**必须**恰等于 orphan 数（Requirement 2.6 / Property 5）。
         if row_shift.count != len(orphan):
@@ -1423,6 +1504,8 @@ def plan_managed_writes(
         sheet_part=region.sheet_part,
         contract=contract,
         runtime_binding=runtime_binding,
+        region_key=binding.region_key,
+        region_last_data_row=(region.last_row if binding.region_key else None),
     )
     anchor = next(
         (
@@ -1713,6 +1796,7 @@ def _plan_row_shift(
     scan: RowIdentityScan,
     substrate_entries: Mapping[str, bytes],
     runtime_binding: Mapping[str, str],
+    region_key: str = "",
 ) -> tuple[RowShiftPlan, tuple[int, ...], str, str]:
     """由 orphan 身份数算出**可安全执行**的插行计划。
 
@@ -1774,7 +1858,9 @@ def _plan_row_shift(
     )
     total_formula_rows: tuple[int, ...] = ()
     if anchor is not None and anchor.carries_total_formula:
-        raw = str(runtime_binding.get("GT_FOOTER_ROW", "")).strip()
+        raw = str(
+            binding_key(runtime_binding, "GT_FOOTER_ROW", region_key=region_key) or ""
+        ).strip()
         if not raw.isdigit():
             raise _reject(
                 "excel_row_shift_plan_range_invalid",
@@ -2006,6 +2092,7 @@ def assert_shifted_footer_gates(
     contract: SyncContract,
     region: ManagedRegion,
     runtime_binding: Mapping[str, str],
+    region_key: str = "",
 ) -> int | None:
     """位移**之后**在 staged 产物上复核 footer 两门（Requirements 7.1 / 7.4）。
 
@@ -2032,6 +2119,8 @@ def assert_shifted_footer_gates(
         contract=contract,
         runtime_binding=runtime_binding,
         row_shift=plan.row_shift,
+        region_key=region_key,
+        region_last_data_row=(region.last_row if region_key else None),
     )
     if footer_row is None:
         return None
@@ -2530,6 +2619,7 @@ def materialize_projection(
                     contract=definitions.contract,
                     region=substrate_view.region,
                     runtime_binding=runtime_binding,
+                    region_key=binding.region_key,
                 )
             tmp.write_bytes(staged)
         os.replace(tmp, output)

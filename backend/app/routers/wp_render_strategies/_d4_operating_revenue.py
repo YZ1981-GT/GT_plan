@@ -33,6 +33,7 @@ from app.services.d4_extraction.account_scope import (
     D4_ROOT_PAIRS,
     SegmentPair,
     build_d4_source_codes,
+    classify_d4_source_status,
     code_in_specs,
     fetch_d4_leaf_rows,
     pair_revenue_cost_leaves,
@@ -439,9 +440,26 @@ async def render(ctx: RenderContext) -> dict | None:
     # → 故 D4 现在输出 `tb_values` / `adjudication_prefill` / `segment_prefill` /
     #   `tb_source_codes`，与 K1/K2/F1/G7 同范式。
     if settings.D_CYCLE_FOUR_TABLE_EXTRACTION_ENABLED:
+        # 取数状态预置为 blocked（异常/缺码要在 tb_source_status 里可见，不静默）
+        # spec Req 2.1 / Property 5：缺合法 scope/code 时给前端可见的拒绝/人工标记。
+        # 成功解析 scope 后由 classify_d4_source_status 覆盖为 ok/manual/blocked。
+        project_context["tb_source_status"] = {
+            "state": "blocked",
+            "reason": "四表取数尚未执行（初始化未完成）。",
+            "unmapped_standard": [],
+            "revenue_resolved_from": "",
+            "cost_resolved_from": "",
+            "revenue_exact": False,
+            "cost_exact": False,
+        }
         try:
             # Step 1: 解析 D4 科目定位（报表行驱动 → 区间展开 → 逐项目反解）
             scope = await resolve_d4_accounts(ctx)
+
+            # 取数状态判定（纯函数）→ 前端据此 gate 是否直接用兜底数。
+            # 不改变 tb_values/adjudication_prefill/segment_prefill/tb_source_codes/
+            # parent_check 的既有下发，本行是纯新增旁路。
+            project_context["tb_source_status"] = classify_d4_source_status(scope)
 
             # Step 2: 按收入/成本规格集取叶子行
             rev_specs = scope.revenue_standard_expanded or scope.revenue_standard
@@ -524,6 +542,19 @@ async def render(ctx: RenderContext) -> dict | None:
                 "D4 render: 四表取数异常（fail-open），其余部分正常 wp_id=%s: %s",
                 wp_id, e,
             )
+            # fail-open 但状态必须可见（Property 5）：异常不静默，标 blocked + 原因。
+            # 若已成功判过 ok/manual（异常发生在取数后段），保留既有状态不降级覆盖。
+            prev = project_context.get("tb_source_status") or {}
+            if prev.get("state") != "ok" and prev.get("state") != "manual":
+                project_context["tb_source_status"] = {
+                    "state": "blocked",
+                    "reason": f"四表取数异常，拒绝取数（请人工核对科目映射）：{e}",
+                    "unmapped_standard": [],
+                    "revenue_resolved_from": "",
+                    "cost_resolved_from": "",
+                    "revenue_exact": False,
+                    "cost_exact": False,
+                }
 
         # ─── Tier A 公式驱动 TB 核对行 transient seed（D4 双标量）────────────────
         try:

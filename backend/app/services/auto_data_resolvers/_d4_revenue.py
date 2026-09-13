@@ -398,3 +398,377 @@ async def _resolve_d4_ledger_monthly_by_product(
     summary = f"6001按产品贷方导入 {len(rows)} 行，年度合计={total:,.0f}"
 
     return {"summary": summary, "rows": rows}
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Resolver 5: d4_25_dealer_sales — D4-25 经销商检查表间提取
+# 按客户名称从 D4-2 收入明细取本期销售金额，从 D2-2 客户账龄取期末应收账款余额
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@auto_resolver("d4_25_dealer_sales")
+async def _resolve_d4_25_dealer_sales(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    customer_name: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """按客户名称从 D4-2 收入明细取本期销售金额，从 D2-2 客户账龄取期末应收账款余额。
+
+    🔴 匹配不到返回 None，禁止返回 0（0 会被误解为「已核对为零」）。
+    🔴 取数走 get_active_filter，禁止裸写 is_deleted == False。
+
+    Args:
+        customer_name: 客户名称（精确匹配）
+
+    Returns:
+        {"sales_amount": float|None, "ar_balance": float|None, "summary": str} 或 None
+    """
+    if not customer_name:
+        return None
+
+    from app.models.audit_platform_models import ChecklistResponse
+
+    sales_amount: float | None = None
+    ar_balance: float | None = None
+
+    try:
+        # D4-2 收入明细：从 checklist_responses 的 D4-2-rows 项里按客户名称查找
+        cr_table = ChecklistResponse.__table__
+        d4_2_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D4-2-rows",
+            ).limit(1)
+        )
+        d4_2_row = d4_2_result.scalar_one_or_none()
+        if d4_2_row:
+            import json
+            try:
+                rows = json.loads(d4_2_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        # D4-2 行结构中客户名称字段可能是 product / customerName
+                        name = row.get("customerName") or row.get("product") or ""
+                        if str(name).strip() == customer_name.strip():
+                            amt = row.get("salesAmount") or row.get("currentAudited")
+                            if amt is not None:
+                                try:
+                                    sales_amount = float(amt)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # D2-2 客户账龄：从 checklist_responses 的 D2-2-rows 项按客户名称查找
+        d2_2_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D2-2-rows",
+            ).limit(1)
+        )
+        d2_2_row = d2_2_result.scalar_one_or_none()
+        if d2_2_row:
+            import json
+            try:
+                rows = json.loads(d2_2_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        name = row.get("customerName") or row.get("客户名称") or ""
+                        if str(name).strip() == customer_name.strip():
+                            bal = row.get("arBalance") or row.get("endingBalance") or row.get("期末余额")
+                            if bal is not None:
+                                try:
+                                    ar_balance = float(bal)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("d4_25_dealer_sales 查询失败: %s", e)
+
+    if sales_amount is None and ar_balance is None:
+        return None
+
+    parts = []
+    if sales_amount is not None:
+        parts.append(f"销售金额={sales_amount:,.2f}")
+    if ar_balance is not None:
+        parts.append(f"应收余额={ar_balance:,.2f}")
+
+    return {
+        "sales_amount": sales_amount,
+        "ar_balance": ar_balance,
+        "summary": "；".join(parts) if parts else "无匹配",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Resolver 6: d4_26_overseas_sales — D4-26 境外销售收入检查表间提取
+# 从境外销售明细取本期销售金额，按客户名称匹配
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@auto_resolver("d4_26_overseas_sales")
+async def _resolve_d4_26_overseas_sales(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    customer_name: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """从境外销售明细取本期销售金额，按客户名称匹配。
+
+    🔴 匹配不到返回 None，禁止返回 0。
+
+    Returns:
+        {"sales_amount": float|None, "summary": str} 或 None
+    """
+    if not customer_name:
+        return None
+
+    from app.models.audit_platform_models import ChecklistResponse
+
+    sales_amount: float | None = None
+
+    try:
+        # 从 D4-2 收入明细中筛选境外客户（或从专门的境外销售底稿取）
+        d4_2_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D4-2-rows",
+            ).limit(1)
+        )
+        d4_2_row = d4_2_result.scalar_one_or_none()
+        if d4_2_row:
+            import json
+            try:
+                rows = json.loads(d4_2_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        name = row.get("customerName") or row.get("product") or ""
+                        if str(name).strip() == customer_name.strip():
+                            amt = row.get("salesAmount") or row.get("currentAudited")
+                            if amt is not None:
+                                try:
+                                    sales_amount = float(amt)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("d4_26_overseas_sales 查询失败: %s", e)
+
+    if sales_amount is None:
+        return None
+
+    return {
+        "sales_amount": sales_amount,
+        "summary": f"销售金额={sales_amount:,.2f}",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Resolver 7: d4_27_related_party_sales — D4-27 识别未披露的关联方表间提取
+# 从客户维度销售明细取年度销售额，按姓名/客户法人匹配
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@auto_resolver("d4_27_related_party_sales")
+async def _resolve_d4_27_related_party_sales(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    person_name: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """从客户维度销售明细取年度销售额，按姓名/客户法人匹配。
+
+    🔴 匹配不到返回 None，禁止返回 0。
+
+    Returns:
+        {"annual_sales": float|None, "summary": str} 或 None
+    """
+    if not person_name:
+        return None
+
+    from app.models.audit_platform_models import ChecklistResponse
+
+    annual_sales: float | None = None
+
+    try:
+        # 从 D4-2 收入明细或 D4-9 客户结构分析中按客户法人/姓名匹配
+        d4_2_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D4-2-rows",
+            ).limit(1)
+        )
+        d4_2_row = d4_2_result.scalar_one_or_none()
+        if d4_2_row:
+            import json
+            try:
+                rows = json.loads(d4_2_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        name = row.get("customerName") or row.get("product") or ""
+                        if str(name).strip() == person_name.strip():
+                            amt = row.get("salesAmount") or row.get("annualTotal") or row.get("currentAudited")
+                            if amt is not None:
+                                try:
+                                    annual_sales = float(amt)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("d4_27_related_party_sales 查询失败: %s", e)
+
+    if annual_sales is None:
+        return None
+
+    return {
+        "annual_sales": annual_sales,
+        "summary": f"年度销售额={annual_sales:,.2f}",
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Resolver 8: d4_28_customer_balances — D4-28 客户信息核查清单表间提取
+# 从 D4-2 收入明细 + D2-2 客户账龄 + 合同负债明细，按客户名称匹配
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@auto_resolver("d4_28_customer_balances")
+async def _resolve_d4_28_customer_balances(
+    db: AsyncSession,
+    project_id: UUID,
+    year: int,
+    *,
+    customer_name: str | None = None,
+    **kwargs: Any,
+) -> dict[str, Any] | None:
+    """从 D4-2 收入明细、D2-2 客户账龄、合同负债明细按客户名称匹配提取。
+
+    🔴 匹配不到返回 None，禁止返回 0。
+    🔴 三个金额字段独立查找，任一非 None 即返回结果。
+
+    Returns:
+        {"sales_amount": float|None, "ar_balance": float|None,
+         "contract_liability": float|None, "summary": str} 或 None
+    """
+    if not customer_name:
+        return None
+
+    from app.models.audit_platform_models import ChecklistResponse
+
+    sales_amount: float | None = None
+    ar_balance: float | None = None
+    contract_liability: float | None = None
+
+    try:
+        # D4-2 销售金额
+        d4_2_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D4-2-rows",
+            ).limit(1)
+        )
+        d4_2_row = d4_2_result.scalar_one_or_none()
+        if d4_2_row:
+            import json
+            try:
+                rows = json.loads(d4_2_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        name = row.get("customerName") or row.get("product") or ""
+                        if str(name).strip() == customer_name.strip():
+                            amt = row.get("salesAmount") or row.get("currentAudited")
+                            if amt is not None:
+                                try:
+                                    sales_amount = float(amt)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # D2-2 应收账款期末余额
+        d2_2_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D2-2-rows",
+            ).limit(1)
+        )
+        d2_2_row = d2_2_result.scalar_one_or_none()
+        if d2_2_row:
+            import json
+            try:
+                rows = json.loads(d2_2_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        name = row.get("customerName") or row.get("客户名称") or ""
+                        if str(name).strip() == customer_name.strip():
+                            bal = row.get("arBalance") or row.get("endingBalance") or row.get("期末余额")
+                            if bal is not None:
+                                try:
+                                    ar_balance = float(bal)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        # 合同负债明细（D7 循环或专门的合同负债底稿）
+        d7_result = await db.execute(
+            sa.select(ChecklistResponse.remark).where(
+                ChecklistResponse.project_id == str(project_id),
+                ChecklistResponse.item_id == "D7-2-rows",
+            ).limit(1)
+        )
+        d7_row = d7_result.scalar_one_or_none()
+        if d7_row:
+            import json
+            try:
+                rows = json.loads(d7_row)
+                if isinstance(rows, list):
+                    for row in rows:
+                        name = row.get("customerName") or row.get("客户名称") or ""
+                        if str(name).strip() == customer_name.strip():
+                            cl = row.get("contractLiability") or row.get("endingBalance") or row.get("期末余额")
+                            if cl is not None:
+                                try:
+                                    contract_liability = float(cl)
+                                except (ValueError, TypeError):
+                                    pass
+                            break
+            except (json.JSONDecodeError, TypeError):
+                pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("d4_28_customer_balances 查询失败: %s", e)
+
+    if sales_amount is None and ar_balance is None and contract_liability is None:
+        return None
+
+    parts = []
+    if sales_amount is not None:
+        parts.append(f"销售金额={sales_amount:,.2f}")
+    if ar_balance is not None:
+        parts.append(f"应收余额={ar_balance:,.2f}")
+    if contract_liability is not None:
+        parts.append(f"合同负债={contract_liability:,.2f}")
+
+    return {
+        "sales_amount": sales_amount,
+        "ar_balance": ar_balance,
+        "contract_liability": contract_liability,
+        "summary": "；".join(parts) if parts else "无匹配",
+    }

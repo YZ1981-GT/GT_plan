@@ -59,3 +59,27 @@ export const D4_ADJ_ROWS_SPEC: DynamicRowsSpec = {
   legacyRows: D4_LEGACY_ROWS,
   valueFields: [...D4_ADJ_VALUE_FIELDS],
 }
+
+/**
+ * D4-1 段标识（sectionKey）真源 —— 与后端 `d4_1_descriptor.D4_1_SECTIONS`
+ * 的 `key` 一一对应（`main-revenue` / `other-revenue`）。
+ */
+export type D4SectionKey = 'main-revenue' | 'other-revenue'
+
+/**
+ * 后端 render 下发的 `section` 中文文案 → 前端 `sectionKey` 的映射真源。
+ *
+ * 后端 `build_d4_adjudication_prefill` 下发的 `section` = 「主营业务收入」/
+ * 「其他业务收入」（见 `_d4_operating_revenue.py`）；后端 descriptor
+ * `D4_1_SECTIONS` 的 `key` = `main-revenue` / `other-revenue`。两侧在此锁死。
+ */
+export const D4_SECTION_LABEL_TO_KEY: Readonly<Record<string, D4SectionKey>> = {
+  主营业务收入: 'main-revenue',
+  其他业务收入: 'other-revenue',
+}
+
+/** 把后端 section 文案映射为 sectionKey；未知文案返回 undefined（宁缺勿造，不臆测归段） */
+export function d4SectionKeyFromLabel(label: string | null | undefined): D4SectionKey | undefined {
+  const raw = String(label ?? '').trim()
+  return D4_SECTION_LABEL_TO_KEY[raw]
+}

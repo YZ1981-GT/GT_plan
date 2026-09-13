@@ -54,6 +54,7 @@ from app.models.audit_platform_models import TbBalance
 from app.services.dataset_query import get_active_filter
 from app.services.four_table import (
     RESOLVED_FROM_FALLBACK,
+    RESOLVED_FROM_REPORT,
     LeafRow,
     ReportLineAccountSpec,
     filter_by_code_specs,
@@ -521,6 +522,105 @@ def build_d4_source_codes(scope: D4AccountScope) -> dict:
     d["revenue_row_code"] = D4_REVENUE_ROW_CODE
     d["cost_row_code"] = D4_COST_ROW_CODE
     return d
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 取数状态判定（纯函数，无 DB；供 render 下发 project_context.tb_source_status）
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: 三态取数状态常量（前端据此 gate 是否直接用兜底数）
+D4_SOURCE_STATUS_OK = "ok"
+D4_SOURCE_STATUS_MANUAL = "manual"
+D4_SOURCE_STATUS_BLOCKED = "blocked"
+
+
+def classify_d4_source_status(scope: D4AccountScope) -> dict:
+    """把 :class:`D4AccountScope` 判定为**明确的取数状态**供前端 gate。纯函数、无 DB。
+
+    🔴 spec Req 2.1 / Property 5：缺合法 scope/code 时给前端**可见**的拒绝/人工标记，
+    不臆测科目、不静默吞异常。render 只调用本函数并把结果原样下发到
+    ``project_context.tb_source_status``；**不改变** ``tb_values`` /
+    ``adjudication_prefill`` / ``segment_prefill`` / ``tb_source_codes`` /
+    ``parent_check`` 的既有下发（零回归，本函数是纯**新增**旁路）。
+
+    三态判定（顺序即优先级）：
+
+    * ``blocked`` —— **完全无法解析**：收入侧既非 ``report_config`` 又反解不出任何
+      原始码（``revenue_resolved_from != 'report_config'`` **且**
+      ``revenue_original`` 为空）。此时拒绝取数，不得用兜底根科目臆测。
+    * ``manual`` —— 解析**不精确**：收入侧走了兜底（``resolved_from == 'fallback'``）
+      或非精确反解（``revenue_exact == False`` / ``cost_exact == False``）
+      或存在 ``unmapped_standard``（标准码有但 `account_mapping` 无映射）。
+      需人工确认科目映射，前端应提示「未精确匹配到科目，请人工确认」而非直接用兜底数。
+    * ``ok`` —— 精确命中：收入与成本均 ``exact`` 且均来自 ``report_config``、
+      无 ``unmapped_standard``。正常取数。
+
+    Args:
+        scope: 已解析的 D4 科目定位结果。
+
+    Returns:
+        ``{"state": str, "reason": str, "unmapped_standard": list[str],
+           "revenue_resolved_from": str, "cost_resolved_from": str,
+           "revenue_exact": bool, "cost_exact": bool}``
+
+    **Validates: Requirements 2.1, Property 5**
+    """
+    rev_from = scope.revenue_resolved_from
+    cost_from = scope.cost_resolved_from
+    rev_exact = bool(scope.revenue_exact)
+    cost_exact = bool(scope.cost_exact)
+    unmapped = list(scope.unmapped_standard or ())
+
+    # blocked：收入侧完全无解析依据（非 report_config 且反解不出任何原始码）
+    revenue_unresolvable = (
+        rev_from != RESOLVED_FROM_REPORT and not scope.revenue_original
+    )
+    if revenue_unresolvable:
+        return {
+            "state": D4_SOURCE_STATUS_BLOCKED,
+            "reason": "无法解析营业收入科目：报表映射未命中且未反解出任何客户原始码，拒绝取数。",
+            "unmapped_standard": unmapped,
+            "revenue_resolved_from": rev_from,
+            "cost_resolved_from": cost_from,
+            "revenue_exact": rev_exact,
+            "cost_exact": cost_exact,
+        }
+
+    # manual：走兜底 / 非精确 / 有未映射标准码
+    reasons: list[str] = []
+    if rev_from == RESOLVED_FROM_FALLBACK:
+        reasons.append("营业收入科目走了兜底码（report_config 未命中）")
+    if cost_from == RESOLVED_FROM_FALLBACK:
+        reasons.append("营业成本科目走了兜底码（report_config 未命中）")
+    if not rev_exact:
+        reasons.append("营业收入未精确反解出客户原始码")
+    if not cost_exact:
+        reasons.append("营业成本未精确反解出客户原始码")
+    if unmapped:
+        reasons.append(
+            "存在标准码在 account_mapping 无映射记录：" + "、".join(unmapped)
+        )
+    if reasons:
+        return {
+            "state": D4_SOURCE_STATUS_MANUAL,
+            "reason": "未精确匹配到科目，请人工确认科目映射后再取数：" + "；".join(reasons) + "。",
+            "unmapped_standard": unmapped,
+            "revenue_resolved_from": rev_from,
+            "cost_resolved_from": cost_from,
+            "revenue_exact": rev_exact,
+            "cost_exact": cost_exact,
+        }
+
+    # ok：收入与成本均精确且来自 report_config、无未映射
+    return {
+        "state": D4_SOURCE_STATUS_OK,
+        "reason": "营业收入与营业成本均精确命中报表科目，正常取数。",
+        "unmapped_standard": [],
+        "revenue_resolved_from": rev_from,
+        "cost_resolved_from": cost_from,
+        "revenue_exact": rev_exact,
+        "cost_exact": cost_exact,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

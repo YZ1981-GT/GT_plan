@@ -1224,12 +1224,33 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "有 file_path。`adapter_registered=True`：overlay 裁决 + manifest 重生 + 发布链产出 representation。"
         ),
     },
+    # ── D4-2 追加（Phase 5 第六个 canary：D4 主营业务收入明细表，位置数组行形态）─────
+    {
+        "contract_id": "d4.revenue_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        "delivered_by_task": "d4-revenue-matrix-bidirectional",
+        "pilot_class": "phase5_revenue_detail",
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "D/D4收入底稿.xlsx",
+        "adapter_registered": False,
+        "reason": (
+            "D4-2 Phase 5 第六个 canary（位置数组行形态——首个验证 list index 作为 json_pointer 段"
+            "的生产形态）。选型守卫 assert_entry_selectable 核四条 manifest 事实（entry 存在 / "
+            "independent=True / profile==room_service_wired.v1 / wp_code==['D4O']）+ 零回退。"
+            "逐 sheet 读净化后权威模板 D/D4收入底稿.xlsx（净化后 sha256 b8fb92d4，Task 4 变异 "
+            "4/4 RED）后只声明受管 sheet 主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，"
+            "A24「合计」footer（纯两字无空格），18 契约字段（A product + B~M months/0..11 + "
+            "N formula periodTotal + O auditAdjustment + Q/R prior + V remark）；P/S/T/U 仅 "
+            "formula_mask。HTML store = checklist_responses.item_id='D4-2-rows'（真载荷 2 行 "
+            "1739 B 落 wp_code=D4，非空首版）。共享 json_path.py 处理数组下标（禁止 provider "
+            "私有 dict-only 副本）。`adapter_registered=False` 是顺序：overlay 裁决 bidirectional "
+            "+ manifest 重生 + 发布链产出 approved bundle + current published representation "
+            "之后方可注册。"
+        ),
+    },
 )
-
-
-# ═══════════════════════════════════════════════════════════════════════════
-# manifest 驱动的注册计划与执行（Task 75）
-# ═══════════════════════════════════════════════════════════════════════════
 
 
 @dataclass(frozen=True)
@@ -1297,6 +1318,7 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_d3_prepaid_receipts",
         "app.services.workpaper_sync.phase5_d6_contract_assets",
         "app.services.workpaper_sync.phase5_d5_receivables_financing",
+        "app.services.workpaper_sync.phase5_d4_revenue_detail",
     }
 )
 

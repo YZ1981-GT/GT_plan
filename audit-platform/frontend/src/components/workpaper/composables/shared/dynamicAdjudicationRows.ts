@@ -37,6 +37,15 @@ export interface DynamicAdjRow {
   source: DynamicRowSource
   /** 仅 `source==='tb'` 时有值，供溯源展示 */
   accountCode?: string
+  /**
+   * 段标识 —— **可选**，向后兼容。
+   *
+   * 多段审定表（如 D4-1 分「主营业务收入」`main-revenue` / 「其他业务收入」
+   * `other-revenue`）需要知道每行属于哪段：动态行可跨段增删，段归属不能靠科目码
+   * 现推（改名后科目码可能被抹）。单段审定表（K2/K1/F1/G7 等）不写此字段
+   * —— `undefined` 表示「不分段」，不影响这些循环的现有行为。
+   */
+  sectionKey?: string
 }
 
 /** 四表库预填候选（后端 `adjudication_prefill` 的形态） */
@@ -45,6 +54,13 @@ export interface DynamicRowPrefillItem {
   code?: string
   opening_balance?: number
   closing_balance?: number
+  /**
+   * 段归属（后端 render 下发，**可选**）。
+   *
+   * 多段审定表的后端 prefill 会带上此字段（D4 下发中文段名「主营业务收入」/
+   * 「其他业务收入」，由调用方映射为 `sectionKey`）。单段循环的 prefill 无此字段。
+   */
+  section?: string
 }
 
 /** 历史固定行声明（迁移用） */
@@ -153,6 +169,7 @@ export function serializeRows(rows: readonly DynamicAdjRow[]): string {
         source: r.source,
       }
       if (r.accountCode) out.accountCode = r.accountCode
+      if (r.sectionKey) out.sectionKey = r.sectionKey
       return out
     }),
   )
@@ -193,6 +210,8 @@ export function deserializeRows(raw: unknown): DynamicAdjRow[] {
     }
     const code = String(rec.accountCode ?? '').trim()
     if (code) row.accountCode = code
+    const sectionKey = String(rec.sectionKey ?? '').trim()
+    if (sectionKey) row.sectionKey = sectionKey
     out.push(row)
   }
   return out
@@ -306,17 +325,24 @@ export function findRowForPrefill(
  * @param spec 循环声明
  * @param prefill 后端 `adjudication_prefill`
  * @param existing 现有动态行清单
- * @param fields 期初 / 未审 字段名（默认 `begin` / `unadj`）
+ * @param fields 期初 / 未审 字段名（默认 `begin` / `unadj`）；
+ *   `sectionOf` 是**可选**的段映射器：把 prefill item 的后端 `section` 文案
+ *   翻成 `sectionKey`（多段审定表如 D4-1 用；单段循环不传，行不带 sectionKey）。
  */
 export function seedRowsFromPrefill(
   spec: DynamicRowsSpec,
   prefill: readonly DynamicRowPrefillItem[] | null | undefined,
   existing: readonly DynamicAdjRow[] = [],
-  fields: { opening?: string; closing?: string } = {},
+  fields: {
+    opening?: string
+    closing?: string
+    sectionOf?: (item: DynamicRowPrefillItem) => string | undefined
+  } = {},
   rand: () => number = Math.random,
 ): SeedFromPrefillResult {
   const openingField = fields.opening ?? 'begin'
   const closingField = fields.closing ?? 'unadj'
+  const sectionOf = fields.sectionOf
   const rows: DynamicAdjRow[] = [...(existing || [])]
   const values: Record<string, string> = {}
   const createdRowIds: string[] = []
@@ -328,6 +354,7 @@ export function seedRowsFromPrefill(
   for (const p of prefill) {
     const label = normalizeLabel(p?.name)
     if (!label) continue
+    const sectionKey = sectionOf ? sectionOf(p) : undefined
     let row = findRowForPrefill(rows, p)
     if (!row) {
       row = {
@@ -335,14 +362,20 @@ export function seedRowsFromPrefill(
         label,
         source: 'tb',
         ...(p.code ? { accountCode: String(p.code) } : {}),
+        ...(sectionKey ? { sectionKey } : {}),
       }
       rows.push(row)
       createdRowIds.push(row.rowId)
-    } else if (p.code && !row.accountCode) {
-      // 命中的是「同名手工/历史行」→ 回填科目码，下次刷新即可按码定位
-      const idx = rows.indexOf(row)
-      row = { ...row, accountCode: String(p.code) }
-      rows[idx] = row
+    } else {
+      // 命中已有行：回填缺失的科目码 / 段归属（改名后科目码可能被抹，段归属需补齐）
+      const patch: Partial<DynamicAdjRow> = {}
+      if (p.code && !row.accountCode) patch.accountCode = String(p.code)
+      if (sectionKey && !row.sectionKey) patch.sectionKey = sectionKey
+      if (Object.keys(patch).length > 0) {
+        const idx = rows.indexOf(row)
+        row = { ...row, ...patch }
+        rows[idx] = row
+      }
     }
     if (!touchedRowIds.includes(row.rowId)) touchedRowIds.push(row.rowId)
     const opening = Number(p?.opening_balance) || 0
@@ -405,17 +438,24 @@ export function renameRowLabel(
   return (rows || []).map((r) => (r.rowId === rowId ? { ...r, label: next } : r))
 }
 
-/** 追加手工行（不做撞名校验 —— 由调用方先用 `findDuplicateLabel` 拦） */
+/**
+ * 追加手工行（不做撞名校验 —— 由调用方先用 `findDuplicateLabel` 拦）。
+ *
+ * `sectionKey` **可选**：多段审定表新增手工行时按当前所在区块赋段归属；
+ * 单段循环不传（行不带 sectionKey，行为不变）。
+ */
 export function appendManualRow(
   rows: readonly DynamicAdjRow[],
   label: string,
   rand: () => number = Math.random,
+  sectionKey?: string,
 ): { rows: DynamicAdjRow[]; row: DynamicAdjRow } {
   const list = [...(rows || [])]
   const row: DynamicAdjRow = {
     rowId: nextRowId(list, rand),
     label: normalizeLabel(label),
     source: 'manual',
+    ...(sectionKey ? { sectionKey } : {}),
   }
   list.push(row)
   return { rows: list, row }

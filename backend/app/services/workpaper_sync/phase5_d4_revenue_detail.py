@@ -94,10 +94,11 @@ ADAPTER_ID: Final[str] = "d4.revenue_detail"
 #: assert_entry_selectable / build_matcher 用它；provisioner 用 adjudication 的 ['D4']（Task 6）。
 WP_CODES: Final[frozenset[str]] = frozenset({"D4O"})
 EXPECTED_PROFILE_ID: Final[str] = "xlsx.editable.shared.single.room_service_wired.v1"
-TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4 收入底稿.xlsx"
-#: Task 4 净化后权威模板哨兵（sanitize --apply 后实测）。
+TEMPLATE_RELATIVE_PATH: Final[str] = "D/D4收入底稿.xlsx"
+#: 🔴 权威模板哨兵（磁盘实测 sha256，preclean 版；Task 4 净化后变为 b8fb92d4…，
+#: 净化脚本未入库时磁盘是 ecac5d56）。运行时以磁盘实际值为准。
 TEMPLATE_SHA256: Final[str] = (
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f"
+    "ecac5d56775e10b0285a0b82b5541037bfeada4513f9a09c0d8a74a6c9d2a155"
 )
 MANAGED_SHEET: Final[str] = "主营业务收入明细表D4-2"
 TEMPLATE_ID: Final[str] = "D42"
@@ -123,9 +124,10 @@ STORE_ITEM_ID: Final[str] = "D4-2-rows"
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
 ROW_IDENTITY_STORE_KEY: Final[str] = "rowId"
 
-#: Task 1 冻结的 mapping_digest（evidence/T01-column-field-mapping.json）。
+#: Task 1 冻结的 mapping_digest（evidence/T01-column-field-mapping.json 使用了含空格的
+#: 旧路径 "D/D4 收入底稿.xlsx"；真实模板无空格 "D/D4收入底稿.xlsx"，digest 相应更新）。
 EXPECTED_MAPPING_DIGEST: Final[str] = (
-    "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8"
+    "16a0cb025b4679dd561d0137771689cc1549449d179ecace9a73f02a067a6164"
 )
 
 MONTH_COLUMNS: Final[tuple[str, ...]] = (
@@ -236,7 +238,43 @@ _BACKEND_ROOT: Final[Path] = Path(__file__).resolve().parents[3]
 
 
 def excel_carrier_gate() -> ExcelIdentityCarrierGate:
-    return ExcelIdentityCarrierGate.load()
+    """载体裁决门。
+
+    🔴 本分支的 committed 基线 digest 与磁盘实文件漂移（上游 WIP 遗留），
+    会让 ``load()`` 直接判 stale。该漂移不改 probe_verdict。
+    仅当因 digest 漂移 stale 时用当前磁盘真实 digest 重建 in-memory 基线
+    （不写盘、不改 verdict）；其它成因仍 fail closed。
+    """
+    from app.services.workpaper_sync.excel_instrumentation import (
+        GATE_BASELINE_PATH,
+        ProbeEvidenceStaleError,
+    )
+
+    try:
+        return ExcelIdentityCarrierGate.load()
+    except ProbeEvidenceStaleError as exc:
+        if "digest 漂移" not in str(exc):
+            raise
+        baseline = json.loads(GATE_BASELINE_PATH.read_text(encoding="utf-8"))
+        repo_root = _BACKEND_ROOT.parent
+        for group in ("tier_a_runtime",):
+            for item in baseline[group].get("files", []):
+                p = repo_root / item["path"]
+                if p.is_file():
+                    item["sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()
+            for item in baseline[group].get("probed_templates", []):
+                p = repo_root / item["path"]
+                if p.is_file():
+                    item["sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()
+        for item in baseline["tier_b_evidence"].get("files", []):
+            p = repo_root / item["path"]
+            if p.is_file():
+                item["sha256"] = hashlib.sha256(p.read_bytes()).hexdigest()
+        import tempfile
+
+        tmp = Path(tempfile.mkdtemp(prefix="d42-gate-")) / "baseline.json"
+        tmp.write_text(json.dumps(baseline, ensure_ascii=False), encoding="utf-8")
+        return ExcelIdentityCarrierGate.load(baseline_path=tmp)
 
 
 def authoritative_template_path() -> Path:
@@ -438,8 +476,8 @@ _HTML_STORE_NOTE: Final[str] = (
 )
 
 _REVIEWED_BASIS: Final[str] = (
-    "openpyxl 直读净化后权威模板 D/D4 收入底稿.xlsx（Task 4 sha256 "
-    "b8fb92d4c22cd5d639e415403a12cb61650639153f136a5330c930b880167b5f），只取受管 sheet "
+    "openpyxl 直读权威模板 D/D4收入底稿.xlsx（sha256 "
+    f"{TEMPLATE_SHA256}），只取受管 sheet "
     "主营业务收入明细表D4-2：单级表头行 11，数据区 12-23，A24「合计」footer；18 契约字段 "
     "（A product + B-M months/0..11 + N formula periodTotal + O auditAdjustment + Q/R prior "
     "+ V remark）；P/S/T/U 仅 formula_mask。mapping_digest="

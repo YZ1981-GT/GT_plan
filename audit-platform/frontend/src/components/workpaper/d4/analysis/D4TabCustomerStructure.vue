@@ -18,9 +18,9 @@ import WpAmountInput from '../../shared/WpAmountInput.vue'
 import { ref, computed, inject, toRef, watch, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import http from '@/utils/http'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import { newRowId, migrateRowIds } from './d4CustomerRowIdentity'
 
 const props = defineProps<{
   wpId: string
@@ -31,20 +31,10 @@ const props = defineProps<{
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 
-// 双模式（结构化视图 / 在线编辑）
-const editorMode = ref<'structured' | 'onlyoffice'>('structured')
-const ooHealthy = ref(false)
-const modeOptions = computed(() => [
-  { label: '结构化视图', value: 'structured' },
-  { label: '在线编辑', value: 'onlyoffice', disabled: !ooHealthy.value },
-])
-async function checkOoHealth() {
-  try {
-    const res = await http.get(`/api/workpapers/onlyoffice/health`, { _silent: true } as any)
-    ooHealthy.value = res.data?.data?.healthy ?? res.data?.healthy ?? false
-  } catch { ooHealthy.value = false }
-}
-checkOoHealth()
+// 🔴 Task 8：移除本组件内的 legacy 双模式（editorMode + GtOnlyOfficeSheet）。
+// D4-9 的「在线编辑」由宿主 GtD4OperatingRevenue 的统一 useD4EntryDualMode +
+// GtOnlyOfficeSheet 承担（entry=xlsx/gt-d4-operating-revenue），本组件只渲染结构化视图。
+// 保留内部第二个 GtOnlyOfficeSheet 会造成双入口：宿主与子组件各起一个 OO 会话。
 
 const auditObjective = '利润表中记录的营业收入已发生，且与被审计单位有关。'
 
@@ -56,6 +46,9 @@ function updateAuditProcess(val: string) { if (props.isReadonly) return; auditPr
 
 // ─── 客户数据 ─────────────────────────────────────────────────────────
 interface CustomerRow {
+  // 稳定行身份（非数组下标）。删除/重排/新增客户行后数据不串行；后端投影按此身份分流。
+  // 与 phase5 双向路径的 store_row_identity 同源规则：区域内唯一、缺/重复即 fail-closed。
+  rowId: string
   name: string
   amount: number
   quantity: number
@@ -71,7 +64,7 @@ const currentPeriod = ref<PeriodData>({ rows: [], totalAmount: 0, totalQuantity:
 const priorPeriod = ref<PeriodData>({ rows: [], totalAmount: 0, totalQuantity: 0 })
 
 function defaultRows(): CustomerRow[] {
-  return Array.from({ length: 10 }, () => ({ name: '', amount: 0, quantity: 0, priorRank: '' }))
+  return Array.from({ length: 10 }, () => ({ rowId: newRowId(), name: '', amount: 0, quantity: 0, priorRank: '' }))
 }
 
 function loadData() {
@@ -79,8 +72,12 @@ function loadData() {
   if (resp?.remark) {
     try {
       const d = JSON.parse(resp.remark)
-      currentPeriod.value = { rows: d.current?.rows || defaultRows(), totalAmount: d.current?.totalAmount || 0, totalQuantity: d.current?.totalQuantity || 0 }
-      priorPeriod.value = { rows: d.prior?.rows || defaultRows(), totalAmount: d.prior?.totalAmount || 0, totalQuantity: d.prior?.totalQuantity || 0 }
+      const cur = migrateRowIds<CustomerRow>(d.current?.rows?.length ? d.current.rows : defaultRows())
+      const pri = migrateRowIds<CustomerRow>(d.prior?.rows?.length ? d.prior.rows : defaultRows())
+      currentPeriod.value = { rows: cur.rows, totalAmount: d.current?.totalAmount || 0, totalQuantity: d.current?.totalQuantity || 0 }
+      priorPeriod.value = { rows: pri.rows, totalAmount: d.prior?.totalAmount || 0, totalQuantity: d.prior?.totalQuantity || 0 }
+      // 历史数据补齐 rowId 后一次性持久化（Requirement 3.2：不丢既有手工值）。
+      if ((cur.changed || pri.changed) && !props.isReadonly) persistData()
       return
     } catch {}
   }
@@ -134,7 +131,7 @@ const concentrationWarning = computed(() => {
 function addRow(period: 'current' | 'prior') {
   if (props.isReadonly) return
   const target = period === 'current' ? currentPeriod.value : priorPeriod.value
-  target.rows.push({ name: '', amount: 0, quantity: 0, priorRank: '' })
+  target.rows.push({ rowId: newRowId(), name: '', amount: 0, quantity: 0, priorRank: '' })
   persistData()
 }
 function removeRow(period: 'current' | 'prior', idx: number) {
@@ -217,13 +214,8 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 <template>
   <div class="d4-customer-structure">
 
-    <!-- 双模式切换 -->
-    <div class="mode-bar">
-      <el-segmented v-model="editorMode" :options="modeOptions" size="small" />
-    </div>
-
-    <!-- 结构化视图 -->
-    <template v-if="editorMode === 'structured'">    <!-- 一、审计目标 -->
+    <!-- 结构化视图（在线编辑由宿主 GtD4OperatingRevenue 统一提供，本组件不再自带 OO 双模式） -->
+    <!-- 一、审计目标 -->
     <section class="sec">
       <h4 class="sec-title">一、审计目标</h4>
       <div class="objective-list"><p class="objective-item">{{ auditObjective }}</p></div>
@@ -373,20 +365,6 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
         <p>4. 关注公司及其实际控制人与大客户是否存在除购销关系外的其他关系。</p>
       </div>
     </details>
-  
-    </template>
-
-    <!-- OnlyOffice 在线编辑 -->
-    <template v-else>
-      <div style="min-height: 600px; height: calc(100vh - 280px);">
-        <GtOnlyOfficeSheet
-          :wp-id="props.wpId"
-          :project-id="props.projectId"
-          sheet-name="重要客户结构分析D4-9"
-          :readonly="isReadonly"
-        />
-      </div>
-    </template>
   </div>
 </template>
 
@@ -412,6 +390,4 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
 .guidance-details summary { font-size: var(--wp-font-size, 13px); font-weight: 500; cursor: pointer; color: #409eff; }
 .guidance-content { margin-top: 8px; font-size: 12px; color: #606266; line-height: 1.8; }
 .guidance-content p { margin: 0 0 4px; }
-
-.mode-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
 </style>

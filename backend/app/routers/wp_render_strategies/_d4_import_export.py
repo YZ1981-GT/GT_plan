@@ -24,6 +24,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.core import User
+from app.routers.wp_render_strategies._d4_cutoff_return_io_spec import (
+    CUTOFF_RETURN_SPECS,
+    D4_20_MAIN_DEAD_MESSAGE,
+    D4_20_MAIN_DEAD_SHEET,
+    SheetIoSpec,
+    get_io_spec,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -35,9 +42,11 @@ router = APIRouter(tags=["d4-import-export"])
 
 _ROW_LIMIT = 500
 
+# 注：主 "D4-20" sheet 已移除 —— 六区结构无单一存储，整表导入导出属死配置，
+# 由 _validate_sheet 显式中文拒绝（Spec Requirement 1.4）。
 _SUPPORTED_SHEETS: set[str] = {
     "D4-1", "D4-2", "D4-3", "D4-4", "D4-6", "D4-7", "D4-8", "D4-9", "D4-10", "D4-11", "D4-12",
-    "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19", "D4-20",
+    "D4-13", "D4-14", "D4-15", "D4-16", "D4-17", "D4-18", "D4-19",
     "D4-20-provision", "D4-20-current", "D4-20-post",
     "D4-21", "D4-22", "D4-23", "D4-24", "D4-25", "D4-26", "D4-27",
     "D4-28", "D4-29", "D4-30", "D4-31", "D4-32",
@@ -46,7 +55,7 @@ _SUPPORTED_SHEETS: set[str] = {
 
 _SHEET_HEADERS: dict[str, list[str]] = {
     "D4-1": [
-        "区块", "行键", "项目",
+        "区块", "行键", "项目", "科目码",
         "本期未审", "本期AJE", "本期RJE",
         "上期未审", "上期AJE", "上期RJE",
     ],
@@ -74,8 +83,10 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "上期销量", "上期平均单价", "上期收入金额",
         "上期成本销量", "上期平均单位成本", "上期成本金额",
     ],
+    # D4-9 重要客户结构分析：本期/上期两分区 + 销售总额行。占比两列是派生列（导出计算值、
+    #   回导时忽略，不覆盖公式）。期间列区分本期/上期归属，总额行 客户名称="销售总额"。
     "D4-9": [
-        "客户名称", "销售金额", "销售数量", "上期排名",
+        "期间", "序号", "客户名称", "销售金额", "销售金额占比", "销售数量", "销售数量占比", "上期排名",
     ],
     "D4-10": [
         "客户名称", "产品种类", "销售金额", "销售数量",
@@ -92,6 +103,9 @@ _SHEET_HEADERS: dict[str, list[str]] = {
     "D4-12": [
         "索引号", "合同名称", "客户名称", "合同金额", "合同日期",
         "履约义务", "交易价格", "收入确认时点/时段", "可变对价", "合同变更", "结论", "备注",
+    ],
+    "D4-13": [
+        "区块", "内容",
     ],
     "D4-14": [
         "序号", "事项名称",
@@ -116,41 +130,7 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "口岸期间", "口岸结关金额", "口岸差异", "口岸差异原因",
         "申报外营收入", "申报差异", "申报差异原因", "索引",
     ],
-    "D4-17": [
-        "序号",
-        "凭证日期", "凭证编号", "凭证品名", "凭证数量", "凭证金额",
-        "发货单日期", "发货单编号", "发货单品名", "发货单数量", "发货单金额",
-        "是否跨期", "备注",
-    ],
-    "D4-18": [
-        "序号",
-        "发货单日期", "发货单编号", "发货单品名", "发货单数量", "发货单金额",
-        "凭证日期", "凭证编号", "凭证品名", "凭证数量", "凭证金额",
-        "是否跨期", "备注",
-    ],
-    "D4-19": [
-        "序号", "客户名称", "折扣类型", "收入金额", "折扣金额", "折扣比例", "原因",
-        "凭证日期", "凭证编号", "会计科目", "明细科目", "借方金额", "贷方金额",
-        "审批日期", "审批人", "备注",
-    ],
-    "D4-20": [
-        "序号", "客户名称", "产品名称", "退货日期", "退货数量", "退货金额", "退货原因",
-        "凭证日期", "凭证编号", "业务内容", "科目名称", "二级明细", "借方金额", "贷方金额",
-        "是否涉及诉讼", "是否异常", "索引号",
-    ],
-    "D4-20-provision": [
-        "序号", "产品名称", "计提基数", "计提比例", "应计提金额", "账面已计提金额", "差异金额", "差异原因",
-    ],
-    "D4-20-current": [
-        "序号", "凭证日期", "凭证编号", "业务内容", "科目名称", "二级明细", "借方金额", "贷方金额",
-        "客户名称", "产品名称", "退货数量", "退货金额", "退货原因",
-        "是否涉及诉讼", "是否异常", "索引号",
-    ],
-    "D4-20-post": [
-        "序号", "凭证日期", "凭证编号", "业务内容", "科目名称", "二级明细", "借方金额", "贷方金额",
-        "客户名称", "产品名称", "退货数量", "退货金额", "退货原因",
-        "是否涉及诉讼", "是否异常", "索引号",
-    ],
+    # D4-17/18/19/20-* 列头由 _d4_cutoff_return_io_spec 单一真源提供（见 _get_headers）。
     "D4-21": [
         "序号", "关联方客户名称", "关联关系", "产品名称", "销售数量", "销售额",
         "销售额占比", "平均单价", "非关联方平均单价", "差异率",
@@ -207,6 +187,25 @@ _SHEET_HEADERS: dict[str, list[str]] = {
         "序号", "单位名称/姓名", "本期交易金额", "占同类交易比例",
         "开户银行", "账号", "资金流水获取途径", "是否发现异常交易", "索引号",
     ],
+    "D4-30": [
+        "客户名称", "访谈时间", "访谈原因", "访谈方式",
+        "被访谈公司注册地址", "实地走访公司地址",
+        "接受访谈人员及身份", "参与访谈的审计人员", "参与访谈的其他人员",
+        "访谈人员行程信息", "是否现场函证", "访谈关注要点",
+        "合同执行核对情况", "交易金额核对是否一致", "往来余额核对是否一致",
+        "访谈结论", "访谈表索引",
+    ],
+    "D4-31": [
+        "访谈对象", "访谈时间及地点", "接受访谈人员及职务", "访谈人",
+        "受访人介绍", "公司名称", "注册资本", "成立日期", "经济性质",
+        "法定代表人", "股权结构", "客户业务关系", "客户采购结算方式",
+        "客户销售结算方式", "是否签订合同", "产品质量情况",
+        "是否有退换货条款", "退换货金额", "验收入库情况",
+        "是否存在返利", "返利支付方式", "返利金额", "经销商是否最终销售",
+        "是否存在其他资金往来", "其他重要事项",
+        "是否持有股份", "是否担任职务", "是否有交易",
+        "签字-受访人", "签字-审计人员", "签字-其他", "签字日期",
+    ],
     "D4-33": [
         "月份",
         "合计-收入", "合计-成本", "合计-毛利率",
@@ -251,12 +250,25 @@ _GENERIC_HEADERS = ["序号", "项目", "金额", "说明", "结论", "备注"]
 
 
 def _get_headers(sheet_code: str) -> list[str]:
-    """获取sheet对应的列头，未定义则用通用列头"""
+    """获取sheet对应的列头。
+
+    D4-17/18/19/20-* 由 _d4_cutoff_return_io_spec 单一真源提供（无 "序号" 列，
+    序号在前端按行序展示，不属于往返身份字段）；其余走内联表或通用列头。
+    """
+    io_spec = get_io_spec(sheet_code)
+    if io_spec is not None:
+        return io_spec.headers
     return _SHEET_HEADERS.get(sheet_code, _GENERIC_HEADERS)
 
 
 def _validate_sheet(sheet_code: str) -> None:
-    """验证sheet_code是否支持"""
+    """验证sheet_code是否支持。
+
+    主 D4-20 sheet 为死配置（六区结构无单一存储）→ 显式中文错误，
+    禁止 generic 静默写孤儿键（Spec Requirement 1.4）。
+    """
+    if sheet_code == D4_20_MAIN_DEAD_SHEET:
+        raise HTTPException(400, D4_20_MAIN_DEAD_MESSAGE)
     if sheet_code not in _SUPPORTED_SHEETS:
         raise HTTPException(
             400,
@@ -519,50 +531,62 @@ async def d4_export_data(
     # 加载 checklist_responses 中的行数据
     import sqlalchemy as sa
 
-    item_id = f"{sheet}-rows"
-    if sheet == "D4-1":
-        item_id = "D4-1-adj-rows"
-    elif sheet == "D4-6":
-        item_id = "D4-6-indicators-v2"
-    elif sheet == "D4-7":
-        item_id = "D4-7-products"
-    elif sheet == "D4-8":
-        item_id = "D4-8-products"
-    elif sheet == "D4-9":
-        item_id = "D4-9-data"
-    elif sheet == "D4-10":
-        item_id = "D4-10-data"
-    elif sheet == "D4-11":
-        item_id = "D4-11-data"
-    elif sheet == "D4-12":
-        item_id = "D4-12-contracts-v2"
-    elif sheet == "D4-14":
-        item_id = "D4-14-transactions"
-    elif sheet == "D4-22":
-        item_id = "D4-22-data"
-    elif sheet == "D4-23":
-        item_id = "D4-23-data"
-    result = await db.execute(
-        sa.text(
-            "SELECT remark FROM checklist_responses "
-            "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
-        ),
-        {"wp_id": wp_id, "item_id": item_id},
-    )
-    row = result.fetchone()
+    cutoff_date = await _resolve_cutoff_date(wp_id, sheet, db)
+
     rows_data: list[dict] = []
-    if row and row.remark:
-        try:
-            parsed = json.loads(row.remark)
-            # D4-22 stores {rows: [...], peers: [...], transportExpense: ...}
-            if sheet == "D4-22" and isinstance(parsed, dict):
-                rows_data = parsed.get("rows", [])
-            elif isinstance(parsed, list):
-                rows_data = parsed
-            else:
-                rows_data = parsed
-        except (json.JSONDecodeError, TypeError):
-            pass
+    # D4-1 走 per-field 模型：一次性拉清单 + per-field 键（+ 旧 blob 兼容回退），
+    # 由 _load_d4_1_rows_for_export 重建 [(row, field_values), ...]。
+    d4_1_export_rows: list[tuple[dict, dict[str, float]]] = []
+    # D4-13 双 item 文本锚点：分别加载 process/conclusion
+    d4_13_texts: dict[str, str | None] = {}
+    if sheet == "D4-13":
+        result = await db.execute(
+            sa.text(
+                "SELECT item_id, remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id IN (:p_id, :c_id)"
+            ),
+            {"wp_id": wp_id, "p_id": "D4-13-process", "c_id": "D4-13-conclusion"},
+        )
+        for r in result.fetchall():
+            d4_13_texts[r.item_id] = r.remark
+    elif sheet == "D4-1":
+        result = await db.execute(
+            sa.text(
+                "SELECT item_id, remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND (item_id = :rows_id OR item_id = :legacy_id "
+                "OR item_id LIKE :field_like)"
+            ),
+            {
+                "wp_id": wp_id,
+                "rows_id": _D4_1_ROWS_ITEM_ID,
+                "legacy_id": _D4_1_LEGACY_BLOB_ITEM_ID,
+                "field_like": f"{_D4_1_PREFIX}-%",
+            },
+        )
+        remark_by_item = {r.item_id: r.remark for r in result.fetchall() if r.remark is not None}
+        d4_1_export_rows = _load_d4_1_rows_for_export(remark_by_item)
+    else:
+        item_id = _resolve_item_id(sheet)
+        result = await db.execute(
+            sa.text(
+                "SELECT remark FROM checklist_responses "
+                "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+            ),
+            {"wp_id": wp_id, "item_id": item_id},
+        )
+        row = result.fetchone()
+        if row and row.remark:
+            try:
+                parsed = json.loads(row.remark)
+                # D4-22 stores {rows: [...], peers: [...], transportExpense: ...}
+                if sheet == "D4-22" and isinstance(parsed, dict):
+                    rows_data = parsed.get("rows", [])
+                elif isinstance(parsed, list):
+                    rows_data = parsed
+                else:
+                    rows_data = parsed
+            except (json.JSONDecodeError, TypeError):
+                pass
 
     wb = Workbook()
     ws = wb.active
@@ -570,11 +594,57 @@ async def d4_export_data(
     ws.append(headers)
     ws.freeze_panes = "A2"
 
+    # D4-1 专用写行（per-field 模型）
+    if sheet == "D4-1":
+        for row_obj, field_values in d4_1_export_rows:
+            ws.append(_export_d4_1_row(row_obj, field_values))
+
+    # D4-13 双 item 文本锚点导出（核对过程 + 核对结论）
+    if sheet == "D4-13":
+        _export_d4_13_rows(
+            ws,
+            d4_13_texts.get("D4-13-process"),
+            d4_13_texts.get("D4-13-conclusion"),
+        )
+        rows_data = []  # 跳过通用循环
+
+    # D4-15 专用导出（delivery/invoice/voucher 三层嵌套 + isConsistent 重算）
+    if sheet == "D4-15" and isinstance(rows_data, list):
+        _export_d4_15_rows(ws, rows_data)
+        rows_data = []  # 跳过通用循环
+
+    # D4-16 专用导出（英文 key + portsDiff/taxDiff 重算）
+    if sheet == "D4-16" and isinstance(rows_data, list):
+        _export_d4_16_rows(ws, rows_data)
+        rows_data = []  # 跳过通用循环
+
+    # D4-9 专用写行：{current,prior,totals} 嵌套 → 本期/上期两分区 + 销售总额行。
+    # 写完后 rows_data 置空，跳过下方通用逐行循环（D4-9 store 是 dict 不是 list）。
+    if sheet == "D4-9":
+        _export_d4_9_rows(ws, rows_data)
+        rows_data = []
+
+    # D4-29/30/31/32 专用导出（非 list[dict] 逐行，需 payload→exporter 组装）
+    if sheet == "D4-29":
+        if isinstance(rows_data, list):
+            _export_d4_29_rows(ws, rows_data, headers)
+        rows_data = []  # 跳过通用循环
+    elif sheet == "D4-30":
+        if isinstance(rows_data, dict):
+            _export_d4_30_rows(ws, rows_data, headers)
+        rows_data = []
+    elif sheet == "D4-31":
+        if isinstance(rows_data, dict) and rows_data:
+            ws.append(_export_d4_31_row(rows_data, headers))
+        rows_data = []
+    elif sheet == "D4-32":
+        if isinstance(rows_data, list):
+            _export_d4_32_rows(ws, rows_data, headers)
+        rows_data = []
+
     # 写入数据行
     for data_row in rows_data:
-        if sheet == "D4-1":
-            row_values = _export_d4_1_row(data_row)
-        elif sheet == "D4-2":
+        if sheet == "D4-2":
             months = data_row.get("months", [0] * 12)
             period_total = sum(_safe_float(m) for m in months)
             audit_adj = _safe_float(data_row.get("auditAdjustment"))
@@ -689,6 +759,12 @@ async def d4_export_data(
                 data_row.get("conclusion", ""),
                 "",  # 备注
             ]
+        elif sheet == "D4-15":
+            # D4-15 走上方 _export_d4_15_rows 批量导出（rows_data 已置空，此分支不可达）
+            continue
+        elif sheet == "D4-16":
+            # D4-16 走上方 _export_d4_16_rows 批量导出（rows_data 已置空，此分支不可达）
+            continue
         elif sheet == "D4-22":
             # D4-22: 固定指标行，动态peers列
             peers = data_row.get("peers", [])
@@ -717,6 +793,10 @@ async def d4_export_data(
                 _safe_float(data_row.get("diff")),
                 data_row.get("indexRef", ""),
             ]
+        elif sheet in CUTOFF_RETURN_SPECS:
+            row_values = _export_cutoff_return_row(
+                CUTOFF_RETURN_SPECS[sheet], data_row, cutoff_date
+            )
         else:
             # 通用：按 headers 顺序提取值
             row_values = [data_row.get(h, "") for h in headers]
@@ -803,45 +883,96 @@ async def d4_import_data(
     if errors:
         return {"ok": False, "errors": errors, "imported_count": 0}
 
+    # 截止日期（D4-17/18 派生 isCutoff 的公式参数，单一真源见 _resolve_cutoff_date）
+    cutoff_date = await _resolve_cutoff_date(wp_id, sheet, db)
+
+    # ───── D4-13 双 item 文本锚点整批处理 ───────────────────────────────
+    d4_13_parsed: dict[str, str] | None = None
+
+    # ───── D4-29/30/31/32 IPO 四表整批处理（非逐行 parse） ─────────────
+    d4_29_payload: list[dict] | None = None
+    d4_30_payload: dict | None = None
+    d4_31_payload: dict | None = None
+    d4_32_payload: list[dict] | None = None
+
+    if sheet == "D4-13":
+        all_data_rows = list(ws.iter_rows(min_row=2, values_only=True))
+        d4_13_parsed = _parse_d4_13_rows(all_data_rows, actual_headers)
+    elif sheet == "D4-29":
+        all_data_rows = list(ws.iter_rows(min_row=2, values_only=True))
+        d4_29_payload = _parse_d4_29_rows(all_data_rows, actual_headers)
+    elif sheet == "D4-30":
+        all_data_rows = list(ws.iter_rows(min_row=2, values_only=True))
+        d4_30_payload = _parse_d4_30_rows(all_data_rows, actual_headers)
+    elif sheet == "D4-31":
+        all_data_rows = list(ws.iter_rows(min_row=2, values_only=True))
+        # D4-31 是单份问卷，只取第一行非空行
+        for r in all_data_rows:
+            if not all(v is None for v in r):
+                d4_31_payload = _parse_d4_31_row(r, actual_headers)
+                break
+    elif sheet == "D4-32":
+        all_data_rows = list(ws.iter_rows(min_row=2, values_only=True))
+        d4_32_payload = _parse_d4_32_rows(all_data_rows, actual_headers)
+
+    # ───── 常规逐行解析（D4-29/30/31/32 已整批处理，跳过） ───────────────
+
     # 解析数据行
     rows_data: list[dict] = []
     truncated = False
     row_count = 0
+    # D4-1 缺码/非法码/未知区块的人工/拒绝报告（Req 4.2）
+    d4_1_warnings: list[str] = []
 
-    for row in ws.iter_rows(min_row=2, values_only=True):
-        if all(v is None for v in row):
-            continue
-        row_count += 1
-        if row_count > _ROW_LIMIT:
-            truncated = True
-            break
+    if sheet not in ("D4-13", "D4-29", "D4-30", "D4-31", "D4-32"):
+        for row in ws.iter_rows(min_row=2, values_only=True):
+            if all(v is None for v in row):
+                continue
+            row_count += 1
+            if row_count > _ROW_LIMIT:
+                truncated = True
+                break
 
-        if sheet == "D4-1":
-            row_dict = _parse_d4_1_row(row, actual_headers, expected_headers)
-        elif sheet == "D4-2":
-            row_dict = _parse_d4_2_row(row, actual_headers, expected_headers)
-        elif sheet == "D4-3":
-            row_dict = _parse_d4_3_row(row, actual_headers, expected_headers)
-        elif sheet == "D4-4":
-            row_dict = _parse_d4_4_row(row, actual_headers, expected_headers)
-        elif sheet == "D4-6":
-            row_dict = _parse_d4_6_row(row, actual_headers)
-        elif sheet == "D4-7":
-            row_dict = _parse_d4_7_row(row, actual_headers)
-        elif sheet == "D4-8":
-            row_dict = _parse_d4_8_row(row, actual_headers)
-        elif sheet == "D4-14":
-            row_dict = _parse_d4_14_row(row, actual_headers)
-        elif sheet == "D4-22":
-            row_dict = _parse_d4_22_row(row, actual_headers)
-        elif sheet == "D4-23":
-            row_dict = _parse_d4_23_row(row, actual_headers)
-        else:
-            row_dict = _parse_generic_row(row, actual_headers)
+            if sheet == "D4-1":
+                row_dict = _parse_d4_1_row(row, actual_headers, expected_headers, d4_1_warnings)
+            elif sheet == "D4-2":
+                row_dict = _parse_d4_2_row(row, actual_headers, expected_headers)
+            elif sheet == "D4-3":
+                row_dict = _parse_d4_3_row(row, actual_headers, expected_headers)
+            elif sheet == "D4-4":
+                row_dict = _parse_d4_4_row(row, actual_headers, expected_headers)
+            elif sheet == "D4-6":
+                row_dict = _parse_d4_6_row(row, actual_headers)
+            elif sheet == "D4-7":
+                row_dict = _parse_d4_7_row(row, actual_headers)
+            elif sheet == "D4-8":
+                row_dict = _parse_d4_8_row(row, actual_headers)
+            elif sheet == "D4-9":
+                row_dict = _parse_d4_9_row(row, actual_headers)
+            elif sheet == "D4-14":
+                row_dict = _parse_d4_14_row(row, actual_headers)
+            elif sheet == "D4-15":
+                row_dict = _parse_d4_15_row(row, actual_headers)
+            elif sheet == "D4-16":
+                row_dict = _parse_d4_16_row(row, actual_headers)
+            elif sheet == "D4-22":
+                row_dict = _parse_d4_22_row(row, actual_headers)
+            elif sheet == "D4-23":
+                row_dict = _parse_d4_23_row(row, actual_headers)
+            elif sheet in CUTOFF_RETURN_SPECS:
+                _spec = CUTOFF_RETURN_SPECS[sheet]
+                parsed = _parse_cutoff_return_row(_spec, row, actual_headers)
+                row_dict = (
+                    _finalize_cutoff_return_row(_spec, parsed, cutoff_date)
+                    if parsed is not None
+                    else None
+                )
+            else:
+                row_dict = _parse_generic_row(row, actual_headers)
 
-        if not row_dict:
-            continue
-        rows_data.append(row_dict)
+            if not row_dict:
+                continue
+            rows_data.append(row_dict)
 
     wb.close()
 
@@ -880,33 +1011,77 @@ async def d4_import_data(
             }
         rows_data = list(products_dict.values())
 
+    # D4-9 post-processing: 扁平行（带 _period 归属 + _isTotal 标记）→ {current,prior} 嵌套。
+    d4_9_payload: dict | None = None
+    if sheet == "D4-9":
+        d4_9_payload = _assemble_d4_9_payload(rows_data)
+
     # 写入 checklist_responses
     import sqlalchemy as sa
     from uuid import uuid4
 
-    item_id = f"{sheet}-rows"
+    # D4-1 特殊：per-field 模型原子写入（清单 D4-1-rows + N×6 field 键）。
+    # 一次事务写全部键 + commit（原子），item_id 已在 _build_d4_1_import_items 去重
+    # （同批次重复 item_id 会被后端整批拒绝）。派生列不落库（Req 4.3）。
     if sheet == "D4-1":
-        item_id = "D4-1-adj-rows"
-    elif sheet == "D4-6":
-        item_id = "D4-6-indicators-v2"
-    elif sheet == "D4-7":
-        item_id = "D4-7-products"
-    elif sheet == "D4-8":
-        item_id = "D4-8-products"
-    elif sheet == "D4-9":
-        item_id = "D4-9-data"
-    elif sheet == "D4-10":
-        item_id = "D4-10-data"
-    elif sheet == "D4-11":
-        item_id = "D4-11-data"
-    elif sheet == "D4-12":
-        item_id = "D4-12-contracts-v2"
-    elif sheet == "D4-14":
-        item_id = "D4-14-transactions"
-    elif sheet == "D4-22":
-        item_id = "D4-22-data"
-    elif sheet == "D4-23":
-        item_id = "D4-23-data"
+        _d4_1_project_id = await _resolve_project_id(wp_id, db)
+        import_items = _build_d4_1_import_items(rows_data)
+        for it in import_items:
+            await db.execute(
+                sa.text("""
+                    INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+                    VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
+                    ON CONFLICT (wp_id, item_id)
+                    DO UPDATE SET remark = :remark, updated_at = NOW()
+                """),
+                {
+                    "id": str(uuid4()),
+                    "project_id": _d4_1_project_id,
+                    "wp_id": wp_id,
+                    "item_id": it["item_id"],
+                    "remark": it["remark"],
+                },
+            )
+        await db.commit()
+
+        result_d4_1: dict[str, Any] = {
+            "ok": True,
+            "imported_count": len(rows_data),
+            "errors": errors,
+            "warnings": d4_1_warnings,
+        }
+        if truncated:
+            result_d4_1["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
+            result_d4_1["truncated"] = True
+        return result_d4_1
+
+    # D4-13 特殊：双 item 文本锚点原子写入（两个 checklist item，非 JSON 数组）。
+    if sheet == "D4-13" and d4_13_parsed:
+        _d4_13_project_id = await _resolve_project_id(wp_id, db)
+        for item_id_13, text_13 in d4_13_parsed.items():
+            await db.execute(
+                sa.text("""
+                    INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+                    VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
+                    ON CONFLICT (wp_id, item_id)
+                    DO UPDATE SET remark = :remark, updated_at = NOW()
+                """),
+                {
+                    "id": str(uuid4()),
+                    "project_id": _d4_13_project_id,
+                    "wp_id": wp_id,
+                    "item_id": item_id_13,
+                    "remark": text_13,
+                },
+            )
+        await db.commit()
+        return {
+            "ok": True,
+            "imported_count": len(d4_13_parsed),
+            "errors": errors,
+        }
+
+    item_id = _resolve_item_id(sheet)
 
     # D4-22 特殊：保留已有peers和transportExpense，只替换rows
     if sheet == "D4-22":
@@ -929,18 +1104,30 @@ async def d4_import_data(
             "transportExpense": existing_data.get("transportExpense", ""),
         }
         remark_json = json.dumps(merged, ensure_ascii=False)
+    elif sheet == "D4-9":
+        remark_json = json.dumps(d4_9_payload or {"current": {"rows": [], "totalAmount": 0, "totalQuantity": 0}, "prior": {"rows": [], "totalAmount": 0, "totalQuantity": 0}}, ensure_ascii=False)
+    elif sheet == "D4-29":
+        remark_json = json.dumps(d4_29_payload or [], ensure_ascii=False)
+    elif sheet == "D4-30":
+        remark_json = json.dumps(d4_30_payload or {"customers": [], "customDimensions": []}, ensure_ascii=False)
+    elif sheet == "D4-31":
+        remark_json = json.dumps(d4_31_payload or {}, ensure_ascii=False)
+    elif sheet == "D4-32":
+        remark_json = json.dumps(d4_32_payload or [{"key": k, "rows": []} for k in _D4_32_GROUP_KEYS], ensure_ascii=False)
     else:
         remark_json = json.dumps(rows_data, ensure_ascii=False)
 
+    project_id = await _resolve_project_id(wp_id, db)
     await db.execute(
         sa.text("""
-            INSERT INTO checklist_responses (id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :wp_id, :item_id, :remark, NOW())
+            INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
+            VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
             ON CONFLICT (wp_id, item_id)
             DO UPDATE SET remark = :remark, updated_at = NOW()
         """),
         {
             "id": str(uuid4()),
+            "project_id": project_id,
             "wp_id": wp_id,
             "item_id": item_id,
             "remark": remark_json,
@@ -948,9 +1135,21 @@ async def d4_import_data(
     )
     await db.commit()
 
+    # 计算导入计数
+    if sheet == "D4-29":
+        _import_count = len(d4_29_payload or [])
+    elif sheet == "D4-30":
+        _import_count = len((d4_30_payload or {}).get("customers", []))
+    elif sheet == "D4-31":
+        _import_count = 1 if d4_31_payload else 0
+    elif sheet == "D4-32":
+        _import_count = sum(len(g.get("rows", [])) for g in (d4_32_payload or []))
+    else:
+        _import_count = len(rows_data)
+
     result: dict[str, Any] = {
         "ok": True,
-        "imported_count": len(rows_data),
+        "imported_count": _import_count,
         "errors": errors,
     }
     if truncated:
@@ -973,6 +1172,120 @@ def _safe_float(val: Any) -> float:
         return float(val)
     except (ValueError, TypeError):
         return 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# item_id 解析（导入导出共用单一真源）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_SPECIAL_ITEM_IDS: dict[str, str] = {
+    # D4-1 不再走单键 blob（旧 `D4-1-adj-rows`）；改 per-field 模型（清单 D4-1-rows +
+    # per-field 键 D4-1-{rowId}-{field}），由 _build_d4_1_import_items / _load_d4_1_rows
+    # 专用路径原子读写。旧 blob 仅在导出时兼容回退（见 _load_d4_1_rows）。
+    "D4-6": "D4-6-indicators-v2",
+    "D4-7": "D4-7-products",
+    "D4-8": "D4-8-products",
+    "D4-9": "D4-9-data",
+    "D4-10": "D4-10-data",
+    "D4-11": "D4-11-data",
+    "D4-12": "D4-12-contracts-v2",
+    "D4-13-process": "D4-13-process",
+    "D4-13-conclusion": "D4-13-conclusion",
+    "D4-14": "D4-14-transactions",
+    "D4-15": "D4-15-items",
+    "D4-16": "D4-16-rows",
+    "D4-22": "D4-22-data",
+    "D4-23": "D4-23-data",
+    # D4-29/30/31/32 IPO 舞弊应对四表（前端英文 key 非默认 f"{sheet}-rows"）
+    "D4-29": "D4-29-customers",
+    "D4-30": "D4-30-customers",
+    "D4-31": "D4-31-interview",
+    "D4-32": "D4-32-groups",
+}
+
+
+_DEFAULT_CUTOFF_DATE = "2025-12-31"
+
+
+async def _resolve_project_id(wp_id: str, db: AsyncSession) -> str | None:
+    """从 working_paper 取 project_id（checklist_responses.project_id NOT NULL）。
+
+    此前导入 INSERT 漏写 project_id，任何首次导入（无既有行、走 INSERT 而非
+    ON CONFLICT UPDATE）都会 NotNullViolation 500。真栈 Playwright 实测抓到。
+    """
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.text("SELECT project_id FROM working_paper WHERE id = :wp_id LIMIT 1"),
+        {"wp_id": wp_id},
+    )
+    row = result.fetchone()
+    return str(row.project_id) if row and row.project_id else None
+
+
+async def _resolve_cutoff_date(wp_id: str, sheet_code: str, db: AsyncSession) -> str:
+    """解析截止日期（D4-17/18 派生 isCutoff 的公式参数）。
+
+    单一真源 = checklist_responses 的 `{sheet}-cutoff-date`（前端 persistAll 同步落库）；
+    缺失时回退默认 2025-12-31。非 D4-17/18 sheet 返回默认（不参与其派生）。
+    """
+    if sheet_code not in ("D4-17", "D4-18"):
+        return _DEFAULT_CUTOFF_DATE
+    import sqlalchemy as sa
+
+    result = await db.execute(
+        sa.text(
+            "SELECT remark FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id = :item_id LIMIT 1"
+        ),
+        {"wp_id": wp_id, "item_id": f"{sheet_code}-cutoff-date"},
+    )
+    row = result.fetchone()
+    if row and row.remark and str(row.remark).strip():
+        return str(row.remark).strip()
+    return _DEFAULT_CUTOFF_DATE
+
+
+def _resolve_item_id(sheet_code: str) -> str:
+    """sheet_code → checklist_responses.item_id（导入导出两侧一致）。
+
+    优先级：截止/退货专用 spec（含 D4-20-current→D4-20-current-returns 修正）
+    > 历史特殊映射表 > 默认 f"{sheet}-rows"。
+    """
+    io_spec = get_io_spec(sheet_code)
+    if io_spec is not None:
+        return io_spec.item_id
+    if sheet_code in _SPECIAL_ITEM_IDS:
+        return _SPECIAL_ITEM_IDS[sheet_code]
+    return f"{sheet_code}-rows"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-17/18/19/20 派生字段公式（后端权威执行，与前端 useD4FormulaEngine 同定义）
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _cutoff_is_ok(voucher_date: str, delivery_date: str, cutoff_date: str) -> bool | None:
+    """截止跨期判断（对齐前端 D4TabCutoff*.checkCutoff）。
+
+    语义：一侧日期在截止日或之前、另一侧在截止日之后 → 跨期问题（返回 False = ×）；
+    否则非跨期（返回 True = √）。任一日期缺失/非法 → None（N/A，不强制取反）。
+
+    D4-17（账到单据）: 早侧=voucherDate，晚侧=deliveryDate。
+    D4-18（单据到账）: 早侧=deliveryDate，晚侧=voucherDate。
+    两表都对"早侧<=截止 且 晚侧>截止"判为问题，非跨期同为 True（不恒相反）。
+    """
+    if not voucher_date or not delivery_date or not cutoff_date:
+        return None
+    # 仅当两个日期都能比较时才判定（字符串 YYYY-MM-DD 可字典序比较）
+    return not (voucher_date <= cutoff_date and delivery_date > cutoff_date)
+
+
+def _discount_rate(revenue_amount: float, discount_amount: float) -> float:
+    """折扣比例 = 折扣金额 / 收入金额（均>0 时），否则 0（对齐前端 calcRate）。"""
+    if revenue_amount > 0 and discount_amount > 0:
+        return discount_amount / revenue_amount
+    return 0.0
 
 
 def _safe_str(val: Any) -> str:
@@ -1009,6 +1322,42 @@ def _parse_d4_2_row(row: tuple, actual_headers: list[str], expected_headers: lis
     }
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-1 营业收入审定表 — per-field 模型导入导出（Spec Requirement 4）
+#
+# 前端真源（useD4Adjudication.ts / d4AdjudicationRows.ts / shared/dynamicAdjudicationRows.ts）：
+#   D4-1-rows              → 行清单 JSON [{rowId, label, source, accountCode?, sectionKey?}]
+#   D4-1-{rowId}-{field}   → per-field 值，field ∈ 六字段
+# 旧模型（本文件此前实现）= D4-1-adj-rows 整行 JSON blob，与前端 per-field 分裂，已废弃。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# 清单 itemId（与前端 rowsItemId(D4_ADJ_ROWS_SPEC) = "D4-1-rows" 锁死）
+_D4_1_ROWS_ITEM_ID = "D4-1-rows"
+# 键前缀（与前端 D4_ADJ_PREFIX 锁死；per-field 键 = f"{prefix}-{rowId}-{field}"）
+_D4_1_PREFIX = "D4-1"
+# 旧 blob 键（仅导出兼容回退，与前端 LEGACY_ADJ_STORAGE_KEY 同口径）
+_D4_1_LEGACY_BLOB_ITEM_ID = "D4-1-adj-rows"
+
+# 六个金额字段（与前端 D4_ADJ_VALUE_FIELDS 锁死，导入导出往返身份字段）
+_D4_1_VALUE_FIELDS: tuple[str, ...] = (
+    "currentUnadjusted",
+    "currentAje",
+    "currentRje",
+    "priorUnadjusted",
+    "priorAje",
+    "priorRje",
+)
+# 列头 ↔ 字段（六金额列）
+_D4_1_FIELD_BY_HEADER: dict[str, str] = {
+    "本期未审": "currentUnadjusted",
+    "本期AJE": "currentAje",
+    "本期RJE": "currentRje",
+    "上期未审": "priorUnadjusted",
+    "上期AJE": "priorAje",
+    "上期RJE": "priorRje",
+}
+
+# 区块中文 ↔ sectionKey（与前端 D4_SECTION_LABEL_TO_KEY 锁死；未知不臆测归段）
 _D4_1_SECTION_BY_LABEL: dict[str, str] = {
     "主营业务收入": "main-revenue",
     "其他业务收入": "other-revenue",
@@ -1019,22 +1368,65 @@ _D4_1_SECTION_LABEL: dict[str, str] = {
 }
 
 
-def _export_d4_1_row(data: dict) -> list:
-    section = data.get("sectionKey", "main-revenue")
+def _d4_1_field_item_id(row_id: str, field: str) -> str:
+    """per-field itemId（与前端 rowFieldItemId 锁死：f"{prefix}-{rowId}-{field}"）。"""
+    return f"{_D4_1_PREFIX}-{row_id}-{field}"
+
+
+def _d4_1_account_code_status(account_code: str) -> str:
+    """科目码合法性三态（Req 4.2）。
+
+    - ""      : 缺科目码（审定表明细行可无外来科目码，不拒整行，进 warnings）
+    - "ok"    : 6001/6051 收入族科目（主营/其他业务收入）
+    - "illegal": 填了但非收入族 → 报告到 warnings，不静默猜测归主营
+
+    与前端 d4AccountScope.isMainRevenueCode/isOtherRevenueCode 同口径（6001/6051 前缀）。
+    """
+    code = account_code.strip()
+    if not code:
+        return ""
+    if code.startswith("6001") or code.startswith("6051"):
+        return "ok"
+    return "illegal"
+
+
+def _export_d4_1_row(row: dict, field_values: dict[str, float]) -> list:
+    """从 per-field 模型导出十列。
+
+    row = D4-1-rows 清单中的一行 {rowId, label, source, accountCode?, sectionKey?}；
+    field_values = 该行六个金额（键为字段名）。派生列（审定数/小计/合计/差异）不进导入列，
+    由公式/前端重算（Req 4.1/4.3）。
+    """
+    section = _safe_str(row.get("sectionKey")) or "main-revenue"
     return [
         _D4_1_SECTION_LABEL.get(section, section),
-        _safe_str(data.get("rowKey")),
-        _safe_str(data.get("label")),
-        _safe_float(data.get("currentUnadjusted")),
-        _safe_float(data.get("currentAje")),
-        _safe_float(data.get("currentRje")),
-        _safe_float(data.get("priorUnadjusted")),
-        _safe_float(data.get("priorAje")),
-        _safe_float(data.get("priorRje")),
+        _safe_str(row.get("rowId")),
+        _safe_str(row.get("label")),
+        _safe_str(row.get("accountCode")),
+        _safe_float(field_values.get("currentUnadjusted")),
+        _safe_float(field_values.get("currentAje")),
+        _safe_float(field_values.get("currentRje")),
+        _safe_float(field_values.get("priorUnadjusted")),
+        _safe_float(field_values.get("priorAje")),
+        _safe_float(field_values.get("priorRje")),
     ]
 
 
-def _parse_d4_1_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
+def _parse_d4_1_row(
+    row: tuple,
+    actual_headers: list[str],
+    expected_headers: list[str],
+    warnings: list[str] | None = None,
+) -> dict:
+    """解析一行为 per-field 中间形态。
+
+    产出 {rowId, label, source, accountCode, sectionKey, <六字段值>}。
+    - rowId：文件有「行键」用之，否则 f"r-{uuid4().hex[:8]}"（与前端 nextRowId 形态一致）。
+    - source：'manual'（人工导入，非四表 seed）。
+    - sectionKey：由「区块」列映射；未知区块不臆测（保留原文本，由前端按 scope 校验）。
+    - accountCode：缺失不拒整行，进 warnings；填了但非 6001/6051 收入族 → warnings（Req 4.2）。
+    派生列（审定数/小计/合计/差异/变动率）即便文件里有也忽略，由公式重算（Req 4.3）。
+    """
     from uuid import uuid4
 
     values = list(row) + [None] * (len(actual_headers) - len(row))
@@ -1049,26 +1441,142 @@ def _parse_d4_1_row(row: tuple, actual_headers: list[str], expected_headers: lis
     section_label = _safe_str(_col_val("区块"))
     row_key = _safe_str(_col_val("行键"))
     label = _safe_str(_col_val("项目"))
+    account_code = _safe_str(_col_val("科目码"))
     if not row_key and not label:
         return {}
 
-    section_key = _D4_1_SECTION_BY_LABEL.get(section_label, "main-revenue")
-    if not row_key:
-        row_key = f"row-{uuid4().hex[:8]}"
+    row_id = row_key or f"r-{uuid4().hex[:8]}"
+    section_key = _D4_1_SECTION_BY_LABEL.get(section_label, "")
 
-    return {
-        "rowKey": row_key,
-        "label": label or row_key,
-        "isFixed": False,
+    # Req 4.2 科目码报告（不静默猜测归主营）
+    if warnings is not None:
+        code_status = _d4_1_account_code_status(account_code)
+        row_desc = label or row_id
+        if code_status == "":
+            warnings.append(f"行「{row_desc}」缺科目码，已按人工明细行导入（未强制外来科目码）")
+        elif code_status == "illegal":
+            warnings.append(
+                f"行「{row_desc}」科目码 {account_code} 非营业收入族（6001/6051），"
+                "请人工核实归属，未自动归段"
+            )
+        if not section_key and section_label:
+            warnings.append(f"行「{row_desc}」区块「{section_label}」无法识别，未自动归段")
+
+    result = {
+        "rowId": row_id,
+        "label": label or row_id,
+        "source": "manual",
+        "accountCode": account_code,
         "sectionKey": section_key,
-        "currentUnadjusted": _safe_float(_col_val("本期未审")),
-        "currentAje": _safe_float(_col_val("本期AJE")),
-        "currentRje": _safe_float(_col_val("本期RJE")),
-        "priorUnadjusted": _safe_float(_col_val("上期未审")),
-        "priorAje": _safe_float(_col_val("上期AJE")),
-        "priorRje": _safe_float(_col_val("上期RJE")),
-        "isFromCrossSheet": False,
     }
+    for header, field in _D4_1_FIELD_BY_HEADER.items():
+        result[field] = _safe_float(_col_val(header))
+    return result
+
+
+def _build_d4_1_import_items(rows_data: list[dict]) -> list[dict[str, str]]:
+    """把解析后的 per-field 中间形态转成 checklist item 批（清单 + N×6 field）。
+
+    返回 [{item_id, remark}, ...]，item_id 去重（同批次重复会被后端整批拒绝）。
+    - 清单键 D4-1-rows：JSON [{rowId, label, source, accountCode?, sectionKey?}]，
+      形态与前端 serializeRows 一致（accountCode/sectionKey 为空不写字段）。
+    - per-field 键 D4-1-{rowId}-{field}：金额字符串（与前端 persistFieldValue 一致）。
+    派生列不落库（Req 4.3）。
+    """
+    row_list: list[dict] = []
+    items: list[dict[str, str]] = []
+    seen_ids: set[str] = set()
+
+    for r in rows_data:
+        row_id = r.get("rowId")
+        if not row_id or row_id in seen_ids:
+            # 去重：同 rowId 只保留首次（防同批次重复 item_id 整批拒绝）
+            continue
+        seen_ids.add(row_id)
+
+        clean: dict[str, Any] = {
+            "rowId": row_id,
+            "label": r.get("label", row_id),
+            "source": r.get("source", "manual"),
+        }
+        if r.get("accountCode"):
+            clean["accountCode"] = r["accountCode"]
+        if r.get("sectionKey"):
+            clean["sectionKey"] = r["sectionKey"]
+        row_list.append(clean)
+
+        for field in _D4_1_VALUE_FIELDS:
+            items.append(
+                {
+                    "item_id": _d4_1_field_item_id(row_id, field),
+                    "remark": str(_safe_float(r.get(field))),
+                }
+            )
+
+    items.insert(
+        0,
+        {
+            "item_id": _D4_1_ROWS_ITEM_ID,
+            "remark": json.dumps(row_list, ensure_ascii=False),
+        },
+    )
+    return items
+
+
+def _load_d4_1_rows_for_export(remark_by_item: dict[str, str]) -> list[tuple[dict, dict[str, float]]]:
+    """从 checklist item 快照重建 D4-1 导出行（清单 + per-field，旧 blob 兼容回退）。
+
+    remark_by_item = {item_id: remark}（导出前一次性拉取该 wp 的相关键）。
+    返回 [(row, field_values), ...] 供 _export_d4_1_row 逐行导出。
+    - 优先读新键 D4-1-rows + D4-1-{rowId}-{field}。
+    - 新键缺失时兼容回退旧 blob D4-1-adj-rows（老项目未迁移数据，与前端 migrateLegacyD4Rows 同口径）。
+    """
+    raw_list = remark_by_item.get(_D4_1_ROWS_ITEM_ID)
+    if raw_list and str(raw_list).strip():
+        try:
+            rows = json.loads(raw_list)
+        except (json.JSONDecodeError, TypeError):
+            rows = []
+        out: list[tuple[dict, dict[str, float]]] = []
+        for r in rows if isinstance(rows, list) else []:
+            if not isinstance(r, dict):
+                continue
+            row_id = _safe_str(r.get("rowId"))
+            if not row_id:
+                continue
+            field_values = {
+                field: _safe_float(remark_by_item.get(_d4_1_field_item_id(row_id, field)))
+                for field in _D4_1_VALUE_FIELDS
+            }
+            out.append((r, field_values))
+        return out
+
+    # 兼容回退：旧 blob D4-1-adj-rows（整行 JSON，金额内嵌在行里）
+    legacy_raw = remark_by_item.get(_D4_1_LEGACY_BLOB_ITEM_ID)
+    if legacy_raw and str(legacy_raw).strip():
+        try:
+            legacy_rows = json.loads(legacy_raw)
+        except (json.JSONDecodeError, TypeError):
+            legacy_rows = []
+        out = []
+        for lr in legacy_rows if isinstance(legacy_rows, list) else []:
+            if not isinstance(lr, dict):
+                continue
+            row_id = _safe_str(lr.get("rowKey")) or _safe_str(lr.get("rowId"))
+            if not row_id:
+                continue
+            row = {
+                "rowId": row_id,
+                "label": lr.get("label", row_id),
+                "source": "tb" if lr.get("isFromCrossSheet") else "manual",
+                "accountCode": lr.get("accountCode", ""),
+                "sectionKey": lr.get("sectionKey", ""),
+            }
+            field_values = {field: _safe_float(lr.get(field)) for field in _D4_1_VALUE_FIELDS}
+            out.append((row, field_values))
+        return out
+
+    return []
 
 
 def _parse_d4_3_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
@@ -1273,6 +1781,397 @@ def _parse_d4_23_row(row: tuple, actual_headers: list[str]) -> dict:
     }
 
 
+#: D4-9 总额行的客户名称标识（导出用「销售总额」，兼容历史「本期/上期销售总额」）。
+_D4_9_TOTAL_LABELS: frozenset[str] = frozenset({"销售总额", "本期销售总额", "上期销售总额", "合计"})
+
+
+def _parse_d4_9_row(row: tuple, actual_headers: list[str]) -> dict | None:
+    """解析 D4-9 一行：按 期间 列判定本期/上期归属，识别销售总额行；忽略派生占比列。
+
+    产出中间形态（带 `_period`/`_isTotal` 标记，供 `_assemble_d4_9_payload` 组装），
+    占比两列（销售金额占比/销售数量占比）是派生列，**不解析、不回写**（不覆盖公式）。
+    """
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+    col = {h: values[i] for i, h in enumerate(actual_headers)}
+
+    period_raw = str(col.get("期间") or "").strip()
+    if period_raw.startswith("上期"):
+        period = "prior"
+    else:
+        # 缺期间列或非「上期」一律归本期（兼容旧单区模板）。
+        period = "current"
+
+    name = str(col.get("客户名称") or "").strip()
+    is_total = name in _D4_9_TOTAL_LABELS
+    amount = _safe_float(col.get("销售金额"))
+    quantity = _safe_float(col.get("销售数量"))
+
+    if is_total:
+        return {"_period": period, "_isTotal": True, "totalAmount": amount, "totalQuantity": quantity}
+
+    # 明细行：全空（无客户名且金额/数量为 0）视为空行跳过。
+    if not name and amount == 0 and quantity == 0:
+        return None
+    return {
+        "_period": period,
+        "_isTotal": False,
+        "name": name,
+        "amount": amount,
+        "quantity": quantity,
+        "priorRank": str(col.get("上期排名") or "").strip(),
+    }
+
+
+def _assemble_d4_9_payload(rows_data: list[dict]) -> dict:
+    """扁平中间行 → `{current:{rows,totalAmount,totalQuantity}, prior:{...}}`，每明细行补 rowId。
+
+    rowId 生成规则与前端 `d4CustomerRowIdentity` 同源（导入后的行可参与双向）。
+    """
+    from uuid import uuid4
+
+    payload: dict[str, dict] = {
+        "current": {"rows": [], "totalAmount": 0, "totalQuantity": 0},
+        "prior": {"rows": [], "totalAmount": 0, "totalQuantity": 0},
+    }
+    for r in rows_data:
+        if not isinstance(r, dict):
+            continue
+        period = r.get("_period", "current")
+        region = payload.get(period) or payload["current"]
+        if r.get("_isTotal"):
+            region["totalAmount"] = _safe_float(r.get("totalAmount"))
+            region["totalQuantity"] = _safe_float(r.get("totalQuantity"))
+            continue
+        region["rows"].append(
+            {
+                "rowId": str(uuid4()),
+                "name": r.get("name", ""),
+                "amount": _safe_float(r.get("amount")),
+                "quantity": _safe_float(r.get("quantity")),
+                "priorRank": r.get("priorRank", ""),
+            }
+        )
+    return payload
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-13 ERP 核对记录 — 双 item 文本锚点 parser/exporter
+#
+# D4-13 非行表结构：两段叙述文本（核对过程 / 核对结论）各存一个 checklist item，
+# item_id = D4-13-process / D4-13-conclusion。缺失文本明确为 N/A（Req 1.2）。
+# 导入导出用 2 行 xlsx（区块列 + 内容列），文本锚点逐字往返。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+_D4_13_NA = "N/A"
+
+# 区块标签 → item_id（与 d4_inspection_descriptor.D4_13_SECTION_TITLES 锁死）
+_D4_13_SECTION_ITEM_MAP: dict[str, str] = {
+    "核对过程": "D4-13-process",
+    "核对结论": "D4-13-conclusion",
+}
+_D4_13_ITEM_SECTION_MAP: dict[str, str] = {v: k for k, v in _D4_13_SECTION_ITEM_MAP.items()}
+
+
+def _export_d4_13_rows(
+    ws, process_text: str | None, conclusion_text: str | None
+) -> None:
+    """D4-13 导出：核对过程 + 核对结论 → 两行。缺失文本写 N/A。"""
+    ws.append(["核对过程", process_text if process_text else _D4_13_NA])
+    ws.append(["核对结论", conclusion_text if conclusion_text else _D4_13_NA])
+
+
+def _parse_d4_13_rows(
+    ws_rows, actual_headers: list[str]
+) -> dict[str, str]:
+    """解析 D4-13 xlsx → {item_id: text}。
+
+    按「区块」列识别核对过程/核对结论，文本逐字保留。
+    缺失文本 → N/A（Req 1.2）。未知区块静默跳过（不塞孤儿键）。
+    """
+    result: dict[str, str] = {}
+    for row in ws_rows:
+        values = list(row) + [None] * max(0, len(actual_headers) - len(row))
+        if all(v is None for v in values):
+            continue
+        col: dict[str, Any] = {}
+        for i, h in enumerate(actual_headers):
+            if i < len(values):
+                col[h] = values[i]
+        section_label = _safe_str(col.get("区块"))
+        content = _safe_str(col.get("内容"))
+        item_id = _D4_13_SECTION_ITEM_MAP.get(section_label)
+        if item_id:
+            result[item_id] = content if content else _D4_13_NA
+    # 确保两段都存在（Req 1.2: 缺失文本明确为 N/A）
+    result.setdefault("D4-13-process", _D4_13_NA)
+    result.setdefault("D4-13-conclusion", _D4_13_NA)
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-15 完整性检查表 — 专用 parser/exporter（delivery/invoice/voucher 三层嵌套）
+#
+# 前端数据模型 CompletenessItem:
+#   {id, delivery:{date,number,product,qty,amount},
+#        invoice:{date,number,product,qty,amount},
+#        voucher:{date,number,product,qty,amount},
+#    isConsistent, remark}
+# item_id = D4-15-items。动态 id 原样保留。isConsistent 由公式重算（Req 1.3）。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# D4-15 中文列头 → 三层嵌套 (layer_key, field_key) 映射
+_D4_15_HEADER_MAP: dict[str, tuple[str, str]] = {
+    "发货单日期": ("delivery", "date"),
+    "发货单编号": ("delivery", "number"),
+    "发货单品名": ("delivery", "product"),
+    "发货单数量": ("delivery", "qty"),
+    "发货单金额": ("delivery", "amount"),
+    "发票日期": ("invoice", "date"),
+    "发票编号": ("invoice", "number"),
+    "发票品名": ("invoice", "product"),
+    "发票数量": ("invoice", "qty"),
+    "发票金额": ("invoice", "amount"),
+    "记账凭证日期": ("voucher", "date"),
+    "记账凭证编号": ("voucher", "number"),
+    "记账凭证品名": ("voucher", "product"),
+    "记账凭证数量": ("voucher", "qty"),
+    "记账凭证金额": ("voucher", "amount"),
+}
+
+# D4-15 层 → 子字段列头顺序（导出用）
+_D4_15_LAYER_EXPORT: list[tuple[str, str, str]] = [
+    # (layer_key, field_key, header)
+    ("delivery", "date", "发货单日期"),
+    ("delivery", "number", "发货单编号"),
+    ("delivery", "product", "发货单品名"),
+    ("delivery", "qty", "发货单数量"),
+    ("delivery", "amount", "发货单金额"),
+    ("invoice", "date", "发票日期"),
+    ("invoice", "number", "发票编号"),
+    ("invoice", "product", "发票品名"),
+    ("invoice", "qty", "发票数量"),
+    ("invoice", "amount", "发票金额"),
+    ("voucher", "date", "记账凭证日期"),
+    ("voucher", "number", "记账凭证编号"),
+    ("voucher", "product", "记账凭证品名"),
+    ("voucher", "qty", "记账凭证数量"),
+    ("voucher", "amount", "记账凭证金额"),
+]
+
+
+def _d4_15_is_consistent(item: dict) -> bool:
+    """D4-15 一致性重算（Req 1.3: isConsistent 由统一公式重算）。
+
+    三层（delivery/invoice/voucher）的 amount 全部相等且非零/非空 → True。
+    与前端 useD4CompletenessCheck.checkConsistency 同定义。
+    """
+    from decimal import Decimal, InvalidOperation
+    amounts: list[Decimal] = []
+    for layer in ("delivery", "invoice", "voucher"):
+        raw = item.get(layer, {}).get("amount")
+        if raw is None or raw == "" or raw == "N/A":
+            return False
+        try:
+            amounts.append(Decimal(str(raw)))
+        except (InvalidOperation, ValueError, TypeError):
+            return False
+    if not amounts or any(a == 0 for a in amounts):
+        return False
+    return len(set(amounts)) == 1
+
+
+def _parse_d4_15_row(row: tuple, actual_headers: list[str]) -> dict | None:
+    """解析 D4-15 一行 → CompletenessItem（delivery/invoice/voucher 三层嵌套）。
+
+    序号列忽略（前端按行序生成）；isConsistent 不信任文件值，由公式重算（Req 1.3）；
+    动态 id 保留（如文件有 id 列则保留，否则生成）。
+    """
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    item: dict[str, Any] = {
+        "delivery": {}, "invoice": {}, "voucher": {},
+    }
+    has_input = False
+
+    for header, (layer, field) in _D4_15_HEADER_MAP.items():
+        raw = _col_val(header)
+        if field in ("amount", "qty"):
+            item[layer][field] = _safe_float(raw)
+            if raw not in (None, ""):
+                has_input = True
+        else:
+            s = _safe_str(raw)
+            item[layer][field] = s
+            if s:
+                has_input = True
+
+    if not has_input:
+        return None
+
+    # 动态 id 保留（如文件有 id 列则用之，否则生成）
+    existing_id = _safe_str(_col_val("id"))
+    item["id"] = existing_id if existing_id else f"c-{uuid4().hex[:10]}"
+
+    # isConsistent 由公式重算，不信任文件值（Req 1.3）
+    item["isConsistent"] = _d4_15_is_consistent(item)
+
+    # 备注
+    item["remark"] = _safe_str(_col_val("备注"))
+
+    return item
+
+
+def _export_d4_15_rows(ws, items: list[dict]) -> None:
+    """D4-15 导出：[CompletenessItem] → 按三层嵌套展平写行。
+
+    isConsistent 由公式重算后导出（√/×），不用存储值。
+    """
+    for seq, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            continue
+        row_values: list[Any] = [seq]  # 序号
+        for layer, field, _header in _D4_15_LAYER_EXPORT:
+            layer_data = item.get(layer, {})
+            val = layer_data.get(field)
+            if field in ("amount", "qty"):
+                row_values.append(_safe_float(val))
+            else:
+                row_values.append(_safe_str(val))
+        # isConsistent：重算后导出为可读符号
+        consistent = _d4_15_is_consistent(item)
+        row_values.append("√" if consistent else "×")
+        # 备注
+        row_values.append(_safe_str(item.get("remark")))
+        ws.append(row_values)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-16 出口口岸核对 — 专用 parser/exporter（中文列头→英文 key，差异重算）
+#
+# 前端数据模型 ExportCheckRow:
+#   {id, bookAmount, portsPeriod, portsAmount, portsDiff, portsReason,
+#    taxReportAmount, taxDiff, taxReason, taxIndex}
+# item_id = D4-16-rows。portsDiff/taxDiff 必须重算（Req 1.4）。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# D4-16 中文列头 → 英文 key（Req 1.4）
+_D4_16_HEADER_TO_KEY: dict[str, str] = {
+    "序号": "_seq",
+    "账面出口收入金额": "bookAmount",
+    "口岸期间": "portsPeriod",
+    "口岸结关金额": "portsAmount",
+    "口岸差异": "portsDiff",
+    "口岸差异原因": "portsReason",
+    "申报外营收入": "taxReportAmount",
+    "申报差异": "taxDiff",
+    "申报差异原因": "taxReason",
+    "索引": "taxIndex",
+}
+
+# 派生字段（portsDiff/taxDiff），导入时不信任文件值（Req 1.4）
+_D4_16_DERIVED_KEYS: frozenset[str] = frozenset({"portsDiff", "taxDiff"})
+
+# 输入字段（非派生、非序号）
+_D4_16_INPUT_KEYS: list[str] = [
+    k for k in _D4_16_HEADER_TO_KEY.values()
+    if k not in _D4_16_DERIVED_KEYS and k != "_seq"
+]
+
+
+def _d4_16_recompute_derived(row: dict) -> None:
+    """D4-16 差异重算（Req 1.4: portsDiff/taxDiff 必须重算）。
+
+    portsDiff = portsAmount - bookAmount（口岸结关 - 账面）
+    taxDiff   = taxReportAmount - bookAmount（申报 - 账面）
+    与前端 onCellChange 和 d4_inspection_formula_verdict.d4_16_ports_diff 同定义
+    （注：descriptor 写 C-A 即 ports-book；前端写 book-ports 有两个流派，
+    以 descriptor 为准：diff = 外部金额 - 账面金额）。
+    """
+    book = _safe_float(row.get("bookAmount"))
+    row["portsDiff"] = _safe_float(row.get("portsAmount")) - book
+    row["taxDiff"] = _safe_float(row.get("taxReportAmount")) - book
+
+
+def _parse_d4_16_row(row: tuple, actual_headers: list[str]) -> dict | None:
+    """解析 D4-16 一行：中文列头 → 英文 key，portsDiff/taxDiff 不信任文件值。
+
+    动态 id 保留（如文件有 id 字段则用之）。
+    """
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    out: dict[str, Any] = {}
+    has_input = False
+    for header, key in _D4_16_HEADER_TO_KEY.items():
+        if key == "_seq":
+            continue  # 序号不进结果
+        if key in _D4_16_DERIVED_KEYS:
+            continue  # 派生字段不信任文件值
+        raw = _col_val(header)
+        if key in ("bookAmount", "portsAmount", "taxReportAmount"):
+            out[key] = _safe_float(raw)
+            if raw not in (None, ""):
+                has_input = True
+        else:
+            s = _safe_str(raw)
+            out[key] = s
+            if s:
+                has_input = True
+
+    if not has_input:
+        return None
+
+    # 动态 id 保留
+    existing_id = _safe_str(_col_val("id"))
+    out["id"] = existing_id if existing_id else f"e-{uuid4().hex[:10]}"
+
+    # portsDiff/taxDiff 由公式重算（Req 1.4）
+    _d4_16_recompute_derived(out)
+
+    return out
+
+
+def _export_d4_16_rows(ws, items: list[dict]) -> None:
+    """D4-16 导出：[ExportCheckRow] → 按中文列头顺序写行。
+
+    portsDiff/taxDiff 由公式重算后导出（不用存储值）。
+    """
+    for seq, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            continue
+        # 重算派生字段
+        _d4_16_recompute_derived(item)
+        ws.append([
+            seq,
+            _safe_float(item.get("bookAmount")),
+            _safe_str(item.get("portsPeriod")),
+            _safe_float(item.get("portsAmount")),
+            _safe_float(item.get("portsDiff")),
+            _safe_str(item.get("portsReason")),
+            _safe_float(item.get("taxReportAmount")),
+            _safe_float(item.get("taxDiff")),
+            _safe_str(item.get("taxReason")),
+            _safe_str(item.get("taxIndex")),
+        ])
+
+
 def _parse_generic_row(row: tuple, actual_headers: list[str]) -> dict:
     """通用行解析"""
     from uuid import uuid4
@@ -1284,6 +2183,522 @@ def _parse_generic_row(row: tuple, actual_headers: list[str]) -> dict:
             val = values[i]
             result[header] = val if val is not None else ""
     return result
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# D4-29/30/31/32 IPO 舞弊应对四表 — 专用 parser/exporter
+#
+# 前端数据模型：
+#   D4-29  useD4CustomerDetail:  [{id,name,fields:{key:val}}]   转置（行=字段,列=客户）
+#   D4-30  D4TabInterviewSummary: {customers:[{id,name,fields}],customDimensions:[{key,label}]}
+#   D4-31  D4TabInterviewDetail:  单对象 InterviewData（q1_relation 是 string[]）
+#   D4-32  D4TabFundFlow:         [{key,rows:[{id,name,amount,...}]}]  六组分组
+#
+# 导出时展开成扁平 xlsx（一行=一个客户/一条记录）；导入时逆向组装回前端形态。
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ─── D4-29 列头↔英文 key 映射（对齐 useD4CustomerDetail.CUSTOMER_FIELDS） ───
+
+_D4_29_HEADER_TO_KEY: dict[str, str] = {
+    "客户名称": "_name",
+    "统一社会信用代码": "creditCode",
+    "注册地址": "regAddress",
+    "办公地址": "officeAddress",
+    "网站地址": "website",
+    "网站IP地址": "websiteIp",
+    "企业邮箱": "email",
+    "成立时间": "establishDate",
+    "注册资本/实缴资本": "registeredCapital",
+    "经营范围": "bizScope",
+    "人员规模/社保缴纳人数": "headcount",
+    "法定代表人": "legalRep",
+    "股东1及持股比例": "shareholder1",
+    "股东2及持股比例": "shareholder2",
+    "股东3及持股比例": "shareholder3",
+    "董事长": "chairman",
+    "总经理": "gm",
+    "关键经办人员": "keyHandler",
+    "实际控制人": "actualController",
+    "是否为关联方": "isRelated",
+    "是否同时为供应商": "isAlsoSupplier",
+    "开始合作时间": "cooperationStart",
+    "是否长期拖欠款项": "hasOverdue",
+    "经营状态": "bizStatus",
+    "是否列入失信人": "isBlacklisted",
+    "信息来源": "infoSource",
+}
+_D4_29_KEY_TO_HEADER: dict[str, str] = {v: k for k, v in _D4_29_HEADER_TO_KEY.items() if v != "_name"}
+
+
+def _parse_d4_29_rows(ws_rows, actual_headers: list[str]) -> list[dict]:
+    """解析 D4-29 xlsx 全部数据行 → [{id, name, fields:{key:val}}]。
+
+    D4-29 是转置表（行=检查项、列=客户），xlsx 也导出为转置形态：
+    第1列是「客户名称」列头行，后续列各是一个客户。
+    但为简化 IO，导出/导入统一用**扁平表**（一行一客户，各字段列展开），
+    与源模板转置方向不同但双向往返保真。
+    """
+    from uuid import uuid4
+
+    customers: list[dict] = []
+    for row in ws_rows:
+        values = list(row) + [None] * max(0, len(actual_headers) - len(row))
+        # 跳过全空行
+        if all(v is None for v in values):
+            continue
+        col = {}
+        for i, h in enumerate(actual_headers):
+            if i < len(values):
+                col[h] = values[i]
+        name = _safe_str(col.get("客户名称"))
+        if not name:
+            continue
+        fields: dict[str, str] = {}
+        for header, key in _D4_29_HEADER_TO_KEY.items():
+            if key == "_name":
+                continue
+            fields[key] = _safe_str(col.get(header))
+        customers.append({
+            "id": f"cust-{uuid4().hex[:12]}",
+            "name": name,
+            "fields": fields,
+        })
+    return customers
+
+
+def _export_d4_29_rows(ws, customers: list[dict], headers: list[str]) -> None:
+    """D4-29 导出：[{id,name,fields}] → 扁平行。"""
+    for cust in customers:
+        if not isinstance(cust, dict):
+            continue
+        row_values: list = []
+        for h in headers:
+            key = _D4_29_HEADER_TO_KEY.get(h)
+            if key == "_name":
+                row_values.append(cust.get("name", ""))
+            elif key:
+                row_values.append(cust.get("fields", {}).get(key, ""))
+            else:
+                row_values.append("")
+        ws.append(row_values)
+
+
+# ─── D4-30 列头↔英文 key 映射（对齐 D4TabInterviewSummary.INTERVIEW_FIELDS） ───
+
+_D4_30_HEADER_TO_KEY: dict[str, str] = {
+    "客户名称": "_name",
+    "访谈时间": "time",
+    "访谈原因": "reason",
+    "访谈方式": "method",
+    "被访谈公司注册地址": "regAddress",
+    "实地走访公司地址": "visitAddress",
+    "接受访谈人员及身份": "interviewee",
+    "参与访谈的审计人员": "auditor",
+    "参与访谈的其他人员": "others",
+    "访谈人员行程信息": "travelInfo",
+    "是否现场函证": "onSiteConfirm",
+    "访谈关注要点": "keyPoints",
+    "合同执行核对情况": "contractCheck",
+    "交易金额核对是否一致": "amountMatch",
+    "往来余额核对是否一致": "balanceMatch",
+    "访谈结论": "conclusion",
+    "访谈表索引": "indexRef",
+}
+_D4_30_KEY_TO_HEADER: dict[str, str] = {v: k for k, v in _D4_30_HEADER_TO_KEY.items() if v != "_name"}
+
+
+def _parse_d4_30_rows(ws_rows, actual_headers: list[str]) -> dict:
+    """解析 D4-30 xlsx → {customers:[{id,name,fields}], customDimensions:[]}。
+
+    customDimensions 从额外列（非固定维度）自动恢复。
+    """
+    from uuid import uuid4
+
+    known_headers = set(_D4_30_HEADER_TO_KEY.keys())
+    # 识别自定义维度列（在固定维度之外的列）
+    custom_dims: list[dict[str, str]] = []
+    custom_header_keys: dict[str, str] = {}  # header → custom key
+    for h in actual_headers:
+        if h and h not in known_headers:
+            ckey = f"custom_{uuid4().hex[:8]}"
+            custom_dims.append({"key": ckey, "label": h})
+            custom_header_keys[h] = ckey
+
+    customers: list[dict] = []
+    for row in ws_rows:
+        values = list(row) + [None] * max(0, len(actual_headers) - len(row))
+        if all(v is None for v in values):
+            continue
+        col = {}
+        for i, h in enumerate(actual_headers):
+            if i < len(values):
+                col[h] = values[i]
+        name = _safe_str(col.get("客户名称"))
+        if not name:
+            continue
+        fields: dict[str, str] = {}
+        for header, key in _D4_30_HEADER_TO_KEY.items():
+            if key == "_name":
+                continue
+            fields[key] = _safe_str(col.get(header))
+        # 自定义维度值
+        for header, ckey in custom_header_keys.items():
+            fields[ckey] = _safe_str(col.get(header))
+        customers.append({
+            "id": f"iv-{uuid4().hex[:12]}",
+            "name": name,
+            "fields": fields,
+        })
+    return {"customers": customers, "customDimensions": custom_dims}
+
+
+def _export_d4_30_rows(ws, data: dict, headers: list[str]) -> None:
+    """D4-30 导出：{customers, customDimensions} → 扁平行。
+
+    固定列 + customDimensions 额外列（动态追加到表头后）。
+    """
+    customers = data.get("customers", [])
+    custom_dims = data.get("customDimensions", [])
+    # 追加自定义列到表头（覆盖 ws 第一行）
+    if custom_dims:
+        extra_headers = [d.get("label", d.get("key", "")) for d in custom_dims]
+        # 重写第一行
+        full_headers = list(headers) + extra_headers
+        for col_idx, val in enumerate(full_headers, 1):
+            ws.cell(row=1, column=col_idx, value=val)
+
+    for cust in customers:
+        if not isinstance(cust, dict):
+            continue
+        row_values: list = []
+        for h in headers:
+            key = _D4_30_HEADER_TO_KEY.get(h)
+            if key == "_name":
+                row_values.append(cust.get("name", ""))
+            elif key:
+                row_values.append(cust.get("fields", {}).get(key, ""))
+            else:
+                row_values.append("")
+        # 自定义维度值
+        for dim in custom_dims:
+            row_values.append(cust.get("fields", {}).get(dim.get("key", ""), ""))
+        ws.append(row_values)
+
+
+# ─── D4-31 列头↔英文 key 映射（对齐 D4TabInterviewDetail.InterviewData） ───
+
+_D4_31_HEADER_TO_KEY: dict[str, str] = {
+    "访谈对象": "target",
+    "访谈时间及地点": "timePlace",
+    "接受访谈人员及职务": "interviewee",
+    "访谈人": "interviewer",
+    "受访人介绍": "introduction",
+    "公司名称": "companyName",
+    "注册资本": "regCapital",
+    "成立日期": "establishDate",
+    "经济性质": "bizNature",
+    "法定代表人": "legalRep",
+    "股权结构": "equityStructure",
+    "客户业务关系": "q1_relation",  # 多选，用「/」分隔
+    "客户采购结算方式": "q2a_payment",
+    "客户销售结算方式": "q2b_collection",
+    "是否签订合同": "q3a_hasContract",
+    "产品质量情况": "q3b_quality",
+    "是否有退换货条款": "q3c_returnClause",
+    "退换货金额": "q3d_returnAmount",
+    "验收入库情况": "q3e_acceptance",
+    "是否存在返利": "q3f_hasRebate",
+    "返利支付方式": "q3f_rebateMethod",
+    "返利金额": "q3f_rebateAmount",
+    "经销商是否最终销售": "q3g_finalSold",
+    "是否存在其他资金往来": "q4_otherFunds",
+    "其他重要事项": "q5_otherMatters",
+    "是否持有股份": "q6_hasShares",
+    "是否担任职务": "q6_hasPosition",
+    "是否有交易": "q6_hasTransaction",
+    "签字-受访人": "signInterviewee",
+    "签字-审计人员": "signAuditor",
+    "签字-其他": "signOther",
+    "签字日期": "signDate",
+}
+
+
+def _parse_d4_31_row(row: tuple, actual_headers: list[str]) -> dict:
+    """解析 D4-31 一行 → InterviewData 单对象。
+
+    q1_relation 列用「/」分隔（如「客户是终端客户/客户是经销商」），
+    解析为 string[] 保持前端 q1_relation: string[] 形态。
+    """
+    values = list(row) + [None] * max(0, len(actual_headers) - len(row))
+    col = {}
+    for i, h in enumerate(actual_headers):
+        if i < len(values):
+            col[h] = values[i]
+
+    result: dict[str, Any] = {}
+    for header, key in _D4_31_HEADER_TO_KEY.items():
+        raw = _safe_str(col.get(header))
+        if key == "q1_relation":
+            # 多选字段：用 / 分隔
+            result[key] = [s.strip() for s in raw.split("/") if s.strip()] if raw else []
+        else:
+            result[key] = raw
+    return result
+
+
+def _export_d4_31_row(data: dict, headers: list[str]) -> list:
+    """D4-31 导出一行：InterviewData → 扁平列值。"""
+    row_values: list = []
+    for h in headers:
+        key = _D4_31_HEADER_TO_KEY.get(h)
+        if not key:
+            row_values.append("")
+            continue
+        val = data.get(key, "")
+        if key == "q1_relation" and isinstance(val, list):
+            row_values.append("/".join(val))
+        else:
+            row_values.append(_safe_str(val) if val else "")
+    return row_values
+
+
+# ─── D4-32 列头↔英文 key 映射（对齐 D4TabFundFlow.FlowRow） ───
+
+_D4_32_HEADER_TO_KEY: dict[str, str] = {
+    "序号": "_seq",
+    "单位名称/姓名": "name",
+    "本期交易金额": "amount",
+    "占同类交易比例": "ratio",
+    "开户银行": "bank",
+    "账号": "account",
+    "资金流水获取途径": "method",
+    "是否发现异常交易": "hasAnomaly",
+    "索引号": "indexRef",
+}
+
+# 六组定义（与前端 D4TabFundFlow.GROUPS 锁死）
+_D4_32_GROUP_KEYS: list[str] = [
+    "supplier", "customer", "shareholder", "controller", "management", "related",
+]
+_D4_32_GROUP_LABELS: dict[str, str] = {
+    "supplier": "主要供应商", "customer": "主要客户",
+    "shareholder": "控股股东", "controller": "实际控制人",
+    "management": "关键管理人员", "related": "其他关联方",
+}
+_D4_32_LABEL_TO_KEY: dict[str, str] = {v: k for k, v in _D4_32_GROUP_LABELS.items()}
+
+
+def _parse_d4_32_rows(ws_rows, actual_headers: list[str]) -> list[dict]:
+    """解析 D4-32 xlsx → [{key, rows:[{id,name,amount,...}]}] 六组。
+
+    导出格式每组前插一行「分组标题行」（序号列="分组"，名称列=组标签），
+    数据行跟随其后。导入时按分组标题行识别归属。
+    """
+    from uuid import uuid4
+
+    groups: dict[str, list[dict]] = {k: [] for k in _D4_32_GROUP_KEYS}
+    current_group = "supplier"  # 默认第一组
+
+    for row in ws_rows:
+        values = list(row) + [None] * max(0, len(actual_headers) - len(row))
+        if all(v is None for v in values):
+            continue
+        col = {}
+        for i, h in enumerate(actual_headers):
+            if i < len(values):
+                col[h] = values[i]
+
+        seq_val = _safe_str(col.get("序号"))
+        name_val = _safe_str(col.get("单位名称/姓名"))
+
+        # 分组标题行：序号列="分组" 或空、名称列匹配六组标签
+        if name_val in _D4_32_LABEL_TO_KEY:
+            current_group = _D4_32_LABEL_TO_KEY[name_val]
+            continue
+
+        # 普通数据行
+        if not name_val:
+            continue
+        amount_raw = col.get("本期交易金额")
+        groups[current_group].append({
+            "id": f"ff-{uuid4().hex[:12]}",
+            "name": name_val,
+            "amount": _safe_float(amount_raw) if amount_raw is not None else "",
+            "ratio": _safe_str(col.get("占同类交易比例")),
+            "bank": _safe_str(col.get("开户银行")),
+            "account": _safe_str(col.get("账号")),
+            "method": _safe_str(col.get("资金流水获取途径")),
+            "hasAnomaly": _safe_str(col.get("是否发现异常交易")),
+            "indexRef": _safe_str(col.get("索引号")),
+        })
+
+    return [{"key": k, "rows": groups[k]} for k in _D4_32_GROUP_KEYS]
+
+
+def _export_d4_32_rows(ws, groups_data: list[dict], headers: list[str]) -> None:
+    """D4-32 导出：六组 [{key,rows}] → 分组标题行 + 数据行。"""
+    for group in groups_data:
+        if not isinstance(group, dict):
+            continue
+        group_key = group.get("key", "")
+        label = _D4_32_GROUP_LABELS.get(group_key, group_key)
+        # 分组标题行
+        title_row = [""] * len(headers)
+        try:
+            name_idx = headers.index("单位名称/姓名")
+            title_row[name_idx] = label
+        except ValueError:
+            pass
+        ws.append(title_row)
+        # 数据行
+        rows = group.get("rows", [])
+        for seq, r in enumerate(rows, 1):
+            if not isinstance(r, dict):
+                continue
+            row_values: list = []
+            for h in headers:
+                key = _D4_32_HEADER_TO_KEY.get(h)
+                if key == "_seq":
+                    row_values.append(seq)
+                elif key == "amount":
+                    row_values.append(_safe_float(r.get("amount")) if r.get("amount") not in (None, "") else "")
+                elif key:
+                    row_values.append(r.get(key, ""))
+                else:
+                    row_values.append("")
+            ws.append(row_values)
+
+
+
+
+
+def _cutoff_return_row_id() -> str:
+    """与前端 addRow 一致形态的稳定行 id（r-<base36>-<rand>）。"""
+    import time
+    from random import choices
+    from string import ascii_lowercase, digits
+
+    base = format(int(time.time() * 1000), "x")
+    rand = "".join(choices(ascii_lowercase + digits, k=5))
+    return f"r-{base}-{rand}"
+
+
+def _parse_cutoff_return_row(
+    spec: SheetIoSpec, row: tuple, actual_headers: list[str]
+) -> dict | None:
+    """按 spec 解析一行：录入字段逐字段映射为英文 key，派生字段忽略文件值。
+
+    未知列不进入结果（禁止默归"其他"）；全空行返回 None（由调用方跳过）。
+    """
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(header: str) -> Any:
+        try:
+            idx = actual_headers.index(header)
+        except ValueError:
+            return None
+        return values[idx] if idx < len(values) else None
+
+    out: dict[str, Any] = {}
+    has_input = False
+    for fs in spec.fields:
+        if fs.kind == "derived":
+            continue  # 派生字段不信任文件值，稍后由公式重算
+        raw = _col_val(fs.header)
+        if fs.kind == "float":
+            out[fs.key] = _safe_float(raw)
+            if raw not in (None, ""):
+                has_input = True
+        else:
+            s = _safe_str(raw)
+            out[fs.key] = s
+            if s:
+                has_input = True
+    if not has_input:
+        return None
+    return out
+
+
+def _finalize_cutoff_return_row(spec: SheetIoSpec, out: dict, cutoff_date: str) -> dict:
+    """补稳定 id + 由公式重算派生字段（导入落库前）。"""
+    out.setdefault("id", _cutoff_return_row_id())
+    _recompute_derived(spec, out, cutoff_date)
+    return out
+
+
+def _recompute_derived(spec: SheetIoSpec, row: dict, cutoff_date: str) -> None:
+    """按 sheet_code 用后端权威公式重算派生字段（导入/导出共用）。"""
+    code = spec.sheet_code
+    if code in ("D4-17", "D4-18"):
+        row["isCutoff"] = _cutoff_is_ok(
+            _safe_str(row.get("voucherDate")),
+            _safe_str(row.get("deliveryDate")),
+            cutoff_date,
+        )
+    elif code == "D4-19":
+        row["discountRate"] = _discount_rate(
+            _safe_float(row.get("revenueAmount")),
+            _safe_float(row.get("discountAmount")),
+        )
+    elif code == "D4-20-provision":
+        base = _safe_float(row.get("base"))
+        rate = _safe_float(row.get("rate"))
+        already = _safe_float(row.get("alreadyProvided"))
+        row["shouldProvide"] = base * rate
+        row["diff"] = row["shouldProvide"] - already
+    # D4-20-current/post 无派生字段
+
+
+def _export_d4_9_rows(ws, store: Any) -> None:
+    """D4-9 导出：本期/上期两分区，每区 客户明细 + 销售总额行。
+
+    列 = 期间/序号/客户名称/销售金额/销售金额占比/销售数量/销售数量占比/上期排名。
+    占比两列是**派生值**（导出计算值、回导忽略），总额行 客户名称="销售总额"、占比列留空。
+    """
+    if not isinstance(store, dict):
+        store = {}
+    for period_label, key in (("本期", "current"), ("上期", "prior")):
+        region = store.get(key) or {}
+        rows = region.get("rows") or []
+        total_amount = _safe_float(region.get("totalAmount"))
+        total_quantity = _safe_float(region.get("totalQuantity"))
+        for idx, r in enumerate(rows, start=1):
+            if not isinstance(r, dict):
+                continue
+            amount = _safe_float(r.get("amount"))
+            quantity = _safe_float(r.get("quantity"))
+            amount_ratio = amount / total_amount if total_amount else 0
+            quantity_ratio = quantity / total_quantity if total_quantity else 0
+            ws.append([
+                period_label,
+                idx,
+                r.get("name", ""),
+                amount,
+                round(amount_ratio, 4),
+                quantity,
+                round(quantity_ratio, 4),
+                r.get("priorRank", ""),
+            ])
+        # 销售总额行（占比列留空 = 不可回导）。
+        ws.append([period_label, "", "销售总额", total_amount, "", total_quantity, "", ""])
+
+
+def _export_cutoff_return_row(spec: SheetIoSpec, data: dict, cutoff_date: str) -> list:
+    """导出一行：录入字段原样、派生字段由公式重算（不信任存储值）。"""
+    # 拷贝一份重算，避免污染入参
+    tmp = dict(data)
+    _recompute_derived(spec, tmp, cutoff_date)
+    out: list[Any] = []
+    for fs in spec.fields:
+        v = tmp.get(fs.key)
+        if fs.key == "isCutoff":
+            # bool|None → √ / × / '' （导出为可读符号）
+            out.append("√" if v is True else ("×" if v is False else ""))
+        elif fs.kind in ("float", "derived") and fs.key not in ("isCutoff",):
+            out.append(_safe_float(v))
+        else:
+            out.append(_safe_str(v))
+    return out
 
 
 def _parse_d4_6_row(row: tuple, actual_headers: list[str]) -> dict:
@@ -1687,3 +3102,6 @@ _GENERIC_GUIDANCE = [
 def _get_guidance_text(sheet_code: str) -> list[str]:
     """获取sheet对应的编制说明文本"""
     return _SHEET_GUIDANCE.get(sheet_code, _GENERIC_GUIDANCE)
+
+
+# (D4-15/D4-16 专用 parser/exporter 已移至文件上方 _parse_generic_row 之前)

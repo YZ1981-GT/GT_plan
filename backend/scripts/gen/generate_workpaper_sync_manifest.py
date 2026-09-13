@@ -74,6 +74,33 @@ _REQUIRED_ENTRY_FIELDS = {
 #: Reviewed per-component profile expectation keys (overlay side of the two-way lock).
 _EXPECTED_PROFILE_FIELDS = ("editability", "room_model", "scenario_profile_ids")
 
+#: Curated entries declare their own migration_state (there is no discoverable mount to
+#: derive one from). Kept disjoint from discovery migration_states so a curated entry can
+#: never masquerade as a discovered one.
+_CURATED_MIGRATION_STATES = {
+    "curated_bidirectional",
+    "curated_single_html",
+    "curated_single_onlyoffice",
+}
+
+#: Required keys on every `curated_entries[]` declaration. Unknown keys are rejected and
+#: any missing key fails the build closed (design §3.1 / §2.2).
+_REQUIRED_CURATED_FIELDS = {
+    "entry_id",
+    "host_path",
+    "curated_reason",
+    "document_type",
+    "wp_match",
+    "html_store",
+    "canonical_resolver",
+    "adapter_id",
+    "capability",
+    "migration_state",
+    "expected_profile",
+    "profile",
+    "evidence",
+}
+
 
 class ManifestGenerationError(RuntimeError):
     """Raised when source facts or reviewed overlay are incomplete."""
@@ -242,6 +269,53 @@ def _group_source_facts(discovery: dict[str, Any]) -> list[list[dict[str, Any]]]
     ]
 
 
+def _assert_profile_in_expected(
+    *,
+    entry_id: str,
+    profile_values: dict[str, tuple[str, str]],
+    expectation: Any,
+    origin: str,
+    label: str,
+) -> None:
+    """Shared two-way profile lock: reviewed `expectation` vs a concrete profile value set.
+
+    `profile_values` maps each `_EXPECTED_PROFILE_FIELDS` key to a `(actual, provenance)`
+    pair. The discovery path passes source-derived values (provenance = the source fact);
+    the curated path passes reviewer-declared values (provenance = the declared block). In
+    both cases the actual value MUST appear in the reviewed `expectation[field]` list, so
+    the overlay can never downgrade/rot a required scenario and neither side drifts silently.
+
+    This is a pure structural check with no dependency on how the values were obtained, so
+    the discovery caller stays byte-identical after the extraction.
+    """
+    if not isinstance(expectation, dict):
+        raise ManifestGenerationError(
+            f"entry {entry_id}: overlay {origin} has no reviewed expected_profile object; "
+            "the source-backed profile must be reviewed, not inferred silently"
+        )
+    unknown = sorted(set(expectation) - set(_EXPECTED_PROFILE_FIELDS) - {"review_note"})
+    if unknown:
+        raise ManifestGenerationError(f"overlay {origin}.expected_profile has unknown keys: {unknown}")
+    for field in _EXPECTED_PROFILE_FIELDS:
+        if field not in expectation:
+            raise ManifestGenerationError(f"overlay {origin}.expected_profile misses {field!r}")
+    for field in _EXPECTED_PROFILE_FIELDS:
+        actual, fact = profile_values[field]
+        approved = expectation[field]
+        if not isinstance(approved, list) or not approved or any(
+            not isinstance(item, str) or not item for item in approved
+        ):
+            raise ManifestGenerationError(
+                f"overlay {origin}.expected_profile.{field} must be a non-empty string array"
+            )
+        if actual not in approved:
+            raise ManifestGenerationError(
+                f"entry {entry_id} ({label}): {field}={actual!r} "
+                f"via {fact}, which is not in the reviewed set {sorted(approved)} - review the "
+                "source diff instead of widening the reviewed set"
+            )
+
+
 def _assert_expected_profile(
     *,
     entry_id: str,
@@ -256,36 +330,191 @@ def _assert_expected_profile(
     derives every value from source. A mismatch is an error, so the overlay can never
     downgrade a required scenario (Requirement 1.2 forbids free text / drifting booleans
     from deciding the profile), and the reviewed side can never silently rot either.
+
+    Delegates the membership logic to `_assert_profile_in_expected` so discovery and curated
+    entries validate profile-vs-expected through the same code (design §3.2 step 6).
     """
-    if not isinstance(expectation, dict):
-        raise ManifestGenerationError(
-            f"entry {entry_id}: overlay {origin} has no reviewed expected_profile object; "
-            "the source-backed profile must be reviewed, not inferred silently"
+    _assert_profile_in_expected(
+        entry_id=entry_id,
+        profile_values={
+            "editability": (
+                derived.editability.value,
+                derived.profile_source["editability_fact"],
+            ),
+            "room_model": (
+                derived.room_model.value,
+                derived.profile_source["room_model_fact"],
+            ),
+            "scenario_profile_ids": (derived.scenario_profile_id, "scenario_profile"),
+        },
+        expectation=expectation,
+        origin=origin,
+        label=component,
+    )
+
+
+def _build_curated_entries(
+    overlay: dict[str, Any],
+    *,
+    discovered_host_paths: set[str],
+    discovery_entry_ids: set[str],
+) -> list[dict[str, Any]]:
+    """Emit synthetic manifest entries from the reviewed `overlay.curated_entries` section.
+
+    Additive facility (design §3.2): a single dynamic host (e.g. GtD4OperatingRevenue.vue)
+    can back several logical sheets, but discovery derives exactly one entry per host. A
+    curated entry lets a reviewer declare an extra logical entry that rides on a real host.
+
+    Every gate is fail-closed and raises `ManifestGenerationError`; a partial or guessed
+    curated entry is never emitted. Curated entries hold to the SAME capability discipline
+    as discovery entries — a curated entry can never silently claim `bidirectional`.
+    """
+    curated = overlay.get("curated_entries")
+    if curated is None:
+        return []
+    if not isinstance(curated, list) or any(not isinstance(item, dict) for item in curated):
+        raise ManifestGenerationError("overlay.curated_entries must be an array of objects")
+
+    entries: list[dict[str, Any]] = []
+    seen_curated_ids: set[str] = set()
+    for declaration in curated:
+        keys = set(declaration)
+        missing = _REQUIRED_CURATED_FIELDS - keys
+        if missing:
+            raise ManifestGenerationError(
+                f"curated entry misses required fields: {sorted(missing)}"
+            )
+        unknown = sorted(keys - _REQUIRED_CURATED_FIELDS)
+        if unknown:
+            raise ManifestGenerationError(
+                f"curated entry {declaration.get('entry_id')!r} has unknown keys: {unknown}"
+            )
+
+        entry_id = declaration["entry_id"]
+        if not isinstance(entry_id, str) or not entry_id:
+            raise ManifestGenerationError("curated entry_id must be a non-empty string")
+        # Requirement 1.4: curated ids disjoint from discovery ids and from each other.
+        if entry_id in discovery_entry_ids:
+            raise ManifestGenerationError(
+                f"curated entry_id collides with a discovery entry_id: {entry_id}"
+            )
+        if entry_id in seen_curated_ids:
+            raise ManifestGenerationError(f"duplicate curated entry_id: {entry_id}")
+        seen_curated_ids.add(entry_id)
+
+        # Requirement 1.5: a curated entry must ride a real discovered host.
+        host_path = declaration["host_path"]
+        if not isinstance(host_path, str) or host_path not in discovered_host_paths:
+            raise ManifestGenerationError(
+                f"curated entry {entry_id} references host_path not produced by discovery: "
+                f"{host_path!r}"
+            )
+
+        document_type = declaration["document_type"]
+        if document_type not in {"xlsx", "docx"}:
+            raise ManifestGenerationError(
+                f"curated entry {entry_id} has invalid document_type: {document_type!r}"
+            )
+
+        migration_state = declaration["migration_state"]
+        if migration_state not in _CURATED_MIGRATION_STATES:
+            raise ManifestGenerationError(
+                f"curated entry {entry_id} migration_state must be one of "
+                f"{sorted(_CURATED_MIGRATION_STATES)}: {migration_state!r}"
+            )
+
+        # Requirement 2.1: capability comes from the reviewed overlay, never inferred.
+        capability = declaration["capability"]
+        if capability not in _CAPABILITIES:
+            raise ManifestGenerationError(
+                f"curated entry {entry_id} has invalid capability: {capability!r}"
+            )
+
+        evidence = declaration["evidence"]
+        if not isinstance(evidence, dict):
+            raise ManifestGenerationError(f"curated entry {entry_id} evidence must be an object")
+        # Requirement 2.4: an unreviewed curated declaration fails closed.
+        if not evidence.get("review_status"):
+            raise ManifestGenerationError(
+                f"curated entry {entry_id} is not reviewed (evidence.review_status empty)"
+            )
+
+        adapter_id = declaration["adapter_id"]
+        html_store = declaration["html_store"]
+        # Requirement 2.2: a curated entry cannot silently claim bidirectional.
+        if capability == "bidirectional":
+            if not adapter_id:
+                raise ManifestGenerationError(
+                    f"curated bidirectional entry {entry_id} requires a non-empty adapter_id"
+                )
+            if not html_store or html_store == "unresolved":
+                raise ManifestGenerationError(
+                    f"curated bidirectional entry {entry_id} requires a resolved html_store"
+                )
+            if not evidence.get("contract_test"):
+                raise ManifestGenerationError(
+                    f"curated bidirectional entry {entry_id} requires evidence.contract_test"
+                )
+
+        # Requirement 2.3: declared profile validated against reviewed expected_profile using
+        # the SAME membership logic as discovery entries (shared _assert_profile_in_expected).
+        profile = declaration["profile"]
+        if not isinstance(profile, dict):
+            raise ManifestGenerationError(f"curated entry {entry_id} profile must be an object")
+        for field in ("editability", "room_model", "scenario_profile_id"):
+            if not isinstance(profile.get(field), str) or not profile.get(field):
+                raise ManifestGenerationError(
+                    f"curated entry {entry_id} profile.{field} must be a non-empty string"
+                )
+        _assert_profile_in_expected(
+            entry_id=entry_id,
+            profile_values={
+                "editability": (profile["editability"], "curated profile.editability"),
+                "room_model": (profile["room_model"], "curated profile.room_model"),
+                "scenario_profile_ids": (
+                    profile["scenario_profile_id"],
+                    "curated profile.scenario_profile_id",
+                ),
+            },
+            expectation=declaration["expected_profile"],
+            origin=f"curated_entries[{entry_id}]",
+            label="curated",
         )
-    unknown = sorted(set(expectation) - set(_EXPECTED_PROFILE_FIELDS) - {"review_note"})
-    if unknown:
-        raise ManifestGenerationError(f"overlay {origin}.expected_profile has unknown keys: {unknown}")
-    for field in _EXPECTED_PROFILE_FIELDS:
-        if field not in expectation:
-            raise ManifestGenerationError(f"overlay {origin}.expected_profile misses {field!r}")
-    for field, actual, fact in (
-        ("editability", derived.editability.value, derived.profile_source["editability_fact"]),
-        ("room_model", derived.room_model.value, derived.profile_source["room_model_fact"]),
-        ("scenario_profile_ids", derived.scenario_profile_id, "scenario_profile"),
-    ):
-        approved = expectation[field]
-        if not isinstance(approved, list) or not approved or any(
-            not isinstance(item, str) or not item for item in approved
-        ):
+
+        wp_match = declaration["wp_match"]
+        if not isinstance(wp_match, dict):
+            raise ManifestGenerationError(f"curated entry {entry_id} wp_match must be an object")
+
+        # Mirror the discovery-entry schema so registry/frontend treat both uniformly. Curated
+        # entries carry no template_ast mounts (mounts=[]), so they never contribute to the
+        # `manifest_mount_ids == source_mount_ids` check (that check filters template_ast).
+        entry = {
+            "entry_id": entry_id,
+            "host_path": host_path,
+            "mounts": [],
+            "independent_entry": True,
+            "parent_entry_id": None,
+            "wp_match": copy.deepcopy(wp_match),
+            "document_type": document_type,
+            "html_store": html_store,
+            "canonical_resolver": declaration["canonical_resolver"],
+            "adapter_id": adapter_id,
+            "capability": capability,
+            "migration_state": migration_state,
+            "evidence": copy.deepcopy(evidence),
+            # source-backed profile fields, mirrored from the reviewed declared profile block.
+            "editability": profile["editability"],
+            "room_model": profile["room_model"],
+            "scenario_profile": {"profile_id": profile["scenario_profile_id"]},
+            "profile_source": {"curated_reason": declaration["curated_reason"]},
+        }
+        missing_fields = _REQUIRED_ENTRY_FIELDS - entry.keys()
+        if missing_fields:
             raise ManifestGenerationError(
-                f"overlay {origin}.expected_profile.{field} must be a non-empty string array"
+                f"curated entry {entry_id} misses fields: {sorted(missing_fields)}"
             )
-        if actual not in approved:
-            raise ManifestGenerationError(
-                f"entry {entry_id} ({component}): source facts derive {field}={actual!r} "
-                f"via {fact}, which is not in the reviewed set {sorted(approved)} - review the "
-                "source diff instead of widening the reviewed set"
-            )
+        entries.append(entry)
+    return entries
 
 
 def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -466,6 +695,45 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
                     f"(derived from source: {sorted(used.get(field, set()))})"
                 )
 
+    # Curated entries (design §3.3): appended AFTER the discovery loop and AFTER the
+    # stale-rule gates so the discovery path is entirely unchanged. Each rides on a real
+    # discovered host and holds to the same fail-closed capability discipline. The builder
+    # gates entry_id collision itself; we re-assert disjointness at merge as defense-in-depth
+    # (Requirement 1.4, redundant with the builder's own check).
+    discovered_host_paths = {entry["host_path"] for entry in entries}
+    discovery_entry_ids = set(seen_entry_ids)
+    curated_entries = _build_curated_entries(
+        overlay,
+        discovered_host_paths=discovered_host_paths,
+        discovery_entry_ids=discovery_entry_ids,
+    )
+    if curated_entries:
+        curated_ids = {entry["entry_id"] for entry in curated_entries}
+        collisions = curated_ids & discovery_entry_ids
+        if collisions:
+            raise ManifestGenerationError(
+                f"curated entry_ids collide with discovery entry_ids at merge: {sorted(collisions)}"
+            )
+        # A curated entry has no discoverable second mount to derive `room_service_state`
+        # from, but the manifest requires exactly ONE global `room_service_state` across all
+        # entries. So each curated entry adopts the single global source fact derived from the
+        # discovery entries (their profile_id already encodes the same `room_service_wired`
+        # state). This keeps the single-global invariant true and gives render_frontend the
+        # field it reads. Deriving it from discovery (not the declaration) means a curated
+        # entry can never introduce a second global service state.
+        global_room_service_states = {
+            entry["scenario_profile"]["room_service_state"] for entry in entries
+        }
+        if len(global_room_service_states) != 1:
+            raise ManifestGenerationError(
+                "cannot stamp curated entries: discovery room_service_state is not a single "
+                f"global fact, got {sorted(global_room_service_states)}"
+            )
+        global_room_service_state = next(iter(global_room_service_states))
+        for entry in curated_entries:
+            entry["scenario_profile"]["room_service_state"] = global_room_service_state
+        entries.extend(curated_entries)
+
     by_id = {entry["entry_id"]: entry for entry in entries}
     for entry in entries:
         parent_id = entry["parent_entry_id"]
@@ -526,10 +794,21 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         "room_service_state": sorted(room_service_states)[0],
         "by_component": discovery["stats"]["byComponent"],
     }
+    # Requirement 3.3 / design §3.4: expose how many curated entries were emitted. Curated
+    # entries already count toward entry_count / independent_entry_count / capability_counts /
+    # editability / room_model / scenario_profile counts above because they are in `entries`.
+    # But `curated_entry_count` is ONLY added when non-zero: including it as 0 would change the
+    # pre-facility baseline bytes and violate the Requirement 1.3 "byte-identical to current
+    # output" invariant (same omit-when-zero treatment as curated_source_digest).
+    if curated_entries:
+        stats["curated_entry_count"] = len(curated_entries)
     manifest: dict[str, Any] = {
         "schema_version": 1,
         "source_digest": discovery["sourceDigest"],
-        "overlay_digest": _sha256_bytes(_stable_json(overlay).encode("utf-8")),
+        # `_overlay_digest` normalizes an empty/absent `curated_entries` out of the overlay so
+        # `[]` and absent both hash to the pre-facility overlay bytes (Requirement 1.3 byte-
+        # identity). A non-empty curated list stays in and is also locked via curated_source_digest.
+        "overlay_digest": _overlay_digest(overlay),
         # Requirement 1.2 / design: the source-backed profile fields AND their provenance
         # digest both participate in `manifest_digest`. `source_digest` stays the reviewed
         # mount inventory digest so the overlay's `approved_source_digest` gate is untouched.
@@ -537,6 +816,13 @@ def build_manifest(discovery: dict[str, Any], overlay: dict[str, Any]) -> dict[s
         "stats": stats,
         "entries": sorted(entries, key=lambda item: item["entry_id"]),
     }
+    # Requirement 3.1: the reviewed curated declarations participate in `manifest_digest`.
+    # Requirement 1.3 / design §3.4: the key is ONLY added when curated is non-empty, so the
+    # empty/absent case stays byte-identical to the pre-facility manifest.
+    if curated_entries:
+        manifest["curated_source_digest"] = _curated_source_digest(
+            overlay.get("curated_entries") or []
+        )
     manifest["manifest_digest"] = _sha256_bytes(_stable_json(manifest).encode("utf-8"))
     return manifest
 
@@ -556,6 +842,39 @@ def _declared_expectations(overlay: dict[str, Any]) -> dict[str, dict[str, list[
     if any(merged.values()):
         declared["unreachable_rules"] = merged
     return declared
+
+
+def _curated_source_digest(curated: list[dict[str, Any]]) -> str:
+    """sha256 over the stable-JSON of the sorted reviewed curated declarations.
+
+    Locks the reviewed curated section into `manifest_digest` (Requirement 3.1): adding,
+    removing, or editing a declaration changes this digest deterministically (Property 4).
+    Sorting by `entry_id` makes the digest order-independent so a pure reorder of the
+    overlay array does not spuriously churn the manifest. The empty case is handled by the
+    caller (the key is omitted when `curated` is empty) so byte-identity holds (Requirement
+    1.3); this function is only ever called with a non-empty list.
+    """
+    payload = sorted(curated, key=lambda item: item.get("entry_id") or "")
+    return _sha256_bytes(_stable_json(payload).encode("utf-8"))
+
+
+def _overlay_digest(overlay: dict[str, Any]) -> str:
+    """`overlay_digest` over the overlay with an empty/absent `curated_entries` normalized out.
+
+    `overlay_digest` covers the whole reviewed overlay so drift in any reviewed field is
+    detected. But the curated facility is additive: an empty (or absent) `curated_entries`
+    MUST leave the manifest byte-identical to the pre-facility output (Requirement 1.3 /
+    Property 1). Since `overlay_digest` feeds `manifest_digest`, a literal `curated_entries: []`
+    would otherwise change the digest and break byte-identity. So we drop an empty curated
+    list before hashing: absent and `[]` both hash to the exact pre-facility overlay bytes.
+    A non-empty curated list stays in the overlay bytes AND is separately locked via
+    `curated_source_digest`, so real declarations still participate in the digest.
+    """
+    curated = overlay.get("curated_entries")
+    if curated:
+        return _sha256_bytes(_stable_json(overlay).encode("utf-8"))
+    normalized = {key: value for key, value in overlay.items() if key != "curated_entries"}
+    return _sha256_bytes(_stable_json(normalized).encode("utf-8"))
 
 
 def _profile_source_digest(entries: list[dict[str, Any]]) -> str:

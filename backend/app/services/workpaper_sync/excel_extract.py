@@ -198,6 +198,7 @@ __all__ = [
     "RuntimeIdentityInventory",
     "read_runtime_identity_inventory",
     "read_runtime_binding_pairs",
+    "binding_key",
     "assert_identity_carriers_usable",
     "assert_identity_inventory_retained",
     "RETENTION_CHECKED_FIELDS",
@@ -589,6 +590,16 @@ class ExcelIdentityBinding:
     uuid_column: str
     #: 受管表在契约里的 `table_key`。绑定与契约表一一对应。
     table_key: str
+    #: 🔴 多受管区 region_key（= instrumentation 的 `template_id`，如 `D49C`/`D49P`）。
+    #:
+    #: 默认空串 = 单受管区，行为与本 spec 之前**逐字不变**：引擎读 `_GT_SYNC` 时用未加
+    #: 后缀的裸键 `GT_FOOTER_ROW` / `GT_MANAGED_TABLE` / `GT_ROW_UUID_COLUMN`。
+    #:
+    #: 非空 = 同 sheet 内多受管区（d4-9 本期/上期）。引擎按 `f"{KEY}__{region_key}"` 先取
+    #: per-region 键，**缺失时回退**未加后缀的裸键（既有单区注入产物没有后缀键，回退保证
+    #: 兼容）。region_key 用每区唯一的 template_id 而非 entry_id —— d4-9 两区共享一个
+    #: entry_id，用 entry_id 作 region_key 无法区分两区。
+    region_key: str = ""
     metadata_sheet: str = GT_SYNC_SHEET_NAME
     defined_name_prefix: str = "GT_"
     #: 该 entry 已 tombstone 的 row identity 清册（Requirement 6.15：不得复用）。
@@ -775,18 +786,37 @@ def managed_tables_of(
             f"binding.table_key={binding.table_key!r} 指向的契约表没有 row_identity —— "
             "Excel Table 锚点只用于定界动态行区域"
         )
+
+    # 🔴 多受管区（binding.region_key 非空）：同 sheet 上有 ≥2 张动态行表**是预期**，
+    #    每张各有自己的 binding（各自的 Table 锚点 + UUID 列 + region_key）。此时
+    #    「第二张动态表」不 fail closed —— 它属于**别的区**，本区的 extract/materialize
+    #    只碰自己那张。静态表（如 customer_totals 表级标量）只挂到**第一张动态表**所在的
+    #    那个区（按契约表顺序），避免两趟都写它造成重复落盘（design §D4-9 orchestration：
+    #    totals 在 current 区那趟写）。
+    #
+    #    region_key 为空（单受管区）时逐字不变：第二张动态表仍 fail closed。
+    region_scoped = bool(binding.region_key)
+    first_dynamic_key = next(
+        (t.table_key for t in sheet.tables if t.has_dynamic_rows), dynamic.table_key
+    )
+    owns_statics = (not region_scoped) or (dynamic.table_key == first_dynamic_key)
+
     statics: list[TableSpec] = []
     for table in sheet.tables:
         if table.table_key == dynamic.table_key:
             continue
         if table.has_dynamic_rows:
+            if region_scoped:
+                # 别的区的动态表：跳过（各区自带 binding，不在本趟处理）。
+                continue
             raise ManagedRegionResolutionError(
                 f"契约 {contract.contract_id} 的 sheet {sheet.sheet_key!r} 上还有第二张动态行表 "
                 f"{table.table_key!r}，但 identity binding 只声明了一组 Table/UUID 列 —— "
                 "沿用同一组会把它的行读到 "
                 f"{dynamic.table_key!r} 的 identity 上"
             )
-        statics.append(table)
+        if owns_statics:
+            statics.append(table)
     others = [
         t.table_key
         for s in contract.sheets
@@ -1317,6 +1347,31 @@ def read_runtime_binding_pairs(
             " —— 载体形态与 Task 17 写侧不符，不得当成「这份文件没有冻结任何绑定」继续"
         )
     return pairs
+
+
+def binding_key(
+    runtime_binding: Mapping[str, str], base_key: str, *, region_key: str = ""
+) -> str | None:
+    """按 region_key 从 runtime binding 取 `_GT_SYNC` 值（多受管区 region-scoped 解析）。
+
+    单一真源：所有消费方（materialize 的 footer 门、extract 的 region 解析）都经本函数
+    取带 region 语义的 `_GT_SYNC` 键，不在各处手写 `f"{k}__{r}"`（手写两遍就会漂移）。
+
+    * `region_key` 空 → 返回未加后缀的裸键 `runtime_binding.get(base_key)`
+      （单区路径，与本 spec 之前逐字不变）；
+    * `region_key` 非空 → **先**取 `f"{base_key}__{region_key}"`，**缺失时回退**裸键。
+      回退是刻意的：既有单区注入产物（358 个工作簿）没有后缀键，多区引擎读它们时应能
+      落到裸键上而不是 fail closed。
+
+    刻意**返回 `None` 而非抛异常**：fail-closed 语义由各调用方自己决定（footer 门抛
+    `FooterAnchorDriftError`，region 解析抛 `IdentityCarrierMissingError`），本函数只做
+    「region-scoped 键 → 值」的纯查表，不替调用方决定缺失时的错误类型。
+    """
+    if region_key:
+        suffixed = runtime_binding.get(f"{base_key}__{region_key}")
+        if suffixed is not None:
+            return suffixed
+    return runtime_binding.get(base_key)
 
 
 def _xml_unescape(text: str) -> str:

@@ -247,6 +247,32 @@
       "wp_codes": [
         "D5"
       ]
+    },
+    {
+      "basis": {
+        "heuristic_is_wrong_because": "manifest 从宿主 Vue 文件名 CamelCase 抽出的 D4O 在 wp_index 里 0 命中（GtD4OperatingRevenue → D4O 是幻影码）",
+        "heuristic_would_say": [
+          "D4O"
+        ],
+        "managed_excel_name": "主营业务收入明细表D4-2",
+        "template_relative_path": "D/D4收入底稿.xlsx",
+        "wp_index_evidence": "wp_code=D4「营业收入」多项目有载荷且未删除。store item D4-2-rows 真库实测 2 行 1739 B 落 wp_code=D4。以载荷落点定 D4（D4O 是 CamelCase 幻影码 finder 零命中；D4-2 名义码无载荷）"
+      },
+      "contract_id": "d4.revenue_detail",
+      "entry_id": "xlsx/gt-d4-operating-revenue",
+      "matcher_domain_conflict": null,
+      "resolvable_for_provisioning": true,
+      "store_payload_evidence": {
+        "max_payload_bytes": 1739,
+        "measured_at": "2026-09-12",
+        "store_item_id": "D4-2-rows",
+        "why_null": null,
+        "wp_code_with_payload": "D4",
+        "wp_count_with_payload": 1
+      },
+      "wp_codes": [
+        "D4"
+      ]
     }
   ],
   "basis_rule": "真源 = 契约里**冻结**的 `template.relative_path`（其文件名前缀即 wp_code）+ 受管 sheet 的 `excel_name`（它是该工作簿里的一个 tab，不是独立底稿）。这两个字段都进了 contract definition 的 sha256，改不了；比「文件名 CamelCase 反推」可靠得多。",

@@ -164,6 +164,8 @@ __all__ = [
     "build_instrumentation_payload",
     "build_template_payload",
     "instrument_workbook_bytes",
+    "instrument_workbook_bytes_multi",
+    "InstrumentedWorkbookMulti",
     "verify_visible_equivalence",
     "read_back_identity",
     "normalized_structure_hash",
@@ -1017,7 +1019,7 @@ def _hide_uuid_column(sheet_xml: str, *, uuid_col: str) -> str:
     return _insert_before(sheet_xml, "<sheetData", f"<cols>{col}</cols>", what="cols block")
 
 
-def _attach_table_part(sheet_xml: str) -> str:
+def _attach_table_part(sheet_xml: str, *, rel_id: str = _GT_TABLE_REL_ID) -> str:
     # 🔴 Task 42 修：`<tablePart>` 用 `r:id`，而**有些工作簿的 `<worksheet>` 根元素并不
     #    声明 `xmlns:r`**（实测 `H1 固定资产.xlsx` 的 26 张 sheet 全是这种：根元素只有
     #    默认命名空间，`r:` 声明写在需要它的子元素上）。原实现无条件不带声明，对这类
@@ -1025,13 +1027,29 @@ def _attach_table_part(sheet_xml: str) -> str:
     #    `unbound prefix`，`identity_inventory` / `structure_fingerprint` 全线不可用。
     #    与 `<sheet>` 侧同一处置：只在根元素**确实没有**声明时才补，避免改动另外 358 个
     #    工作簿的注入字节（那会改掉 Task 40/41 已冻结的 structure hash）。
+    #
+    # 🔴 d4-9 同 sheet 双区修：`<worksheet>` 只允许**一个** `<tableParts>` 块（OOXML
+    #    schema：`tableParts` 是 `CT_Worksheet` 的单一元素）。同一张 sheet 注入第二个受管
+    #    区时，若无条件新建第二个块，产出的字节含两个 `<tableParts>` ⇒ 非法 OOXML，
+    #    openpyxl 只认出最后一张 Table，第一区 identity 丢失（假双向）。因此：sheet 里已有
+    #    `<tableParts>` 时，往块内**追加** `<tablePart>` 并把 count 加一；不存在时才走原来
+    #    的「新建块」路径 —— 单区注入（既有 358 个工作簿）走后者，字节完全不变。
+    part = f'<tablePart r:id="{rel_id}"/>'
+    existing = re.search(r'<tableParts\b[^>]*\bcount="(\d+)"[^>]*>', sheet_xml)
+    if existing is not None:
+        count = int(existing.group(1)) + 1
+        updated_open = re.sub(r'\bcount="\d+"', f'count="{count}"', existing.group(0), count=1)
+        insert_at = existing.end()
+        return (
+            sheet_xml[: existing.start()]
+            + updated_open
+            + part
+            + sheet_xml[insert_at:]
+        )
     root_end = sheet_xml.find(">", sheet_xml.find("<worksheet"))
     root_tag = sheet_xml[: root_end + 1] if root_end > 0 else sheet_xml
     rel_ns_decl = "" if 'xmlns:r="' in root_tag else f' xmlns:r="{_REL_NS}"'
-    block = (
-        f'<tableParts{rel_ns_decl} count="1">'
-        f'<tablePart r:id="{_GT_TABLE_REL_ID}"/></tableParts>'
-    )
+    block = f'<tableParts{rel_ns_decl} count="1">{part}</tableParts>'
     for tail in _SHEET_TAIL_ORDER:
         idx = sheet_xml.find(f"<{tail}")
         if idx >= 0:
@@ -1270,6 +1288,336 @@ def instrument_workbook_bytes(
         gt_sync_pairs=pair_map,
         defined_name_refs=refs,
         table_ref=spec.table_ref,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 5b. 同 sheet 多受管区注入（d4-9：本期 + 上期两个动态行区在同一张 sheet）
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class InstrumentedWorkbookMulti:
+    """同 sheet 多受管区一次注入的产物 + 自证材料（每区一份 identity 材料）。"""
+
+    source_sha256: str
+    instrumented_bytes: bytes
+    instrumented_sha256: str
+    managed_sheet_name_at_instrumentation: str
+    managed_sheet_id_at_instrumentation: str
+    gt_sync_pairs: Mapping[str, str]
+    #: `{template_id: {row_no: uuid}}`（每区一份；template_id 每区唯一，entry_id 可共享）。
+    row_uuids_by_region: Mapping[str, Mapping[int, str]]
+    #: `{template_id: table_ref}`（每区一份）。
+    table_refs_by_region: Mapping[str, str]
+    defined_name_refs: Mapping[str, str]
+
+
+def instrument_workbook_bytes_multi(
+    source: bytes,
+    specs: Sequence[ExcelInstrumentationSpec],
+    *,
+    gate: ExcelIdentityCarrierGate,
+) -> InstrumentedWorkbookMulti:
+    """把 **多个受管区** identity 载体注入同一 workbook 副本字节。
+
+    与 :func:`instrument_workbook_bytes` 的关系：单区注入走单区函数（既有 358 个工作簿
+    字节不变）；本函数专供**同一张 sheet 内有多个受管动态行区**的模板（d4-9 本期/上期）。
+
+    硬约束（每条都有可执行判据，不是靠注释）：
+
+    1. 所有 spec 必须指向**同一个** ``managed_sheet``（否则应各自走单区函数分别注入不同
+       sheet，如 D4-2/3）；不同 sheet 混入本函数 fail closed。
+    2. 各区**行段不得重叠**、**UUID 列两两不同**（同列会互相覆盖 UUID）、``table_name``
+       两两不同（OOXML displayName 全局唯一）。
+    3. 共享 ``_GT_SYNC`` 只写一次；per-region 元数据键带 ``__{template_id}`` 后缀区分
+       （d4-9 两区共享 entry_id，故 region_key 用每区唯一的 template_id）。
+    4. Table 部件 per-region（``xl/tables/tableGtRowId{N}.xml`` + rel ``rIdGTTBL{N}``），
+       经修好的 :func:`_attach_table_part` 合并进**同一个** ``<tableParts>`` 块。
+    """
+    if not specs:
+        raise InstrumentationError("instrument_workbook_bytes_multi 至少需要一个 spec")
+    if len(specs) == 1:
+        # 单区退化：语义上等价于单区函数，但仍走本函数以保持多区结果形态一致。
+        pass
+
+    for carrier in ("hidden_sheet", "defined_name", "excel_table", "hidden_uuid_column"):
+        gate.assert_carrier_allowed(carrier)
+
+    managed_sheet = specs[0].managed_sheet
+    for spec in specs:
+        if spec.managed_sheet != managed_sheet:
+            raise InstrumentationError(
+                f"instrument_workbook_bytes_multi 的所有 spec 必须指向同一 sheet，"
+                f"但见到 {managed_sheet!r} 与 {spec.managed_sheet!r} —— 不同 sheet 应各自走单区注入"
+            )
+    # 行段重叠 / UUID 列冲突 / table 名冲突（结构性 fail closed）。
+    seen_cols: dict[str, str] = {}
+    seen_tables: dict[str, str] = {}
+    ordered = sorted(specs, key=lambda s: s.first_data_row)
+    for idx, spec in enumerate(ordered):
+        if spec.uuid_col in seen_cols:
+            raise InstrumentationError(
+                f"受管区 {spec.entry_id} 与 {seen_cols[spec.uuid_col]} 共用 UUID 列 "
+                f"{spec.uuid_col} —— 同列会互相覆盖行身份"
+            )
+        seen_cols[spec.uuid_col] = spec.entry_id
+        if spec.table_name in seen_tables:
+            raise InstrumentationError(
+                f"受管区 {spec.entry_id} 与 {seen_tables[spec.table_name]} 的 Table "
+                f"displayName 同为 {spec.table_name!r} —— OOXML 要求全局唯一"
+            )
+        seen_tables[spec.table_name] = spec.entry_id
+        if idx > 0:
+            prev = ordered[idx - 1]
+            if spec.first_data_row <= prev.last_data_row:
+                raise InstrumentationError(
+                    f"受管区 {prev.entry_id}(R{prev.first_data_row}-{prev.last_data_row}) 与 "
+                    f"{spec.entry_id}(R{spec.first_data_row}-{spec.last_data_row}) 行段重叠"
+                )
+
+    template_sha = _sha256_bytes(source)
+    try:
+        with zipfile.ZipFile(io.BytesIO(source)) as zf:
+            entries: dict[str, bytes] = {name: zf.read(name) for name in zf.namelist()}
+    except zipfile.BadZipFile as exc:
+        raise InstrumentationError(f"源 artifact 不是合法 xlsx zip: {exc}") from exc
+
+    for required in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels", "[Content_Types].xml"):
+        if required not in entries:
+            raise InstrumentationError(f"源 artifact 缺 OOXML 必需部件: {required}")
+    if _GT_SYNC_SHEET_PART in entries:
+        raise InstrumentationError(
+            "源 artifact 已含 instrumentation 部件 —— 重复注入会产生第二套 identity"
+        )
+
+    workbook_xml = entries["xl/workbook.xml"].decode("utf-8")
+    wb_rels_xml = entries["xl/_rels/workbook.xml.rels"].decode("utf-8")
+    content_types = entries["[Content_Types].xml"].decode("utf-8")
+
+    managed_sheet_id = _sheet_id_for(workbook_xml, managed_sheet)
+    target_part = _sheet_part_for(workbook_xml, wb_rels_xml, managed_sheet)
+    if target_part not in entries:
+        raise InstrumentationError(f"目标 sheet 部件不存在: {target_part}")
+
+    # 排版占位行门（逐区，同单区路径）。
+    sheet_bytes = entries[target_part].decode("utf-8", "replace")
+    shared_strings = _typography.read_shared_strings_from_entries(entries)
+    for spec in ordered:
+        _where = f"entry {spec.entry_id} / sheet {spec.managed_sheet!r}"
+        try:
+            _typography.assert_last_data_row_is_not_typography_placeholder(
+                sheet_xml=sheet_bytes,
+                shared=shared_strings,
+                label_column=_typography.MANAGED_LABEL_COLUMN,
+                first_data_row=spec.first_data_row,
+                last_data_row=spec.last_data_row,
+                where=_where,
+            )
+        except _typography.TypographyRowError as exc:
+            raise InstrumentationError(str(exc)) from exc
+
+    # ── 载体 1：共享 hidden `_GT_SYNC`（只写一次，per-region 键带后缀）──────
+    pairs: list[tuple[str, str]] = [
+        ("GT_SYNC_SCHEMA_VERSION", "1"),
+        ("GT_IDENTITY_SCHEMA_VERSION", IDENTITY_SCHEMA_VERSION),
+        ("GT_INSTRUMENTATION_VERSION", INSTRUMENTATION_VERSION),
+        ("GT_TEMPLATE_ID", ordered[0].template_id),
+        ("GT_TEMPLATE_SHA256", template_sha),
+        ("GT_MANAGED_SHEET_ID", managed_sheet_id),
+        ("GT_MANAGED_SHEET_NAME_AT_INSTRUMENTATION", managed_sheet),
+        ("GT_MANAGED_REGION_COUNT", str(len(ordered))),
+        # 必备键 `GT_ROW_UUID_COLUMN`（REQUIRED_GT_SYNC_KEYS）取第一区作 sheet 级默认；
+        # 各区完整信息见带 __{template_id} 后缀的键。
+        ("GT_ROW_UUID_COLUMN", ordered[0].uuid_col),
+    ]
+    # 🔴 per-region 键的后缀是 **template_id** 而不是 entry_id。d4-9 的两区
+    #    （本期/上期）**共享同一个 entry_id**（`xlsx/gt-d4-customer-structure`），
+    #    用 entry_id 作后缀会让两区的 `GT_FOOTER_ROW__{entry}` 等键互相覆盖 ——
+    #    第一区元数据被第二区整片盖掉，materialize/extract 消费到的只有最后一区。
+    #    template_id 每区唯一（D49C / D49P），是稳定的 region_key，引擎侧
+    #    `ExcelIdentityBinding.region_key` 按它拼 `f"{KEY}__{region_key}"` 消费。
+    seen_region_keys: dict[str, str] = {}
+    for spec in ordered:
+        if spec.template_id in seen_region_keys:
+            raise InstrumentationError(
+                f"受管区 {spec.entry_id} 与 {seen_region_keys[spec.template_id]} 的 "
+                f"template_id 同为 {spec.template_id!r} —— 多区 _GT_SYNC 后缀用 template_id "
+                "作 region_key，重复会让两区元数据互相覆盖"
+            )
+        seen_region_keys[spec.template_id] = spec.entry_id
+        sfx = f"__{spec.template_id}"
+        pairs.extend(
+            [
+                (f"GT_ENTRY_ID{sfx}", spec.entry_id),
+                (f"GT_ROW_UUID_COLUMN{sfx}", spec.uuid_col),
+                (f"GT_ROW_UUID_FIRST_ROW{sfx}", str(spec.first_data_row)),
+                (f"GT_ROW_UUID_LAST_ROW{sfx}", str(spec.last_data_row)),
+                (f"GT_MANAGED_TABLE{sfx}", spec.table_name),
+                (f"GT_MANAGED_TABLE_REF{sfx}", spec.table_ref),
+                (f"GT_MANAGED_RANGE{sfx}", spec.managed_range),
+                (f"GT_FOOTER_ROW{sfx}", str(spec.footer_row)),
+            ]
+        )
+    pair_map = dict(pairs)
+    missing_required = [k for k in REQUIRED_GT_SYNC_KEYS if k not in pair_map]
+    if missing_required:
+        raise InstrumentationError(
+            f"`_GT_SYNC` 缺 Task 5 契约声明的必备键 {missing_required} —— "
+            "多区注入的必备键取第一区（sheet 级键共享，行级键带 __template_id 后缀）"
+        )
+    assert_no_runtime_binding(pair_map)
+    entries[_GT_SYNC_SHEET_PART] = _gt_sync_sheet_xml(pairs)
+
+    existing_ids = [int(m) for m in re.findall(r'<sheet [^>]*sheetId="(\d+)"', workbook_xml)]
+    _root_end = workbook_xml.find(">", workbook_xml.find("<workbook"))
+    _root_tag = workbook_xml[: _root_end + 1] if _root_end > 0 else workbook_xml
+    _rel_ns_decl = "" if 'xmlns:r="' in _root_tag else f' xmlns:r="{_REL_NS}"'
+    workbook_xml = _insert_before(
+        workbook_xml,
+        "</sheets>",
+        f"<sheet{_rel_ns_decl} name=\"{GT_SYNC_SHEET_NAME}\" "
+        f'sheetId="{(max(existing_ids) + 1) if existing_ids else 1}" '
+        f'state="hidden" r:id="{_GT_SYNC_REL_ID}"/>',
+        what="hidden _GT_SYNC sheet 声明",
+    )
+    wb_rels_xml = _insert_before(
+        wb_rels_xml,
+        "</Relationships>",
+        f'<Relationship Id="{_GT_SYNC_REL_ID}" Type="{_REL_NS}/worksheet" '
+        'Target="worksheets/sheetGtSync.xml"/>',
+        what="_GT_SYNC 关系",
+    )
+    content_types = _insert_before(
+        content_types,
+        "</Types>",
+        f'<Override PartName="/{_GT_SYNC_SHEET_PART}" ContentType="application/'
+        'vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>',
+        what="_GT_SYNC content type",
+    )
+
+    # ── 载体 2：defined names（per-region；名字已带 template_id 后缀，无冲突）──
+    quoted = (
+        f"'{managed_sheet}'"
+        if re.search(r"[\s\-()（）]", managed_sheet)
+        else managed_sheet
+    )
+    sheet_order = re.findall(r'<sheet [^>]*name="([^"]+)"', workbook_xml)
+    local_sheet_id = sheet_order.index(_xml_escape(managed_sheet))
+    refs: dict[str, str] = {}
+    nodes: list[str] = []
+    for spec in ordered:
+        for name, ref_tpl, sheet_local in spec.defined_names():
+            ref = ref_tpl.format(
+                sheet=quoted,
+                first=spec.first_data_row,
+                last=spec.last_data_row,
+                last_col=spec.managed_last_col,
+                footer=spec.footer_row,
+                uuid_col=spec.uuid_col,
+            )
+            if name in refs:
+                raise InstrumentationError(
+                    f"defined name {name!r} 在多区注入中重复 —— 各区 template_id 必须不同"
+                )
+            refs[name] = ref
+            scope = f' localSheetId="{local_sheet_id}"' if sheet_local else ""
+            nodes.append(f'<definedName name="{name}"{scope}>{_xml_escape(ref)}</definedName>')
+    joined = "".join(nodes)
+    if "<definedNames>" in workbook_xml:
+        workbook_xml = _insert_before(workbook_xml, "</definedNames>", joined, what="defined names")
+    else:
+        workbook_xml = workbook_xml.replace(
+            "</sheets>", f"</sheets><definedNames>{joined}</definedNames>", 1
+        )
+
+    # ── 载体 3/4：per-region Excel Table + 隐藏 UUID 列 ────────────────
+    sheet_xml = entries[target_part].decode("utf-8")
+    rels_part = f"{target_part.rsplit('/', 1)[0]}/_rels/{target_part.rsplit('/', 1)[1]}.rels"
+    rel_nodes: list[str] = []
+    table_ids = [
+        int(m)
+        for name, blob in entries.items()
+        if name.startswith("xl/tables/")
+        for m in re.findall(r'<table [^>]*\bid="(\d+)"', blob.decode("utf-8", "replace"))
+    ]
+    next_table_id = (max(table_ids) + 1) if table_ids else 1
+    row_uuids_by_region: dict[str, dict[int, str]] = {}
+    table_refs: dict[str, str] = {}
+
+    for region_idx, spec in enumerate(ordered, start=1):
+        uuids = {
+            row: spec.row_uuid(row)
+            for row in range(spec.first_data_row, spec.last_data_row + 1)
+        }
+        row_uuids_by_region[spec.template_id] = uuids
+        table_refs[spec.template_id] = spec.table_ref
+        sheet_xml = _add_uuid_cells(sheet_xml, uuid_col=spec.uuid_col, uuids=uuids)
+        sheet_xml = _hide_uuid_column(sheet_xml, uuid_col=spec.uuid_col)
+
+        table_part = f"xl/tables/tableGtRowId{region_idx}.xml"
+        table_rel_id = f"{_GT_TABLE_REL_ID}{region_idx}"
+        entries[table_part] = _table_xml(
+            table_id=next_table_id,
+            name=spec.table_name,
+            ref=spec.table_ref,
+            column_count=_col_index(spec.uuid_col),
+        )
+        next_table_id += 1
+        sheet_xml = _attach_table_part(sheet_xml, rel_id=table_rel_id)
+        rel_nodes.append(
+            f'<Relationship Id="{table_rel_id}" Type="{_REL_NS}/table" '
+            f'Target="../tables/tableGtRowId{region_idx}.xml"/>'
+        )
+        content_types = _insert_before(
+            content_types,
+            "</Types>",
+            f'<Override PartName="/{table_part}" ContentType="application/'
+            'vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>',
+            what="table content type",
+        )
+
+    # dimension 扩到最右侧 UUID 列。
+    max_uuid_col = max(ordered, key=lambda s: _col_index(s.uuid_col)).uuid_col
+    dim = re.search(r'<dimension ref="([A-Z]+\d+):([A-Z]+)(\d+)"/>', sheet_xml)
+    if dim and _col_index(dim.group(2)) < _col_index(max_uuid_col):
+        sheet_xml = sheet_xml.replace(
+            dim.group(0), f'<dimension ref="{dim.group(1)}:{max_uuid_col}{dim.group(3)}"/>', 1
+        )
+
+    joined_rels = "".join(rel_nodes)
+    if rels_part in entries:
+        entries[rels_part] = _insert_before(
+            entries[rels_part].decode("utf-8"), "</Relationships>", joined_rels, what="table 关系"
+        ).encode("utf-8")
+    else:
+        entries[rels_part] = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f"{joined_rels}</Relationships>"
+        ).encode("utf-8")
+
+    entries[target_part] = sheet_xml.encode("utf-8")
+    entries["xl/workbook.xml"] = workbook_xml.encode("utf-8")
+    entries["xl/_rels/workbook.xml.rels"] = wb_rels_xml.encode("utf-8")
+    entries["[Content_Types].xml"] = content_types.encode("utf-8")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as out:
+        for name in entries:
+            out.writestr(name, entries[name])
+    result = buf.getvalue()
+
+    return InstrumentedWorkbookMulti(
+        source_sha256=template_sha,
+        instrumented_bytes=result,
+        instrumented_sha256=_sha256_bytes(result),
+        managed_sheet_name_at_instrumentation=managed_sheet,
+        managed_sheet_id_at_instrumentation=managed_sheet_id,
+        gt_sync_pairs=pair_map,
+        row_uuids_by_region=row_uuids_by_region,
+        table_refs_by_region=table_refs,
+        defined_name_refs=refs,
     )
 
 

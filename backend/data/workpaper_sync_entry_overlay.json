@@ -5,6 +5,45 @@
   "review_basis": "2026-09-06 mount diff 复核：宿主拓扑未变（185=185，added/removed 均为空、mountCount 276 不变、byComponent 分布不变）。44 个宿主的 mountId / sourceSpan / templateNodeOrdinal 整体位移一行（如 GtG14 的 24→25、templateNodeOrdinal +1），根因是各宿主工具栏新增 GtEntrySyncCapabilityNotice 一行；htmlRendererRegistry.ts 的 word-template registry_ast 挂载由 line 297 移至 568（grep 实证仍在）。语义多重集比对（排除三个位置字段后）差异恰 1 条且仅在旧侧，正是那条行号漂移的 registry_ast —— 无挂载点新增/删除/属性语义变更，故更新 digest。前一版基线：2026-08-24 full production mount inventory（43 parent duplicates + G6 unreachable legacy stub）",
   "entry_id_strategy": "document_type_plus_semantic_source_path_v1",
   "wp_match_strategy": "source_sheet_literals_and_component_code_v1",
+  "curated_entries": [
+    {
+      "entry_id": "xlsx/gt-d4-customer-structure",
+      "host_path": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
+      "curated_reason": "one dynamic GtOnlyOfficeSheet host (GtD4OperatingRevenue.vue) backs D4-1/2/3/9; discovery derives exactly one entry per host, so D4-9 (重要客户结构分析D4-9) needs its own curated entry to carry its delivered contract+adapter (spec d4-9-customer-structure-bidirectional-writeback)",
+      "document_type": "xlsx",
+      "wp_match": {
+        "wp_code_patterns": ["D4-9"],
+        "component_types": [],
+        "sheet_literals": ["重要客户结构分析D4-9"],
+        "sheet_expressions": [],
+        "source_host": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
+      },
+      "html_store": "D4-9-data",
+      "canonical_resolver": "d4_customer_structure_projection",
+      "adapter_id": "d4.customer_structure",
+      "capability": "bidirectional",
+      "migration_state": "curated_bidirectional",
+      "expected_profile": {
+        "editability": ["editable"],
+        "room_model": ["shared"],
+        "scenario_profile_ids": [
+          "xlsx.editable.shared.single.room_service_wired.v1"
+        ],
+        "review_note": "curated 声明的 declared-vs-reviewed 两向锁：D4-9 与同宿主 D4-2/3 共用 GtOnlyOfficeSheet（editable/shared），profile 显式声明且必须落在本 expected 集内，任一不符 fail closed —— 与 discovery entry 的 derived-vs-reviewed 同一把锁（design §2.2）"
+      },
+      "profile": {
+        "editability": "editable",
+        "room_model": "shared",
+        "scenario_profile_id": "xlsx.editable.shared.single.room_service_wired.v1"
+      },
+      "evidence": {
+        "review_status": "curated_reviewed",
+        "contract_test": "backend/tests/workpaper_sync/test_d4_9_task3_contract.py",
+        "browser_case": null,
+        "legacy_reasons": []
+      }
+    }
+  ],
   "defaults_by_component": {
     "GtOnlyOfficeSheet": {
       "html_store": "unresolved",
@@ -206,6 +245,19 @@
       "html_store": "checklist_responses_g7_soe_disclosure_rows",
       "canonical_resolver": "workpaper_sync_published_representation",
       "adapter_id": "g7.soe_subsidiary_disclosure",
+      "capability": "bidirectional",
+      "migration_state": "adapter_registered",
+      "evidence_patch": {
+        "review_status": "published_representation_verified",
+        "legacy_reasons": []
+      }
+    },
+    {
+      "file_glob": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
+      "component": "GtOnlyOfficeSheet",
+      "html_store": "checklist_responses_d4_revenue_detail_rows",
+      "canonical_resolver": "workpaper_sync_published_representation",
+      "adapter_id": "d4.revenue_detail",
       "capability": "bidirectional",
       "migration_state": "adapter_registered",
       "evidence_patch": {
