@@ -104,16 +104,136 @@ def _load_index() -> list[dict]:
     return _index_cache
 
 
-def _code_prefix_boundary_ok(filename: str, wp_code: str) -> bool:
+def _wp_code_filename_prefix_ok(filename: str, wp_code: str) -> bool:
     """filename 以 wp_code 开头，且 wp_code 之后紧跟的不是数字。
 
     避免「E1-2」误命中「E1-26至E1-32...」（字符串前缀碰撞：E1-2 是 E1-26 的前缀）。
     仍允许 `-`/空白/「至」/中文/字母后缀（如 D2→D2-1至D2-4、A9→A9-1、E1→E1-14）。
+
+    同类真实碰撞（本函数的存在理由）::
+
+        D4-1  vs  "D4-12 营业收入-合同检查…"      → False（'2' 是数字）
+        D4-2  vs  "D4-21营业收入-关联方检查…"      → False
+        F2-2  vs  "F2-29至F2-35 …检查类…"          → False
+        F2-2  vs  "F2-21至F2-26 …盘点类…"          → False
+        D4-1  vs  "D4-1至D4-4 营业收入 - 审定表…"  → True （'至' 非数字）
     """
     if not filename.startswith(wp_code):
         return False
     rest = filename[len(wp_code):]
     return not rest[:1].isdigit()
+
+
+#: 旧名别名（2026-07 引入时叫 `_code_prefix_boundary_ok`）。保留以免模块外引用断裂。
+_code_prefix_boundary_ok = _wp_code_filename_prefix_ok
+
+
+#: 整册合并本文件名：`{编码}{中文短名}`，编码后**紧跟** CJK，无 `-子号`、无空格、无「至」。
+#: 现存两例：``D4收入底稿.xlsx`` / ``F2存货.xlsx``。
+#:
+#: 🔴 要求「紧跟 CJK」而不是「非数字」，是为了把 ``D4 收入底稿.xlsx``（编码后是空格）
+#: 排除在外 —— 同一目录下同时存在带空格与不带空格两份时，判据必须是确定的；
+#: 权威惯例是不带空格的那份（``D4收入底稿.xlsx`` 已入库，带空格那份是工作树新增）。
+_WHOLE_EXCEL_NAME_RE = re.compile(r"^[A-Z]+\d+[\u4e00-\u9fff]")
+
+
+def _is_whole_excel_template_name(name: str) -> bool:
+    """是否为「整册合并本」文件名（与范围式拆分包互斥）。
+
+    True ::
+
+        D4收入底稿.xlsx
+        F2存货.xlsx
+
+    False ::
+
+        D4-1至D4-4 营业收入 - 审定表明细表.xlsx      # 编码后是 '-'
+        F2-1至F2-14 存货实质性程序-审定表明细表类.xlsx # 同上
+        D4 收入底稿.xlsx                              # 编码后是空格
+    """
+    if not name:
+        return False
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return bool(_WHOLE_EXCEL_NAME_RE.match(stem))
+
+
+def find_whole_workbook_template(wp_code: str) -> Path | None:
+    """该 wp_code 的**整册合并本**（如 ``D4收入底稿.xlsx`` / ``F2存货.xlsx``）。
+
+    整册本**不在** ``_index.json`` 里（索引只收范围式拆分包），因此只能扫权威目录。
+    这也是它必须走独立入口的原因：普通链路（``find_template_file`` /
+    ``find_all_template_files``）全部以索引为准，天然不会返回整册本。
+
+    前缀用 :func:`_wp_code_filename_prefix_ok` 而非裸 ``startswith``，避免
+    ``D4`` 命中假想的 ``D40…``。
+    """
+    if not wp_code:
+        return None
+    subdir = TEMPLATES_DIR / wp_code[0]
+    if not subdir.exists():
+        return None
+    for f in sorted(subdir.iterdir()):
+        if f.suffix.lower() not in (".xlsx", ".xlsm"):
+            continue
+        if not _wp_code_filename_prefix_ok(f.name, wp_code):
+            continue
+        if _is_whole_excel_template_name(f.name):
+            return f
+    return None
+
+
+#: 主模板优先级阶梯（**按序**，前一级命中即不看后一级）。
+#:
+#: 🔴 「审定」必须**严格高于**「常规程序」，不能像原来那样 `or` 成同一级：
+#: 索引里 ``wp_code == "D4"`` 有 8 条拆分包，其中 ``D4-12 营业收入-合同检查
+#: （Leap-常规程序）.xlsx`` 排在 ``D4-1至D4-4 … 审定表明细表（Leap-常规程序）.xlsx``
+#: 之前，两者都含「常规程序」⇒ 同级下由**索引顺序**决定结果，D4 拿到了「合同检查」。
+#: F2 同理拿到了「会计政策」。
+#:
+#: 用「审定」而不是「审定表」：F2 的主表叫「审定**明细**表类」，不含连续三字「审定表」。
+_PRIMARY_TEMPLATE_TIERS: tuple[str, ...] = ("审定", "常规程序")
+
+
+def _pick_by_tier(names_to_paths: list[tuple[str, Path]]) -> Path | None:
+    """按 :data:`_PRIMARY_TEMPLATE_TIERS` 逐级挑选；同级内按 (名字长度, 名字) 定序。
+
+    同级内显式排序而不是「取遍历到的第一个」：后者让结果依赖索引/目录枚举顺序，
+    正是 D4/F2 错配的机制。
+    """
+    for tier in _PRIMARY_TEMPLATE_TIERS:
+        hits = [(n, p) for n, p in names_to_paths if tier in n]
+        if hits:
+            hits.sort(key=lambda item: (len(item[0]), item[0]))
+            return hits[0][1]
+    return None
+
+
+#: 实质性程序表码：``D4A`` / ``F2A`` / ``K3A`` 这类「主码 + **A**」编码。磁盘上没有自己的
+#: 模板文件，载体就是主码的主工作簿（程序表是主工作簿里的一个 sheet）。
+#:
+#: 🔴 后缀**只认 `A`**，不能放宽成任意字母。`H1F` / `G7L` / `G7E` 形状相同但语义完全不同：
+#: 它们是渲染宿主组件名（``GtH1FixedAssets`` / ``GtG7LongTermEquityMain``）被
+#: ``WP_CODE_EXTRACTION_PATTERN`` 机械抽出来的**产物**，不是真 wp_code。
+#: ``pilot_h1_grouped_dynamic`` / ``pilot_g7_two_level_dynamic`` 的选型门把
+#: 「这些码在 finder 上解析不到任何文件」当作可打红判据（零回退的最强形态是根本没有回退），
+#: 一旦它们能解析到东西，契约的 source_ref 就可能指向另一份底稿的单元格。
+_PROGRAM_TABLE_CODE_RE = re.compile(r"^([A-Z]+\d+)A$")
+
+#: 渲染 schema 目录：``{wp_code}.yaml`` 是该码的**配置真源**，自带 ``template_path``。
+_RENDER_SCHEMA_DIR = BACKEND_DIR / "data" / "ledger_adapters" / "wp_render_schema"
+
+
+def _has_own_render_schema(wp_code: str) -> bool:
+    """该码是否有独立 render schema（配置真源已指定模板 ⇒ finder 不得再猜）。
+
+    ``D2A`` / ``E1A`` / ``G7A`` 属于这一类：``D2A.yaml`` 明确声明了 ``template_path``，
+    平台渲染它时以该 YAML 为唯一真源。此时 finder 若还去回落主码工作簿，就多出一个
+    与配置并列的第二真源 —— ``pilot_d2_large_json`` 的选型门正是拿
+    「``find_template_file("D2A")`` 解析不到」来锁这件事。
+    """
+    if not wp_code:
+        return False
+    return (_RENDER_SCHEMA_DIR / f"{wp_code}.yaml").is_file()
 
 
 def find_template_file(wp_code: str) -> Path | None:
@@ -135,12 +255,15 @@ def find_template_file(wp_code: str) -> Path | None:
         if e["wp_code"] == wp_code and e["format"] in ("xlsx", "xlsm")
     ]
     if candidates:
-        # 优先选择含"审定表"或"常规程序"的文件
-        for c in candidates:
-            if "审定表" in c["filename"] or "常规程序" in c["filename"]:
-                full_path = TEMPLATES_DIR / c["relative_path"]
-                if full_path.exists():
-                    return full_path
+        # 优先级阶梯：审定 > 常规程序（见 _PRIMARY_TEMPLATE_TIERS 的理由）
+        existing = [
+            (e["filename"], TEMPLATES_DIR / e["relative_path"])
+            for e in candidates
+            if (TEMPLATES_DIR / e["relative_path"]).exists()
+        ]
+        tiered = _pick_by_tier(existing)
+        if tiered is not None:
+            return tiered
         # 其次选择文件名最短的
         candidates.sort(key=lambda e: len(e["filename"]))
         rel_path = candidates[0]["relative_path"]
@@ -152,14 +275,19 @@ def find_template_file(wp_code: str) -> Path | None:
     prefix = wp_code[0]
     template_subdir = TEMPLATES_DIR / prefix
     if template_subdir.exists():
-        # 优先含"审定表"（边界匹配：wp_code 后不得紧跟数字，避免 E1-2 命中 E1-26）
-        for f in sorted(template_subdir.iterdir()):
-            if _code_prefix_boundary_ok(f.name, wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
-                if "审定表" in f.name or "常规程序" in f.name:
-                    return f
+        # 同一优先级阶梯（边界匹配：wp_code 后不得紧跟数字，避免 E1-2 命中 E1-26）
+        on_disk = [
+            (f.name, f)
+            for f in sorted(template_subdir.iterdir())
+            if _wp_code_filename_prefix_ok(f.name, wp_code)
+            and f.suffix.lower() in (".xlsx", ".xlsm")
+        ]
+        tiered = _pick_by_tier(on_disk)
+        if tiered is not None:
+            return tiered
         # 其次最短文件名
         for f in sorted(template_subdir.iterdir(), key=lambda x: len(x.name)):
-            if _code_prefix_boundary_ok(f.name, wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
+            if _wp_code_filename_prefix_ok(f.name, wp_code) and f.suffix.lower() in (".xlsx", ".xlsm"):
                 return f
 
         # 子表回退：如 D2-2 找不到，尝试包含范围式命名的文件（D2-1至D2-4）
@@ -194,6 +322,23 @@ def find_template_file(wp_code: str) -> Path | None:
             for f in sorted(template_subdir.iterdir()):
                 if f.name.startswith(primary + " ") and f.suffix.lower() in (".xlsx", ".xlsm"):
                     return f
+
+    # ── 实质性程序表码回落（D4A / F2A / K3A …）──────────────────────────────
+    #
+    # 放在**所有**匹配之后，纯加法：这类码磁盘上没有自己的文件（原先一路走到底返回
+    # None），载体是主码的主工作簿。若将来真出现 `D4A …xlsx`，上面的分支会先命中，
+    # 本回落不生效。
+    #
+    # 两道收窄，缺一条就会踩到别的 spec 的判据（见两个常量/函数各自的说明）：
+    #   * 后缀只认 `A` —— 否则 `H1F` / `G7L` / `G7E` 这些**名字提取产物**也被回落；
+    #   * 跳过有独立 render schema 的码 —— 否则 `D2A` 的配置真源旁边多出第二真源。
+    #
+    # 递归调 `find_template_file_unresolved` 而非模块全局 `find_template_file`：
+    # 后者在模块末尾被重绑定成覆盖层薄封装，权威侧递归到它会穿出覆盖层
+    # （与 `find_all_template_files` 调 `find_template_file_any_unresolved` 同理）。
+    program_table = _PROGRAM_TABLE_CODE_RE.match(wp_code)
+    if program_table and not _has_own_render_schema(wp_code):
+        return find_template_file_unresolved(program_table.group(1))
 
     return None
 

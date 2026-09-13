@@ -16,6 +16,9 @@ import http from '@/utils/http'
 import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import GtIndexChip from '../../GtIndexChip.vue'
+import type useD4CrossSheet from '../../composables/useD4CrossSheet'
+import { eventBus } from '@/utils/eventBus'
+import { mergeProducts } from '../../composables/d4PriceUpstreamMerge'
 
 const props = defineProps<{
   wpId: string
@@ -25,6 +28,14 @@ const props = defineProps<{
 }>()
 
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
+
+// ─── 上游联动（宿主 provide 的 useD4CrossSheet 实例） ────────────────────
+// 从 D4-2 主营明细（productRevenueForMargin，按产品聚合）取产品行。
+type D4CrossSheet = ReturnType<typeof useD4CrossSheet>
+const crossSheet = inject<D4CrossSheet | null>('d4CrossSheet', null)
+
+// ─── 异常价格阈值（产品价格：与定价/市价差异绝对值 > 10%） ────────────
+const ABNORMAL_THRESHOLD = 0.1
 
 // 双模式（结构化视图 / 在线编辑）
 const editorMode = ref<'structured' | 'onlyoffice'>('structured')
@@ -87,6 +98,32 @@ const computedRows = computed<ComputedRow[]>(() => rows.value.map(r => ({
   marketDiff: r.marketPrice === 0 ? (r.unitPrice === 0 ? null : 1) : (r.unitPrice - r.marketPrice) / r.marketPrice,
 })))
 
+// ─── 异常产品清单 + 回标上游（方案 C，spec Req 4.2） ──────────────────
+// 与定价表/市价差异绝对值 > 10% 视为价格异常，按品种归并（取最大差异率），
+// 经 eventBus 'd4:price-abnormal' 回标 D4-2 主营明细对应行。幂等：每次发全量异常集。
+const abnormalProducts = computed(() => {
+  const byName = new Map<string, number>()
+  for (const r of computedRows.value) {
+    const maxDiff = Math.max(
+      r.policyDiff != null ? Math.abs(r.policyDiff) : 0,
+      r.marketDiff != null ? Math.abs(r.marketDiff) : 0,
+    )
+    const name = (r.product || '').trim()
+    if (!name || maxDiff <= ABNORMAL_THRESHOLD) continue
+    byName.set(name, Math.max(byName.get(name) ?? 0, maxDiff))
+  }
+  return [...byName.entries()].map(([name, diffPct]) => ({ name, diffPct }))
+})
+
+watch(abnormalProducts, (items) => {
+  eventBus.emit('d4:price-abnormal', {
+    wpCode: 'D4-11',
+    targetKey: 'product',
+    items,
+    timestamp: Date.now(),
+  })
+}, { deep: true })
+
 function addRow() {
   if (props.isReadonly) return
   rows.value.push({ customer: '', product: '', unitPrice: 0, quantity: 0, invoiceDate: '', orderNo: '', orderDate: '', listPrice: 0, marketPrice: 0, reason: '', priceSource: '', remark: '' })
@@ -104,8 +141,10 @@ const auditNote = ref('')
 const auditConclusion = ref('')
 function loadNoteConclusion() { auditNote.value = props.allResponses.get('D4-11-note')?.remark || ''; auditConclusion.value = props.allResponses.get('D4-11-conclusion')?.remark || '' }
 watch(() => props.allResponses.get('D4-11-note')?.remark, () => loadNoteConclusion(), { immediate: true })
-function updateNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persist('D4-11-note', val) }
-function updateConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persist('D4-11-conclusion', val) }
+function updateNote(val: string) { if (props.isReadonly) return; auditNote.value = val; persist('D4-11-note', val); emitNoteUpdated() }
+function updateConclusion(val: string) { if (props.isReadonly) return; auditConclusion.value = val; persist('D4-11-conclusion', val); emitNoteUpdated() }
+// 结论/说明变更 → 供 D4 附注/审计说明消费（方案 C，spec Req 5.1）
+function emitNoteUpdated() { eventBus.emit('disclosure:note-text-updated', { wpCode: 'D4-11', timestamp: Date.now() }) }
 
 // ─── 格式化 ──────────────────────────────────────────────────────────
 function fmtPercent(val: number | null): string { if (val == null) return '-'; return (val * 100).toFixed(2) + '%' }
@@ -149,6 +188,32 @@ function handleExportTemplate() { exportTemplate('D4-11' as any) }
 function handleExportData() { exportData('D4-11' as any) }
 function handleImportUpload(file: File): boolean { importData('D4-11' as any, file).then(r => { if (r && r.rowCount > 0) loadData() }); return false }
 
+// ─── 从 D4-2 主营明细导入产品（上游联动，spec Req 3） ────────────────
+// D4-2 只有产品×金额（无单价/数量，账面无数量维度）：导入带出产品清单，
+// 单价/数量/定价表单价由审计师按抽样凭证手工录。merge：按品种去重，不覆盖手工行。
+const importingUpstream = ref(false)
+async function importFromUpstream() {
+  if (props.isReadonly) return
+  if (!crossSheet) { ElMessage.warning('上游联动未就绪，请在营业收入底稿内打开本表'); return }
+  const upstream = crossSheet.productRevenueForMargin.value
+  if (!upstream || upstream.length === 0) {
+    ElMessage.warning('D4-2 主营明细为空，无法取产品清单；请先编制 D4-2 主营业务收入明细')
+    return
+  }
+  importingUpstream.value = true
+  try {
+    const { added } = mergeProducts(
+      rows.value,
+      upstream,
+      (name) => ({ customer: '', product: name, unitPrice: 0, quantity: 0, invoiceDate: '', orderNo: '', orderDate: '', listPrice: 0, marketPrice: 0, reason: '', priceSource: '', remark: '' }),
+    )
+    persistData()
+    ElMessage.success(added > 0 ? `已从 D4-2 主营明细导入 ${added} 个产品（单价/数量请按抽样凭证手工录）` : '无新产品可导入（品种已全部存在）')
+  } finally {
+    importingUpstream.value = false
+  }
+}
+
 // ─── 持久化 ──────────────────────────────────────────────────────────
 let debounceTimer: ReturnType<typeof setTimeout> | null = null
 function persist(itemId: string, value: string) { props.allResponses.set(itemId, { item_id: itemId, conclusion: null, remark: value }); debounceSave() }
@@ -191,6 +256,9 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
       <div class="sec-header">
         <h4 class="sec-title">产品销售价格分析</h4>
         <div class="sec-actions">
+          <el-tooltip content="从 D4-2 主营业务收入明细导入产品清单（单价/数量按抽样凭证手工录）" placement="top" :show-after="300">
+            <el-button size="small" type="primary" plain :disabled="isReadonly" :loading="importingUpstream" @click="importFromUpstream">从 D4-2 导入产品</el-button>
+          </el-tooltip>
           <el-dropdown size="small" trigger="click" :disabled="isReadonly">
             <el-button size="small">导入导出 ▾</el-button>
             <template #dropdown>
@@ -204,7 +272,8 @@ onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); flushS
           <el-tooltip content="批量数据建议：先导出模板在Excel中填写后导入" placement="top" :show-after="300">
             <el-button size="small" :disabled="isReadonly" @click="addRow">+ 增行</el-button>
           </el-tooltip>
-          <GtIndexChip value="wp:D4-10" :context-project-id="projectId" />
+          <!-- 🔴 修 bug：本表(D4-11)原挂 value="wp:D4-10"（指错），改指真实上游 D4-2 主营明细 -->
+          <GtIndexChip value="wp:D4-2" :context-project-id="projectId" />
         </div>
       </div>
 

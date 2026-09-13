@@ -41,6 +41,13 @@ function fmtRate(rate: number | '' | 'N/A'): string {
   return (rate * 100).toFixed(1) + '%'
 }
 
+/** 价格异常回标 tooltip：D4-10: 35.0% · D4-11: 12.0% */
+function formatPriceAbnormal(mark: Record<string, number>): string {
+  return Object.entries(mark)
+    .map(([src, pct]) => `${src}: ${(Number(pct) * 100).toFixed(1)}%`)
+    .join(' · ')
+}
+
 // ─── Composable ───────────────────────────────────────────────────────
 const {
   rows,
@@ -273,20 +280,36 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
         :max-height="600"
       >
         <!-- A: 项目（产品/服务） -->
-        <el-table-column prop="product" label="产品/服务" width="140" fixed>
+        <el-table-column prop="product" label="产品/服务" width="180" fixed>
           <template #default="{ row }">
             <template v-if="row.rowId === 'subtotal'">
               <span class="font-bold">合计</span>
             </template>
             <template v-else>
-              <el-input
-                v-if="!isReadonly"
-                :model-value="row.product"
-                size="small"
-                placeholder="产品名称"
-                @change="(v: string) => updateCell(row.rowId, 'product', v)"
-              />
-              <span v-else>{{ row.product || '(未命名)' }}</span>
+              <div class="product-cell">
+                <el-input
+                  v-if="!isReadonly"
+                  :model-value="row.product"
+                  size="small"
+                  placeholder="产品名称"
+                  @change="(v: string) => updateCell(row.rowId, 'product', v)"
+                />
+                <span v-else>{{ row.product || '(未命名)' }}</span>
+                <el-tooltip
+                  v-if="row.priceAbnormal && Object.keys(row.priceAbnormal).length"
+                  :content="formatPriceAbnormal(row.priceAbnormal)"
+                  placement="top"
+                  :show-after="200"
+                >
+                  <el-tag
+                    size="small"
+                    type="danger"
+                    effect="plain"
+                    class="price-abnormal-tag"
+                    data-testid="d4-price-abnormal"
+                  >价格异常</el-tag>
+                </el-tooltip>
+              </div>
             </template>
           </template>
         </el-table-column>
@@ -577,6 +600,15 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 }
 .font-bold {
   font-weight: 600;
+}
+.product-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.price-abnormal-tag {
+  flex-shrink: 0;
 }
 :deep(.subtotal-row-bg) {
   background-color: #fafafa !important;

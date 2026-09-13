@@ -46,12 +46,15 @@ const {
   addRow,
   removeRow,
   updateCell,
+  flushPendingSave,
 } = useD4OtherRevenue({
   wpId: toRef(props, 'wpId') as Ref<string>,
   projectId: toRef(props, 'projectId') as Ref<string>,
   allResponses: toRef(props, 'allResponses') as Ref<Map<string, any>>,
   isReadonly: toRef(props, 'isReadonly') as Ref<boolean>,
 })
+
+defineExpose({ flushPendingSave })
 
 // ─── 导入导出 ─────────────────────────────────────────────────────────
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({

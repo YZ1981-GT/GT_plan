@@ -7,13 +7,13 @@
 
     <!-- 根据外层 GtWpRenderer 传入的 sheetName 分发到对应子组件 -->
     <template v-else>
-      <div v-if="showModeToolbar" class="d4-mode-toolbar">
+      <div v-if="showModeToolbar && !isD4DedicatedSyncSheet" class="d4-mode-toolbar">
         <el-segmented v-model="renderMode" :options="renderModeOptions" size="small" :disabled="isD4DetailSheet && syncBusy" />
-        <el-tag v-if="!isD4DetailSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
-        <GtEntrySyncCapabilityNotice entry-id="xlsx/gt-d4-operating-revenue" />
+        <el-tag v-if="!isD4DetailSheet && !isD4DedicatedSyncSheet && !dualMode.ooAvailable.value" size="small" type="warning">OO不可用</el-tag>
+        <GtEntrySyncCapabilityNotice v-if="!isD4DedicatedSyncSheet" entry-id="xlsx/gt-d4-operating-revenue" />
       </div>
 
-      <!-- G5-1 D4-2 canary：统一双向路径（descriptor → WorkpaperSyncEditorHost） -->
+      <!-- D4-2 由外层统一桥接；D4-5 与 IPO/舞弊子表由自身组件管理双向模式。 -->
       <WorkpaperSyncEditorHost
         v-if="renderMode === 'onlyoffice' && isD4DetailSheet"
         ref="syncEditorHostRef"
@@ -21,9 +21,8 @@
         :bridge="syncBridge"
       />
 
-      <!-- 其余 sheet 的在线编辑仍走 legacy GtOnlyOfficeSheet（D4-5 自管 dualMode，排除） -->
       <GtOnlyOfficeSheet
-        v-else-if="renderMode === 'onlyoffice' && currentSheet !== 'D4-5'"
+        v-else-if="renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'"
         :key="ooSheetName"
         :wp-id="props.wpId"
         :sheet-name="ooSheetName"
@@ -258,6 +257,12 @@ const formData = useD4FormData({
   projectId: toRef(props, 'projectId'),
 })
 const { flushPendingSave } = formData
+provide('d4SaveItems', async (items: ChecklistResponse[]) => {
+  await formData.saveBatch(items.map(item => ({
+    itemId: item.item_id,
+    data: { conclusion: item.conclusion ?? null, remark: item.remark ?? null },
+  })))
+})
 
 // 直接传 Ref<Map>，禁止 computed(() => map.value) —— 否则子表 watch remark 丢响应，
 // OO→HTML 镜像后的新行（如 GTROW）不会进 D4TabRevenueDetail DOM。
@@ -374,8 +379,12 @@ const D4_SHEET_KEY_BY_CODE: Record<string, string> = {
   'D4-3': 'd43-managed',
   'D4-6': 'd46-managed',
   'D4-7': 'd47-managed',
+  'D4-30': 'd4-30-managed',
+  'D4-31': 'd4-31-managed',
+  'D4-32': 'd4-32-managed',
 }
 const isD4DetailSheet = computed(() => currentSheet.value != null && currentSheet.value in D4_SHEET_KEY_BY_CODE)
+const isD4DedicatedSyncSheet = computed(() => ['D4-5', 'D4-29', 'D4-30', 'D4-31', 'D4-32'].includes(currentSheet.value || ''))
 const syncSwitching = ref(false)
 const syncEditorHostRef = ref<{ forceSave: () => Promise<{ operationId: string }> } | null>(null)
 const syncEntryId = ref(D4_SYNC_ENTRY_ID)
@@ -387,7 +396,7 @@ const syncBridge = useWorkpaperSyncBridge({
   sheetKey: syncSheetKey,
   capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
   flushHtml: async () => {
-    flushPendingSave()
+    await flushPendingSave()
     const sheetKey = D4_SHEET_KEY_BY_CODE[currentSheet.value] || 'd42-managed'
     const snap = await readStoreProjection({
       projectId: props.projectId,
@@ -503,10 +512,10 @@ async function selfLoad() {
 // 修复：此前主入口无监听器，所有经 window event 保存的子表数据从不落库。
 // 各子 composable flushSave 发 CustomEvent('d4:save-items', {items:[{item_id,conclusion,remark}]})。
 
-function handleD4SaveItems(e: Event): void {
+async function handleD4SaveItems(e: Event): Promise<void> {
   const items = (e as CustomEvent<{ items: ChecklistResponse[] }>).detail?.items
   if (!Array.isArray(items) || items.length === 0) return
-  void formData.saveBatch(
+  await formData.saveBatch(
     items
       .filter(it => it && it.item_id)
       .map(it => ({

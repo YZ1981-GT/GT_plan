@@ -25,7 +25,7 @@ whitelist 的语义是「打磨应让文件变小不变大」。本模块的三�
 
 from __future__ import annotations
 
-from typing import Any, Final, Mapping
+from typing import Any, Final, Mapping, Sequence
 
 from app.services.excel_structure_fingerprint import (
     FingerprintError,
@@ -39,6 +39,7 @@ from app.services.workpaper_sync.published_identity_observer import (
     ObservationStage,
     ObservedIdentityDriftError,
     _frozen_anchors,
+    _frozen_sheet_anchors,
     observe_structure_inventory,
     parse_identity_inventory,
     recompute_structure_hash,
@@ -46,6 +47,7 @@ from app.services.workpaper_sync.published_identity_observer import (
 
 __all__: Final = [
     "anchors_from_instrumentation_spec",
+    "anchors_from_instrumentation_specs",
     "compute_structure_hash_from_artifact",
     "frozen_anchors_from_instrumentation",
 ]
@@ -92,11 +94,19 @@ def anchors_from_instrumentation_spec(spec: Any) -> dict[str, str]:
             context={"stage": ObservationStage.observe_workbook.value},
         )
     return {
-        "sheet_key": f"{template_id.lower()}-managed",
+        "sheet_key": (
+            str(getattr(spec, "resolved_sheet_key", "") or "").strip()
+            or f"{template_id.lower()}-managed"
+        ),
         "table_name": table_name,
         "uuid_column_letter": uuid_col,
         "metadata_sheet": GT_SYNC_SHEET_NAME,
     }
+
+
+def anchors_from_instrumentation_specs(specs: Sequence[Any]) -> tuple[dict[str, str], ...]:
+    """多受管 sheet：每张 spec 投影一组锚点（顺序与 instrumentation_specs / sheets 对齐）。"""
+    return tuple(anchors_from_instrumentation_spec(spec) for spec in specs)
 
 
 def compute_structure_hash_from_artifact(
@@ -104,7 +114,7 @@ def compute_structure_hash_from_artifact(
     data: bytes,
     contract: SyncContract,
     instrumentation: Mapping[str, Any] | None = None,
-    anchors: Mapping[str, str] | None = None,
+    anchors: Mapping[str, str] | Sequence[Mapping[str, str]] | None = None,
 ) -> str:
     """**发布时刻**用与请求时刻观测器同一条链算 ``representation.structure_hash``。
 
@@ -118,7 +128,8 @@ def compute_structure_hash_from_artifact(
 
     锚点两条来源（**二选一，必须给一个**）：``instrumentation`` = 已发布的冻结
     definition payload（请求时刻口径）；``anchors`` = 由
-    :func:`anchors_from_instrumentation_spec` 从 provider spec 投影（首版发布时刻）。
+    :func:`anchors_from_instrumentation_spec` / ``anchors_from_instrumentation_specs``
+    从 provider spec 投影（首版发布时刻）。多 sheet 时 ``anchors`` 可为序列。
 
     失败一律抛，**不**回退到字节摘要：回退等于让「同构」这条承诺在出错时静默失效，
     而调用方拿到的仍是一个看起来正常的 64 位 hex。
@@ -131,44 +142,95 @@ def compute_structure_hash_from_artifact(
                 stage=ObservationStage.observe_workbook,
                 context={"stage": ObservationStage.observe_workbook.value},
             )
-        resolved = _frozen_anchors(instrumentation)
-        if resolved is None:
+        sheet_anchors = _frozen_sheet_anchors(instrumentation)
+        if not sheet_anchors:
             raise FrozenChildUnusableError(
                 "冻结 instrumentation payload 缺 managed_sheets/table/uuid 列锚点 —— "
                 "发布时刻算 structure_hash 的反读参数只能来自它，不得按 sheet 展示名猜",
                 stage=ObservationStage.observe_workbook,
                 context={"stage": ObservationStage.observe_workbook.value},
             )
-        anchors = resolved
+    elif isinstance(anchors, Mapping):
+        sheet_anchors = [dict(anchors)]
+    else:
+        sheet_anchors = [dict(item) for item in anchors]
+        if not sheet_anchors:
+            raise FrozenChildUnusableError(
+                "compute_structure_hash_from_artifact 收到空 anchors 序列 —— "
+                "无从反读受管结构",
+                stage=ObservationStage.observe_workbook,
+                context={"stage": ObservationStage.observe_workbook.value},
+            )
     try:
         fingerprint = structure_fingerprint(data)
-        inventory_raw = identity_inventory(
-            data,
-            expected_table=anchors["table_name"],
-            uuid_column_letter=anchors["uuid_column_letter"],
-            metadata_sheet=anchors["metadata_sheet"],
-        )
+        physical_sheet_by_key: dict[str, str] = {}
+        row_uuid_rows_by_sheet: dict[str, list[int]] = {}
+        for sheet_anchor in sheet_anchors:
+            inventory_raw = identity_inventory(
+                data,
+                expected_table=sheet_anchor["table_name"],
+                uuid_column_letter=sheet_anchor["uuid_column_letter"],
+                metadata_sheet=sheet_anchor["metadata_sheet"],
+            )
+            table = inventory_raw.get("excel_table") or {}
+            physical_sheet = table.get("table_sheet")
+            if not table.get("present") or not physical_sheet:
+                raise ObservedIdentityDriftError(
+                    f"将要发布的 artifact 里找不到冻结 instrumentation 声明的 Excel Table "
+                    f"{sheet_anchor['table_name']!r} —— 受管 sheet 的唯一运行态锚点已断",
+                    stage=ObservationStage.observe_workbook,
+                    context={"stage": ObservationStage.observe_workbook.value},
+                )
+            physical_sheet_by_key[sheet_anchor["sheet_key"]] = str(physical_sheet)
+            inv = parse_identity_inventory(inventory_raw)
+            row_uuid_rows_by_sheet[sheet_anchor["sheet_key"]] = sorted(
+                int(row) for row in inv.row_uuids if str(row).isdigit()
+            )
     except FingerprintError as exc:
         raise ArtifactUnreadableError(
             f"发布时刻结构采集失败: {exc}",
             stage=ObservationStage.observe_workbook,
             context={"stage": ObservationStage.observe_workbook.value},
         ) from exc
-    table = inventory_raw.get("excel_table") or {}
-    physical_sheet = table.get("table_sheet")
-    if not table.get("present") or not physical_sheet:
-        raise ObservedIdentityDriftError(
-            f"将要发布的 artifact 里找不到冻结 instrumentation 声明的 Excel Table "
-            f"{anchors['table_name']!r} —— 受管 sheet 的唯一运行态锚点已断",
-            stage=ObservationStage.observe_workbook,
-            context={"stage": ObservationStage.observe_workbook.value},
-        )
-    inventory = parse_identity_inventory(inventory_raw)
-    row_uuid_rows = sorted(int(row) for row in inventory.row_uuids if str(row).isdigit())
     structure = observe_structure_inventory(
         contract=contract,
         fingerprint=fingerprint,
-        physical_sheet_by_key={anchors["sheet_key"]: str(physical_sheet)},
-        row_uuid_rows=row_uuid_rows,
+        physical_sheet_by_key=physical_sheet_by_key,
+        row_uuid_rows_by_sheet=row_uuid_rows_by_sheet,
     )
     return recompute_structure_hash(contract=contract, observed_structure=structure)
+
+
+async def load_frozen_structure_anchors(
+    *, session: Any, resolution: Any, bundle: Any, document_type: str,
+) -> tuple[dict[str, str], ...] | None:
+    """Read only the supplied frozen bundle; Word/opaque keep their own identity.
+
+    返回**全部**受管 sheet 锚点（多 sheet entry 时 structure_hash 必须覆盖 sibling）。
+    """
+    from app.services.workpaper_sync.definitions import BundleSlot, DefinitionKind, DefinitionState
+    from app.services.workpaper_sync.published_identity_observer import (
+        PublishedIdentityObserver,
+        _frozen_sheet_anchors,
+    )
+
+    if document_type == "docx" or bundle.authority_model.value != "projection_contract":
+        return None
+    observer = PublishedIdentityObserver(session=session, resolution=resolution)
+    context = {"definition_bundle_id": str(bundle.bundle_id)}
+    child = await observer._load_child_row(
+        slot=BundleSlot.instrumentation, bundle=bundle, context=context,
+    )
+    if child.kind != DefinitionKind.instrumentation.value or child.state != DefinitionState.approved.value:
+        raise FrozenChildUnusableError(
+            "Frozen instrumentation must be approved",
+            stage=ObservationStage.frozen_children, context=context,
+        )
+    payload = await observer._read_definition_payload(child=child, context=context)
+    sheet_anchors = tuple(_frozen_sheet_anchors(payload))
+    if not sheet_anchors:
+        raise FrozenChildUnusableError(
+            "Frozen instrumentation is missing structure anchors",
+            stage=ObservationStage.frozen_children, context=context,
+        )
+    return sheet_anchors

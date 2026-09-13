@@ -5,12 +5,15 @@
  * 三模式：卡片视图(逐客户填写) / 矩阵视图(行=字段,列=客户只读对比) / 在线编辑
  * 31个检查字段 × N个客户，底部CAS18号舞弊风险提示折叠
  */
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, toRef } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4CustomerDetail, CUSTOMER_FIELDS, FIELD_GROUPS } from '../../composables/useD4CustomerDetail'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
+import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
 import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 import { Plus } from '@element-plus/icons-vue'
@@ -19,17 +22,27 @@ const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<s
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 // 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
+let reloadInFlight: Promise<void> | null = null
+async function reloadD429Data(): Promise<void> {
+  if (!reloadWorkpaperData) throw new Error('D4-29 未提供回读宿主')
+  if (!reloadInFlight) {
+    reloadInFlight = reloadWorkpaperData().finally(() => { reloadInFlight = null })
+  }
+  await reloadInFlight
+}
+const saveD4Items = inject<((items: any[]) => Promise<void>) | null>('d4SaveItems', null)
 
 const {
   customers, auditNote, auditConclusion,
   customerCount, relatedCount, completionRate,
   addCustomer, removeCustomer, updateField, updateCustomerName,
-  updateAuditNote, updateAuditConclusion,
+  updateAuditNote, updateAuditConclusion, flushPendingSave,
 } = useD4CustomerDetail({
   wpId: computed(() => props.wpId),
   projectId: computed(() => props.projectId),
   allResponses: computed(() => props.allResponses),
   isReadonly: computed(() => props.isReadonly),
+  saveItems: saveD4Items ?? undefined,
 })
 
 const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
@@ -38,6 +51,36 @@ const { exportTemplate, exportData, importData, importing } = useD4ImportExport(
 const editorMode = ref<string>('卡片视图')
 const modeOptions = ['卡片视图', '矩阵视图', '在线编辑']
 const activeCustomerIdx = ref(0)
+
+// D4-29 专用同步桥：转置表由后端 provider 动态生成列并按客户 id 合并
+const D429_ENTRY = 'xlsx/gt-d4-operating-revenue'
+const D429_SHEET_KEY = 'd4-29-managed'
+const d429Bridge = useWorkpaperSyncBridge({
+  entryId: ref(D429_ENTRY), wpId: toRef(props, 'wpId'), projectId: toRef(props, 'projectId'),
+  sheetKey: ref(D429_SHEET_KEY), capability: capabilityForEntry(D429_ENTRY),
+  flushHtml: async () => {
+    await flushPendingSave()
+    const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D429_ENTRY })
+    return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: D429_SHEET_KEY }
+  },
+  reloadHtml: async () => { await reloadD429Data() },
+})
+const d429SyncBusy = computed(() => ['oo_loading', 'forcesave_pending', 'refresh_required'].includes(String(d429Bridge.state.value)))
+const d429Switching = ref(false)
+const d429LastError = ref<string | null>(null)
+async function switchD429Mode(v: string) {
+  d429Switching.value = true; d429LastError.value = null
+  try {
+    if (v === '在线编辑') await d429Bridge.switchToOnlyOffice()
+    else if (d429Bridge.mode.value === 'oo') await d429Bridge.switchToHtml()
+    editorMode.value = v
+  } catch (error: any) { d429LastError.value = error?.message || '模式切换失败'; ElMessage.error(d429LastError.value) }
+  finally { d429Switching.value = false }
+}
+const d429Mode = computed({
+  get: () => d429Bridge.mode.value === 'oo' ? '在线编辑' : editorMode.value,
+  set: (v: string) => { void switchD429Mode(v) },
+})
 
 // ─── AI ──────────────────────────────────────────────────────────────
 const aiAvailable = ref(false)
@@ -53,7 +96,7 @@ async function handleAddCustomer() { if (props.isReadonly) return; try { const {
 
 function handleExportTemplate() { exportTemplate('D4-29') }
 function handleExportData() { exportData('D4-29') }
-async function handleImportFile(f: any) { const r = await importData('D4-29', f.raw || f); if (r) await reloadWorkpaperData?.() }
+async function handleImportFile(f: any) { const r = await importData('D4-29', f.raw || f); if (r) await reloadD429Data() }
 
 // 当前卡片客户
 const activeCustomer = computed(() => customers.value[activeCustomerIdx.value] || null)
@@ -81,9 +124,10 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
 <template>
 <div class="d4-customer-detail">
   <!-- 工具条 -->
-  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="editorMode" :options="modeOptions" size="small" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item><el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-29" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-28" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-29-detail')">💬 复核</el-button></div></div>
+  <div class="toolbar"><div class="toolbar-left"><el-segmented v-model="d429Mode" :options="modeOptions" size="small" :disabled="d429SyncBusy || d429Switching" /></div><div class="toolbar-right"><el-dropdown trigger="click" size="small"><el-button size="small">导入导出 ▾</el-button><template #dropdown><el-dropdown-menu><el-dropdown-item @click="handleExportTemplate">导出模板</el-dropdown-item><el-dropdown-item @click="handleExportData">导出数据</el-dropdown-item><el-dropdown-item><el-upload :show-file-list="false" accept=".xlsx" :auto-upload="false" :disabled="isReadonly||importing" @change="handleImportFile"><span>导入数据</span></el-upload></el-dropdown-item></el-dropdown-menu></template></el-dropdown><D4IpoFindingWriteback wp-code="D4-29" :all-responses="allResponses" :is-readonly="isReadonly" :findings="riskFindings" /><GtIndexChip value="wp:D4-28" :context-project-id="projectId" /><el-button v-if="openReviewDialog" size="small" @click="openReviewDialog('D4-29-detail')">💬 复核</el-button></div></div>
 
   <!-- 仪表板 -->
+  <div v-if="d429LastError || d429Bridge.lastError.value" role="alert">{{ d429LastError || d429Bridge.lastError.value }}</div>
   <div class="stats-dashboard">
     <div class="stat-card stat-primary"><div class="stat-value">{{ customerCount }}<span class="stat-unit">家</span></div><div class="stat-label">检查客户</div></div>
     <div class="stat-card" :class="relatedCount > 0 ? 'stat-warn' : 'stat-ok'"><div class="stat-value">{{ relatedCount }}<span class="stat-unit">家</span></div><div class="stat-label">关联方</div></div>
@@ -91,7 +135,7 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   </div>
 
   <!-- ═══ 卡片视图 ═══ -->
-  <template v-if="editorMode === '卡片视图'">
+  <template v-if="d429Mode === '卡片视图'">
     <!-- 使用说明 -->
     <div class="usage-guide">
       <span class="usage-icon">💡</span>
@@ -129,7 +173,7 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   </template>
 
   <!-- ═══ 矩阵视图 ═══ -->
-  <template v-else-if="editorMode === '矩阵视图'">
+  <template v-else-if="d429Mode === '矩阵视图'">
     <el-table :data="CUSTOMER_FIELDS" border class="matrix-table" max-height="600">
       <el-table-column label="检查项目" min-width="150" fixed>
         <template #default="{ row }">{{ row.label }}</template>
@@ -144,12 +188,12 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   </template>
 
   <!-- ═══ 在线编辑 ═══ -->
-  <template v-else-if="editorMode === '在线编辑'">
-    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户信息检查表D4-29" :readonly="isReadonly" /></div>
+  <template v-else-if="d429Mode === '在线编辑'">
+    <div class="oo-container"><WorkpaperSyncEditorHost v-if="d429Bridge.descriptor.value" ref="d429Descriptor" :descriptor="d429Bridge.descriptor.value" :bridge="d429Bridge" /><div v-else class="oo-loading">正在打开 D4-29 同步编辑器…</div></div>
   </template>
 
   <!-- 非OO模式共享区域 -->
-  <template v-if="editorMode !== '在线编辑'">
+  <template v-if="d429Mode !== '在线编辑'">
     <!-- 审计意见区 -->
     <el-card class="audit-opinion-card" shadow="never"><template #header><div class="opinion-header"><span class="opinion-title">审计意见区</span><div class="opinion-actions"><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiNoteLoading" :disabled="isReadonly||!aiAvailable" @click="genNote">🤖 AI辅助说明</el-button></el-tooltip><el-tooltip :content="aiTip" placement="top"><el-button size="small" type="primary" plain :loading="aiConclusionLoading" :disabled="isReadonly||!aiAvailable" @click="genConclusion">🤖 AI辅助结论</el-button></el-tooltip></div></div></template><div class="opinion-body"><div class="opinion-field"><label>三、审计说明</label><el-input type="textarea" :autosize="{minRows:3,maxRows:12}" :model-value="auditNote" :disabled="isReadonly" placeholder="记录客户信息核查发现的异常情况" @input="(v:string)=>updateAuditNote(v)" /></div><div class="opinion-field"><label>四、审计结论</label><el-input type="textarea" :autosize="{minRows:2,maxRows:8}" :model-value="auditConclusion" :disabled="isReadonly" placeholder="综合判断客户信息是否真实、是否存在第三方配合舞弊迹象" @input="(v:string)=>updateAuditConclusion(v)" /></div></div></el-card>
 

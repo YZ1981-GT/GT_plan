@@ -63,7 +63,7 @@ function fmtAmount(v: number | string): string {
 }
 
 function rowClassName({ row }: { row: any }) {
-  if (row.diff !== 0 && (parseNum(row.mainRevenue) || parseNum(row.vatAmount))) return 'row-diff'
+  if (row.diff !== 0 && (parseNum(row.mainRevenue) || parseNum(row.vatInvoiceAmount))) return 'row-diff'
   return ''
 }
 
@@ -224,22 +224,22 @@ async function handleImportFile(uploadFile: any) { await importData('D4-23', upl
         <el-table-column label="本期开具发票的金额" align="center" class-name="col-invoice">
           <el-table-column label="增值税发票金额" min-width="120" align="right">
             <template #default="{ row, $index }">
-              <WpAmountInput v-model="row.vatAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'vatAmount', row.vatAmount)" />
+              <WpAmountInput v-model="row.vatInvoiceAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'vatInvoiceAmount', row.vatInvoiceAmount)" />
             </template>
           </el-table-column>
           <el-table-column label="增值税发票份数" min-width="110" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row.vatCount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" :precision="0" @change="updateCell($index, 'vatCount', row.vatCount)" />
+              <el-input-number v-model="row.vatInvoiceCount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" :precision="0" @change="updateCell($index, 'vatInvoiceCount', row.vatInvoiceCount)" />
             </template>
           </el-table-column>
           <el-table-column label="普通发票金额" min-width="120" align="right">
             <template #default="{ row, $index }">
-              <WpAmountInput v-model="row.normalAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'normalAmount', row.normalAmount)" />
+              <WpAmountInput v-model="row.plainInvoiceAmount" size="small" :disabled="isReadonly" style="width:100%" @change="updateCell($index, 'plainInvoiceAmount', row.plainInvoiceAmount)" />
             </template>
           </el-table-column>
           <el-table-column label="普通发票份数" min-width="100" align="right">
             <template #default="{ row, $index }">
-              <el-input-number v-model="row.normalCount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" :precision="0" @change="updateCell($index, 'normalCount', row.normalCount)" />
+              <el-input-number v-model="row.plainInvoiceCount" size="small" :controls="false" :disabled="isReadonly" style="width:100%" :precision="0" @change="updateCell($index, 'plainInvoiceCount', row.plainInvoiceCount)" />
             </template>
           </el-table-column>
           <el-table-column label="开票金额合计" min-width="120" align="right">
@@ -259,7 +259,7 @@ async function handleImportFile(uploadFile: any) { await importData('D4-23', upl
         <!-- 索引号 -->
         <el-table-column label="索引号" min-width="90">
           <template #default="{ row, $index }">
-            <el-input v-model="row.indexRef" size="small" :disabled="isReadonly" @change="updateCell($index, 'indexRef', row.indexRef)" />
+            <el-input v-model="row.indexNo" size="small" :disabled="isReadonly" @change="updateCell($index, 'indexNo', row.indexNo)" />
           </template>
         </el-table-column>
       </el-table>
@@ -324,7 +324,7 @@ function getSummary({ columns, data }: any) {
   columns.forEach((_col: any, index: number) => {
     if (index === 0) { sums[index] = '合计'; return }
     // Auto-sum numeric columns
-    const prop = ['', 'mainRevenue', 'otherRevenue', 'revenueTotal', 'vatAmount', 'vatCount', 'normalAmount', 'normalCount', 'invoiceTotal', 'diff', ''][index] || ''
+    const prop = ['', 'mainRevenue', 'otherRevenue', 'revenueTotal', 'vatInvoiceAmount', 'vatInvoiceCount', 'plainInvoiceAmount', 'plainInvoiceCount', 'invoiceTotal', 'diff', 'indexNo', ''][index] || ''
     if (prop && data.length) {
       const sum = data.reduce((acc: number, row: any) => {
         const v = typeof row[prop] === 'number' ? row[prop] : parseFloat(row[prop]) || 0

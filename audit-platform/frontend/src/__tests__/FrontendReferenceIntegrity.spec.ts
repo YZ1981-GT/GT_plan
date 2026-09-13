@@ -40,7 +40,8 @@
  * Validates: Requirements 1.5, 1.9
  */
 import { describe, it, expect } from 'vitest'
-import { resolve } from 'path'
+import { resolve, dirname } from 'path'
+import { readdirSync } from 'fs'
 import {
   FRONTEND_SRC,
   walkSourceFiles,
@@ -102,7 +103,19 @@ const DEAD_FILE_SET = new Set(KNOWN_DEAD_MODULE_FILES.map((d) => d.file))
 const ALL_SOURCE_FILES = walkSourceFiles(FRONTEND_SRC).filter((f) => !isTestFile(f))
 const ROUTER_FILE = resolve(FRONTEND_SRC, 'router/index.ts')
 const ROUTER_SOURCE = readSource(ROUTER_FILE)
-const DECLARED_ROUTES = parseDeclaredRoutes(ROUTER_SOURCE)
+
+// router/index.ts 已按域拆分（domains/*.ts 为唯一真源），本文件只做装配。
+// 声明路由集合必须读「index.ts + 它实际导入的域文件」，否则 barrel 化后
+// 只剩 '/' 一条，下方所有导航可达性判据会静默打红。
+// 直接扫 domains 目录下全部 .ts（目录里不存在未装配的域文件），
+// 若有人新加域文件却忘了在 index.ts 装配，routeDomainProjection.spec.ts 会打红。
+const ROUTER_DOMAIN_DIR = resolve(dirname(ROUTER_FILE), 'domains')
+const ROUTER_DOMAIN_SOURCES = readdirSync(ROUTER_DOMAIN_DIR)
+  .filter((f) => f.endsWith('.ts'))
+  .map((f) => readSource(resolve(ROUTER_DOMAIN_DIR, f)))
+  .join('\n')
+
+const DECLARED_ROUTES = parseDeclaredRoutes(ROUTER_SOURCE + '\n' + ROUTER_DOMAIN_SOURCES)
 
 // ---------------------------------------------------------------------------
 
@@ -126,7 +139,9 @@ describe('前端引用完整性 · 判据自身不空洞', () => {
     // `parseDeclaredRoutes` 把「不以 / 开头的子路由」直接拼到 '/' 下面，
     // 这只在「唯一的 children 属于 '/' 路由」时正确。
     // 一旦出现第二层嵌套，可达集合会算错 —— 必须打红而不是静默变宽。
-    expect(countNestedChildren(ROUTER_SOURCE)).toBe(1)
+    // 域文件内不允许出现 children（域文件是 DefaultLayout 的平铺子路由），
+    // 所以拼接后的总计数必须仍为 1。
+    expect(countNestedChildren(ROUTER_SOURCE + '\n' + ROUTER_DOMAIN_SOURCES)).toBe(1)
   })
 })
 

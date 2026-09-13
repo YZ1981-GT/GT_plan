@@ -375,7 +375,8 @@ def observe_structure_inventory(
     contract: SyncContract,
     fingerprint: WorkbookFingerprint,
     physical_sheet_by_key: Mapping[str, str],
-    row_uuid_rows: Sequence[int],
+    row_uuid_rows: Sequence[int] = (),
+    row_uuid_rows_by_sheet: Mapping[str, Sequence[int]] | None = None,
 ) -> tuple[tuple[str, str, str, str], ...]:
     """按契约声明逐字段**核对物理锚点是否真在工作簿里**，产出实测结构清册。
 
@@ -388,6 +389,9 @@ def observe_structure_inventory(
     🔴 这里**不是**「把声明抄一遍」：每一项都要过 :func:`_sheet_extent` 的物理外延与
     :func:`_cell_coordinates_for` 的物理行解析；``physical_sheet_by_key`` 也不是契约里的
     ``excel_name``，而是由 Excel Table 关联反解出来的真实 sheet 名（sheet 改名不改身份）。
+
+    多受管 sheet 时必须传 ``row_uuid_rows_by_sheet``（及完整 ``physical_sheet_by_key``），
+    否则 sibling 表会因缺物理 sheet / 错用主表 row UUID 而从清册消失，触发假漂移。
     """
     rows: list[tuple[str, str, str, str]] = []
     extents: dict[str, tuple[int, int]] = {}
@@ -398,9 +402,13 @@ def observe_structure_inventory(
         if physical not in extents:
             extents[physical] = _sheet_extent(fingerprint, physical)
         max_row, max_col = extents[physical]
+        if row_uuid_rows_by_sheet is not None:
+            sheet_rows: Sequence[int] = row_uuid_rows_by_sheet.get(sheet.sheet_key, ())
+        else:
+            sheet_rows = row_uuid_rows
         for table in sheet.tables:
             for spec in table.fields:
-                coordinate = _cell_coordinates_for(spec, row_uuid_rows=row_uuid_rows)
+                coordinate = _cell_coordinates_for(spec, row_uuid_rows=sheet_rows)
                 if coordinate is None:
                     continue
                 column, row = coordinate
@@ -811,7 +819,7 @@ class PublishedIdentityObserver:
             resolution=resolution, entry_id=entry_id, correlation_id=correlation_id
         )
         contract_child = await self._load_child_row(
-            slot=BundleSlot.contract, resolution=resolution, context=base
+            slot=BundleSlot.contract, bundle=resolution.bundle, context=base
         )
         if contract_child.kind != DefinitionKind.contract.value:
             raise FrozenChildUnusableError(
@@ -836,7 +844,7 @@ class PublishedIdentityObserver:
             )
 
         instrumentation_child = await self._load_child_row(
-            slot=BundleSlot.instrumentation, resolution=resolution, context=base
+            slot=BundleSlot.instrumentation, bundle=resolution.bundle, context=base
         )
         if instrumentation_child.kind != DefinitionKind.instrumentation.value:
             raise FrozenChildUnusableError(
@@ -853,15 +861,15 @@ class PublishedIdentityObserver:
                 context={**base, "slot": BundleSlot.instrumentation.value},
             )
         payload = await self._read_definition_payload(
-            child=instrumentation_child, resolution=resolution, context=base
+            child=instrumentation_child, context=base
         )
         return semantic_version, payload
 
     async def _load_child_row(
-        self, *, slot: BundleSlot, resolution: CanonicalResolution, context: Mapping[str, Any]
+        self, *, slot: BundleSlot, bundle: Any, context: Mapping[str, Any]
     ) -> WorkpaperSyncDefinitionArtifact:
         """按 frozen slot ref 读 child definition row（无 alias、无 entry 反查）。"""
-        spec = resolution.bundle.slots.get(slot)
+        spec = bundle.slots.get(slot)
         if spec is None or not spec.is_definition:
             raise FrozenChildUnusableError(
                 f"frozen bundle 的 {slot.value} slot 不是 definition child（"
@@ -894,7 +902,7 @@ class PublishedIdentityObserver:
         return row
 
     async def _read_definition_payload(
-        self, *, child: WorkpaperSyncDefinitionArtifact, resolution: CanonicalResolution,
+        self, *, child: WorkpaperSyncDefinitionArtifact,
         context: Mapping[str, Any],
     ) -> Mapping[str, Any]:
         """读 child definition 的 canonical payload 字节并按 digest 复核。"""
@@ -1029,53 +1037,64 @@ class PublishedIdentityObserver:
         ctx = self._identity_context(
             resolution=resolution, entry_id=entry_id, correlation_id=correlation_id
         )
-        anchors = _frozen_anchors(instrumentation)
-        if anchors is None:
+        sheet_anchors = _frozen_sheet_anchors(instrumentation)
+        if not sheet_anchors:
             raise FrozenChildUnusableError(
                 "frozen instrumentation payload 缺 managed_sheets/table/uuid 列锚点 —— "
                 "请求时刻的反读参数只能来自冻结 instrumentation，不得按 sheet 展示名猜",
                 stage=ObservationStage.observe_workbook,
                 context=ctx,
             )
+        anchors = sheet_anchors[0]
         try:
             fingerprint = structure_fingerprint(data)
-            inventory_raw = identity_inventory(
-                data,
-                expected_table=anchors["table_name"],
-                uuid_column_letter=anchors["uuid_column_letter"],
-                metadata_sheet=anchors["metadata_sheet"],
-            )
+            if fingerprint.errors:
+                raise ArtifactUnreadableError(
+                    f"published artifact 结构采集有非致命错误 {fingerprint.errors[:3]} —— "
+                    "采集不完整时不得按半份事实组装 adapter",
+                    stage=ObservationStage.observe_workbook,
+                    context={**ctx, "fingerprint_errors": list(fingerprint.errors)},
+                )
+            physical_sheet_by_key: dict[str, str] = {}
+            row_uuid_rows_by_sheet: dict[str, list[int]] = {}
+            primary_inventory = None
+            for sheet_anchor in sheet_anchors:
+                inventory_raw = identity_inventory(
+                    data,
+                    expected_table=sheet_anchor["table_name"],
+                    uuid_column_letter=sheet_anchor["uuid_column_letter"],
+                    metadata_sheet=sheet_anchor["metadata_sheet"],
+                )
+                table = inventory_raw.get("excel_table") or {}
+                physical_sheet = table.get("table_sheet")
+                if not table.get("present") or not physical_sheet:
+                    raise ObservedIdentityDriftError(
+                        f"published artifact 里找不到冻结 instrumentation 声明的 Excel Table "
+                        f"{sheet_anchor['table_name']!r} —— 受管 sheet 的唯一运行态锚点"
+                        "（`excel_table_sheet_association`）已断，不得回退按 sheet 展示名定位",
+                        stage=ObservationStage.observe_workbook,
+                        context={**ctx, "expected_table": sheet_anchor["table_name"]},
+                    )
+                physical_sheet_by_key[sheet_anchor["sheet_key"]] = str(physical_sheet)
+                inv = parse_identity_inventory(inventory_raw)
+                row_uuid_rows_by_sheet[sheet_anchor["sheet_key"]] = sorted(
+                    int(row) for row in inv.row_uuids if str(row).isdigit()
+                )
+                if primary_inventory is None:
+                    primary_inventory = inv
         except FingerprintError as exc:
             raise ArtifactUnreadableError(
                 f"published artifact 结构采集失败: {exc}",
                 stage=ObservationStage.observe_workbook,
                 context=ctx,
             ) from exc
-        if fingerprint.errors:
-            raise ArtifactUnreadableError(
-                f"published artifact 结构采集有非致命错误 {fingerprint.errors[:3]} —— "
-                "采集不完整时不得按半份事实组装 adapter",
-                stage=ObservationStage.observe_workbook,
-                context={**ctx, "fingerprint_errors": list(fingerprint.errors)},
-            )
-        table = inventory_raw.get("excel_table") or {}
-        physical_sheet = table.get("table_sheet")
-        if not table.get("present") or not physical_sheet:
-            raise ObservedIdentityDriftError(
-                f"published artifact 里找不到冻结 instrumentation 声明的 Excel Table "
-                f"{anchors['table_name']!r} —— 受管 sheet 的唯一运行态锚点"
-                "（`excel_table_sheet_association`）已断，不得回退按 sheet 展示名定位",
-                stage=ObservationStage.observe_workbook,
-                context={**ctx, "expected_table": anchors["table_name"]},
-            )
-        physical_sheet_by_key = {anchors["sheet_key"]: str(physical_sheet)}
-        inventory = parse_identity_inventory(inventory_raw)
-        row_uuid_rows = sorted(int(row) for row in inventory.row_uuids if str(row).isdigit())
+        assert primary_inventory is not None
+        inventory = primary_inventory
         structure = observe_structure_inventory(
             contract=contract,
             fingerprint=fingerprint,
             physical_sheet_by_key=physical_sheet_by_key,
-            row_uuid_rows=row_uuid_rows,
+            row_uuid_rows_by_sheet=row_uuid_rows_by_sheet,
         )
         dynamic_columns = observe_dynamic_columns(
             contract=contract,
@@ -1106,10 +1125,11 @@ class PublishedIdentityObserver:
         resolution: CanonicalResolution, correlation_id: str,
     ) -> Any:
         """组 ``ExcelIdentityBinding``：Table 名/UUID 列取**冻结 instrumentation**，
-        ``table_key`` 取契约里那张**唯一**声明了 ``row_identity`` 的受管表。
+        ``table_key`` 取契约里与主 sheet 锚点对齐的那张 ``row_identity`` 表。
 
-        ``row_identity`` 表不唯一（0 张或 ≥2 张）时 fail closed 并点名 —— 「随手挑第一张」
-        会让 UUID 列绑到另一张表上，受管格整体错位而没有任何报错。
+        单 sheet entry：``row_identity`` 表必须恰好 1 张。多 sheet entry（如 D4-2+D4-3）：
+        允许 ≥2 张，但**主** binding 必须绑到 ``anchors['sheet_key']`` 对应的那张，
+        sibling 由 attach / publish 另传 ``sibling_bindings`` —— 不得「随手挑第一张」。
         """
         from app.services.workpaper_sync.excel_extract import ExcelIdentityBinding
 
@@ -1122,18 +1142,30 @@ class PublishedIdentityObserver:
         ctx = self._identity_context(
             resolution=resolution, entry_id=entry_id, correlation_id=correlation_id
         )
-        if len(row_tables) != 1:
+        if not row_tables:
+            raise FrozenChildUnusableError(
+                "契约未声明任何带 row_identity 的表 —— 隐藏 UUID 列无从绑定",
+                stage=ObservationStage.observe_workbook,
+                context=ctx,
+            )
+        primary_sheet = str(anchors.get("sheet_key") or "").strip()
+        matched = [table_key for sheet_key, table_key in row_tables if sheet_key == primary_sheet]
+        if len(matched) == 1:
+            table_key = matched[0]
+        elif len(row_tables) == 1:
+            table_key = row_tables[0][1]
+        else:
             raise FrozenChildUnusableError(
                 f"契约声明了 {len(row_tables)} 张带 row_identity 的表 "
-                f"{[t for _s, t in row_tables]} —— 隐藏 UUID 列只有一列，绑定必须唯一；"
-                "不得随手挑第一张（挑错会让受管格整体错位而无任何报错）",
+                f"{[t for _s, t in row_tables]}，但主 sheet 锚点 {primary_sheet!r} "
+                f"未能唯一对齐（匹配 {matched!r}）—— 不得随手挑第一张",
                 stage=ObservationStage.observe_workbook,
                 context=ctx,
             )
         return ExcelIdentityBinding(
             table_name=anchors["table_name"],
             uuid_column=anchors["uuid_column_letter"],
-            table_key=row_tables[0][1],
+            table_key=table_key,
             metadata_sheet=anchors["metadata_sheet"],
             dynamic_column_columns={
                 key: dict(value) for key, value in dynamic_bindings.items()
@@ -1249,34 +1281,44 @@ def recompute_structure_hash(
 
 
 def _frozen_anchors(instrumentation: Mapping[str, Any]) -> dict[str, str] | None:
-    """从冻结 instrumentation payload 取反读所需的三个锚点参数。缺任一项返回 ``None``。"""
+    """从冻结 instrumentation payload 取**主**受管 sheet 的反读锚点。缺任一项返回 ``None``。"""
+    all_anchors = _frozen_sheet_anchors(instrumentation)
+    return all_anchors[0] if all_anchors else None
+
+
+def _frozen_sheet_anchors(instrumentation: Mapping[str, Any]) -> list[dict[str, str]]:
+    """从冻结 instrumentation 取出**每一张**受管 sheet 的反读锚点（顺序 = managed_sheets）。"""
     sheets = instrumentation.get("managed_sheets")
     if not isinstance(sheets, (list, tuple)) or not sheets:
-        return None
-    sheet = sheets[0]
-    if not isinstance(sheet, AbcMapping):
-        return None
-    sheet_key = str(sheet.get("sheet_key") or "").strip()
-    boundary = sheet.get("region_boundary_locator")
-    table_name = ""
-    if isinstance(boundary, AbcMapping):
-        table_name = str(boundary.get("table_key") or "").strip()
-    tables = sheet.get("tables")
-    uuid_column = ""
-    if isinstance(tables, (list, tuple)) and tables and isinstance(tables[0], AbcMapping):
-        uuid_column = str(tables[0].get("row_uuid_column_letter") or "").strip()
+        return []
+    out: list[dict[str, str]] = []
     meta = instrumentation.get("hidden_metadata_sheet")
     metadata_sheet = ""
     if isinstance(meta, AbcMapping):
         metadata_sheet = str(meta.get("sheet_name") or "").strip()
-    if not (sheet_key and table_name and uuid_column and metadata_sheet):
-        return None
-    return {
-        "sheet_key": sheet_key,
-        "table_name": table_name,
-        "uuid_column_letter": uuid_column,
-        "metadata_sheet": metadata_sheet,
-    }
+    for sheet in sheets:
+        if not isinstance(sheet, AbcMapping):
+            continue
+        sheet_key = str(sheet.get("sheet_key") or "").strip()
+        boundary = sheet.get("region_boundary_locator")
+        table_name = ""
+        if isinstance(boundary, AbcMapping):
+            table_name = str(boundary.get("table_key") or "").strip()
+        tables = sheet.get("tables")
+        uuid_column = ""
+        if isinstance(tables, (list, tuple)) and tables and isinstance(tables[0], AbcMapping):
+            uuid_column = str(tables[0].get("row_uuid_column_letter") or "").strip()
+        if not (sheet_key and table_name and uuid_column and metadata_sheet):
+            continue
+        out.append(
+            {
+                "sheet_key": sheet_key,
+                "table_name": table_name,
+                "uuid_column_letter": uuid_column,
+                "metadata_sheet": metadata_sheet,
+            }
+        )
+    return out
 
 
 async def resolve_project_scope(*, session: AsyncSession, representation: Any) -> uuid.UUID:

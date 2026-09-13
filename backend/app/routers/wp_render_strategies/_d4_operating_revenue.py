@@ -537,4 +537,35 @@ async def render(ctx: RenderContext) -> dict | None:
         except Exception as e:  # noqa: BLE001 — 兜底 fail-open，不阻断 render
             logger.warning("D4 render: Tier A seed 兜底异常（fail-open）: %s", e)
 
+        # ─── D4-21 营业收入审定数 canonical 镜像（Req 3.3）────────────────────────
+        try:
+            _mirror_d4_1_revenue_to_d421(responses_snapshot)
+        except Exception as e:  # noqa: BLE001 — fail-open，不阻断 render
+            logger.warning("D4 render: D4-21 revenue-audited canonical 镜像异常（fail-open）: %s", e)
+
     return html_data
+
+
+def _mirror_d4_1_revenue_to_d421(responses_snapshot: dict) -> bool:
+    """把 D4-1 审定营业收入(6001) canonical 快照镜像到规范键 `D4-21-revenue-audited`（Req 3.3）。
+
+    D4-21「占收入比例」需要营业收入审定数。**不得**让 D4-21 直接读旧键
+    `D4-1-adj-tb-6001`（那是 D4-1 内部 TB 核对锚点，Req 3.3 明令禁读）。本函数把
+    D4-1 canonical 快照（同一条 6001 Tier A 有效定义求值结果）镜像到规范键，
+    前端 useD4RelatedPrice 只消费该规范键 —— 公式取数走 D4-1 快照、导航 refs 分离（DEC6）。
+
+    宁缺勿造：D4-1 未 seed 出 6001（缺失/空）时不镜像，返回 False（前端呈现「—」）。
+    幂等纯函数（原地改 dict），可独立单测 + 变异检验。
+    """
+    d4_1_audited = responses_snapshot.get("D4-1-adj-tb-6001")
+    canonical_val = d4_1_audited.get("remark") if isinstance(d4_1_audited, dict) else d4_1_audited
+    if canonical_val in (None, ""):
+        return False
+    responses_snapshot["D4-21-revenue-audited"] = {
+        "item_id": "D4-21-revenue-audited",
+        "conclusion": None,
+        "remark": str(canonical_val),
+        # 溯源：值来自 D4-1 审定营业收入(6001) canonical 快照，非 D4-21 自算
+        "_source_ref": "WP('D4','D4-1','营业收入审定数')#6001",
+    }
+    return True

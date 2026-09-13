@@ -2108,6 +2108,52 @@ class OoToHtmlCoordinator:
     # 6.4 三方 extract
     # ─────────────────────────────────────────────────────────────────
 
+    async def _adapter_for_oo_to_html(
+        self,
+        *,
+        adapter: WorkpaperSyncAdapter,
+        frozen: FrozenApplicationIdentity,
+    ) -> WorkpaperSyncAdapter:
+        """把 registry 上的 Excel adapter 改绑成 OO→HTML 形态（incoming + base baseline）。
+
+        生产注册点（pilot / manifest）普遍只建 `html_to_oo` 方向；callback 后的 apply
+        复用同一实例时，必须在这里补上 application 冻结的 base representation，否则：
+
+        * materialize 按 published substrate 形态处理 durable incoming；
+        * `baseline_representation is None` ⇒ 无法从 base 重注被 OO 掏空的 `_GT_SYNC`。
+        """
+        from app.services.workpaper_sync.adapters.excel import (
+            ExcelSyncAdapter,
+            build_excel_adapter,
+        )
+        from app.services.workpaper_sync.models import ArtifactKind
+
+        if not isinstance(adapter, ExcelSyncAdapter):
+            return adapter
+        if (
+            adapter.substrate_kind is ArtifactKind.incoming
+            and adapter.baseline_representation is not None
+        ):
+            return adapter
+        base_resolved = await self._resolution.resolve(
+            intent=ResolutionIntent.extract,
+            project_id=frozen.project_id,
+            wp_id=frozen.wp_id,
+            entry_id=frozen.entry_id,
+            representation_id=frozen.base_representation_id,
+        )
+        return build_excel_adapter(
+            definitions=adapter.definitions,
+            binding=adapter.binding,
+            direction="oo_to_html",
+            baseline_representation=base_resolved.artifact_path,
+            capability=adapter.capability,
+            limits=adapter.limits,
+            # multi-sheet registry adapters (e.g. D4-2+D4-3) must keep sibling
+            # extract/mirror; dropping them leaves Excel dirty but checklist stale.
+            sibling_bindings=adapter.sibling_bindings,
+        )
+
     async def extract_three_way(
         self,
         *,
@@ -2243,6 +2289,12 @@ class OoToHtmlCoordinator:
 
         substrate = await self.open_substrate(frozen)
         j.record(ApplyStage.substrate_opened, substrate.sha256)
+
+        # Pilot/manifest 常以 `html_to_oo` 注册同一 adapter（无 baseline、substrate=published）。
+        # OO→HTML rematerialize 必须改绑为 `oo_to_html` + application 冻结的 base
+        # representation，否则 materialize 读 incoming 时 `_GT_SYNC` 被 OO 掏空会直接
+        # `excel_extract_identity_carrier_missing`，也无法从 base 重注 runtime binding。
+        adapter = await self._adapter_for_oo_to_html(adapter=adapter, frozen=frozen)
 
         state = _ApplyState(
             frozen=frozen,
@@ -2406,6 +2458,26 @@ class OoToHtmlCoordinator:
         state.merged_digest = projection_canonical_digest(merged)
         state.incoming_digest = projection_canonical_digest(state.incoming_projection)
 
+        # 会话级 room apply 锁：跨越下方 commit + rematerialize CPU，避免并行 apply
+        # 在 fence 上互踩（G4-0d result_bundle_identity_mismatch）。
+        await self._repo.lock_room_oo_apply(state.frozen.room_id)
+        try:
+            return await self._apply_settled_locked(
+                state, adapter=adapter, merged=merged
+            )
+        finally:
+            try:
+                await self._repo.unlock_room_oo_apply(state.frozen.room_id)
+            except Exception:  # noqa: BLE001 — 连接已死时仍要让主异常冒泡
+                pass
+
+    async def _apply_settled_locked(
+        self,
+        state: _ApplyState,
+        *,
+        adapter: WorkpaperSyncAdapter,
+        merged: Any,
+    ) -> OoToHtmlOutcome:
         app = await self._lock_application(state.frozen.application_id)
         await self._walk_application(
             app,
@@ -2431,6 +2503,8 @@ class OoToHtmlCoordinator:
         # 而 `rematerializing` 是「已经开始改文件」的审计事实，失败时要留下来。
         await self._session.commit()
 
+        from app.services.workpaper_sync.publish_time_structure_hash import load_frozen_structure_anchors
+
         plan = ContentCommitPlan(
             project_id=state.frozen.project_id,
             wp_id=state.frozen.wp_id,
@@ -2454,13 +2528,17 @@ class OoToHtmlCoordinator:
             operation_id=op_id,
             parent_version_id=await self._current_version_id(state.frozen.wp_id),
             contract=state.contract,
+            structure_anchors=await load_frozen_structure_anchors(
+                session=self._session, resolution=self._resolution,
+                bundle=state.bundle, document_type=state.substrate.document_type,
+            ),
             room_id=state.frozen.room_id,
             application_id=state.frozen.application_id,
             reason="rematerialize",
         )
         mutation = BusinessMutation(
             projection=merged,
-            merge=merge,
+            merge=state.merge,
             incoming=state.incoming_projection,
             # Task 15 会用这批裁决**独立重算**一次折叠并与 `projection` 逐字节比对
             # （`AdjudicationNotFoldedError`）—— 这是「折叠真的发生了」的第二把锁。
@@ -2470,6 +2548,10 @@ class OoToHtmlCoordinator:
             plan=plan, mutation=mutation, adapter=adapter, fence=_ApplyFence(self, state)
         )
         state.journal.record(ApplyStage.business_committed, str(receipt.content_version_id))
+
+        # Store-backed entry：content_version 已前进，但 HTML 宿主仍读 checklist_responses。
+        # 不镜像则 §9.6 DOM 永远看不到 OO 受管格回写（G4-0d D2 / G4-1 H1 实证）。
+        await self._mirror_store_backed_if_needed(state, merged_projection=merged)
 
         await self._assert_incoming_untouched(state)
         await self._settle_baseline(state, receipt=receipt)
@@ -2484,6 +2566,343 @@ class OoToHtmlCoordinator:
             result=result,
             receipt=receipt,
             next_forcesave_allowed=not receipt.requires_client_refresh,
+        )
+
+    async def _mirror_store_backed_if_needed(
+        self, state: _ApplyState, *, merged_projection: Any
+    ) -> None:
+        """Store-backed pilot：把 merged projection 镜像进 checklist_responses。
+
+        统一路径只提交 content_version；D2/H1 宿主 ``reloadHtml`` 仍读 checklist。
+        不镜像则 OO 受管格回写对结构化视图不可见（§9.6）。
+        """
+        adapter_id = str(state.frozen.adapter_id)
+        if adapter_id == "d2.receivable_detail":
+            from app.services.workpaper_sync import d2_bidirectional_bridge as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "h1.disposal_check":
+            from app.services.workpaper_sync import pilot_h1_grouped_dynamic as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "g7.soe_subsidiary_disclosure":
+            from app.services.workpaper_sync import pilot_g7_two_level_dynamic as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "state"
+            merge_state_fn = bridge.merge_projection_into_store_state
+        elif adapter_id == "b60.hour_budget":
+            from app.services.workpaper_sync import pilot_simple_checklist as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "d1.notes_receivable_detail":
+            # G5-1 Phase 5 首个非 pilot canary：行数组 store，与 B60/H1 同型（merge_kind=rows）。
+            from app.services.workpaper_sync import phase5_d1_notes_receivable as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "d7.contract_liabilities_detail":
+            # G5-1 Phase 5 第二个 canary：行数组 store（merge_kind=rows），但含 nested 账龄
+            # （agingPrior/agingAudited），merge_projection_into_store_rows 内部用 _set_json_path
+            # 写 nested 路径，宿主侧 rows 合并逻辑不变。
+            from app.services.workpaper_sync import phase5_d7_contract_liabilities as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "d3.prepaid_receipts_detail":
+            # G5-1 Phase 5 第三个 canary：行数组 store（merge_kind=rows），含 nested 账龄
+            # （agingPrior/agingAudited），与 D7 同型；merge_projection_into_store_rows 内部
+            # 用 _set_json_path 写 nested 路径。store item = D3-det-rows。
+            from app.services.workpaper_sync import phase5_d3_prepaid_receipts as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "d6.contract_assets_detail":
+            # G5-1 Phase 5 第四个 canary：行数组 store（merge_kind=rows）。🔴 账龄是 FLAT top-level
+            # 键（agePrior1y/ageEnd1y ...），非 nested；merge_projection_into_store_rows 用
+            # _set_json_path 写单段键。store item = D6-2-rows。
+            from app.services.workpaper_sync import phase5_d6_contract_assets as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "d5.receivables_financing_detail":
+            # G5-1 Phase 5 第五个 canary：行数组 store（merge_kind=rows）。FVOCI 无账龄组、无 nested，
+            # 17 列全平铺。store item = D5-2-rows。
+            from app.services.workpaper_sync import phase5_d5_receivables_financing as bridge
+
+            store_item_id = bridge.STORE_ITEM_ID
+            merge_kind = "rows"
+            merge_rows_fn = bridge.merge_projection_into_store_rows
+        elif adapter_id == "d4.revenue_detail":
+            # G5-1 Phase 5 第六个 canary：D4-2 months[] + D4-3 扁平行，双 store item。
+            from app.services.workpaper_sync import phase5_d4_revenue_detail as bridge
+
+            await self._mirror_d4_dual_stores(
+                state, merged_projection=merged_projection, bridge=bridge
+            )
+            return
+        else:
+            return
+
+        import json
+
+        raw = (
+            await self._session.execute(
+                sa.text(
+                    "SELECT remark FROM checklist_responses "
+                    "WHERE wp_id = :wp AND item_id = :item"
+                ),
+                {"wp": str(state.frozen.wp_id), "item": store_item_id},
+            )
+        ).scalar_one_or_none()
+        if merge_kind == "state":
+            base_state: dict | None = None
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        base_state = parsed
+                except (TypeError, ValueError):
+                    base_state = None
+            merged_payload, applied, _visited = merge_state_fn(
+                projection=merged_projection, base_state=base_state
+            )
+            if applied <= 0 and base_state:
+                return
+            payload = json.dumps(merged_payload, ensure_ascii=False)
+        else:
+            base_rows: list = []
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        base_rows = parsed
+                except (TypeError, ValueError):
+                    base_rows = []
+            merged_rows, applied, _visited, _touched = merge_rows_fn(
+                projection=merged_projection, base_rows=base_rows
+            )
+            if applied <= 0 and base_rows:
+                # 投影相对 store 无字段变化时仍允许跳过写库（避免无意义大 JSON 刷新）
+                return
+            payload = json.dumps(merged_rows, ensure_ascii=False)
+        updated = (
+            await self._session.execute(
+                sa.text(
+                    "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                    "WHERE wp_id = :wp AND item_id = :item"
+                ),
+                {
+                    "val": payload,
+                    "wp": str(state.frozen.wp_id),
+                    "item": store_item_id,
+                },
+            )
+        ).rowcount
+        if not updated:
+            await self._session.execute(
+                sa.text(
+                    "INSERT INTO checklist_responses "
+                    "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                    "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                ),
+                {
+                    "pid": str(state.frozen.project_id),
+                    "wp": str(state.frozen.wp_id),
+                    "item": store_item_id,
+                    "val": payload,
+                },
+            )
+        await self._session.commit()
+
+    async def _mirror_d4_dual_stores(
+        self, state: _ApplyState, *, merged_projection: Any, bridge: Any
+    ) -> None:
+        """D4-2-rows + D4-3-rows：按 table 前缀分别 merge 后写回各自 checklist item。"""
+        import json
+
+        base_by_item: dict[str, list] = {}
+        for item_id in bridge.STORE_ITEM_IDS:
+            raw = (
+                await self._session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).scalar_one_or_none()
+            rows: list = []
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        rows = parsed
+                except (TypeError, ValueError):
+                    rows = []
+            base_by_item[item_id] = rows
+
+        updates = bridge.merge_projection_into_all_d4_stores(
+            projection=merged_projection, base_by_item=base_by_item
+        )
+        wrote_any = False
+        for item_id, (merged_rows, applied, _visited, _touched) in updates.items():
+            base_rows = base_by_item.get(item_id) or []
+            if applied <= 0 and base_rows:
+                continue
+            if applied <= 0 and not merged_rows:
+                continue
+            payload = json.dumps(merged_rows, ensure_ascii=False)
+            updated = (
+                await self._session.execute(
+                    sa.text(
+                        "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {
+                        "val": payload,
+                        "wp": str(state.frozen.wp_id),
+                        "item": item_id,
+                    },
+                )
+            ).rowcount
+            if not updated:
+                await self._session.execute(
+                    sa.text(
+                        "INSERT INTO checklist_responses "
+                        "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                        "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                    ),
+                    {
+                        "pid": str(state.frozen.project_id),
+                        "wp": str(state.frozen.wp_id),
+                        "item": item_id,
+                        "val": payload,
+                    },
+                )
+            wrote_any = True
+        if wrote_any:
+            await self._session.commit()
+
+        # D4-5 固定 item（纯文本 remark）
+        if hasattr(bridge, "merge_d45_fixed_from_projection") and hasattr(
+            bridge, "STORE_ITEM_IDS_D45_FIXED"
+        ):
+            base_fixed: dict[str, str | None] = {}
+            for item_id in bridge.STORE_ITEM_IDS_D45_FIXED:
+                raw = (
+                    await self._session.execute(
+                        sa.text(
+                            "SELECT remark FROM checklist_responses "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).scalar_one_or_none()
+                base_fixed[item_id] = raw if isinstance(raw, str) else None
+            fixed_updates = bridge.merge_d45_fixed_from_projection(
+                projection=merged_projection, base_by_item=base_fixed
+            )
+            for item_id, text in fixed_updates.items():
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {
+                            "val": text,
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                        },
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": text,
+                        },
+                    )
+            if fixed_updates:
+                await self._session.commit()
+
+        # D4-35 dict store（{rows, sampling, periodAmount}）：只 merge rows，保留 sampling/periodAmount
+        if hasattr(bridge, "merge_d435_from_projection") and hasattr(
+            bridge, "STORE_ITEM_ID_D435_DICT"
+        ):
+            item_id = bridge.STORE_ITEM_ID_D435_DICT
+            raw = (
+                await self._session.execute(
+                    sa.text(
+                        "SELECT remark FROM checklist_responses "
+                        "WHERE wp_id = :wp AND item_id = :item"
+                    ),
+                    {"wp": str(state.frozen.wp_id), "item": item_id},
+                )
+            ).scalar_one_or_none()
+            base_state: dict | None = None
+            if raw:
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, dict):
+                        base_state = parsed
+                except (TypeError, ValueError):
+                    base_state = None
+            merged_dict, applied, _visited = bridge.merge_d435_from_projection(
+                projection=merged_projection, base_state=base_state
+            )
+            # 无实际写入且已有基线时不覆盖（避免把 sampling 写空）
+            if not (applied <= 0 and base_state is not None):
+                payload = json.dumps(merged_dict, ensure_ascii=False)
+                updated = (
+                    await self._session.execute(
+                        sa.text(
+                            "UPDATE checklist_responses SET remark = :val, updated_at = now() "
+                            "WHERE wp_id = :wp AND item_id = :item"
+                        ),
+                        {"val": payload, "wp": str(state.frozen.wp_id), "item": item_id},
+                    )
+                ).rowcount
+                if not updated:
+                    await self._session.execute(
+                        sa.text(
+                            "INSERT INTO checklist_responses "
+                            "(id, project_id, wp_id, item_id, remark, created_at, updated_at) "
+                            "VALUES (gen_random_uuid(), :pid, :wp, :item, :val, now(), now())"
+                        ),
+                        {
+                            "pid": str(state.frozen.project_id),
+                            "wp": str(state.frozen.wp_id),
+                            "item": item_id,
+                            "val": payload,
+                        },
+                    )
+                await self._session.commit()
+
+    async def _mirror_d2_store_if_needed(
+        self, state: _ApplyState, *, merged_projection: Any
+    ) -> None:
+        """兼容旧名：转调 :meth:`_mirror_store_backed_if_needed`。"""
+        await self._mirror_store_backed_if_needed(
+            state, merged_projection=merged_projection
         )
 
     # ─────────────────────────────────────────────────────────────────

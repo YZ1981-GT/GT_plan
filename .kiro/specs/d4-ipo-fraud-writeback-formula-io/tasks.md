@@ -13,10 +13,16 @@
   - _Requirements: 3.3, 3.4_
 - [x] 6. 行为守卫与四态变异：覆盖真实客户来源、item_id、矩阵/问卷/分组结构、未知映射、公式三态、A13 人工门和双模式同定义执行。
   - _Requirements: 4.1_
-- [x] 7. 真栈验收与收口：Playwright 实测 HTML/Excel 双向往返、三方合并、ack 成功/失败恢复、D4-1 独立重试；完成 spec 结构与产物检查。
-  - _Requirements: 2.3, 4.1
+- [~] 7. 真栈验收与收口：Playwright 实测 HTML/Excel 双向往返、三方合并、ack 成功/失败恢复、D4-1 独立重试；完成 spec 结构与产物检查。
+  - _Requirements: 2.3, 4.1_
+  - D4-29 生命周期修复重开：已补真实组件挂载测试 5 项（保存等待、保存失败与重试、oo_editing 切回矩阵、回读失败保留编辑器、结论独立刷新）；与同步桥/API 合跑 122 passed。移除 flush await 后，保存时序测试按预期 RED，恢复后全绿。
+  - 浏览器验收未完成：已登录并打开重庆和平药房项目 D4-29；点击内部在线编辑后 store-projection 请求尚未取得响应，未进入实际 Excel 往返。页面同时存在内外两套模式入口及「两侧数据未互通」提示，仍需继续排查。浏览器验收由本任务继续负责，不交由用户代验。
 
-## Task Dependency Graph
-```json
+- [ ] 8. D4-30/31/32 接入统一同步桥与受管 provider；未注册能力保持阻塞态，不修改 D4-29。
+  - Requirements: 5.1, 6.1, 6.2
+- [ ] 9. D4-32 unknown 组保真与人工映射：保留 label/id/金额三态/账号中文，非法 JSON 和保存失败保留旧数据并显示错误。
+  - Requirements: 5.2, 5.3
+
+## Task Dependency Graph```json
 {"waves":[{"wave":1,"tasks":["1"]},{"wave":2,"tasks":["2"]},{"wave":3,"tasks":["3","4"]},{"wave":4,"tasks":["5"]},{"wave":5,"tasks":["6"]},{"wave":6,"tasks":["7"]}],"blocking":{"1":"未完成源核定与客户粒度 gate 不得实现 IO","2":"未完成共享公式/双模式 gate 不得宣称完成","4":"未人工确认方向金额证据不得写 A13","5":"emit 无 durable ack 不视为成功"}}
 ```

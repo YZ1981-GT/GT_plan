@@ -599,6 +599,7 @@ async def d4_export_data(
     rows_data: list[dict] = []
     _d4_33_store: dict = {}  # D4-33 嵌套 store（bizTypes/months/priorYear），循环后展开
     _d4_30_custom_dims: list[dict] = []  # D4-30 自定义维度（尾部动态列）
+    _d4_10_formula_meta: dict | None = None  # D4-10 公式真源元数据（随行导出）
     if row and row.remark:
         try:
             parsed = json.loads(row.remark)
@@ -632,6 +633,15 @@ async def d4_export_data(
             # D4-10 stores {rows, totalAmount, formula…}
             elif sheet == "D4-10" and isinstance(parsed, dict):
                 rows_data = parsed.get("rows", []) or []
+                _d4_10_formula_meta = {
+                    "totalAmount": parsed.get("totalAmount", 0),
+                    "totalQuantity": parsed.get("totalQuantity", 0),
+                    "totalAmountManualOverride": parsed.get(
+                        "totalAmountManualOverride", False
+                    ),
+                    "totalAmountFormulaRef": parsed.get("totalAmountFormulaRef")
+                    or "WP('D4-2','本期未审合计')",
+                }
             # D4-34 stores {rentals: [...], consults: [...]}；按导出子区取对应区
             elif sheet == "D4-34-rental" and isinstance(parsed, dict):
                 rows_data = parsed.get("rentals", [])
@@ -847,6 +857,48 @@ async def d4_export_data(
                 data_row.get("conclusion", ""),
                 "",  # 备注
             ]
+        elif sheet == "D4-21":
+            # D4-21 关联方销售/价格：camelCase store 键 → 中文列头顺序。
+            # 差异率/差异率(公允) 是派生列，导出侧按公式重算供展示（导入侧忽略，Req 4.2）。
+            _g = _safe_float(data_row.get("avgPrice"))
+            _h = _safe_float(data_row.get("nonrelatedAvgPrice"))
+            _j = _safe_float(data_row.get("fairPrice"))
+            _diff_nr = round((_g - _h) / _h * 100, 2) if _h else ""
+            _diff_fair = round((_g - _j) / _j * 100, 2) if _j else ""
+            row_values = [
+                "",  # 序号（展示列，导入忽略）
+                data_row.get("partyName", ""),
+                data_row.get("relationship", ""),
+                data_row.get("product", ""),
+                _safe_float(data_row.get("qty")),
+                _safe_float(data_row.get("salesAmount")),
+                _safe_float(data_row.get("salesRatio")),
+                _g,
+                _h,
+                _diff_nr,          # 差异率（派生，展示用）
+                _j,
+                _diff_fair,        # 差异率(公允)（派生，展示用）
+                _safe_float(data_row.get("priorSalesRatio")),
+                _safe_float(data_row.get("priorAvgPrice")),
+                data_row.get("remark", ""),
+            ]
+        elif sheet == "D4-24":
+            # D4-24 第三方回款：camelCase store 键 → 中文列头顺序（无派生列）。
+            row_values = [
+                "",  # 序号（展示列，导入忽略）
+                data_row.get("customerName", ""),
+                _safe_float(data_row.get("annualSales")),
+                _safe_float(data_row.get("endingAr")),
+                _safe_float(data_row.get("thirdPartyAmount")),
+                data_row.get("payerName", ""),
+                data_row.get("reason", ""),
+                data_row.get("payerCustomerRelation", ""),
+                data_row.get("payerEntityRelation", ""),
+                data_row.get("hasPaymentAgreement", ""),
+                data_row.get("isConfirmed", ""),
+                data_row.get("rationality", ""),
+                data_row.get("indexNo", ""),
+            ]
         elif sheet == "D4-22":
             # D4-22: 固定指标行，动态peers列
             peers = data_row.get("peers", [])
@@ -967,6 +1019,18 @@ async def d4_export_data(
             ws.cell(row=1, column=1 + (c_idx - 1), value=h)
         _write_d4_33_rows(ws, biz_types, months_map, prior_map)
 
+    # D4-10：附加「公式元数据」sheet，保证导出可再导入时还原 preset/override
+    if sheet == "D4-10" and _d4_10_formula_meta is not None:
+        meta_ws = wb.create_sheet("公式元数据")
+        meta_ws.append(["字段", "值"])
+        for key in (
+            "totalAmount",
+            "totalQuantity",
+            "totalAmountManualOverride",
+            "totalAmountFormulaRef",
+        ):
+            meta_ws.append([key, _d4_10_formula_meta.get(key, "")])
+
     buffer = io.BytesIO()
     wb.save(buffer)
     buffer.seek(0)
@@ -1015,6 +1079,16 @@ async def d4_import_data(
     expected_headers = _get_headers(sheet)
     actual_headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
     actual_headers = [str(h).strip() if h else "" for h in actual_headers]
+
+    # D4-10：单独打开一份 workbook 读「公式元数据」副表（避免 read_only 主表迭代冲突）
+    _d4_10_xlsx_meta: dict = {}
+    if sheet == "D4-10":
+        try:
+            wb_meta = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            _d4_10_xlsx_meta = _extract_d4_10_formula_meta_from_wb(wb_meta)
+            wb_meta.close()
+        except Exception:
+            _d4_10_xlsx_meta = {}
 
     errors: list[str] = []
     if sheet == "D4-33":
@@ -1089,6 +1163,10 @@ async def d4_import_data(
             row_dict = _parse_d4_15_row(row, actual_headers)
         elif sheet == "D4-16":
             row_dict = _parse_d4_16_row(row, actual_headers)
+        elif sheet == "D4-21":
+            row_dict = _parse_d4_21_row(row, actual_headers)
+        elif sheet == "D4-24":
+            row_dict = _parse_d4_24_row(row, actual_headers)
         elif sheet == "D4-22":
             row_dict = _parse_d4_22_row(row, actual_headers)
         elif sheet == "D4-23":
@@ -1275,17 +1353,9 @@ async def d4_import_data(
     elif sheet == "D4-10":
         # 🔴 D4-10 HTML store 是 dict（{rows, totalAmount, formula…}），不得整表写成裸数组。
         # 导入只替换 rows；总额/公式覆盖位保留既有值（公式真源不被 I/O 冲掉）。
+        # 若 xlsx 含「公式元数据」副表，用其补全空缺位（导出往返）。
         existing_data = await _load_existing(item_id)
-        merged = {
-            "rows": rows_data,
-            "totalAmount": existing_data.get("totalAmount", 0),
-            "totalQuantity": existing_data.get("totalQuantity", 0),
-            "totalAmountManualOverride": existing_data.get(
-                "totalAmountManualOverride", False
-            ),
-            "totalAmountFormulaRef": existing_data.get("totalAmountFormulaRef")
-            or "WP('D4-2','本期未审合计')",
-        }
+        merged = merge_d4_10_import_rows(existing_data, rows_data, _d4_10_xlsx_meta)
         remark_json = json.dumps(merged, ensure_ascii=False)
     elif sheet == "D4-9":
         # D4-9 store = {current:{rows,total…}, prior:{…}}；xlsx 只投影 current 行，
@@ -1779,6 +1849,64 @@ def _parse_d4_9_row(row: tuple, actual_headers: list[str]) -> dict:
     }
 
 
+def merge_d4_10_import_rows(
+    existing_data: dict,
+    imported_rows: list[dict],
+    xlsx_meta: dict | None = None,
+) -> dict:
+    """合并 D4-10 导入行与既有公式元数据（公式真源不被 I/O 冲掉）。
+
+    优先级：xlsx「公式元数据」副表显式字段 > existing store > 预设默认。
+    """
+    meta = xlsx_meta or {}
+    existing = existing_data or {}
+
+    def _pick(key: str, default: Any) -> Any:
+        if key in meta and meta[key] not in (None, ""):
+            return meta[key]
+        if key in existing and existing[key] not in (None, ""):
+            return existing[key]
+        return default
+
+    override = _pick("totalAmountManualOverride", False)
+    if isinstance(override, str):
+        override = override.strip().lower() in ("1", "true", "yes", "y")
+
+    return {
+        "rows": imported_rows,
+        "totalAmount": _safe_float(_pick("totalAmount", 0)),
+        "totalQuantity": _safe_float(_pick("totalQuantity", 0)),
+        "totalAmountManualOverride": bool(override),
+        "totalAmountFormulaRef": str(
+            _pick("totalAmountFormulaRef", "WP('D4-2','本期未审合计')")
+        ),
+    }
+
+
+def _extract_d4_10_formula_meta_from_wb(wb: Any) -> dict:
+    """从导出的「公式元数据」副表还原 D4-10 公式字段；无副表返回 {}。"""
+    try:
+        if "公式元数据" not in getattr(wb, "sheetnames", []):
+            return {}
+        ws = wb["公式元数据"]
+    except Exception:
+        return {}
+    out: dict = {}
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if not row or row[0] is None:
+            continue
+        key = str(row[0]).strip()
+        val = row[1] if len(row) > 1 else None
+        if key in (
+            "totalAmount",
+            "totalQuantity",
+            "totalAmountManualOverride",
+            "totalAmountFormulaRef",
+        ):
+            out[key] = val
+    return out
+
+
 def _parse_d4_10_row(row: tuple, actual_headers: list[str]) -> dict:
     """D4-10 客户价格：中文列 → PriceRow 英文字段（录入列；派生列前端重算）。"""
     values = list(row) + [None] * (len(actual_headers) - len(row))
@@ -1828,6 +1956,76 @@ def _parse_d4_11_row(row: tuple, actual_headers: list[str]) -> dict:
         "reason": _safe_str(_col_val("差异原因分析")),
         "priceSource": _safe_str(_col_val("市场价格来源")),
         "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_21_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-21 关联方销售/价格：中文列头 → 契约 camelCase 键（与 phase5_d4_ipo_related_sheets
+    descriptor 的 json_path 逐字对齐）。
+
+    🔴 Req 4.2「派生列不采信」：差异率 I=(G-H)/H、差异率(公允) K=(G-J)/J 是模板内部
+    OO 公式（FORMULA_MASK），**不从文件读**、不写入 store —— 前端/OOXML 按公式重算。
+    序号是展示列也不入 store（行身份用 rowId）。
+    """
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "rowId": str(uuid4()),
+        "partyName": _safe_str(_col_val("关联方客户名称")),
+        "relationship": _safe_str(_col_val("关联关系")),
+        "product": _safe_str(_col_val("产品名称")),
+        "qty": _safe_float(_col_val("销售数量")),
+        "salesAmount": _safe_float(_col_val("销售额")),
+        "salesRatio": _safe_float(_col_val("销售额占比")),
+        "avgPrice": _safe_float(_col_val("平均单价")),
+        "nonrelatedAvgPrice": _safe_float(_col_val("非关联方平均单价")),
+        # 差异率 / 差异率(公允) 是派生列 —— 不采信、不写 store（Req 4.2 / FORMULA_MASK I/K）
+        "fairPrice": _safe_float(_col_val("可比公允价格")),
+        "priorSalesRatio": _safe_float(_col_val("上年度占比")),
+        "priorAvgPrice": _safe_float(_col_val("上年度平均单价")),
+        "remark": _safe_str(_col_val("备注")),
+    }
+
+
+def _parse_d4_24_row(row: tuple, actual_headers: list[str]) -> dict:
+    """D4-24 第三方回款：中文列头 → 契约 camelCase 键（descriptor json_path 对齐）。
+
+    无内部公式（FORMULA_MASK 空），13 列全录入。序号为展示列不入 store（行身份 rowId）。
+    """
+    from uuid import uuid4
+
+    values = list(row) + [None] * (len(actual_headers) - len(row))
+
+    def _col_val(col_name: str) -> Any:
+        try:
+            idx = actual_headers.index(col_name)
+            return values[idx] if idx < len(values) else None
+        except ValueError:
+            return None
+
+    return {
+        "rowId": str(uuid4()),
+        "customerName": _safe_str(_col_val("客户名称")),
+        "annualSales": _safe_float(_col_val("本年度销售金额")),
+        "endingAr": _safe_float(_col_val("期末应收账款余额")),
+        "thirdPartyAmount": _safe_float(_col_val("本年度第三方回款金额")),
+        "payerName": _safe_str(_col_val("第三方回款方名称")),
+        "reason": _safe_str(_col_val("第三方回款原因")),
+        "payerCustomerRelation": _safe_str(_col_val("第三方回款方与客户关系")),
+        "payerEntityRelation": _safe_str(_col_val("第三方回款方与被审计单位关系")),
+        "hasPaymentAgreement": _safe_str(_col_val("是否有代付协议")),
+        "isConfirmed": _safe_str(_col_val("是否函证")),
+        "rationality": _safe_str(_col_val("合理性分析")),
+        "indexNo": _safe_str(_col_val("索引")),
     }
 
 
@@ -2590,10 +2788,12 @@ def _reshape_d4_32_rows(rows_data: list[dict]) -> list[dict]:
     unknown: list[dict] = []
     for r in rows_data:
         gkey = r.pop("_groupKey", "__unknown__")
-        r.pop("_groupLabel", None)
+        glabel = r.pop("_groupLabel", "")
         if gkey in buckets:
             buckets[gkey].append(r)
         else:
+            # Preserve the source label on every unknown row for later manual mapping.
+            r["groupLabel"] = glabel
             unknown.append(r)
     groups = [{"key": k, "rows": buckets[k]} for k in _D4_32_GROUP_ORDER]
     if unknown:

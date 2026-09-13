@@ -8,10 +8,14 @@
  * AI辅助生成访谈问卷内容 + 双模式OO
  */
 import { ref, computed, inject, watch, onBeforeUnmount } from 'vue'
+import { useD4InterviewSave, useD4InterviewMode } from './useD4InterviewSync'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useD4ImportExport } from '../../composables/useD4ImportExport'
 import D4IpoFindingWriteback, { type D4IpoFinding } from './D4IpoFindingWriteback.vue'
-import GtOnlyOfficeSheet from '../../GtOnlyOfficeSheet.vue'
+import WorkpaperSyncEditorHost from '../../sync/WorkpaperSyncEditorHost.vue'
+import { useWorkpaperSyncBridge } from '../../sync/useWorkpaperSyncBridge'
+import { readStoreProjection } from '../../sync/workpaperSyncApi'
+import { capabilityForEntry } from '../../sync/workpaperSyncCapability'
 import GtIndexChip from '../../GtIndexChip.vue'
 import http from '@/utils/http'
 
@@ -19,7 +23,15 @@ const props = defineProps<{ wpId: string; projectId: string; allResponses: Map<s
 const openReviewDialog = inject<((sectionId: string) => void) | null>('openReviewDialog', null)
 // 导入 xlsx 成功后重载 allResponses（主入口 provide），否则界面停留在旧值
 const reloadWorkpaperData = inject<(() => Promise<void>) | null>('reloadWorkpaperData', null)
-const { exportTemplate, exportData, importData, importing } = useD4ImportExport({ wpId: computed(() => props.wpId), projectId: computed(() => props.projectId) })
+const d4Save = useD4InterviewSave(() => ['D4-31-interview'].map(k => props.allResponses.get(k)).filter(Boolean))
+const D4_SYNC_ENTRY_ID = 'xlsx/gt-d4-operating-revenue'
+const d4SyncBridge = useWorkpaperSyncBridge({
+  entryId: ref(D4_SYNC_ENTRY_ID), wpId: computed(() => props.wpId), projectId: computed(() => props.projectId), sheetKey: ref('d4-31-managed'), capability: capabilityForEntry(D4_SYNC_ENTRY_ID),
+  flushHtml: async () => { await d4Save.flush(); const snap = await readStoreProjection({ projectId: props.projectId, wpId: props.wpId, entryId: D4_SYNC_ENTRY_ID }); return { expectedRevision: snap.expectedRevision, projection: snap.projection, sheetKey: 'd4-31-managed' } },
+  reloadHtml: async () => { await reloadWorkpaperData?.() },
+})
+const d4SyncDescriptor = computed(() => d4SyncBridge.descriptor.value)
+
 async function handleImportFile(f: any) { const r = await importData('D4-31', f.raw || f); if (r) await reloadWorkpaperData?.() }
 
 // ─── 问卷数据模型 ─────────────────────────────────────────────────────
@@ -79,10 +91,10 @@ watch(() => props.allResponses.get('D4-31-interview')?.remark, loadData, { immed
 function persistAll() {
   props.allResponses.set('D4-31-interview', { item_id: 'D4-31-interview', conclusion: null, remark: JSON.stringify(formData.value) })
   if (debounceTimer) clearTimeout(debounceTimer)
-  debounceTimer = setTimeout(() => { debounceTimer = null; window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: [props.allResponses.get('D4-31-interview')].filter(Boolean) } })) }, 2000)
+  d4Save.schedule()
 }
 function update(field: keyof InterviewData, value: any) { if (props.isReadonly) return; (formData.value as any)[field] = value; persistAll() }
-onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); window.dispatchEvent(new CustomEvent('d4:save-items', { detail: { items: [props.allResponses.get('D4-31-interview')].filter(Boolean) } })) } })
+onBeforeUnmount(() => { if (debounceTimer) { clearTimeout(debounceTimer); d4Save.flush().catch(() => undefined) } })
 
 // ─── 访谈红旗发现（仅显式'是'/关联关系标记；q5 其他事项非空作留痕候选，人工认定后才推）───
 const riskFindings = computed<D4IpoFinding[]>(() => {
@@ -100,7 +112,7 @@ const riskFindings = computed<D4IpoFinding[]>(() => {
   return out
 })
 
-const editorMode = ref<string>('问卷视图'); const modeOptions = ['问卷视图', '在线编辑']
+const { editorMode, modeOptions, busy: syncBusy, feedback: syncFeedback } = useD4InterviewMode(d4SyncBridge, () => props.isReadonly, ['问卷视图'])
 const activeSection = ref('meta')
 const showExample = ref(false)
 
@@ -347,9 +359,7 @@ const exampleTradeItems = [
     </div>
   </template>
 
-  <template v-if="editorMode === '在线编辑'">
-    <div class="oo-container"><GtOnlyOfficeSheet :wp-id="wpId" :project-id="projectId" sheet-name="客户访谈记录 D4-31" :readonly="isReadonly" /></div>
-  </template>
+  <template v-if="editorMode === '在线编辑'"><div class="oo-container"><WorkpaperSyncEditorHost v-if="d4SyncDescriptor" :descriptor="d4SyncDescriptor" :bridge="d4SyncBridge" /><div v-else class="oo-loading">正在打开 D4-31 同步编辑器…</div></div></template>
 
   <!-- 访谈案例弹窗 -->
   <el-dialog v-model="showExample" title="📖 访谈记录与核对示例" width="800px" destroy-on-close top="5vh">

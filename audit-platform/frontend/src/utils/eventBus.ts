@@ -450,6 +450,19 @@ export type Events = {
     timestamp: number
   }
 
+  // D4 价格分析异常回标上游（D4-10 客户价格 / D4-11 产品价格 → D4-2 主营明细行标记）
+  // spec: d4-price-analysis-writeback-linkage / Req 4。幂等：items 为该表当前全部异常项，
+  // 接收端按 targetKey 覆盖标记集合（非追加），空数组 = 清除该来源全部标记。
+  'd4:price-abnormal': {
+    /** 来源底稿：D4-10（客户价格）/ D4-11（产品价格） */
+    wpCode: 'D4-10' | 'D4-11'
+    /** 回标目标维度：客户名 / 产品品种 */
+    targetKey: 'customer' | 'product'
+    /** 当前全部异常项（name = 客户名/品种，diffPct = 最大差异率） */
+    items: Array<{ name: string; diffPct: number }>
+    timestamp?: number
+  }
+
   // H5 折耗分配 → D5 营业成本
   'depletion:allocated': {
     wp_code: string

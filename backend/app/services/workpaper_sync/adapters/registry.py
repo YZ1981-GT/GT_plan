@@ -1224,6 +1224,27 @@ DELIVERED_PER_ENTRY_CONTRACTS: Final[tuple[Mapping[str, Any], ...]] = (
             "有 file_path。`adapter_registered=True`：overlay 裁决 + manifest 重生 + 发布链产出 representation。"
         ),
     },
+    # ── G5-1 D4 营业收入（位置数组；契约含 D4-2/D4-3/D4-5 sibling sheets）─────
+    {
+        "contract_id": "d4.revenue_detail",
+        "provider_module": "app.services.workpaper_sync.phase5_d4_revenue_detail",
+        "delivered_by_task": "G5-1",
+        "pilot_class": "phase5_revenue_detail",
+        "entry_id": "xlsx/gt-d4-operating-revenue",
+        "document_type": "xlsx",
+        "authority_model": "projection_contract",
+        "template_relative_path": "D/D4 收入底稿.xlsx",
+        "adapter_registered": True,
+        "reason": (
+            "G5-1 Phase 5 第六个 canary（第五种行形态：位置数组）。选型守卫 assert_entry_selectable "
+            "核四条 manifest 事实（entry 存在 / independent=True / profile==room_service_wired.v1 / "
+            "wp_code==['D4O']）+ 零回退（D4O find/any 均 None、父码 D4 落净化后权威模板）+ "
+            "mapping_digest 哨兵。权威模板 D/D4 收入底稿.xlsx（sha256 b8fb92d4…）；受管 sheets="
+            "d42-managed / d43-managed / d45-managed（D4-5 政策检查：分组紧凑表 + 经营模式 B11–B16；"
+            "宿主 D4TabPolicyCheck 独立，不进 isD4DetailSheet）。HTML store 含 D4-2-rows / D4-3-rows / "
+            "D4-5-policy-groups + D4-5-biz-*。wp_code 裁决=['D4']（真载荷落点）。"
+        ),
+    },
 )
 
 
@@ -1297,6 +1318,7 @@ _ALLOWED_PROVIDER_MODULES: Final[frozenset[str]] = frozenset(
         "app.services.workpaper_sync.phase5_d3_prepaid_receipts",
         "app.services.workpaper_sync.phase5_d6_contract_assets",
         "app.services.workpaper_sync.phase5_d5_receivables_financing",
+        "app.services.workpaper_sync.phase5_d4_revenue_detail",
     }
 )
 

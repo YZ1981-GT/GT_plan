@@ -289,6 +289,7 @@ describe('switchToOnlyOffice：消费 pending token，materialize 成功才 moun
     const [scope, input] = h.api.materialize.mock.calls[0]
     expect(scope).toEqual({ projectId: PROJECT, wpId: WP, entryId: ENTRY })
     expect(input.pendingMutationToken).toBe('tok-1')
+    expect(input.idempotencyKey).toBe('idem-1')
     expect(input.expectedRevision).toBe(11)
     expect(descriptor.roomId).toBe(UUID(21))
     // descriptor 到手但还没挂载：mount 计数为 0（挂载是宿主的事，Task 33）。
