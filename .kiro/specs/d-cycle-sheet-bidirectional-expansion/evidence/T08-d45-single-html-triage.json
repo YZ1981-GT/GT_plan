@@ -1,0 +1,37 @@
+{
+  "measured_at": "2026-09-13",
+  "sheet": "营业收入会计政策检查D4-5",
+  "entry_id": "xlsx/gt-d4-operating-revenue",
+  "adapter_id": "d4.revenue_detail",
+  "decision": "single_html",
+  "not_bidirectional": true,
+  "rationale": [
+    "Excel 为段落式程序/政策叙述（一、审计目标 / 二、审计过程 / 经营模式 / 会计政策分组 / 信用政策 / 结论），非固定 data-row 网格",
+    "HTML 持久化为多 item_id：D4-5-biz-*、D4-5-policy-groups(JSON)、D4-5-credit-policy、D4-5-audit-note、D4-5-audit-conclusion —— 与契约 table_key 扁平行不对齐",
+    "policyGroups 可动态增删；Excel 侧无 GTROW/UUID 身份列、无 footer 合计锚",
+    "spec 诚实边界：程序/附注/政策检查不得强行单元格双向"
+  ],
+  "html": {
+    "composable": "useD4PolicyCheck",
+    "dual_mode_key": "policy-check",
+    "store_shape": "multi_item_id_prefix_D4-5-",
+    "dynamic": true
+  },
+  "excel_probe": {
+    "template_path": "backend/wp_templates/D/D4 收入底稿.xlsx",
+    "layout": "narrative_sections",
+    "sample_anchors": [
+      "R5 一、审计目标",
+      "R7 二、审计过程",
+      "R10 （一）经营模式",
+      "R17 （二）会计政策…",
+      "R18/R31 业务类型分组（销售商品收入/贸易业务）"
+    ],
+    "gtrow_or_uuid_column": false,
+    "managed_data_band": null
+  },
+  "host_implication": "Keep dualMode / GtOnlyOfficeSheet or HTML-only; do NOT add d45-managed to d4.revenue_detail sheets[]",
+  "redirect": {
+    "next_bidirectional_candidate": "D4-4 (Wave 2 kickoff; UUID col still unfrozen) or D1-2"
+  }
+}
