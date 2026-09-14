@@ -717,13 +717,32 @@ class SyncContract:
         )
         return nested + self.fields + self.repeaters
 
+    def _stable_key_index(self) -> Mapping[str, FieldSpec]:
+        """`{stable_field_key: FieldSpec}` 的**惰性 memoized** 索引（O(1) 查找）。
+
+        🔴 性能修复（spec oo-html-writeback-performance ROI-5a）：原 `field_by_stable_key`
+        逐字段线性扫 `all_fields()`（且每次重建 tuple），`build_projection` 对 28431 个
+        运行时 key 各调 2 次 → O(字段²) ≈ 千万次比较（实测 pending-mutations 24-33s 根因）。
+
+        `SyncContract` 是 `frozen=True`，故用 `object.__setattr__` 挂私有缓存；契约不可变，
+        索引一次建成即恒定。**用 `setdefault` 保留首个** —— 与原线性扫描"返回首个匹配"
+        语义逐字对齐（D4 契约实证 180 字段全唯一，此处只为防未来出现重复时行为漂移）。
+        """
+        idx = getattr(self, "_field_index_cache", None)
+        if idx is None:
+            idx = {}
+            for field in self.all_fields():
+                idx.setdefault(field.stable_field_key, field)
+            object.__setattr__(self, "_field_index_cache", idx)
+        return idx
+
     def field_by_stable_key(self, stable_key: str) -> FieldSpec:
-        for field in self.all_fields():
-            if field.stable_field_key == stable_key:
-                return field
-        raise ContractSchemaError(
-            f"contract {self.contract_id}: 未登记 stable_field_key {stable_key!r}"
-        )
+        try:
+            return self._stable_key_index()[stable_key]
+        except KeyError:
+            raise ContractSchemaError(
+                f"contract {self.contract_id}: 未登记 stable_field_key {stable_key!r}"
+            ) from None
 
     def editable_field_keys(self) -> tuple[str, ...]:
         return tuple(

@@ -1711,15 +1711,39 @@ def verify_unmanaged_regions(
     事后推断位移量等于让被检查对象自己声明自己合法，那才是放宽（design.md 拒绝方案第 3 条）。
     """
     lim = limits or load_limits()
-    base = unmanaged_region_digest(
-        before,
-        contract=contract,
-        region=region,
-        binding=binding,
-        scan=scan,
-        limits=lim,
-        extra_managed_sheet_parts=extra_managed_sheet_parts,
+    # 🔴 before 侧 digest 是**不变量**：它只依赖 before 文件字节 + region/binding/extra 判别
+    # 子（不含 after-only 的 row_shift/propagation/shared_strings_limit）。before 是已发布
+    # 不可变 substrate，同字节永远算出同 digest。按 before 字节 sha256 + 判别子进程内 LRU
+    # 缓存，命中时省掉一次整簿逐 part 字节 digest（materialize 的 verify 每次都重算它）。
+    # after 侧照常每次算（它是本次产物，必变）；漂移判定的比较逻辑一字不动 —— 只避免重算
+    # 不变量，不弱化任何校验。（spec oo-html-writeback-performance ROI-4）
+    #
+    # 键用 before 字节 sha256 而非路径/revision：D4-29 的 before-normalization 依赖 after
+    # （每次不同），其 before 字节随 after 变 → sha 变 → 自然 miss，无需特判排除，也不会误命中。
+    from app.services.workpaper_sync.parse_cache import BEFORE_DIGEST_CACHE
+
+    before_sha = _file_sha256_cached(before, limits=lim)
+    before_key = "|".join(
+        (
+            before_sha,
+            str(contract.contract_id),
+            str(region.sheet_part),
+            str(binding.table_key),
+            ",".join(sorted(str(p) for p in extra_managed_sheet_parts)),
+        )
     )
+    base = BEFORE_DIGEST_CACHE.get(before_key)
+    if base is None:
+        base = unmanaged_region_digest(
+            before,
+            contract=contract,
+            region=region,
+            binding=binding,
+            scan=scan,
+            limits=lim,
+            extra_managed_sheet_parts=extra_managed_sheet_parts,
+        )
+        BEFORE_DIGEST_CACHE.put(before_key, base)
     target = unmanaged_region_digest(
         after,
         contract=contract,
@@ -2155,7 +2179,7 @@ def extract_projection(
     assert_substrate_usable(
         role=substrate_role, artifact_kind=artifact_kind, artifact_state=artifact_state
     )
-    ooxml = validate_ooxml_artifact(artifact, document_type="xlsx", limits=lim)
+    ooxml = _validate_ooxml_cached(artifact, document_type="xlsx", limits=lim)
 
     try:
         with zipfile.ZipFile(artifact) as zf:
@@ -2197,7 +2221,7 @@ def extract_projection(
         sheet_name=region.sheet_name,
         uuid_column=region.uuid_column,
         raw_by_row=raw_uuid_by_row,
-        artifact_sha256=_file_sha256(artifact, limits=lim),
+        artifact_sha256=_file_sha256_cached(artifact, limits=lim),
         tombstoned=binding.tombstoned_row_keys,
     )
 
@@ -2346,6 +2370,81 @@ def _file_sha256(path: Path, *, limits: SyncLimits) -> str:
                 break
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 按文件内容记忆化的纯文件级 IO（性能，不改判据）
+#
+# ``sha256`` 与 OOXML 安全门只依赖文件字节：同一物理 artifact 无论被几个 binding
+# 反读、无论被同一次 GET 端点请求几次，结果都恒等。多 sheet 大底稿（如 D4-营业收入）
+# 的 ``extract`` 会 ``for binding in _all_bindings()`` 逐个 binding 各跑一遍
+# ``extract_projection``，其中 ``validate_ooxml_artifact`` 会**流式解压整册**、
+# ``_file_sha256`` 会**全量读一遍文件**。N 个 binding = N 次全量解压 + N 次全量哈希，
+# 这是 store-projection 端点几十秒耗时的数量级来源。
+#
+# 缓存键含 (path, mtime_ns, size)：published substrate 运行时不变，命中率高；一旦文件
+# 被重写（mtime/size 变）自动失效，绝不会读到旧内容。缓存有上限，满则清空（只读结果、
+# 无副作用，重算即可），不会无界增长。
+# ═══════════════════════════════════════════════════════════════════════════
+
+_FILE_IO_CACHE_MAX_ENTRIES: Final[int] = 64
+_sha256_cache: dict[tuple[str, int, int], str] = {}
+_ooxml_cache: dict[tuple[Any, ...], Any] = {}
+
+
+def _file_cache_key(path: Path) -> tuple[str, int, int] | None:
+    """(resolved_path, mtime_ns, size)；无法 stat（文件不存在等）返回 None → 不缓存。"""
+    try:
+        st = path.stat()
+    except OSError:
+        return None
+    return (str(path.resolve()), st.st_mtime_ns, st.st_size)
+
+
+def _file_sha256_cached(path: Path, *, limits: SyncLimits) -> str:
+    # sha256 只依赖文件字节（limits 仅提供 chunk 读取粒度，不影响结果值），故缓存键不含 limits。
+    key = _file_cache_key(path)
+    if key is None:
+        return _file_sha256(path, limits=limits)
+    hit = _sha256_cache.get(key)
+    if hit is not None:
+        return hit
+    value = _file_sha256(path, limits=limits)
+    if len(_sha256_cache) >= _FILE_IO_CACHE_MAX_ENTRIES:
+        _sha256_cache.clear()
+    _sha256_cache[key] = value
+    return value
+
+
+def _ooxml_budget_fingerprint(limits: SyncLimits) -> tuple[Any, ...]:
+    """OOXML 门判据依赖的**全部**阈值指纹 —— 任一变化即让缓存失效（不误命中）。
+
+    门的结果取决于这些预算与策略版本；把它们纳入键，才不会出现「宽松 limits 缓存了
+    通过的 report，严格 limits 命中缓存跳过应有的 BudgetExceededError」这类安全门被
+    静默旁路的错误（test_*_budget_is_wired_into_extract 守护此不变量）。
+    """
+    return (
+        limits.max_compressed_bytes,
+        limits.max_expanded_bytes,
+        limits.max_zip_entries,
+        limits.max_compression_ratio,
+        limits.ooxml.policy_version,
+    )
+
+
+def _validate_ooxml_cached(path: Path, *, document_type: str, limits: SyncLimits) -> Any:
+    base = _file_cache_key(path)
+    if base is None:
+        return validate_ooxml_artifact(path, document_type=document_type, limits=limits)
+    key = (*base, document_type, *_ooxml_budget_fingerprint(limits))
+    hit = _ooxml_cache.get(key)
+    if hit is not None:
+        return hit
+    report = validate_ooxml_artifact(path, document_type=document_type, limits=limits)
+    if len(_ooxml_cache) >= _FILE_IO_CACHE_MAX_ENTRIES:
+        _ooxml_cache.clear()
+    _ooxml_cache[key] = report
+    return report
 
 
 def _collect_fields(

@@ -48,6 +48,7 @@ confirm-descriptor 重放比对），而下载签名必须短 TTL（AC 10.7）�
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -72,6 +73,7 @@ from app.services.workpaper_sync.adapters.registry import (
     build_production_registry,
 )
 from app.services.workpaper_sync.artifacts import CanonicalArtifactRepository
+from app.services.workpaper_sync.parse_cache import BoundedLruCache
 from app.services.workpaper_sync.callback_delivery import CallbackDeliveryService
 from app.services.workpaper_sync.callback_download import (
     build_download_policy,
@@ -551,6 +553,29 @@ async def _attach_pilot_adapters(svc: _SyncServices) -> tuple[str, ...]:
         attach_pilot_adapters as attach_g7_pilot_adapters,
     )
 
+    # 🔴 性能（spec oo-html-writeback-performance ROI-0）：完整注册（4 条 pilot attach +
+    # register_from_manifest 覆盖 186 条 entry）实测每请求 21-27s —— 三个 sync 端点共同的
+    # 主瓶颈。其成本几乎全在 `_describe_entry_supply` 的逐 entry DB 查询（~186×2 往返）与
+    # 各 pilot provider 的 published-identity 观测（读 definition blob + 校 digest）。
+    #
+    # 但注册结果**只依赖**：静态 source-backed manifest + 已发布状态（每个 entry 当前指向哪个
+    # representation）。二者只在 publish/finalize 时才变（罕见）。因此按「已发布状态指纹」
+    # 进程级缓存已注册的 AdapterRegistration 对象（它们由 frozen definitions 构建，不持有
+    # 会话，跨请求安全）。指纹变化（有新 representation 发布）即重建；否则把缓存的注册**原样
+    # 重放**进本请求的新 registry（`register()` 是纯内存 + 全量重校验，微秒级）。
+    #
+    # register() 在重放时仍逐条跑全部 RG 判据（身份唯一/document_type/bundle/authority/
+    # contract 双重漂移/matcher 重叠），故缓存不弱化任何注册准入校验 —— 只跳过「查供给」的
+    # DB 往返与观测器重跑。
+    fingerprint = await _registration_state_fingerprint(svc)
+    cached = _REGISTRATION_CACHE.get(fingerprint)
+    if cached is not None:
+        already = {reg.entry_id for reg in svc.registry.registrations()}
+        for reg in cached.registrations:
+            if reg.entry_id not in already:
+                svc.registry.register(reg)
+        return cached.adapter_ids
+
     explicit = (
         await attach_pilot_adapters(svc.registry, session=svc.session)
         + await attach_d2_pilot_adapters(svc.registry, session=svc.session)
@@ -562,7 +587,64 @@ async def _attach_pilot_adapters(svc: _SyncServices) -> tuple[str, ...]:
     # 上面：计划里每个 entry 仍派发到它**自己**的 attach（不共用），本次 pass 会发现它们
     # 已注册并原样计入。零注册不再是「没人来注册」，而是可读的供给原因。
     outcome = await svc.registry.register_from_manifest(session=svc.session)
-    return tuple(dict.fromkeys((*explicit, *outcome.registered_adapter_ids)))
+    adapter_ids = tuple(dict.fromkeys((*explicit, *outcome.registered_adapter_ids)))
+    _REGISTRATION_CACHE.put(
+        fingerprint,
+        _RegistrationSnapshot(
+            registrations=svc.registry.registrations(),
+            adapter_ids=adapter_ids,
+        ),
+    )
+    return adapter_ids
+
+
+@dataclass(frozen=True)
+class _RegistrationSnapshot:
+    """一次成功注册的可重放快照：已注册的 AdapterRegistration + 汇总 adapter_ids。
+
+    `AdapterRegistration` 由 frozen definitions 构建、不持有会话，跨请求重放安全。
+    """
+
+    registrations: tuple[Any, ...]
+    adapter_ids: tuple[str, ...]
+
+
+#: ROI-0 进程级注册缓存。键 = 已发布状态指纹（manifest digest + entry→current representation
+#: 映射）。有界，防指纹爆炸（理论上项目/发布态组合有限，8 足够）。
+_REGISTRATION_CACHE: "BoundedLruCache[str, _RegistrationSnapshot]" = BoundedLruCache(
+    maxsize=8
+)
+
+
+async def _registration_state_fingerprint(svc: _SyncServices) -> str:
+    """注册结果的**廉价**失效指纹：一次查询代替 186×2 次逐 entry 查询。
+
+    注册结果只依赖：静态 manifest（进程内常量）+ 每个 entry 当前指向的 representation。
+    用**一次** `working_paper_sync_entry_state` 全表扫（entry_id → current_representation_id）
+    的规范化摘要作指纹。任何 publish/finalize 改了某 entry 的 current pointer ⇒ 指纹变 ⇒
+    缓存 miss ⇒ 重建。manifest 是源码 source-backed 静态物，进程生命周期内不变，纳入 key
+    只为防不同 manifest 串味（多 workspace / 热重载）。
+    """
+    import hashlib
+
+    from app.models.workpaper_sync_models import WorkpaperSyncEntryState
+
+    rows = (
+        await svc.session.execute(
+            sa.select(
+                WorkpaperSyncEntryState.entry_id,
+                WorkpaperSyncEntryState.current_representation_id,
+            )
+        )
+    ).all()
+    # 规范化：按 entry_id 排序后拼接，保证顺序无关的稳定摘要。
+    body = ";".join(
+        f"{eid}={rep}" for eid, rep in sorted((str(e), str(r)) for e, r in rows)
+    )
+    manifest_digest = str(len(svc.registry.manifest_entries))
+    return hashlib.sha256(
+        f"{manifest_digest}|{body}".encode("utf-8")
+    ).hexdigest()
 
 
 async def _registration(svc: _SyncServices, scope: GuardedScope):
@@ -916,7 +998,13 @@ async def _materialize_request(
             },
         )
     try:
-        projection = build_projection(payload=payload.get("projection"), contract=contract)
+        # build_projection 是纯 CPU（无 DB/会话）：对 28431 字段的大 payload 达数十秒。
+        # 直接在 async 端点里跑会阻塞整个事件循环，把并发轻量轮询（active-job /
+        # notifications 等）连累到数秒级。丢进线程池，事件循环在解析期间照常服务其他请求。
+        # （spec oo-html-writeback-performance ROI-5b）
+        projection = await asyncio.to_thread(
+            build_projection, payload=payload.get("projection"), contract=contract
+        )
     except SyncDomainError as exc:
         raise _sync_http(exc) from exc
     return MaterializeRequest(

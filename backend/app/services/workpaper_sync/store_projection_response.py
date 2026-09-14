@@ -23,6 +23,7 @@ store（materialize 会另报 `materialize_substrate_not_published`）。
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import uuid
 from typing import Any
@@ -117,7 +118,24 @@ async def _overlay_with_published_substrate(
     if not substrate.is_file():
         return store_projection, False
 
-    baseline = registration.adapter.extract(artifact=substrate, contract=contract)
+    # 🔴 baseline extract 是 substrate **字节的纯函数**：同一份已发布不可变 artifact 永远
+    # 解析出同一 Projection。substrate 是内容寻址存储（`resolved.artifact_sha256` 是它的
+    # 字节 sha256），因此按 `{contract_id}:{sha256}` 作键进程内 LRU 缓存 —— 字节一变即 key
+    # 变即天然失效，无需推理"何时清除"。命中时省掉 40s 的整簿 openpyxl 全量解析（这是
+    # store-projection 37-46s 的全部成本；overlay 本身是毫秒级）。
+    # （spec oo-html-writeback-performance ROI-1）
+    #
+    # adapter.extract 是同步 openpyxl 全量解析：miss 时仍丢线程池执行，让事件循环在解析
+    # 期间照常服务其他请求（并发轻量轮询不被连累）。
+    from app.services.workpaper_sync.parse_cache import BASELINE_EXTRACT_CACHE
+
+    cache_key = f"{contract.contract_id}:{resolved.artifact_sha256}"
+    baseline = BASELINE_EXTRACT_CACHE.get(cache_key)
+    if baseline is None:
+        baseline = await asyncio.to_thread(
+            registration.adapter.extract, artifact=substrate, contract=contract
+        )
+        BASELINE_EXTRACT_CACHE.put(cache_key, baseline)
     merged = overlay_store_on_baseline_projection(
         baseline=baseline, store_projection=store_projection
     )
