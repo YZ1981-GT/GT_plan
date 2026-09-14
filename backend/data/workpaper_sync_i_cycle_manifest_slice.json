@@ -1125,8 +1125,8 @@
       }
     ],
     "why_i_is_clean_unlike_f2": "F2 的失效根因是「同一 wp_code 在 _index.json 里有 11 条候选、优先级只由索引顺序决定」。I 循环的索引里每个 I 码**恰好一本**工作簿（6 条索引项对 6 个文件，一一对应），候选集合大小恒为 1 ⇒ 优先级链根本不参与。与 H 同理：I 的模板按循环整册组织（一个 wp_code 一册）。",
-    "program_table_code_note": "`I1A`..`I6A` 这类程序表码在 `_index.json` 里没有独立条目，两个解析函数都返回 None —— 这是正确的：程序表是各册内的一张 sheet（`无形资产实质性程序 I1A` / `开发支出实质性程序I2A` / …），wp_code_overrides 把它们映射到 componentType 而不是独立模板文件。守卫对它们断言 `resolved is None` 而不是断言解析成功。",
-    "i0_code_note": "`I0` 亦返回 None（两个函数都是）—— I 循环没有函证册，见 slice_scope.excluded_from_slice 第 2 条。守卫对它断言 None，与程序表码同处理但理由不同（一个是「sheet 不是册」，一个是「册不存在」）。"
+    "program_table_code_note": "🔴 2026-09-14 更新（平台行为演进，不弱化）：`I1A`..`I6A` 这类程序表码在 `_index.json` 里没有独立条目、也没有独立 render schema。commit 82f58ea44（D4-IPO）起 `find_template_file` 对这类码统一**回落到主码 `I{n}` 工作簿**（程序表是主册里的一张 sheet：`无形资产实质性程序 I1A` / `开发支出实质性程序 I2A` / …），A/B/C/D/F/H/I/N 等几十个循环共用此行为（原冻结 None 是回落引入前的快照）。守卫改为断言回落目标是文件名以 `I{n} ` 开头的自己主册（不串别册）。wp_code_overrides 另把它们映射到 componentType 供渲染。",
+    "i0_code_note": "`I0`（无 `A` 后缀、不匹配程序表码正则 `^[A-Z]+\\d+A$`）返回 None（两个函数都是）—— I 循环没有 I0 册，见 slice_scope.excluded_from_slice 第 2 条。与程序表码回落不同：I0 是「册不存在」故 None，程序表码 I{n}A 是回落到主册。"
   },
   "classification_row_model_derivation": {
     "why_this_section_exists": "🔴 这一节直接兑现 tasks.md 的 Task 51 正文第一条：「分类/行模型由源 xlsx 真源派生，source_ref 守卫含源标签，防同源错仍自洽」。前五个循环的 slice 都只把 source_ref 写成 `工作簿!sheet!cell`，守卫验的是「那个 cell 存在 / 那张 sheet 在册」—— 这留了一个洞：**声明的 cell 与实现的常量同时错成一致时，判据仍然自洽**（例如把分类常量改成 12 类、同时把 source_ref 指到另一段区间，两边都「对得上」）。本节把判据补成三边：① 声明的 `工作簿!sheet!cell`；② openpyxl **真读**那个 cell 得到的字面文本；③ 前端常量里对应位置的 label。守卫断言 ②==③ 且 ① 可解析 —— 于是「声明」与「实现」同错时，第三边（源字节）会把它们一起打红。",

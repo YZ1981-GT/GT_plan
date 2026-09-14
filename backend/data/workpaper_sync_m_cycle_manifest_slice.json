@@ -1967,10 +1967,16 @@
    "registry 里现算 M adapter 数 == 0（`xlsx/gt-m` 在 registry.py 命中 0）。",
    "deletion plan 的删除路径与其余九份 slice 的删除路径不相交。"
   ],
-  "contract_scan_recipe": "🔴 契约目录共 5 个文件，其中 **生产契约 4 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）+ **candidate 1 份**（`_example.candidate.json`，`review_status == \"candidate\"`、`review.entry_id` 为 null）。判归属一律读 `review.entry_id`，**不按文件名猜**（`b60.hour_budget.json` 的 entry_id 是 `xlsx/b60/gt-b60-bundle`，两者不同构）。",
+  "contract_scan_recipe": "🔴 契约目录共 11 个文件，其中 **生产契约 10 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）+ **candidate 1 份**（`_example.candidate.json`，`review_status == \"candidate\"`、`review.entry_id` 为 null）。判归属一律读 `review.entry_id`，**不按文件名猜**（`b60.hour_budget.json` 的 entry_id 是 `xlsx/b60/gt-b60-bundle`，两者不同构）。🔴 2026-09-14 更新：契约随 D 循环 adapter 迁移由 4 份增至 10 份（新增 D1/D3/D4/D5/D6/D7），无一属 M 循环。",
   "production_contract_files": [
    "b60.hour_budget.json",
+   "d1.notes_receivable_detail.json",
    "d2.receivable_detail.json",
+   "d3.prepaid_receipts_detail.json",
+   "d4.revenue_detail.json",
+   "d5.receivables_financing_detail.json",
+   "d6.contract_assets_detail.json",
+   "d7.contract_liabilities_detail.json",
    "g7.soe_subsidiary_disclosure.json",
    "h1.disposal_check.json"
   ],

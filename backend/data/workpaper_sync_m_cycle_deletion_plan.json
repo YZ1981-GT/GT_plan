@@ -21,7 +21,7 @@
  ],
  "deletion_execution_owner": "Task 66（plan）/ Task 72（execute）",
  "pilot_already_migrated": null,
- "pilot_already_migrated_note": "🔴 M 循环**没有** pilot，故本键为 null。实证：四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的顶层 `review.entry_id` 得 xlsx/b60/gt-b60-bundle · xlsx/gt-d2-accounts-receivable · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 M。",
+ "pilot_already_migrated_note": "🔴 M 循环**没有** pilot，故本键为 null。实证：逐文件读 `backend/data/workpaper_sync_contracts/*.json` 顶层 `review.entry_id` 得已迁移契约归属 —— 原始四个 pilot 是 B60（Task 40）/ D2（41）/ H1（42）/ G7（43），随 D 循环 adapter 迁移推进现共 10 条：xlsx/b60/gt-b60-bundle · xlsx/gt-d1-notes-receivable · xlsx/gt-d2-accounts-receivable · xlsx/gt-d3-prepaid-accounts · xlsx/gt-d4-operating-revenue · xlsx/gt-d5-receivables-financing · xlsx/gt-d6-contract-assets · xlsx/gt-d7-contract-liabilities · xlsx/gt-g7-long-term-equity-main · xlsx/gt-h1-fixed-assets，无一条属 M。",
  "why_this_plan_has_two_deletion_object_classes": {
   "statement": "本清册的删除对象分两类：① orphan 11 个文件（直接删，零副作用）；② 在用封装 9 个文件（须先改线）。共享基类保留。",
   "why": "M 循环的 dual-mode 承载是**成对孪生**（MD-1）：每条 entry 一个自带完整实现的 orphan + 一个薄封装共享基类的活模块。orphan 删了行为不变；活模块删了会让模式切换与 OO tab 定位同时失效。",

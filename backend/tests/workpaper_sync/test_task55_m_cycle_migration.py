@@ -113,9 +113,17 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 SWITCH_VERDICTS = ("switch_redeemable", "switch_present_but_inert", "no_switch_at_all")
 
 #: 四条 pilot 契约的 `review.entry_id` 实测值 —— 🔴 按 entry_id 判归属，不按文件名猜。
+#: 🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移由 4 条增至 10 条（新增 D1/D3/D4/D5/D6/D7
+#: 的 reviewed 生产契约），全部属 D/B/G/H 循环、无一属本 slice。逐文件读顶层 review.entry_id 的实证值。
 PILOT_CONTRACT_OWNERS = {
     "xlsx/b60/gt-b60-bundle",
+    "xlsx/gt-d1-notes-receivable",
     "xlsx/gt-d2-accounts-receivable",
+    "xlsx/gt-d3-prepaid-accounts",
+    "xlsx/gt-d4-operating-revenue",
+    "xlsx/gt-d5-receivables-financing",
+    "xlsx/gt-d6-contract-assets",
+    "xlsx/gt-d7-contract-liabilities",
     "xlsx/gt-g7-long-term-equity-main",
     "xlsx/gt-h1-fixed-assets",
 }
@@ -881,18 +889,26 @@ class TestSliceScopeIsRecomputable:
         self, manifest_slice: dict
     ) -> None:
         """可达性判据 = htmlRendererRegistry 的**模块边**（不是符号名 grep）。"""
-        registry = _strip_comments(_cached_text(HTML_RENDERER_REGISTRY))
+        # commit 82f58ea44 把集中式注册拆分到 registry/entries/*.ts；spec 以各自子文件为基准
+        # 解析。遍历主 registry + 每个 entries 子文件各自扫 spec 并解析，仍要求宿主真在某条模块边
+        # 上，不弱化。
+        _reg_files = [HTML_RENDERER_REGISTRY]
+        _entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        if _entries_dir.is_dir():
+            _reg_files += sorted(_entries_dir.glob("*.ts"))
+        resolved = set()
+        for _rf in _reg_files:
+            _reg = _strip_comments(_cached_text(_rf))
+            for rx in _IMPORT_FORMS:
+                for line in _reg.split("\n"):
+                    for m in rx.finditer(line):
+                        if _inside_double_quoted_string(line, m.start()):
+                            continue
+                        r = _resolve_spec(m.group(1), _rf)
+                        if r:
+                            resolved.add(r.with_suffix("").as_posix())
         for entry in manifest_slice["independent_entries"]:
             stem = entry["host"][: -len(".vue")]
-            specs = [
-                m.group(1) for rx in _IMPORT_FORMS for line in registry.split("\n")
-                for m in rx.finditer(line)
-                if not _inside_double_quoted_string(line, m.start())
-            ]
-            resolved = {
-                r.with_suffix("").as_posix()
-                for r in (_resolve_spec(s, HTML_RENDERER_REGISTRY) for s in specs) if r
-            }
             want = (WP_COMPONENTS / stem).as_posix()
             assert want in resolved, f"{entry['host']} 在 registry 里没有模块边 ⇒ 不可达"
 

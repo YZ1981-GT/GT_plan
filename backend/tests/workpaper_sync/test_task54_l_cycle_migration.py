@@ -103,9 +103,17 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 SWITCH_VERDICTS = ("switch_redeemable", "switch_present_but_inert", "no_switch_at_all")
 
 #: 四条 pilot 契约的 `review.entry_id` 实测值 —— 🔴 按 entry_id 判归属，不按文件名猜。
+#: 🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移由 4 条增至 10 条（新增 D1/D3/D4/D5/D6/D7
+#: 的 reviewed 生产契约），全部属 D/B/G/H 循环、无一属本 slice。逐文件读顶层 review.entry_id 的实证值。
 PILOT_CONTRACT_OWNERS = {
     "xlsx/b60/gt-b60-bundle",
+    "xlsx/gt-d1-notes-receivable",
     "xlsx/gt-d2-accounts-receivable",
+    "xlsx/gt-d3-prepaid-accounts",
+    "xlsx/gt-d4-operating-revenue",
+    "xlsx/gt-d5-receivables-financing",
+    "xlsx/gt-d6-contract-assets",
+    "xlsx/gt-d7-contract-liabilities",
     "xlsx/gt-g7-long-term-equity-main",
     "xlsx/gt-h1-fixed-assets",
 }
@@ -752,12 +760,24 @@ class TestSliceScopeIsRecomputable:
     def test_host_module_edges_in_the_renderer_registry_are_real(
         self, manifest_slice: dict
     ) -> None:
-        """可达性判据落在 htmlRendererRegistry 的**模块边**，不按符号名 grep。"""
-        reg = _strip_comments(_cached_text(HTML_RENDERER_REGISTRY))
-        specs = {m.group(1) for rx in _IMPORT_FORMS for m in rx.finditer(reg)}
-        resolved = {
-            r for r in (_resolve_spec(s, HTML_RENDERER_REGISTRY) for s in specs) if r is not None
-        }
+        """可达性判据落在 htmlRendererRegistry 的**模块边**，不按符号名 grep。
+
+        commit 82f58ea44 把集中式注册拆分到 registry/entries/*.ts；import 相对 spec 以各自
+        子文件为基准解析（如 '../../GtL1ShortTermLoans.vue'）。遍历主 registry + 每个 entries
+        子文件、各自解析 spec 再并集，仍要求宿主真在某条模块边上，不弱化。
+        """
+        _reg_files = [HTML_RENDERER_REGISTRY]
+        _entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        if _entries_dir.is_dir():
+            _reg_files += sorted(_entries_dir.glob("*.ts"))
+        resolved = set()
+        for _rf in _reg_files:
+            _reg = _strip_comments(_cached_text(_rf))
+            for rx in _IMPORT_FORMS:
+                for m in rx.finditer(_reg):
+                    r = _resolve_spec(m.group(1), _rf)
+                    if r is not None:
+                        resolved.add(r)
         for entry in manifest_slice["independent_entries"]:
             host = ROOT / entry["host_path"]
             assert host.exists(), f"宿主不存在：{host}"

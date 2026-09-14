@@ -103,9 +103,17 @@ N_CODES = ("N1", "N2", "N3", "N4", "N5")
 HTML_COUNTERPART_VERDICTS = ("none", "exists")
 
 #: 四条 pilot 契约的 `review.entry_id` 实测值 —— 🔴 按 entry_id 判归属，不按文件名猜。
+#: 🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移由 4 条增至 10 条（新增 D1/D3/D4/D5/D6/D7
+#: 的 reviewed 生产契约），全部属 D/B/G/H 循环、无一属本 slice。逐文件读顶层 review.entry_id 的实证值。
 PILOT_CONTRACT_OWNERS = {
     "xlsx/b60/gt-b60-bundle",
+    "xlsx/gt-d1-notes-receivable",
     "xlsx/gt-d2-accounts-receivable",
+    "xlsx/gt-d3-prepaid-accounts",
+    "xlsx/gt-d4-operating-revenue",
+    "xlsx/gt-d5-receivables-financing",
+    "xlsx/gt-d6-contract-assets",
+    "xlsx/gt-d7-contract-liabilities",
     "xlsx/gt-g7-long-term-equity-main",
     "xlsx/gt-h1-fixed-assets",
 }
@@ -697,16 +705,28 @@ class TestSliceScopeIsRecomputable:
         """**Validates: Requirements 12.4**
 
         可达性判据落在 `htmlRendererRegistry.ts` 的**模块边**上（不是符号名 grep）。
+
+        commit 82f58ea44 把集中式注册拆分到 registry/entries/*.ts；模块边现指向子模块、import
+        相对前缀由 './' 变 '../../'。判据接受指向主 registry 或任一 entries 子模块的边，并在
+        主 registry + 子模块合并文本里按文件名（忽略相对前缀）找 import，仍要求真实模块边，不弱化。
         """
         registry = _cached_text(HTML_RENDERER_REGISTRY)
+        _entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        _reg_rels = [_rel(HTML_RENDERER_REGISTRY)]
+        if _entries_dir.is_dir():
+            for _sub in sorted(_entries_dir.glob("*.ts")):
+                registry += "\n" + _cached_text(_sub)
+                _reg_rels.append(_rel(_sub))
         for entry in manifest_slice["independent_entries"]:
             host = ROOT / entry["host_path"]
             assert host.is_file(), entry["host_path"]
             prod, _ = _statement_edges_to(host)
-            assert any(_rel(HTML_RENDERER_REGISTRY) in ref for ref in prod), (
-                f"{entry['entry_id']} 的宿主在 registry 里没有模块边：{prod}"
+            assert any(any(rr in ref for rr in _reg_rels) for ref in prod), (
+                f"{entry['entry_id']} 的宿主在 registry(含 entries 子模块) 里没有模块边：{prod}"
             )
-            assert f"./{host.name}" in registry
+            assert re.search(r"import\(['\"][^'\"]*/" + re.escape(host.name) + r"['\"]", registry), (
+                f"{entry['entry_id']}: registry 合并文本里没有指向 {host.name} 的 import"
+            )
         assert manifest_slice["honest_adjudication_summary"][
             "reachable_hosts_in_cycle"] == len(manifest_slice["independent_entries"])
 

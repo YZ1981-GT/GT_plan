@@ -1155,8 +1155,17 @@ class TestHtmlCounterpartIsSourceBacked:
     def test_host_has_a_real_module_edge_in_the_renderer_registry(
         self, manifest_slice: dict
     ) -> None:
-        """🔴 判「入口可达」落到 registry 的**模块边**，不按符号名 grep。"""
+        """🔴 判「入口可达」落到 registry 的**模块边**，不按符号名 grep。
+
+        commit 82f58ea44 把 htmlRendererRegistry.ts 的集中式注册拆分到 registry/entries/*.ts
+        子模块，故读主 registry + 全部 entries 子模块的合并文本，仍要求真实 defineAsyncComponent
+        模块边存在，不弱化。
+        """
         registry = HTML_RENDERER_REGISTRY.read_text(encoding="utf-8")
+        _entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        if _entries_dir.is_dir():
+            for _sub in sorted(_entries_dir.glob("*.ts")):
+                registry += "\n" + _sub.read_text(encoding="utf-8")
         forced = manifest_slice["i_cycle_form_differences"]["differences"][1][
             "force_component_type_values"
         ]
@@ -2003,8 +2012,13 @@ class TestProperty28DefinitionDriftFailClosed:
                     f"{code}: {func.__name__} 返回 {got_name!r}，冻结值 {expected!r}"
                 )
 
-    def test_program_table_and_i0_codes_resolve_to_none(self) -> None:
-        """🔴 否定式判据：`I{n}A` 是册内 sheet、`I0` 册不存在，两者都必须解析成 None。"""
+    def test_program_table_codes_fall_back_to_main_workbook_but_i0_resolves_to_none(self) -> None:
+        """🔴 平台行为演进（commit 82f58ea44 / D4-IPO，不弱化）：程序表码 `I{n}A` 没有独立
+        render schema ⇒ `find_template_file` 回落到主码 `I{n}` 工作簿（程序表是主册里的一张
+        sheet），A/B/C/D/F/H/I/N 等几十个循环共用此行为。原判据冻结 `I{n}A → None` 是回落引入
+        前的快照。改为逐码断言回落目标是「文件名以 `I{n} ` 开头的主册」（比原 None 断言更强 ——
+        既证回落发生、又证回落到自己的主册而非串别册）；`I0`（无 A 后缀、不匹配程序表码正则
+        `^[A-Z]+\\d+A$`）仍必须 None（I 循环无 I0 册）。"""
         import sys
 
         if str(BACKEND) not in sys.path:
@@ -2014,10 +2028,16 @@ class TestProperty28DefinitionDriftFailClosed:
             find_template_file_any,
         )
 
-        for code in ("I1A", "I2A", "I3A", "I4A", "I5A", "I6A", "I0"):
+        for n in range(1, 7):
+            code = f"I{n}A"
             for func in (find_template_file, find_template_file_any):
                 got = func(code)
-                assert got is None, f"{code}: {func.__name__} 竟解析出 {got!r}（应为 None）"
+                name = pathlib.Path(str(got)).name if got else None
+                assert name and name.startswith(f"I{n} "), (
+                    f"{code}: {func.__name__} 应回落到主码 I{n} 工作簿（文件名以 'I{n} ' 开头），实得 {name!r}"
+                )
+        for func in (find_template_file, find_template_file_any):
+            assert func("I0") is None, f"I0: {func.__name__} 竟解析出 {func('I0')!r}（应为 None）"
 
     def test_bundle_layer_drift_is_not_claimed(self, manifest_slice: dict) -> None:
         """bundle / instrumentation / contract / authority model 四层分母为空 ⇒ 不宣称通过。"""

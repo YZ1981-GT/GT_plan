@@ -110,14 +110,22 @@ HTML_COUNTERPART_VERDICTS = ("none", "exists")
 CONFIRMATION_CYCLES = ("D", "E", "F", "G", "H", "K", "L")
 
 #: 四条 pilot 契约的 `review.entry_id` 实测值 —— 🔴 按 entry_id 判归属，不按文件名猜。
+#: 🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移由 4 条增至 10 条（新增 D1/D3/D4/D5/D6/D7
+#: 的 reviewed 生产契约），全部属 D/B/G/H 循环。逐文件读顶层 review.entry_id 的实证值。
 PILOT_CONTRACT_OWNERS = {
     "xlsx/b60/gt-b60-bundle",
+    "xlsx/gt-d1-notes-receivable",
     "xlsx/gt-d2-accounts-receivable",
+    "xlsx/gt-d3-prepaid-accounts",
+    "xlsx/gt-d4-operating-revenue",
+    "xlsx/gt-d5-receivables-financing",
+    "xlsx/gt-d6-contract-assets",
+    "xlsx/gt-d7-contract-liabilities",
     "xlsx/gt-g7-long-term-equity-main",
     "xlsx/gt-h1-fixed-assets",
 }
-#: 第 5 个契约文件是 candidate：`review_status == "candidate"` 且 `review.entry_id` 为 **null**。
-#: 它是「candidate 不得注册生产 adapter」的反例分母 —— **不得**要求其 entry_id 非空。
+#: 契约目录共 11 个文件，第 11 个是 candidate：`review_status == "candidate"` 且 `review.entry_id`
+#: 为 **null**。它是「candidate 不得注册生产 adapter」的反例分母 —— **不得**要求其 entry_id 非空。
 CANDIDATE_CONTRACT_FILE = "_example.candidate.json"
 
 

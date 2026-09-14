@@ -12791,7 +12791,13 @@
   "contract_scan_recipe": "逐文件读 `backend/data/workpaper_sync_contracts/*.json` 的顶层 `review.entry_id`；**按 entry_id 判归属，不按文件名猜**。`_example.candidate.json` 的 entry_id 为 null 是刻意的反例分母。",
   "production_contract_files": [
    "b60.hour_budget.json",
+   "d1.notes_receivable_detail.json",
    "d2.receivable_detail.json",
+   "d3.prepaid_receipts_detail.json",
+   "d4.revenue_detail.json",
+   "d5.receivables_financing_detail.json",
+   "d6.contract_assets_detail.json",
+   "d7.contract_liabilities_detail.json",
    "g7.soe_subsidiary_disclosure.json",
    "h1.disposal_check.json"
   ],

@@ -1428,10 +1428,16 @@
    "8 条 entry 各有自己的 per-cycle 持久化 composable `useL{n}FormData` 与自己的 `L{n}-{sheet}-{field}` item_id 命名空间（现算 8 个文件、8 个互不相同的 ITEM 前缀）⇒ 不存在跨 entry 共用持久化命名空间。",
    "deletion plan 的删除路径集合与其余八份 slice 的删除路径集合不相交。"
   ],
-  "contract_scan_recipe": "🔴 契约目录共 5 个文件，其中 **生产契约 4 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）与 **candidate 样例 1 份**（_example.candidate.json，`review_status == \"candidate\"`，`review.entry_id` 为 null）。判据只对生产契约要求 `review.entry_id` 非空；candidate 那份本身就是 step 6 的「review_status=candidate 不得注册生产 adapter」的反例分母 —— 要求它 entry_id 非空是口径错。",
+  "contract_scan_recipe": "🔴 契约目录共 11 个文件，其中 **生产契约 10 份**（`review_status == \"reviewed\"`，逐文件读顶层 `review.entry_id`）与 **candidate 样例 1 份**（_example.candidate.json，`review_status == \"candidate\"`，`review.entry_id` 为 null）。判据只对生产契约要求 `review.entry_id` 非空；candidate 那份本身就是 step 6 的「review_status=candidate 不得注册生产 adapter」的反例分母 —— 要求它 entry_id 非空是口径错。🔴 2026-09-14 更新：契约目录随 D 循环 adapter 迁移由 4 份增至 10 份（新增 D1/D3/D4/D5/D6/D7），全部属 D/B/G/H 循环、无一属 L 循环。",
   "production_contract_files": [
    "b60.hour_budget.json",
+   "d1.notes_receivable_detail.json",
    "d2.receivable_detail.json",
+   "d3.prepaid_receipts_detail.json",
+   "d4.revenue_detail.json",
+   "d5.receivables_financing_detail.json",
+   "d6.contract_assets_detail.json",
+   "d7.contract_liabilities_detail.json",
    "g7.soe_subsidiary_disclosure.json",
    "h1.disposal_check.json"
   ],
