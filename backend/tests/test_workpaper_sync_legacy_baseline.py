@@ -63,10 +63,33 @@ def test_every_open_independent_entry_has_explicit_failure_reasons(
         if entry["independent_entry"] and entry["capability"] != "unreachable"
     ]
     assert open_entries
+    # manifest 经 reviewed overlay 演进出 4 条 bidirectional entry（d2/d4/g7/h1），它们已交付
+    # adapter（missing_adapter=False），但仍是 open debt（reason_codes 非空、缺 durable
+    # forcesave ack）。原判据对**每个** open entry 都断言 missing_adapter=True，冻结了「全平台
+    # 迁移前所有 entry 都缺 adapter」的旧假设 ⇒ 命中已交付 adapter 的 bidirectional 时红。
+    single_adapter_debt = 0
+    delivered_adapter = 0
     for entry in open_entries:
+        # 核心不变式（对所有 open entry 恒成立，不弱化）：每个 open debt 都有显式失败理由、
+        # 且都还没有 durable forcesave ack —— 即没有被静默 allowlist。
         assert entry["reason_codes"], entry["entry_id"]
         assert entry["flags"]["no_durable_forcesave_ack"], entry["entry_id"]
-        assert entry["flags"]["missing_adapter"], entry["entry_id"]
+        # missing_adapter 按 capability 分情形（比原判据更强：锁死 adapter 交付状态与 capability 一致）
+        if entry["capability"] == "bidirectional":
+            delivered_adapter += 1
+            assert not entry["flags"]["missing_adapter"], (
+                f"{entry['entry_id']} 是 bidirectional 却仍标 missing_adapter "
+                "⇒ adapter 交付状态与 capability 裁决脱钩"
+            )
+            # 已交付 adapter 但仍 open：失败理由不能空（此处必含非 adapter 的债务码）
+            assert "missing_adapter" not in entry["reason_codes"], entry["entry_id"]
+        else:
+            single_adapter_debt += 1
+            assert entry["flags"]["missing_adapter"], entry["entry_id"]
+    assert single_adapter_debt, "没有仍缺 adapter 的 single-capability open entry ⇒ 判据退化"
+    assert delivered_adapter, (
+        "没有已交付 adapter 的 bidirectional open entry ⇒ 无法证明分情形判据的双侧都活着"
+    )
 
 
 def test_single_mode_switch_debt_has_source_line_evidence(

@@ -71,9 +71,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
@@ -185,9 +184,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
@@ -292,9 +290,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
@@ -406,9 +403,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "frontend_endpoint_without_backend_route",
@@ -479,13 +475,13 @@
           "documentType": "docx",
           "file": "audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue",
           "importKind": "registry-dynamic",
-          "localName": "GtWordTemplate",
+          "localName": "WorkpaperWordEditor",
           "loop": null,
           "mountId": "mount_d4b8a91cbb8386a448b3",
           "registryEvidence": {
             "componentType": "word-template",
-            "file": "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
-            "line": 297
+            "file": "audit-platform/frontend/src/components/workpaper/registry/entries/core.ts",
+            "line": 87
           },
           "runtimeCardinality": "dynamic",
           "sheetExpression": ":sheet-name=\"activeSheetName\"",
@@ -654,7 +650,7 @@
       "parent_entry_id": "docx/gt-a16-bundle",
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 6,
+        "inbound_reference_count": 5,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA10Bundle.vue",
           "audit-platform/frontend/src/components/workpaper/GtA12Bundle.vue"
@@ -905,10 +901,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtBIndex.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -1150,9 +1146,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/core.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -1249,17 +1244,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_ede2497def1b8c433fa8",
+          "mountId": "mount_57e4fe1916960d855662",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"重要客户销售价格分析D4-10\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 11,
-            "endLine": 425,
+            "endLine": 512,
             "startColumn": 9,
-            "startLine": 420
+            "startLine": 507
           },
-          "templateNodeOrdinal": 114,
+          "templateNodeOrdinal": 116,
           "wpExpression": ":wp-id=\"props.wpId\""
         }
       ],
@@ -1273,7 +1268,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue#L420",
+          "audit-platform/frontend/src/components/workpaper/d4/analysis/D4TabCustomerPrice.vue#L507",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -2887,732 +2882,6 @@
       "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-customer-checklist",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "客户信息核查清单D4-28",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"客户信息核查清单D4-28\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_87e41223ed44bf2f9eef",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"客户信息核查清单D4-28\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 175,
-            "endLine": 125,
-            "startColumn": 66,
-            "startLine": 125
-          },
-          "templateNodeOrdinal": 135,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue#L125",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"客户信息核查清单D4-28\""
-        ],
-        "sheet_literals": [
-          "客户信息核查清单D4-28"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerChecklist.vue",
-        "wp_code_patterns": [
-          "D4-28",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-customer-detail",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "客户信息检查表D4-29",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"客户信息检查表D4-29\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_df289533b00e85017940",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"客户信息检查表D4-29\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 139,
-            "endLine": 129,
-            "startColumn": 31,
-            "startLine": 129
-          },
-          "templateNodeOrdinal": 63,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue#L129",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"客户信息检查表D4-29\""
-        ],
-        "sheet_literals": [
-          "客户信息检查表D4-29"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabCustomerDetail.vue",
-        "wp_code_patterns": [
-          "D4-29",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-dealer",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "经销商检查D4-25",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"经销商检查D4-25\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_fe3654caed634a3e2379",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"经销商检查D4-25\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 172,
-            "endLine": 96,
-            "startColumn": 66,
-            "startLine": 96
-          },
-          "templateNodeOrdinal": 101,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue#L96",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"经销商检查D4-25\""
-        ],
-        "sheet_literals": [
-          "经销商检查D4-25"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabDealer.vue",
-        "wp_code_patterns": [
-          "D4-25",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-fund-flow",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "客户、供应商等资金流水检查D4-32",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"客户、供应商等资金流水检查D4-32\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_59b8d698ab41b03b3f1a",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"客户、供应商等资金流水检查D4-32\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 180,
-            "endLine": 138,
-            "startColumn": 66,
-            "startLine": 138
-          },
-          "templateNodeOrdinal": 97,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue#L138",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"客户、供应商等资金流水检查D4-32\""
-        ],
-        "sheet_literals": [
-          "客户、供应商等资金流水检查D4-32"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabFundFlow.vue",
-        "wp_code_patterns": [
-          "D4-32",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-interview-detail",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "客户访谈记录 D4-31",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"客户访谈记录 D4-31\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_31332ead13060741992d",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"客户访谈记录 D4-31\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 139,
-            "endLine": 327,
-            "startColumn": 31,
-            "startLine": 327
-          },
-          "templateNodeOrdinal": 227,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue#L327",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"客户访谈记录 D4-31\""
-        ],
-        "sheet_literals": [
-          "客户访谈记录 D4-31"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewDetail.vue",
-        "wp_code_patterns": [
-          "D4-31",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-interview-summary",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "客户访谈记录汇总表D4-30",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"客户访谈记录汇总表D4-30\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_e1cb33b792389788a0bb",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"客户访谈记录汇总表D4-30\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 141,
-            "endLine": 163,
-            "startColumn": 31,
-            "startLine": 163
-          },
-          "templateNodeOrdinal": 53,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue#L163",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"客户访谈记录汇总表D4-30\""
-        ],
-        "sheet_literals": [
-          "客户访谈记录汇总表D4-30"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabInterviewSummary.vue",
-        "wp_code_patterns": [
-          "D4-30",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
       "entry_id": "xlsx/d4/ipo/d4-tab-invoice-compare",
       "evidence": {
         "browser_case": null,
@@ -3855,127 +3124,6 @@
       "capability": "single_onlyoffice",
       "document_type": "xlsx",
       "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-overseas",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "境外销售收入检查D4-26",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"境外销售收入检查D4-26\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_1562f925c5648f73ff66",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"境外销售收入检查D4-26\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 175,
-            "endLine": 106,
-            "startColumn": 66,
-            "startLine": 106
-          },
-          "templateNodeOrdinal": 119,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue#L106",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"境外销售收入检查D4-26\""
-        ],
-        "sheet_literals": [
-          "境外销售收入检查D4-26"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabOverseas.vue",
-        "wp_code_patterns": [
-          "D4-26",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
       "entry_id": "xlsx/d4/ipo/d4-tab-third-party",
       "evidence": {
         "browser_case": null,
@@ -4038,9 +3186,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 178,
-            "endLine": 243,
+            "endLine": 246,
             "startColumn": 70,
-            "startLine": 243
+            "startLine": 246
           },
           "templateNodeOrdinal": 128,
           "wpExpression": ":wp-id=\"wpId\""
@@ -4056,7 +3204,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabThirdParty.vue#L243",
+          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabThirdParty.vue#L246",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -4087,248 +3235,6 @@
         "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabThirdParty.vue",
         "wp_code_patterns": [
           "D4-24",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/ipo/d4-tab-undisclosed-rp",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "识别未披露的关联方D4-27",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"识别未披露的关联方D4-27\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_c65800bdfd9fdf91f192",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"识别未披露的关联方D4-27\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 176,
-            "endLine": 176,
-            "startColumn": 66,
-            "startLine": 176
-          },
-          "templateNodeOrdinal": 155,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue#L176",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"识别未披露的关联方D4-27\""
-        ],
-        "sheet_literals": [
-          "识别未披露的关联方D4-27"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/ipo/D4TabUndisclosedRp.vue",
-        "wp_code_patterns": [
-          "D4-27",
-          "D4T"
-        ]
-      }
-    },
-    {
-      "adapter_id": null,
-      "canonical_resolver": "legacy_sheet_onlyoffice_router",
-      "capability": "single_onlyoffice",
-      "document_type": "xlsx",
-      "editability": "editable",
-      "entry_id": "xlsx/d4/other/d4-tab-other-check",
-      "evidence": {
-        "browser_case": null,
-        "contract_test": null,
-        "legacy_reasons": [
-          "template_only_open",
-          "no_durable_forcesave_ack",
-          "missing_adapter"
-        ],
-        "parent_reason": "D4 tab hosts are rendered inside the D4 root entry and must not be counted as independent adapters",
-        "review_status": "source_inventory_reviewed"
-      },
-      "host_path": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
-      "html_store": "unresolved",
-      "independent_entry": false,
-      "migration_state": "parent_duplicate",
-      "mounts": [
-        {
-          "attributes": [
-            {
-              "argument": "wp-id",
-              "expression": "wpId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":wp-id=\"wpId\""
-            },
-            {
-              "argument": "project-id",
-              "expression": "projectId",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":project-id=\"projectId\""
-            },
-            {
-              "argument": null,
-              "expression": "其他业务收入检查表D4-35",
-              "kind": "attribute",
-              "name": "sheet-name",
-              "raw": "sheet-name=\"其他业务收入检查表D4-35\""
-            },
-            {
-              "argument": "readonly",
-              "expression": "isReadonly",
-              "kind": "directive",
-              "name": "bind",
-              "raw": ":readonly=\"isReadonly\""
-            }
-          ],
-          "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
-          "component": "GtOnlyOfficeSheet",
-          "condition": null,
-          "documentType": "xlsx",
-          "file": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
-          "importKind": "static",
-          "localName": "GtOnlyOfficeSheet",
-          "loop": null,
-          "mountId": "mount_d01d1f7e075210cdfe85",
-          "runtimeCardinality": "single",
-          "sheetExpression": "sheet-name=\"其他业务收入检查表D4-35\"",
-          "sourceKind": "template_ast",
-          "sourceSpan": {
-            "endColumn": 176,
-            "endLine": 173,
-            "startColumn": 66,
-            "startLine": 173
-          },
-          "templateNodeOrdinal": 137,
-          "wpExpression": ":wp-id=\"wpId\""
-        }
-      ],
-      "parent_entry_id": "xlsx/gt-d4-operating-revenue",
-      "profile_source": {
-        "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 1,
-        "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue"
-        ],
-        "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
-        "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue#L173",
-          "backend/app/routers/wp_onlyoffice_router.py#L710"
-        ]
-      },
-      "room_model": "shared",
-      "scenario_profile": {
-        "component_readonly_default": "false",
-        "doc_key_defects": [],
-        "doc_key_identity": "server_doc_key_scoped_to_wp_without_user_component",
-        "document_type": "xlsx",
-        "editability": "editable",
-        "host_reachable": true,
-        "mount_cardinality": "single",
-        "mount_count": 1,
-        "profile_id": "xlsx.editable.shared.single.room_service_wired.v1",
-        "readonly_binding": "runtime_expression",
-        "room_model": "shared",
-        "room_service_state": "room_service_wired",
-        "schema_version": 1
-      },
-      "wp_match": {
-        "component_types": [],
-        "sheet_expressions": [
-          "sheet-name=\"其他业务收入检查表D4-35\""
-        ],
-        "sheet_literals": [
-          "其他业务收入检查表D4-35"
-        ],
-        "source_host": "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCheck.vue",
-        "wp_code_patterns": [
-          "D4-35",
           "D4T"
         ]
       }
@@ -4395,17 +3301,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_78060400253416809d88",
+          "mountId": "mount_57790b7960158e536044",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"其他业务收入合同测算表D4-34\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 178,
-            "endLine": 201,
+            "endLine": 226,
             "startColumn": 66,
-            "startLine": 201
+            "startLine": 226
           },
-          "templateNodeOrdinal": 167,
+          "templateNodeOrdinal": 176,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -4419,7 +3325,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherContract.vue#L201",
+          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherContract.vue#L226",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -4516,17 +3422,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_8ff9e91d2ece264c397b",
+          "mountId": "mount_4f5a1e96c1cc9277b912",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"其他业务收入截止性测试D4-36\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 178,
-            "endLine": 203,
+            "endLine": 230,
             "startColumn": 66,
-            "startLine": 203
+            "startLine": 230
           },
-          "templateNodeOrdinal": 169,
+          "templateNodeOrdinal": 170,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -4540,7 +3446,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCutoff.vue#L203",
+          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherCutoff.vue#L230",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -4637,17 +3543,17 @@
           "importKind": "static",
           "localName": "GtOnlyOfficeSheet",
           "loop": null,
-          "mountId": "mount_1f7f1f286cb8e49b22a8",
+          "mountId": "mount_f3e961dc3b45482b697e",
           "runtimeCardinality": "single",
           "sheetExpression": "sheet-name=\"其他业务毛利率分析表D4-33\"",
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 177,
-            "endLine": 205,
+            "endLine": 246,
             "startColumn": 66,
-            "startLine": 205
+            "startLine": 246
           },
-          "templateNodeOrdinal": 102,
+          "templateNodeOrdinal": 103,
           "wpExpression": ":wp-id=\"wpId\""
         }
       ],
@@ -4661,7 +3567,7 @@
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
-          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherMargin.vue#L205",
+          "audit-platform/frontend/src/components/workpaper/d4/other/D4TabOtherMargin.vue#L246",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
       },
@@ -4895,9 +3801,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -5015,9 +3920,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -5149,10 +4053,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA1Dashboard.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -5284,10 +4188,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA1Dashboard.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -5405,9 +4309,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -5532,10 +4435,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -5659,10 +4562,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -5793,10 +4696,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -5927,10 +4830,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -6061,10 +4964,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -6195,10 +5098,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -6315,10 +5218,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA17Bundle.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -6432,9 +5335,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -6552,9 +5454,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -6672,9 +5573,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -6785,9 +5685,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/core.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -6920,10 +5819,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/GtA3ConsolidationConsole.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -7041,10 +5940,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/workpaper/CashFlowVerification.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -7161,9 +6060,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -7281,9 +6179,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -7408,9 +6305,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -7532,9 +6428,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -7642,9 +6537,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -7766,9 +6660,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/reports.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -7911,9 +6804,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8057,9 +6949,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8203,9 +7094,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8349,9 +7239,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8474,9 +7363,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8613,9 +7501,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8738,9 +7625,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -8875,9 +7761,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -9006,10 +7891,10 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 3,
+        "inbound_reference_count": 2,
         "inbound_reference_sample": [
           "audit-platform/frontend/src/components/formula/FormulaEditDialog.vue",
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts"
+          "audit-platform/frontend/src/components/workpaper/registry/entries/core.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
@@ -9188,9 +8073,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -9324,9 +8208,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -9463,9 +8346,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -9525,10 +8407,10 @@
           "attributes": [
             {
               "argument": null,
-              "expression": "renderMode === 'onlyoffice' && currentSheet !== 'D4-5'",
+              "expression": "renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'",
               "kind": "directive",
               "name": "else-if",
-              "raw": "v-else-if=\"renderMode === 'onlyoffice' && currentSheet !== 'D4-5'\""
+              "raw": "v-else-if=\"renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'\""
             },
             {
               "argument": "key",
@@ -9575,7 +8457,7 @@
           ],
           "canonicalComponentFile": "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue",
           "component": "GtOnlyOfficeSheet",
-          "condition": "v-else-if=\"renderMode === 'onlyoffice' && currentSheet !== 'D4-5'\"",
+          "condition": "v-else-if=\"renderMode === 'onlyoffice' && !isD4DedicatedSyncSheet && currentSheet !== 'D4-5'\"",
           "documentType": "xlsx",
           "file": "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue",
           "importKind": "static",
@@ -9587,9 +8469,9 @@
           "sourceKind": "template_ast",
           "sourceSpan": {
             "endColumn": 9,
-            "endLine": 33,
+            "endLine": 32,
             "startColumn": 7,
-            "startLine": 25
+            "startLine": 24
           },
           "templateNodeOrdinal": 10,
           "wpExpression": ":wp-id=\"props.wpId\""
@@ -9598,14 +8480,13 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
         "source_refs": [
-          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue#L25",
+          "audit-platform/frontend/src/components/workpaper/GtD4OperatingRevenue.vue#L24",
           "audit-platform/frontend/src/components/workpaper/GtOnlyOfficeSheet.vue#L61",
           "backend/app/routers/wp_onlyoffice_router.py#L710"
         ]
@@ -9737,9 +8618,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -9876,9 +8756,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -10015,9 +8894,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/forms.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -10220,9 +9098,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -10419,9 +9296,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -10618,9 +9494,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -10817,9 +9692,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -11016,9 +9890,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -11156,9 +10029,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/programs.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -11354,9 +10226,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -11553,9 +10424,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -11752,9 +10622,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -11965,9 +10834,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -12165,9 +11033,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -12364,9 +11231,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -12563,9 +11429,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -12762,9 +11627,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -12961,9 +11825,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -13174,9 +12037,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -13381,9 +12243,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -13580,9 +12441,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -13779,9 +12639,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -13978,9 +12837,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -14177,9 +13035,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -14505,9 +13362,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -14704,9 +13560,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -14903,9 +13758,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -15102,9 +13956,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -15301,9 +14154,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -15496,9 +14348,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -15695,9 +14546,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -15894,9 +14744,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -16089,9 +14938,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -16295,9 +15143,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -16501,9 +15348,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -16700,9 +15546,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -16899,9 +15744,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -17105,9 +15949,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -17304,9 +16147,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -17503,9 +16345,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -17702,9 +16543,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -17901,9 +16741,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -18100,9 +16939,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -18299,9 +17137,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -18630,9 +17467,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -18831,9 +17667,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -19030,9 +17865,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -19229,9 +18063,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -19428,9 +18261,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -19627,9 +18459,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -19826,9 +18657,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -20025,9 +18855,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -20224,9 +19053,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -20423,9 +19251,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -20622,9 +19449,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -20821,9 +19647,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -21020,9 +19845,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -21219,9 +20043,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -21418,9 +20241,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -21624,9 +20446,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -21830,9 +20651,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22015,9 +20835,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22200,9 +21019,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22319,9 +21137,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22436,9 +21253,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22553,9 +21369,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22670,9 +21485,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22787,9 +21601,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -22904,9 +21717,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -23073,9 +21885,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -23243,9 +22054,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -23413,9 +22223,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -23583,9 +22392,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -23753,9 +22561,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -23923,9 +22730,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -24093,9 +22899,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -24263,9 +23068,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -24433,9 +23237,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -24551,9 +23354,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "component_readonly_prop_defaults_editable",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -24741,9 +23543,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -25020,9 +23821,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -25286,9 +24086,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -25552,9 +24351,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -25884,9 +24682,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -26780,9 +25577,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -27571,9 +26367,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -27770,9 +26565,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -27969,9 +26763,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -28168,9 +26961,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -28301,9 +27093,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -28499,9 +27290,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -28698,9 +27488,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -28897,9 +27686,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -29096,9 +27884,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -29295,9 +28082,8 @@
       "parent_entry_id": null,
       "profile_source": {
         "editability_fact": "host_forwards_runtime_readonly_flag",
-        "inbound_reference_count": 2,
+        "inbound_reference_count": 1,
         "inbound_reference_sample": [
-          "audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts",
           "audit-platform/frontend/src/components/workpaper/registry/entries/specialized.ts"
         ],
         "room_model_fact": "server_doc_key_scoped_to_wp_without_user_component",
@@ -29466,45 +28252,45 @@
       }
     }
   ],
-  "manifest_digest": "87602a8b5cbf7dca925bfa0af2e0fe8cf487d6b958b997df0643ed8238d48cf7",
-  "overlay_digest": "c03b475c578f4e8f8f55ba043ddce7ad818cdb7fcf6e1fa5a83d27983ddb3d23",
-  "profile_source_digest": "fed34d8e3a1a4af76afb17e0e89967dc88edf8f42789cbb4404849791d242aed",
+  "manifest_digest": "5c55208f01c0560612438aa005895c533c719f16c7834021958a8df0a74f517e",
+  "overlay_digest": "98a0eeb2e952933981c9b605b27a68685cbe37754bee8283a23257835e302fcc",
+  "profile_source_digest": "10f015fcc14c41d76c5433e0013fc30701faa73433c84cd1a89b262ab1de0afe",
   "schema_version": 1,
-  "source_digest": "65e7c37195915c541775d71362c85b0aad104359265814c6ebb52e36f295486a",
+  "source_digest": "cc0af3f8756e8946403c68a606be0c72dd530afb8e6ebe34bd6a59d2773d74c0",
   "stats": {
     "by_component": {
-      "GtOnlyOfficeSheet": 268,
+      "GtOnlyOfficeSheet": 259,
       "OnlyOfficeWordDialog": 2,
       "WorkpaperWordEditor": 4
     },
     "capability_counts": {
       "bidirectional": 4,
       "single_html": 5,
-      "single_onlyoffice": 175,
+      "single_onlyoffice": 166,
       "unreachable": 1
     },
     "dispatcher_count": 1,
     "editability_counts": {
-      "editable": 184,
+      "editable": 175,
       "unreachable": 1
     },
-    "entry_count": 185,
-    "host_count": 184,
+    "entry_count": 176,
+    "host_count": 175,
     "independent_entry_count": 142,
     "legacy_fake_bidirectional_count": 137,
-    "mount_count": 274,
-    "parent_duplicate_count": 42,
+    "mount_count": 265,
+    "parent_duplicate_count": 33,
     "room_model_counts": {
       "exclusive": 6,
       "none": 1,
-      "shared": 178
+      "shared": 169
     },
     "room_service_state": "room_service_wired",
     "scenario_profile_counts": {
       "docx.editable.exclusive.dynamic.room_service_wired.v1": 1,
       "docx.editable.exclusive.single.room_service_wired.v1": 5,
       "docx.editable.shared.single.room_service_wired.v1": 1,
-      "xlsx.editable.shared.single.room_service_wired.v1": 177,
+      "xlsx.editable.shared.single.room_service_wired.v1": 168,
       "xlsx.unreachable.none.single.room_service_wired.v1": 1
     },
     "unadjudicated_count": 132,

@@ -840,21 +840,41 @@ class TestCrossRulesRunAgainstTheRealManifest:
                     profile, EP.capability_of(entry)
                 )
 
-    def test_rg16_fires_where_a_single_capability_host_still_offers_both_modes(
+    def test_rg16_fires_on_single_capability_hosts_but_not_on_bidirectional(
         self, manifest: dict[str, Any]
     ) -> None:
-        hit = 0
+        """RG-16：**single** capability 的宿主仍暴露 mode-switch UI ⇒ drift；但 **bidirectional**
+        宿主暴露切换 UI 是**合规**的（双向本就该能切换），必须**不**报 drift。
+
+        manifest 经 reviewed overlay 演进出 4 条 bidirectional entry（d2/d4/g7/h1）后，它们同样
+        `exposes_mode_switch=True`。原判据冻结了「所有暴露切换 UI 的都是 single-capability 反例」
+        的旧假设、对每一个都 `raises(EntryProfileDriftError)` ⇒ 命中合规双向时 DID NOT RAISE 而红。
+        改为按 capability 分情形（比原判据更强 —— 既证 RG-16 抓得住真实违规，又证它**不误伤**合规双向）：
+          · single_* + exposes_mode_switch ⇒ 必抛 drift（真实反例，single_hit）
+          · bidirectional + exposes_mode_switch ⇒ 必**不**抛（合规对照，bidir_hit）
+        两组都必须有真实样本，否则本判据退化。
+        """
+        single_hit = 0
+        bidir_hit = 0
         for entry in _independent_reachable(manifest):
             descriptor = F.observe_descriptor_facts(entry)
             assert descriptor is not None
             if not descriptor.exposes_mode_switch:
                 continue
-            hit += 1
-            with pytest.raises(EP.EntryProfileDriftError):
-                EP.assert_profile_consistent_with_descriptor(
-                    EP.extract_entry_profile(entry), EP.capability_of(entry), descriptor
-                )
-        assert hit, "没有 single capability + 仍显示切换 UI 的真实 entry ⇒ RG-16 无真实反例"
+            capability = EP.capability_of(entry)
+            profile = EP.extract_entry_profile(entry)
+            if capability == EP.Capability.bidirectional:
+                bidir_hit += 1
+                # 合规：双向宿主暴露切换 UI 不是 drift —— RG-16 必须放行，否则误伤真实双向。
+                EP.assert_profile_consistent_with_descriptor(profile, capability, descriptor)
+            else:
+                single_hit += 1
+                with pytest.raises(EP.EntryProfileDriftError):
+                    EP.assert_profile_consistent_with_descriptor(profile, capability, descriptor)
+        assert single_hit, "没有 single capability + 仍显示切换 UI 的真实 entry ⇒ RG-16 无真实反例"
+        assert bidir_hit, (
+            "没有 bidirectional + 暴露切换 UI 的真实 entry ⇒ 无法证明 RG-16 不误伤合规双向"
+        )
 
     def test_rg17_branches_are_alive_under_synthetic_non_conformant_facts(self) -> None:
         """RG-17 的每条分支都用**合成**的非合规 room 事实单独打一遍，消息必须可区分。

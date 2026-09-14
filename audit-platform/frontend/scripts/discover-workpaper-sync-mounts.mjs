@@ -301,20 +301,42 @@ function discoverVueFile(repoRoot, file) {
 }
 
 function registryWordMount(repoRoot) {
-  const registryRelative = 'audit-platform/frontend/src/components/workpaper/htmlRendererRegistry.ts'
+  // htmlRendererRegistry.ts（commit 82f58ea44）已把集中式 defineAsyncComponent + 注册
+  // 拆分到 registry/entries/*.ts 子模块。word-template 现以**内联**形态注册在其中一个子
+  // 文件里：`componentType: 'word-template' … component: defineAsyncComponent(() =>
+  //  import('…/WorkpaperWordEditor.vue'))`。扫全部 entries 子模块定位它，避免写死某一个
+  // 子文件（未来再搬也不失配）。判据强度不弱化——仍三重校验：
+  //   ① word-template 条目真实存在（内联 componentType）
+  //   ② 该条目 component 绑定的正是 WorkpaperWordEditor.vue 的 lazy import
+  //   ③ GtWpRenderer.vue 有 rendererEntry.component 动态挂载
+  const entriesRelativeDir = 'audit-platform/frontend/src/components/workpaper/registry/entries'
   const rendererRelative = 'audit-platform/frontend/src/components/workpaper/GtWpRenderer.vue'
-  const registryFile = path.join(repoRoot, ...registryRelative.split('/'))
+  const entriesDir = path.join(repoRoot, ...entriesRelativeDir.split('/'))
+  if (!fs.existsSync(entriesDir)) {
+    throw new Error(`registry/entries 目录不存在（htmlRendererRegistry 拆分结构已变）: ${entriesRelativeDir}`)
+  }
+  // 内联注册块：componentType: 'word-template' 到其 component: defineAsyncComponent(import(...WorkpaperWordEditor.vue))
+  const wordEntryRe = /componentType:\s*['"]word-template['"][\s\S]{0,300}?component:\s*defineAsyncComponent\(\(\)\s*=>\s*import\(['"][^'"]*\/WorkpaperWordEditor\.vue['"]\)\)/
+  let registryRelative = null
+  let registryLine = 0
+  for (const name of fs.readdirSync(entriesDir).filter((f) => f.endsWith('.ts')).sort()) {
+    const filePath = path.join(entriesDir, name)
+    const text = fs.readFileSync(filePath, 'utf8')
+    const hit = wordEntryRe.exec(text)
+    if (hit) {
+      registryRelative = `${entriesRelativeDir}/${name}`
+      registryLine = text.slice(0, hit.index).split(/\r?\n/).length
+      break
+    }
+  }
+  if (!registryRelative) {
+    throw new Error("registry/entries/*.ts 未找到 word-template 绑定 WorkpaperWordEditor 的内联注册")
+  }
   const rendererFile = path.join(repoRoot, ...rendererRelative.split('/'))
-  const registry = fs.readFileSync(registryFile, 'utf8')
   const renderer = fs.readFileSync(rendererFile, 'utf8')
-  const importMatch = /const\s+(\w+)\s*=\s*defineAsyncComponent\(\(\)\s*=>\s*import\(['"]\.\/WorkpaperWordEditor\.vue['"]\)\)/.exec(registry)
-  if (!importMatch) throw new Error('htmlRendererRegistry.ts 未找到 WorkpaperWordEditor lazy import')
-  const localName = importMatch[1]
-  const registration = new RegExp(`componentType:\\s*['"]word-template['"][\\s\\S]{0,500}?component:\\s*${localName}\\b`).exec(registry)
-  if (!registration) throw new Error('word-template 未绑定 WorkpaperWordEditor')
   const dynamicMount = /<component\b[\s\S]*?:is=["']rendererEntry\.component["'][\s\S]*?>/.exec(renderer)
   if (!dynamicMount) throw new Error('GtWpRenderer.vue 未找到 rendererEntry.component 动态挂载')
-  const registryLine = registry.slice(0, importMatch.index).split(/\r?\n/).length
+  const localName = 'WorkpaperWordEditor'
   const rendererLine = renderer.slice(0, dynamicMount.index).split(/\r?\n/).length
   const fact = {
     mountId: '',
