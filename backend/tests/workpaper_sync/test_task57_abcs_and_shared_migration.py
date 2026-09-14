@@ -283,38 +283,47 @@ def _registry_pairs() -> list[tuple[str, pathlib.Path, int]]:
     `component: defineAsyncComponent(() => import('...'))`。只认一种会漏掉 94/211 条
     （首版实测），进而让分组键的第一维对一半 entry 退化成「不在 registry 里」。
     """
-    src = _cached_text(HTML_RENDERER_REGISTRY)
-    lines = src.split("\n")
-    local2rel: dict[str, str] = {}
-    for m in re.finditer(
-        r"^const\s+(\w+)\s*=\s*defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'\s*\)\s*\)",
-        src, re.M,
-    ):
-        local2rel[m.group(1)] = m.group(2)
-    out: list[tuple[str, pathlib.Path, int]] = []
-    for i, ln in enumerate(lines):
-        m = re.match(r"^\s*componentType:\s*'([^']+)',?\s*$", ln)
-        if not m:
-            continue
-        ct, rel = m.group(1), None
-        for j in range(i + 1, min(i + 8, len(lines))):
-            mi = re.search(
-                r"component:\s*defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'", lines[j])
-            if mi:
-                rel = mi.group(1)
-                break
-            ml = re.match(r"^\s*component:\s*(\w+),?\s*$", lines[j])
-            if ml:
-                rel = local2rel.get(ml.group(1))
-                break
-        if rel:
-            out.append((ct, (HTML_RENDERER_REGISTRY.parent / rel).resolve(), i + 1))
+    # 🔴 commit 82f58ea44 把集中式注册拆分到 registry/entries/*.ts 子模块。遍历主 registry +
+    # 每个子文件，各自解析两种 component 写法（hoisted const / inline），import 相对路径以**各自
+    # 文件目录**为基准 resolve（子模块里是 '../../GtXxx.vue'）。返回 (ct, 组件路径, 文件内行号,
+    # 源文件) —— 加源文件维度让调用方能按正确文件判 hoisted/inline，不弱化。
+    reg_files = [HTML_RENDERER_REGISTRY]
+    entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+    if entries_dir.is_dir():
+        reg_files += sorted(entries_dir.glob("*.ts"))
+    out: list[tuple[str, pathlib.Path, int, pathlib.Path]] = []
+    for reg_file in reg_files:
+        src = _cached_text(reg_file)
+        lines = src.split("\n")
+        local2rel: dict[str, str] = {}
+        for m in re.finditer(
+            r"^const\s+(\w+)\s*=\s*defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'\s*\)\s*\)",
+            src, re.M,
+        ):
+            local2rel[m.group(1)] = m.group(2)
+        for i, ln in enumerate(lines):
+            m = re.match(r"^\s*componentType:\s*'([^']+)',?\s*$", ln)
+            if not m:
+                continue
+            ct, rel = m.group(1), None
+            for j in range(i + 1, min(i + 8, len(lines))):
+                mi = re.search(
+                    r"component:\s*defineAsyncComponent\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'", lines[j])
+                if mi:
+                    rel = mi.group(1)
+                    break
+                ml = re.match(r"^\s*component:\s*(\w+),?\s*$", lines[j])
+                if ml:
+                    rel = local2rel.get(ml.group(1))
+                    break
+            if rel:
+                out.append((ct, (reg_file.parent / rel).resolve(), i + 1, reg_file))
     return out
 
 
 def _component_types_of(host_path: str) -> list[str]:
     host = (ROOT / host_path).resolve()
-    return sorted(ct for ct, p, _ln in _registry_pairs() if p == host)
+    return sorted(ct for ct, p, _ln, _sf in _registry_pairs() if p == host)
 
 
 def _ct_to_wp_codes() -> dict[str, list[str]]:
@@ -639,16 +648,26 @@ class TestGuardSelfChecks:
         assert _resolve_spec("vue", importer) is None
 
     def test_registry_parser_sees_both_component_forms(self) -> None:
-        """🔴 registry 有两种 `component:` 写法；只认一种会漏掉近一半条目。"""
-        src = _cached_text(HTML_RENDERER_REGISTRY)
-        declared = len(re.findall(r"^\s*componentType:\s*'([^']+)'", src, re.M))
+        """🔴 registry 有两种 `component:` 写法；只认一种会漏掉近一半条目。
+
+        commit 82f58ea44 把注册拆分到 registry/entries/*.ts；componentType 声明散布在主 registry
+        + 各子模块。declared 跨所有 registry 文件累计，hoisted/inline 判断用每条所在的**源文件**。
+        """
+        _reg_files = [HTML_RENDERER_REGISTRY]
+        _entries_dir = HTML_RENDERER_REGISTRY.parent / "registry" / "entries"
+        if _entries_dir.is_dir():
+            _reg_files += sorted(_entries_dir.glob("*.ts"))
+        declared = sum(
+            len(re.findall(r"^\s*componentType:\s*'([^']+)'", _cached_text(_rf), re.M))
+            for _rf in _reg_files
+        )
         parsed = _registry_pairs()
         assert len(parsed) == declared, (
             f"registry 声明 {declared} 条 componentType，解析出 {len(parsed)} 条 ⇒ 解析器漏了"
         )
         hoisted = sum(
-            1 for _ct, _p, ln in parsed
-            if re.match(r"^\s*component:\s*\w+,?\s*$", src.split("\n")[ln])
+            1 for _ct, _p, ln, sf in parsed
+            if re.match(r"^\s*component:\s*\w+,?\s*$", _cached_text(sf).split("\n")[ln])
         )
         inline = len(parsed) - hoisted
         assert hoisted > 0 and inline > 0, (
