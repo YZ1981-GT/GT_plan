@@ -1604,13 +1604,20 @@ class TestProperty3BidirectionalRequiresAdapter:
         with pytest.raises(RG.FakeBidirectionalError):
             registry.assert_bidirectional_ready(entry["entry_id"])
 
-    def test_real_manifest_has_no_bidirectional_entry_yet(self) -> None:
-        """实况判据：186 条 entry 里**零** bidirectional、零 adapter_id。
+    def test_real_manifest_bidirectional_entries_have_adapter_id_but_are_not_registered(
+        self,
+    ) -> None:
+        """实况判据（capability drift 更新）：manifest 已由 reviewed overlay 裁决出 4 条
+        bidirectional entry（d2/d4/g7/h1），各带 `adapter_id`；但 registry **未真注册**
+        （供给尚未在生产库就绪）⇒ 「未注册 adapter 不得宣称双向」仍覆盖全部入口。
 
-        因此「未注册 adapter 不得宣称双向」现在覆盖全部入口 —— 任何 UI 上出现的
-        双向宣称都是 legacy 假双向（`migration_state=legacy_fake_bidirectional`）。
-        本条不锁数字基线，只锁不变式：capability=bidirectional 的 entry 必须有
-        adapter_id，否则 registry 报告非空。
+        本条不锁数字基线，只锁不变式（比原「全部 adapter_id 为 None」更强——锁死
+        adapter_id 与 capability **一致**）：
+        ① `bidirectional_without_adapter` 恰为「所有 independent 的 bidirectional entry」
+           （它们在 manifest 有 adapter_id，但 registry 里没有真实 registration ⇒ 报告点名）；
+        ② `registered_adapter_ids == ()`（registry 未 register，宣称的双向都还是 legacy 假双向）；
+        ③ adapter_id 与 capability 一致：bidirectional entry 全部带 adapter_id，
+           非 bidirectional entry 全部 `adapter_id is None`（overlay 只给裁决过的写回）。
         """
         registry = RG.WorkpaperSyncAdapterRegistry(manifest=EP.load_entry_manifest())
         report = registry.build_report()
@@ -1623,7 +1630,18 @@ class TestProperty3BidirectionalRequiresAdapter:
         )
         assert sorted(report.bidirectional_without_adapter) == expected
         assert report.registered_adapter_ids == ()
-        assert all(entry.get("adapter_id") is None for entry in entries.values())
+        # ③ adapter_id 与 capability 一致（不放宽：仍逐 entry 断言，只是按 capability 分情形）
+        for entry in entries.values():
+            if entry.get("capability") == "bidirectional":
+                assert entry.get("adapter_id") is not None, (
+                    f"bidirectional entry {entry.get('entry_id')!r} 缺 adapter_id "
+                    "⇒ overlay 裁决与 adapter_id 写回脱钩"
+                )
+            else:
+                assert entry.get("adapter_id") is None, (
+                    f"非 bidirectional entry {entry.get('entry_id')!r} 却有 adapter_id "
+                    "⇒ 未裁决双向却写了 adapter_id"
+                )
 
 
 # ═══════════════════════════════════════════════════════════════════════════
