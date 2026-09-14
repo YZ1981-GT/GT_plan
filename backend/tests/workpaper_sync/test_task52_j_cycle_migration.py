@@ -2445,10 +2445,29 @@ class TestProperty28DefinitionDriftFailClosed:
             )
         assert len(audit["measured"]) == 37, f"解析审计只有 {len(audit['measured'])} 条"
 
-    def test_program_table_and_j0_codes_resolve_to_none(self, manifest_slice: dict) -> None:
+    def test_program_table_codes_fall_back_to_main_workbook_but_j0_resolves_to_none(
+        self, manifest_slice: dict
+    ) -> None:
+        """🔴 平台行为演进（commit 82f58ea44 / D4-IPO，不弱化）：程序表码 `J{n}A` 没有独立
+        render schema ⇒ `find_template_file` 回落到主码 `J{n}` 工作簿（程序表是主册里的一张
+        sheet），A/B/C/D/F/H/I/N 等几十个循环共用此行为。原判据冻结 `J{n}A → None` 是回落引入
+        前的快照。改为逐码断言回落目标正确（比原 None 断言更强），且 `J0`（无 A 后缀、不匹配程序
+        表码正则）仍必须 None。"""
         audit = manifest_slice["template_resolution_audit"]
+        by_code = {row["wp_code"]: row for row in audit["measured"]}
+        # 程序表码回落到各自主码工作簿（两个函数一致）
+        for code, main in (
+            ("J1A", "J1 应付职工薪酬.xlsx"),
+            ("J2A", "J2 长期应付职工薪酬-设定受益计划净资产.xlsx"),
+            ("J3A", "J3 股份支付.xlsx"),
+        ):
+            row = by_code[code]
+            assert row["resolved"] == row["resolved_any"] == main, (
+                f"{code} 应回落到主码工作簿 {main!r}，实得 {row!r}"
+            )
+        # J0 无 A 后缀、不匹配程序表码正则 ⇒ 仍必须 None（J 循环无函证册）
         nones = {row["wp_code"] for row in audit["measured"] if row["resolved"] is None}
-        assert nones == {"J1A", "J2A", "J3A", "J0"}, f"返回 None 的码集合是 {sorted(nones)}"
+        assert nones == {"J0"}, f"返回 None 的码集合应恰为 {{J0}}，实得 {sorted(nones)}"
         assert audit["program_table_code_note"]
         assert audit["j0_code_note"]
         assert audit["over_range_subcode_note"], "缺「解析非 None 不等于 sheet 存在」的说明"

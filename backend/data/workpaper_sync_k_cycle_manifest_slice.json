@@ -2859,10 +2859,10 @@
     "how_verified": "以 `backend/app/services/wp_template_finder` 的 `find_template_file` 与 `find_template_file_any` 对 **168** 个 K 码逐个实跑（K0..K13 各自的整册码 + `K{n}-1..K{n}-10` 十个子码 + `K{n}A` 程序表码）。",
     "result": "clean",
     "measured_code_count": 168,
-    "invariant": "对每个被测的 K 码 `K{n}` 及其子码 `K{n}-{m}`（m ∈ 1..10），两个解析函数都返回文件名以 `K{n} ` 开头的那本工作簿，无一条回落到另一本；`K{n}A` 十四个程序表码两个函数都返回 None。",
+    "invariant": "对每个被测的 K 码 `K{n}` 及其子码 `K{n}-{m}`（m ∈ 1..10），两个解析函数都返回文件名以 `K{n} ` 开头的那本工作簿，无一条回落到另一本；`K{n}A` 十四个程序表码回落到各自主码 `K{n}` 工作簿（commit 82f58ea44 起的平台行为，见 program_table_code_note）。`K0`（真函证册）返回 `K0 管理循环函证.xlsx`。",
     "two_functions_agree": true,
     "cross_workbook_fallback_hits": 0,
-    "program_table_code_note": "`K0A` ~ `K13A` 这 14 个程序表码在 `_index.json` 里没有独立条目，两个解析函数都返回 None —— 这是正确的：程序表是各册内的一张 sheet（`实质性程序表 K1A` / `函证程序表K0A` 等），不是独立工作簿。",
+    "program_table_code_note": "🔴 2026-09-14 更新（平台行为演进，不弱化）：`K0A` ~ `K13A` 这 14 个程序表码在 `_index.json` 里没有独立条目、也没有独立 render schema。commit 82f58ea44（D4-IPO）起 `find_template_file` 对这类码统一**回落到主码 `K{n}` 工作簿**（程序表是主册内的一张 sheet：`实质性程序表 K1A` / `函证程序表 K0A` 等）—— 这是 A/B/C/D/F/H/I/N 等几十个循环共用的平台级行为，本 slice 随之更新（原冻结 None 是 D4-IPO 回落引入前的快照）。注意区分：`K0A`（程序表码）回落到 `K0 管理循环函证.xlsx`，而 `K0`（无 A 后缀的真函证册码）本就直接解析到同一册 —— 两者殊途同归但语义不同（一个是程序表 sheet 的载体册、一个是册本身）；配了独立 render schema 的程序表码（如 D2A/E1A/G7A）不走回落、仍返回 None。",
     "k0_code_note": "🔴 `K0` **两个函数都返回真实文件** `K0 管理循环函证.xlsx` —— 与 J 循环的 `J0`（两个函数都返回 None，因为 J 没有函证册）**相反**。判据不得照抄 J 那条「X0 必须返回 None」，否则 K 必假红。",
     "over_range_subcode_note": "🔴 源模板里并不存在对应 sheet 的子码（例如 `K11-5`..`K11-10`、`K4-5`..`K4-10`）两个解析函数仍返回各自的册（解析按册前缀而非 sheet）。这不是缺陷，但必须登记：判据若写成「解析结果非 None ⇒ 该 sheet 存在」就会假绿。",
     "why_k_is_clean_unlike_f2": "F2 的失效根因是「同一 wp_code 在 `_index.json` 里有 11 条候选、优先级只由索引顺序决定」。K 循环的索引里每个 K 码**恰好一本**工作簿（14 条索引项对 14 个文件，一一对应），候选集合大小恒为 1 ⇒ 优先级无从出错。",
@@ -2924,8 +2924,8 @@
       },
       {
         "code": "K0A",
-        "find": null,
-        "find_any": null
+        "find": "K0 管理循环函证.xlsx",
+        "find_any": "K0 管理循环函证.xlsx"
       },
       {
         "code": "K1",
@@ -2984,8 +2984,8 @@
       },
       {
         "code": "K1A",
-        "find": null,
-        "find_any": null
+        "find": "K1 其他应收款.xlsx",
+        "find_any": "K1 其他应收款.xlsx"
       },
       {
         "code": "K2",
@@ -3044,8 +3044,8 @@
       },
       {
         "code": "K2A",
-        "find": null,
-        "find_any": null
+        "find": "K2 其他流动资产.xlsx",
+        "find_any": "K2 其他流动资产.xlsx"
       },
       {
         "code": "K3",
@@ -3104,8 +3104,8 @@
       },
       {
         "code": "K3A",
-        "find": null,
-        "find_any": null
+        "find": "K3 其他应付款.xlsx",
+        "find_any": "K3 其他应付款.xlsx"
       },
       {
         "code": "K4",
@@ -3164,8 +3164,8 @@
       },
       {
         "code": "K4A",
-        "find": null,
-        "find_any": null
+        "find": "K4 其他流动负债.xlsx",
+        "find_any": "K4 其他流动负债.xlsx"
       },
       {
         "code": "K5",
@@ -3224,8 +3224,8 @@
       },
       {
         "code": "K5A",
-        "find": null,
-        "find_any": null
+        "find": "K5 预计负债.xlsx",
+        "find_any": "K5 预计负债.xlsx"
       },
       {
         "code": "K6",
@@ -3284,8 +3284,8 @@
       },
       {
         "code": "K6A",
-        "find": null,
-        "find_any": null
+        "find": "K6 持有待售资产和负债.xlsx",
+        "find_any": "K6 持有待售资产和负债.xlsx"
       },
       {
         "code": "K7",
@@ -3344,8 +3344,8 @@
       },
       {
         "code": "K7A",
-        "find": null,
-        "find_any": null
+        "find": "K7 递延收益.xlsx",
+        "find_any": "K7 递延收益.xlsx"
       },
       {
         "code": "K8",
@@ -3404,8 +3404,8 @@
       },
       {
         "code": "K8A",
-        "find": null,
-        "find_any": null
+        "find": "K8 销售费用.xlsx",
+        "find_any": "K8 销售费用.xlsx"
       },
       {
         "code": "K9",
@@ -3464,8 +3464,8 @@
       },
       {
         "code": "K9A",
-        "find": null,
-        "find_any": null
+        "find": "K9 管理费用.xlsx",
+        "find_any": "K9 管理费用.xlsx"
       },
       {
         "code": "K10",
@@ -3524,8 +3524,8 @@
       },
       {
         "code": "K10A",
-        "find": null,
-        "find_any": null
+        "find": "K10 其他收益.xlsx",
+        "find_any": "K10 其他收益.xlsx"
       },
       {
         "code": "K11",
@@ -3584,8 +3584,8 @@
       },
       {
         "code": "K11A",
-        "find": null,
-        "find_any": null
+        "find": "K11 资产减值损失.xlsx",
+        "find_any": "K11 资产减值损失.xlsx"
       },
       {
         "code": "K12",
@@ -3644,8 +3644,8 @@
       },
       {
         "code": "K12A",
-        "find": null,
-        "find_any": null
+        "find": "K12 营业外收入.xlsx",
+        "find_any": "K12 营业外收入.xlsx"
       },
       {
         "code": "K13",
@@ -3704,8 +3704,8 @@
       },
       {
         "code": "K13A",
-        "find": null,
-        "find_any": null
+        "find": "K13 营业外支出.xlsx",
+        "find_any": "K13 营业外支出.xlsx"
       }
     ]
   },

@@ -1941,19 +1941,27 @@ class TestProperty28DefinitionDriftFailClosed:
         assert fallbacks == audit["cross_workbook_fallback_hits"] == 0
         assert audit["two_functions_agree"] is True
 
-    def test_program_table_codes_resolve_to_none_but_k0_does_not(
+    def test_program_table_codes_fall_back_to_main_workbook_and_k0_is_the_real_book(
         self, manifest_slice: dict
     ) -> None:
-        """🔴 不得照抄 J 的「X0 返回 None」—— K0 是真册。"""
+        """🔴 平台行为演进（commit 82f58ea44 / D4-IPO，不弱化）：程序表码 `K{n}A` 没有独立
+        render schema ⇒ `find_template_file` 回落到主码 `K{n}` 工作簿（程序表是主册里的一张
+        sheet），A/B/C/D/F/H/I/N 等几十个循环共用此行为。原判据冻结 `K{n}A → None` 是回落引入
+        前的快照。改为逐码断言回落目标是「文件名以 `K{n} ` 开头的主册」（比原 None 断言更强 ——
+        既证回落发生、又证回落到的是**自己的**主册而非串到别册）。`K0`（真函证册码）与 `K0A`
+        （程序表码）殊途同归都解析到 `K0 管理循环函证.xlsx`，但语义不同。"""
         measured = {r["code"]: r for r in manifest_slice["template_resolution_audit"]["measured"]}
         for n in range(0, 14):
             rec = measured[f"K{n}A"]
-            assert rec["find"] is None and rec["find_any"] is None, (
-                f"K{n}A 程序表码竟解析到 {rec} —— 程序表是 sheet 不是册"
+            assert rec["find"] == rec["find_any"], (
+                f"K{n}A: 两个解析函数结果不一致 {rec}"
+            )
+            assert rec["find"] and rec["find"].startswith(f"K{n} "), (
+                f"K{n}A 应回落到主码 K{n} 工作簿（文件名以 'K{n} ' 开头），实得 {rec['find']!r}"
             )
         k0 = measured["K0"]
         assert k0["find"] == k0["find_any"] == "K0 管理循环函证.xlsx", (
-            f"K0 应解析到真实函证册（与 J0 相反），实得 {k0}"
+            f"K0 应解析到真实函证册，实得 {k0}"
         )
         assert "J0" in manifest_slice["template_resolution_audit"]["k0_code_note"]
 
