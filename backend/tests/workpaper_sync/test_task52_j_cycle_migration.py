@@ -1757,7 +1757,10 @@ class TestTransportKeyResolution:
             assert sources and sources <= allowed, (
                 f"{decl['id']}: orphan 载体有未登记的生产边 {sorted(sources - allowed)}"
             )
-        assert checked == 2, f"应有 2 条 orphan 载体声明，实际 {checked}"
+        # 🔴 2026-09-14：原 2 条 orphan 载体（TK-6 useJ2FormData / TK-7 useJ3FormData）中，
+        # useJ2FormData.ts 已被 tb-writeback Task 17 批C 作为孤儿链 TB 回写死代码物理删除，
+        # 其 orphan_carrier_* 登记随之移除 ⇒ 现只剩 TK-7 一条。保持精确等值（非 fail-open）。
+        assert checked == 1, f"应有 1 条 orphan 载体声明（TK-7 useJ3FormData），实际 {checked}"
 
     def test_tk6_real_key_shape_is_component_local_literals(self, manifest_slice: dict) -> None:
         """TK-6 的真实形态：六个 J2 子 Tab 各自的 `KEY` 对象字面量。"""

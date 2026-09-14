@@ -592,7 +592,7 @@
         "wraps_shared_base": false,
         "wraps_shared_base_source": null,
         "production_consumers": [
-          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L11"
+          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L18"
         ],
         "test_only_consumers": [
           "audit-platform/frontend/src/composables/workpaper/j2/__tests__/j2Components.spec.ts#L13"
@@ -664,27 +664,6 @@
       "why_not_in_scope": "本清册的删除对象是 legacy **dual-mode** composable（legacy_deletion_paradigm step 3）。FormData composable 是持久化载体，属另一类；且它们的 `writebackTB` / `publishAdjudicated` 逻辑将来可能被真实 adapter 复用 ⇒ 删除决定不由本任务下，登记为 BP-7。",
       "modules": [
         {
-          "module": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts",
-          "lines": 152,
-          "production_consumers": [
-            "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L4"
-          ],
-          "test_only_consumers": [],
-          "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
-          "barrel_inbound_edges": 0,
-          "pipeline_it_contains": [
-            "GET /api/workpapers/{wpId}/render-config (#L51)",
-            "PUT /api/workpapers/{wpId}/checklist-responses (#L90)",
-            "POST /api/projects/{projectId}/trial-balance/writeback (#L102)",
-            "POST /api/projects/{projectId}/events/publish (#L117)"
-          ],
-          "fabricated_transport_key_form": "item_id: `J2-${key}`",
-          "fabricated_transport_key_source": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
-          "fabricated_transport_key_note": "🔴 它把 item_id 拼成 `J2-` + 「render-config 的 html_data.responses 里的任意键」—— 键集合在编译期不可知、运行期由后端返回什么定什么。而 J2 真实持久化用的是 6 个子 Tab 里的**字面量 KEY 对象**（`J2-1-main` / `J2-2-main` / … 见 transport_key_resolution 的 TK-6）。两种形态只在「都以 J2- 开头」上巧合相似 ⇒ 接错了不会立刻报错，只会写出一批谁都读不到的行。",
-          "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue#L110（宿主经 useChecklistPersistence）",
-          "registered_as": "BP-7"
-        },
-        {
           "module": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts",
           "lines": 151,
           "production_consumers": [
@@ -718,7 +697,7 @@
       "orphan_dual_mode_with_broken_sheet_map": 2,
       "orphan_dual_mode_with_legacy_endpoint_direct_call": 1,
       "orphan_barrels": 2,
-      "lookalike_persistence_carriers_total": 2,
+      "lookalike_persistence_carriers_total": 1,
       "counting_note": "🔴 各计数按维度现算并与本键等值比对：orphan_order == 'first_order' 的 OD-1/OD-2 共 2 条；'second_order' 的 OD-3/OD-4 共 2 条；sheet_map_defect 非 null 的 OD-1/OD-2 共 2 条；legacy_endpoint_direct_call 非 null 的 OD-4 共 1 条；barrel_only_reachable_via 去重后 2 个 barrel。多一条少一条都红。"
     }
   },
@@ -954,11 +933,8 @@
         "identity_defect_detail": "🔴 `id: i + 1`（#L104）是**纯序号、无稳定兜底**，来自 `props.htmlData.adjustments` 的种子行；随后 `scheduleSave()` 把 `JSON.stringify(entries)` 写进 `KEY.entries`（'J2-3-entries'，#L121）⇒ 真落库。删中间一行再新增，后续行的 id 全部左移、历史备注串到另一笔分录。#L111 的 `id: e.id ?? i + 1` 是兜底形态（弱一级）。这是全 J 域**唯一**的 family_a 命中。",
         "persisted_via": "宿主 useChecklistPersistence（props.saveImmediate）",
         "persist_site": "audit-platform/frontend/src/components/workpaper/j2/J2TabAdjustment.vue#L121",
-        "orphan_carrier_fabricated_form": "item_id: `J2-${key}`",
-        "orphan_carrier_fabricated_source": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
-        "orphan_carrier_verdict": "FABRICATED_KEY_SHAPE_NEVER_WRITTEN_IN_PRODUCTION",
-        "orphan_carrier_verdict_detail": "🔴 **这就是任务正文要「解清」的东西**：`useJ2FormData.saveResponses()` 把 item_id 拼成 `J2-` + `render-config 返回的 html_data.responses 的任意键`，键集合编译期不可知；而生产路径写的是六个 Tab 的字面量键（`J2-1-main` 形态）。两者只在「都以 `J2-` 开头」上巧合相似 ⇒ 若 Task 72 把 adapter 接到这个 orphan 载体上，宿主行为一点不变（它不可达）、契约字段却会按一套从未存在过的键形态生成，而「文件确实被改了」会让常规守卫全绿。判据：断言 `J2-${key}` 这个模板串只出现在 orphan 载体里、且 orphan 载体的生产可达性为 0。",
-        "registered_as": "BP-7 + BP-8",
+        "orphan_carrier_removed_note": "🔴 2026-09-14 更新：原 TK-6 登记的 orphan 载体 `useJ2FormData.ts`（拼 `J2-${key}` 伪造键）已被 tb-writeback-explicit-publish-gate Task 17 批C 作为无宿主 import 的孤儿链 TB 回写死代码物理删除，风险由删除动作自然消解（不再有可误接的实体）。故移除本条 orphan_carrier_* 字段；J3 侧 TK-7 的 useJ3FormData 仍在磁盘、保留登记。BP-7 亦已从 source_refs 移除 useJ2FormData 引用。",
+        "registered_as": "BP-8",
         "status": "resolved_with_defect"
       },
       {
@@ -1684,7 +1660,6 @@
       "must_fix_before": "step 9 注册 adapter 并改线之前（否则会接到死代码上）",
       "owner_task": "Task 66（plan）/ Task 72（execute）—— 🔴 需新立任务或并入 Task 72",
       "source_refs": [
-        "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
         "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts#L96",
         "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
         "audit-platform/frontend/src/composables/workpaper/j3/index.ts"
@@ -1806,7 +1781,7 @@
     "orphan_dual_mode_first_order": 2,
     "orphan_dual_mode_second_order": 2,
     "orphan_barrels": 2,
-    "lookalike_persistence_carriers": 2,
+    "lookalike_persistence_carriers": 1,
     "shared_base_statement_consumers": 29,
     "shared_base_pseudo_string_edges": 5,
     "shared_base_j_cycle_consumers": 3,

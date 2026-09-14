@@ -151,7 +151,7 @@
         "orphan_order": "second_order",
         "wraps_shared_base": false,
         "consumers": [
-          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L11"
+          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L18"
         ],
         "test_only_consumers": [
           "audit-platform/frontend/src/composables/workpaper/j2/__tests__/j2Components.spec.ts#L13"
@@ -161,7 +161,7 @@
         "localStorage_prefix": null,
         "action": "delete_file_and_drop_barrel_reexport_and_update_spec",
         "action_side_effects": [
-          "必须同步删掉 `composables/workpaper/j2/index.ts#L11` 的 `export { useJ2DualMode } from './useJ2DualMode'`（否则 barrel 编译失败）",
+          "必须同步删掉 `composables/workpaper/j2/index.ts#L18` 的 `export { useJ2DualMode } from './useJ2DualMode'`（否则 barrel 编译失败）",
           "必须同步改 `composables/workpaper/j2/__tests__/j2Components.spec.ts#L13` 的 import（否则 vitest 报 Cannot find module）"
         ],
         "blocking_risk": "low",
@@ -195,11 +195,11 @@
     "orphan_barrels": [
       {
         "file": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
-        "lines": 16,
+        "lines": 22,
         "inbound_edges": 0,
-        "reexports": 11,
+        "reexports": 9,
         "action": "keep_but_drop_the_dual_mode_reexport",
-        "why_not_delete_the_barrel": "🔴 barrel 本身入边为 0（也是死代码），但删它会连带 11 条 re-export 里的其余 10 个模块（useJ2FormData / useJ2CrossSheet / useJ2Adjudication / useJ2Detail / useJ2AccrualCheck / useJ2Disclosure / useJ2ImportExport / useJ2Integration / useJ2FormulaEngine / useJ2ActuarialEngine）的可达性判定 —— 其中 useJ2ActuarialEngine 与 useJ2FormulaEngine 各有 PBT 测试边（`__tests__/useJ2FormulaEngine.pbt.spec.ts`），删 barrel 不会打破它们但会改变「哪些模块只剩测试边」的清单。本任务只负责 dual-mode 那一条 re-export；整个 barrel 的存废是 BP-7 的对象。",
+        "why_not_delete_the_barrel": "🔴 barrel 本身入边为 0（也是死代码）。2026-09-14 更新：useJ2FormData / useJ2Integration 已被 tb-writeback Task 17 批C 删除，barrel 现 re-export 9 条（其余 8 个模块 useJ2CrossSheet / useJ2Adjudication / useJ2Detail / useJ2AccrualCheck / useJ2Disclosure / useJ2ImportExport / useJ2FormulaEngine / useJ2ActuarialEngine + 本任务负责的 useJ2DualMode）—— 其中 useJ2ActuarialEngine 与 useJ2FormulaEngine 各有 PBT 测试边（`__tests__/useJ2FormulaEngine.pbt.spec.ts`），删 barrel 不会打破它们但会改变「哪些模块只剩测试边」的清单。本任务只负责 dual-mode 那一条 re-export；整个 barrel 的存废是 BP-7 的对象。",
         "inbound_edge_recipe": "🔴 判 barrel 入边**必须用路径解析口径**（把 import spec 解析成绝对文件路径再比对），不能用「模块 stem 相等」口径 —— 后者会把 `services/apiPaths.ts#L16/L17` 的 `export * from './apiPaths/index'` 误命中成 j2/j3 barrel 的入边（实测：stem 口径各得 2 条假边，路径解析口径得 0 条）。"
       },
       {
@@ -230,27 +230,6 @@
     "in_scope_of_this_deletion_plan": false,
     "why_not_in_scope": "它们是持久化载体而非 legacy dual-mode 实现，不在 legacy_deletion_paradigm step 3 的删除对象内；且 `useJ2FormData.writebackTB` / `publishAdjudicated` 的逻辑将来可能被真实 adapter 复用 ⇒ 删或留的决定不由本任务下，登记为 slice 的 BP-7。",
     "modules": [
-      {
-        "module": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts",
-        "lines": 152,
-        "production_consumers": [
-          "audit-platform/frontend/src/composables/workpaper/j2/index.ts#L4"
-        ],
-        "test_only_consumers": [],
-        "barrel_only_reachable_via": "audit-platform/frontend/src/composables/workpaper/j2/index.ts",
-        "barrel_inbound_edges": 0,
-        "pipeline_it_contains": [
-          "GET /api/workpapers/{wpId}/render-config (#L51)",
-          "PUT /api/workpapers/{wpId}/checklist-responses (#L90)",
-          "POST /api/projects/{projectId}/trial-balance/writeback (#L102)",
-          "POST /api/projects/{projectId}/events/publish (#L117)"
-        ],
-        "fabricated_transport_key_form": "item_id: `J2-${key}`",
-        "fabricated_transport_key_source": "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts#L87",
-        "real_carrier_instead": "audit-platform/frontend/src/components/workpaper/j2/GtJ2DefinedBenefitPlan.vue#L110（宿主经 useChecklistPersistence，六个子 Tab 的字面量 KEY 对象）",
-        "must_not_wire_to": true,
-        "must_not_wire_to_why": "接到它身上 ⇒ 宿主行为一点不变（不可达）而契约按一套从未存在过的键形态生成，且「文件确实被改了」会让常规守卫全绿 —— 假绿第①源（additive 注入即死代码）的最贵形态。"
-      },
       {
         "module": "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts",
         "lines": 151,
@@ -366,7 +345,6 @@
         "BP-11：收敛 J1-2 传输键的两份真源，否则契约看不见读方"
       ],
       "must_not_wire_to": [
-        "audit-platform/frontend/src/composables/workpaper/j2/useJ2FormData.ts",
         "audit-platform/frontend/src/composables/workpaper/j3/useJ3FormData.ts"
       ],
       "must_not_wire_to_why": "两者生产可达性为 0 且键形态是 `J2-${key}` / `J3-${key}`（从未在生产写过）—— 接到它们身上会得到「文件改了、守卫全绿、行为不变」的假绿。它们也不属本 entry（J2/J3 非 entry 宿主的载体）。",
@@ -402,7 +380,7 @@
     "orphan_dual_mode_to_delete": 4,
     "orphan_dual_mode_lines_total": 152,
     "orphan_barrel_reexports_to_drop": 2,
-    "lookalike_persistence_carriers": 2,
+    "lookalike_persistence_carriers": 1,
     "pseudo_consumer_edges": 5,
     "hosts_with_inlined_second_implementation": 0,
     "hosts_without_any_dual_mode": 2,
