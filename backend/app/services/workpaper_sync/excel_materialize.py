@@ -1964,23 +1964,37 @@ def _plan_row_shift(
             f"样式源 {last_data_row}）：{exc}",
         ) from exc
 
+    # 🔴 多 sheet 契约：anchor 与 frozen footer row 都必须绑定**本次位移的那张表**
+    #    （`region.table_key`），不得取「跨全部 sheet 的第一张 footer 表」。首版两处都偷懒：
+    #    ① anchor = 第一张有 footer_anchor 的表 —— combined 契约里恒是 primary sheet（D42）；
+    #    ② frozen row = 裸主键 `GT_FOOTER_ROW`（= primary sheet 的行）。
+    #    于是给 sibling 表（D4-23 footer 在 24 行）算扩张时，`total_formula_rows` 塞进的是
+    #    primary 的行号（31）。`shift_sheet_rows` 的 `is_total_row = block.row in {31}` 对
+    #    sibling 的 24 行主格恒为假 ⇒ 合计公式**不扩张** ⇒ 位移后 footer 落在 36 行、公式仍是
+    #    stale 的 `SUM(B12:B23)` ⇒ apply-phase gate `footer_formula_range_stale`。
+    #    真实 D4-29 编辑触发（sheet_key=d4-29-managed），combined projection 里 D4-22/D4-23
+    #    各有 12 个 orphan 行要插，此路径每次必炸。修复 = 用 `region.table_key` 定位本表的
+    #    footer_anchor + 用 `_resolve_frozen_footer_row(sheet_key=...)` 取本表冻结行号。
+    region_sheet_key = _sheet_key_for_table(contract, region.table_key)
     anchor = next(
         (
             table.footer_anchor
             for sheet in contract.sheets
             for table in sheet.tables
-            if table.footer_anchor is not None
+            if table.table_key == region.table_key and table.footer_anchor is not None
         ),
         None,
     )
     total_formula_rows: tuple[int, ...] = ()
     if anchor is not None and anchor.carries_total_formula:
-        raw = str(runtime_binding.get("GT_FOOTER_ROW", "")).strip()
+        frozen = _resolve_frozen_footer_row(runtime_binding, sheet_key=region_sheet_key)
+        raw = str(frozen or "").strip()
         if not raw.isdigit():
             raise _reject(
                 "excel_row_shift_plan_range_invalid",
                 "契约声明 footer 携带合计公式，但 runtime binding 的 "
-                f"GT_FOOTER_ROW={raw!r} 不是行号 —— 无从确定该扩张哪一行的区间",
+                f"GT_FOOTER_ROW（sheet_key={region_sheet_key!r}）={raw!r} 不是行号 —— "
+                "无从确定该扩张哪一行的区间",
             )
         # 🔴 取**冻结声明**而不是现场搜 marker：扩张的目标行必须是声明值，
         #    从 substrate 观测出来的行号会把「footer 已被人挪过」当成合法。

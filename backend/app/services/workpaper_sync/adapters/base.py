@@ -426,8 +426,15 @@ class MaterializeResult:
     row_shift: Any = None
     #: 契约声明「携带合计公式」的行号（位移**前**口径）。
     total_formula_rows: tuple[int, ...] = ()
-    #: 本次工作簿级传播声明（`excel_workbook_row_change.WorkbookRowChangePlan | None`）。
+    #: 本次工作簿级传播声明（`excel_workbook_row_change.WorkbookRowChangePlan | None`
+    #: 或多 sheet 合并后的 `MaterializeWorkbookChangeSet`）。
     workbook_row_change: Any = None
+    #: 多 sheet materialize:每张**发生插行**的受管表各自那趟冻结的位移声明。
+    #: 键 = `table_key`；值 = `(row_shift, total_formula_rows)`。`None` = 单 sheet / 无插行
+    #: （Word 与单 binding 路径恒为默认值）。verify 按 `region.table_key` 取本表声明做
+    #: shift-aware 归一化 —— 修复"主 binding 未插行、sibling 插行时 sibling 的 managed_sheet_*
+    #: 桶被判 unmanaged drift"（spec multi-sheet-materialize-defined-name-shift-normalization §4b）。
+    per_table_shift: Any = None
 
     def __post_init__(self) -> None:
         for name in ("artifact_sha256", "structure_hash", "identity_inventory_sha256"):

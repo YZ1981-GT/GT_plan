@@ -69,6 +69,8 @@ __all__ = [
     "PropagationEntry",
     "UnpropagatedCarrier",
     "WorkbookRowChangePlan",
+    "MaterializeWorkbookChangeSet",
+    "merge_workbook_row_change_propagations",
     "PropagationReport",
     "CARRIER_COUNTER_NAMES",
     # ── 扫描 ────────────────────────────────────────────────────
@@ -722,6 +724,90 @@ class WorkbookRowChangePlan:
             "propagations": [e.as_dict() for e in self.propagations],
             "unpropagated": [c.as_dict() for c in self.unpropagated],
         }
+
+
+@dataclass(frozen=True)
+class MaterializeWorkbookChangeSet:
+    """一次**多 sheet** materialize 的 workbook 级位移声明**并集**（只读，零写入面）。
+
+    ═══ 为什么需要它（spec multi-sheet-materialize-defined-name-shift-normalization）═══
+
+    一个 workbook 里多张受管 sheet 由同一个 adapter 在一次 `materialize` 里多趟叠写。每趟
+    `materialize_projection` 为**那一张** sheet 生成自己的 `WorkbookRowChangePlan`（含它对
+    `xl/workbook.xml` 里指向该 sheet 的 own-sheet definedName —— `GT_FOOTER_ANCHOR_D42x` /
+    `_xlnm.Print_Area` —— 的合法位移声明）。但 `adapters/excel.py::materialize` 只返回**主
+    binding** 那一趟的 `workbook_row_change`，sibling 各趟的被丢弃。于是 `verify_unmanaged_regions`
+    收不到 sibling 对 workbook.xml 的位移声明 ⇒ workbook.xml 走逐字节比对 ⇒ 合法位移被判
+    `adapter_unmanaged_region_drift`（真实 D4-29 编辑触发,D4-22/D4-23 各 12 orphan）。
+
+    本类是"给 verify 用的、跨全部受管 sheet 的位移声明并集"。它**不是** `WorkbookRowChangePlan`:
+    多 sheet 各有自己的 `at`/`count`/`managed_sheet_name`,单一标量无法诚实表达,强塞会让
+    `WorkbookRowChangePlan.__post_init__` 打红或语义谎报。verify 侧只消费 `.propagations`
+    （`normalise_propagated_part` 与 `unmanaged_region_digest` 均只读该属性）,故本类只暴露
+    `propagations` 一个字段,鸭子兼容。
+
+    🔴 apply **不消费**本类:apply 仍在每趟内用各自 `plan.workbook_row_change` 逐趟执行
+    （现状不动）。本类只在 materialize 返回值组装时构造,喂给 verify。
+    """
+
+    propagations: tuple[PropagationEntry, ...]
+
+    def __post_init__(self) -> None:
+        # 零副作用面实测：与 WorkbookRowChangePlan 同一条纪律（Property 1）。
+        from app.services.workpaper_sync.adapters.base import (
+            assert_no_mutation_surface,
+        )
+
+        assert_no_mutation_surface(self, label="MaterializeWorkbookChangeSet")
+        # 条目身份去重后不得再有冲突（构造器已去重；这里守「构造器没绕过」）。
+        seen: set[tuple[str, str, str, str]] = set()
+        for entry in self.propagations:
+            key = (entry.part, entry.locator, entry.ref_before, entry.ref_after)
+            if key in seen:
+                raise PropagationDriftError(
+                    f"MaterializeWorkbookChangeSet 含重复条目 {key} —— 合并器必须先去重"
+                )
+            seen.add(key)
+
+
+def merge_workbook_row_change_propagations(
+    plans: Iterable["WorkbookRowChangePlan | MaterializeWorkbookChangeSet | None"],
+) -> "MaterializeWorkbookChangeSet | None":
+    """把多趟 materialize 的 workbook 级位移声明合并成一份并集（spec §Design 候选 B）。
+
+    收集**所有** part 的 `PropagationEntry` 并集（不只 `xl/workbook.xml` —— 引用侧 sheet 的
+    跨 sheet 传播条目也要保留,否则主 binding 的传播归一化会回退,见 Requirement R5）。
+
+    去重键 `(part, locator, ref_before, ref_after)`。
+
+    🔴 **冲突检测**:同一 `(part, ref_before)` 出现两个**不同** `ref_after` ⇒ 抛
+    :class:`PropagationDriftError` —— 两趟声称把同一处引用位移到不同行,不自洽,不得静默取一。
+
+    全空（无任何非 None plan 或所有 plan 无 propagations）⇒ 返回 `None`,保持零传播路径
+    （Requirement R4:与本 spec 之前逐字节相同）。
+    """
+    by_identity: dict[tuple[str, str, str, str], PropagationEntry] = {}
+    by_before: dict[tuple[str, str], str] = {}
+    for plan in plans:
+        if plan is None:
+            continue
+        for entry in plan.propagations:
+            identity = (entry.part, entry.locator, entry.ref_before, entry.ref_after)
+            before_key = (entry.part, entry.ref_before)
+            prior_after = by_before.get(before_key)
+            if prior_after is not None and prior_after != entry.ref_after:
+                raise PropagationDriftError(
+                    f"合并 workbook 位移声明冲突:{before_key} 同时被声明位移到 "
+                    f"{prior_after!r} 与 {entry.ref_after!r} —— 两趟对同一处引用给出不同"
+                    "目标行,不自洽,不得静默取其一"
+                )
+            by_before.setdefault(before_key, entry.ref_after)
+            by_identity.setdefault(identity, entry)
+    if not by_identity:
+        return None
+    # 稳定顺序：按去重键排序,产物可重现。
+    merged = tuple(by_identity[k] for k in sorted(by_identity))
+    return MaterializeWorkbookChangeSet(propagations=merged)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -1677,6 +1677,7 @@ class ContentMutationService:
             row_shift=materialized.row_shift,
             total_formula_rows=materialized.total_formula_rows,
             propagation=materialized.workbook_row_change,
+            per_table_shift=materialized.per_table_shift,
         )
         unmanaged.assert_equivalent()
         structure_hash = self._projection_structure_hash(

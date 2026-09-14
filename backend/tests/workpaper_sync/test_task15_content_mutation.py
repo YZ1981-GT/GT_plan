@@ -482,14 +482,18 @@ class _FakeExcelAdapter:
         row_shift: Any = _NOT_PASSED,
         total_formula_rows: Any = _NOT_PASSED,
         propagation: Any = _NOT_PASSED,
+        per_table_shift: Any = _NOT_PASSED,
     ) -> UnmanagedRegionReport:
         # 🔴 默认值刻意是 `_NOT_PASSED` 哨兵而**不是** `None`：无插行时 materialize
         #    声明的就是 `None`，拿 `None` 当「没传」会让 BP-23 的接线一旦被回退（调用点
-        #    删掉三个 kwarg）仍然报绿 —— 那正是本轮修掉的「生产零消费」形态。
+        #    删掉 kwarg）仍然报绿 —— 那正是本轮修掉的「生产零消费」形态。
+        #    per_table_shift 同理（spec multi-sheet-materialize-defined-name-shift-normalization
+        #    §4b:多 sheet 各表 shift 声明必须喂到 verify）。
         self.unmanaged_call_kwargs = {
             "row_shift": row_shift,
             "total_formula_rows": total_formula_rows,
             "propagation": propagation,
+            "per_table_shift": per_table_shift,
         }
         if self.unmanaged_equivalent:
             return UnmanagedRegionReport(
@@ -1373,8 +1377,13 @@ class TestStageAndVerifyWithRealFiles:
             f"生产调用点没有喂这些归一化声明：{missing} —— "
             "它们会退回 BP-23 之前的「参数在、无人喂」形态"
         )
-        # 三者的值必须来自 `MaterializeResult` 的声明字段，而不是调用点自己现造。
-        assert set(seen) == {"row_shift", "total_formula_rows", "propagation"}
+        # 四者的值必须来自 `MaterializeResult` 的声明字段，而不是调用点自己现造。
+        assert set(seen) == {
+            "row_shift",
+            "total_formula_rows",
+            "propagation",
+            "per_table_shift",
+        }
 
     @pytest.mark.asyncio
     async def test_roundtrip_gap_blocks_before_any_db_write(

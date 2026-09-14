@@ -336,16 +336,33 @@ class ExcelSyncAdapter:
                 return result
 
             # 多受管 sheet：按 binding 顺序叠写同一份 workbook（首版 / 重投影）。
-            # 🔴 row_shift / propagation 必须保留**主 binding**那一趟的声明：末趟（sibling）
-            #    常无插行 ⇒ row_shift=None，若用末趟结果喂 verify，主 sheet 的插行会被
-            #    判成 unmanaged drift（D4 rematerialize 实测 169→253）。
+            # 🔴 row_shift / total_formula_rows / identity 清册保留**主 binding**那一趟的声明：
+            #    末趟（sibling）常无插行 ⇒ row_shift=None，若用末趟结果喂 verify，主 sheet 的
+            #    插行会被判成 unmanaged drift（D4 rematerialize 实测 169→253）。
+            #
+            # 🔴 但 workbook_row_change 例外：它必须是**全部趟**的位移声明并集，不能只留主 binding。
+            #    多 sheet 各趟对 xl/workbook.xml own-sheet definedName（GT_FOOTER_ANCHOR_D42x /
+            #    _xlnm.Print_Area）的合法位移各自声明在自己那趟的 workbook_row_change 里；只留主
+            #    binding（如 D4-29 转置表无这些位移）会让 sibling（D4-22/D4-23）的合法 workbook.xml
+            #    位移在 verify 时无声明可归一化 ⇒ 逐字节判 adapter_unmanaged_region_drift。
+            #    收集每趟 step.workbook_row_change，返回前合并成一份 MaterializeWorkbookChangeSet。
+            #    （spec multi-sheet-materialize-defined-name-shift-normalization）
             import dataclasses
             import tempfile
+
+            from app.services.workpaper_sync.excel_workbook_row_change import (
+                merge_workbook_row_change_propagations,
+            )
 
             current = substrate_for_write
             primary_result: MaterializeResult | None = None
             last_result: MaterializeResult | None = None
             field_count = 0
+            trip_changes: list[Any] = []
+            # 每张**发生插行**的 sheet 各自那趟的位移声明,供 verify 按 sheet 分派归一化。
+            # 主 binding 不一定是插行的那张（真实场景 D4-2 未插、D4-22/D4-23 插）——只留主
+            # binding 的 row_shift 会让 sibling 的 managed_sheet_* 桶漏归一化判 drift（§4b）。
+            per_table_shift: dict[str, tuple[Any, Any]] = {}
             tmp_paths: list[Path] = []
             try:
                 for index, binding in enumerate(bindings):
@@ -375,6 +392,13 @@ class ExcelSyncAdapter:
                         ),
                     ).result
                     field_count += int(step.managed_field_count)
+                    if step.workbook_row_change is not None:
+                        trip_changes.append(step.workbook_row_change)
+                    if step.row_shift is not None:
+                        per_table_shift[binding.table_key] = (
+                            step.row_shift,
+                            step.total_formula_rows,
+                        )
                     if binding.table_key == self.binding.table_key:
                         primary_result = step
                     last_result = step
@@ -394,6 +418,9 @@ class ExcelSyncAdapter:
                     last_result,
                     artifact_sha256=hashlib.sha256(output.read_bytes()).hexdigest(),
                 )
+            # workbook_row_change = 全部趟的位移声明并集（含主 binding + sibling 的
+            # workbook.xml own-sheet definedName 位移 + 引用侧 sheet 传播）。
+            merged_change = merge_workbook_row_change_propagations(trip_changes)
             return dataclasses.replace(
                 primary_result,
                 managed_field_count=field_count,
@@ -405,6 +432,8 @@ class ExcelSyncAdapter:
                 # 会写成 D43 清册并与观测器重算的 D42 清册漂移（D4 rematerialize 实测）。
                 structure_hash=last_result.structure_hash,
                 identity_inventory_sha256=primary_result.identity_inventory_sha256,
+                workbook_row_change=merged_change,
+                per_table_shift=(per_table_shift or None),
             )
         finally:
             if repaired is not None:
@@ -498,6 +527,7 @@ class ExcelSyncAdapter:
         row_shift: Any = None,
         total_formula_rows: Any = (),
         propagation: Any = None,
+        per_table_shift: Any = None,
     ) -> UnmanagedRegionReport:
         """未管理区域比对。判据实现全部在 Task 37，本层只解析受管区域后转手。
 
@@ -573,6 +603,20 @@ class ExcelSyncAdapter:
             last_report: UnmanagedRegionReport | None = None
             for binding, region in regions_by_binding:
                 extra = all_managed_parts - {region.sheet_part}
+                # 🔴 每张 sheet 的 shift-aware 归一化必须用**它自己那趟**的 row_shift /
+                #    total_formula_rows。多 sheet 场景里主 binding 不一定是插行的 sheet
+                #    （真实：D4-2 未插、D4-22/D4-23 插）——只按 "是否主 binding" 分派会把
+                #    sibling 的合法插行判 managed_sheet_* drift（§4b）。
+                #    per_table_shift 给了就按 region.table_key 取本表声明；没给（Word/单 sheet
+                #    /旧调用方）则回退旧口径（主 binding 标量 + sibling None），纯增量。
+                if per_table_shift is not None:
+                    this_shift, this_total = per_table_shift.get(
+                        region.table_key, (None, ())
+                    )
+                else:
+                    is_primary = binding.table_key == self.binding.table_key
+                    this_shift = row_shift if is_primary else None
+                    this_total = total_formula_rows if is_primary else ()
                 # 插行 / 工作簿传播声明来自主 sheet 那一趟；sibling 校验仍要带上，
                 # 否则 workbook.xml definedName 位移会被判成 workbook_and_styles 漂移。
                 last_report = verify_unmanaged_regions(
@@ -582,16 +626,8 @@ class ExcelSyncAdapter:
                     region=region,
                     binding=binding,
                     limits=self._limits,
-                    row_shift=(
-                        row_shift
-                        if binding.table_key == self.binding.table_key
-                        else None
-                    ),
-                    total_formula_rows=(
-                        total_formula_rows
-                        if binding.table_key == self.binding.table_key
-                        else ()
-                    ),
+                    row_shift=this_shift,
+                    total_formula_rows=this_total,
                     propagation=propagation,
                     extra_managed_sheet_parts=extra,
                 )
