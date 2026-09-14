@@ -204,34 +204,10 @@ export function useH6FormData(params: {
     }, DEBOUNCE_MS))
   }
 
-  // ─── writebackTrialBalance（科目1606，借方/资产类，过渡科目） ────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目1606固定资产清理（借方/资产类，过渡科目）。
-   * 过渡科目规则：期末余额应为0（清理完毕全部结转）。
-   * 回写成功后发布 EventBus 事件通知其他底稿（附注/H10资产处置损益等）。
-   */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1606,
-        audited_amount: auditedAmount,
-      })
-
-      // 发布 EventBus 事件通知其他底稿（附注/H10等）
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: {
-          wpCode: 'H6',
-          accountCode: ACCOUNT_CODE_1606,
-          auditedAmount,
-          isTransitAccount: true,
-        },
-      }))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1606，含 substantive:adjudicated emit）
+  // 为零消费死代码，已移除（useH6FormData() 全仓 0 调用方）。H6 活路径在 H6TabAdjudication.onWritebackTB→
+  // useH6Adjudication.publishAdjudicated。TB 回写走显式发布门（publish-to-tb，随批次改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -415,8 +391,6 @@ export function useH6FormData(params: {
     // Save actions
     saveResponse,
     saveBatchResponses,
-    // TB writeback
-    writebackTrialBalance,
     // Load
     selfLoad,
     loadAllResponses,

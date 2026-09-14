@@ -186,27 +186,10 @@ export function useH1FormData(wpId: Ref<string>, projectId: Ref<string>) {
     await _doSave(checklistItems)
   }
 
-  // ─── writebackTrialBalance（1601+1602） ────────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目1601固定资产（借方）+ 1602累计折旧（贷方/备抵）。
-   * Req 17.2: H1-1审定数→TB回写
-   */
-  async function writebackTrialBalance(auditedCost: number, auditedDep: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1601,
-        audited_amount: auditedCost,
-      })
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1602,
-        audited_amount: auditedDep,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1601+1602）为零消费死代码，已移除
+  // （useH1FormData() 全仓 0 调用方 / GtH1 不 destructure；H1-1 活路径在 H1TabAdjudication.onWritebackTB→
+  // useH1Adjudication.publishAdjudicated）。TB 回写走显式发布门（publish-to-tb，随批次改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -376,8 +359,6 @@ export function useH1FormData(wpId: Ref<string>, projectId: Ref<string>) {
     saveImmediate,
     debouncedSave,
     saveBatch,
-    // TB writeback
-    writebackTrialBalance,
     // Load
     selfLoad,
   }

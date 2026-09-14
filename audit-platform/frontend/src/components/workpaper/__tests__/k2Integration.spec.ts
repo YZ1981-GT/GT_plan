@@ -229,7 +229,10 @@ describe('K2 Integration: 交叉验证 adjudicationVsDetail', () => {
 // Requirements: 2.5, 2.6
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe('K2 Integration: 审定表subtotalRow + writebackTB（科目 1901）', () => {
+// 注：原 describe 含 3 个直调 useK2FormData.writebackTB 的用例，测的是零生产消费死代码
+//     （spec tb-writeback-explicit-publish-gate Task 17 批C 已移除 writebackTB），随之移除。
+//     subtotalRow 用例测的是 useK2Adjudication 活路径，保留。
+describe('K2 Integration: 审定表subtotalRow（科目 1901）', () => {
   beforeEach(() => { vi.clearAllMocks() })
 
   it('subtotalRow 汇总全部动态行（历史固定行按有数据者迁移）', () => {
@@ -283,56 +286,6 @@ describe('K2 Integration: 审定表subtotalRow + writebackTB（科目 1901）', 
     expect(subtotalRow.value.rje).toBe(-1000)
     // subtotalRow.audited = calcAuditedAmount(192000, 2000, -1000) = 193000
     expect(subtotalRow.value.audited).toBe(193000)
-  })
-
-  it('writebackTB 调用正确端点并发布 EventBus（科目 1901，不是 1231）', async () => {
-    const { useK2FormData } = await import('../composables/useK2FormData')
-    const formData = useK2FormData(ref('wp-k2-001'), ref('proj-001'))
-
-    await formData.writebackTB(193000)
-
-    // 🔴 科目口径 = 报表行 BS-014 解析结果（实证 TB('1901')）。
-    // 历史实现写死 `1231`（应收款项坏账准备）→ 回写会覆盖 D1/D2/K1 的坏账口径。
-    expect(mockPut).toHaveBeenCalledTimes(1)
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      { account_code: '1901', audited_amount: 193000 },
-    )
-
-    // 验证 EventBus 发布
-    expect(emitSpy).toHaveBeenCalledTimes(1)
-    expect(emitSpy).toHaveBeenCalledWith(
-      'substantive:adjudicated',
-      expect.objectContaining({
-        accountCode: '1901',
-        auditedAmount: 193000,
-        wpCode: 'K2',
-      }),
-    )
-  })
-
-  it('writebackTB payload 包含 timestamp', async () => {
-    const { useK2FormData } = await import('../composables/useK2FormData')
-    const formData = useK2FormData(ref('wp-k2-002'), ref('proj-002'))
-
-    const before = Date.now()
-    await formData.writebackTB(500000)
-    const after = Date.now()
-
-    const payload = emitSpy.mock.calls[0][1]
-    expect(payload.timestamp).toBeGreaterThanOrEqual(before)
-    expect(payload.timestamp).toBeLessThanOrEqual(after)
-  })
-
-  it('writebackTB 失败时不发布 EventBus', async () => {
-    mockPut.mockRejectedValueOnce(new Error('network error'))
-
-    const { useK2FormData } = await import('../composables/useK2FormData')
-    const formData = useK2FormData(ref('wp-k2-003'), ref('proj-003'))
-
-    await formData.writebackTB(100000)
-
-    expect(emitSpy).not.toHaveBeenCalled()
   })
 })
 

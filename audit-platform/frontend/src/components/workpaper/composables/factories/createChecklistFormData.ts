@@ -44,7 +44,6 @@ import {
   type PersistenceState,
 } from '@/composables/workpaper/useChecklistPersistence'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import { ElMessage } from 'element-plus'
 
 // ─── Configuration ───────────────────────────────────────────────────────────
@@ -105,8 +104,6 @@ export interface ChecklistFormDataReturn {
   saveBatch: (items: Array<{ itemId: string; data: Partial<ChecklistResponse> }>) => Promise<void>
   /** debounce 文本字段保存（per item_id 独立计时器） */
   debouncedSave: (itemId: string, data: Partial<ChecklistResponse>) => void
-  /** 审定数回写 trial_balance + EventBus 通知 */
-  writebackTB: (amounts: Record<string, number>) => Promise<void>
   /** 获取 render-config sheet 数据 */
   getSheet: (name: string) => any
   /** TB 只读字段种子（从 render-config html_data 注入） */
@@ -125,15 +122,16 @@ export function createChecklistFormData(config: ChecklistFormDataConfig): Checkl
   const {
     wpId,
     projectId,
-    year,
     itemPrefix,
     label,
     forceComponentType,
-    accountCodes = [],
     normalizeResponse,
     afterSave,
     debounceMs = 800,
   } = config
+  // 注：config.year / config.accountCodes 保留为公共配置项（调用方可传），
+  //     但其唯一消费者 writebackTB 已作为零消费死代码移除
+  //     （spec tb-writeback-explicit-publish-gate Task 17 批C）。TB 回写走 publish-to-tb。
 
   // ─── Persistence Adapter（复用 Wave 1 统一适配器） ────────────────────────
 
@@ -266,37 +264,12 @@ export function createChecklistFormData(config: ChecklistFormDataConfig): Checkl
 
   // ─── TB Writeback ──────────────────────────────────────────────────────────
 
-  /**
-   * 回写审定数到 trial_balance + EventBus 通知。
-   * @param amounts - { accountCode: auditedAmount } 映射
-   */
-  async function writebackTB(amounts: Record<string, number>): Promise<void> {
-    if (!projectId.value) return
-    try {
-      const params: Record<string, any> = {}
-      if (year?.value) params.year = year.value
-
-      for (const [accountCode, auditedAmount] of Object.entries(amounts)) {
-        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: accountCode,
-          audited_amount: auditedAmount,
-          ...params,
-        })
-      }
-
-      // EventBus 通知审定数变更
-      const firstCode = Object.keys(amounts)[0] ?? accountCodes[0] ?? ''
-      const firstAmount = Object.values(amounts)[0] ?? 0
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: firstCode,
-        auditedAmount: firstAmount,
-        wpCode: label,
-        timestamp: Date.now(),
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // ─── TB Writeback（已移除） ─────────────────────────────────────────────────
+  // 原 writebackTB(amounts) 直调 PUT /api/projects/{pid}/trial-balance/writeback +
+  // emit substantive:adjudicated，为零消费死代码（createChecklistFormData 工厂全仓 0
+  // 生产调用点，writebackTB 更无任何消费方）。已移除 —— TB 回写统一走显式发布门
+  // publish-to-tb（活路径在各循环 TabAdjudication）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 批C（Property 9）
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -343,7 +316,6 @@ export function createChecklistFormData(config: ChecklistFormDataConfig): Checkl
     save,
     saveBatch,
     debouncedSave,
-    writebackTB,
     getSheet,
     setTbValues,
     flush,

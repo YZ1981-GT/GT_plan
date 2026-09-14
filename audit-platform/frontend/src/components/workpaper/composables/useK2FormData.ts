@@ -7,7 +7,7 @@
  * 职责：
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文 + checklist_responses
  * - loadTbData(): 从 trial_balance 获取其他流动资产未审/审定数据
- * - writebackTB(): 审定数回写 trial_balance + EventBus 'substantive:adjudicated'
+ * - （writebackTB 已移除：零生产消费死代码，spec tb-writeback-explicit-publish-gate Task 17 批C）
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "K2-{sheet}-{field}"（如 "K2-1-audited-amount", "K2-4-contract-cost"）
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
@@ -21,10 +21,10 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
+// 注：eventBus / K2_GROSS_FALLBACK_STANDARD 原仅用于已移除的 writebackTB
+//     （spec tb-writeback-explicit-publish-gate Task 17 批C），一并移除 import。
 import {
   K2_ACCOUNT_NAME,
-  K2_GROSS_FALLBACK_STANDARD,
   k2GrossQueryCodes,
 } from './k2AccountScope'
 import { sumLongestPrefixOnly, type TbSourceCodes } from './shared/tbSourceCodes'
@@ -255,38 +255,14 @@ export function useK2FormData(wpId: Ref<string>, projectId: Ref<string>) {
     }
   }
 
-  // ─── writebackTB（其他流动资产，科目由报表映射解析） ────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：其他流动资产（借方/资产类）。
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * 🔴 科目码取解析结果（实证 `1901`），**不是** `1231`（那是应收款项坏账准备，
-   * 往它回写会覆盖 D1/D2/K1 的坏账口径）。
-   */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    const accountCode = _queryCodes()[0] || K2_GROSS_FALLBACK_STANDARD
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      })
-
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode,
-        auditedAmount,
-        wpCode: 'K2',
-        timestamp: Date.now(),
-      })
-
-      // 同步更新本地 tbData
-      tbData.value.audited = auditedAmount
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // ─── writebackTB（已移除） ────────────────────────────────────────────────
+  // 原 writebackTB(auditedAmount) 直调 PUT /api/projects/{pid}/trial-balance/writeback
+  // （科目由 k2AccountScope 解析，实证 1901）+ emit substantive:adjudicated。
+  // 实证：无任何 .vue 生产宿主 import useK2FormData（K2 活路径在 K2TabAdjudication inline
+  // handleWritebackTB），writebackTB 仅被 k2Integration.spec 直调 ⇒ 零生产消费死代码。
+  // 已移除 —— TB 回写走显式发布门 publish-to-tb（K 循环活路径改造归 M6/task7）。
+  // 连带移除 k2Integration.spec 中 3 个直调 writebackTB 的用例。
+  // spec: tb-writeback-explicit-publish-gate Task 17 批C（Property 9）
 
   // ─── selfLoad（render-config + checklist_responses + TB） ───────────────────
 
@@ -404,7 +380,6 @@ export function useK2FormData(wpId: Ref<string>, projectId: Ref<string>) {
     saveBatch,
     // TB
     loadTbData,
-    writebackTB,
     setTbValues,
     // Load
     selfLoad,

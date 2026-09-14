@@ -197,23 +197,9 @@ export function useI4FormData(wpId: Ref<string>, projectId: Ref<string>) {
     }
   }
 
-  // ─── writebackTrialBalance（1801） ─────────────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目1801长期待摊费用（借方/资产类）。
-   * I4仅一个科目1801。
-   */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1801,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /api/projects/.../trial-balance/writeback，科目 1801）为零消费死代码，已移除；
+  // TB 回写走显式发布门 publish-to-tb（活路径在 useI4Adjudication.writeback，M9/task13 改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -380,8 +366,6 @@ export function useI4FormData(wpId: Ref<string>, projectId: Ref<string>) {
     saveImmediate,
     debouncedSave,
     saveBatch,
-    // TB writeback
-    writebackTrialBalance,
     // TB values setter
     setTbValues,
     // Load

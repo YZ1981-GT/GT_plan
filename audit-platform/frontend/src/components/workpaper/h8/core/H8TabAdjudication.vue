@@ -504,7 +504,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'save', itemId: string, value: any): void
-  (e: 'writeback-tb', costAudited: number, depAudited: number, impairAudited?: number): void
+  // 注：原 'writeback-tb' emit 声明为断链死代码（无 onWritebackTB 调用、GtH8 不绑 @writeback-tb），已移除。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
   (e: 'navigate-sheet', sheetName: string): void
 }>()
 
@@ -591,9 +592,8 @@ const {
     saveResponse(itemId, value)
     emit('save', itemId, value)
   },
-  onWritebackTB: async (cost, dep, impair) => {
-    emit('writeback-tb', cost, dep, impair)
-  },
+  // 注：原 onWritebackTB → emit('writeback-tb') 为断链死代码（GtH8 不绑 @writeback-tb），已移除。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
 })
 
 const { h8VsH9Linkage, h83AdjustmentSync, h8H9ContractVariance } = useH8CrossSheet(allResponsesRef as any)

@@ -24,7 +24,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import { parseNum } from './useK11FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -338,47 +337,12 @@ export function useK11FormData(opts: {
     }
   }
 
-  // ─── writebackTB（发生额回写！非期末余额）─────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目6701资产减值损失
-   * ⚠️ 关键区别：损益类回写**发生额**，非期末余额！
-   * 与K9(6602)/K8(6601)/I6(6602研发)/H10(6115)同款处理逻辑。
-   *
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * @param auditedAmount 审定发生额（借方-贷方净额）
-   */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    isSaving.value = true
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_6701,
-        audited_amount: auditedAmount,
-        is_occurrence: true, // 标识：损益类发生额回写
-      })
-
-      // 更新本地 tbData
-      tbData.value.auditedAmount = auditedAmount
-
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_6701,
-        auditedAmount,
-        wpCode: 'K11',
-        type: 'occurrence_amount', // 标识：发生额回写
-        timestamp: Date.now(),
-      })
-
-      // 保存审定金额到独立 item_id 供跨sheet引用
-      await saveResponse('K11-1-adjudicated-amount', String(auditedAmount))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    } finally {
-      isSaving.value = false
-    }
-  }
+  // ─── writebackTB 已移除（零消费死代码） ──────────────────────────────────────
+  // 原 writebackTB（PUT /api/projects/{pid}/trial-balance/writeback，科目 6701 资产减值损失发生额）
+  // 为零消费死代码，已移除；K11 的 TB 回写走显式发布门 publish-to-tb（M6/task7 改造）。
+  // 实证：useK11FormData 无任何渲染宿主 import（孤儿 composable，仅测试用 setTbValues），
+  // K11 真实回写路径在 useK11Adjudication.writeback（inline http.put，被 K11.vue handleTbWriteback 消费）。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── setTbValues（外部设置TB值，render策略seed回读） ────────────────────────
 
@@ -445,7 +409,6 @@ export function useK11FormData(opts: {
     saveBatch,
     getResponse,
     setResponse,
-    writebackTB,
     loadTbData,
     // Extras
     debouncedSave,

@@ -220,53 +220,10 @@ export function useI1FormData(params: {
     }, DEBOUNCE_MS))
   }
 
-  // ─── writebackTrialBalance（科目1701+1702+1703） ───────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：
-   * - 科目1701无形资产（借方/资产类）
-   * - 科目1702累计摊销（贷方/备抵类）
-   * - 科目1703无形资产减值准备（贷方/备抵类）
-   *
-   * 回写成功后发布 'substantive:adjudicated' 事件通知其他底稿。
-   * Req 2.10: WHEN 审定数变化时 writebackTrialBalance + 发布事件
-   */
-  async function writebackTrialBalance(
-    auditedCost: number,
-    auditedAmort: number,
-    auditedImpairment: number,
-  ): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await Promise.all([
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_1701,
-          audited_amount: auditedCost,
-        }),
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_1702,
-          audited_amount: auditedAmort,
-        }),
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_1703,
-          audited_amount: auditedImpairment,
-        }),
-      ])
-
-      // 发布 EventBus 事件通知其他底稿（附注/报表等）
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: {
-          wpCode: 'I1',
-          accountCodes: [ACCOUNT_CODE_1701, ACCOUNT_CODE_1702, ACCOUNT_CODE_1703],
-          auditedCost,
-          auditedAmort,
-          auditedImpairment,
-        },
-      }))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1701+1702+1703，含 substantive:adjudicated
+  // dispatch）为零消费死代码，已移除（useI1FormData() 无调用方；I1-1 活路径在 useI1Adjudication.saveAdjudication
+  // 的 inline http.put，多科目）。TB 回写走显式发布门（publish-to-tb，随批次改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1（BP-5）。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -487,8 +444,7 @@ export function useI1FormData(params: {
     // Save actions
     saveResponse,
     saveBatchResponses,
-    // TB writeback
-    writebackTrialBalance,
+    // 注：writebackTrialBalance 已移除（零消费死代码，见上方收口注释）
     // Load
     selfLoad,
     loadAllResponses,

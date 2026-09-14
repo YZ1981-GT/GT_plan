@@ -340,37 +340,9 @@ export function useI6FormData(options: {
     }
   }
 
-  // ─── writebackTB（发生额回写！非期末余额） ────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目6602研发费用
-   * ⚠️ 关键区别：损益类回写**发生额**，非期末余额！
-   * 与H10(6115)同款处理逻辑。
-   *
-   * @param auditedAmount 审定发生额（借方-贷方净额）
-   */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_6602,
-        audited_amount: auditedAmount,
-      })
-      // 更新本地 tbData
-      tbData.value.auditedAmount = auditedAmount
-      // 记录回写日志
-      await saveImmediate('I6-1-tb-writeback', JSON.stringify({
-        accountCode: ACCOUNT_CODE_6602,
-        auditedAmount,
-        type: 'occurrence_amount', // 标识：发生额回写
-        timestamp: new Date().toISOString(),
-      }))
-      // 保存审定金额到独立 item_id 供跨sheet引用
-      await saveImmediate('I6-1-adjudicated-amount', String(auditedAmount))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTB（PUT /api/projects/.../trial-balance/writeback，科目 6602 发生额）为零消费死代码，已移除；
+  // TB 回写走显式发布门 publish-to-tb（活路径在 useI6Adjudication.writeback，含 I6→I2 联动，M9/task13 改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── setTbValues（外部设置TB值） ───────────────────────────────────────────
 
@@ -436,7 +408,6 @@ export function useI6FormData(options: {
     selfLoad,
     setResponse,
     getResponse,
-    writebackTB,
     // Low-level (for advanced usage)
     saveImmediate,
     debouncedSave,

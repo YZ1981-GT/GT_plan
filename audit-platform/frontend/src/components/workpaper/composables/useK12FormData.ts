@@ -8,7 +8,7 @@
  * 职责：
  * - selfLoad(): bundle内嵌场景从 render-config 加载上下文 + checklist_responses
  * - loadTbData(): 从 trial_balance 获取科目 6301 发生额数据（损益类！）
- * - writebackTB(): 审定数回写 trial_balance(6301) + EventBus 'substantive:adjudicated'
+ * - （writebackTB 已移除：零生产消费死代码，spec tb-writeback-explicit-publish-gate Task 17 批C）
  * - checklist_responses 持久化: GET/PUT /api/workpapers/:wpId/checklist-responses
  * - item_id 命名: 前缀 "K12-{sheet}-{field}"
  * - debounce/即时保存: 文本字段 debounce 2s，枚举/结论即时保存
@@ -24,7 +24,7 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
+// 注：eventBus 原仅用于已移除的 writebackTB（spec tb-writeback-explicit-publish-gate Task 17 批C），移除 import。
 import { parseNum } from './useK12FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -341,45 +341,13 @@ export function useK12FormData(opts: {
 
   // ─── writebackTB（发生额回写！非期末余额）─────────────────────────────────
 
-  /**
-   * 审定数回写 trial_balance：科目6301营业外收入
-   * ⚠️ 关键区别：损益类回写**发生额**，非期末余额！
-   * ⚠️ 6301贷方科目：审定发生额 = 贷方发生 - 借方发生（红冲）
-   *
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * @param auditedAmount 审定发生额（贷方-借方净额）
-   */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    isSaving.value = true
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_6301,
-        audited_amount: auditedAmount,
-        is_occurrence: true, // 标识：损益类发生额回写
-      })
-
-      // 更新本地 tbData
-      tbData.value.auditedAmount = auditedAmount
-
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_6301,
-        auditedAmount,
-        wpCode: 'K12',
-        type: 'occurrence_amount', // 标识：发生额回写（损益类）
-        timestamp: Date.now(),
-      })
-
-      // 保存审定金额到独立 item_id 供跨sheet引用
-      await saveResponse('K12-1-adjudicated-amount', String(auditedAmount))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    } finally {
-      isSaving.value = false
-    }
-  }
+  // 原 writebackTB(auditedAmount) 直调 PUT /api/projects/{pid}/trial-balance/writeback
+  // （科目 6301 发生额 is_occurrence=true）+ emit substantive:adjudicated + saveResponse。
+  // 实证：生产宿主 K12TabAdjustment.vue 仅用 formData.selfLoad（不 destructure writebackTB），
+  // K12 活路径 TB 回写在 K12TabAdjudication inline handleWritebackTBInternal ⇒ 本方法零生产消费死代码。
+  // 已移除 —— TB 回写走显式发布门 publish-to-tb（K 循环发生额活路径改造归 M6/task9）。
+  // 连带移除 k12Integration.test.ts Part A 中直调 writebackTB 的用例。
+  // spec: tb-writeback-explicit-publish-gate Task 17 批C（Property 9）
 
   // ─── setTbValues（外部设置TB值，render策略seed回读） ────────────────────────
 
@@ -447,7 +415,6 @@ export function useK12FormData(opts: {
     saveBatch,
     getResponse,
     setResponse,
-    writebackTB,
     loadTbData,
     // Extras
     debouncedSave,

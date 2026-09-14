@@ -175,45 +175,10 @@ describe('createChecklistFormData', () => {
     expect(resp?.remark).toBe('pending')
   })
 
-  // ─── writebackTB ───────────────────────────────────────────────────────────
-
-  it('writebackTB calls trial-balance/writeback for each account', async () => {
-    const fd = await createInstance()
-
-    await fd.writebackTB({ '1221': 500000, '1231': 50000 })
-
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      expect.objectContaining({ account_code: '1221', audited_amount: 500000 }),
-    )
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      expect.objectContaining({ account_code: '1231', audited_amount: 50000 }),
-    )
-  })
-
-  it('writebackTB emits substantive:adjudicated event', async () => {
-    const fd = await createInstance()
-
-    await fd.writebackTB({ '1221': 500000 })
-
-    expect(mockEmit).toHaveBeenCalledWith('substantive:adjudicated', expect.objectContaining({
-      accountCode: '1221',
-      auditedAmount: 500000,
-      wpCode: 'K1',
-    }))
-  })
-
-  it('writebackTB includes year param when provided', async () => {
-    const fd = await createInstance({ year: ref(2025) })
-
-    await fd.writebackTB({ '1221': 100 })
-
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-001/trial-balance/writeback',
-      expect.objectContaining({ account_code: '1221', audited_amount: 100, year: 2025 }),
-    )
-  })
+  // ─── writebackTB（已移除，spec tb-writeback-explicit-publish-gate Task 17 批C） ──
+  // 原 3 个 writebackTB 用例（trial-balance/writeback 直调 / emit substantive:adjudicated /
+  // year 透传）测的是零消费死代码 writebackTB，已随工厂 writebackTB 一并移除。
+  // TB 回写走显式发布门 publish-to-tb（活路径在各循环 TabAdjudication，别处已测）。
 
   // ─── setTbValues ───────────────────────────────────────────────────────────
 

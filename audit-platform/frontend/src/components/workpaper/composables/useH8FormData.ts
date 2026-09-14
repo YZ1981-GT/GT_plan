@@ -15,7 +15,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import { h8Scope } from './hCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -224,51 +223,11 @@ export function useH8FormData(params: {
     }, DEBOUNCE_MS))
   }
 
-  // ─── writebackTrialBalance（使用权资产原值 + 累计折旧） ─────────────────────
-
-  /**
-   * 审定数回写 trial_balance：
-   * - 使用权资产原值（借方/资产类）
-   * - 累计折旧（贷方/备抵类）
-   *
-   * 审定数变化时回写TB并发布 'substantive:adjudicated' EventBus事件。
-   * CAS21特有：H8与H9强联动，回写后通知H9底稿。
-   *
-   * 🔴 目标科目走 scope（历史往 `1901` 写审定数会污染 K2 其他流动资产）。
-   */
-  async function writebackTrialBalance(
-    auditedAmountCost: number,
-    auditedAmountAccDep?: number
-  ): Promise<void> {
-    if (!projectId.value) return
-    const costCode = _costCode()
-    try {
-      // 回写使用权资产原值
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: costCode,
-        audited_amount: auditedAmountCost,
-      })
-
-      // 回写累计折旧（如果提供）
-      if (auditedAmountAccDep != null) {
-        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: _depCode(),
-          audited_amount: auditedAmountAccDep,
-        })
-      }
-
-      // 发布 EventBus 事件通知其他底稿（附注/H9租赁负债/报表等）
-      eventBus.emit('substantive:adjudicated', {
-        wpCode: 'H8',
-        accountCode: costCode,
-        auditedAmount: auditedAmountCost,
-        adjudicatedAmount: auditedAmountCost,
-        auditedAmountAccDep: auditedAmountAccDep ?? null,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，使用权资产原值 + 累计折旧，
+  // 含 substantive:adjudicated emit）为零消费死代码，已移除（useH8FormData() 全仓 0 调用方）。
+  // H8 全链断裂：H8TabAdjudication.onWritebackTB 只 emit('writeback-tb') 而 GtH8 不绑 @writeback-tb
+  // （该断链亦已在本任务清理）。TB 回写走显式发布门（publish-to-tb，随批次改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -493,8 +452,6 @@ export function useH8FormData(params: {
     // Save actions
     saveResponse,
     saveBatchResponses,
-    // TB writeback (原值 + 累计折旧)
-    writebackTrialBalance,
     // Load
     selfLoad,
     loadAllResponses,

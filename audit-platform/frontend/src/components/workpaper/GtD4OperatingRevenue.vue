@@ -144,7 +144,8 @@
  */
 import { ref, computed, onMounted, onBeforeUnmount, provide, toRef, inject, defineAsyncComponent } from 'vue'
 import { useD4FormData, type ChecklistResponse } from './composables/useD4FormData'
-import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD } from './composables/d4AccountScope'
+// 注：D4_MAIN_REVENUE_STANDARD / D4_OTHER_REVENUE_STANDARD 原仅用于已移除的
+//     handleD4Writeback 孤儿监听器（spec tb-writeback-explicit-publish-gate Task 17 批C），一并移除 import。
 import { useD4CrossSheet } from './composables/useD4CrossSheet'
 import { useD4PriceWriteback } from './composables/useD4PriceWriteback'
 import { resolveCycleReviewSection } from './composables/cycleReviewSectionMap'
@@ -526,38 +527,21 @@ async function handleD4SaveItems(e: Event): Promise<void> {
   scheduleAutoSnapshot()
 }
 
-// ─── 审定表 TB 回写：监听 d4:writeback-trial-balance → 落库 trial_balance ──────
-async function handleD4Writeback(e: Event): Promise<void> {
-  const d = (e as CustomEvent<{ accountCode: string; auditedAmount: number }>).detail
-  if (d?.accountCode == null || d.auditedAmount == null) return
-
-  // TB 回写成功后同步 D4-1 的只读核对影子值，确保 D4-2/D4-1 下一次计算读到同一审定口径。
-  await formData.writebackTrialBalance(d.accountCode, d.auditedAmount)
-  const itemId = d.accountCode === D4_MAIN_REVENUE_STANDARD
-    ? 'D4-1-adj-tb-6001'
-    : d.accountCode === D4_OTHER_REVENUE_STANDARD
-      ? 'D4-1-adj-tb-6051'
-      : null
-  if (itemId) {
-    await formData.saveBatch([{
-      itemId,
-      data: { remark: String(d.auditedAmount), conclusion: null },
-    }])
-    scheduleAutoSnapshot()
-  }
-}
+// ─── 审定表 TB 回写：已移除孤儿监听器（spec tb-writeback-explicit-publish-gate Task 17 批C） ──
+// 原 handleD4Writeback 监听 window 'd4:writeback-trial-balance' → formData.writebackTrialBalance
+// 落库 trial_balance。但 M1（D4-1 改造）已从 useD4Adjudication.publishAdjudicated 移除该
+// dispatch，全仓已无 dispatcher ⇒ 此监听器 + useD4FormData.writebackTrialBalance 均为孤儿死代码
+// （grep 实证 0 dispatcher / 0 其他消费）。TB 回写走显式发布门 publish-to-tb（D4-1 已改造）。
 
 // ─── Lifecycle ───────────────────────────────────────────────────────────────
 
 onMounted(() => {
   window.addEventListener('d4:save-items', handleD4SaveItems)
-  window.addEventListener('d4:writeback-trial-balance', handleD4Writeback)
   selfLoad()
 })
 
 onBeforeUnmount(() => {
   window.removeEventListener('d4:save-items', handleD4SaveItems)
-  window.removeEventListener('d4:writeback-trial-balance', handleD4Writeback)
 })
 </script>
 

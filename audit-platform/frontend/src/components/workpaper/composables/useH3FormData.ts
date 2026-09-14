@@ -99,16 +99,6 @@ export function useH3FormData(params: {
     return h3AccountScope.queryCodes(src, slotKey)
   }
 
-  /** 原值科目码（回写 / 事件载荷）；无则空串 */
-  function h3GrossCode(): string {
-    return h3QueryCodes(H3_SLOT_GROSS)[0] || ''
-  }
-
-  /** 累计折旧科目码；本项目无该科目时空串（不回写，宁缺勿造） */
-  function h3AccumDepCode(): string {
-    return h3QueryCodes(H3_SLOT_ACCUM_DEP)[0] || ''
-  }
-
   // Per-item debounce timers
   const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
   const _pendingItems = new Set<string>()
@@ -244,57 +234,12 @@ export function useH3FormData(params: {
     await _doSave(checklistItems)
   }
 
-  // ─── writebackTrialBalance（原值 + 累计折旧，按计量模式）─────────────────────
-
-  /**
-   * 审定数回写 trial_balance：
-   * - 成本模式：投资性房地产原值（借方/资产类）+ 累计折旧（贷方/备抵类）
-   * - 公允价值模式：仅原值（公允价值模式不计提折旧）
-   *
-   * 🔴 科目码取 render 下发的语义定位结果（`h3AccountScope`），改造前写死
-   * `1503`/`1504` —— 那是**可供出售金融资产(G6 域)** 与 **债权投资(G4 域)**，
-   * 即长期在往别的两个循环的试算表行写投资性房地产审定数。
-   */
-  async function writebackTrialBalance(auditedData: {
-    grossAudited: number
-    accumDepAudited?: number
-  }): Promise<void> {
-    if (!projectId.value) return
-    const grossCode = h3GrossCode()
-    const depCode = h3AccumDepCode()
-    try {
-      if (grossCode) {
-        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: grossCode,
-          audited_amount: auditedData.grossAudited,
-        })
-      }
-
-      // 成本模式额外回写累计折旧；本项目无该科目时不写（宁缺勿造）
-      if (
-        measurementModel.value === 'cost'
-        && auditedData.accumDepAudited != null
-        && depCode
-      ) {
-        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: depCode,
-          audited_amount: auditedData.accumDepAudited,
-        })
-      }
-
-      // 发布 EventBus 事件通知其他底稿（附注等）
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: {
-          wpCode: 'H3',
-          accountCode: grossCode,
-          auditedAmount: auditedData.grossAudited,
-          measurementModel: measurementModel.value,
-        },
-      }))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，原值 + 累计折旧，含 substantive:adjudicated emit）
+  // 为零消费死代码，已移除（useH3FormData() 各宿主仅 destructure getValue/setValue/saveImmediate，
+  // GtH3 不 destructure writebackTrialBalance；H3 活路径在 H3TabAdjudicationCost.vue 自带的
+  // 局部 writebackTrialBalance（debounce watcher，防跨循环污染））。连带删除仅服务此死函数的
+  // h3GrossCode/h3AccumDepCode 辅助（loadTbData 直接用 h3QueryCodes）。
+  // TB 回写走显式发布门（publish-to-tb，随批次改造）。spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -545,8 +490,6 @@ export function useH3FormData(params: {
     saveImmediate,
     debouncedSave,
     saveBatch,
-    // TB writeback
-    writebackTrialBalance,
     // Load
     selfLoad,
     loadAllResponses,

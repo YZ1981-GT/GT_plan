@@ -397,24 +397,13 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
     }
   }
 
-  /**
-   * writebackTB: 保存后回写 trial_balance 审定数（科目1503 其他债权投资）
-   * POST /api/projects/{projectId}/trial_balance 更新科目1503的审定数
-   */
-  async function writebackTB(adjudicatedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await http.post(`/api/projects/${projectId.value}/trial_balance`, {
-        account_code: '1503',
-        audited_amount: adjudicatedAmount,
-      })
-    } catch (err: any) {
-      const msg = err?.message || ''
-      if (msg !== 'canceled' && err?.code !== 'ERR_CANCELED') {
-        ElMessage.error('试算表回写失败，请稍后重试')
-      }
-    }
-  }
+  // ─── TB writeback（已移除） ───────────────────────────────────────────────
+  // 原 writebackTB(adjudicatedAmount) 走 TB 回写变体端点
+  // POST /api/projects/{pid}/trial_balance（科目 1503）。实证 GtG6OtherBondMain.vue 未
+  // destructure/调用它、无任何测试消费 ⇒ 零消费死代码。G6 真实回写在 useG6MainAdjudication
+  // （aggregateG6WritebackNets）。已移除 —— TB 回写走显式发布门 publish-to-tb。
+  // 该变体端点字面量亦纳入 task 18 CI 守卫。
+  // spec: tb-writeback-explicit-publish-gate Task 17 批C（Property 9）
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -461,8 +450,7 @@ export function useG6MainFormData(opts: UseG6MainFormDataOptions) {
     debouncedSave,
     saveContent,
     flushPending: _flushPending,
-    // TB writeback
-    writebackTB,
+    // 注：TB writeback（writebackTB）已作为零消费死代码移除（见上，Task 17 批C）
   }
 }
 

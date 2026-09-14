@@ -181,23 +181,9 @@ export function useI3FormData(wpId: Ref<string>, projectId: Ref<string>) {
     await _doSave(checklistItems)
   }
 
-  // ─── writebackTrialBalance（1711） ─────────────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目1711商誉（借方/资产类）。
-   * I3仅一个科目，不像H1有双科目(1601+1602)。
-   */
-  async function writebackTrialBalance(auditedGoodwill: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1711,
-        audited_amount: auditedGoodwill,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1711 商誉）为零消费死代码，已移除
+  // （useI3FormData() 无调用方；I3-1 活路径在 useI3Adjudication.saveAdjudication 的 inline http.put）。
+  // TB 回写走显式发布门（publish-to-tb，随批次改造）。spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1（BP-5）。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -357,8 +343,7 @@ export function useI3FormData(wpId: Ref<string>, projectId: Ref<string>) {
     saveImmediate,
     debouncedSave,
     saveBatch,
-    // TB writeback
-    writebackTrialBalance,
+    // 注：writebackTrialBalance 已移除（零消费死代码，见上方收口注释）
     // Load
     selfLoad,
   }

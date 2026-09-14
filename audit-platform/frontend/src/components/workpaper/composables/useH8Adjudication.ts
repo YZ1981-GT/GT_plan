@@ -412,10 +412,13 @@ export function useH8Adjudication(params: {
   /** 运行态 `tb_source_codes`（只用于 TB 核对行的**科目码展示**，取不到时用 scope 兜底码） */
   tbSourceCodes?: Ref<TbSourceCodes | null | undefined>
   onSave?: (itemId: string, value: any) => void
-  onWritebackTB?: (auditedCost: number, auditedAccDep: number, auditedImpair?: number) => Promise<void>
+  // 注：原 onWritebackTB 回调（→ H8TabAdjudication emit('writeback-tb')，GtH8 不绑 @writeback-tb）
+  // 为断链死代码，已随 publishAdjudicated 内调用一并移除。H8 无真实 TB 回写；审定数下游仅走
+  // substantive:adjudicated（保留）。TB 回写走显式发布门（publish-to-tb，随批次改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
   onPublishEvent?: (event: string, payload: any) => void
 }) {
-  const { allResponses, onSave, onWritebackTB, onPublishEvent } = params
+  const { allResponses, onSave, onPublishEvent } = params
   const isReadonly = params.isReadonly ?? ref(false)
 
   const costRows = ref<H8AdjudicationRow[]>([])
@@ -996,13 +999,8 @@ export function useH8Adjudication(params: {
 
   async function publishAdjudicated(): Promise<void> {
     _persist()
-    if (onWritebackTB) {
-      await onWritebackTB(
-        costSubtotal.value.endAudited,
-        depSubtotal.value.endAudited,
-        impairSubtotal.value.endAudited,
-      )
-    }
+    // 注：原此处 onWritebackTB(...) 调用为断链死代码（emit('writeback-tb') 无 GtH8 监听），已移除。
+    // 审定数下游仅保留 substantive:adjudicated（附注/报表刷新）。spec: tb-writeback-explicit-publish-gate Task 17。
     try {
       onPublishEvent?.('substantive:adjudicated', {
         wpCode: 'H8',

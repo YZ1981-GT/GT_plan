@@ -24,7 +24,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import { parseNum } from './useK13FormulaEngine'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -339,47 +338,12 @@ export function useK13FormData(opts: {
     }
   }
 
-  // ─── writebackTB（发生额回写！非期末余额）─────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目6711营业外支出
-   * ⚠️ 关键区别：损益类回写**发生额**，非期末余额！
-   * ⚠️ 6711借方科目：审定发生额 = 借方发生 - 贷方发生（红冲）
-   *
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * @param auditedAmount 审定发生额（借方-贷方净额）
-   */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    isSaving.value = true
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_6711,
-        audited_amount: auditedAmount,
-        is_occurrence: true, // 标识：损益类发生额回写
-      })
-
-      // 更新本地 tbData
-      tbData.value.auditedAmount = auditedAmount
-
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_6711,
-        auditedAmount,
-        wpCode: 'K13',
-        type: 'occurrence_amount', // 标识：发生额回写（损益类）
-        timestamp: Date.now(),
-      })
-
-      // 保存审定金额到独立 item_id 供跨sheet引用
-      await saveResponse('K13-1-adjudicated-amount', String(auditedAmount))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    } finally {
-      isSaving.value = false
-    }
-  }
+  // ─── writebackTB 已移除（零消费死代码） ──────────────────────────────────────
+  // 原 writebackTB（PUT /api/projects/{pid}/trial-balance/writeback，科目 6711 营业外支出发生额）
+  // 为零消费死代码，已移除；K13 的 TB 回写走显式发布门 publish-to-tb（M6/task9 改造）。
+  // 实证：K13TabAdjustment.vue 引入 useK13FormData 仅用其 save/subtotal（不 destructure writebackTB），
+  // K13 真实回写路径在 K13TabAdjudication.vue 的 inline handleWritebackTBInternal（非本 FormData.writebackTB）。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── setTbValues（外部设置TB值，render策略seed回读） ────────────────────────
 
@@ -447,7 +411,6 @@ export function useK13FormData(opts: {
     saveBatch,
     getResponse,
     setResponse,
-    writebackTB,
     loadTbData,
     // Extras
     debouncedSave,

@@ -15,7 +15,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 import { h9Scope } from './hCycleAccountScope'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -224,48 +223,10 @@ export function useH9FormData(params: {
     }, DEBOUNCE_MS))
   }
 
-  // ─── writebackTrialBalance（科目2205租赁负债 + 未确认融资费用） ──────────────
-
-  /**
-   * 审定数回写 trial_balance：
-   * - 科目2205租赁负债（贷方/负债类）
-   * - 未确认融资费用（借方/负债备抵类）
-   *
-   * 审定数变化时回写TB并发布 'substantive:adjudicated' EventBus事件。
-   * CAS21特有：H9与H8强联动，回写后通知附注及相关底稿。
-   */
-  async function writebackTrialBalance(
-    auditedAmountLeaseLiability: number,
-    auditedAmountFinanceCost?: number
-  ): Promise<void> {
-    if (!projectId.value) return
-    try {
-      // 回写2205租赁负债（贷方/负债类）
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_LEASE_LIABILITY,
-        audited_amount: auditedAmountLeaseLiability,
-      })
-
-      // 回写未确认融资费用（借方/负债备抵类，如果提供）
-      if (auditedAmountFinanceCost != null) {
-        await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_FINANCE_COST,
-          audited_amount: auditedAmountFinanceCost,
-        })
-      }
-
-      // 发布 EventBus 事件通知其他底稿（附注/H8使用权资产/报表等）
-      eventBus.emit('substantive:adjudicated' as any, {
-        wpCode: 'H9',
-        accountCode: ACCOUNT_CODE_LEASE_LIABILITY,
-        auditedAmount: auditedAmountLeaseLiability,
-        adjudicatedAmount: auditedAmountLeaseLiability,
-        auditedAmountFinanceCost: auditedAmountFinanceCost ?? null,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，2205租赁负债 + 未确认融资费用，
+  // 含 substantive:adjudicated emit）为零消费死代码，已移除（useH9FormData() 全仓 0 调用方）。
+  // H9 活路径在 H9TabAdjudication.onWritebackTB→useH9Adjudication.publishAdjudicated（双科目 + 活联动）。
+  // TB 回写走显式发布门（publish-to-tb，随批次改造）。spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -484,8 +445,6 @@ export function useH9FormData(params: {
     // Save actions
     saveResponse,
     saveBatchResponses,
-    // TB writeback (2205租赁负债 + 未确认融资费用)
-    writebackTrialBalance,
     // Load
     selfLoad,
     loadAllResponses,

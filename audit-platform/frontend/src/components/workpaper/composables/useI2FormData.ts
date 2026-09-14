@@ -217,36 +217,10 @@ export function useI2FormData(params: {
     }, DEBOUNCE_MS))
   }
 
-  // ─── writebackTrialBalance（科目1717开发支出） ─────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目1717开发支出（借方/资产类）。
-   * 回写成功后发布 'substantive:adjudicated' 事件通知其他底稿（附注/报表/I6联动等）。
-   * Req 2.5: writebackTB(1717)
-   */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1717,
-        audited_amount: auditedAmount,
-      })
-
-      // 更新本地 tbData
-      tbData.value.audited1717 = auditedAmount
-
-      // 发布 EventBus 事件通知其他底稿（I6联动/附注/报表等）
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
-        detail: {
-          wpCode: 'I2',
-          accountCodes: [ACCOUNT_CODE_1717],
-          audited1717: auditedAmount,
-        },
-      }))
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /trial-balance/writeback，科目 1717 开发支出，含 substantive:adjudicated
+  // dispatch）为零消费死代码，已移除（useI2FormData() 无调用方；I2-1 活路径在 I2TabAdjudication.vue 的 inline
+  // writebackTb，走 per-wp 端点 /api/workpapers/{wpId}/writeback-trial-balance）。TB 回写走显式发布门（publish-to-tb，
+  // 随批次改造）。spec: tb-writeback-explicit-publish-gate Task 17 / Req 9.1（BP-5）。
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -471,8 +445,7 @@ export function useI2FormData(params: {
     saveBatchResponses,
     saveResponses,
     loadResponses,
-    // TB writeback
-    writebackTrialBalance,
+    // 注：writebackTrialBalance 已移除（零消费死代码，见上方收口注释）
     // Load
     selfLoad,
     loadAllResponses,

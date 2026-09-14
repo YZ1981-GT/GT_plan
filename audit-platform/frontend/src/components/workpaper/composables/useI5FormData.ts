@@ -213,23 +213,9 @@ export function useI5FormData(
     }
   }
 
-  // ─── writebackTrialBalance（1911） ─────────────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目1911其他非流动资产（借方/资产类）。
-   * I5仅一个科目1911。
-   */
-  async function writebackTrialBalance(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_1911,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // 注：原 writebackTrialBalance（PUT /api/projects/.../trial-balance/writeback，科目 1911）为零消费死代码，已移除；
+  // TB 回写走显式发布门 publish-to-tb（活路径在 useI5Adjudication.writeback，M9/task13 改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── selfLoad（render-config + checklist_responses） ────────────────────────
 
@@ -413,8 +399,6 @@ export function useI5FormData(
     saveImmediate,
     debouncedSave,
     saveBatch,
-    // TB writeback
-    writebackTrialBalance,
     // TB values setter
     setTbValues,
     // Load

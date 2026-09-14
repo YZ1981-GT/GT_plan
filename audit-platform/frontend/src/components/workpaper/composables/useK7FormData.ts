@@ -20,7 +20,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -169,38 +168,12 @@ export function useK7FormData(params: {
     }
   }
 
-  // ─── writebackTB（2401 递延收益 负债口径） ─────────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：科目2401递延收益（贷方/负债类）。
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * ⚠️ 负债类2401！正数口径回写（v2 trial_balance 正数，无需取反）。
-   *
-   * Req 2.6: WHEN 审定数变化时 SHALL 回写trial_balance(2401)+发布'substantive:adjudicated'
-   */
-  async function writebackTB(auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: ACCOUNT_CODE_2401,
-        audited_amount: auditedAmount,
-      })
-
-      // EventBus publish 'substantive:adjudicated'
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_2401,
-        auditedAmount,
-        wpCode: 'K7',
-        timestamp: Date.now(),
-      })
-
-      // 同步更新本地 tbData
-      tbData.value.audited2401 = auditedAmount
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // ─── writebackTB 已移除（零消费死代码） ──────────────────────────────────────
+  // 原 writebackTB（PUT /api/projects/{pid}/trial-balance/writeback，科目 2401 递延收益）
+  // 为零消费死代码，已移除；K7 的 TB 回写走显式发布门 publish-to-tb（M6/task7~9 改造）。
+  // 实证：useK7FormData 无任何渲染宿主 import（孤儿 composable），K7 真实审定路径在
+  // K7TabAdjudication.vue（当前仅 emit save，不写 TB，属 task16 假回写决策范围）。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── Save core ─────────────────────────────────────────────────────────────
 
@@ -381,7 +354,6 @@ export function useK7FormData(params: {
     saveResponse,
     saveResponses,
     getResponse,
-    writebackTB,
     loadTbData,
     // Extras
     debouncedSave,

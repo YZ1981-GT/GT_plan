@@ -266,7 +266,8 @@ const {
   tbValues,
   saveResponse,
   flushPending,
-  writebackTrialBalance,
+  // 注：writebackTrialBalance 已从 useH4FormData 移除（零消费死代码，此前 destructure 从不调用）；
+  // TB 回写走 H4TabAdjudication 显式发布门。spec: tb-writeback-explicit-publish-gate Task 17。
   mergeHtmlData,
   selfLoad: formSelfLoad,
   loadAllResponses,

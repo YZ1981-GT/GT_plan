@@ -23,7 +23,6 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { api } from '@/services/apiProxy'
-import { eventBus } from '@/utils/eventBus'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -222,61 +221,13 @@ export function useK6FormData(params: {
     }
   }
 
-  // ─── writebackTB（双科目：1481资产 + 2605负债） ─────────────────────────────
-
-  /**
-   * 审定数回写 trial_balance：双科目。
-   * - 1481 持有待售资产（借方/资产类），正数口径
-   * - 2605 持有待售负债（贷方/负债类），正数口径
-   *
-   * 回写成功后发布 EventBus 'substantive:adjudicated' 通知附注刷新。
-   *
-   * Req 2.6: WHEN 审定数变化时 SHALL 回写trial_balance(持有待售资产+负债)+发布'substantive:adjudicated'
-   *
-   * @param assetAudited  持有待售资产审定额（1481, 借方/资产类正数口径）
-   * @param liabilityAudited 持有待售负债审定额（2605, 贷方/负债类正数口径）
-   */
-  async function writebackTB(assetAudited: number, liabilityAudited: number): Promise<void> {
-    if (!projectId.value) return
-    isSaving.value = true
-    try {
-      // 并行回写双科目
-      await Promise.all([
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_ASSET,
-          audited_amount: assetAudited,
-        }),
-        api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-          account_code: ACCOUNT_CODE_LIABILITY,
-          audited_amount: liabilityAudited,
-        }),
-      ])
-
-      // EventBus publish 'substantive:adjudicated'（资产科目）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_ASSET,
-        auditedAmount: assetAudited,
-        wpCode: 'K6',
-        timestamp: Date.now(),
-      })
-
-      // EventBus publish 'substantive:adjudicated'（负债科目）
-      eventBus.emit('substantive:adjudicated', {
-        accountCode: ACCOUNT_CODE_LIABILITY,
-        auditedAmount: liabilityAudited,
-        wpCode: 'K6',
-        timestamp: Date.now(),
-      })
-
-      // 同步更新本地 tbData
-      tbData.value.auditedAsset = assetAudited
-      tbData.value.auditedLiability = liabilityAudited
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    } finally {
-      isSaving.value = false
-    }
-  }
+  // ─── writebackTB 已移除（零消费死代码） ──────────────────────────────────────
+  // 原 writebackTB（PUT /api/projects/{pid}/trial-balance/writeback，双科目 1481 持有待售资产
+  // + 2605 持有待售负债）为零消费死代码，已移除；K6 的 TB 回写走显式发布门 publish-to-tb
+  // （M6/task8 改造）。实证：useK6FormData 无任何 import（孤儿 composable，含 test 亦零引用），
+  // K6 真实回写路径在 GtK6HeldForSale.vue（provide 'k6WritebackTB' → K6TabAdjudication inject
+  // + inline Promise.all 双 put），与本 FormData.writebackTB 无关。
+  // spec: tb-writeback-explicit-publish-gate Task 17
 
   // ─── Save core ─────────────────────────────────────────────────────────────
 
@@ -460,7 +411,6 @@ export function useK6FormData(params: {
     saveResponse,
     saveResponses,
     getResponse,
-    writebackTB,
     loadTbData,
     // Extras
     debouncedSave,

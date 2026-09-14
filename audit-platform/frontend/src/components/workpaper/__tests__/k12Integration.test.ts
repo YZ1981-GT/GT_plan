@@ -17,8 +17,7 @@
  *   → UPDATE trial_balance SET audited_amount WHERE account_code='6301'
  *   → publish TRIAL_BALANCE_UPDATED
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref } from 'vue'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ─── Mock eventBus ───────────────────────────────────────────────────────────
 
@@ -53,123 +52,24 @@ vi.mock('element-plus', () => ({
   ElMessageBox: { confirm: vi.fn().mockResolvedValue(true) },
 }))
 
-// ─── Import composable under test ────────────────────────────────────────────
-
-import { useK12FormData } from '@/components/workpaper/composables/useK12FormData'
+// 注：useK12FormData / ref 原用于已移除的 Part A/B（直调 formData.writebackTB 死代码，
+//     spec tb-writeback-explicit-publish-gate Task 17 批C），随之移除 import。
+//     保留的 Part C/D/E 用本地 handler 函数 + regex，不需要 composable 实例。
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Part A: writebackTB → API → EventBus.emit('substantive:adjudicated')
 // ═══════════════════════════════════════════════════════════════════════════════
 
 describe('K12 EventBus Integration: TB回写(6301发生额) → substantive:adjudicated → 附注', () => {
-  let formData: ReturnType<typeof useK12FormData>
-
   beforeEach(() => {
     vi.clearAllMocks()
-    formData = useK12FormData({
-      wpId: ref('wp-k12-001'),
-      projectId: ref('proj-001'),
-      sheetName: ref('审定表K12-1'),
-    })
   })
 
-  // ═══ Part A: writebackTB publishes correct event ═══
-
-  describe('Part A: writebackTB → substantive:adjudicated', () => {
-    it('should PUT to /trial-balance/writeback with 6301 and is_occurrence=true', async () => {
-      const auditedAmount = 125000
-
-      await formData.writebackTB(auditedAmount)
-
-      // 验证 API 调用
-      expect(mockPut).toHaveBeenCalledWith(
-        expect.stringContaining('/trial-balance/writeback'),
-        expect.objectContaining({
-          account_code: '6301',
-          audited_amount: auditedAmount,
-          is_occurrence: true, // 损益类标识：发生额非余额
-        }),
-      )
-    })
-
-    it('should emit substantive:adjudicated after successful writeback', async () => {
-      const auditedAmount = 88500
-
-      await formData.writebackTB(auditedAmount)
-
-      expect(emitSpy).toHaveBeenCalledTimes(1)
-      expect(emitSpy).toHaveBeenCalledWith(
-        'substantive:adjudicated',
-        expect.objectContaining({
-          accountCode: '6301',
-          auditedAmount: 88500,
-          wpCode: 'K12',
-          type: 'occurrence_amount',
-        }),
-      )
-    })
-
-    it('should include timestamp in event payload', async () => {
-      const before = Date.now()
-      await formData.writebackTB(50000)
-      const after = Date.now()
-
-      const [eventName, payload] = emitSpy.mock.calls[0]
-      expect(eventName).toBe('substantive:adjudicated')
-      expect(payload.timestamp).toBeGreaterThanOrEqual(before)
-      expect(payload.timestamp).toBeLessThanOrEqual(after)
-    })
-
-    it('should NOT emit event when API call fails', async () => {
-      mockPut.mockRejectedValueOnce(new Error('network error'))
-
-      await formData.writebackTB(99000)
-
-      // eventBus.emit should NOT be called (saveResponse call after writeback would have been skipped)
-      // The emit is called before saveResponse, so check if it was still called
-      // Actually, looking at the code: the emit happens inside try block after the PUT
-      // If PUT fails, it goes to catch → no emit
-      expect(emitSpy).not.toHaveBeenCalled()
-    })
-
-    it('should update local tbData.auditedAmount on success', async () => {
-      await formData.writebackTB(200000)
-
-      expect(formData.tbData.value.auditedAmount).toBe(200000)
-    })
-  })
-
-  // ═══ Part B: Payload contract validation ═══
-
-  describe('Part B: Event payload contract', () => {
-    it('payload has required fields for disclosure subscription', async () => {
-      await formData.writebackTB(333000)
-
-      const [eventName, payload] = emitSpy.mock.calls[0]
-
-      // Event name
-      expect(eventName).toBe('substantive:adjudicated')
-
-      // Required fields (disclosure components check these)
-      expect(payload).toHaveProperty('accountCode', '6301')
-      expect(payload).toHaveProperty('auditedAmount', 333000)
-      expect(payload).toHaveProperty('wpCode', 'K12')
-      expect(payload).toHaveProperty('type', 'occurrence_amount')
-      expect(payload).toHaveProperty('timestamp')
-      expect(typeof payload.timestamp).toBe('number')
-    })
-
-    it('auditedAmount is the occurrence amount (贷方-借方), not balance', async () => {
-      // K12 is 损益类贷方科目: 发生额=贷方发生-借方发生
-      // This is just the value passed to writebackTB (already calculated upstream)
-      const occurrenceAmount = 150000 - 20000 // 贷方150000 - 借方20000(红冲) = 130000净发生额
-      await formData.writebackTB(occurrenceAmount)
-
-      const [, payload] = emitSpy.mock.calls[0]
-      expect(payload.auditedAmount).toBe(130000)
-      expect(payload.type).toBe('occurrence_amount') // 标识是发生额
-    })
-  })
+  // ═══ Part A/B（已移除，spec tb-writeback-explicit-publish-gate Task 17 批C） ═══
+  // 原 Part A（5 用例）+ Part B（2 用例）直调 formData.writebackTB，测的是零生产消费死代码
+  //（useK12FormData.writebackTB 已随本 spec 移除）。Part C/D/E 测的是附注订阅 handler 逻辑 /
+  // 后端 regex / 事件流分离（用本地函数，不调 formData.writebackTB），与死代码无关，保留。
+  // K12 发生额活路径回写走显式发布门 publish-to-tb（改造归 M6/task9）。
 
   // ═══ Part C: Disclosure subscription wiring ═══
 

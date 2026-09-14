@@ -214,20 +214,13 @@ export function useD4FormData(options: UseD4FormDataOptions) {
     _debounceTimers.set(itemId, timer)
   }
 
-  // ─── trial_balance 回写 ──────────────────────────────────────────────────
-
-  /** 回写审定数到 trial_balance（科目 6001 主营业务收入 / 6051 其他业务收入） */
-  async function writebackTrialBalance(accountCode: string, auditedAmount: number): Promise<void> {
-    if (!projectId.value) return
-    try {
-      await api.put(`/api/projects/${projectId.value}/trial-balance/writeback`, {
-        account_code: accountCode,
-        audited_amount: auditedAmount,
-      })
-    } catch {
-      ElMessage.warning('审定数回写失败，请手动确认试算表数据')
-    }
-  }
+  // ─── trial_balance 回写（已移除） ─────────────────────────────────────────
+  // 原 writebackTrialBalance(accountCode, auditedAmount) 直调
+  // PUT /api/projects/{pid}/trial-balance/writeback（科目 6001/6051）。其唯一消费者是
+  // GtD4OperatingRevenue 的 handleD4Writeback 监听器，而 D4-1 改造（M1）已移除对应 dispatcher，
+  // 使监听器 + 本方法双双成为孤儿死代码（grep 实证 0 dispatcher / 0 其他消费）。
+  // 已移除 —— TB 回写走显式发布门 publish-to-tb（D4-1 已改造）。
+  // spec: tb-writeback-explicit-publish-gate Task 17 批C（Property 9）
 
   // ─── Flush（组件卸载） ───────────────────────────────────────────────────
 
@@ -271,7 +264,6 @@ export function useD4FormData(options: UseD4FormDataOptions) {
     saveImmediate,
     saveBatch,
     debouncedSave,
-    writebackTrialBalance,
     /** G5-1 D4 canary：flushHtml 前先冲掉 debounce，避免投影读到旧 store */
     flushPendingSave: _flushPending,
   }

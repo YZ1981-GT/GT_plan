@@ -14,8 +14,8 @@
  * Task: 7.2
  * Requirements: 2.5, 5.1-5.4, 6.1-6.3
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { ref, nextTick } from 'vue'
+import { describe, it, expect, vi } from 'vitest'
+import { ref } from 'vue'
 
 const { mockGet, mockPut } = vi.hoisted(() => ({
   mockGet: vi.fn().mockResolvedValue([]),
@@ -222,46 +222,12 @@ describe('H6 集成 — 审定↔明细一致性 (Req 2.5)', () => {
   })
 })
 
-// ─── 5. TB回写 ──────────────────────────────────────────────────────────────
-
-describe('H6 集成 — TB回写 (Req 2.8)', () => {
-  let eventsCaptured: CustomEvent[]
-  let handler: (e: Event) => void
-
-  beforeEach(() => {
-    eventsCaptured = []
-    handler = (e: Event) => eventsCaptured.push(e as CustomEvent)
-    window.addEventListener('substantive:adjudicated', handler)
-    mockPut.mockResolvedValue({})
-  })
-
-  afterEach(() => {
-    window.removeEventListener('substantive:adjudicated', handler)
-  })
-
-  it('writebackTrialBalance dispatches substantive:adjudicated event', async () => {
-    const { useH6FormData } = await import('../composables/useH6FormData')
-    const formData = useH6FormData({
-      wpId: ref('wp-100'),
-      projectId: ref('proj-200'),
-    })
-
-    await formData.writebackTrialBalance(50000)
-
-    // 验证API调用
-    expect(mockPut).toHaveBeenCalledWith(
-      '/api/projects/proj-200/trial-balance/writeback',
-      { account_code: '1606', audited_amount: 50000 },
-    )
-
-    // 验证CustomEvent发布
-    expect(eventsCaptured.length).toBe(1)
-    expect(eventsCaptured[0].detail.wpCode).toBe('H6')
-    expect(eventsCaptured[0].detail.accountCode).toBe('1606')
-    expect(eventsCaptured[0].detail.auditedAmount).toBe(50000)
-    expect(eventsCaptured[0].detail.isTransitAccount).toBe(true)
-  })
-})
+// ─── 5. TB回写（已移除，spec tb-writeback-explicit-publish-gate Task 17） ─────
+// 原 describe('H6 集成 — TB回写 (Req 2.8)') 唯一用例直调 useH6FormData.writebackTrialBalance，
+// 测的是零消费死代码（useH6FormData 无 .vue 生产宿主，writebackTrialBalance 已随批B移除）。
+// 批B 删了 useH6FormData.writebackTrialBalance 死代码但漏删此直调用例致其变红，批C 补删。
+// H6 活路径 TB 回写在 H6TabAdjudication.onWritebackTB → useH6Adjudication.publishAdjudicated，
+// 走显式发布门 publish-to-tb（改造归 M7/task10）。
 
 // ─── 6. useH6Adjudication transitCheck ───────────────────────────────────────
 
