@@ -111,6 +111,16 @@
           :disabled="readonly"
           @click="onSave"
         >💾 保存</el-button>
+        <!-- 发布到试算表（P0-项3）：显式确认后把审定数发布到 trial_balance。
+             与保存分离——普通保存不再自动回写 TB，必须显式点此并二次确认。 -->
+        <el-button
+          type="warning"
+          size="small"
+          class="gas-btn-publish-tb"
+          :loading="publishing"
+          :disabled="readonly"
+          @click="onPublishToTb"
+        >📤 发布到试算表</el-button>
       </div>
     </div>
 
@@ -457,7 +467,7 @@
 
 <script setup lang="ts">
 import WpAmountInput from './shared/WpAmountInput.vue'
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { confirmDangerous } from '@/utils/confirm'
 import { useFullscreen } from '@/composables/useFullscreen'
@@ -616,6 +626,47 @@ async function onRestore() {
   ElMessage.success('正在恢复模板默认行…')
 }
 
+// ─── 发布到试算表（P0-项3：显式确认 + 二次确认，中文）───
+const publishing = ref(false)
+
+/**
+ * 发布审定数到试算表：区别于保存。普通保存不再自动回写 trial_balance，
+ * 必须经本操作显式确认（后端再校验发布权限 + 幂等）。
+ */
+async function onPublishToTb() {
+  if (props.readonly || publishing.value) return
+  try {
+    await confirmDangerous(
+      '发布后将把本审定表各科目的审定数写入试算表（trial_balance），并触发报表/错报评价等下游重算。确认发布？',
+      '发布到试算表确认',
+    )
+  } catch {
+    return // 用户取消
+  }
+  publishing.value = true
+  try {
+    const { api } = await import('@/services/apiProxy')
+    const resp: any = await api.post(
+      `/api/workpapers/${props.wpId}/audit-determination/publish-to-tb`,
+      { sheet_name: props.sheetName, html_data: props.htmlData },
+    )
+    ElMessage.success(resp?.message || '已发布到试算表')
+  } catch (err: any) {
+    const status = err?.response?.status
+    if (status === 403) {
+      ElMessage.error('无发布权限（需底稿编辑权）')
+    } else if (status === 423) {
+      ElMessage.error('项目已被合并锁定，无法发布')
+    } else if (status === 400) {
+      ElMessage.error(err?.response?.data?.detail || err?.response?.data?.message || '当前 sheet 无可发布的审定数')
+    } else {
+      ElMessage.error('发布失败，请稍后重试')
+    }
+  } finally {
+    publishing.value = false
+  }
+}
+
 // ─── 表格样式 ───
 const headerStyle = {
   background: 'var(--gt-color-primary-bg)',
@@ -658,6 +709,9 @@ defineExpose({
   onSave,
   onOpenFormula,
   onRestore,
+  // ─── 发布到试算表（P0-项3）───
+  onPublishToTb,
+  publishing,
   // ─── 导入导出（Task 16）───
   onExportTemplate,
   triggerImport,

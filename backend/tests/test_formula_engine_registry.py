@@ -255,12 +255,19 @@ class TestRegistryDrivenExecution:
         result = execute("IF(TB('1002','期末余额')>50,TB('1002','期末余额'),0)", ctx)
         assert result.value == Decimal("100")
 
-    def test_unknown_function_returns_zero(self):
-        """未注册函数返回 0"""
+    def test_unknown_function_blocked_not_silent_zero(self):
+        """未注册函数 → blocked（P0-项2）：不再静默返 0 冒充正常。
+
+        契约变更（spec d4-dual-mode-formula-governance 项2）：此前未注册函数静默返 0
+        且 ok=True，会把"配置错/注入"伪装成"诚实的 0"。现在标 blocked（ok=False，
+        state='blocked'），value 仍给 0 但语义明确。
+        """
         ctx = FormulaContext()
         result = execute("NONEXIST('x')", ctx)
         assert result.value == Decimal("0")
-        assert any("unknown" in t for t in result.trace)
+        assert result.blocked is True
+        assert result.ok is False
+        assert result.state == "blocked"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

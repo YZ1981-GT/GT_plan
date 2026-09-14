@@ -57,15 +57,32 @@ _PARSE_MODE: str = os.environ.get("FORMULA_PARSE_MODE", "ast")
 
 @dataclass
 class FormulaResult:
-    """公式执行结果"""
+    """公式执行结果。
+
+    ``blocked``（P0-项2）：公式结构合法但含**非白名单**内容（未注册函数 / eval/exec /
+    URL / 外链）。此时 ``value`` 仍会给出（通常 0），但 ``ok`` 为 False 且分类明确为
+    blocked —— **不静默返 0 冒充正常**，供调用方区分「配置/注入问题」与「诚实的 0」。
+    """
     value: Decimal = Decimal("0")
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)  # 取数轨迹（审计用）
+    blocked: bool = False  # 含非白名单函数/危险标识/外链（P0-项2）
 
     @property
     def ok(self) -> bool:
-        return len(self.errors) == 0
+        return len(self.errors) == 0 and not self.blocked
+
+    @property
+    def state(self) -> str:
+        """求值态分类（ok/damaged/blocked）。missing 由调用方按 key 存在性判定，不在此。"""
+        if self.blocked:
+            return "blocked"
+        if self.errors and any("解析失败" in e for e in self.errors):
+            return "damaged"
+        if self.errors:
+            return "error"
+        return "ok"
 
 
 @dataclass
@@ -354,6 +371,15 @@ def _tokenize(formula: str) -> list[_Token]:
 
 class FormulaParseError(Exception):
     """公式解析错误"""
+    pass
+
+
+class FormulaBlockedError(Exception):
+    """公式含非白名单内容（未注册函数 / eval/exec / URL / 外链）——被拦截（P0-项2）。
+
+    与 ``FormulaParseError``（结构坏=damaged）区分：blocked 是**结构合法但语义越权/未授权**。
+    引擎据此把 ``FormulaResult.blocked`` 置 True（不静默返 0 冒充正常）。
+    """
     pass
 
 
@@ -1025,9 +1051,47 @@ def execute(formula: str | None, ctx: FormulaContext) -> FormulaResult:
         return _execute_parallel(formula, ctx)
 
 
+def _is_blocked_formula(formula: str | None) -> bool:
+    """公式是否含非白名单内容（未注册函数 / eval/exec / URL / 外链）→ blocked（P0-项2）。
+
+    委托 ``formula_management.formula_state``（单一真源，避免第二份白名单/危险表）。
+    仅判 blocked（不判 damaged —— 解析失败仍走 parse_to_ast 的既有 error 路径）。
+    """
+    if not formula or not formula.strip():
+        return False
+    from app.services.formula_management.formula_state import (
+        _dangerous_or_external,
+    )
+
+    text = formula.strip()
+    if _dangerous_or_external(text):
+        return True
+    # 非白名单函数（白名单 = 本模块 FunctionRegistry，单一真源）
+    import re as _re
+    known = _REGISTRY.known_function_names()
+    for m in _re.finditer(r"([A-Za-z_][A-Za-z_0-9]*)\s*\(", text):
+        if m.group(1) not in known:
+            return True
+    return False
+
+
 def _execute_ast(formula: str, ctx: FormulaContext) -> FormulaResult:
-    """新 AST 递归下降求值路径。"""
+    """新 AST 递归下降求值路径。
+
+    P0-项2：求值前先做 blocked 判定（非白名单函数 / eval/exec / URL / 外链）——
+    命中则标 ``result.blocked=True`` 并记 error，**不静默返 0 冒充正常**。
+    仍会尝试给出 value（通常 0），但 ``ok`` 因 blocked/errors 为 False。
+    """
     result = FormulaResult()
+    # ── blocked 前置判定（结构合法但语义越权/未授权）──
+    if _is_blocked_formula(formula):
+        result.blocked = True
+        result.errors.append(
+            f"公式含非白名单内容（未注册函数/eval/URL/外链），已拦截: {formula}"
+        )
+        result.trace.append(f"BLOCKED: {formula}")
+        logger.warning("Formula blocked (non-whitelist/dangerous): %s", formula)
+        return result
     try:
         ast_node = parse_to_ast(formula)
         result.value = _eval_ast(ast_node, ctx, result.trace)

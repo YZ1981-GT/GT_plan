@@ -35,8 +35,21 @@ SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+import pytest
+
 from app.models.workpaper_models import WpFormula
 from app.services.wp_formula_service import WpFormulaService
+
+
+@pytest.fixture(autouse=True)
+def _stub_wp_ownership():
+    """隔离归属校验（Req 10）：仅建 wp_formula 表不建 working_paper，save() 的
+    _verify_wp_ownership 查 working_paper → sqlite no such table。此 PBT 聚焦悬空引用
+    拒绝契约（ownership 在 ref 校验之前），归属另有专测，class 级 stub 返回 True 隔离。"""
+    with patch.object(
+        WpFormulaService, "_verify_wp_ownership", new=AsyncMock(return_value=True)
+    ):
+        yield
 
 
 # ─────────────────────────────────────────────────────────────────────────────

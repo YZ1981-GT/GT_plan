@@ -23,12 +23,28 @@ from openpyxl import Workbook, load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.deps import get_current_user
+from app.deps import (
+    authorize_wp_edit,
+    authorize_wp_read,
+    check_consol_lock,
+    get_current_user,
+)
 from app.models.core import User
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["d4-import-export"])
+
+
+def _parse_wp_uuid(wp_id: str) -> UUID:
+    """把路径参数 wp_id（str）解析为 UUID（供权限助手/合并锁使用）。
+
+    非法 UUID → 404（与「底稿不存在」同语义，不泄露内部错误）。
+    """
+    try:
+        return UUID(str(wp_id))
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(404, "底稿不存在")
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Sheet 配置：每种sheet的列头定义
@@ -421,7 +437,12 @@ async def d4_export_template(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出空白模板xlsx（含表头+格式+编制说明，无数据行）"""
+    """导出空白模板xlsx（含表头+格式+编制说明，无数据行）
+
+    权限门禁（P0-项5）：读操作，按 readonly 项目权限收口（``authorize_wp_read``），
+    不误伤只读成员，但拒绝非项目成员。
+    """
+    await authorize_wp_read(db, current_user, _parse_wp_uuid(wp_id))
     _validate_sheet(sheet)
     headers = _get_headers(sheet)
 
@@ -525,7 +546,11 @@ async def d4_export_data(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
-    """导出当前数据xlsx"""
+    """导出当前数据xlsx
+
+    权限门禁（P0-项5）：读操作，按 readonly 项目权限收口（``authorize_wp_read``）。
+    """
+    await authorize_wp_read(db, current_user, _parse_wp_uuid(wp_id))
     _validate_sheet(sheet)
     if sheet == "D4-13":
         return await _handle_d4_13_export(wp_id, db)
@@ -1049,15 +1074,33 @@ async def d4_export_data(
 async def d4_import_data(
     wp_id: str,
     sheet: str = Query(..., description="Sheet编码如D4-2"),
+    base_version: int | None = Query(
+        None,
+        description="乐观锁基线版本（If-Match）。提供时若服务端当前版本不符返回409；不提供按创建/覆盖处理。",
+    ),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """解析上传xlsx，校验格式，写入 checklist_responses"""
+    """解析上传xlsx，校验格式，写入 checklist_responses
+
+    权限门禁（P0-项5）：导入是**写操作**，函数体首句显式校验目标底稿编辑权
+    （``authorize_wp_edit`` —— readonly/qc/非项目成员 → 403，底稿不存在 → 404），
+    并检查合并锁（``check_consol_lock`` —— 锁定 → 423）。校验先于任何 xlsx 解析与
+    DB 写入，任何早退分支（含 D4-13）都在其后，确保无权者不产生任何数据变更。
+
+    并发一致性（P0-项4）：写入走 ``_upsert_checklist_response`` 乐观锁。传 ``base_version``
+    时做 If-Match 冲突检测（版本不符 → 409，不静默覆盖）；不传时按创建/覆盖处理（兼容旧客户端）。
+    响应回带 ``content_version`` 供客户端下次 If-Match。
+    """
+    _wp_uuid = _parse_wp_uuid(wp_id)
+    await authorize_wp_edit(db, current_user, _wp_uuid)
+    await check_consol_lock(wp_id=_wp_uuid, db=db)
+
     _validate_sheet(sheet)
 
     if sheet == "D4-13":
-        return await _handle_d4_13_import(wp_id, file, db)
+        return await _handle_d4_13_import(wp_id, file, db, base_version=base_version)
 
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(400, "请上传 .xlsx 格式文件")
@@ -1112,17 +1155,16 @@ async def d4_import_data(
         wb.close()
         remark_json = json.dumps(data, ensure_ascii=False)
         project_id = await _resolve_project_id(db, wp_id)
-        await db.execute(
-            sa.text("""
-                INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
-                VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
-                ON CONFLICT (wp_id, item_id)
-                DO UPDATE SET remark = :remark, updated_at = NOW()
-            """),
-            {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": "D4-31-interview", "remark": remark_json},
+        new_version = await _upsert_checklist_response(
+            db,
+            project_id=project_id,
+            wp_id=wp_id,
+            item_id="D4-31-interview",
+            remark=remark_json,
+            base_version=base_version,
         )
         await db.commit()
-        return {"ok": True, "imported_count": 1 if data else 0, "errors": []}
+        return {"ok": True, "imported_count": 1 if data else 0, "errors": [], "content_version": new_version}
 
     # 解析数据行
     rows_data: list[dict] = []
@@ -1375,20 +1417,13 @@ async def d4_import_data(
         remark_json = json.dumps(rows_data, ensure_ascii=False)
 
     project_id = await _resolve_project_id(db, wp_id)
-    await db.execute(
-        sa.text("""
-            INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
-            VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
-            ON CONFLICT (wp_id, item_id)
-            DO UPDATE SET remark = :remark, updated_at = NOW()
-        """),
-        {
-            "id": str(uuid4()),
-            "project_id": project_id,
-            "wp_id": wp_id,
-            "item_id": item_id,
-            "remark": remark_json,
-        },
+    new_version = await _upsert_checklist_response(
+        db,
+        project_id=project_id,
+        wp_id=wp_id,
+        item_id=item_id,
+        remark=remark_json,
+        base_version=base_version,
     )
     await db.commit()
 
@@ -1396,6 +1431,7 @@ async def d4_import_data(
         "ok": True,
         "imported_count": len(rows_data),
         "errors": errors,
+        "content_version": new_version,
     }
     if truncated:
         result["warning"] = f"数据行数超过{_ROW_LIMIT}行限制，已截断"
@@ -1449,6 +1485,89 @@ async def _resolve_project_id(db: AsyncSession, wp_id: str) -> str:
     if not row or row.project_id is None:
         raise HTTPException(404, "底稿不存在或未关联项目")
     return str(row.project_id)
+
+
+async def _upsert_checklist_response(
+    db: AsyncSession,
+    *,
+    project_id: str,
+    wp_id: str,
+    item_id: str,
+    remark: str,
+    base_version: int | None,
+) -> int:
+    """带乐观锁的 checklist_responses upsert（P0-项4）。
+
+    并发一致性口径（基于真实表结构 + 调用链定，非硬套 ContentMutationService）：
+      - checklist_responses 按 (wp_id,item_id) 唯一，导入写整张 sheet 的 JSON blob。
+      - 首次写（无既有行）或 ``base_version=None`` → 按"创建/覆盖"语义写入（兼容存量与旧客户端）。
+      - 提供 ``base_version`` 时做 If-Match：先 ``SELECT ... FOR UPDATE`` 锁住既有行读当前
+        content_version，与 base_version 不符 → 抛 409（``VERSION_CONFLICT``），**不静默覆盖**；
+        相符 → content_version+1 写入。``FOR UPDATE`` 把「读版本→比对→写」串行化，
+        消除 READ COMMITTED 下的检查-写竞争窗口。
+
+    Returns:
+        写入后的新 content_version（供客户端下次 If-Match 用）。
+
+    Raises:
+        HTTPException 409（版本冲突，detail 含当前版本供客户端刷新后重试）。
+
+    SQLite 兼容：``FOR UPDATE`` 在 SQLite 上被忽略（无行级锁），逻辑仍正确（单测环境无并发）。
+    """
+    import sqlalchemy as sa
+    from uuid import uuid4
+
+    # ① 锁行读当前版本（存量行可能无 content_version 概念时按 1 起算，COALESCE 兜底）
+    cur = await db.execute(
+        sa.text(
+            "SELECT content_version FROM checklist_responses "
+            "WHERE wp_id = :wp_id AND item_id = :item_id FOR UPDATE"
+        ),
+        {"wp_id": wp_id, "item_id": item_id},
+    )
+    row = cur.fetchone()
+    current_version = int(row.content_version) if row and row.content_version is not None else None
+
+    # ② If-Match：仅当调用方声明 base_version 且行已存在时做冲突检测
+    if base_version is not None and current_version is not None and base_version != current_version:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error_code": "VERSION_CONFLICT",
+                "message": "底稿数据已被其他用户更新，请刷新后重试",
+                "current_version": current_version,
+                "your_base_version": base_version,
+                "item_id": item_id,
+            },
+        )
+
+    next_version = (current_version or 0) + 1
+
+    # ③ upsert（版本 +1）。ON CONFLICT 兜住"读时无行但写前被他人插入"的极端竞态：
+    #    此时按 checklist_responses.content_version + 1 递增（不覆盖版本计数）。
+    await db.execute(
+        sa.text(
+            """
+            INSERT INTO checklist_responses
+                (id, project_id, wp_id, item_id, remark, content_version, updated_at)
+            VALUES (:id, :project_id, :wp_id, :item_id, :remark, :version, NOW())
+            ON CONFLICT (wp_id, item_id)
+            DO UPDATE SET
+                remark = :remark,
+                content_version = checklist_responses.content_version + 1,
+                updated_at = NOW()
+            """
+        ),
+        {
+            "id": str(uuid4()),
+            "project_id": project_id,
+            "wp_id": wp_id,
+            "item_id": item_id,
+            "remark": remark,
+            "version": next_version,
+        },
+    )
+    return next_version
 
 
 def _parse_d4_2_row(row: tuple, actual_headers: list[str], expected_headers: list[str]) -> dict:
@@ -2475,10 +2594,15 @@ async def _handle_d4_13_export(wp_id: str, db: AsyncSession) -> StreamingRespons
     )
 
 
-async def _handle_d4_13_import(wp_id: str, file: UploadFile, db: AsyncSession) -> dict[str, Any]:
-    """D4-13 导入：按「区块」列把内容写回 D4-13-process / D4-13-conclusion 两个 item_id。"""
+async def _handle_d4_13_import(
+    wp_id: str, file: UploadFile, db: AsyncSession, *, base_version: int | None = None
+) -> dict[str, Any]:
+    """D4-13 导入：按「区块」列把内容写回 D4-13-process / D4-13-conclusion 两个 item_id。
+
+    并发一致性（P0-项4）：两个 item_id 各自走 ``_upsert_checklist_response`` 乐观锁；
+    ``base_version`` 对每个 item_id 分别做 If-Match（D4-13 两块通常一起编辑，版本各自独立递增）。
+    """
     import sqlalchemy as sa
-    from uuid import uuid4
 
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(400, "请上传 .xlsx 格式文件")
@@ -2509,6 +2633,7 @@ async def _handle_d4_13_import(wp_id: str, file: UploadFile, db: AsyncSession) -
 
     project_id = await _resolve_project_id(db, wp_id)
     written = 0
+    versions: dict[str, int] = {}
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not row or all(v is None for v in row):
             continue
@@ -2517,21 +2642,18 @@ async def _handle_d4_13_import(wp_id: str, file: UploadFile, db: AsyncSession) -
         iid = _D4_13_SECTION_BY_LABEL.get(label)
         if not iid:
             continue
-        await db.execute(
-            sa.text(
-                """
-                INSERT INTO checklist_responses (id, project_id, wp_id, item_id, remark, updated_at)
-                VALUES (:id, :project_id, :wp_id, :item_id, :remark, NOW())
-                ON CONFLICT (wp_id, item_id)
-                DO UPDATE SET remark = :remark, updated_at = NOW()
-                """
-            ),
-            {"id": str(uuid4()), "project_id": project_id, "wp_id": wp_id, "item_id": iid, "remark": text},
+        versions[iid] = await _upsert_checklist_response(
+            db,
+            project_id=project_id,
+            wp_id=wp_id,
+            item_id=iid,
+            remark=text,
+            base_version=base_version,
         )
         written += 1
     await db.commit()
     wb.close()
-    return {"ok": True, "imported_count": written, "errors": []}
+    return {"ok": True, "imported_count": written, "errors": [], "content_versions": versions}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

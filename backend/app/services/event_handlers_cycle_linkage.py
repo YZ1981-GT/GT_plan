@@ -85,6 +85,7 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 
 from app.core.database import async_session as async_session_factory
 from app.models.audit_platform_schemas import EventPayload, EventType
@@ -435,8 +436,15 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
           · A13 错报评价汇总更新
           · 其他订阅 TRIAL_BALANCE_UPDATED 的 handler
     """
-    wp_code = payload.extra.get("wp_code", "") if payload.extra else ""
+    extra = payload.extra or {}
+    wp_code = extra.get("wp_code", "")
     if not re.match(r"^[D-N]\d+-1$", wp_code):
+        return
+
+    # ── P0-项3：显式发布确认门 ──────────────────────────────────────────────
+    # 此前把任意审定表 WORKPAPER_SAVED 当发布 → 普通保存/模式切换误触 TB 回写 + 下游级联。
+    # 现改为：仅当 extra.publish_confirmed 明确为 True 才回写；普通保存直接返回不动 TB。
+    if extra.get("publish_confirmed") is not True:
         return
 
     project_id = payload.project_id
@@ -445,17 +453,60 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
         logger.warning("_on_d_audit_determination_saved: missing project_id or year, wp_code=%s", wp_code)
         return
 
-    parsed_data = payload.extra.get("parsed_data") or {} if payload.extra else {}
+    parsed_data = extra.get("parsed_data") or {}
     rows = parsed_data.get("rows", [])
     if not rows:
         return
+
+    confirmed_by = extra.get("confirmed_by")  # 发布确认者（服务端可校验权限）
+    # 幂等键：优先用调用方给的 publish_token；缺省则由 wp/project/year/version 合成，
+    # 使"同一确认重复投递"共用同一 token（重复投递不产生重复效果）。
+    publish_token = extra.get("publish_token") or (
+        f"{project_id}:{year}:{wp_code}:{extra.get('target_version', '')}"
+    )
 
     async with async_session_factory() as session:
         try:
             from decimal import Decimal
             from sqlalchemy import update as _update
-            from app.models.trial_balance_models import TrialBalance
+            from app.models.audit_platform_models import TrialBalance
             import sqlalchemy as sa
+
+            # ① 服务端校验发布者权限（confirmed_by 须具 WORKPAPER_WRITE；缺 confirmed_by 视为不可验证 → 拒）。
+            if not await _publisher_can_publish(session, confirmed_by):
+                logger.warning(
+                    "[%s→TB] 发布被拒：确认者 %s 无发布权限或不可验证 project=%s",
+                    wp_code[0] if wp_code else "?", confirmed_by, project_id,
+                )
+                return
+
+            # ② 耐久幂等 ack：同一 publish_token 只生效一次。ON CONFLICT DO NOTHING →
+            #    rowcount==0 表示此确认已应用过，直接跳过（不重复回写 TB、不重复级联）。
+            ack = await session.execute(
+                sa.text(
+                    """
+                    INSERT INTO tb_publish_ack
+                        (id, project_id, year, wp_code, publish_token, confirmed_by, accounts_updated)
+                    VALUES (:id, :project_id, :year, :wp_code, :token, :confirmed_by, 0)
+                    ON CONFLICT (publish_token) DO NOTHING
+                    """
+                ),
+                {
+                    "id": str(uuid.uuid4()),
+                    "project_id": str(project_id),
+                    "year": year,
+                    "wp_code": wp_code,
+                    "token": publish_token,
+                    "confirmed_by": str(confirmed_by) if confirmed_by else None,
+                },
+            )
+            if ack.rowcount == 0:
+                await session.rollback()
+                logger.info(
+                    "[%s→TB] 发布确认已应用过（token=%s），幂等跳过 project=%s",
+                    wp_code[0], publish_token, project_id,
+                )
+                return
 
             updated_count = 0
             for row in rows:
@@ -480,21 +531,59 @@ async def _on_d_audit_determination_saved(payload: EventPayload) -> None:
                     if result.rowcount > 0:
                         updated_count += 1
 
+            # 回填本次实际更新数到 ack（审计用）
+            await session.execute(
+                sa.text(
+                    "UPDATE tb_publish_ack SET accounts_updated = :n WHERE publish_token = :token"
+                ),
+                {"n": updated_count, "token": publish_token},
+            )
+
             await session.commit()
             if updated_count:
-                logger.info("[%s→TB] Wrote back audited_amount for %d accounts from %s project=%s year=%s",
-                            wp_code[0], updated_count, wp_code, project_id, year)
+                logger.info("[%s→TB] Published audited_amount for %d accounts from %s project=%s year=%s by=%s",
+                            wp_code[0], updated_count, wp_code, project_id, year, confirmed_by)
                 await event_bus.publish_immediate(EventPayload(
                     event_type=EventType.TRIAL_BALANCE_UPDATED,
                     project_id=project_id,
                     year=year,
                     account_codes=payload.account_codes,
-                    extra={"source": f"d_audit_determination:{wp_code}"},
+                    extra={"source": f"d_audit_determination:{wp_code}", "publish_token": publish_token},
                 ))
         except Exception:
             await session.rollback()
             logger.warning("[%s→TB] Failed to write back audited_amount for %s project=%s",
                            wp_code[0] if wp_code else "?", wp_code, project_id, exc_info=True)
+
+
+async def _publisher_can_publish(session, confirmed_by) -> bool:
+    """校验发布确认者具备发布权限（服务端可验证；P0-项3）。
+
+    口径：``confirmed_by`` 须为存在且启用的用户，且其系统角色具 ``WORKPAPER_WRITE`` 能力
+    （admin/partner/manager/auditor 具备；qc/readonly 不具备）。``confirmed_by`` 缺失 →
+    不可验证 → 拒（fail-closed，绝不把无主发布放行）。
+    """
+    if not confirmed_by:
+        return False
+    try:
+        import sqlalchemy as sa
+        from app.services.permission_service import Permission, check_permission
+
+        row = (
+            await session.execute(
+                sa.text(
+                    "SELECT role FROM users WHERE id = :uid "
+                    "AND is_active = true AND is_deleted = false LIMIT 1"
+                ),
+                {"uid": str(confirmed_by)},
+            )
+        ).fetchone()
+        if not row or not row.role:
+            return False
+        return check_permission(str(row.role), Permission.WORKPAPER_WRITE)
+    except Exception:
+        logger.warning("_publisher_can_publish 校验异常，fail-closed 拒绝 uid=%s", confirmed_by, exc_info=True)
+        return False
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

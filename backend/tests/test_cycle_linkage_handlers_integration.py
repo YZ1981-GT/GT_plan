@@ -48,17 +48,36 @@ sys.modules.setdefault("app.models.trial_balance_models", _tb_module)
 
 
 class _CapturingSession:
-    """模拟 AsyncSession — 捕获 .execute() 调用的语句."""
+    """模拟 AsyncSession — 捕获 .execute() 调用的语句.
 
-    def __init__(self, row_count: int = 1):
-        self.executed_stmts: list = []
+    P0-项3 适配：``_on_d_audit_determination_saved`` 现在先写 tb_publish_ack（幂等 ack），
+    再做 TB update。本 mock 按 SQL 内容分派 rowcount：
+      - ack INSERT（含 ``tb_publish_ack`` 且 ``insert``）→ 返回 ``ack_rowcount``（默认 1=首次）。
+      - ack UPDATE（accounts_updated 回填）→ 返回 1，不计入 tb_update_stmts。
+      - 其余（TrialBalance update / FOR UPDATE 等）→ 返回 ``row_count``，计入 executed_stmts。
+    ``executed_stmts`` 仅收集 **TB update** 语句（保持既有断言语义：一行一条 update）。
+    """
+
+    def __init__(self, row_count: int = 1, ack_rowcount: int = 1):
+        self.executed_stmts: list = []  # 仅 TB update 语句
+        self.all_stmts: list = []       # 全部 execute 语句（含 ack）
         self.committed = False
         self.rolled_back = False
         self._row_count = row_count
+        self._ack_rowcount = ack_rowcount
 
     async def execute(self, stmt, *args, **kwargs):
-        self.executed_stmts.append(stmt)
+        self.all_stmts.append(stmt)
+        sql = str(getattr(stmt, "text", stmt)).lower()
         result = MagicMock()
+        if "tb_publish_ack" in sql and "insert" in sql:
+            result.rowcount = self._ack_rowcount
+            return result
+        if "tb_publish_ack" in sql and "update" in sql:
+            result.rowcount = 1
+            return result
+        # TB update（或其它）
+        self.executed_stmts.append(stmt)
         result.rowcount = self._row_count
         return result
 
@@ -110,6 +129,27 @@ def sample_project_id():
     return uuid.uuid4()
 
 
+@pytest.fixture
+def patch_publisher_ok(monkeypatch):
+    """P0-项3：patch _publisher_can_publish → True（发布者有权限）。"""
+    async def _ok(session, confirmed_by):
+        return True
+
+    monkeypatch.setattr(
+        "app.services.event_handlers_cycle_linkage._publisher_can_publish", _ok
+    )
+
+
+def _confirmed(extra: dict) -> dict:
+    """在 extra 上叠加 P0-项3 发布确认信号（publish_confirmed + confirmed_by + token）。"""
+    return {
+        **extra,
+        "publish_confirmed": True,
+        "confirmed_by": str(uuid.uuid4()),
+        "publish_token": f"tok-{uuid.uuid4()}",
+    }
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -120,9 +160,9 @@ class TestOnDAuditDeterminationSaved:
 
     @pytest.mark.asyncio
     async def test_d1_1_writeback_updates_tb(
-        self, mock_session, patch_session_factory, patch_event_bus, sample_project_id
+        self, mock_session, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id
     ):
-        """T1: 发 WORKPAPER_SAVED with wp_code=D1-1 + rows → TB audited_amount 被更新."""
+        """T1: 发布确认的 D1-1 + rows → TB audited_amount 被更新（P0-项3：须带 publish_confirmed）。"""
         from app.services.event_handlers_cycle_linkage import (
             _on_d_audit_determination_saved,
         )
@@ -131,7 +171,7 @@ class TestOnDAuditDeterminationSaved:
             event_type=EventType.WORKPAPER_SAVED,
             project_id=sample_project_id,
             year=2025,
-            extra={
+            extra=_confirmed({
                 "wp_code": "D1-1",
                 "parsed_data": {
                     "rows": [
@@ -139,7 +179,7 @@ class TestOnDAuditDeterminationSaved:
                         {"standard_account_code": "1002", "audited_amount": "250000.00"},
                     ]
                 },
-            },
+            }),
         )
 
         await _on_d_audit_determination_saved(payload)
@@ -209,9 +249,9 @@ class TestOnDAuditDeterminationSaved:
 
     @pytest.mark.asyncio
     async def test_multiple_cycles_accepted(
-        self, mock_session, patch_session_factory, patch_event_bus, sample_project_id
+        self, mock_session, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id
     ):
-        """T4: K8-1, N5-1 等其他循环审定表也能正常处理."""
+        """T4: K8-1, N5-1 等其他循环审定表也能正常处理（发布确认）."""
         from app.services.event_handlers_cycle_linkage import (
             _on_d_audit_determination_saved,
         )
@@ -225,14 +265,14 @@ class TestOnDAuditDeterminationSaved:
                 event_type=EventType.WORKPAPER_SAVED,
                 project_id=sample_project_id,
                 year=2025,
-                extra={
+                extra=_confirmed({
                     "wp_code": wp_code,
                     "parsed_data": {
                         "rows": [
                             {"standard_account_code": "6001", "audited_amount": "50000"},
                         ]
                     },
-                },
+                }),
             )
 
             await _on_d_audit_determination_saved(payload)
@@ -242,9 +282,9 @@ class TestOnDAuditDeterminationSaved:
 
     @pytest.mark.asyncio
     async def test_invalid_audited_amount_skipped(
-        self, mock_session, patch_session_factory, patch_event_bus, sample_project_id
+        self, mock_session, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id
     ):
-        """T5: audited_amount 非数字（如 'N/A'）→ 跳过该行，继续其他行."""
+        """T5: audited_amount 非数字（如 'N/A'）→ 跳过该行，继续其他行（发布确认）."""
         from app.services.event_handlers_cycle_linkage import (
             _on_d_audit_determination_saved,
         )
@@ -253,7 +293,7 @@ class TestOnDAuditDeterminationSaved:
             event_type=EventType.WORKPAPER_SAVED,
             project_id=sample_project_id,
             year=2025,
-            extra={
+            extra=_confirmed({
                 "wp_code": "D1-1",
                 "parsed_data": {
                     "rows": [
@@ -262,7 +302,7 @@ class TestOnDAuditDeterminationSaved:
                         {"standard_account_code": "1003", "audited_amount": "not_a_number"},
                     ]
                 },
-            },
+            }),
         )
 
         await _on_d_audit_determination_saved(payload)
@@ -273,9 +313,9 @@ class TestOnDAuditDeterminationSaved:
 
     @pytest.mark.asyncio
     async def test_publish_event_on_successful_update(
-        self, mock_session, patch_session_factory, patch_event_bus, sample_project_id
+        self, mock_session, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id
     ):
-        """T6: commit 后有更新 → 发布 TRIAL_BALANCE_UPDATED 并携带来源信息."""
+        """T6: commit 后有更新 → 发布 TRIAL_BALANCE_UPDATED 并携带来源信息（发布确认）."""
         from app.services.event_handlers_cycle_linkage import (
             _on_d_audit_determination_saved,
         )
@@ -285,14 +325,14 @@ class TestOnDAuditDeterminationSaved:
             project_id=sample_project_id,
             year=2025,
             account_codes=["1001"],
-            extra={
+            extra=_confirmed({
                 "wp_code": "F2-1",
                 "parsed_data": {
                     "rows": [
                         {"standard_account_code": "1001", "audited_amount": "999.99"},
                     ]
                 },
-            },
+            }),
         )
 
         await _on_d_audit_determination_saved(payload)
@@ -307,14 +347,14 @@ class TestOnDAuditDeterminationSaved:
 
     @pytest.mark.asyncio
     async def test_no_publish_when_zero_updates(
-        self, patch_session_factory, patch_event_bus, sample_project_id, monkeypatch
+        self, patch_event_bus, patch_publisher_ok, sample_project_id, monkeypatch
     ):
-        """当 rowcount=0（未匹配任何行）时，不应发布事件."""
+        """当 rowcount=0（未匹配任何行）时，不应发布事件（发布确认）."""
         from app.services.event_handlers_cycle_linkage import (
             _on_d_audit_determination_saved,
         )
 
-        # 使用 rowcount=0 的 session
+        # 使用 rowcount=0 的 session（ack INSERT 仍返回 1 = 首次确认，走进 TB update 段）
         zero_session = _CapturingSession(row_count=0)
 
         @asynccontextmanager
@@ -330,14 +370,14 @@ class TestOnDAuditDeterminationSaved:
             event_type=EventType.WORKPAPER_SAVED,
             project_id=sample_project_id,
             year=2025,
-            extra={
+            extra=_confirmed({
                 "wp_code": "D1-1",
                 "parsed_data": {
                     "rows": [
                         {"standard_account_code": "9999", "audited_amount": "100"},
                     ]
                 },
-            },
+            }),
         )
 
         await _on_d_audit_determination_saved(payload)
@@ -372,9 +412,39 @@ class TestOnDAuditDeterminationSaved:
 
     @pytest.mark.asyncio
     async def test_account_code_field_fallback(
-        self, mock_session, patch_session_factory, patch_event_bus, sample_project_id
+        self, mock_session, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id
     ):
-        """rows 中用 account_code（而非 standard_account_code）也能正常处理."""
+        """rows 中用 account_code（而非 standard_account_code）也能正常处理（发布确认）."""
+        from app.services.event_handlers_cycle_linkage import (
+            _on_d_audit_determination_saved,
+        )
+
+        payload = EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=sample_project_id,
+            year=2025,
+            extra=_confirmed({
+                "wp_code": "D1-1",
+                "parsed_data": {
+                    "rows": [
+                        {"account_code": "1001", "audited_amount": "300.00"},
+                    ]
+                },
+            }),
+        )
+
+        await _on_d_audit_determination_saved(payload)
+
+        assert len(mock_session.executed_stmts) == 1
+        assert mock_session.committed is True
+
+    # ─── P0-项3 新增：显式发布确认门 + 权限 + 幂等 ─────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_plain_save_without_confirm_does_not_write_tb(
+        self, mock_session, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id
+    ):
+        """普通保存（无 publish_confirmed）→ 不回写 TB、不发布、不开会话（P0-项3 核心）。"""
         from app.services.event_handlers_cycle_linkage import (
             _on_d_audit_determination_saved,
         )
@@ -387,16 +457,92 @@ class TestOnDAuditDeterminationSaved:
                 "wp_code": "D1-1",
                 "parsed_data": {
                     "rows": [
-                        {"account_code": "1001", "audited_amount": "300.00"},
+                        {"standard_account_code": "1001", "audited_amount": "100"},
                     ]
                 },
-            },
+            },  # 注意：无 publish_confirmed
         )
 
         await _on_d_audit_determination_saved(payload)
 
-        assert len(mock_session.executed_stmts) == 1
-        assert mock_session.committed is True
+        assert len(mock_session.all_stmts) == 0, "普通保存不应触碰 DB"
+        assert mock_session.committed is False
+        patch_event_bus.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_confirm_denied_when_publisher_lacks_permission(
+        self, mock_session, patch_session_factory, patch_event_bus, sample_project_id, monkeypatch
+    ):
+        """发布者无权限（_publisher_can_publish→False）→ 不回写 TB、不发布。"""
+        from app.services.event_handlers_cycle_linkage import (
+            _on_d_audit_determination_saved,
+        )
+
+        async def _deny(session, confirmed_by):
+            return False
+
+        monkeypatch.setattr(
+            "app.services.event_handlers_cycle_linkage._publisher_can_publish", _deny
+        )
+
+        payload = EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=sample_project_id,
+            year=2025,
+            extra=_confirmed({
+                "wp_code": "D1-1",
+                "parsed_data": {
+                    "rows": [{"standard_account_code": "1001", "audited_amount": "100"}]
+                },
+            }),
+        )
+
+        await _on_d_audit_determination_saved(payload)
+
+        # 权限校验先于 ack/TB update：无 ack INSERT、无 TB update、无发布
+        assert mock_session.executed_stmts == []
+        assert all("tb_publish_ack" not in str(getattr(s, "text", s)).lower() for s in mock_session.all_stmts)
+        patch_event_bus.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_confirm_idempotent_duplicate_token_no_double_write(
+        self, patch_session_factory, patch_event_bus, patch_publisher_ok, sample_project_id, monkeypatch
+    ):
+        """同一确认重复投递（ack rowcount=0）→ 不重复回写 TB、不重复发布（耐久幂等）。"""
+        from app.services.event_handlers_cycle_linkage import (
+            _on_d_audit_determination_saved,
+        )
+
+        # ack INSERT ON CONFLICT DO NOTHING → rowcount=0（该 token 已应用过）
+        dup_session = _CapturingSession(row_count=1, ack_rowcount=0)
+
+        @asynccontextmanager
+        async def _dup_factory(*args, **kwargs):
+            yield dup_session
+
+        monkeypatch.setattr(
+            "app.services.event_handlers_cycle_linkage.async_session_factory",
+            _dup_factory,
+        )
+
+        payload = EventPayload(
+            event_type=EventType.WORKPAPER_SAVED,
+            project_id=sample_project_id,
+            year=2025,
+            extra=_confirmed({
+                "wp_code": "D1-1",
+                "parsed_data": {
+                    "rows": [{"standard_account_code": "1001", "audited_amount": "100"}]
+                },
+            }),
+        )
+
+        await _on_d_audit_determination_saved(payload)
+
+        # 只有 ack INSERT（rowcount=0），没有任何 TB update，没有发布
+        assert dup_session.executed_stmts == [], "幂等跳过不应有 TB update"
+        assert dup_session.rolled_back is True
+        patch_event_bus.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------

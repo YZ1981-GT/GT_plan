@@ -542,4 +542,23 @@ backend/scripts/diagnose/diagnose_guidance_source_ref_localization.py  860
 #   parser/exporter 集中模块（历史大文件，本就远超上限）。spec d4-ipo-fraud-writeback-formula-io
 #   为 D4-29/30/31/32 补齐专用 parser/exporter/item_id 映射/reshape（+~1000 行，与既有
 #   _parse_d4_XX 同构、内聚在同一 IO 模块）。拆分需与并发 D4 会话协调，属独立瘦身 spec。
-backend/app/routers/wp_render_strategies/_d4_import_export.py  3077
+backend/app/routers/wp_render_strategies/_d4_import_export.py  3399
+
+# spec: d4-dual-mode-formula-governance（P0 阻塞修复，2026-09-14 入库）
+#   三个文件均为**改动前即大文件**，本次为 P0 必要修改净增，非从零造超限：
+#   formula_engine.py —— 改动前 1787 行（splitlines 计，已远超 800 上限，报表公式 L1 内核，
+#     14 函数 AST 求值 + regex 降级路径 + 多个 Executor 兼容类挤在单文件）。本次 +177：
+#     公式四态（missing/damaged/blocked/ok）机制 + FormulaBlockedError + FormulaResult.blocked/.state
+#     + 未注册函数不再静默返 0。四态分类逻辑已抽伴生模块 formula_management/formula_state.py（单一真源），
+#     宿主只加 blocked 字段与捕获分支。拆分方向：把 regex 降级路径与 Executor 兼容类各抽伴生模块，属独立任务。
+#     spec: d4-dual-mode-formula-governance P0-项2
+#   test_cycle_linkage_handlers_integration.py —— 改动前 953 行（已超上限）。本次 +143：
+#     P0-项3 显式发布确认门的集成用例（publish_confirmed 门 / 普通保存不写 TB / 无权拒 / 幂等不双写）。
+#     守卫与被测 handler 同文件是既有范式，按 handler 拆分属独立任务。
+#     spec: d4-dual-mode-formula-governance P0-项3
+#   _d4_import_export.py —— 基线由 3077→3399（+322）：P0-项5 编辑权限门（authorize_wp_edit +
+#     check_consol_lock）+ P0-项4 checklist_responses 乐观锁 CAS（_upsert_checklist_response + base_version）。
+#     该文件的瘦身属独立 spec（whitelist 已有登记说明），不与 P0 安全修复同批。
+#     spec: d4-dual-mode-formula-governance P0-项4/项5
+backend/app/services/formula_engine.py  1964
+backend/tests/test_cycle_linkage_handlers_integration.py  1096

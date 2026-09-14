@@ -94,6 +94,7 @@ const {
   addProductRow,
   removeProductRow,
   publishAdjudicated,
+  publishing,
   hasPrefillData,
   previewSeedFromPrefill,
 } = useD4Adjudication({
@@ -504,7 +505,7 @@ const aiTip = computed(() => aiAvailable.value ? 'AI 辅助生成' : 'AI 服务�
 
     <!-- 确认审定按钮 -->
     <div class="action-row">
-      <el-button type="primary" size="small" :disabled="isReadonly" @click="publishAdjudicated">
+      <el-button type="primary" size="small" :disabled="isReadonly" :loading="publishing" @click="publishAdjudicated">
         确认审定（回写TB）
       </el-button>
     </div>

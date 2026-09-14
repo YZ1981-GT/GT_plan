@@ -530,6 +530,11 @@ async def _maybe_publish_determination_writeback(
         from app.models.audit_platform_schemas import EventPayload, EventType
         from app.services.event_bus import event_bus
 
+        # 🔴 P0-项3（spec d4-dual-mode-formula-governance）：普通保存**不再**自动回写 TB。
+        # 该事件仍照发（供一致性比对 / stale / SSE 等下游 handler），但**不带**
+        # ``publish_confirmed`` 信号 —— TB 回写 handler ``_on_d_audit_determination_saved``
+        # 现在只在显式发布确认时才动 trial_balance（见专用发布端点 publish_determination_to_tb）。
+        # 因此本处的自动保存对 TB 是 no-op，消除"普通保存/模式切换误触 TB 回写 + 下游级联"。
         await event_bus.publish(EventPayload(
             event_type=EventType.WORKPAPER_SAVED,
             project_id=project_id,
@@ -538,6 +543,7 @@ async def _maybe_publish_determination_writeback(
                 "wp_code": det_code,
                 "trigger": "aggregated_audit_sheet_save",
                 "parsed_data": {"rows": writeback_rows},
+                # 注意：不含 publish_confirmed，故 TB 回写 handler 不动 trial_balance。
             },
         ))
     except Exception as e:  # noqa: BLE001 — 回写联动失败不影响保存
@@ -580,3 +586,134 @@ def _publish_cross_ref_updated(
     except Exception as exc:
         # SSE 发布失败不应阻断保存流程
         logger.warning("Failed to publish cross_ref.updated SSE: %s", exc)
+
+
+# ─── P0-项3：显式"发布审定表到试算表"端点 ────────────────────────────────────
+
+
+class PublishToTbRequest(BaseModel):
+    """发布审定表到试算表请求体（显式确认）。"""
+    sheet_name: str = Field(..., description="审定表 sheet 名（须含审定表子码 [D-N]\\d+-1）")
+    html_data: dict = Field(..., description="审定表 HTML 数据（含 audit_rows），据此计算各行审定数")
+    publish_token: str | None = Field(
+        None,
+        description="幂等键（可选）。同一确认重复提交须带同一 token，服务端据此保证只生效一次。",
+    )
+
+
+class PublishToTbResponse(BaseModel):
+    """发布结果。"""
+    published: bool
+    wp_code: str
+    publish_token: str
+    message: str
+
+
+@router.post("/{wp_id}/audit-determination/publish-to-tb", response_model=PublishToTbResponse)
+async def publish_determination_to_tb(
+    wp_id: UUID,
+    body: PublishToTbRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PublishToTbResponse:
+    """把审定表审定数**显式发布**到 trial_balance（P0-项3）。
+
+    与普通保存的区别：普通保存**不动** TB（见 `_maybe_publish_determination_writeback`）；
+    只有本端点携带显式发布确认信号（``publish_confirmed=True`` + ``confirmed_by`` +
+    ``publish_token``），TB 回写 handler 才会回写 trial_balance.audited_amount 并向下游级联。
+
+    权限（服务端可验证）：发布者须具底稿编辑权（``authorize_wp_edit`` —— review/edit 级；
+    qc/readonly/非成员 → 403）。合并锁定 → 423。
+    幂等：``publish_token`` 唯一，handler 侧 ``tb_publish_ack`` 去重；同一确认重复提交只生效一次。
+    """
+    from uuid import uuid4
+
+    from app.deps import authorize_wp_edit, check_consol_lock
+    from app.models.audit_platform_schemas import EventPayload, EventType
+    from app.services.event_bus import event_bus
+    from app.services.wp_account_package_resolver import extract_determination_wp_code
+    from app.services.wp_audit_sheet_tb_service import fetch_audit_sheet_tb_values
+
+    # ① 权限门 + 合并锁（写操作）
+    project_id = await authorize_wp_edit(db, current_user, wp_id)
+    await check_consol_lock(wp_id=wp_id, db=db)
+
+    # ② 校验审定表子码
+    det_code = extract_determination_wp_code(body.sheet_name)
+    if not det_code:
+        raise HTTPException(400, "该 sheet 不是审定表（无 [D-N]{n}-1 子码），无法发布到试算表")
+
+    audit_rows = body.html_data.get("audit_rows") if isinstance(body.html_data, dict) else None
+    if not isinstance(audit_rows, list) or not audit_rows:
+        raise HTTPException(400, "审定表无 audit_rows 数据，无可发布内容")
+
+    # ③ 计算各行审定数（与 _maybe_publish_determination_writeback / 前端口径一致）
+    tb_values = await fetch_audit_sheet_tb_values(audit_rows, db=db, project_id=project_id)
+
+    def _num(v: Any) -> float:
+        try:
+            return float(v) if v is not None else 0.0
+        except (TypeError, ValueError):
+            return 0.0
+
+    writeback_rows: list[dict] = []
+    for row in audit_rows:
+        if not isinstance(row, dict):
+            continue
+        account_code = row.get("account_code")
+        if not account_code or row.get("isComputed") or row.get("isSection"):
+            continue
+        tb = tb_values.get(row.get("id"), {}) if isinstance(tb_values, dict) else {}
+        current_unadj = row.get("current_unadjusted")
+        if current_unadj is None:
+            current_unadj = tb.get("current_unadjusted")
+        adj = row.get("adj_amount")
+        if adj is None:
+            adj = row.get("sys_aje")
+        if adj is None:
+            adj = tb.get("sys_aje")
+        reclass = row.get("reclass_amount")
+        if reclass is None:
+            reclass = row.get("sys_rje")
+        if reclass is None:
+            reclass = tb.get("sys_rje")
+        audited = _num(current_unadj) + _num(adj) + _num(reclass)
+        writeback_rows.append({"account_code": account_code, "audited_amount": audited})
+
+    if not writeback_rows:
+        raise HTTPException(400, "无可回写行（审定表全为计算行/小计行或缺科目编码）")
+
+    year = await fetch_project_audit_year(db, project_id)
+    if not year:
+        raise HTTPException(400, "项目未设置审计年度，无法定位 trial_balance")
+
+    # ④ 幂等 token：缺省用 project/year/wp_code + 内容摘要合成（同一批数据重复点击共用 token）
+    token = body.publish_token or (
+        f"{project_id}:{year}:{det_code}:{abs(hash(str(sorted((r['account_code'], r['audited_amount']) for r in writeback_rows))))}"
+    )
+
+    # ⑤ 发布**带确认信号**的 WORKPAPER_SAVED → handler 回写 TB（服务端再校验发布者权限 + 幂等）
+    await event_bus.publish(EventPayload(
+        event_type=EventType.WORKPAPER_SAVED,
+        project_id=project_id,
+        year=year,
+        extra={
+            "wp_code": det_code,
+            "trigger": "audit_determination_publish",
+            "parsed_data": {"rows": writeback_rows},
+            "publish_confirmed": True,
+            "confirmed_by": str(current_user.id),
+            "publish_token": token,
+        },
+    ))
+
+    logger.info(
+        "[publish-to-tb] %s 发布 %d 行审定数到 TB project=%s by=%s token=%s",
+        det_code, len(writeback_rows), project_id, current_user.id, token,
+    )
+    return PublishToTbResponse(
+        published=True,
+        wp_code=det_code,
+        publish_token=token,
+        message=f"已发布 {len(writeback_rows)} 个科目的审定数到试算表",
+    )

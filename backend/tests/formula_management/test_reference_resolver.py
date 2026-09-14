@@ -49,6 +49,17 @@ from app.services.formula_management.reference_resolver import (  # noqa: E402
 from app.services.wp_formula_service import WpFormulaService  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _stub_wp_ownership():
+    """隔离归属校验（Req 10）：仅建 wp_formula 表不建 working_paper，save() 的
+    _verify_wp_ownership 查 working_paper → sqlite no such table。此文件聚焦 reference
+    来源解析/失效链，归属另有专测，class 级 stub 返回 True 隔离（纯 ORM 用例中此桩不触发）。"""
+    with patch.object(
+        WpFormulaService, "_verify_wp_ownership", new=AsyncMock(return_value=True)
+    ):
+        yield
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试基座
 # ─────────────────────────────────────────────────────────────────────────────
@@ -160,14 +171,15 @@ def test_save_reference_source_reuses_source_expression():
                     "app.services.acnr.events.invalidate",
                     new_callable=AsyncMock,
                 ):
-                    # 引用方提交一个占位 expression，reference 分支应改用源表达式。
+                    # 引用方提交一个合法占位 expression（须过 P0-项2 公式态分类），
+                    # reference 分支应改用源表达式复用。
                     saved, issues = await svc.save(
                         db,
                         project_id=project_id,
                         wp_id=uuid.uuid4(),
                         sheet_name="审定表",
                         target_cell="C9",
-                        expression="占位待复用",
+                        expression="TB('9999')",
                         year=2025,
                         formula_source="reference",
                         reference_formula_id=src.id,
@@ -373,7 +385,8 @@ def test_dangling_reference_fail_open_records_issue():
                 # 关键：不静默产错值 —— expression 必须为 None。
                 assert res.expression is None
                 assert res.issue is not None
-                assert str(ghost_id) in res.issue.description
+                # issue 现为 dict（{"code","description",...}），非对象属性访问。
+                assert str(ghost_id) in res.issue["description"]
         finally:
             await engine.dispose()
 
@@ -437,13 +450,15 @@ def test_save_dangling_reference_rejected_not_written():
                     "app.services.acnr.events.invalidate",
                     new_callable=AsyncMock,
                 ):
+                    # 合法占位 expression（须过 P0-项2 公式态分类），才能走到
+                    # reference 悬空拒写分支。
                     saved, issues = await svc.save(
                         db,
                         project_id=project_id,
                         wp_id=uuid.uuid4(),
                         sheet_name="审定表",
                         target_cell="C9",
-                        expression="占位",
+                        expression="TB('9999')",
                         year=2025,
                         formula_source="reference",
                         reference_formula_id=ghost_id,

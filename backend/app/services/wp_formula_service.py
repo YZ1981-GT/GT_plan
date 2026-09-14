@@ -222,6 +222,35 @@ class WpFormulaService:
 
         normalized_refs = _normalize_refs(refs)
 
+        # ── P0-项2：公式态分类保护（damaged/blocked 不静默仅存值，保留原始表达式作证据）──
+        # 结构坏（damaged）或含非白名单内容（blocked）→ 拒绝写库，返回 issue（router 转 422）。
+        from app.services.formula_management.formula_state import (
+            FormulaState,
+            classify_formula,
+        )
+
+        fstate = classify_formula(expression, key_exists=True)
+        if fstate in (FormulaState.DAMAGED, FormulaState.BLOCKED):
+            logger.info(
+                "wp_formula save 拒绝：公式态=%s wp_id=%s cell=%s expr=%r",
+                fstate.value, wp_uuid, target_cell, expression,
+            )
+            return None, [
+                {
+                    "ref": None,
+                    "uri": None,
+                    "status": f"formula_{fstate.value}",
+                    "reason": f"formula_{fstate.value}",
+                    # 保留原始表达式作证据（不静默丢/不静默存为正常公式）
+                    "expression": expression,
+                    "message": (
+                        "公式表达式解析失败（结构损坏），已拒绝保存"
+                        if fstate == FormulaState.DAMAGED
+                        else "公式含非白名单函数/eval/URL/外链，已拦截拒绝保存"
+                    ),
+                }
+            ]
+
         # ── 来源校验（Req 25.1/25.6）：非法来源拒绝写库 ──
         fsource = (formula_source or "custom").strip()
         if fsource not in _VALID_FORMULA_SOURCES:
@@ -266,9 +295,13 @@ class WpFormulaService:
                         "uri": None,
                         "status": "reference_dangling",
                         "reason": "reference_dangling",
+                        # ReferenceResolution.issue 为 dict（{"code","description",...}），
+                        # 非对象属性访问（旧代码 .description 会 AttributeError → 500）。
                         "message": (
-                            ref_res.issue.description
-                            if ref_res.issue is not None
+                            ref_res.issue.get(
+                                "description", "参照来源公式不存在（可能已删除）"
+                            )
+                            if isinstance(ref_res.issue, dict)
                             else "参照来源公式不存在（可能已删除）"
                         ),
                     }
@@ -292,6 +325,10 @@ class WpFormulaService:
 
         # ── 计算 definition_hash ──
         def_hash = _compute_definition_hash(expression, ftype, normalized_refs)
+
+        # ── 稳定键推导（P0-项1）：与旧键 (sheet_name,target_cell) 双写共存 ──
+        from app.services.formula_management.stable_key import derive_stable_key
+        stable = derive_stable_key(sheet_name, target_cell)
 
         # ── upsert：按 (wp_id, sheet_name, target_cell) 维度 ──
         existing = (
@@ -318,6 +355,12 @@ class WpFormulaService:
             existing.hint_text = hint_text
             existing.formula_source = fsource
             existing.reference_formula_id = reference_uuid
+            # ── P0-项1：稳定键双写（identity 不随 sheet 展示重命名而变）──
+            if hasattr(existing, "stable_sheet_key"):
+                existing.stable_sheet_key = stable.stable_sheet_key
+                existing.row_key = stable.row_key
+                existing.field_key = stable.field_key
+                existing.stable_key_needs_review = stable.needs_review
             # ── P5：save 绝不写 last_computed_at ──
             # existing.last_computed_at 保持原值不动
             existing.updated_at = datetime.now(timezone.utc)
@@ -353,6 +396,11 @@ class WpFormulaService:
             hint_text=hint_text,
             formula_source=fsource,
             reference_formula_id=reference_uuid,
+            # ── P0-项1：稳定键（identity 不随 sheet 展示重命名而变）──
+            stable_sheet_key=stable.stable_sheet_key,
+            row_key=stable.row_key,
+            field_key=stable.field_key,
+            stable_key_needs_review=stable.needs_review,
             # ── P5：save 绝不写 last_computed_at（保持 NULL）──
             last_computed_at=None,
             created_by=created_by_uuid,

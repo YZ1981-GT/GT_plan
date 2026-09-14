@@ -42,8 +42,21 @@ if not hasattr(SQLiteTypeCompiler, "visit_JSONB"):
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 
+import pytest  # noqa: E402
+
 from app.models.workpaper_models import WpFormula  # noqa: E402
 from app.services.wp_formula_service import WpFormulaService  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _stub_wp_ownership():
+    """隔离归属校验（Req 10）：仅建 wp_formula 表不建 working_paper，save()/list_by_wp()
+    的 _verify_wp_ownership 查 working_paper → sqlite no such table。此 PBT 聚焦来源往返
+    保真，归属另有专测，class 级 stub 返回 True 隔离。"""
+    with patch.object(
+        WpFormulaService, "_verify_wp_ownership", new=AsyncMock(return_value=True)
+    ):
+        yield
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -104,10 +117,17 @@ _TARGET_CELL = st.builds(
     st.integers(min_value=1, max_value=999),
 )
 
-# expression：非空文本（save 前 validate 被桩为 []，内容不影响持久化）。
-_EXPRESSION = st.text(
-    alphabet="ABCDEFGHIJ0123456789+-*/()',!=<> ", min_size=1, max_size=40
-).filter(lambda s: s.strip() != "")
+# expression：合法 DSL 表达式（save 前 classify_formula 会拒绝 damaged/blocked，
+# P0-项2 公式态保护）。来源往返属性只关心 formula_source 保真，故用合法表达式抽样。
+_EXPRESSION = st.sampled_from(
+    [
+        "WP('D1','B5')+WP('D2','C3')",
+        "TB('6001','审定数')",
+        "SUM_TB('6001','期末')",
+        "1+2",
+        "TB('1001')-TB('1002')",
+    ]
+)
 
 _SHEET_NAME = st.text(alphabet="审定表明细ABC ", min_size=1, max_size=8).filter(
     lambda s: s.strip() != ""
@@ -180,8 +200,8 @@ def test_source_roundtrip_fidelity(inp):
                 assert issues == []
                 assert saved is not None
 
-                # 读回：list_by_wp 恰返回刚保存的这一条。
-                loaded = await svc.list_by_wp(db, wp_id)
+                # 读回：list_by_wp 恰返回刚保存的这一条（Req 10 需 project_id）。
+                loaded = await svc.list_by_wp(db, wp_id, project_id=project_id)
                 assert len(loaded) == 1
                 row = loaded[0]
 

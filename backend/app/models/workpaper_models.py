@@ -897,6 +897,17 @@ class WpFormula(Base):
         PG_UUID(as_uuid=True), nullable=True
     )
 
+    # ── V163 稳定键（P0-项1 d4-dual-mode-formula-governance）──────────────
+    # 目标 identity = (wp_id, stable_sheet_key, row_key, field_key)；preset_version 不入。
+    # 旧列 sheet_name/target_cell + 旧唯一索引保留一版过渡（双写共存）。
+    # needs_review：target_cell 无法安全解析为 A1（命名单元等）时置 True，供人工复核（不静默丢）。
+    stable_sheet_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    row_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    field_key: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    stable_key_needs_review: Mapped[bool] = mapped_column(
+        sa.Boolean, nullable=False, server_default=text("false")
+    )
+
     __table_args__ = (
         Index(
             "uq_wp_formula_wp_sheet_cell",
@@ -904,6 +915,14 @@ class WpFormula(Base):
             unique=True,
         ),
         Index("idx_wp_formula_project", "project_id"),
+        # 新稳定键唯一索引（部分索引，仅对已回填行生效；needs_review 行 row_key 可空用 '' 兜底）
+        Index(
+            "uq_wp_formula_stable_key",
+            "wp_id", "stable_sheet_key",
+            sa.text("COALESCE(row_key, '')"), "field_key",
+            unique=True,
+            postgresql_where=sa.text("stable_sheet_key IS NOT NULL"),
+        ),
     )
 
 

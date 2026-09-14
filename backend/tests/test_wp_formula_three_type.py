@@ -27,6 +27,18 @@ from app.services.wp_formula_eval_service import evaluate_wp_formula_expression
 from app.services.wp_formula_service import WpFormulaService
 
 
+@pytest.fixture(autouse=True)
+def _stub_wp_ownership():
+    """隔离归属校验（Req 10）：此文件聚焦公式定义契约（formula_type/refs/悬空引用），
+    _make_session 仅建 wp_formula 表不建 working_paper，save() 的 _verify_wp_ownership
+    会查 working_paper 表 → sqlite no such table。归属校验另有 ownership_guard 专测覆盖，
+    此处 stub 返回 True 隔离。"""
+    with patch.object(
+        WpFormulaService, "_verify_wp_ownership", new=AsyncMock(return_value=True)
+    ):
+        yield
+
+
 async def _make_session():
     engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
     async with engine.begin() as conn:
@@ -72,7 +84,13 @@ async def test_save_persists_formula_type_and_refs():
 
 
 @pytest.mark.asyncio
-async def test_auto_calc_records_last_computed_at():
+async def test_auto_calc_save_sets_lifecycle_not_last_computed_at():
+    """auto_calc save 只保存定义：置 lifecycle_state='saved'，绝不写 last_computed_at。
+
+    生命周期修正（formula-runtime-convergence Req 5 / P5）：save 仅存定义，
+    last_computed_at 由 coordinator 在**执行回填后**记录，不在 save 时写。
+    （旧断言 last_computed_at is not None 反映的是 P5 修正前行为，已过时。）
+    """
     factory, engine = await _make_session()
     async with factory() as db:
         svc = WpFormulaService()
@@ -93,7 +111,10 @@ async def test_auto_calc_records_last_computed_at():
             )
         assert issues == []
         assert saved.formula_type == "auto_calc"
-        assert saved.last_computed_at is not None  # P9
+        # P5：save 绝不写 last_computed_at（执行后由 coordinator 记）
+        assert saved.last_computed_at is None
+        # 定义保存后 lifecycle_state 置为 saved
+        assert getattr(saved, "lifecycle_state", "saved") == "saved"
     await engine.dispose()
 
 

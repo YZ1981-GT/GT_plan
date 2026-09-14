@@ -406,6 +406,63 @@ async def authorize_wp_edit(db: AsyncSession, current_user: User, wp_id: UUID) -
     return project_id
 
 
+async def authorize_wp_read(db: AsyncSession, current_user: User, wp_id: UUID) -> UUID:
+    """底稿只读权校验（可复用；供 body/path-wp_id 的**读**端点调用）。
+
+    与 ``authorize_wp_edit`` 对称，但只要求项目 ``readonly`` 级权限——用于导出模板/
+    导出数据等读操作：不能被误提到 edit（否则 readonly 成员无法导出），但也不能对
+    非项目成员放行（否则任意登录用户可拉取他人项目底稿数据）。
+
+    判定口径：
+    1. admin/partner 全局放行（在确认底稿存在后返回其 project_id）。
+    2. 其余角色须为目标底稿所属项目成员（``project_users`` 任一权限级 ≥ readonly）。
+
+    Returns:
+        目标底稿所属 project_id。
+
+    Raises:
+        HTTPException 403（非项目成员）/ 404（底稿不存在）。
+    """
+    from app.models.workpaper_models import WorkingPaper
+
+    role = current_user.role.value
+
+    project_id = (
+        await db.execute(
+            select(WorkingPaper.project_id).where(
+                WorkingPaper.id == wp_id,
+                WorkingPaper.is_deleted == False,  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if project_id is None:
+        raise HTTPException(status_code=404, detail="底稿不存在")
+
+    if role in ("admin", "partner"):
+        return project_id
+
+    cached_level = await _get_cached_permission(current_user.id, project_id)
+    if cached_level is None:
+        project_user = (
+            await db.execute(
+                select(ProjectUser).where(
+                    ProjectUser.project_id == project_id,
+                    ProjectUser.user_id == current_user.id,
+                    ProjectUser.is_deleted == False,  # noqa: E712
+                )
+            )
+        ).scalar_one_or_none()
+        if project_user is None:
+            raise HTTPException(status_code=403, detail="无底稿访问权限")
+        cached_level = project_user.permission_level.value
+        await _set_cached_permission(current_user.id, project_id, cached_level)
+
+    if PERMISSION_HIERARCHY.get(cached_level, 0) < PERMISSION_HIERARCHY["readonly"]:
+        raise HTTPException(status_code=403, detail="无底稿访问权限")
+
+    return project_id
+
+
 # ---------------------------------------------------------------------------
 # Permission cache helpers (Redis, graceful degradation)
 # ---------------------------------------------------------------------------

@@ -74,3 +74,30 @@ key=`wp_id + stable_sheet_key + row_key + field_key + custom`；`preset_version`
 ### Property 5
 各owner的C0-C4只门控相关产物，UNVERIFIABLE不假绿。
 **Validates: Requirements 8.1**
+
+
+## P0 修复设计（2026-09-14 实施，append-only）
+
+> 落实总纲 R1-R8 中的 5 项 P0 修复的**实现设计 + 现状 grep 证据**。均遵守：迁移 V/R 配对幂等可回滚查最新 version 防重号、service 只 flush router 统一 commit、单一真源禁平行体系、中文 UI、PBT max_examples=5。
+
+### D-P0-1 公式稳定键（Req 3.1）
+- **现状证据**：既有 identity = `(wp_id, sheet_name, target_cell)`（`WpFormula` 唯一索引 `uq_wp_formula_wp_sheet_cell`）；无 `preset_version` 列（故其"不进 identity"结构上已成立）。ACNR 已有 `addr_id`（`{wp_code}/{sheet_code}/{coordinate_key}`）稳定键概念，但 wp_formula 行无 wp_code/sheet_code 直取，无法直接复用为行级键。
+- **设计**：新增单一真源 `formula_management/stable_key.py`：`normalize_sheet_key`（剥离排序前缀 + 折叠空白，使展示重命名不改键）+ `parse_cell`（A1 → row/col）。派生列 `stable_sheet_key/row_key/field_key` + `stable_key_needs_review`。旧列/旧索引保留一版，新部分唯一索引 `uq_wp_formula_stable_key` 仅对已回填行生效。回填在 V163 SQL 内用 PG regex 对齐 Python 逻辑；不可安全转换（非 A1）行标 needs_review 不丢。
+- **降级/切换点**：迁移回滚（R163）后系统回退纯旧键，稳定键为派生列可重推。
+
+### D-P0-2 公式四态（Req 3.2/3.3）
+- **现状证据**：`formula_engine._eval_func_node` 对未注册函数**静默返 0**（trace "unknown"）——把配置错/注入伪装成诚实 0。`validate_formula` 已能检未知函数但求值路径不消费。
+- **设计**：单一真源 `formula_management/formula_state.py`（枚举 + `classify_formula`，白名单取 `_REGISTRY.known_function_names()` 不另立清单）。引擎加 `FormulaResult.blocked`/`.state` + `FormulaBlockedError` + `_execute_ast` 前置 blocked 判定。`WpFormulaService.save` 对 damaged/blocked 拒绝写库返 issue 含原始 expression。`report_engine.evaluate_formula` 仅读 `.value`，blocked 为附加信号，报表生成零回归。
+
+### D-P0-3 TB 显式发布确认（Req 5.1）
+- **现状证据**：`_on_d_audit_determination_saved` 订阅 `WORKPAPER_SAVED`，wp_code ~ `^[D-N]\d+-1$` 即回写 TB，无确认门/幂等；产者 `wp_html_save._maybe_publish_determination_writeback` 在每次审定表保存时自动发该事件。
+- **设计**：handler 仅在 `extra.publish_confirmed is True` 才回写；`_publisher_can_publish`（查 users.role + WORKPAPER_WRITE，fail-closed）；`tb_publish_ack`（publish_token 唯一）ON CONFLICT DO NOTHING 做耐久幂等。产者自动保存事件不带确认信号（对 TB no-op）。新增专用发布端点（authorize_wp_edit + consol_lock + 计算审定数 + 发确认事件）。前端 `GtAuditSheet.vue` 加"发布到试算表"按钮 + 二次确认。
+- **外部依赖**：Playwright 端到端待前端 3030 启动；不向真实审计项目发布测试金额。
+
+### D-P0-4 checklist_responses CAS（Req 7）
+- **现状证据（核实真实表结构）**：`checklist_responses` 按 `(wp_id,item_id)` 唯一，导入以整表 JSON blob `ON CONFLICT DO UPDATE`（last-write-wins），**无版本列**——多编辑成员并发导入同表会静默覆盖，是真实并发写风险（非无风险，故加行级 CAS 而非仅记文档）。写的是 D4 应答表 `checklist_responses`，非 `working_paper.parsed_data`，不套 ContentMutationService。
+- **设计**：V161 加 `content_version`；`_upsert_checklist_response`（`SELECT FOR UPDATE` → If-Match → 冲突 409 / 相符 +1 / 无 base_version 覆盖）。SQLite 忽略 FOR UPDATE，逻辑仍正确。
+
+### D-P0-5 D4 导入权限门（Req 7）
+- **现状证据修正**：`_d4_import_export.py` 三端点函数签名仅 Depends(get_current_user, get_db)，但 router_registry 注册时对含 `{wp_id}` 的 router **统一附加 router-level `dedicated_wp_gate`**（Wp_Bound_Gate 可见性/委派门）。旧契约报告漏看该 router-level 依赖误判"零权限"。可见性门**不查合并锁**。
+- **设计**：import(写) 首句 `authorize_wp_edit` + `check_consol_lock`（纵深防御 + 补合并锁）；export(读) `authorize_wp_read`（新增，readonly 级，不误伤只读）。因可见性门用真实 DB，全 ASGI 集成需真实 seed wp，改直接单元测试新增授权逻辑。

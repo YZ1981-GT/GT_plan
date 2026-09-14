@@ -20,6 +20,18 @@ from app.core.database import get_db
 from app.deps import get_current_user
 from app.models.workpaper_models import WpFormula
 from app.routers.wp_formula import router as wp_formula_router
+from app.services.wp_formula_service import WpFormulaService
+
+
+@pytest.fixture(autouse=True)
+def _stub_wp_ownership():
+    """隔离归属校验（Req 10）：这些端点测试只建 wp_formula 表不建 working_paper，
+    save()/list_by_wp() 的 _verify_wp_ownership 会查 working_paper → sqlite no such table。
+    归属另有 ownership_guard 专测覆盖，此处 class 级 stub 返回 True 隔离。"""
+    with patch.object(
+        WpFormulaService, "_verify_wp_ownership", new=AsyncMock(return_value=True)
+    ):
+        yield
 
 
 class _FakeUser:

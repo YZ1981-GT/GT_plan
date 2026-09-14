@@ -18,7 +18,7 @@
  * Requirements: 3.2, 3.4, 3.5
  */
 import { ref, computed, watch, onBeforeUnmount, type Ref, type ComputedRef } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { D4_MAIN_REVENUE_STANDARD, D4_OTHER_REVENUE_STANDARD, isMainRevenueCode, isOtherRevenueCode } from './d4AccountScope'
 import { D4_ADJ_ROWS_SPEC, D4_ADJ_PREFIX } from './d4AdjudicationRows'
 import {
@@ -782,40 +782,106 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
 
   // ─── EventBus: publishAdjudicated ────────────────────────────────────
 
-  function publishAdjudicated(): void {
+  const publishing = ref(false)
+
+  /**
+   * 确认审定 → 发布审定数到试算表（P0-项3：显式确认门）。
+   *
+   * 🔴 修复情形B（AC-3.4）：D4-1 用 d4-operating-revenue 组件渲染（非 GtAuditSheet），
+   * 此前 publishAdjudicated 只 dispatch `d4:writeback-trial-balance` → 经
+   * `PUT /projects/{pid}/trial-balance/writeback` 直写 audited_amount，**绕过** P0-项3 的
+   * `publish_confirmed` 显式确认门（门只接在 GtAuditSheet）。现改为与 GtAuditSheet 同范式：
+   * 二次确认（中文）→ `POST /workpapers/{wpId}/audit-determination/publish-to-tb`
+   * （携带审定表 sheet 名 + audit_rows），后端计算审定数、校验发布权限、发 `publish_confirmed=True`
+   * + token → 回写 handler 幂等回写 trial_balance。普通保存对 TB 仍是 no-op。
+   *
+   * audit_rows 口径：主营小计→6001、其他小计→6051；每行 current_unadjusted/adj_amount(AJE)/
+   * reclass_amount(RJE) 取自 sections 小计行，后端 audited = 三者之和（与前端 calcAuditedAmount 一致）。
+   */
+  async function publishAdjudicated(): Promise<void> {
+    if (readonly.value || publishing.value) return
+
     const mainSub = sections.value[0]?.subtotalRow
     const otherSub = sections.value[1]?.subtotalRow
 
-    const payload = {
-      wpCode: 'D4',
-      accountCode: '6001,6051',
-      auditedAmount: {
-        main: mainSub?.currentAudited ?? 0,
-        other: otherSub?.currentAudited ?? 0,
-      },
-    }
+    // 二次确认（中文，危险操作提示）
     try {
-      window.dispatchEvent(new CustomEvent('substantive:adjudicated', { detail: payload }))
-    } catch { /* silent */ }
+      await ElMessageBox.confirm(
+        '发布后将把营业收入审定数（主营 6001 / 其他 6051）写入试算表（trial_balance），'
+        + '并触发报表/错报评价等下游重算。确认发布？',
+        '发布到试算表确认',
+        {
+          confirmButtonText: '确认发布',
+          cancelButtonText: '取消',
+          type: 'warning',
+        },
+      )
+    } catch {
+      return // 用户取消
+    }
 
-    // Writeback TB
-    if (projectId.value) {
+    if (!wpId.value) {
+      ElMessage.error('缺少底稿标识，无法发布')
+      return
+    }
+
+    // 构造 audit_rows（主营小计→6001，其他小计→6051）
+    const auditRows = [
+      {
+        id: 'D4-1-6001',
+        account_code: D4_MAIN_REVENUE_STANDARD,
+        current_unadjusted: mainSub?.currentUnadjusted ?? 0,
+        adj_amount: mainSub?.currentAje ?? 0,
+        reclass_amount: mainSub?.currentRje ?? 0,
+      },
+      {
+        id: 'D4-1-6051',
+        account_code: D4_OTHER_REVENUE_STANDARD,
+        current_unadjusted: otherSub?.currentUnadjusted ?? 0,
+        adj_amount: otherSub?.currentAje ?? 0,
+        reclass_amount: otherSub?.currentRje ?? 0,
+      },
+    ]
+
+    publishing.value = true
+    try {
+      const { api } = await import('@/services/apiProxy')
+      const resp: any = await api.post(
+        `/api/workpapers/${wpId.value}/audit-determination/publish-to-tb`,
+        {
+          // sheet 名固定含审定表子码 D4-1，后端 extract_determination_wp_code 据此解出 D4-1
+          sheet_name: '审定表D4-1',
+          html_data: { audit_rows: auditRows },
+        },
+      )
+      ElMessage.success(resp?.message || '已发布到试算表')
+
+      // 发布成功 → 通知下游附注/检查表刷新（TB 回写已由后端确认门完成）
       try {
-        window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
+        window.dispatchEvent(new CustomEvent('substantive:adjudicated', {
           detail: {
-            projectId: projectId.value,
-            accountCode: D4_MAIN_REVENUE_STANDARD,
-            auditedAmount: mainSub?.currentAudited ?? 0,
-          },
-        }))
-        window.dispatchEvent(new CustomEvent('d4:writeback-trial-balance', {
-          detail: {
-            projectId: projectId.value,
-            accountCode: D4_OTHER_REVENUE_STANDARD,
-            auditedAmount: otherSub?.currentAudited ?? 0,
+            wpCode: 'D4',
+            accountCode: '6001,6051',
+            auditedAmount: {
+              main: mainSub?.currentAudited ?? 0,
+              other: otherSub?.currentAudited ?? 0,
+            },
           },
         }))
       } catch { /* silent */ }
+    } catch (err: any) {
+      const status = err?.response?.status
+      if (status === 403) {
+        ElMessage.error('无发布权限（需底稿编辑权）')
+      } else if (status === 423) {
+        ElMessage.error('项目已被合并锁定，无法发布')
+      } else if (status === 400) {
+        ElMessage.error(err?.response?.data?.detail || err?.response?.data?.message || '当前审定表无可发布的审定数')
+      } else {
+        ElMessage.error('发布失败，请稍后重试')
+      }
+    } finally {
+      publishing.value = false
     }
   }
 
@@ -934,6 +1000,7 @@ export function useD4Adjudication(options: UseD4AdjudicationOptions) {
     // Operations
     updateCell,
     publishAdjudicated,
+    publishing,
   }
 }
 

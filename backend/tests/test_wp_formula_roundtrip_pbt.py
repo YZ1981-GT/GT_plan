@@ -26,6 +26,19 @@ SQLiteTypeCompiler.visit_UUID = SQLiteTypeCompiler.visit_uuid
 from sqlalchemy.orm import sessionmaker
 
 from app.models.workpaper_models import WpFormula
+from app.services.wp_formula_service import WpFormulaService
+
+
+@pytest.fixture(autouse=True)
+def _stub_wp_ownership():
+    """隔离归属校验（Req 10）：_make_session 仅建 wp_formula 表不建 working_paper，
+    save() 的 _verify_wp_ownership 查 working_paper → sqlite no such table。此 PBT 聚焦
+    公式持久化往返契约（P12），归属另有专测覆盖，class 级 stub 返回 True 隔离。
+    fixture 同步上下文包裹整个用例（_run 的新事件循环在其内执行），patch 生效。"""
+    with patch.object(
+        WpFormulaService, "_verify_wp_ownership", new=AsyncMock(return_value=True)
+    ):
+        yield
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +129,10 @@ class TestP12FormulaRoundtrip:
                     assert saved is not None
                     await session.commit()
 
-                    # Load back
-                    loaded_list = await svc.list_by_wp(session, wp_id)
+                    # Load back（list_by_wp 现要求 project_id，Req 10 归属守卫）
+                    loaded_list = await svc.list_by_wp(
+                        session, wp_id, project_id=project_id
+                    )
                     assert len(loaded_list) == 1
                     loaded = loaded_list[0]
 
@@ -187,8 +202,10 @@ class TestP12FormulaRoundtrip:
                     )
                     await session.commit()
 
-                # Exactly 1 record, not 2
-                all_formulas = await svc.list_by_wp(session, wp_id)
+                # Exactly 1 record, not 2（list_by_wp 现要求 project_id，Req 10 守卫）
+                all_formulas = await svc.list_by_wp(
+                    session, wp_id, project_id=project_id
+                )
                 assert len(all_formulas) == 1
                 assert all_formulas[0].expression == expr2
                 assert all_formulas[0].category == "cross_check"
