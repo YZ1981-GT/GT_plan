@@ -442,6 +442,24 @@ def build_projection(*, payload: Any, contract: SyncContract) -> Any:
         raise ProjectionPayloadError(
             "flush payload 缺 `values` 对象 —— 空 projection 与「没带 payload」必须可分辨"
         )
+    # 🔴 客户端如带显式 `row_keys`（store-projection 契约要求），它是行身份的权威来源：
+    # 每个 table 的行 id **有序去重**。缺它时才从字段级 row_key 派生（见下方 dedup），
+    # 绝不能像旧实现那样「每字段 append 一次」——那会把 N 字段的单行放大成 N 个重复行 id。
+    raw_row_keys = payload.get("row_keys")
+    explicit_row_keys: dict[str, tuple[str, ...]] | None = None
+    if isinstance(raw_row_keys, Mapping):
+        collected: dict[str, tuple[str, ...]] = {}
+        for table_key, ids in raw_row_keys.items():
+            if not isinstance(ids, (list, tuple)):
+                continue
+            seen: list[str] = []
+            for rid in ids:
+                sid = str(rid)
+                if sid not in seen:
+                    seen.append(sid)
+            collected[str(table_key)] = tuple(seen)
+        if collected:
+            explicit_row_keys = collected
     # 行域（repeater）前缀必须同时覆盖 xlsx 与 docx 两种契约形态：
     # - docx 契约的行域字段挂在顶层 `repeaters`；
     # - xlsx 契约按 CS-19 只能挂在 `sheets[].tables[].fields`，`repeaters` 恒为空。
@@ -485,13 +503,23 @@ def build_projection(*, payload: Any, contract: SyncContract) -> Any:
             row_key=(None if row_key is None else str(row_key)),
         )
         if row_key is not None:
-            row_keys.setdefault(table, []).append(str(row_key))
+            # 派生 fallback：有序去重，一行只出现一次（一行多字段共享同一 row_key）。
+            bucket = row_keys.setdefault(table, [])
+            sid = str(row_key)
+            if sid not in bucket:
+                bucket.append(sid)
+    # 显式 row_keys 覆盖派生结果（仅对同名 table），其余 table 保留派生值。
+    derived_row_keys: dict[str, tuple[str, ...]] = {
+        k: tuple(v) for k, v in row_keys.items()
+    }
+    if explicit_row_keys is not None:
+        derived_row_keys.update(explicit_row_keys)
     return Projection(
         contract_id=contract.contract_id,
         semantic_version=contract.semantic_version,
         document_type=contract.document_type,
         values=values,
-        row_keys={k: tuple(v) for k, v in row_keys.items()},
+        row_keys=derived_row_keys,
     )
 
 

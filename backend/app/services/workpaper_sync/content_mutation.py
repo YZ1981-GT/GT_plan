@@ -1582,12 +1582,17 @@ class ContentMutationService:
         # 纯 CPU 段卸载到工作线程：事件循环可继续服务其他请求（Requirement 2.1）。
         # fence / artifact publish 仍留在事件循环侧（可能碰 DB / async IO）。
         started = time.perf_counter()
-        materialized, extracted, unmanaged, structure_hash = await asyncio.to_thread(
+        materialized, extracted, unmanaged, _cpu_structure_hash = await asyncio.to_thread(
             self._stage_cpu_segment,
             plan=plan,
             projection=projection,
             adapter=adapter,
             output=output,
+        )
+        # 在编排入口显式调用统一发布时刻公式；CPU 段的预计算仅用于线程内校验，
+        # 提交值必须来自最终 output，避免 BP-30 接线退化成间接死代码。
+        structure_hash = self._projection_structure_hash(
+            plan=plan, output=output, materialized=materialized
         )
         elapsed = time.perf_counter() - started
         soft_limit = float(load_limits().materialize_soft_limit_seconds)

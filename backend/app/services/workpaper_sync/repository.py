@@ -37,6 +37,7 @@ from typing import Any, Mapping, Sequence
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.workpaper_sync_models import (
@@ -309,6 +310,37 @@ class WorkpaperSyncRepository:
         if room is None:
             raise ScopeIntegrityError(f"room 不存在: {room_id}")
         return room
+
+    async def lock_room_oo_apply(self, room_id: uuid.UUID) -> None:
+        """per-room OO→HTML apply 串行锁（**会话级** advisory lock）。
+
+        `oo_to_html._apply_settled` 用它把「rematerialize + fence + publish」这段
+        跨越内部 `commit` 的临界区串起来，避免两个并行 apply 在同一 room 的 fence 上
+        互踩（G4-0d `result_bundle_identity_mismatch`）。
+
+        🔴 必须是**会话级** `pg_advisory_lock` 而不是事务级 `pg_advisory_xact_lock`：
+        临界区内部会 `commit`（Task 15 的 content commit 自开事务边界），事务级锁会在
+        那次 commit 时**自动释放**，锁就形同虚设。会话级锁跨事务存活，由 `finally` 里的
+        :meth:`unlock_room_oo_apply` 显式释放（连接归还池前必须解锁，否则泄漏）。
+
+        与 `lock_workpaper` 共用 :data:`_ADVISORY_NAMESPACE` 但 key 前缀不同
+        （`oo_apply:` vs `workpaper_sync:`）⇒ 两把锁互不阻塞。
+        """
+        await self._session.execute(
+            sa.text("SELECT pg_advisory_lock(:ns, hashtext(:key))"),
+            {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
+        )
+
+    async def unlock_room_oo_apply(self, room_id: uuid.UUID) -> None:
+        """释放 :meth:`lock_room_oo_apply` 取得的会话级 advisory lock。
+
+        会话级锁不随事务结束自动释放，必须与加锁**同 key** 显式解锁；调用方在
+        `finally` 中调用，即使临界区异常也不泄漏锁（连接归池后残留会拖住后续 apply）。
+        """
+        await self._session.execute(
+            sa.text("SELECT pg_advisory_unlock(:ns, hashtext(:key))"),
+            {"ns": _ADVISORY_NAMESPACE, "key": f"oo_apply:{room_id}"},
+        )
 
     # ─────────────────────────────────────────────────────────────────
     # 2. scope index（authorization-only，与 child 同事务）
@@ -832,6 +864,41 @@ class WorkpaperSyncRepository:
         if rep is None:
             raise ScopeIntegrityError(f"representation 不存在: {representation_id}")
         await self.assert_bundle_usable(rep.definition_bundle_id)
+        # 🔴 幂等：`uq_wpocc_active(room_id, participant_id, generation)` 只允许每
+        # (room, participant, generation) 一条 active confirmation。onDocumentReady 可能
+        # 触发多次 confirm-descriptor（编辑器重连 / 前端重放 / DocServer 重发 ready），
+        # 直接再 INSERT 会撞唯一键抛 IntegrityError → 整个 confirm 端点 500，编辑器停在
+        # 「已挂载但不能保存」。真正的重放（同 descriptor identity）必须是幂等 no-op：
+        # 返回既有 confirmation。identity 不同则是「同槽位换了内容」——那是真冲突，抛
+        # 领域错误（可映射 409）而不是让 DB 唯一键以 500 形态暴露。
+        existing = (
+            await self._session.execute(
+                sa.select(WorkpaperOoClientConfirmation)
+                .where(
+                    WorkpaperOoClientConfirmation.room_id == room_id,
+                    WorkpaperOoClientConfirmation.participant_id == participant_id,
+                    WorkpaperOoClientConfirmation.generation == int(room.generation),
+                    WorkpaperOoClientConfirmation.invalidated_at.is_(None),
+                )
+                .order_by(WorkpaperOoClientConfirmation.confirmed_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if existing is not None:
+            same_identity = (
+                existing.representation_id == representation_id
+                and existing.content_version_id == content_version_id
+                and existing.projection_sha256 == projection_sha256
+            )
+            if same_identity:
+                # 幂等重放：同一 descriptor 再确认一次 —— 返回既有行，不重复 INSERT。
+                return existing
+            raise ScopeIntegrityError(
+                "该 (room, participant, generation) 已存在一条 active client-confirmation，"
+                "且 descriptor identity 不同 —— 同一编辑会话不得用不同基线二次确认"
+                f"（existing rep={existing.representation_id} cv={existing.content_version_id}"
+                f" vs new rep={representation_id} cv={content_version_id}）"
+            )
         conf = WorkpaperOoClientConfirmation(
             id=uuid.uuid4(),
             room_id=room_id,
@@ -1870,7 +1937,13 @@ class WorkpaperSyncRepository:
         forcesave_request_id: uuid.UUID | None = None,
         operation_id: uuid.UUID | None = None,
     ) -> WorkpaperCallbackDelivery:
-        """登记一次 callback 投递（pre-durable：零 application/recovery owner）。"""
+        """登记一次 callback 投递（pre-durable：零 application/recovery owner）。
+
+        🔴 去重的执法点在**库里**（`working_paper_callback_delivery_delivery_key_key`
+        唯一约束），不在这里做 check-then-insert —— 后者在并发下会双写（两个请求都查到
+        「没有」再各插一行）。因此本方法保持「直接 INSERT」，撞唯一键时由调用方
+        （`handle_callback`）捕获 23505 并 re-fetch 既有行（竞态的输家读到赢家写的行）。
+        """
         if not is_digest(delivery_key):
             raise IdentityError("delivery_key 必须是非空非全零 digest")
         assert_delivery_ownership(
@@ -1908,6 +1981,58 @@ class WorkpaperSyncRepository:
             generation=generation,
         )
         return row
+
+    async def record_or_get_delivery(
+        self,
+        *,
+        project_id: uuid.UUID,
+        wp_id: uuid.UUID,
+        entry_id: str,
+        room_id: uuid.UUID,
+        generation: int,
+        route_credential_id: uuid.UUID,
+        callback_status: int,
+        delivery_key: str,
+        payload_sha256: str | None = None,
+        oo_users_digest: str | None = None,
+        forcesave_request_id: uuid.UUID | None = None,
+        operation_id: uuid.UUID | None = None,
+    ) -> WorkpaperCallbackDelivery:
+        """幂等登记：撞 `delivery_key` 唯一约束时 re-fetch 既有行（网络重试折叠）。
+
+        去重执法点仍在**库里**（`record_delivery` 直接 INSERT，唯一约束是唯一防线，
+        并发下不双写）；本方法只是在赢家已写入后，让输家/重试**不以 500 收场**。
+        INSERT 包在 SAVEPOINT 里：撞唯一键只回滚该 savepoint，父事务与既有写入不受影响，
+        随后按 `delivery_key` 读回赢家写的行（DocServer 对 500 不重投，静默丢件不可接受）。
+        """
+        try:
+            async with self._session.begin_nested():
+                return await self.record_delivery(
+                    project_id=project_id,
+                    wp_id=wp_id,
+                    entry_id=entry_id,
+                    room_id=room_id,
+                    generation=generation,
+                    route_credential_id=route_credential_id,
+                    callback_status=callback_status,
+                    delivery_key=delivery_key,
+                    payload_sha256=payload_sha256,
+                    oo_users_digest=oo_users_digest,
+                    forcesave_request_id=forcesave_request_id,
+                    operation_id=operation_id,
+                )
+        except IntegrityError:
+            existing = (
+                await self._session.execute(
+                    sa.select(WorkpaperCallbackDelivery).where(
+                        WorkpaperCallbackDelivery.delivery_key == delivery_key
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                # 唯一键以外的完整性冲突（不是 delivery_key 折叠）—— 不吞，交由上层。
+                raise
+            return existing
 
     async def mark_delivery_downloading(
         self, *, delivery_id: uuid.UUID

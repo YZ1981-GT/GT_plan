@@ -640,6 +640,7 @@ class ExcelInstrumentationSpec:
     #: instrumentation/anchors 写成 ``d425-managed`` 与契约对不上，
     #: ``observe_structure_inventory`` 按契约 key 查物理 sheet 会整表跳过。
     sheet_key: str | None = None
+    transposed_sheets: tuple[dict[str, Any], ...] = ()
 
     def __post_init__(self) -> None:
         if not self.entry_id.strip():
@@ -867,6 +868,14 @@ def build_instrumentation_payload_for_sheets(
         "ignored_by_business_sheet_enumerators": [GT_SYNC_SHEET_NAME],
         "cell_geometry": cell_geometry,
     }
+    transposed = [sheet for spec in specs for sheet in spec.transposed_sheets]
+    if transposed:
+        payload["transposed_sheets"] = transposed
+        for sheet in transposed:
+            boundary = sheet["region_boundary_locator"]
+            payload["defined_names"][boundary["defined_name"]] = (
+                "{managed_sheet}!" + boundary["range"]
+            )
     validate_instrumentation_payload(payload)
     _assert_no_forbidden_anchor_declared(payload, gate=gate)
     return payload
@@ -1401,6 +1410,32 @@ def instrument_workbook_bytes_multi(
         all_refs.update(refs)
         if index == 0:
             primary_uuids = uuids
+
+    for spec in specs:
+        for sheet in spec.transposed_sheets:
+            from xml.etree import ElementTree as ET
+            boundary = sheet["region_boundary_locator"]
+            name = boundary["defined_name"]
+            root = ET.fromstring(workbook_xml)
+            if any(n.get("name", "").lower() == name.lower()
+                   for n in root.findall("{*}definedNames/{*}definedName")):
+                raise InstrumentationError(f"Duplicate transposed definedName: {name}")
+            part = _sheet_part_for(workbook_xml, wb_rels_xml, sheet["excel_name"])
+            ref = _quote_sheet_name(sheet["excel_name"]) + "!" + boundary["range"]
+            node = f'<definedName name="{name}">{_xml_escape(ref)}</definedName>'
+            workbook_xml = _insert_before(workbook_xml, "</definedNames>", node, what="transposed anchor")
+            all_refs[name] = ref
+            sheet_root = ET.fromstring(entries[part])
+            ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+            data_node = sheet_root.find(ns + "sheetData")
+            identity_row = sheet["tables"][0]["transposed_columns"]["identity_row"]
+            row = next((r for r in data_node if r.get("r") == str(identity_row)), None)
+            if row is None:
+                row = ET.Element(ns + "row", {"r": str(identity_row)})
+                index = next((i for i, r in enumerate(data_node) if int(r.get("r")) > identity_row), len(data_node))
+                data_node.insert(index, row)
+            row.set("hidden", "1")
+            entries[part] = ET.tostring(sheet_root, encoding="utf-8", xml_declaration=True)
 
     entries["xl/workbook.xml"] = workbook_xml.encode("utf-8")
     entries["[Content_Types].xml"] = content_types.encode("utf-8")

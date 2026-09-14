@@ -1108,7 +1108,9 @@ class CallbackDeliveryService:
         # operation 指针由 `bind_delivery_to_application` 在归组同一条 UPDATE 里写入；
         # request↔shell 是 1:1（`uq_wpso_request`），保留 request 已给足可追溯性
         # （这也正是 `mark_delivery_pre_durable_failure` 清 operation 指针的同一条理由）。
-        delivery = await self._repo.record_delivery(
+        # 幂等登记：DocServer 会对同一次保存重发 callback（网络重试 / status 重放）。
+        # 撞 `delivery_key` 唯一约束时 re-fetch 既有行，避免 500（OO 对 500 不重投）。
+        delivery = await self._repo.record_or_get_delivery(
             project_id=await self._project_of(room_facts.wp_id),
             wp_id=room_facts.wp_id,
             entry_id=room_facts.entry_id,
@@ -1133,6 +1135,27 @@ class CallbackDeliveryService:
             correlation_result=delivery.correlation_result,
         )
         j.assert_request_first()
+
+        # ── ④.5 幂等重放：record_delivery 命中既有 delivery_key（DocServer 重发同一次
+        # 保存的 callback）。既有 delivery 已不在 `received` 时，说明它已被处理过（正在/
+        # 已下载、已 durable、或已 rejected）——不得再走一遍下载/durable（会撞状态机与
+        # 唯一键）。按既有终态回一个 no-op 成功：durable 之后一律 error=0（AC 5.7/5.8），
+        # 仍在处理中的则回契约 status 的 oo_response_error（通常 0）。
+        if DeliveryState(delivery.state) is not DeliveryState.received:
+            j.record(CallbackStage.responded, f"idempotent_replay:{delivery.state}")
+            replay_error = (
+                0 if delivery.durable_at is not None else int(rule.oo_response_error)
+            )
+            return CallbackHandleOutcome(
+                response_error=replay_error,
+                delivery_id=delivery.id,
+                delivery_state=DeliveryState(delivery.state),
+                correlation_result=delivery.correlation_result,
+                application_id=delivery.application_id,
+                operation_id=delivery.operation_id,
+                plan=plan,
+                journal=j,
+            )
 
         # ── ⑤ 无内容 status：真值表说不下载就不下载
         if not plan.download_required:

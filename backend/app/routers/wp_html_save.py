@@ -42,7 +42,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -591,10 +591,35 @@ def _publish_cross_ref_updated(
 # ─── P0-项3：显式"发布审定表到试算表"端点 ────────────────────────────────────
 
 
+class WritebackRow(BaseModel):
+    """前端预算好的审定行（路径②）。
+
+    供发生额 / 多科目 / 无三分量分解的审定表直传最终审定数，端点不再从
+    ``未审+AJE+RJE`` 三分量重算。``amount_kind`` 仅作语义标注供审计/日志区分，
+    不改变 handler 回写行为（handler 仍只读 ``account_code`` + ``audited_amount``）。
+    """
+    account_code: str = Field(..., description="科目编码")
+    audited_amount: float = Field(..., description="前端已算最终审定数")
+    amount_kind: Literal["balance", "occurrence"] = Field(
+        "balance", description="余额(balance) / 发生额(occurrence) 语义标注，供审计日志区分"
+    )
+
+
 class PublishToTbRequest(BaseModel):
-    """发布审定表到试算表请求体（显式确认）。"""
+    """发布审定表到试算表请求体（显式确认）。
+
+    两条互斥路径（向后兼容）：
+      - 路径①（原 D4-1）：``html_data.audit_rows`` → 端点按 ``未审+AJE+RJE`` 三分量重算。
+      - 路径②（扩展）：``writeback_rows`` → 直接用前端预算好的最终审定数，跳过三分量重算。
+    二者非空时以 ``writeback_rows`` 优先；二者都空 → 400。
+    """
     sheet_name: str = Field(..., description="审定表 sheet 名（须含审定表子码 [D-N]\\d+-1）")
-    html_data: dict = Field(..., description="审定表 HTML 数据（含 audit_rows），据此计算各行审定数")
+    html_data: dict | None = Field(
+        None, description="路径①：审定表 HTML 数据（含 audit_rows），据此三分量重算各行审定数"
+    )
+    writeback_rows: list[WritebackRow] | None = Field(
+        None, description="路径②：前端预算好的审定行（发生额/多科目/无三分量分解），直传最终审定数"
+    )
     publish_token: str | None = Field(
         None,
         description="幂等键（可选）。同一确认重复提交须带同一 token，服务端据此保证只生效一次。",
@@ -643,13 +668,6 @@ async def publish_determination_to_tb(
     if not det_code:
         raise HTTPException(400, "该 sheet 不是审定表（无 [D-N]{n}-1 子码），无法发布到试算表")
 
-    audit_rows = body.html_data.get("audit_rows") if isinstance(body.html_data, dict) else None
-    if not isinstance(audit_rows, list) or not audit_rows:
-        raise HTTPException(400, "审定表无 audit_rows 数据，无可发布内容")
-
-    # ③ 计算各行审定数（与 _maybe_publish_determination_writeback / 前端口径一致）
-    tb_values = await fetch_audit_sheet_tb_values(audit_rows, db=db, project_id=project_id)
-
     def _num(v: Any) -> float:
         try:
             return float(v) if v is not None else 0.0
@@ -657,28 +675,49 @@ async def publish_determination_to_tb(
             return 0.0
 
     writeback_rows: list[dict] = []
-    for row in audit_rows:
-        if not isinstance(row, dict):
-            continue
-        account_code = row.get("account_code")
-        if not account_code or row.get("isComputed") or row.get("isSection"):
-            continue
-        tb = tb_values.get(row.get("id"), {}) if isinstance(tb_values, dict) else {}
-        current_unadj = row.get("current_unadjusted")
-        if current_unadj is None:
-            current_unadj = tb.get("current_unadjusted")
-        adj = row.get("adj_amount")
-        if adj is None:
-            adj = row.get("sys_aje")
-        if adj is None:
-            adj = tb.get("sys_aje")
-        reclass = row.get("reclass_amount")
-        if reclass is None:
-            reclass = row.get("sys_rje")
-        if reclass is None:
-            reclass = tb.get("sys_rje")
-        audited = _num(current_unadj) + _num(adj) + _num(reclass)
-        writeback_rows.append({"account_code": account_code, "audited_amount": audited})
+    # 语义标注：科目 → amount_kind（仅路径②携带；透传进 extra 供审计/日志，不改回写口径）
+    amount_kinds: dict[str, str] = {}
+
+    if body.writeback_rows:
+        # ③-路径②：前端预算好的审定行（发生额/多科目/无三分量分解）——直接用最终审定数，
+        #          跳过 fetch_audit_sheet_tb_values 三分量重算。
+        for wr in body.writeback_rows:
+            code = (wr.account_code or "").strip()
+            if not code:
+                continue
+            writeback_rows.append({"account_code": code, "audited_amount": _num(wr.audited_amount)})
+            amount_kinds[code] = wr.amount_kind
+    else:
+        # ③-路径①：原 D4-1 三分量重算（未审+AJE+RJE），零回归。
+        audit_rows = body.html_data.get("audit_rows") if isinstance(body.html_data, dict) else None
+        if not isinstance(audit_rows, list) or not audit_rows:
+            raise HTTPException(400, "审定表无 audit_rows 数据，无可发布内容")
+
+        # ③ 计算各行审定数（与 _maybe_publish_determination_writeback / 前端口径一致）
+        tb_values = await fetch_audit_sheet_tb_values(audit_rows, db=db, project_id=project_id)
+
+        for row in audit_rows:
+            if not isinstance(row, dict):
+                continue
+            account_code = row.get("account_code")
+            if not account_code or row.get("isComputed") or row.get("isSection"):
+                continue
+            tb = tb_values.get(row.get("id"), {}) if isinstance(tb_values, dict) else {}
+            current_unadj = row.get("current_unadjusted")
+            if current_unadj is None:
+                current_unadj = tb.get("current_unadjusted")
+            adj = row.get("adj_amount")
+            if adj is None:
+                adj = row.get("sys_aje")
+            if adj is None:
+                adj = tb.get("sys_aje")
+            reclass = row.get("reclass_amount")
+            if reclass is None:
+                reclass = row.get("sys_rje")
+            if reclass is None:
+                reclass = tb.get("sys_rje")
+            audited = _num(current_unadj) + _num(adj) + _num(reclass)
+            writeback_rows.append({"account_code": account_code, "audited_amount": audited})
 
     if not writeback_rows:
         raise HTTPException(400, "无可回写行（审定表全为计算行/小计行或缺科目编码）")
@@ -704,6 +743,9 @@ async def publish_determination_to_tb(
             "publish_confirmed": True,
             "confirmed_by": str(current_user.id),
             "publish_token": token,
+            # 语义标注（仅路径② writeback_rows 携带）：科目 → balance/occurrence，供审计/日志区分。
+            # handler 不消费该字段，故不影响回写口径。
+            **({"amount_kinds": amount_kinds} if amount_kinds else {}),
         },
     ))
 

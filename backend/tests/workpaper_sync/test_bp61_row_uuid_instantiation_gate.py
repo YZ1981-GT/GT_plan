@@ -261,7 +261,11 @@ class TestSameRowDuplicateFormsCollapse:
         projection = EP.build_projection(payload=payload, contract=contract)
         assert projection.values[INSTANTIATED_KEY].value == "实例化写法"
         assert len(projection.values) == 1
-        assert projection.row_keys[ROWS].count(ROW_ID) == 2
+        # 🔴 行身份**有序去重**：同一行的多个字段形态共享同一 row_key，行集合里只能出现
+        #    一次。旧实现「每字段 append 一次」会把 N 字段的单行放大成 N 个重复行 id ——
+        #    D4-29 转置表（29 字段/客户）正是被它压成 row_keys=29 vs base=1 才 500 的。
+        assert projection.row_keys[ROWS].count(ROW_ID) == 1
+        assert projection.row_keys[ROWS] == (ROW_ID,)
 
     def test_two_rows_collapse_independently(self, contract: Any) -> None:
         """两行的同一字段各提交一次 ⇒ 两条独立实例化 key，行集合完整。"""
@@ -274,6 +278,37 @@ class TestSameRowDuplicateFormsCollapse:
         assert projection.values[INSTANTIATED_KEY].value == "v1"
         assert projection.values[other].value == "v2"
         assert len(projection.values) == 2
+
+
+class TestExplicitWireRowKeysAreAuthoritative:
+    """store-projection 契约：payload 带显式 `row_keys` 时，它是行身份的权威来源。
+
+    转置表（如 D4-29）一行有 29 个字段，若行集合只能从字段级 `row_key` 派生就必须
+    去重；而当客户端按契约回传 store-projection 现算的 `row_keys` 时，后端应**直接采信**
+    该有序去重集合，而不是重新从 values 的字段段推断（那正是把字段名当行 id 的 500 根因）。
+    """
+
+    def test_explicit_row_keys_are_used_and_deduped(self, contract: Any) -> None:
+        payload = {
+            "values": {
+                INSTANTIATED_KEY: {"value": "x", "row_key": ROW_ID},
+            },
+            # 客户端显式回传（含重复），后端须有序去重后采信。
+            "row_keys": {ROWS: [ROW_ID, ROW_ID]},
+        }
+        projection = EP.build_projection(payload=payload, contract=contract)
+        assert projection.row_keys[ROWS] == (ROW_ID,)
+
+    def test_explicit_row_keys_override_derived(self, contract: Any) -> None:
+        # values 只提到 ROW_ID，但显式 row_keys 声明了两行（含一个尚未在 values 出现的行）。
+        payload = {
+            "values": {
+                INSTANTIATED_KEY: {"value": "x", "row_key": ROW_ID},
+            },
+            "row_keys": {ROWS: [ROW_ID, OTHER_ROW_ID]},
+        }
+        projection = EP.build_projection(payload=payload, contract=contract)
+        assert projection.row_keys[ROWS] == (ROW_ID, OTHER_ROW_ID)
 
 
 class TestRowScopedCoverage:

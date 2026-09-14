@@ -32,7 +32,7 @@ from app.services.excel_structure_fingerprint import (
     identity_inventory,
     structure_fingerprint,
 )
-from app.services.workpaper_sync.contracts import SyncContract
+from app.services.workpaper_sync.contracts import SyncContract, assert_no_structure_drift
 from app.services.workpaper_sync.published_identity_observer import (
     ArtifactUnreadableError,
     FrozenChildUnusableError,
@@ -106,7 +106,10 @@ def anchors_from_instrumentation_spec(spec: Any) -> dict[str, str]:
 
 def anchors_from_instrumentation_specs(specs: Sequence[Any]) -> tuple[dict[str, str], ...]:
     """多受管 sheet：每张 spec 投影一组锚点（顺序与 instrumentation_specs / sheets 对齐）。"""
-    return tuple(anchors_from_instrumentation_spec(spec) for spec in specs)
+    anchors = [anchors_from_instrumentation_spec(spec) for spec in specs]
+    for spec in specs:
+        anchors.extend(_frozen_sheet_anchors({"transposed_sheets": getattr(spec, "transposed_sheets", ())}))
+    return tuple(anchors)
 
 
 def compute_structure_hash_from_artifact(
@@ -161,43 +164,11 @@ def compute_structure_hash_from_artifact(
                 stage=ObservationStage.observe_workbook,
                 context={"stage": ObservationStage.observe_workbook.value},
             )
-    try:
-        fingerprint = structure_fingerprint(data)
-        physical_sheet_by_key: dict[str, str] = {}
-        row_uuid_rows_by_sheet: dict[str, list[int]] = {}
-        for sheet_anchor in sheet_anchors:
-            inventory_raw = identity_inventory(
-                data,
-                expected_table=sheet_anchor["table_name"],
-                uuid_column_letter=sheet_anchor["uuid_column_letter"],
-                metadata_sheet=sheet_anchor["metadata_sheet"],
-            )
-            table = inventory_raw.get("excel_table") or {}
-            physical_sheet = table.get("table_sheet")
-            if not table.get("present") or not physical_sheet:
-                raise ObservedIdentityDriftError(
-                    f"将要发布的 artifact 里找不到冻结 instrumentation 声明的 Excel Table "
-                    f"{sheet_anchor['table_name']!r} —— 受管 sheet 的唯一运行态锚点已断",
-                    stage=ObservationStage.observe_workbook,
-                    context={"stage": ObservationStage.observe_workbook.value},
-                )
-            physical_sheet_by_key[sheet_anchor["sheet_key"]] = str(physical_sheet)
-            inv = parse_identity_inventory(inventory_raw)
-            row_uuid_rows_by_sheet[sheet_anchor["sheet_key"]] = sorted(
-                int(row) for row in inv.row_uuids if str(row).isdigit()
-            )
-    except FingerprintError as exc:
-        raise ArtifactUnreadableError(
-            f"发布时刻结构采集失败: {exc}",
-            stage=ObservationStage.observe_workbook,
-            context={"stage": ObservationStage.observe_workbook.value},
-        ) from exc
-    structure = observe_structure_inventory(
-        contract=contract,
-        fingerprint=fingerprint,
-        physical_sheet_by_key=physical_sheet_by_key,
-        row_uuid_rows_by_sheet=row_uuid_rows_by_sheet,
+    from app.services.workpaper_sync.published_identity_observer import collect_workbook_structure
+    _, _, _, structure = collect_workbook_structure(
+        data=data, contract=contract, sheet_anchors=sheet_anchors
     )
+    assert_no_structure_drift(contract, structure)
     return recompute_structure_hash(contract=contract, observed_structure=structure)
 
 

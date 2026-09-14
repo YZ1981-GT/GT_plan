@@ -201,15 +201,16 @@ class TestBp30PublishAndRequestShareOneFormula:
         """实测原语也必须复用，而不是另写一套采集。"""
         stripped = _strip_docstrings(PUBLISH_HASH_PATH.read_text(encoding="utf-8"))
         text = ast.unparse(_function_node(stripped, "compute_structure_hash_from_artifact"))
+        assert "collect_workbook_structure" in text
+        observer = _strip_docstrings(OBSERVER_PATH.read_text(encoding="utf-8"))
+        shared = ast.unparse(_function_node(observer, "collect_workbook_structure"))
+        request = ast.unparse(_function_node(observer, "_observe_workbook"))
+        assert "collect_workbook_structure" in request
         for primitive in (
-            "structure_fingerprint",
-            "identity_inventory",
-            "observe_structure_inventory",
-            "parse_identity_inventory",
+            "structure_fingerprint", "identity_inventory",
+            "observe_structure_inventory", "parse_identity_inventory",
         ):
-            assert primitive in text, (
-                f"发布时刻函数没有复用观测器原语 {primitive!r} —— 采集口径会与请求时刻分叉"
-            )
+            assert primitive in shared
 
     def test_it_does_not_fall_back_to_a_byte_digest(self) -> None:
         """🔴 失败不得回退成字节摘要。

@@ -642,6 +642,46 @@ def sign_callback_route_token(
     return jwt.encode(payload, secret, algorithm=schema.algorithm)
 
 
+def resolve_platform_callback_authorization(
+    *,
+    authorization_header: str | None,
+    route_token_query: str | None,
+    secret: str,
+) -> str:
+    """从 DocServer 回调里解析出**平台自己的** callback route claim 凭据。
+
+    DocServer 开启 JWT 后，会用它自己的 outbox secret 重签整个回调，并把该 JWT 放进
+    `Authorization` header（payload 是 `{"payload": <整个 body>}`，**不含**平台 claim，
+    没有 `cbv`）。平台的 route claim（带 `cbv`/`act`/`room`/`generation`/`doc_key`/
+    `route_credential_id`）在 `materialize` 时被签进 **callbackUrl 的 `route_token`
+    query**（见 `wp_sync_router._attach_launch_urls`），DocServer 原样回呼。
+
+    因此授权凭据的**唯一正确来源是 `route_token` query**，不是 header：
+    - header 里是 OO 自签 token，拿它当平台授权等于让 DocServer 的 secret 决定平台鉴权；
+    - 且它没有 `cbv`，`parse_callback_claims` 必然抛 `callback_claim_version_invalid`
+      （这正是把 header 直接当凭据时线上实测到的失败）。
+
+    header 仅在**它本身就携带平台 claim**（`route_token` 缺失、且 header 能被平台 secret
+    解出带 `cbv` 的 claim）时才作为兜底 —— 覆盖「非 DocServer 直连、自带平台 Bearer」的
+    调用形态。两者都拿不到平台 claim 时 fail closed（返回空串，让 verify 抛缺失）。
+    """
+    route_token = (route_token_query or "").strip()
+    if route_token:
+        # query 明确给了平台 route token —— 它是权威来源，直接作为 Bearer。
+        return f"Bearer {route_token}"
+    # 没有 route_token query：仅当 header 自身就是平台 claim（能被平台 secret 验出 cbv）
+    # 时才回退采用；否则（DocServer OO-JWT / 无凭据）返回空串 fail closed。
+    header = (authorization_header or "").strip()
+    if not header or not secret:
+        return ""
+    try:
+        candidate = extract_bearer_token(header)
+        parse_callback_claims(candidate, secret=secret)
+    except CallbackRouteError:
+        return ""
+    return header
+
+
 __all__ = [
     "URL_BOUND_PARAMS",
     "CallbackRouteError",
@@ -663,4 +703,5 @@ __all__ = [
     "verify_callback_route",
     "build_callback_url",
     "sign_callback_route_token",
+    "resolve_platform_callback_authorization",
 ]

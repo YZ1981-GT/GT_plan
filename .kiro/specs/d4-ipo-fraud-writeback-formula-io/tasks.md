@@ -26,3 +26,11 @@
 ## Task Dependency Graph```json
 {"waves":[{"wave":1,"tasks":["1"]},{"wave":2,"tasks":["2"]},{"wave":3,"tasks":["3","4"]},{"wave":4,"tasks":["5"]},{"wave":5,"tasks":["6"]},{"wave":6,"tasks":["7"]}],"blocking":{"1":"未完成源核定与客户粒度 gate 不得实现 IO","2":"未完成共享公式/双模式 gate 不得宣称完成","4":"未人工确认方向金额证据不得写 A13","5":"emit 无 durable ack 不视为成功"}}
 ```
+
+## D4-29 根因修复续作
+- [ ] 10. 冻结稳定转置 sheet 锚、编译注入、发布/请求共享物理观测及完整性门禁；空客户、缺失/重复/公式身份防御测试。
+- [ ] 11. 合法升级 representation 后完成真实 HTML -> OO -> callback -> HTML 往返，记录 revision 和 operation；不得用模拟 callback 验收。
+- 复现记录：专用测试 1 failed / 6 passed，当前 provider 关闭 D429 导致 instrumentation digest 与磁盘 contract 不一致。尚未修改冻结记录，真实 OO 验收未完成。
+
+### Task 3 live preflight (2026-09-13)
+Blocked, not accepted: see task3-live-blocker.md. D429 source switch is False and Task76 contract differs from task-2 handoff. Template candidate rejects 2051B nonempty store; authenticated store-projection returns HTTP500. No legal upgrade or actual OO callback achieved. Task 11 remains unchecked.

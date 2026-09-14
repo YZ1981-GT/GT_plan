@@ -959,23 +959,33 @@ class TestRouterShape:
         )
 
     def test_the_callback_route_is_a_service_scope_route(self) -> None:
-        """callback 挂 `public_router`、不在用户前缀下、路径含 `onlyoffice-callback`。"""
+        """callback 挂 `public_router`、不在用户前缀下、路径含 `onlyoffice-callback`。
+
+        `public_router` 是 **DocServer 服务凭证面**（不发用户 Bearer），合法成员有两个：
+        `onlyoffice-callback`（回调）与 `rooms/{room_id}/contents`（OO `document.url`
+        文件下载）。两者都不得走用户前缀；判据逐路由校验，而不是假设只有一条。
+        """
         paths = [r.path for r in SR.public_router.routes]
-        assert len(paths) == 1, paths
-        (path,) = paths
-        assert not path.startswith(SR.USER_SYNC_PREFIX), (
-            "callback 不得走用户 404/403 契约（AC 10.6 末段）"
-        )
-        # `ResponseWrapperMiddleware._SKIP_CONTAINS` 认这个子串；OO 协议要求
-        # `{"error": N}` 是**顶层**，被 `{code,message,data}` 包一层就等于回了个 200 空壳。
-        assert "onlyoffice-callback" in path, path
+        # 每条 public 路由都不得挂在用户 404/403 契约的前缀下（AC 10.6 末段）。
+        for path in paths:
+            assert not path.startswith(SR.USER_SYNC_PREFIX), (
+                f"public 路由 {path} 不得走用户 404/403 契约（AC 10.6 末段）"
+            )
+        # callback 必须存在且**恰有一条**——它是唯一需要 wrapper-skip 的路由：
+        # OO 协议要求 `{"error": N}` 是**顶层**，被 `{code,message,data}` 包一层就等于
+        # 回了个 200 空壳。
+        callback_paths = [p for p in paths if "onlyoffice-callback" in p]
+        assert len(callback_paths) == 1, callback_paths
 
     def test_response_wrapper_really_skips_that_path(self) -> None:
-        """反向锁死上一条：判据不能只看子串，要看中间件真的会跳过。"""
+        """反向锁死上一条：判据不能只看子串，要看中间件真的会跳过 callback。"""
         from app.middleware.response import _SKIP_CONTAINS
 
-        (path,) = [r.path for r in SR.public_router.routes]
-        assert any(seg in path for seg in _SKIP_CONTAINS)
+        callback_paths = [
+            r.path for r in SR.public_router.routes if "onlyoffice-callback" in r.path
+        ]
+        assert len(callback_paths) == 1, callback_paths
+        assert any(seg in callback_paths[0] for seg in _SKIP_CONTAINS)
 
 
 class TestGuardIsTheFirstAwaitInEveryHandler:

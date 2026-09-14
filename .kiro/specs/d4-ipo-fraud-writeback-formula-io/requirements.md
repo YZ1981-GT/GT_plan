@@ -47,3 +47,9 @@
 ### Property 4
 **Validates: Requirements 4.1**
 变异能命中预期行为守卫，真实双模式测试验证三方合并、失败恢复和 durable ack。
+
+### Requirement 7: D4-29 重开修复
+1. 本次明确授权修复 D4-29，覆盖此前 Requirement 6.2 的阶段排除，保留并发修改。
+2. 转置物理观测使用冻结稳定 sheet 锚，第 9 行客户身份及全部 29 字段严格校验，支持空客户，缺失/重复/公式身份拒绝。
+3. 发布与请求使用同构完整观测，在 hash 前拒绝不完整清册；不篡改旧冻结记录，合法升级生成新 representation。
+4. HTML 到真实 OO 读值、真实 OO 编辑强制保存与 callback 应用、HTML 刷新值一致及 revision/operation 均有证据才完成验收。

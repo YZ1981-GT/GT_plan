@@ -259,7 +259,15 @@ export interface StoreProjectionSnapshot {
   readonly expectedRevision: number
   readonly fieldCount: number
   readonly rowCount: number
-  readonly projection: { readonly values: Readonly<Record<string, unknown>> }
+  /**
+   * 🔴 `row_keys` 必须原样透传给 flush/materialize。转置表（如 D4-29）的行增删由
+   * 后端按 `row_keys[table_key]` 判定；缺失时 `merge_projection_into_store` 会退化成把
+   * stable key 的字段段当行 id（29 字段 vs 1 客户）而抛 invalid customer identities。
+   */
+  readonly projection: {
+    readonly values: Readonly<Record<string, unknown>>
+    readonly row_keys?: Readonly<Record<string, readonly string[]>>
+  }
 }
 
 export async function readStoreProjection(
@@ -310,11 +318,29 @@ export async function readStoreProjection(
       'store-projection 返回空 values —— 不得作为 flush/materialize 载荷',
     )
   }
+  // row_keys 原样透传：带 row identity 的表缺它会让下游 materialize 把字段段误判成行 id。
+  const rawRowKeys = (projection as { row_keys?: unknown }).row_keys
+  let rowKeys: Record<string, readonly string[]> | undefined
+  if (
+    rawRowKeys != null &&
+    typeof rawRowKeys === 'object' &&
+    !Array.isArray(rawRowKeys)
+  ) {
+    const collected: Record<string, string[]> = {}
+    for (const [tableKey, ids] of Object.entries(rawRowKeys as Record<string, unknown>)) {
+      if (Array.isArray(ids)) {
+        collected[tableKey] = ids.map((id) => String(id))
+      }
+    }
+    if (Object.keys(collected).length > 0) {
+      rowKeys = collected
+    }
+  }
   return {
     expectedRevision,
     fieldCount: typeof fieldCount === 'number' ? fieldCount : Object.keys(values).length,
     rowCount: typeof rowCount === 'number' ? rowCount : 0,
-    projection: { values },
+    projection: rowKeys ? { values, row_keys: rowKeys } : { values },
   }
 }
 

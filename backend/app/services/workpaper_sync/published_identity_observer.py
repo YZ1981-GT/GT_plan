@@ -377,6 +377,7 @@ def observe_structure_inventory(
     physical_sheet_by_key: Mapping[str, str],
     row_uuid_rows: Sequence[int] = (),
     row_uuid_rows_by_sheet: Mapping[str, Sequence[int]] | None = None,
+    transposed_fields_by_sheet: Mapping[str, Mapping[str, tuple[str, int]]] | None = None,
 ) -> tuple[tuple[str, str, str, str], ...]:
     """按契约声明逐字段**核对物理锚点是否真在工作簿里**，产出实测结构清册。
 
@@ -408,7 +409,9 @@ def observe_structure_inventory(
             sheet_rows = row_uuid_rows
         for table in sheet.tables:
             for spec in table.fields:
-                coordinate = _cell_coordinates_for(spec, row_uuid_rows=sheet_rows)
+                transposed = (transposed_fields_by_sheet or {}).get(sheet.sheet_key)
+                coordinate = (transposed.get(spec.stable_field_key) if transposed is not None
+                              else _cell_coordinates_for(spec, row_uuid_rows=sheet_rows))
                 if coordinate is None:
                     continue
                 column, row = coordinate
@@ -1046,55 +1049,8 @@ class PublishedIdentityObserver:
                 context=ctx,
             )
         anchors = sheet_anchors[0]
-        try:
-            fingerprint = structure_fingerprint(data)
-            if fingerprint.errors:
-                raise ArtifactUnreadableError(
-                    f"published artifact 结构采集有非致命错误 {fingerprint.errors[:3]} —— "
-                    "采集不完整时不得按半份事实组装 adapter",
-                    stage=ObservationStage.observe_workbook,
-                    context={**ctx, "fingerprint_errors": list(fingerprint.errors)},
-                )
-            physical_sheet_by_key: dict[str, str] = {}
-            row_uuid_rows_by_sheet: dict[str, list[int]] = {}
-            primary_inventory = None
-            for sheet_anchor in sheet_anchors:
-                inventory_raw = identity_inventory(
-                    data,
-                    expected_table=sheet_anchor["table_name"],
-                    uuid_column_letter=sheet_anchor["uuid_column_letter"],
-                    metadata_sheet=sheet_anchor["metadata_sheet"],
-                )
-                table = inventory_raw.get("excel_table") or {}
-                physical_sheet = table.get("table_sheet")
-                if not table.get("present") or not physical_sheet:
-                    raise ObservedIdentityDriftError(
-                        f"published artifact 里找不到冻结 instrumentation 声明的 Excel Table "
-                        f"{sheet_anchor['table_name']!r} —— 受管 sheet 的唯一运行态锚点"
-                        "（`excel_table_sheet_association`）已断，不得回退按 sheet 展示名定位",
-                        stage=ObservationStage.observe_workbook,
-                        context={**ctx, "expected_table": sheet_anchor["table_name"]},
-                    )
-                physical_sheet_by_key[sheet_anchor["sheet_key"]] = str(physical_sheet)
-                inv = parse_identity_inventory(inventory_raw)
-                row_uuid_rows_by_sheet[sheet_anchor["sheet_key"]] = sorted(
-                    int(row) for row in inv.row_uuids if str(row).isdigit()
-                )
-                if primary_inventory is None:
-                    primary_inventory = inv
-        except FingerprintError as exc:
-            raise ArtifactUnreadableError(
-                f"published artifact 结构采集失败: {exc}",
-                stage=ObservationStage.observe_workbook,
-                context=ctx,
-            ) from exc
-        assert primary_inventory is not None
-        inventory = primary_inventory
-        structure = observe_structure_inventory(
-            contract=contract,
-            fingerprint=fingerprint,
-            physical_sheet_by_key=physical_sheet_by_key,
-            row_uuid_rows_by_sheet=row_uuid_rows_by_sheet,
+        fingerprint, physical_sheet_by_key, inventory, structure = collect_workbook_structure(
+            data=data, contract=contract, sheet_anchors=sheet_anchors, context=ctx
         )
         dynamic_columns = observe_dynamic_columns(
             contract=contract,
@@ -1287,16 +1243,25 @@ def _frozen_anchors(instrumentation: Mapping[str, Any]) -> dict[str, str] | None
 
 
 def _frozen_sheet_anchors(instrumentation: Mapping[str, Any]) -> list[dict[str, str]]:
-    """从冻结 instrumentation 取出**每一张**受管 sheet 的反读锚点（顺序 = managed_sheets）。"""
-    sheets = instrumentation.get("managed_sheets")
-    if not isinstance(sheets, (list, tuple)) or not sheets:
+    """从冻结 instrumentation 取出每一张受管 sheet 的反读锚点。
+
+    转置表与普通 managed sheet 都是受管结构；instrumentation payload 将前者放在
+    ``transposed_sheets``，不能只读取 ``managed_sheets``，否则 contract 中的转置
+    字段会被 observer 误判为结构漂移。
+    """
+    sections = []
+    for key in ("managed_sheets", "transposed_sheets"):
+        sheets = instrumentation.get(key)
+        if isinstance(sheets, (list, tuple)):
+            sections.extend(sheets)
+    if not sections:
         return []
     out: list[dict[str, str]] = []
     meta = instrumentation.get("hidden_metadata_sheet")
     metadata_sheet = ""
     if isinstance(meta, AbcMapping):
         metadata_sheet = str(meta.get("sheet_name") or "").strip()
-    for sheet in sheets:
+    for sheet in sections:
         if not isinstance(sheet, AbcMapping):
             continue
         sheet_key = str(sheet.get("sheet_key") or "").strip()
@@ -1304,6 +1269,12 @@ def _frozen_sheet_anchors(instrumentation: Mapping[str, Any]) -> list[dict[str, 
         table_name = ""
         if isinstance(boundary, AbcMapping):
             table_name = str(boundary.get("table_key") or "").strip()
+        if isinstance(boundary, AbcMapping) and boundary.get("anchor") == "defined_name_ref":
+            name = str(boundary.get("defined_name") or "").strip()
+            if sheet_key and name:
+                out.append({"sheet_key": sheet_key, "defined_name": name,
+                            "anchor": "defined_name_ref"})
+            continue
         tables = sheet.get("tables")
         uuid_column = ""
         if isinstance(tables, (list, tuple)) and tables and isinstance(tables[0], AbcMapping):
@@ -1381,3 +1352,61 @@ async def observe_published_frozen_definitions(
         intent=intent,
         correlation_id=correlation_id,
     )
+
+
+def collect_workbook_structure(*, data, contract, sheet_anchors, context=None):
+    """One physical collection path for publication and request-time observation."""
+    ctx = context or {}
+    try:
+        fingerprint = structure_fingerprint(data)
+        if fingerprint.errors:
+            raise ArtifactUnreadableError("Workbook fingerprint is incomplete",
+                stage=ObservationStage.observe_workbook,
+                context={**ctx, "fingerprint_errors": list(fingerprint.errors)})
+        physical, rows, transposed = {}, {}, {}
+        primary_inventory = None
+        for anchor in sheet_anchors:
+            key = anchor["sheet_key"]
+            if anchor.get("anchor") == "defined_name_ref":
+                from app.services.workpaper_sync import phase5_d4_29_customer_detail as d429
+                if key != d429.SHEET_KEY or anchor["defined_name"] != d429.DEFINED_NAME:
+                    raise ValueError("Unsupported transposed anchor")
+                _, ws = d429.resolve_managed_sheet(data, defined_name=anchor["defined_name"])
+                d429.extract_transposed_workbook(data)
+                physical[key] = ws.title
+                declaration = next(s for s in contract.canonical_payload["sheets"] if s["sheet_key"] == key)
+                fields = {}
+                for table in declaration["tables"]:
+                    for field in table["fields"]:
+                        row = field.get("transposed_row")
+                        if not isinstance(row, int) or not d429.HEADER_ROW <= row <= d429.LAST_FIELD_ROW:
+                            raise ValueError("Invalid transposed field row")
+                        # The definedName supplies the complete C:M geometry. Only the
+                        # anchor field cell must survive in the XML; trailing customer
+                        # columns may legitimately be absent when the current store has
+                        # fewer customers than the template width.
+                        if (row, 3) not in ws._cells:
+                            continue
+                        fields[field["stable_field_key"]] = ("C", row)
+                transposed[key] = fields
+                continue
+            raw = identity_inventory(data, expected_table=anchor["table_name"],
+                uuid_column_letter=anchor["uuid_column_letter"], metadata_sheet=anchor["metadata_sheet"])
+            table = raw.get("excel_table") or {}
+            if not table.get("present") or not table.get("table_sheet"):
+                raise ValueError(f"Missing frozen Excel Table {anchor['table_name']!r}")
+            physical[key] = str(table["table_sheet"])
+            inventory = parse_identity_inventory(raw)
+            rows[key] = sorted(int(row) for row in inventory.row_uuids if str(row).isdigit())
+            if primary_inventory is None:
+                primary_inventory = inventory
+        structure = observe_structure_inventory(contract=contract, fingerprint=fingerprint,
+            physical_sheet_by_key=physical, row_uuid_rows_by_sheet=rows,
+            transposed_fields_by_sheet=transposed)
+        from app.services.workpaper_sync.contracts import assert_no_structure_drift
+        assert_no_structure_drift(contract, structure)
+        return fingerprint, physical, primary_inventory, structure
+    except FingerprintError as exc:
+        raise ArtifactUnreadableError(str(exc), stage=ObservationStage.observe_workbook, context=ctx) from exc
+    except ValueError as exc:
+        raise ObservedIdentityDriftError(str(exc), stage=ObservationStage.observe_workbook, context=ctx) from exc

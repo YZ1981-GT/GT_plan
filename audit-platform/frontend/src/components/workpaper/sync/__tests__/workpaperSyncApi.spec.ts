@@ -256,6 +256,26 @@ describe('生成的路由表与 client 一一对应', () => {
     await expectAsyncRefusal(() => readStoreProjection(SCOPE), 'store_projection_empty')
   })
 
+  it('readStoreProjection 原样透传 row_keys（转置表行身份，缺它下游会误判行增删）', async () => {
+    mockGet.mockResolvedValueOnce({
+      data: {
+        expected_revision: 3,
+        field_count: 2,
+        row_count: 1,
+        projection: {
+          values: {
+            'customer_detail_transposed/cust-1/name': { value: '甲', row_key: 'cust-1' },
+            'customer_detail_transposed/cust-1/amount': { value: 100, row_key: 'cust-1' },
+          },
+          // 后端契约：带 row identity 的表必须同时返回 values 与 row_keys。
+          row_keys: { customer_detail_transposed: ['cust-1'] },
+        },
+      },
+    })
+    const snap = await readStoreProjection(SCOPE)
+    expect(snap.projection.row_keys).toEqual({ customer_detail_transposed: ['cust-1'] })
+  })
+
   it.each(WP_SYNC_ROUTES.map((route) => [route.endpoint, route.method, route.suffix]))(
     '%s 真实打到 %s + 生成的 suffix 模板',
     async (endpoint, method, _suffix) => {

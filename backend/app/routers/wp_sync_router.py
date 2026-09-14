@@ -2244,9 +2244,10 @@ async def rollback_version(
 # ═══════════════════════════════════════════════════════════════════════════
 
 
-# G4-3：OO outbox JWT 与平台 route token 的拆分已迁
-# `workpaper_sync/callback_route.resolve_platform_callback_authorization()`。
-# 理由：它自己要 `jwt.decode` 验 OO 签名，而 Task 28 明令 callback 的验签只在该模块。
+# G4-3：OO outbox JWT 与平台 route token 的拆分在
+# `workpaper_sync/callback_route.resolve_platform_callback_authorization()`：
+# DocServer 用自己的 secret 覆盖 Authorization header，平台 route claim 只在 callbackUrl
+# 的 `route_token` query 里，授权凭据必须从 query 解析（否则 callback_claim_version_invalid）。
 
 
 @public_router.post("/api/workpaper-sync/rooms/{room_id}/onlyoffice-callback")
@@ -2284,6 +2285,9 @@ async def post_room_onlyoffice_callback(
     )
     secret = _onlyoffice_secret()
     try:
+        # DocServer 开启 JWT 后用自己的 secret 覆盖了 Authorization header（无平台 cbv
+        # claim）；平台 route claim 在 callbackUrl 的 `route_token` query 里。授权凭据
+        # 必须从 query 解析，直接用 header 会恒抛 callback_claim_version_invalid。
         authorization = resolve_platform_callback_authorization(
             authorization_header=request.headers.get("Authorization"),
             route_token_query=request.query_params.get("route_token"),

@@ -226,6 +226,8 @@ TEMPLATE_SHA256: Final[str] = (
 )
 #: D4-30/31/32 几何未就绪：关则不进 instrumentation/contract/combined projection。
 _INCLUDE_IPO_INTERVIEW_SHEETS: Final[bool] = False
+#: D4-29 uses an independently compiled, workbook-scope transposed anchor.
+_INCLUDE_D429_TRANSPOSED: Final[bool] = True
 MANAGED_SHEET: Final[str] = "主营业务收入明细表D4-2"
 TEMPLATE_ID: Final[str] = "D42"
 SHEET_KEY: Final[str] = f"{TEMPLATE_ID.lower()}-managed"
@@ -255,7 +257,7 @@ STORE_ITEM_IDS: Final[tuple[str, ...]] = (
     STORE_ITEM_ID_D422,
     STORE_ITEM_ID_D423,
     STORE_ITEM_ID_D424,
-    STORE_ITEM_ID_D429,
+    *((STORE_ITEM_ID_D429,) if _INCLUDE_D429_TRANSPOSED else ()),
     *STORE_ITEM_ID_BY_CODE.values(),
 )
 EMPTY_STORE_PAYLOAD: Final[str] = "[]"
@@ -487,6 +489,7 @@ def instrumentation_spec() -> ExcelInstrumentationSpec:
         managed_last_col=MANAGED_LAST_COL,
         uuid_col=UUID_COL,
         table_name=TABLE_NAME,
+        transposed_sheets=(sheet_payload(),) if _INCLUDE_D429_TRANSPOSED else (),
     )
 
 
@@ -554,7 +557,9 @@ def instrumentation_definition_payload() -> dict[str, Any]:
         template_sha256=TEMPLATE_SHA256,
         gate=excel_carrier_gate(),
     )
-    payload["transposed_sheets"] = [sheet_payload()]
+    payload["transposed_sheets"] = (
+        [sheet_payload()] if _INCLUDE_D429_TRANSPOSED else []
+    )
     return payload
 
 
@@ -670,7 +675,8 @@ def build_contract_payload() -> dict[str, Any]:
     assert_mapping_digest_d45()
     assert_mapping_digest_d435()
     assert_all_checklist_mapping_digests()
-    assert_mapping_digest_d429()
+    if _INCLUDE_D429_TRANSPOSED:
+        assert_mapping_digest_d429()
     template_payload = template_definition_payload()
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION,
@@ -737,12 +743,18 @@ def build_contract_payload() -> dict[str, Any]:
                 "locator": {"anchor": TABLE_SHEET_ANCHOR},
                 "tables": [rows_table_payload_d435()],
             },
-            {
-                "sheet_key": SHEET_KEY_D429,
-                "excel_name": MANAGED_SHEET_D429,
-                "locator": {"anchor": TABLE_SHEET_ANCHOR},
-                "tables": sheet_payload()["tables"],
-            },
+            *(
+                (
+                    {
+                        "sheet_key": SHEET_KEY_D429,
+                        "excel_name": MANAGED_SHEET_D429,
+                        "locator": sheet_payload()["locator"],
+                        "tables": sheet_payload()["tables"],
+                    },
+                )
+                if _INCLUDE_D429_TRANSPOSED
+                else ()
+            ),
             *(ipo_checklist_sheet_payload(code) for code in CHECKLIST_SHEET_CODES),
             *(
                 interview_sheet_payload(code)
@@ -827,9 +839,19 @@ def build_contract_payload() -> dict[str, Any]:
                             "为 HTML-only 非行数据，不进 Excel Table 受管区（15..25），mirror 回读须包回并保留。"
                         ),
                     },
-                    {"item_id": STORE_ITEM_ID_D429, "sheet_key": SHEET_KEY_D429,
-                     "table_key": sheet_payload()["tables"][0]["table_key"],
-                     "row_identity_key": "id", "note": "客户按 id 同步，Excel 转置客户列由专用 dispatcher 读写。"},
+                    *(
+                        (
+                            {
+                                "item_id": STORE_ITEM_ID_D429,
+                                "sheet_key": SHEET_KEY_D429,
+                                "table_key": sheet_payload()["tables"][0]["table_key"],
+                                "row_identity_key": "id",
+                                "note": "客户按 id 同步，Excel 转置客户列由专用 dispatcher 读写。",
+                            },
+                        )
+                        if _INCLUDE_D429_TRANSPOSED
+                        else ()
+                    ),
                     *(
                         {
                             "item_id": STORE_ITEM_ID_BY_CODE[code],
@@ -848,7 +870,11 @@ def build_contract_payload() -> dict[str, Any]:
             "mapping_digest_d45": EXPECTED_MAPPING_DIGEST_D45,
             "mapping_digest_d435": EXPECTED_MAPPING_DIGEST_D435,
             "mapping_digest_ipo_checklist": assert_all_checklist_mapping_digests(),
-            "mapping_digest_d429": assert_mapping_digest_d429(),
+            **(
+                {"mapping_digest_d429": assert_mapping_digest_d429()}
+                if _INCLUDE_D429_TRANSPOSED
+                else {}
+            ),
             "instrumentation_template_ids": [
                 TEMPLATE_ID,
                 TEMPLATE_ID_D43,
@@ -858,7 +884,11 @@ def build_contract_payload() -> dict[str, Any]:
                 TEMPLATE_ID_D423,
                 TEMPLATE_ID_D424,
                 TEMPLATE_ID_D435,
-                sheet_payload()["template_id"],
+                *(
+                    (sheet_payload()["template_id"],)
+                    if _INCLUDE_D429_TRANSPOSED
+                    else ()
+                ),
                 *[ipo_checklist_sheet_payload(c)["template_id"] for c in CHECKLIST_SHEET_CODES],
             ],
             "instrumentation_tables": [
@@ -870,7 +900,11 @@ def build_contract_payload() -> dict[str, Any]:
                 TABLE_NAME_D423,
                 TABLE_NAME_D424,
                 TABLE_NAME_D435,
-                sheet_payload()["tables"][0]["table_key"],
+                *(
+                    (sheet_payload()["tables"][0]["table_key"],)
+                    if _INCLUDE_D429_TRANSPOSED
+                    else ()
+                ),
                 *[ipo_checklist_sheet_payload(c)["tables"][0]["table_key"] for c in CHECKLIST_SHEET_CODES],
             ],
         },
@@ -1159,7 +1193,13 @@ def build_combined_store_projection(
         elif isinstance(raw, str):
             fixed_payloads[item_id] = raw
     fixed = build_d45_fixed_store_projection(fixed_payloads, contract=contract)
-    d429 = build_d429_store_projection(payloads.get(STORE_ITEM_ID_D429, []), contract=contract, limits=limits)
+    d429 = (
+        build_d429_store_projection(
+            payloads.get(STORE_ITEM_ID_D429, []), contract=contract, limits=limits
+        )
+        if _INCLUDE_D429_TRANSPOSED
+        else None
+    )
 
     d421 = build_d421_store_projection(
         payloads.get(STORE_ITEM_ID_D421, EMPTY_STORE_PAYLOAD), contract=contract, limits=limits
@@ -1201,8 +1241,10 @@ def build_combined_store_projection(
     values.update(right.values)
     values.update(groups.values)
     values.update(fixed.values)
-    for proj in (d421, d422, d423, d424, d429, d435, *ipo_checklist_projs, *interview_projs):
+    for proj in (d421, d422, d423, d424, d435, *ipo_checklist_projs, *interview_projs):
         values.update(proj.values)
+    if d429 is not None:
+        values.update(d429.values)
     row_keys = {
         **dict(left.row_keys),
         **dict(right.row_keys),
@@ -1211,8 +1253,7 @@ def build_combined_store_projection(
         **dict(d422.row_keys),
         **dict(d423.row_keys),
         **dict(d424.row_keys),
-        **dict(d429.row_keys),
-
+        **(dict(d429.row_keys) if d429 is not None else {}),
         **{k: v for p in interview_projs for k, v in dict(p.row_keys).items()},
         **{k: v for p in ipo_checklist_projs for k, v in dict(p.row_keys).items()},
     }
@@ -1266,8 +1307,18 @@ def merge_projection_into_all_d4_stores(
         STORE_ITEM_ID_D423: merge_projection_into_d423_store_rows(
             projection=projection, base_rows=d423_base
         ),
-        STORE_ITEM_ID_D429: merge_d429_projection_into_store(
-            projection=projection, base_payload=base_by_item.get(STORE_ITEM_ID_D429)
+        STORE_ITEM_ID_D424: merge_projection_into_d424_store_rows(
+            projection=projection, base_rows=d424_base
+        ),
+        **(
+            {
+                STORE_ITEM_ID_D429: merge_d429_projection_into_store(
+                    projection=projection,
+                    base_payload=base_by_item.get(STORE_ITEM_ID_D429),
+                )
+            }
+            if _INCLUDE_D429_TRANSPOSED
+            else {}
         ),
 
         **interview_results,

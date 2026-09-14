@@ -232,11 +232,17 @@ async def compute_store_projection_response(
         )
     ).scalar_one()
     values = _flatten_projection_values(projection)
+    row_keys = {
+        str(table_key): [str(rid) for rid in ids]
+        for table_key, ids in projection.row_keys.items()
+    }
     return {
         "expected_revision": int(revision),
         "field_count": len(values),
         "row_count": sum(len(v) for v in projection.row_keys.values()),
         "store_field_count": store_field_count,
         "overlay_applied": bool(overlay_applied),
-        "projection": {"values": values},
+        # 契约：凡带 row identity 的表，projection 必须同时返回 values 与 row_keys。
+        # 下游 materialize 依赖 row_keys 判定行增删；缺失会退化成把字段名当行 id 的误判。
+        "projection": {"values": values, "row_keys": row_keys},
     }

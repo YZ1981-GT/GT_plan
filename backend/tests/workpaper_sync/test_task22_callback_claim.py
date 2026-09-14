@@ -106,6 +106,7 @@ from app.services.workpaper_sync.callback_route import (  # noqa: E402
     RoomRouteFacts,
     build_callback_url,
     parse_callback_claims,
+    resolve_platform_callback_authorization,
     sign_callback_route_token,
     verify_callback_route,
 )
@@ -1297,13 +1298,21 @@ def test_jwt_decoding_lives_only_in_callback_route() -> None:
 
     改成对**调用点**断言，并且两侧都给正向下限（否则「谁都不解」也满足「只有 route 解」）：
 
-    * `decode` 调用点集合 == {`callback_route.py`} —— 解 token 是**校验**，Task 22 要求它
-      只有一处实现；且 route 侧至少 1 处，否则「谁都不解」也满足这条。
-    * `encode` 调用点集合 == {`callback_route.py`, `command_service.py`} —— 同步域里只有
-      **两种** token，各有唯一签发者：route token 由 `callback_route.mint_callback_token()`
-      签（与它自己的校验同源，claim 常量取自契约），出站 Command Service token 由
-      `command_service.sign_command_token()` 签（契约 `command_service.jwt.required=true`）。
-      多一个签发者（例如让 `callback_delivery` 自己签一个 route token）即打红。
+    同步域里有**三种** token，各有唯一签发者/校验者（Task 28 / G4-3 把 `document.url`
+    的 contents token 独立到 `room_launch.py`）：
+
+    * route token —— `callback_route.py` 签发 + 校验（claim 常量取自契约，callback 授权）；
+    * 出站 Command Service token —— `command_service.py` 签发（契约
+      `command_service.jwt.required=true`，只 encode 不 decode）；
+    * contents token —— `room_launch.py` 签发 + 校验（`document.url` 短 TTL 下载凭据，
+      room→representation→artifact 授权，与 callback 授权是两条独立信任链）。
+
+    因此：
+    * `decode` 调用点集合 == {`callback_route.py`, `room_launch.py`} —— 两种需要**校验**
+      的 token 各自在其归属模块解；且各 ≥1 处，否则「谁都不解」也满足这条。
+    * `encode` 调用点集合 == {`callback_route.py`, `command_service.py`, `room_launch.py`}
+      —— 三种 token 各有唯一签发者。多一个签发者（例如让 `callback_delivery` 自己签一个
+      route token）即打红。
     """
     sync_dir = _BACKEND / "app" / "services" / "workpaper_sync"
     modules = sorted(sync_dir.glob("*.py"))
@@ -1318,9 +1327,74 @@ def test_jwt_decoding_lives_only_in_callback_route() -> None:
         if (hits := _jose_call_sites(tree, "encode")):
             encoders[path.name] = hits
 
-    assert sorted(decoders) == ["callback_route.py"], f"意外的 token 解码者: {decoders}"
-    assert decoders["callback_route.py"] >= 1, decoders
-    assert sorted(encoders) == ["callback_route.py", "command_service.py"], (
-        f"意外的 token 签发者: {encoders}"
+    assert sorted(decoders) == ["callback_route.py", "room_launch.py"], (
+        f"意外的 token 解码者: {decoders}"
     )
+    assert min(decoders.values()) >= 1, decoders
+    assert sorted(encoders) == [
+        "callback_route.py",
+        "command_service.py",
+        "room_launch.py",
+    ], f"意外的 token 签发者: {encoders}"
     assert min(encoders.values()) >= 1, encoders
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# resolve_platform_callback_authorization：平台凭据来自 route_token query，
+# 不是 DocServer 用自己 secret 覆盖的 Authorization header（G4-3 线上根因）。
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+class TestResolvePlatformCallbackAuthorization:
+    def test_prefers_route_token_query_over_docserver_header(
+        self, room: RoomRouteFacts
+    ) -> None:
+        """query 有平台 route_token 时，它是权威来源；DocServer 的 OO-JWT header 被忽略。"""
+        route_token = _token(room)
+        docserver_header = "Bearer docserver-oo-jwt-without-cbv"
+        resolved = resolve_platform_callback_authorization(
+            authorization_header=docserver_header,
+            route_token_query=route_token,
+            secret=SECRET,
+        )
+        assert resolved == f"Bearer {route_token}"
+        # 解析出的凭据能被 verify_callback_route 接受（真实走一遍）。
+        claim = verify_callback_route(
+            authorization_header=resolved,
+            callback_url=_url(room),
+            payload_doc_key=room.doc_key,
+            room=room,
+            secret=SECRET,
+            contract=CONTRACT,
+        )
+        assert claim.room_id == room.room_id
+
+    def test_docserver_header_alone_is_not_accepted(self, room: RoomRouteFacts) -> None:
+        """只有 DocServer OO-JWT header、无 route_token query ⇒ fail closed（返回空串）。
+
+        这正是线上 `callback_claim_version_invalid` 的成因：把无 cbv 的 header 当平台凭据。
+        """
+        resolved = resolve_platform_callback_authorization(
+            authorization_header="Bearer docserver-oo-jwt-without-cbv",
+            route_token_query=None,
+            secret=SECRET,
+        )
+        assert resolved == ""
+
+    def test_platform_bearer_header_without_query_is_accepted_as_fallback(
+        self, room: RoomRouteFacts
+    ) -> None:
+        """非 DocServer 直连：header 本身就是平台 route token（带 cbv）⇒ 兜底采用。"""
+        header = f"Bearer {_token(room)}"
+        resolved = resolve_platform_callback_authorization(
+            authorization_header=header,
+            route_token_query=None,
+            secret=SECRET,
+        )
+        assert resolved == header
+
+    def test_no_credentials_fail_closed(self, room: RoomRouteFacts) -> None:
+        resolved = resolve_platform_callback_authorization(
+            authorization_header=None, route_token_query=None, secret=SECRET
+        )
+        assert resolved == ""

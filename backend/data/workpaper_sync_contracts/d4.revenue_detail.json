@@ -7,7 +7,7 @@
     "excel_table",
     "hidden_uuid_column"
   ],
-  "instrumentation_definition_sha256": "b36fb1e331c25f5403f5694952c9412912148f0e9130b31ff54f1a8537530adf",
+  "instrumentation_definition_sha256": "e6ac63934d7d80a1585ca5b825fcfb942688c100c97e07f55d430a7c39391772",
   "review": {
     "authority_root": "backend/wp_templates",
     "entry_id": "xlsx/gt-d4-operating-revenue",
@@ -143,7 +143,7 @@
       "D428"
     ],
     "mapping_digest": "6d2f340d45ba0a24c95424c1e698be3df105252c160d174a2e4c748ec1554cc8",
-    "mapping_digest_d429": "36b1656cf6468789b6e7136f32c6f68f7b6515083e4dd5cbd1609d764560925a",
+    "mapping_digest_d429": "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856",
     "mapping_digest_d43": "b3186632300c84d14c4c9c3c947cbff0cdcaaf807ce2e5f9848d42195513637f",
     "mapping_digest_d435": "67082d36b06053d607e6697967b8f5ce5f91cfaeae4892a543994a1544bb9b00",
     "mapping_digest_d45": "5e261da248cb0df23ba45f562099c1fdfdb450130df96022fb41ec4275f12eee",
@@ -1721,7 +1721,8 @@
     {
       "excel_name": "客户信息检查表D4-29",
       "locator": {
-        "anchor": "excel_table_sheet_association"
+        "anchor": "defined_name_ref",
+        "defined_name": "GT_MANAGED_REGION_D429"
       },
       "sheet_key": "d4-29-managed",
       "tables": [

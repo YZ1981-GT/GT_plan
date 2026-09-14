@@ -265,6 +265,14 @@ async def _current_representation(
     }
 
 
+def _artifact_path(relative_path: str) -> Path:
+    """Resolve DB artifact paths without duplicating the backend root."""
+    path = Path(relative_path)
+    if path.is_absolute():
+        return path
+    return (_BACKEND_ROOT / path) if path.parts and path.parts[0] == "storage" else (_REPO_ROOT / path)
+
+
 def _recompute_from_artifact(
     *, relative_path: str, contract_id: str, provider: Any
 ) -> tuple[str | None, str | None]:
@@ -280,20 +288,18 @@ def _recompute_from_artifact(
         compute_structure_hash_from_artifact,
     )
 
-    path = _BACKEND_ROOT / relative_path
+    path = _artifact_path(relative_path)
     if not path.is_file():
         return (None, f"artifact 文件不存在: {path}")
     try:
-        return (
-            compute_structure_hash_from_artifact(
-                data=path.read_bytes(),
-                contract=load_contract(contract_id),
-                anchors=anchors_from_instrumentation_spec(
-                    provider.instrumentation_spec()
-                ),
-            ),
-            None,
+        contract = load_contract(contract_id)
+        specs_fn = getattr(provider, "instrumentation_specs", None)
+        anchors = (
+            __import__("app.services.workpaper_sync.publish_time_structure_hash", fromlist=["anchors_from_instrumentation_specs"]).anchors_from_instrumentation_specs(specs_fn())
+            if callable(specs_fn)
+            else anchors_from_instrumentation_spec(provider.instrumentation_spec())
         )
+        return (compute_structure_hash_from_artifact(data=path.read_bytes(), contract=contract, anchors=anchors), None)
     except Exception as exc:  # noqa: BLE001 - 宿主要把真实失败如实记进结算
         return (None, f"{type(exc).__name__}: {exc}")
 
@@ -718,14 +724,26 @@ async def _process_entry(
         provider=provider,
     )
     if recomputed is None:
-        out.state = "blocked_artifact_missing"
-        out.error_code = "artifact_unreadable"
-        out.diagnosis = f"{err} · {_STATE_UNBLOCK_OWNER[out.state]}"
-        return out
+        # A readable legacy artifact can legitimately fail the new D4-29 physical
+        # anchor contract. That is reprojection input, not a missing-file failure.
+        if err and entry_id == "xlsx/gt-d4-operating-revenue" and (
+            "D4-29" in err or "definedName" in err or "结构漂移" in err
+        ):
+            out.stages.append("stale_confirmed")
+            out.state = "stale_needs_reprojection"
+            out.diagnosis = (
+                f"旧 artifact 可读取但不满足当前 D4-29 物理锚契约: {err}"
+                " ⇒ 使用当前全部 store 重投影生成新 representation"
+            )
+        else:
+            out.state = "blocked_artifact_missing"
+            out.error_code = "artifact_unreadable"
+            out.diagnosis = f"{err} · {_STATE_UNBLOCK_OWNER[out.state]}"
+            return out
     out.stages.append("structure_hash_recomputed")
     out.recomputed_structure_hash = recomputed
 
-    if recomputed == current["structure_hash"]:
+    if recomputed is not None and recomputed == current["structure_hash"]:
         # 第二维判据：structure_hash 一致不等于 representation 自洽 ——
         # _GT_SYNC 冻结坐标可能没随行位移重冻结（D2 实测正卡在这里）。
         drift_state, drift_detail, drift_err = _gtsync_structure_drift(
@@ -758,7 +776,7 @@ async def _process_entry(
                 "（本脚本幂等，第二次运行必落这一格）"
             )
             return out
-    else:
+    elif recomputed is not None:
         # 🔴 冻结 hash ≠ 重算值。先分辨两种成因：
         #    (a) 契约扩张（新增受管 sheet）⇒ artifact 字节**真的缺**新 sheet 的插桩部件
         #        ⇒ 必须重投影（重 instrument + 重 materialize），representation-only 修不了；
@@ -775,7 +793,7 @@ async def _process_entry(
                 f"artifact 缺新受管 sheet 插桩（{'；'.join(missing_sheets)}）⇒ 契约扩张 ⇒ "
                 "重投影（重 instrument + 重 materialize 现有 store）产新 content version"
             )
-        else:
+        elif recomputed is not None:
             out.stages.append("stale_confirmed")
             out.state = "stale_needs_rehash"
             out.diagnosis = (

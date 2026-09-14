@@ -71,6 +71,28 @@ def _resolve_store_path(row: Mapping[str, Any], json_path: str) -> Any:
         return None
 
 
+def _encode_identity_segment(identity: str) -> str:
+    """把行身份编码成 stable key 里的**单段** —— `/` 是 stable key 的段分隔符。
+
+    🔴 D4-22 的行身份是自由文本指标名（`ROW_IDENTITY_STORE_KEY_D422='metricName'`），
+    其中 `运输费用/营业收入` 含 `/`，直接嵌进 `表/{身份}/字段` 会多出一段，令
+    `endpoint_payloads._resolve_stable_key` 的段级匹配（分段数须与模板一致，这是**故意**的
+    fail-closed 反 `remark`↔`remark_typo` 误挂）判定为未登记 → `projection_unknown_stable_field_key`。
+
+    修复不是放宽段级匹配（那会开 fail-open），而是让身份在进入 stable key 前**百分号编码**
+    成单段：先编码 `%` 再编码 `/`（顺序保证可逆），使 `运输费用/营业收入` →
+    `运输费用%2F营业收入`。store 侧数据一字不动（仍存原始 metricName），只有 stable key 与
+    projection.row_key 用编码形态；merge 侧用 :func:`_decode_identity_segment` 解回原始身份
+    做 `by_key` 查找。D4-21/23/24 身份是 rowId/月份，本就 `/`-free，编码是恒等无副作用。
+    """
+    return identity.replace("%", "%25").replace("/", "%2F")
+
+
+def _decode_identity_segment(encoded: str) -> str:
+    """:func:`_encode_identity_segment` 的逆（先解 `/` 再解 `%`，与编码顺序相反）。"""
+    return encoded.replace("%2F", "/").replace("%25", "%")
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # D4-21 关联方销售情况及价格分析（动态行）
 # ═══════════════════════════════════════════════════════════════════════════
@@ -417,9 +439,11 @@ def _merge_flat_rows(
         fv = projection.get(key)
         if fv is None or getattr(fv, "is_protected", False):
             continue
-        rid = getattr(fv, "row_key", None)
-        if not rid:
+        rid_raw = getattr(fv, "row_key", None)
+        if not rid_raw:
             continue
+        # row_key 是 build 侧编码形态；解回原始身份查 store（rowId 本 `/`-free，解码恒等）。
+        rid = _decode_identity_segment(str(rid_raw))
         target = by_id.get(str(rid))
         if target is None:
             target = {identity_key: str(rid), seed_first_field: ""}
@@ -590,7 +614,9 @@ def merge_projection_into_d423_store_rows(
         fv = projection.get(key)
         if fv is None or getattr(fv, "is_protected", False):
             continue
-        rid = getattr(fv, "row_key", None)
+        rid_raw = getattr(fv, "row_key", None)
+        # row_key 是 build 侧编码形态；解回原始月份键（月份本 `/`-free，解码恒等）。
+        rid = _decode_identity_segment(str(rid_raw)) if rid_raw else None
         target = by_key.get(str(rid)) if rid else None
         if target is None:
             continue  # 月份固定，未知键不新增
@@ -796,7 +822,9 @@ def merge_projection_into_d422_store_rows(
         fv = projection.get(key)
         if fv is None or getattr(fv, "is_protected", False):
             continue
-        rid = getattr(fv, "row_key", None)
+        rid_raw = getattr(fv, "row_key", None)
+        # row_key 是编码形态（build 侧编码），解回原始 metricName 才能命中 store by_key。
+        rid = _decode_identity_segment(str(rid_raw)) if rid_raw else None
         target = by_key.get(str(rid)) if rid else None
         if target is None:
             continue
@@ -887,17 +915,21 @@ def _build_projection(
     row_keys: list[str] = []
     for identity, row in _iter_store_rows(payload, identity_key=identity_key, item_id=item_id):
         budget.add_row(table_key)
-        row_keys.append(identity)
+        # 身份编码成单段，使含 `/` 的自由文本指标名（D4-22）不撑破 stable key 段级匹配。
+        # row_key 与 stable key 用**同一**编码形态（否则 _resolve_stable_key 的
+        # embedded != row_key 会误判）；merge 侧解码回原始身份查 store。
+        enc_identity = _encode_identity_segment(identity)
+        row_keys.append(enc_identity)
         for column_key, _c, _m, _vt, json_path, _h in field_specs:
             spec = contract.field_by_stable_key(stable_key_fn(column_key))
             budget.add_field()
-            sk = stable_key_fn(column_key, identity)
+            sk = stable_key_fn(column_key, enc_identity)
             values[sk] = FieldValue(
                 stable_key=sk,
                 value=_resolve_store_path(row, json_path),
                 value_type=spec.value_type,
                 mode=spec.mode,
-                row_key=identity,
+                row_key=enc_identity,
             )
     return Projection(
         contract_id=contract.contract_id,

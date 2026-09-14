@@ -28,6 +28,36 @@ FIRST_CUSTOMER_COLUMN = "C"
 INITIAL_CUSTOMER_COLUMN = "M"
 IDENTITY_CARRIER_ROW = 9
 IDENTITY_CARRIER_PREFIX = "GT-CUSTOMER-"
+DEFINED_NAME = "GT_MANAGED_REGION_D429"
+MANAGED_REF = "$C$10:$M$41"
+
+
+def resolve_managed_sheet(workbook_bytes, *, defined_name=DEFINED_NAME):
+    """Validate the raw name list before openpyxl can collapse duplicates."""
+    import zipfile
+    from xml.etree import ElementTree as ET
+    with zipfile.ZipFile(io.BytesIO(workbook_bytes)) as archive:
+        root = ET.fromstring(archive.read("xl/workbook.xml"))
+    names = [n for n in root.findall("{*}definedNames/{*}definedName")
+             if n.get("name", "").lower() == defined_name.lower()]
+    if len(names) != 1 or "localSheetId" in names[0].attrib:
+        raise ValueError("D4-29 requires one workbook-scope definedName")
+    from openpyxl.workbook.defined_name import DefinedName
+    name = DefinedName(defined_name, attr_text=names[0].text)
+    if name.type != "RANGE":
+        raise ValueError("D4-29 invalid managed region anchor")
+    destinations = list(name.destinations)
+    if len(destinations) != 1 or destinations[0][1] != MANAGED_REF:
+        raise ValueError("D4-29 managed region geometry drift")
+    wb = load_workbook(io.BytesIO(workbook_bytes), data_only=False)
+    title = destinations[0][0].replace("''", "'")
+    if title not in wb.sheetnames:
+        raise ValueError("D4-29 managed region sheet missing")
+    ws = wb[title]
+    if ws.max_row < LAST_FIELD_ROW or ws.max_column < 13:
+        raise ValueError("D4-29 managed region extent missing")
+    return wb, ws
+
 # Rows 27 and 32..33 are source-template continuation slots, not new fields.
 FIELD_ROWS = {
     "creditCode": 11, "regAddress": 12, "officeAddress": 13, "website": 14,
@@ -115,7 +145,11 @@ def merge_projection_into_store(*, projection, base_payload):
             applied += 1
     ids = list(projection.row_keys[TABLE_KEY]) if TABLE_KEY in projection.row_keys else order
     if len(ids) != len(set(ids)) or any(i not in by for i in ids):
-        raise ValueError("D4-29 invalid projection customer identities")
+        missing = [i for i in ids if i not in by]
+        raise ValueError(
+            f"D4-29 invalid projection customer identities: missing={missing[:10]} "
+            f"row_keys={len(ids)} base={len(by)}"
+        )
     removed = original - set(ids)
     applied += len(removed) + int(ids != order and not removed)
     return [by[i] for i in ids], applied, visited, removed
@@ -143,6 +177,9 @@ def sheet_payload():
             "instances": "many",
         })
     return {"sheet_key": SHEET_KEY, "template_id": TEMPLATE_ID, "excel_name": MANAGED_SHEET,
+            "locator": {"anchor": "defined_name_ref", "defined_name": DEFINED_NAME},
+            "region_boundary_locator": {"anchor": "defined_name_ref", "defined_name": DEFINED_NAME,
+                                        "range": MANAGED_REF},
             "tables": [{
                 "table_key": TABLE_KEY, "anchor": "C10", "header_rows": 1,
                 "layout": "customer_columns", "row_identity": {"kind": "field", "json_pointer": "/customers/*/id"},
@@ -162,7 +199,7 @@ def compute_mapping_digest():
     return canonical_digest(mapping_digest_payload())
 
 
-EXPECTED_MAPPING_DIGEST = "36b1656cf6468789b6e7136f32c6f68f7b6515083e4dd5cbd1609d764560925a"
+EXPECTED_MAPPING_DIGEST = "e3193dd9b581ac32041d25d7def13df44955108cce34c0341b05ec30eda17856"
 
 
 def assert_mapping_digest():
@@ -193,8 +230,8 @@ def _copy_column(ws, src, dst):
 
 
 def materialize_transposed_workbook(workbook_bytes: bytes, payload, *, sheet_name=MANAGED_SHEET) -> bytes:
-    wb = load_workbook(io.BytesIO(workbook_bytes))
-    ws = wb[sheet_name]
+    wb, ws = resolve_managed_sheet(workbook_bytes)
+    sheet_name = ws.title
     customers = _payload(payload)
     start = column_index_from_string(FIRST_CUSTOMER_COLUMN)
     last = column_index_from_string(INITIAL_CUSTOMER_COLUMN)
@@ -247,13 +284,30 @@ def materialize_transposed_workbook(workbook_bytes: bytes, payload, *, sheet_nam
 
 
 def extract_transposed_workbook(workbook_bytes: bytes, *, sheet_name=MANAGED_SHEET):
-    ws = load_workbook(io.BytesIO(workbook_bytes), data_only=False)[sheet_name]
+    _, ws = resolve_managed_sheet(workbook_bytes)
+    if not ws.row_dimensions[IDENTITY_CARRIER_ROW].hidden:
+        raise ValueError("D4-29 customer identity row must be hidden")
     result = []
     for col in range(column_index_from_string(FIRST_CUSTOMER_COLUMN), ws.max_column + 1):
-        raw = ws.cell(IDENTITY_CARRIER_ROW, col).value
-        if not raw:
+        carrier = ws.cell(IDENTITY_CARRIER_ROW, col)
+        raw = carrier.value
+        if raw is None or raw == "":
+            values = [ws.cell(row, col).value for row in (HEADER_ROW, *FIELD_ROWS.values())]
+            # The source template contains non-business placeholder headers in the
+            # empty customer slots. They are baseline scaffolding, not customers.
+            business_values = [value for row, value in zip((HEADER_ROW, *FIELD_ROWS.values()), values)
+                               if row != HEADER_ROW]
+            header_value = values[0]
+            import re
+            placeholder_header = (
+                header_value in (None, "", "……")
+                or bool(re.fullmatch(r"客户\d+XXX", str(header_value)))
+            )
+            if any(value not in (None, "") for value in business_values) or not placeholder_header:
+                raise ValueError("D4-29 missing customer identity carrier for populated column")
             continue
-        if not isinstance(raw, str) or not raw.startswith(IDENTITY_CARRIER_PREFIX):
+        if (carrier.data_type == "f" or not isinstance(raw, str)
+                or not raw.startswith(IDENTITY_CARRIER_PREFIX)):
             raise ValueError("D4-29 invalid customer identity carrier")
         def value(row):
             cell = ws.cell(row, col)
@@ -279,7 +333,10 @@ def is_enabled(contract):
 def materialize_file(output, projection, contract):
     if not is_enabled(contract) or TABLE_KEY not in projection.row_keys:
         return
-    customers, _, _, _ = merge_projection_into_store(projection=projection, base_payload=[])
+    current_payload = extract_transposed_workbook(output.read_bytes())
+    customers, _, _, _ = merge_projection_into_store(
+        projection=projection, base_payload=current_payload
+    )
     output.write_bytes(materialize_transposed_workbook(output.read_bytes(), customers))
 
 

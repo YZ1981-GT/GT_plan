@@ -88,6 +88,7 @@ import hashlib
 import json
 import re
 import sys
+import tempfile
 import zipfile
 from dataclasses import dataclass, field as dataclass_field
 from enum import Enum
@@ -198,6 +199,7 @@ __all__ = [
     "RuntimeIdentityInventory",
     "read_runtime_identity_inventory",
     "read_runtime_binding_pairs",
+    "reinject_runtime_binding_from_base_if_needed",
     "assert_identity_carriers_usable",
     "assert_identity_inventory_retained",
     "RETENTION_CHECKED_FIELDS",
@@ -1306,6 +1308,83 @@ def read_runtime_binding_pairs(
             " —— 载体形态与 Task 17 写侧不符，不得当成「这份文件没有冻结任何绑定」继续"
         )
     return pairs
+
+
+def reinject_runtime_binding_from_base_if_needed(
+    *,
+    incoming: Path,
+    base: Path,
+    metadata_sheet: str = GT_SYNC_SHEET_NAME,
+) -> Path | None:
+    """OO→HTML：若 OnlyOffice 掏空了 incoming 的 `_GT_SYNC` runtime binding，从冻结的
+    base representation 重注，返回**临时**修复副本路径；binding 完好则返回 ``None``。
+
+    OnlyOffice 保存后常保留 `_GT_SYNC` 隐藏 sheet 的清册项（workbook.xml 的 `<sheet>` 与
+    workbook rels 都在），却把该 worksheet part 的 sheetData 清空 —— runtime binding 的
+    key/value 行随之消失（:func:`read_runtime_binding_pairs` 抛
+    :class:`IdentityCarrierMissingError`）。此时 identity 载体（representation 冻结的绑定）
+    丢失，后续 materialize/extract 会把整表当无身份行集合。
+
+    修复策略是**最小手术**：incoming 与 base 由**同一模板**instrumentation 而来
+    （Task 17 确定性地放置 `_GT_SYNC` part），二者的 `_GT_SYNC` part 路径、workbook
+    `<sheet>` 条目、rels、content-type 完全同构，OnlyOffice 只清空了 part 的**内容**。
+    因此只需把 base 的 `_GT_SYNC` worksheet part 字节原样覆盖进 incoming 的同名 part，
+    其余部件（业务 sheetData / tables / drawings / sharedStrings …）一字不动 —— durable
+    incoming 本体的业务内容不受影响（AC 8.10）。
+
+    仅当 incoming 的 binding 确实缺失/被掏空时才生成副本；完好时不产生任何 IO，返回
+    ``None`` 让调用方原样使用 incoming。
+    """
+    with zipfile.ZipFile(incoming) as zf_in:
+        try:
+            read_runtime_binding_pairs(zf_in, metadata_sheet=metadata_sheet)
+            # binding 完好 —— 无需重注。
+            return None
+        except IdentityCarrierMissingError:
+            pass  # 掏空 / 缺失，落到下方重注分支。
+        incoming_names = set(zf_in.namelist())
+        incoming_part = _sheet_parts(zf_in).get(metadata_sheet)
+
+    # 从 base 取出完好的 `_GT_SYNC` part 字节与它在 base 里的 part 路径。
+    with zipfile.ZipFile(base) as zf_base:
+        # 先确认 base 自己的 binding 是完好的 —— base 若也坏了，无从重注，fail closed。
+        read_runtime_binding_pairs(zf_base, metadata_sheet=metadata_sheet)
+        base_part = _sheet_parts(zf_base).get(metadata_sheet)
+        if base_part is None:
+            raise IdentityCarrierMissingError(
+                f"base representation 里定位不到 `{metadata_sheet}` part —— 无从重注 "
+                "runtime binding（base 也缺载体即 fail closed）"
+            )
+        base_part_bytes = zf_base.read(base_part)
+
+    # incoming 若连 `_GT_SYNC` part 清册项都没了，用 base 的 part 路径落位（同模板同构）。
+    target_part = incoming_part or base_part
+
+    tmp = Path(
+        tempfile.NamedTemporaryFile(
+            suffix=".gtsync-repaired.xlsx", delete=False
+        ).name
+    )
+    # 逐部件复制 incoming，仅把目标 `_GT_SYNC` part 换成 base 的完好字节；其余原样。
+    with zipfile.ZipFile(incoming) as zf_in, zipfile.ZipFile(
+        tmp, "w", zipfile.ZIP_DEFLATED
+    ) as zf_out:
+        replaced = False
+        for item in zf_in.infolist():
+            if item.filename == target_part:
+                zf_out.writestr(item, base_part_bytes)
+                replaced = True
+            else:
+                zf_out.writestr(item, zf_in.read(item.filename))
+        if not replaced:
+            # incoming 完全没有该 part 条目 —— 追加它（清册项已在，仅 part 缺失的罕见形态）。
+            zf_out.writestr(target_part, base_part_bytes)
+
+    # 反读自证：修复副本必须能读出完好 binding，否则不得当成已修复继续。
+    with zipfile.ZipFile(tmp) as zf_fixed:
+        read_runtime_binding_pairs(zf_fixed, metadata_sheet=metadata_sheet)
+    _ = incoming_names  # 保留局部以示 incoming 清册已被逐件保留（除目标 part 外未增删）。
+    return tmp
 
 
 def _xml_unescape(text: str) -> str:

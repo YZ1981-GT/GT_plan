@@ -437,6 +437,7 @@ class TestObserverStructure:
             "JSONDecodeError",
             "FingerprintError",
             "ContractError",
+            "ValueError",  # Transposed physical validation is re-raised as identity drift.
         }, sorted(set(caught))
 
     def test_every_stage_carries_a_reachable_error_path(self) -> None:
